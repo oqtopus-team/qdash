@@ -213,7 +213,11 @@ describe("ChatTrace", () => {
         ]}
       />,
     );
-    expect(screen.getByText("Writing fit.py")).toBeTruthy();
+    // Folded while it is written; the live code is one click away.
+    const row = screen.getByRole("button", { name: /Writing fit.py/ });
+    expect(row.getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(row);
+    expect(row.getAttribute("aria-expanded")).toBe("true");
     const live = screen.getByTestId("live-code");
     expect(live.textContent).toContain("fit.py · python");
     expect(live.textContent).toContain("import numpy as np");
@@ -239,8 +243,15 @@ describe("ChatTrace", () => {
         ]}
       />,
     );
-    expect(screen.getByText("$ python fit.py")).toBeTruthy();
-    // A live workspace step is open without a click, so the output is in view as it lands.
+    // The row names the program only; the failure's last line stays visible while folded.
+    const row = screen.getByRole("button", { name: /Ran python.*Failed/ });
+    expect(row.getAttribute("aria-expanded")).toBe("false");
+    expect(screen.queryByText("$ python fit.py")).toBeNull();
+    expect(screen.getByTestId("tool-failure-line").textContent).toBe("FileNotFoundError: data.csv");
+    // Opened, the raw command, its output and the exit status are in the details.
+    fireEvent.click(row);
+    expect(screen.getByTestId("tool-code").textContent).toContain("python fit.py");
+    expect(screen.queryByTestId("tool-failure-line")).toBeNull();
     expect(screen.getByText("FileNotFoundError: data.csv")).toBeTruthy();
     expect(screen.getByText("exit 1")).toBeTruthy();
   });
@@ -272,7 +283,7 @@ describe("ChatTrace", () => {
     expect(screen.getByText("javascript")).toBeTruthy();
   });
 
-  it("keeps a live code mode step open with its script and failed tool calls", () => {
+  it("folds a live code mode step, showing its failure until it is opened", () => {
     render(
       <LiveTrace
         steps={[
@@ -291,7 +302,12 @@ describe("ChatTrace", () => {
         ]}
       />,
     );
-    expect(screen.getByText(/Ran a script/)).toBeTruthy();
+    const row = screen.getByRole("button", { name: /Ran a script.*Failed/ });
+    expect(row.getAttribute("aria-expanded")).toBe("false");
+    expect(screen.getByTestId("tool-failure-line").textContent).toMatch(
+      /qdash_list_cryostats \(3 ms\): QDash answered 503/,
+    );
+    fireEvent.click(row);
     // Open, not only mounted: folded output stays mounted under aria-hidden="true".
     const output = screen.getByText(/qdash_list_cryostats \(3 ms\): QDash answered 503/);
     expect(output.closest("[aria-hidden]")?.getAttribute("aria-hidden")).toBe("false");

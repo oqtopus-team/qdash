@@ -1032,7 +1032,8 @@ export function CopilotChatSessionProvider({
       const updateTurn = (fold: (t: LiveTurn) => LiveTurn) => {
         turn = fold(turn);
         const next = turn;
-        setRun(sessionId, (run) => ({ ...run, turn: next }));
+        // New streamed activity supersedes a status such as context compaction.
+        setRun(sessionId, (run) => ({ ...run, turn: next, statusMessage: null }));
       };
 
       const finish = (result: CopilotBlocksResult, entryId?: string) => {
