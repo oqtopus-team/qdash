@@ -31,6 +31,18 @@ export interface ChatImageAttachment {
   mimeType: string;
 }
 
+/** Where a user message sent while an answer was written landed in the conversation. */
+export interface ChatMessageSteer {
+  requestId: string;
+  /** Its entry in the runtime's transcript. */
+  entryId: string | null;
+  /**
+   * `exact`: the chat saw where it landed. `approximate`: it was confirmed after the
+   * answer it interrupted was saved as one message, and follows that message.
+   */
+  placement: "exact" | "approximate";
+}
+
 export interface ChatMessage {
   role: "user" | "assistant";
   /** Plain text, or a JSON-encoded `CopilotBlocksResult` for assistant answers. */
@@ -42,6 +54,19 @@ export interface ChatMessage {
    * browser session that sent them; the server stores presence, not bytes.
    */
   attachments?: string[];
+  /** Set on a user message sent while an answer was written (a steer). */
+  steer?: ChatMessageSteer;
+  /**
+   * An assistant answer's entry in the runtime's transcript, from the stream's
+   * result. Only such an answer can be branched from; older answers have none.
+   */
+  entryId?: string;
+}
+
+/** Where a branched chat came from. */
+export interface ChatBranchOrigin {
+  sourceSessionId: string;
+  sourceEntryId: string;
 }
 
 /** A choice the assistant asks the user to make, shown as buttons. */

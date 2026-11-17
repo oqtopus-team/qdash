@@ -66,3 +66,20 @@ test("returns null without the section or without any usable line", () => {
   assert.equal(extractToolGuide("# No guide here\n", ["qdash_list_chips"]), null);
   assert.equal(extractToolGuide(SKILL, []), null);
 });
+
+test("deferred tools are marked so the model searches before calling them", async () => {
+  const { DEFERRED_MARK, toolGuideNames } = await import("../src/tool-guide.ts");
+  const guide = extractToolGuide(
+    SKILL,
+    ["qdash_config_info", "qdash_list_chips", "qdash_get_default_chip", "qdash_create_agent_session"],
+    ["qdash_config_info", "qdash_create_agent_session", "qdash_list_cryostats"],
+  );
+  assert.match(guide, new RegExp(`\`qdash_config_info\`\\${DEFERRED_MARK} — check profile names`));
+  assert.match(guide, /- `qdash_create_agent_session`\*/);
+  assert.match(guide, /`qdash_list_chips`, `qdash_get_default_chip`$/m);
+  assert.deepEqual(
+    [...toolGuideNames(guide)].sort(),
+    ["qdash_config_info", "qdash_create_agent_session", "qdash_get_default_chip", "qdash_list_chips"],
+  );
+  assert.equal(toolGuideNames(null).size, 0);
+});

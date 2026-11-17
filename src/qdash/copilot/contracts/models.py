@@ -143,6 +143,44 @@ class ChatStopResponse(BaseModel):
     stopped: bool
 
 
+class ChatSteerRequest(BaseModel):
+    """Request body for POST /copilot/chat/steer: a message sent while an answer is written."""
+
+    session_id: str = Field(min_length=1, description="Chat session whose running turn to steer")
+    request_id: str = Field(
+        min_length=1,
+        max_length=200,
+        description="Idempotency key: a retry with the same key reports the same steer",
+    )
+    turn_request_id: str = Field(
+        min_length=1,
+        max_length=200,
+        description="Request ID of the chat turn it was sent to; only that turn admits it",
+    )
+    message: str = Field(min_length=1, max_length=100_000, description="What the user wrote")
+
+
+class ChatSteerStatusRequest(BaseModel):
+    """Request body for POST /copilot/chat/steer/status: where a steer stands, without sending it."""
+
+    session_id: str = Field(min_length=1, description="Chat session the steer was sent to")
+    request_id: str = Field(min_length=1, max_length=200, description="The steer's request ID")
+
+
+class ChatSteerResponse(BaseModel):
+    """Where a steer stands.
+
+    ``queued``: admitted, placed after the current tool round. ``applied``: placed in
+    the transcript as ``entry_id``. ``withdrawn``: the run failed or was stopped
+    before it was placed. ``rejected``: nothing was running; send it as a new message.
+    ``not_found`` (status lookups only): never admitted, and no longer admitted later.
+    """
+
+    status: Literal["queued", "applied", "withdrawn", "rejected", "not_found"]
+    reason: str | None = None
+    entry_id: str | None = None
+
+
 class TaskChatTarget(BaseModel):
     """The task result a chat is about; its first turn opens with the result's context."""
 
@@ -252,6 +290,15 @@ class ChatRequest(ImageAttachmentsRequest):
     approval: ApprovalDecision | None = Field(
         default=None,
         description="Decision on the write operation the previous turn asked approval for.",
+    )
+    continue_run: bool = Field(
+        default=False,
+        description=(
+            "Continue the last run, which ended without an answer (stopped or a model "
+            "error), instead of sending ``message``: no user message is added. Refused "
+            "after an answer, while a run is going, or while a question, an approval or a "
+            "proposed edit waits for the user."
+        ),
     )
 
 

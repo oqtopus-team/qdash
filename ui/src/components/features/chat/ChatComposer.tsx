@@ -14,6 +14,7 @@ import {
   ArrowUp,
   Check,
   ChevronDown,
+  CornerDownRight,
   Cpu,
   Paperclip,
   Square,
@@ -94,6 +95,11 @@ interface ChatComposerProps {
   onRemoveAttachment?: (id: string) => void;
   /** Narrow surfaces: smaller type and a shorter model label. */
   compact?: boolean;
+  /**
+   * While an answer streams, a message can still be sent: the answer reads it after its
+   * current step (`onSubmit` is called as usual). Figures cannot go with it.
+   */
+  steerable?: boolean;
 }
 
 export interface ChatComposerHandle {
@@ -123,6 +129,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
     onAttach,
     onRemoveAttachment,
     compact = false,
+    steerable = false,
   },
   ref,
 ) {
@@ -160,7 +167,9 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
 
   const canAttach = Boolean(onAttach) && !isStreaming && !disabled;
   const attachmentsFull = (attachments?.length ?? 0) >= MAX_ATTACHMENTS;
-  const canSend = value.trim().length > 0 && !isStreaming && !disabled && !isStaging;
+  const hasText = value.trim().length > 0;
+  const canSteer = isStreaming && steerable && hasText && !disabled && !(attachments?.length ?? 0);
+  const canSend = (hasText && !isStreaming && !disabled && !isStaging) || canSteer;
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -275,7 +284,9 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={handleKeyDown}
         onPaste={handlePaste}
-        placeholder={placeholder}
+        placeholder={
+          isStreaming && steerable ? "Add a note; it is read after the current step" : placeholder
+        }
         rows={1}
         aria-label="Message"
         className="w-full resize-none bg-transparent border-none outline-none focus:ring-0 leading-6 px-1 pt-1 text-sm placeholder:text-base-content/35"
@@ -379,6 +390,21 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
           </Tooltip>
         )}
         <div className="flex-1" />
+        {isStreaming && steerable && hasText && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="submit"
+                disabled={!canSteer}
+                className="btn btn-circle btn-sm btn-primary disabled:bg-base-content/15 disabled:text-base-100"
+                aria-label="Send to the answer in progress"
+              >
+                <CornerDownRight className="w-4 h-4" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Send now: read after the current step (Enter)</TooltipContent>
+          </Tooltip>
+        )}
         {isStreaming ? (
           <Tooltip>
             <TooltipTrigger asChild>

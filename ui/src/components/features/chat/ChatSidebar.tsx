@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Ellipsis,
   FlaskConical,
+  GitBranch,
   MessageSquare,
   PanelLeftClose,
   Pencil,
@@ -258,6 +259,12 @@ export function ChatSidebar({
                         <FlaskConical
                           className="w-3.5 h-3.5 mr-1.5 shrink-0 text-primary/70"
                           aria-label="About a calibration result"
+                        />
+                      )}
+                      {session.branch && (
+                        <GitBranch
+                          className="w-3.5 h-3.5 mr-1.5 shrink-0 text-base-content/50"
+                          aria-label="Branched from another chat"
                         />
                       )}
                       <span className="truncate">{session.title}</span>

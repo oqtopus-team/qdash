@@ -255,7 +255,9 @@ The classifier runs as a nested call, `qdash.presentation.classify`, under a fix
 replay-safe `present_results` call, so its result is journaled with the call. After a restart
 the call reruns, gets the committed classification back, and rebuilds the same layout. The
 nested tool is not replay-safe, so a classification a restart interrupted ends as an error and
-falls back instead of asking the classifier again. The model is never offered the nested tool.
+falls back instead of asking the classifier again. The model is never offered the nested tool,
+and Code Mode scripts can neither see nor call it: the tool policy lets only a running
+`present_results` call it ([Code Mode and deferred tools](./architecture.md#code-mode-and-deferred-tools)).
 
 The classifier model comes from `config/copilot/classifier.yaml`, which lists the classifier
 models any QDash feature can use, as `chat.yaml` and `evaluation.yaml` list theirs.

@@ -1,15 +1,17 @@
 "use client";
 
-import React, { memo, useCallback, useEffect, useRef, useState } from "react";
+import React, { memo, useCallback, useEffect, useId, useRef, useState } from "react";
 import {
   AlertTriangle,
   Check,
   CheckCircle2,
   Copy,
+  GitBranch,
   ImageIcon,
   Pencil,
   RotateCcw,
   Square,
+  StepForward,
   ThumbsDown,
   ThumbsUp,
   XCircle,
@@ -84,35 +86,63 @@ function isErrorMessage(message: CopilotMessage): boolean {
 
 function ActionButton({
   label,
+  hint,
   onClick,
-  active = false,
+  active,
+  disabled = false,
   children,
 }: {
   label: string;
+  /** What the action does, shown under the label before the user clicks. */
+  hint?: string;
   onClick: () => void;
-  /** A toggle that is on, e.g. the rating the user gave. */
+  /** A toggle and whether it is on, e.g. the rating the user gave; unset for a plain action. */
   active?: boolean;
+  disabled?: boolean;
   children: React.ReactNode;
 }) {
+  const hintId = useId();
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <button
           type="button"
           onClick={onClick}
+          disabled={disabled}
           className={`btn btn-ghost btn-xs btn-square ${
             active ? "text-primary" : "text-base-content/45 hover:text-base-content"
           }`}
           aria-label={label}
           aria-pressed={active}
+          aria-describedby={hint ? hintId : undefined}
         >
           {children}
         </button>
       </TooltipTrigger>
-      <TooltipContent>{label}</TooltipContent>
+      <TooltipContent>
+        {hint ? (
+          <>
+            <span className="block font-medium">{label}</span>
+            <span className="block text-base-content/70">{hint}</span>
+          </>
+        ) : (
+          label
+        )}
+      </TooltipContent>
+      {hint && (
+        // The description stays in the page for assistive technology while the tooltip is closed.
+        <span id={hintId} className="sr-only">
+          {hint}
+        </span>
+      )}
     </Tooltip>
   );
 }
+
+/** What branching does, shown before the user branches. */
+const BRANCH_HINT =
+  "Starts a new chat with this conversation up to this answer. It shares this chat's workspace " +
+  "files as they are now, not as they were then, and only one of the two can answer at a time.";
 
 /** One assistant turn: full-width text, no avatar, like ChatGPT and Claude. */
 function AssistantRow({ className = "", children, ...rest }: React.HTMLAttributes<HTMLDivElement>) {
@@ -401,6 +431,11 @@ export const UserMessage = memo(function UserMessage({
       <div className="chat-bubble-user-soft rounded-3xl px-4 py-2.5 max-w-[85%] text-sm leading-relaxed whitespace-pre-wrap break-words">
         {message.content}
       </div>
+      {message.steer?.placement === "approximate" && (
+        <span className="text-xs text-base-content/55">
+          Sent while the answer above was written; it read this during or after that answer
+        </span>
+      )}
       <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
         <CopyButton text={message.content} />
         {canEdit && (
@@ -423,11 +458,24 @@ export const AssistantMessage = memo(function AssistantMessage({
   onDecide,
   onOther,
   onRate,
+  canContinue = false,
+  onContinue,
+  canBranch = false,
+  branching = false,
+  onBranch,
 }: {
   message: CopilotMessage;
   isLast: boolean;
   canRetry: boolean;
   onRetry: () => void;
+  /** The answer stopped or failed and can go on from where it ended, without a new message. */
+  canContinue?: boolean;
+  onContinue?: () => void;
+  /** A new chat can start from this answer: it is complete, saved with its runtime entry, and nothing runs. */
+  canBranch?: boolean;
+  /** A branch from this answer is being created. */
+  branching?: boolean;
+  onBranch?: () => void;
   /** The user message that follows this answer, if any. */
   answer?: string;
   onAnswer: InteractionState["onAnswer"];
@@ -442,16 +490,29 @@ export const AssistantMessage = memo(function AssistantMessage({
           <XCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
           <span className="break-words min-w-0">{message.content.slice("Error: ".length)}</span>
         </div>
-        {isLast && canRetry && (
-          <button
-            type="button"
-            onClick={onRetry}
-            className="btn btn-ghost btn-sm gap-1.5 mt-2 rounded-full"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            Retry
-          </button>
-        )}
+        <div className="flex flex-wrap items-center gap-1 mt-2">
+          {isLast && canContinue && onContinue && (
+            <button
+              type="button"
+              onClick={onContinue}
+              className="btn btn-ghost btn-sm gap-1.5 rounded-full"
+              title="Go on from where the answer ended, without sending your message again"
+            >
+              <StepForward className="w-3.5 h-3.5" />
+              Continue
+            </button>
+          )}
+          {isLast && canRetry && (
+            <button
+              type="button"
+              onClick={onRetry}
+              className="btn btn-ghost btn-sm gap-1.5 rounded-full"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              Retry
+            </button>
+          )}
+        </div>
       </AssistantRow>
     );
   }
@@ -470,7 +531,7 @@ export const AssistantMessage = memo(function AssistantMessage({
       )}
       <div
         className={`mt-1.5 -ml-1.5 flex items-center gap-0.5 transition-opacity ${
-          isLast || feedback
+          isLast || feedback || branching
             ? "opacity-100"
             : "opacity-0 group-hover:opacity-100 focus-within:opacity-100"
         }`}
@@ -490,6 +551,25 @@ export const AssistantMessage = memo(function AssistantMessage({
         >
           <ThumbsDown className="w-3.5 h-3.5" />
         </ActionButton>
+        {isLast && canContinue && onContinue && (
+          <ActionButton label="Continue" onClick={onContinue}>
+            <StepForward className="w-3.5 h-3.5" />
+          </ActionButton>
+        )}
+        {onBranch && (canBranch || branching) && (
+          <ActionButton
+            label={branching ? "Creating branch" : "Branch from here"}
+            hint={BRANCH_HINT}
+            onClick={onBranch}
+            disabled={branching}
+          >
+            {branching ? (
+              <span className="loading loading-spinner loading-xs" aria-hidden="true" />
+            ) : (
+              <GitBranch className="w-3.5 h-3.5" />
+            )}
+          </ActionButton>
+        )}
         {isLast && canRetry && (
           <ActionButton label="Regenerate" onClick={onRetry}>
             <RotateCcw className="w-3.5 h-3.5" />

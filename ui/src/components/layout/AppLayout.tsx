@@ -62,7 +62,7 @@ function ProjectAccessState() {
 export function AppLayout({ children }: AppLayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, username } = useAuth();
   const { currentProject, loading: projectLoading, projects } = useProject();
   const isPublicPage = PUBLIC_PATHS.includes(pathname);
   const isProjectOptionalPage = PROJECT_OPTIONAL_PATH_PREFIXES.some((prefix) =>
@@ -86,7 +86,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   // Authenticated pages - render with sidebar and navbar
   return (
     <SidebarProvider>
-      <CopilotChatSessionProvider>
+      <CopilotChatSessionProvider owner={username ?? null}>
         <ChatDockProvider>
           {/* `h-dvh` tracks the visible viewport on mobile browsers, so the tab bar at the
               bottom of the column stays on screen; the side and top padding keep the

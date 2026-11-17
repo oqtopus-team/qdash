@@ -5,6 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { CopilotChatSessionSummaryBranch } from './copilotChatSessionSummaryBranch';
 import type { CopilotChatSessionSummaryContext } from './copilotChatSessionSummaryContext';
 
 /**
@@ -15,6 +16,7 @@ export interface CopilotChatSessionSummary {
   title: string;
   context?: CopilotChatSessionSummaryContext;
   message_count?: number;
+  branch?: CopilotChatSessionSummaryBranch;
   created_at: string;
   updated_at: string;
 }

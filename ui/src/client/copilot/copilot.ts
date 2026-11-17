@@ -31,6 +31,7 @@ import type {
   CopilotPreferences,
   CopilotPreferencesUpdate,
   CopilotSystemPrompt,
+  CreateCopilotChatBranchRequest,
   CreateCopilotChatSessionRequest,
   DeleteCopilotChatSession200,
   DisconnectChatGPTResponse,
@@ -174,6 +175,10 @@ export function useGetCopilotConfig<TData = Awaited<ReturnType<typeof getCopilot
 
 /**
  * Return all persisted chat sessions owned by the current user.
+ *
+ * First cleans up, best effort, what failed requests of the user left: a
+ * branch still pending after its request's lease, and a deleted chat's store
+ * the runtime could not remove yet.
  * @summary List the current user's chat sessions
  */
 export const listCopilotChatSessions = (
@@ -491,6 +496,13 @@ export const useUpdateCopilotChatSession = <TError = HTTPValidationError,
     }
     /**
  * Delete a chat session owned by the current user.
+ *
+ * The chat's own running turn is stopped; a turn of another branch is not.
+ * Its runtime store and workspace are removed with the last session that uses
+ * them: a chat and its branches share one, so it stays while one is left.
+ * When the runtime cannot remove the store yet, the deleted chat is kept,
+ * hidden, and the removal is retried by deleting it again or by the next
+ * listing of the user's chats.
  * @summary Delete a chat session
  */
 export const deleteCopilotChatSession = (
@@ -551,6 +563,78 @@ export const useDeleteCopilotChatSession = <TError = HTTPValidationError,
         TContext
       > => {
       return useMutation(getDeleteCopilotChatSessionMutationOptions(options), queryClient);
+    }
+    /**
+ * Start a new chat session from a saved answer of one of the user's chats.
+ *
+ * The new session continues the conversation as it was at that answer, in the
+ * same runtime store: it shares the chat's current workspace files, and the
+ * chat and its branches answer one at a time. Only a completed answer the chat
+ * saved with its runtime entry ID qualifies, and only while nothing runs in
+ * the chat or its branches. The same request again returns the same session.
+ * @summary Branch a chat session from one of its answers
+ */
+export const branchCopilotChatSession = (
+    sessionId: string,
+    createCopilotChatBranchRequest: CreateCopilotChatBranchRequest,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<CopilotChatSessionResponse>(
+      {url: `/copilot/chat/sessions/${sessionId}/branches`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: createCopilotChatBranchRequest, signal
+    },
+      options);
+    }
+
+
+
+
+export const getBranchCopilotChatSessionMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof branchCopilotChatSession>>, TError,{sessionId: string;data: CreateCopilotChatBranchRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof branchCopilotChatSession>>, TError,{sessionId: string;data: CreateCopilotChatBranchRequest}, TContext> => {
+
+const mutationKey = ['branchCopilotChatSession'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof branchCopilotChatSession>>, {sessionId: string;data: CreateCopilotChatBranchRequest}> = (props) => {
+          const {sessionId,data} = props ?? {};
+
+          return  branchCopilotChatSession(sessionId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type BranchCopilotChatSessionMutationResult = NonNullable<Awaited<ReturnType<typeof branchCopilotChatSession>>>
+    export type BranchCopilotChatSessionMutationBody = CreateCopilotChatBranchRequest
+    export type BranchCopilotChatSessionMutationError = HTTPValidationError
+
+    /**
+ * @summary Branch a chat session from one of its answers
+ */
+export const useBranchCopilotChatSession = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof branchCopilotChatSession>>, TError,{sessionId: string;data: CreateCopilotChatBranchRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof branchCopilotChatSession>>,
+        TError,
+        {sessionId: string;data: CreateCopilotChatBranchRequest},
+        TContext
+      > => {
+      return useMutation(getBranchCopilotChatSessionMutationOptions(options), queryClient);
     }
     /**
  * QDash and allowlisted dependency source served read-only, with known revisions.

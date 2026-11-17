@@ -32,7 +32,9 @@ sequenceDiagram
     H->>D: exec / readTextFile / writeFile ... through RemoteExecutionEnv
 ```
 
-1. `SharedRuntime.openSession` creates an `ExecWorkspace` for the owner and session and
+1. `SharedRuntime.openSession` creates an `ExecWorkspace` for the owner and the chat's store
+   session (the chat's own session ID, or for a branch the store it shares; see
+   [Branches](./chat-streaming.md#branches)) and
    passes `env: (target) => workspace.env(target.cwd)` to `Harness.open`, with the agent's
    `cwd` set to the conversation's directory.
 2. The first tool call creates that directory (`createDir`, recursive) and starts the
@@ -46,9 +48,11 @@ sequenceDiagram
    container.
 5. Closing the conversation closes the connection; the daemon then kills every process it
    started. The first tool call also writes a marker file beside the session's SQLite store
-   (`<store>.workspace`); deleting a QDash chat session removes the directory only when that
-   marker exists (`deleteSessionState` → `removeWorkspace`), so a chat or evaluation that never
-   ran code starts no daemon and creates no owner directory.
+   (`<store>.workspace`); deleting the last QDash chat session that uses the store removes the
+   directory only when that marker exists (`deleteSessionState` → `removeWorkspace`), so a chat
+   or evaluation that never ran code starts no daemon and creates no owner directory. A chat and
+   its branches share one directory: a branch sees the files as they are now, not as they were at
+   the answer it was branched from.
 
 ## Isolation
 

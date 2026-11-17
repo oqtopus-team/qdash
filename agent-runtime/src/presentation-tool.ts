@@ -3,6 +3,7 @@ import type { ClassifierContext, ClassifierResult } from "@earendil-works/pi-ai"
 import { defineTool } from "@earendil-works/pi-durable";
 import { Type, type Static } from "typebox";
 
+import { isNestedReadTool } from "./allowed-tools.ts";
 import { classifierLabel, selectClassifierModel, type ClassifierModels, type Log } from "./classifier-models.ts";
 import { classifyWithin } from "./classify-tool.ts";
 // See ui-tool.ts for why this path resolves in the image too.
@@ -45,6 +46,8 @@ type JsonObject = ClassifierContext["state"];
 export const PRESENT_TOOL = "present_results";
 /** Internal nested tool behind the classification; never offered to the model. */
 export const CLASSIFY_TOOL = "qdash.presentation.classify";
+/** The classifier is an internal tool only present_results may call (see codemode.ts' tool policy). */
+export const PRESENTATION_INTERNAL_CALLS = { [CLASSIFY_TOOL]: [PRESENT_TOOL] } as const;
 /** The nested call's key, fixed so a rerun reattaches to the committed classification. */
 const CLASSIFY_KEY = "classify";
 
@@ -542,11 +545,25 @@ export function buildPresentationTools(config: PresentationConfig) {
     // same spec from the same arguments.
     replay: "safe",
     execute: async (args, api, context) => {
-      // The named sources must be tools this chat offers, and not the
-      // presentation tools themselves.
-      const offered = new Set((await api.agent(context)).tools.map((tool) => tool.name));
+      // The named sources must be tools whose results this chat could have
+      // read, and not the presentation tools themselves: a tool the model is
+      // offered, or an audited read tool a Code Mode script may call. A
+      // deferred read tool is callable from a script before `tool_search`
+      // loads it, so a script's values may come from one the model is not
+      // offered yet. Only the pinned audited implementation is callable by
+      // tools (see buildQDashExtension), so a write tool or a local
+      // checkout's replacement never qualifies this way.
+      const agent = await api.agent(context);
+      const offered = new Set(agent.tools.map((tool) => tool.name));
+      const scriptReads = new Set(
+        agent.callable.filter((tool) => isNestedReadTool(tool.name)).map((tool) => tool.name),
+      );
       const unknown = args.sources.filter(
-        (name) => !offered.has(name) || name === PRESENT_TOOL || name === "render_ui" || name === "render_chart",
+        (name) =>
+          !(offered.has(name) || scriptReads.has(name)) ||
+          name === PRESENT_TOOL ||
+          name === "render_ui" ||
+          name === "render_chart",
       );
       if (unknown.length > 0) {
         throw new Error(
