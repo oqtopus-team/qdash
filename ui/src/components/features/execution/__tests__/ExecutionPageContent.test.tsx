@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ExecutionPageContent } from "@/components/features/execution/ExecutionPageContent";
 
 let loadingNextPage = false;
+let mockProjectId: string | null = "project-1";
 const DEFAULT_DETAIL = { note: { flow_run_id: "flow-123" }, task: [] };
 let executionDetail: Record<string, unknown> = DEFAULT_DETAIL;
 const mockInvestigate = vi.fn();
@@ -96,6 +97,10 @@ vi.mock("@/client/execution/execution", () => ({
 
 vi.mock("@/contexts/ChatDockContext", () => ({
   useOptionalChatDock: () => ({ investigate: mockInvestigate }),
+}));
+
+vi.mock("@/contexts/ProjectContext", () => ({
+  useProject: () => ({ projectId: mockProjectId }),
 }));
 
 vi.mock("@/hooks/useDateNavigation", () => ({
@@ -194,6 +199,7 @@ describe("ExecutionPageContent cancel confirmation", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     loadingNextPage = false;
+    mockProjectId = "project-1";
     executionDetail = DEFAULT_DETAIL;
     // Reset the mutate implementation so callback-driven tests don't leak into others.
     mockCancelMutate.mockReset();
@@ -253,9 +259,10 @@ describe("ExecutionPageContent cancel confirmation", () => {
     expect(next.disabled).toBe(false);
     expect(within(panel).getByText("1 of 2 on this page")).toBeTruthy();
 
-    panel.scrollTop = 300;
+    const scrollBody = within(panel).getByTestId("execution-details-scroll");
+    scrollBody.scrollTop = 300;
     fireEvent.click(next);
-    expect(panel.scrollTop).toBe(0);
+    expect(scrollBody.scrollTop).toBe(0);
     expect(within(panel).getByRole("heading", { name: "Completed Execution" })).toBeTruthy();
     expect(within(panel).getByRole("link", { name: "View Details" }).getAttribute("href")).toBe(
       "/execution/chip-1/exec-2",
@@ -295,12 +302,13 @@ describe("ExecutionPageContent cancel confirmation", () => {
       render(<ExecutionPageContent />);
       fireEvent.click(screen.getByText("Running Execution"));
       const panel = screen.getByRole("complementary", { name: "Execution details" });
-      panel.scrollTop = 300;
+      const scrollBody = within(panel).getByTestId("execution-details-scroll");
+      scrollBody.scrollTop = 300;
       fireEvent.click(screen.getByRole("button", { name }));
       expect(document.activeElement).toBe(
         screen.getByRole("button", { name: "View Other Execution execution details" }),
       );
-      expect(panel.scrollTop).toBe(0);
+      expect(scrollBody.scrollTop).toBe(0);
       expect(panel.getAttribute("aria-hidden")).toBe("true");
     },
   );
@@ -543,5 +551,456 @@ describe("ExecutionPageContent status presentation", () => {
 
     fireEvent.click(row);
     expect(within(panel).queryByText("TaskFigure")).toBeNull();
+  });
+});
+
+describe("ExecutionPageContent floating details window", () => {
+  const originalMatchMedia = window.matchMedia;
+  const originalAnimate = Element.prototype.animate;
+  const originalWidth = window.innerWidth;
+  const originalHeight = window.innerHeight;
+  let isDesktop = true;
+  let reducedMotion = false;
+  let mediaListeners: Array<() => void> = [];
+  const animate = vi.fn();
+  const pointerCaptureMethods = ["setPointerCapture", "hasPointerCapture", "releasePointerCapture"];
+  const originalPointerCapture = pointerCaptureMethods.map(
+    (name) => (HTMLElement.prototype as unknown as Record<string, unknown>)[name],
+  );
+  let captured: Set<number>;
+  const releasePointerCapture = vi.fn((pointerId: number) => {
+    if (!captured.delete(pointerId)) throw new DOMException("No capture", "NotFoundError");
+  });
+
+  function setViewport(width: number, height: number) {
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: width });
+    Object.defineProperty(window, "innerHeight", { configurable: true, value: height });
+  }
+
+  function setDesktop(value: boolean) {
+    isDesktop = value;
+    act(() => mediaListeners.forEach((listener) => listener()));
+  }
+
+  function getPanel() {
+    return document.getElementById("execution-details-panel") as HTMLElement;
+  }
+
+  function openFloatingWindow() {
+    render(<ExecutionPageContent />);
+    fireEvent.click(screen.getByText("Running Execution"));
+    fireEvent.click(screen.getByRole("button", { name: "Float execution details" }));
+    return getPanel();
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    loadingNextPage = false;
+    mockProjectId = "project-1";
+    executionDetail = DEFAULT_DETAIL;
+    isDesktop = true;
+    reducedMotion = false;
+    mediaListeners = [];
+    setViewport(1440, 900);
+    window.matchMedia = ((query: string) => ({
+      matches: query.includes("reduced-motion") ? reducedMotion : isDesktop,
+      media: query,
+      onchange: null,
+      addListener: () => undefined,
+      removeListener: () => undefined,
+      addEventListener: (_type: string, listener: () => void) => {
+        mediaListeners.push(listener);
+      },
+      removeEventListener: (_type: string, listener: () => void) => {
+        mediaListeners = mediaListeners.filter((item) => item !== listener);
+      },
+      dispatchEvent: () => false,
+    })) as unknown as typeof window.matchMedia;
+    Element.prototype.animate = animate as unknown as typeof Element.prototype.animate;
+    captured = new Set();
+    Object.assign(HTMLElement.prototype, {
+      setPointerCapture: (pointerId: number) => captured.add(pointerId),
+      hasPointerCapture: (pointerId: number) => captured.has(pointerId),
+      releasePointerCapture,
+    });
+  });
+
+  afterEach(() => {
+    cleanup();
+    window.matchMedia = originalMatchMedia;
+    Element.prototype.animate = originalAnimate;
+    setViewport(originalWidth, originalHeight);
+    pointerCaptureMethods.forEach((name, index) => {
+      (HTMLElement.prototype as unknown as Record<string, unknown>)[name] =
+        originalPointerCapture[index];
+    });
+  });
+
+  function startHeaderDrag(panel: HTMLElement) {
+    const move = within(panel).getByRole("button", { name: "Move execution details window" });
+    const header = move.parentElement as HTMLElement;
+    fireEvent.pointerDown(header, { button: 0, pointerId: 1, clientX: 500, clientY: 100 });
+    fireEvent.pointerMove(header, { pointerId: 1, clientX: 400, clientY: 150 });
+    return header;
+  }
+
+  it("floats the open details without losing the selection and keeps the list usable", () => {
+    render(<ExecutionPageContent />);
+    fireEvent.click(screen.getByText("Running Execution"));
+    const panel = getPanel();
+    expect(panel.dataset.mode).toBe("docked");
+
+    fireEvent.click(within(panel).getByRole("button", { name: "Float execution details" }));
+
+    expect(panel.dataset.mode).toBe("floating");
+    expect(panel.getAttribute("aria-hidden")).toBe("false");
+    expect(panel.style.width).toBe("520px");
+    expect(panel.style.left).toBe(`${1440 - 520 - 32}px`);
+    expect(within(panel).getByRole("heading", { name: "Running Execution" })).toBeTruthy();
+    expect(document.activeElement).toBe(
+      within(panel).getByRole("button", { name: "Dock execution details" }),
+    );
+
+    // The window is non-modal: picking another run swaps its content in place.
+    fireEvent.click(screen.getByText("Completed Execution"));
+    expect(panel.dataset.mode).toBe("floating");
+    expect(within(panel).getByRole("heading", { name: "Completed Execution" })).toBeTruthy();
+    expect(
+      screen
+        .getByRole("button", { name: "View Completed Execution execution details" })
+        .getAttribute("aria-expanded"),
+    ).toBe("true");
+  });
+
+  it("minimizes to a restore control and restores the same execution", () => {
+    const panel = openFloatingWindow();
+
+    fireEvent.click(within(panel).getByRole("button", { name: "Minimize execution details" }));
+
+    expect(panel.getAttribute("aria-hidden")).toBe("true");
+    expect(panel.hasAttribute("inert")).toBe(true);
+    const restore = screen.getByRole("button", {
+      name: "Restore execution details for Running Execution",
+    });
+    expect(document.activeElement).toBe(restore);
+    expect(
+      screen
+        .getByRole("button", { name: "View Running Execution execution details" })
+        .getAttribute("aria-expanded"),
+    ).toBe("false");
+
+    fireEvent.click(restore);
+
+    expect(panel.dataset.mode).toBe("floating");
+    expect(panel.getAttribute("aria-hidden")).toBe("false");
+    expect(within(panel).getByRole("heading", { name: "Running Execution" })).toBeTruthy();
+    expect(document.activeElement).toBe(
+      within(panel).getByRole("button", { name: "Minimize execution details" }),
+    );
+    expect(screen.queryByRole("region", { name: "Minimized execution details" })).toBeNull();
+  });
+
+  it("restores a minimized window when another execution is picked", () => {
+    const panel = openFloatingWindow();
+    fireEvent.click(within(panel).getByRole("button", { name: "Minimize execution details" }));
+
+    fireEvent.click(screen.getByText("Completed Execution"));
+
+    expect(panel.getAttribute("aria-hidden")).toBe("false");
+    expect(within(panel).getByRole("heading", { name: "Completed Execution" })).toBeTruthy();
+  });
+
+  it("closes from the minimized control, returns focus, and reopens floating", () => {
+    const panel = openFloatingWindow();
+    fireEvent.click(within(panel).getByRole("button", { name: "Minimize execution details" }));
+    const control = screen.getByRole("region", { name: "Minimized execution details" });
+
+    fireEvent.click(within(control).getByRole("button", { name: "Close execution details" }));
+
+    expect(screen.queryByRole("region", { name: "Minimized execution details" })).toBeNull();
+    const card = screen.getByRole("button", { name: "View Running Execution execution details" });
+    expect(document.activeElement).toBe(card);
+    expect(panel.getAttribute("aria-hidden")).toBe("true");
+
+    fireEvent.click(card);
+    expect(panel.dataset.mode).toBe("floating");
+    expect(panel.getAttribute("aria-hidden")).toBe("false");
+  });
+
+  it("docks the window back to the right edge and moves focus to Float", () => {
+    const panel = openFloatingWindow();
+
+    fireEvent.click(within(panel).getByRole("button", { name: "Dock execution details" }));
+
+    expect(panel.dataset.mode).toBe("docked");
+    expect(panel.style.left).toBe("");
+    expect(panel.className).toContain("right-0");
+    expect(within(panel).getByRole("heading", { name: "Running Execution" })).toBeTruthy();
+    expect(document.activeElement).toBe(
+      within(panel).getByRole("button", { name: "Float execution details" }),
+    );
+  });
+
+  it("takes Escape only from inside the floating window", () => {
+    const panel = openFloatingWindow();
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(panel.getAttribute("aria-hidden")).toBe("false");
+
+    fireEvent.keyDown(within(panel).getByRole("button", { name: "Next execution" }), {
+      key: "Escape",
+    });
+    expect(panel.getAttribute("aria-hidden")).toBe("true");
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "View Running Execution execution details" }),
+    );
+  });
+
+  it("leaves Escape to the cancellation dialog over a floating window", () => {
+    const panel = openFloatingWindow();
+    fireEvent.click(within(panel).getByRole("button", { name: "Cancel" }));
+    const dialog = screen.getByRole("dialog");
+
+    fireEvent.keyDown(dialog, { key: "Escape" });
+
+    expect(panel.getAttribute("aria-hidden")).toBe("false");
+    expect(mockCancelMutate).not.toHaveBeenCalled();
+  });
+
+  it("moves and resizes with the keyboard inside the viewport", () => {
+    const panel = openFloatingWindow();
+    const move = within(panel).getByRole("button", { name: "Move execution details window" });
+    const resize = within(panel).getByRole("button", { name: "Resize execution details window" });
+    const left = parseFloat(panel.style.left);
+    const top = parseFloat(panel.style.top);
+
+    fireEvent.keyDown(move, { key: "ArrowLeft" });
+    expect(panel.style.left).toBe(`${left - 16}px`);
+    fireEvent.keyDown(move, { key: "ArrowDown", shiftKey: true });
+    expect(panel.style.top).toBe(`${top + 64}px`);
+    for (let i = 0; i < 40; i++) fireEvent.keyDown(move, { key: "ArrowRight", shiftKey: true });
+    expect(panel.style.left).toBe(`${1440 - 520 - 16}px`);
+
+    for (let i = 0; i < 20; i++) fireEvent.keyDown(resize, { key: "ArrowLeft", shiftKey: true });
+    expect(panel.style.width).toBe("360px");
+    for (let i = 0; i < 40; i++) fireEvent.keyDown(resize, { key: "ArrowUp", shiftKey: true });
+    expect(panel.style.height).toBe("280px");
+
+    fireEvent.keyDown(move, { key: "Home" });
+    expect(panel.style.left).toBe(`${1440 - 520 - 32}px`);
+    expect(panel.style.width).toBe("520px");
+  });
+
+  it("drags by the header and keeps the window on screen", () => {
+    const panel = openFloatingWindow();
+    const move = within(panel).getByRole("button", { name: "Move execution details window" });
+    const header = move.parentElement as HTMLElement;
+    const left = parseFloat(panel.style.left);
+    const top = parseFloat(panel.style.top);
+
+    fireEvent.pointerDown(header, { button: 0, pointerId: 1, clientX: 500, clientY: 100 });
+    fireEvent.pointerMove(header, { pointerId: 1, clientX: 400, clientY: 150 });
+    expect(panel.style.left).toBe(`${left - 100}px`);
+    expect(panel.style.top).toBe(`${top + 50}px`);
+    fireEvent.pointerMove(header, { pointerId: 1, clientX: -5000, clientY: -5000 });
+    fireEvent.pointerUp(header, { pointerId: 1, clientX: -5000, clientY: -5000 });
+    expect(panel.style.left).toBe("16px");
+    expect(panel.style.top).toBe("16px");
+
+    // Pressing the header's own buttons never starts a drag.
+    fireEvent.pointerDown(within(panel).getByRole("button", { name: "Dock execution details" }), {
+      button: 0,
+      pointerId: 2,
+      clientX: 0,
+      clientY: 0,
+    });
+    fireEvent.pointerMove(header, { pointerId: 2, clientX: 300, clientY: 300 });
+    expect(panel.style.left).toBe("16px");
+  });
+
+  it("falls back to the full-width drawer on narrow screens", () => {
+    const panel = openFloatingWindow();
+    fireEvent.click(within(panel).getByRole("button", { name: "Minimize execution details" }));
+
+    setDesktop(false);
+
+    expect(panel.dataset.mode).toBe("docked");
+    expect(panel.getAttribute("aria-hidden")).toBe("false");
+    expect(panel.style.left).toBe("");
+    expect(within(panel).queryByRole("button", { name: "Float execution details" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Minimized execution details" })).toBeNull();
+    expect(within(panel).getByRole("heading", { name: "Running Execution" })).toBeTruthy();
+  });
+
+  it("ends a drag when the breakpoint docks the window, so it cannot jump when floating again", () => {
+    const panel = openFloatingWindow();
+    const left = parseFloat(panel.style.left);
+    startHeaderDrag(panel);
+    expect(captured.has(1)).toBe(true);
+
+    setDesktop(false);
+
+    expect(releasePointerCapture).toHaveBeenCalledWith(1);
+    expect(panel.dataset.mode).toBe("docked");
+    expect(panel.style.left).toBe("");
+
+    setDesktop(true);
+    const header = within(panel).getByRole("button", {
+      name: "Move execution details window",
+    }).parentElement as HTMLElement;
+    expect(panel.dataset.mode).toBe("floating");
+    expect(header.className).not.toContain("cursor-grabbing");
+    // The drag ended where it got to; a stray move for the old pointer changes nothing.
+    expect(panel.style.left).toBe(`${left - 100}px`);
+    fireEvent.pointerMove(header, { pointerId: 1, clientX: 0, clientY: 0 });
+    expect(panel.style.left).toBe(`${left - 100}px`);
+  });
+
+  it("ends a drag when pointer capture is lost or the viewport resizes", () => {
+    const panel = openFloatingWindow();
+    const header = startHeaderDrag(panel);
+    expect(header.className).toContain("cursor-grabbing");
+
+    fireEvent.lostPointerCapture(header, { pointerId: 1 });
+    const left = panel.style.left;
+    fireEvent.pointerMove(header, { pointerId: 1, clientX: 0, clientY: 0 });
+    expect(panel.style.left).toBe(left);
+    expect(header.className).not.toContain("cursor-grabbing");
+
+    startHeaderDrag(panel);
+    setViewport(1100, 700);
+    act(() => {
+      window.dispatchEvent(new Event("resize"));
+    });
+    expect(releasePointerCapture).toHaveBeenLastCalledWith(1);
+    const fitted = panel.style.left;
+    expect(parseFloat(fitted) + parseFloat(panel.style.width)).toBeLessThanOrEqual(1100 - 16);
+    fireEvent.pointerMove(header, { pointerId: 1, clientX: 0, clientY: 0 });
+    expect(panel.style.left).toBe(fitted);
+  });
+
+  it("releases pointer capture when unmounted mid-drag", () => {
+    const panel = openFloatingWindow();
+    startHeaderDrag(panel);
+
+    cleanup();
+
+    expect(releasePointerCapture).toHaveBeenCalledWith(1);
+    expect(captured.size).toBe(0);
+  });
+
+  it("moves focus from a window control the breakpoint removes to the visible panel", () => {
+    const panel = openFloatingWindow();
+    within(panel).getByRole("button", { name: "Move execution details window" }).focus();
+
+    setDesktop(false);
+
+    expect(document.activeElement).toBe(
+      within(panel).getByRole("button", { name: "Close execution details" }),
+    );
+  });
+
+  it("moves focus between the panel and Restore when the breakpoint hides either", () => {
+    const panel = openFloatingWindow();
+    fireEvent.click(within(panel).getByRole("button", { name: "Minimize execution details" }));
+
+    setDesktop(false);
+    const close = within(panel).getByRole("button", { name: "Close execution details" });
+    expect(document.activeElement).toBe(close);
+
+    setDesktop(true);
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "Restore execution details for Running Execution" }),
+    );
+  });
+
+  it("leaves unrelated focus alone when the breakpoint changes", () => {
+    const panel = openFloatingWindow();
+    const card = screen.getByRole("button", { name: "View Running Execution execution details" });
+    card.focus();
+
+    setDesktop(false);
+
+    expect(document.activeElement).toBe(card);
+    expect(panel.dataset.mode).toBe("docked");
+  });
+
+  it("closes the panel and pending cancellation when the project switches to the same chip ID", () => {
+    const { rerender } = render(<ExecutionPageContent />);
+    fireEvent.click(screen.getByText("Running Execution"));
+    const panel = getPanel();
+    fireEvent.click(within(panel).getByRole("button", { name: "Cancel" }));
+    expect(screen.getByRole("dialog")).toBeTruthy();
+
+    mockProjectId = "project-2";
+    rerender(<ExecutionPageContent />);
+
+    expect(panel.getAttribute("aria-hidden")).toBe("true");
+    expect(within(panel).queryByRole("heading", { name: "Running Execution" })).toBeNull();
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(mockCancelMutate).not.toHaveBeenCalled();
+  });
+
+  it("returns focus to the list only when the switched-away panel had it", () => {
+    const { rerender } = render(<ExecutionPageContent />);
+    fireEvent.click(screen.getByText("Running Execution"));
+    const card = screen.getByRole("button", { name: "View Running Execution execution details" });
+
+    mockProjectId = "project-2";
+    rerender(<ExecutionPageContent />);
+    expect(document.activeElement).toBe(card);
+
+    fireEvent.click(card);
+    const heading = screen.getByRole("heading", { name: "Recent executions" });
+    heading.focus();
+    mockProjectId = "project-3";
+    rerender(<ExecutionPageContent />);
+    expect(getPanel().getAttribute("aria-hidden")).toBe("true");
+    expect(document.activeElement).toBe(heading);
+  });
+
+  it("resets the picked day on a project switch but not when the project first resolves", () => {
+    mockProjectId = null;
+    const { rerender } = render(<ExecutionPageContent />);
+    fireEvent.click(screen.getByText("Running Execution"));
+
+    mockProjectId = "project-1";
+    rerender(<ExecutionPageContent />);
+    expect(getPanel().getAttribute("aria-hidden")).toBe("false");
+
+    fireEvent.click(screen.getByRole("button", { name: "pick-day" }));
+    expect(screen.getByText("selected:20260101")).toBeTruthy();
+    mockProjectId = "project-2";
+    rerender(<ExecutionPageContent />);
+    expect(screen.getByText("selected:latest")).toBeTruthy();
+  });
+
+  it("closes the window when the chip changes", () => {
+    const panel = openFloatingWindow();
+
+    fireEvent.click(screen.getByRole("button", { name: "Change chip" }));
+
+    expect(panel.getAttribute("aria-hidden")).toBe("true");
+    expect(within(panel).queryByRole("heading", { name: "Running Execution" })).toBeNull();
+  });
+
+  it("animates mode changes and skips motion when reduced motion is preferred", () => {
+    const panel = openFloatingWindow();
+    expect(animate).toHaveBeenCalledTimes(1);
+    fireEvent.click(within(panel).getByRole("button", { name: "Minimize execution details" }));
+    expect(animate).toHaveBeenCalledTimes(2);
+    cleanup();
+
+    animate.mockClear();
+    reducedMotion = true;
+    const reducedPanel = openFloatingWindow();
+    fireEvent.click(
+      within(reducedPanel).getByRole("button", { name: "Minimize execution details" }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Restore execution details for Running Execution" }),
+    );
+    expect(reducedPanel.dataset.mode).toBe("floating");
+    expect(animate).not.toHaveBeenCalled();
   });
 });
