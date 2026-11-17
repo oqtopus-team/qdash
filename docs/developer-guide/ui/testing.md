@@ -37,6 +37,27 @@ bun run test -- src/components/features/tasks/__tests__/TaskWorkbenchRun.test.ts
 `task ci-ui` runs unit tests, Next.js type generation, TypeScript, Oxlint, Oxfmt, Knip, and the Bun
 audit. The production build is intentionally separate in `task ci-ui-build`.
 
+### Audit Exceptions
+
+`task ci-ui` runs `bun audit` through `.github/scripts/audit-exceptions.mjs`, which passes each
+exception in `AUDIT_EXCEPTIONS` to Bun as `--ignore=<GHSA ID>`. Bun still exits nonzero for every
+other advisory and for a failed registry request. Once an exception reaches its expiry, the
+wrapper exits nonzero without running the audit, so an exception cannot outlive its approval.
+An exception may last at most 14 days from its approval; extending it needs a new risk assessment
+and approval. The QDash repository maintainers own each exception.
+
+| Advisory | Package | Expires | Remove when |
+| --- | --- | --- | --- |
+| [GHSA-fc5q-39xc-vjpf](https://github.com/advisories/GHSA-fc5q-39xc-vjpf) | `picomatch` | 2026-12-02T00:00:00Z | A patched release is installed, or patterns stop coming only from checked-in configuration |
+
+GHSA-fc5q-39xc-vjpf is a ReDoS through extglob patterns such as `+(*)`, and no patched release
+exists. The UI reaches `picomatch` only through Knip, Vite and Vitest, whose glob patterns come
+from checked-in configuration such as `ui/knip.json` and `ui/vitest.config.mts`. The residual risk
+is a slow or stalled local or CI tool run if a contributor commits a crafted pattern. Next.js bundles
+its own copy of `picomatch`, which `bun audit` does not cover. At runtime that copy compiles only
+the `images.remotePatterns` entry in `ui/next.config.js` (`github.com` and `/**`), and requests
+supply only the strings matched against it.
+
 ## Place Tests Beside Their Layer
 
 Component tests live in a sibling `__tests__/` directory. Hook tests live under

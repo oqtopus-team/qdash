@@ -11,6 +11,7 @@ on:
       - "package.json"
       - "bun.lock"
       - "Taskfile.yaml"
+      - ".github/scripts/audit-exceptions*.mjs"
       - ".github/workflows/frontend-ci.yml"
   pull_request:
     branches: [main, develop]
@@ -22,6 +23,7 @@ on:
       - "package.json"
       - "bun.lock"
       - "Taskfile.yaml"
+      - ".github/scripts/audit-exceptions*.mjs"
       - ".github/workflows/frontend-ci.yml"
 
 permissions:
