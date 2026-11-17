@@ -119,10 +119,7 @@ function EmptyState({
             }
           >
             {variant !== "panel" && (
-              <Icon
-                data-icon="inline-start"
-                className="text-base-content/40 group-hover:text-primary transition-colors shrink-0"
-              />
+              <Icon className="w-3.5 h-3.5 text-base-content/40 group-hover:text-primary transition-colors shrink-0" />
             )}
             <span className="text-xs leading-snug">{text}</span>
           </button>

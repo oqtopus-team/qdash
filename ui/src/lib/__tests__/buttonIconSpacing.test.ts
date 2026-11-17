@@ -120,7 +120,13 @@ function auditButtonIcons(file: string, source: string): string[] {
       if (ts.isJsxFragment(node)) choices = variants(node.children);
       else if (ts.isJsxExpression(node) && node.expression) {
         const expr = unwrap(node.expression);
-        if (ts.isConditionalExpression(expr)) {
+        if (
+          ts.isBinaryExpression(expr) &&
+          expr.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken &&
+          ts.isJsxFragment(unwrap(expr.right))
+        ) {
+          choices = [[], ...variants((unwrap(expr.right) as ts.JsxFragment).children)];
+        } else if (ts.isConditionalExpression(expr)) {
           choices = [expr.whenTrue, expr.whenFalse].flatMap((branch) => {
             const value = unwrap(branch);
             return ts.isJsxFragment(value)
@@ -136,13 +142,24 @@ function auditButtonIcons(file: string, source: string): string[] {
     return result;
   };
 
+  // A conditional class can select a different component altogether. Without
+  // evaluating runtime conditions, its children cannot be assigned to the .btn branch.
+  const alwaysButton = (node: JsxNode) => {
+    const init = attribute(node, "className")?.initializer;
+    if (init && ts.isJsxExpression(init) && init.expression) {
+      const expr = unwrap(init.expression);
+      if (ts.isConditionalExpression(expr)) {
+        return [expr.whenTrue, expr.whenFalse].every((branch) =>
+          BTN_CLASS.test(branch.getText(sf)),
+        );
+      }
+    }
+    return BTN_CLASS.test(classText(node));
+  };
+
   const problems: string[] = [];
   const visit = (node: ts.Node) => {
-    if (
-      ts.isJsxElement(node) &&
-      BTN_CLASS.test(classText(node)) &&
-      !ALIGNED_ROW_CLASS.test(classText(node))
-    ) {
+    if (ts.isJsxElement(node) && alwaysButton(node) && !ALIGNED_ROW_CLASS.test(classText(node))) {
       const iconOnly = ICON_ONLY_CLASS.test(classText(node));
       for (const rendered of variants(node.children)) {
         const children = rendered.map(classify).filter((child) => child !== null);
@@ -236,6 +253,27 @@ describe("button icon spacing", () => {
     const problems = auditButtonIcons(resolve(SRC_DIR, "Fixture.tsx"), source);
     expect(problems.filter((problem) => problem.includes("expected data-icon"))).toHaveLength(2);
     expect(problems.filter((problem) => problem.includes("remove spacing"))).toHaveLength(2);
+  });
+
+  it("does not apply button rules to a conditional non-button variant", () => {
+    const source = `
+      import { Plus } from "lucide-react";
+      const A = ({panel}) => <button className={panel ? "btn btn-sm" : "chat-suggestion-pill"}>
+        {!panel && <Plus className="w-3.5 h-3.5" />}Save
+      </button>;
+    `;
+    expect(auditButtonIcons(resolve(SRC_DIR, "Fixture.tsx"), source)).toEqual([]);
+  });
+
+  it("checks icons inside logical-AND fragments", () => {
+    const source = `
+      import { Plus } from "lucide-react";
+      const Missing = ({open}) => <button className="btn">{open && <><Plus />Save</>}</button>;
+      const Valid = ({open}) => <button className="btn">{open && <><Plus data-icon="inline-start" />Save</>}</button>;
+    `;
+    expect(auditButtonIcons(resolve(SRC_DIR, "Fixture.tsx"), source)).toEqual([
+      "src/Fixture.tsx:3 expected data-icon=inline-start, found undefined",
+    ]);
   });
 
   it("compiles the shared rule so only the icon side of a text button loses padding", async () => {
