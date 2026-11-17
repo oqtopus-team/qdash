@@ -2,7 +2,7 @@
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { useGetCopilotPreferences } from "@/client/copilot/copilot";
-import { ArrowDown, FlaskConical } from "lucide-react";
+import { ArrowDown, FlaskConical, GitBranch } from "lucide-react";
 import { StickToBottom, useStickToBottomContext } from "use-stick-to-bottom";
 import { useChatSuggestions, type ChatSuggestion } from "@/hooks/useChatSuggestions";
 import { useCopilotChat } from "@/hooks/useCopilotChat";
@@ -12,6 +12,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { withViewTransition } from "@/lib/viewTransition";
 import { ChatComposer, type ChatComposerHandle } from "@/components/features/chat/ChatComposer";
 import { ChatLinkPreviewProvider } from "@/components/features/chat/ChatLinkPreview";
+import { ChatNotice, ChatPendingSteers } from "@/components/features/chat/ChatPendingSteers";
 import { QdashBotAvatar } from "@/components/ui/UserAvatar";
 import {
   AssistantMessage,
@@ -153,6 +154,19 @@ function SuggestionPills({
   );
 }
 
+/** Above a branched chat: where it came from, and what it shares with that chat. */
+function BranchOrigin() {
+  return (
+    <p className="flex items-start gap-1.5 text-xs text-base-content/55">
+      <GitBranch className="w-3.5 h-3.5 shrink-0 mt-px" aria-hidden="true" />
+      <span>
+        Branched from another chat at one of its answers. It shares that chat&apos;s workspace files
+        as they are now, and only one of them answers at a time.
+      </span>
+    </p>
+  );
+}
+
 export interface ChatThreadHandle {
   focus: () => void;
 }
@@ -185,6 +199,18 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
     canEditMessage,
     editMessage,
     rateAnswer,
+    steers,
+    steer,
+    resendSteer,
+    checkSteer,
+    dismissSteer,
+    notice: chatNotice,
+    dismissNotice,
+    continueLast,
+    canContinue,
+    branchFrom,
+    canBranchAt,
+    branchingIndex,
   } = useCopilotChat(sessionId);
   const { data: preferences } = useGetCopilotPreferences({ query: { staleTime: 60_000 } });
   const [input, setInput] = useState("");
@@ -196,7 +222,7 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
 
   const context = session?.context ?? null;
   const suggestions = useChatSuggestions(Boolean(context));
-  const isEmpty = messages.length === 0 && !liveTurn;
+  const isEmpty = messages.length === 0 && !liveTurn && steers.length === 0;
   const lastIndex = messages.length - 1;
 
   // Focus the composer on session switch
@@ -220,7 +246,12 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
   const submit = useCallback(
     (text: string) => {
       const trimmed = text.trim();
-      if (!trimmed || isStreaming || isLoadingMessages || isPending()) return;
+      if (!trimmed || isLoadingMessages || isPending()) return;
+      if (isStreaming) {
+        // The answer in progress reads it after its current step; figures wait for a new message.
+        if (attachments.length === 0 && steer(trimmed)) setInput("");
+        return;
+      }
       const images = attachments.map(({ data, mimeType }) => ({ data, mimeType }));
       // The first send turns the greeting into a thread; morph the mark and
       // the composer into their new places instead of swapping layouts.
@@ -230,7 +261,7 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
         clear();
       });
     },
-    [attachments, clear, isLoadingMessages, isPending, isStreaming, send],
+    [attachments, clear, isLoadingMessages, isPending, isStreaming, send, steer],
   );
 
   const focusComposer = useCallback(() => composerRef.current?.focus(), []);
@@ -259,6 +290,7 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
       onThinkingChange={thinking.select}
       instructionsActive={Boolean(preferences?.data.instructions)}
       compact={variant !== "page"}
+      steerable
     />
   );
 
@@ -310,6 +342,7 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
           <StickToBottom.Content
             className={`${variant === "page" ? "max-w-3xl mx-auto px-4 pt-6 pb-10 space-y-7" : `${pad} pt-3 pb-6 space-y-5`}`}
           >
+            {session?.branch && <BranchOrigin />}
             {isLoadingMessages && (
               <div className="space-y-6 pt-4" aria-label="Loading messages">
                 <div className="ml-auto h-10 w-1/2 rounded-3xl bg-base-content/5 animate-pulse" />
@@ -338,10 +371,23 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
                   onDecide={decide}
                   onOther={focusComposer}
                   onRate={(feedback) => rateAnswer(idx, feedback)}
+                  canContinue={canContinue}
+                  onContinue={continueLast}
+                  canBranch={canBranchAt(idx)}
+                  branching={idx === branchingIndex}
+                  onBranch={() => branchFrom(idx)}
                 />
               ),
             )}
             {liveTurn && <LiveAssistantMessage turn={liveTurn} statusMessage={statusMessage} />}
+            <ChatPendingSteers
+              steers={steers}
+              isStreaming={isStreaming}
+              onResend={resendSteer}
+              onCheck={checkSteer}
+              onDismiss={dismissSteer}
+            />
+            {chatNotice && <ChatNotice text={chatNotice} onDismiss={dismissNotice} />}
           </StickToBottom.Content>
           <ScrollToBottomButton />
         </StickToBottom>

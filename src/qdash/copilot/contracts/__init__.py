@@ -2,6 +2,9 @@
 
 from qdash.copilot.contracts.models import (
     ChatRequest,
+    ChatSteerRequest,
+    ChatSteerResponse,
+    ChatSteerStatusRequest,
     ChatStopRequest,
     ChatStopResponse,
     FlowEditorContext,
@@ -14,6 +17,9 @@ from qdash.copilot.contracts.models import (
 
 __all__ = [
     "ChatRequest",
+    "ChatSteerRequest",
+    "ChatSteerResponse",
+    "ChatSteerStatusRequest",
     "ChatStopRequest",
     "ChatStopResponse",
     "FlowEditorContext",

@@ -245,6 +245,61 @@ describe("ChatTrace", () => {
     expect(screen.getByText("exit 1")).toBeTruthy();
   });
 
+  it("shows a code mode script with its output and the tool calls it made", () => {
+    render(
+      <ChatTraceSummary
+        trace={{
+          durationMs: 3000,
+          steps: [
+            {
+              kind: "tool",
+              id: "s1",
+              tool: "codemode",
+              label: "Codemode",
+              status: "done",
+              startedAt: 0,
+              endedAt: 2000,
+              args: { code: "const chips = await tools.qdash_list_chips({});" },
+              output: "B: 80 us\n\nTool calls: 1\nok        qdash_list_chips (12 ms)",
+            },
+          ],
+        }}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /used 1 tool/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Ran a script/ }));
+    expect(screen.getByText(/ok\s+qdash_list_chips \(12 ms\)/)).toBeTruthy();
+    expect(screen.getByText("javascript")).toBeTruthy();
+  });
+
+  it("keeps a live code mode step open with its script and failed tool calls", () => {
+    render(
+      <LiveTrace
+        steps={[
+          {
+            kind: "tool",
+            id: "s2",
+            tool: "codemode",
+            label: "Code mode script",
+            status: "error",
+            startedAt: 0,
+            endedAt: 1000,
+            args: { code: "await tools.qdash_list_cryostats({});" },
+            output:
+              "Script failed\n\nTool calls: 1, 1 failed\nerror     qdash_list_cryostats (3 ms): QDash answered 503",
+          },
+        ]}
+      />,
+    );
+    expect(screen.getByText(/Ran a script/)).toBeTruthy();
+    // Open, not only mounted: folded output stays mounted under aria-hidden="true".
+    const output = screen.getByText(/qdash_list_cryostats \(3 ms\): QDash answered 503/);
+    expect(output.closest("[aria-hidden]")?.getAttribute("aria-hidden")).toBe("false");
+    expect(
+      screen.getByText("javascript").closest("[aria-hidden]")?.getAttribute("aria-hidden"),
+    ).toBe("false");
+  });
+
   it("folds a finished workspace step in the summary until it is opened", () => {
     render(
       <ChatTraceSummary

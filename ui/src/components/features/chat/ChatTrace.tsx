@@ -16,6 +16,7 @@ import {
   ToolDetails,
   hasDetails,
   isWorkspaceTool,
+  CODEMODE_TOOL,
   stepPreview,
   stepTitle,
   toolIcon,
@@ -162,7 +163,9 @@ function ToolStepRow({
   const preview = stepPreview(step);
   // Code written live stays open while it runs and when its output lands;
   // folding it the moment the call starts would hide what the user just watched.
-  const stayOpen = live && (isWorkspaceTool(step.tool) || step.tool === "qdash_save_flow");
+  const stayOpen =
+    live &&
+    (isWorkspaceTool(step.tool) || step.tool === CODEMODE_TOOL || step.tool === "qdash_save_flow");
   const elapsed = (step.endedAt ?? now) - step.startedAt;
   const details = hasDetails(step);
   const drafting = step.status === "drafting";

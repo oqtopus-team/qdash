@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { CopilotChatMessageSchema } from './copilotChatMessageSchema';
+import type { CopilotChatSessionResponseBranch } from './copilotChatSessionResponseBranch';
 import type { CopilotChatSessionResponseContext } from './copilotChatSessionResponseContext';
 
 /**
@@ -16,6 +17,7 @@ export interface CopilotChatSessionResponse {
   title: string;
   context?: CopilotChatSessionResponseContext;
   messages?: CopilotChatMessageSchema[];
+  branch?: CopilotChatSessionResponseBranch;
   created_at: string;
   updated_at: string;
 }

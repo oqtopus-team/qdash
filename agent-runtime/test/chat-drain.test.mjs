@@ -40,7 +40,8 @@ for (const failure of ["watch", "entries"]) {
         BACKGROUND_CONTEXT,
         SharedRuntime: { create: async () => ({
           listToolNames: () => [],
-          openSession: async () => ({ conversation, close: async () => { closed = true; } }),
+          storePath: () => "/nonexistent/chat-drain/store.sqlite",
+          openSession: async () => ({ conversation, harness: { resume: () => {}, inspect: async () => ({ scheduling: "paused", tasks: [], submissions: [] }) }, close: async () => { closed = true; } }),
         }) },
         answerText: async () => "Answer",
         pendingApproval: async () => undefined,
