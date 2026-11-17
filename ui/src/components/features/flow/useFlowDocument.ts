@@ -1,6 +1,8 @@
 "use client";
 
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useController, useForm, type FieldErrors } from "react-hook-form";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { GetFlowResponse, SaveFlowRequest } from "@/schemas";
@@ -9,12 +11,30 @@ import { useGetCurrentUser } from "@/client/auth/auth";
 import { useListChips } from "@/client/chip/chip";
 import { getFlow, getListFlowsQueryKey, saveFlow } from "@/client/flow/flow";
 import type { JourneyContext } from "@/components/features/first-calibration/useFirstCalibrationJourney";
+import {
+  flowPropertiesSchema,
+  type FlowPropertiesFormData,
+  type FlowPropertiesFormInput,
+} from "@/components/features/flow/flowMetadataSchema";
 import { useToast } from "@/components/ui/Toast";
+
+export type FlowPropertyField = keyof FlowPropertiesFormInput;
+
+const EMPTY_PROPERTIES: FlowPropertiesFormInput = {
+  description: "",
+  flow_function_name: "",
+  username: "",
+  chip_id: "",
+  tags: "",
+  folder: "",
+  default_interval: "",
+};
 
 /**
  * One workflow open in an editor pane: its saved source, the draft being edited, its
  * properties, and the save that writes them back. The workflow editor holds one per pane,
- * so each pane edits and saves its own workflow.
+ * so each pane edits and saves its own workflow. The properties are a React Hook Form form
+ * validated by `flowPropertiesSchema`.
  */
 export interface FlowDocument {
   /** The workflow this document is for, or null for an empty pane. */
@@ -44,13 +64,51 @@ export interface FlowDocument {
   setFolder: (value: string) => void;
   defaultInterval: string;
   setDefaultInterval: (value: string) => void;
+  /** Validation errors of the properties from the last save attempt, cleared as they are fixed. */
+  propertyErrors: FieldErrors<FlowPropertiesFormInput>;
   /** The draft differs from the saved source. */
   isDirty: boolean;
-  /** Save the draft and properties under `name`; false when there is nothing ready to save. */
-  save: (context: JourneyContext) => boolean;
+  /**
+   * Validate the properties and save them with the draft under `name`. Invalid properties are
+   * not saved; `onInvalid` receives their errors. Does nothing while no workflow is ready.
+   */
+  save: (
+    context: JourneyContext,
+    onInvalid?: (errors: FieldErrors<FlowPropertiesFormInput>) => void,
+  ) => void;
   isSaving: boolean;
   saveError: unknown;
   resetSave: () => void;
+}
+
+/** The save request for a workflow's draft and its validated properties. */
+function buildSaveRequest(
+  name: string,
+  code: string,
+  values: FlowPropertiesFormData,
+): SaveFlowRequest {
+  return {
+    name,
+    description: values.description,
+    code,
+    flow_function_name: values.flow_function_name,
+    chip_id: values.chip_id,
+    tags: values.tags,
+    folder: values.folder,
+    default_parameters: {
+      username: values.username,
+      chip_id: values.chip_id,
+    },
+    default_run_parameters: values.default_interval
+      ? {
+          interval: {
+            value: values.default_interval,
+            value_type: "int",
+            unit: "ns",
+          },
+        }
+      : {},
+  };
 }
 
 export function useFlowDocument(name: string | null): FlowDocument {
@@ -65,15 +123,29 @@ export function useFlowDocument(name: string | null): FlowDocument {
   // Counts each time a workflow is opened, so a save that answers after the pane reopened its
   // workflow does not move the new draft's baseline.
   const openCountRef = useRef(0);
-  const [description, setDescription] = useState("");
   const [code, setCode] = useState("");
   const [originalCode, setOriginalCode] = useState("");
-  const [flowFunctionName, setFlowFunctionName] = useState("");
-  const [username, setUsername] = useState("");
-  const [chipId, setChipId] = useState("");
-  const [tags, setTags] = useState("");
-  const [folder, setFolder] = useState("");
-  const [defaultInterval, setDefaultInterval] = useState("");
+
+  const {
+    control,
+    handleSubmit,
+    reset,
+    setValue,
+    formState: { errors: propertyErrors },
+  } = useForm<FlowPropertiesFormInput, unknown, FlowPropertiesFormData>({
+    resolver: zodResolver(flowPropertiesSchema),
+    defaultValues: EMPTY_PROPERTIES,
+    shouldFocusError: false,
+  });
+  const { field: descriptionField } = useController({ control, name: "description" });
+  const { field: flowFunctionNameField } = useController({ control, name: "flow_function_name" });
+  const { field: usernameField } = useController({ control, name: "username" });
+  const { field: chipIdField } = useController({ control, name: "chip_id" });
+  const { field: tagsField } = useController({ control, name: "tags" });
+  const { field: folderField } = useController({ control, name: "folder" });
+  const { field: defaultIntervalField } = useController({ control, name: "default_interval" });
+  const username = usernameField.value;
+  const chipId = chipIdField.value;
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["flow", name],
@@ -101,33 +173,34 @@ export function useFlowDocument(name: string | null): FlowDocument {
       return;
     }
     if (loadedNameRef.current === name) return;
-    setDescription(flow.description);
     setCode(flow.code);
     setOriginalCode(flow.code);
-    setFlowFunctionName(flow.flow_function_name);
 
     // Set username from flow or fallback to current user
     const flowUsername = (flow.default_parameters?.username as string) || "";
-    setUsername(flowUsername || currentUsername.current || "");
-
-    setChipId(flow.chip_id);
-    setTags(flow.tags?.join(", ") || "");
-    setFolder(flow.folder ?? "");
     const runParams = flow.default_run_parameters as
       | Record<string, { value?: string | number }>
       | undefined;
-    setDefaultInterval(runParams?.interval?.value != null ? String(runParams.interval.value) : "");
+    reset({
+      description: flow.description,
+      flow_function_name: flow.flow_function_name,
+      username: flowUsername || currentUsername.current || "",
+      chip_id: flow.chip_id,
+      tags: flow.tags?.join(", ") || "",
+      folder: flow.folder ?? "",
+      default_interval: runParams?.interval?.value != null ? String(runParams.interval.value) : "",
+    });
     openCountRef.current += 1;
     loadedNameRef.current = name;
     setLoadedName(name);
-  }, [name, flow]);
+  }, [name, flow, reset]);
 
   // Set default username if not set by flow data
   useEffect(() => {
     if (userData?.data?.username && !username && !flow) {
-      setUsername(userData.data.username);
+      setValue("username", userData.data.username);
     }
-  }, [userData, username, flow]);
+  }, [userData, username, flow, setValue]);
 
   // Set default chip_id if not set by flow data
   useEffect(() => {
@@ -138,9 +211,9 @@ export function useFlowDocument(name: string | null): FlowDocument {
         const dateB = b.installed_at ? new Date(b.installed_at).getTime() : 0;
         return dateB - dateA;
       });
-      setChipId(sortedChips[0].chip_id);
+      setValue("chip_id", sortedChips[0].chip_id);
     }
-  }, [chipsData, chipId, flow]);
+  }, [chipsData, chipId, flow, setValue]);
 
   const isReady = Boolean(name && flow && loadedName === name);
 
@@ -171,54 +244,20 @@ export function useFlowDocument(name: string | null): FlowDocument {
   const mutateSave = saveMutation.mutate;
 
   const save = useCallback(
-    (context: JourneyContext) => {
-      if (!name || !isReady) return false;
-      if (!username.trim()) {
-        toast.error("Please enter a username");
-        return false;
-      }
-      const request: SaveFlowRequest = {
-        name,
-        description: description.trim(),
-        code,
-        flow_function_name: flowFunctionName.trim() || undefined,
-        chip_id: chipId.trim(),
-        tags: tags
-          .split(",")
-          .map((t) => t.trim())
-          .filter(Boolean),
-        folder: folder.trim(),
-        default_parameters: {
-          username: username.trim(),
-          chip_id: chipId.trim(),
-        },
-        default_run_parameters: defaultInterval.trim()
-          ? {
-              interval: {
-                value: defaultInterval.trim(),
-                value_type: "int",
-                unit: "ns",
-              },
-            }
-          : {},
-      };
-      mutateSave({ request, context, openCount: openCountRef.current });
-      return true;
+    (
+      context: JourneyContext,
+      onInvalid?: (errors: FieldErrors<FlowPropertiesFormInput>) => void,
+    ) => {
+      if (!name || !isReady) return;
+      void handleSubmit((values) => {
+        mutateSave({
+          request: buildSaveRequest(name, code, values),
+          context,
+          openCount: openCountRef.current,
+        });
+      }, onInvalid)();
     },
-    [
-      name,
-      isReady,
-      username,
-      description,
-      code,
-      flowFunctionName,
-      chipId,
-      tags,
-      folder,
-      defaultInterval,
-      mutateSave,
-      toast,
-    ],
+    [name, isReady, code, handleSubmit, mutateSave],
   );
 
   return {
@@ -229,20 +268,21 @@ export function useFlowDocument(name: string | null): FlowDocument {
     isReady,
     code,
     setCode,
-    description,
-    setDescription,
-    flowFunctionName,
-    setFlowFunctionName,
+    description: descriptionField.value,
+    setDescription: descriptionField.onChange,
+    flowFunctionName: flowFunctionNameField.value,
+    setFlowFunctionName: flowFunctionNameField.onChange,
     username,
-    setUsername,
+    setUsername: usernameField.onChange,
     chipId,
-    setChipId,
-    tags,
-    setTags,
-    folder,
-    setFolder,
-    defaultInterval,
-    setDefaultInterval,
+    setChipId: chipIdField.onChange,
+    tags: tagsField.value,
+    setTags: tagsField.onChange,
+    folder: folderField.value,
+    setFolder: folderField.onChange,
+    defaultInterval: defaultIntervalField.value,
+    setDefaultInterval: defaultIntervalField.onChange,
+    propertyErrors,
     isDirty: isReady && code !== originalCode,
     save,
     isSaving: saveMutation.isPending,

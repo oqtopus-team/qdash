@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -13,6 +13,13 @@ import { WorkflowEditorPageContent } from "@/components/features/flow/WorkflowEd
 import { deleteFlow, saveFlow } from "@/client/flow/flow";
 
 const mocks = vi.hoisted(() => ({
+  monaco: {
+    KeyMod: { CtrlCmd: 2048, Alt: 512 },
+    KeyCode: { KeyS: 49, KeyZ: 56 },
+    editor: { remeasureFonts: () => undefined },
+  },
+  // Commands the mounted editor registered, such as Cmd/Ctrl+S, by keybinding.
+  editorCommands: new Map<number, () => void>(),
   executeFlow: vi.fn(),
   toastSuccess: vi.fn(),
   toastError: vi.fn(),
@@ -34,15 +41,31 @@ vi.mock("next/navigation", () => ({
 
 vi.mock("next/dynamic", () => ({
   default: () =>
+    /** Monaco stand-in: a text area that registers the editor commands on mount. */
     function MockEditor({
       value,
       onChange,
+      onMount,
       options,
     }: {
       value?: string;
       onChange?: (value?: string) => void;
+      onMount?: (editor: unknown, monaco: unknown) => void;
       options?: { readOnly?: boolean };
     }) {
+      useEffect(() => {
+        onMount?.(
+          {
+            onDidDispose: () => undefined,
+            onDidChangeCursorPosition: () => undefined,
+            onDidChangeCursorSelection: () => undefined,
+            updateOptions: () => undefined,
+            addCommand: (keybinding: number, handler: () => void) =>
+              mocks.editorCommands.set(keybinding, handler),
+          },
+          mocks.monaco,
+        );
+      }, [onMount]);
       return (
         <textarea
           data-testid="editor"
@@ -614,5 +637,165 @@ describe("WorkflowEditorPageContent split editor", () => {
     expect(deleteFlow).toHaveBeenCalledTimes(1);
     expect(deleteFlow).toHaveBeenCalledWith("first_calibration");
     await waitFor(() => expect(mocks.push).toHaveBeenCalledWith("/workflow"));
+  });
+});
+
+/** Presses Cmd/Ctrl+S in the Monaco editor. */
+async function pressSaveShortcut() {
+  const save = mocks.editorCommands.get(mocks.monaco.KeyMod.CtrlCmd | mocks.monaco.KeyCode.KeyS);
+  if (!save) throw new Error("Cmd/Ctrl+S is not registered");
+  await act(async () => {
+    save();
+  });
+}
+
+/** Unlocks the editor once the flow has loaded. */
+async function unlockEditor() {
+  await screen.findByTestId("editor");
+  fireEvent.click(screen.getByTitle("Click to edit"));
+}
+
+/** Opens the Properties side panel from the activity bar button, which follows the header button. */
+function openPropertiesPanel() {
+  fireEvent.click(screen.getAllByRole("button", { name: "Properties" })[1]);
+}
+
+/** Whether leaving the page now asks the browser to warn about unsaved changes. */
+function warnsBeforeUnload() {
+  const event = new Event("beforeunload", { cancelable: true });
+  window.dispatchEvent(event);
+  return event.defaultPrevented;
+}
+
+describe("WorkflowEditorPageContent properties", () => {
+  beforeEach(() => {
+    mocks.projectId = "project-1";
+    mocks.disabledReason = null;
+    mocks.editorCommands.clear();
+    window.localStorage.setItem(PROJECT_STORAGE_KEY, "project-1");
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+    window.localStorage.clear();
+  });
+
+  it("saves the properties and the code through Cmd/Ctrl+S", async () => {
+    vi.mocked(saveFlow).mockResolvedValue({ data: {} } as Awaited<ReturnType<typeof saveFlow>>);
+    renderEditor();
+    await unlockEditor();
+    expect(warnsBeforeUnload()).toBe(false);
+
+    openPropertiesPanel();
+    fireEvent.change(screen.getByLabelText("Description"), {
+      target: { value: "  Daily T1  " },
+    });
+    fireEvent.change(screen.getByLabelText("Tags"), { target: { value: " t1, , daily " } });
+    fireEvent.change(screen.getByLabelText("Default Interval (ns)"), {
+      target: { value: " 150 * 1024 " },
+    });
+    expect(screen.queryByTitle("Unsaved changes")).toBeNull();
+    expect(warnsBeforeUnload()).toBe(false);
+
+    fireEvent.change(screen.getByLabelText("Code"), {
+      target: { value: "from prefect import flow\n\n# edited\n" },
+    });
+    expect(screen.getByTitle("Unsaved changes")).toBeInTheDocument();
+    expect(warnsBeforeUnload()).toBe(true);
+
+    await pressSaveShortcut();
+
+    await waitFor(() =>
+      expect(mocks.toastSuccess).toHaveBeenCalledWith("first_calibration saved successfully!"),
+    );
+    expect(saveFlow).toHaveBeenCalledWith({
+      name: "first_calibration",
+      description: "Daily T1",
+      code: "from prefect import flow\n\n# edited\n",
+      flow_function_name: "first_calibration",
+      chip_id: "chip-a",
+      tags: ["t1", "daily"],
+      folder: "",
+      default_parameters: { username: "alice", chip_id: "chip-a" },
+      default_run_parameters: {
+        interval: { value: "150 * 1024", value_type: "int", unit: "ns" },
+      },
+    });
+    await waitFor(() => expect(screen.queryByTitle("Unsaved changes")).toBeNull());
+    expect(warnsBeforeUnload()).toBe(false);
+    expect(mocks.toastError).not.toHaveBeenCalled();
+  });
+
+  it("does not save through Cmd/Ctrl+S while the editor is locked", async () => {
+    renderEditor();
+    await screen.findByTitle("Click to edit");
+
+    await pressSaveShortcut();
+
+    expect(saveFlow).not.toHaveBeenCalled();
+  });
+
+  it("shows and focuses a hidden invalid username when saving by shortcut", async () => {
+    renderEditor();
+    await unlockEditor();
+    openPropertiesPanel();
+    fireEvent.change(screen.getByLabelText("Username *"), { target: { value: "   " } });
+    fireEvent.click(screen.getByRole("button", { name: "Explorer" }));
+    expect(screen.queryByLabelText("Username *")).toBeNull();
+
+    await pressSaveShortcut();
+
+    const username = await screen.findByLabelText("Username *");
+    await waitFor(() => expect(document.activeElement).toBe(username));
+    expect(username).toHaveAttribute("aria-invalid", "true");
+    const error = document.getElementById(username.getAttribute("aria-describedby") ?? "");
+    expect(error).toHaveTextContent("Please enter a username");
+    expect(saveFlow).not.toHaveBeenCalled();
+    expect(mocks.toastError).not.toHaveBeenCalled();
+
+    vi.mocked(saveFlow).mockResolvedValue({ data: {} } as Awaited<ReturnType<typeof saveFlow>>);
+    fireEvent.change(username, { target: { value: " bob " } });
+    await waitFor(() => expect(username).not.toHaveAttribute("aria-invalid", "true"));
+    await pressSaveShortcut();
+    await waitFor(() =>
+      expect(saveFlow).toHaveBeenCalledWith(
+        expect.objectContaining({
+          default_parameters: { username: "bob", chip_id: "chip-a" },
+        }),
+      ),
+    );
+  });
+
+  it("saves from the command palette and reports an invalid field in the open modal", async () => {
+    renderEditor();
+    await unlockEditor();
+    fireEvent.click(screen.getAllByRole("button", { name: "Properties" })[0]);
+    const dialog = await screen.findByRole("dialog", { name: "Properties" });
+    fireEvent.change(within(dialog).getByLabelText("Username *"), { target: { value: "" } });
+
+    fireEvent.keyDown(window, { key: "p", ctrlKey: true, shiftKey: true });
+    fireEvent.click(await screen.findByRole("option", { name: /Save Flow/ }));
+
+    const username = await within(
+      await screen.findByRole("dialog", { name: "Properties" }),
+    ).findByLabelText("Username *");
+    await waitFor(() => expect(document.activeElement).toBe(username));
+    expect(username).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getAllByText("Please enter a username").length).toBeGreaterThan(0);
+    expect(saveFlow).not.toHaveBeenCalled();
+  });
+
+  it("keeps a failed save as a submission error", async () => {
+    vi.mocked(saveFlow).mockRejectedValue(new Error("disk full"));
+    renderEditor();
+    await unlockEditor();
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(
+      await screen.findByText("Failed to save first_calibration: disk full"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Please enter a username")).toBeNull();
   });
 });
