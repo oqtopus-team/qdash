@@ -5365,6 +5365,148 @@
         "task_type": "qubit"
       },
       {
+        "class_name": "CheckQubitFrequencyMapping",
+        "description": "Task to identify a qubit's coarse frequency and its resonator.\n\nThe task drives one qubit and reads every resonator candidate published by the\nlatest CheckResonatorSpectroscopy run of its MUX in one multiplexed qubit\nspectroscopy. It analyzes each candidate's map with the CheckQubitSpectroscopy\nanalysis and ranks the candidates by the raw f01 ``moment`` of that analysis. It\npublishes the readout and coarse qubit values of the best candidate only when its\n``quality_level`` meets the absolute threshold, its f01 is at least 2.5 GHz, and its\nmoment is at least ``min_score_ratio`` times the runner-up's, where the runner-up is\nthe next candidate with any f01 peak, low quality included. Exact and near ties\nare rejected as ambiguous. The default ratio of 2.0 is a provisional heuristic, not\nan empirically calibrated threshold, and the moment is not normalized: it depends\non each candidate's readout amplitude and noise. It does not use the qubit's\nexisting readout_frequency, so a wrong resonator assignment does not affect the\nresult.\n\nEvery outcome saves a summary figure first, followed by each candidate's marked\nand raw figures. The summary lists every candidate's moment, quality level, f01,\nreadout frequency and power, the ranking, runner-up margin, and the selection or\nrejection reason, and carries the same evidence as JSON under\n``layout.meta[\"qubit_frequency_mapping\"]``, so the existing AI evaluation of a\ntask result can review the deterministic decision.\n\nThe candidate set must come from a CheckResonatorSpectroscopy run with\n``detection_only`` set, and that run must be the latest complete producer\nattempt in the MUX: a newer, failed, or partial attempt rejects the task before\nany measurement. Each candidate's map is analyzed from its phase data on the\nmeasured sweep axes, never from a figure.\n\nRequires a Qubex revision that provides\n``qubex.contrib.multiplexed_readout_qubit_spectroscopy``.",
+        "file_path": "cw/check_qubit_frequency_mapping.py",
+        "input_parameters": {
+          "resonator_candidate_0_frequency": {
+            "default_value": null,
+            "description": "Frequency of resonator candidate 0.",
+            "resolution": "database_optional",
+            "ui_group": "Resonator candidates",
+            "ui_group_collapsed": true,
+            "unit": "GHz",
+            "user_override": "forbidden"
+          },
+          "resonator_candidate_0_readout_amplitude": {
+            "default_value": null,
+            "description": "Readout amplitude of resonator candidate 0.",
+            "resolution": "database_optional",
+            "ui_group": "Resonator candidates",
+            "ui_group_collapsed": true,
+            "unit": "a.u.",
+            "user_override": "forbidden"
+          },
+          "resonator_candidate_1_frequency": {
+            "default_value": null,
+            "description": "Frequency of resonator candidate 1.",
+            "resolution": "database_optional",
+            "ui_group": "Resonator candidates",
+            "ui_group_collapsed": true,
+            "unit": "GHz",
+            "user_override": "forbidden"
+          },
+          "resonator_candidate_1_readout_amplitude": {
+            "default_value": null,
+            "description": "Readout amplitude of resonator candidate 1.",
+            "resolution": "database_optional",
+            "ui_group": "Resonator candidates",
+            "ui_group_collapsed": true,
+            "unit": "a.u.",
+            "user_override": "forbidden"
+          },
+          "resonator_candidate_2_frequency": {
+            "default_value": null,
+            "description": "Frequency of resonator candidate 2.",
+            "resolution": "database_optional",
+            "ui_group": "Resonator candidates",
+            "ui_group_collapsed": true,
+            "unit": "GHz",
+            "user_override": "forbidden"
+          },
+          "resonator_candidate_2_readout_amplitude": {
+            "default_value": null,
+            "description": "Readout amplitude of resonator candidate 2.",
+            "resolution": "database_optional",
+            "ui_group": "Resonator candidates",
+            "ui_group_collapsed": true,
+            "unit": "a.u.",
+            "user_override": "forbidden"
+          },
+          "resonator_candidate_3_frequency": {
+            "default_value": null,
+            "description": "Frequency of resonator candidate 3.",
+            "resolution": "database_optional",
+            "ui_group": "Resonator candidates",
+            "ui_group_collapsed": true,
+            "unit": "GHz",
+            "user_override": "forbidden"
+          },
+          "resonator_candidate_3_readout_amplitude": {
+            "default_value": null,
+            "description": "Readout amplitude of resonator candidate 3.",
+            "resolution": "database_optional",
+            "ui_group": "Resonator candidates",
+            "ui_group_collapsed": true,
+            "unit": "a.u.",
+            "user_override": "forbidden"
+          },
+          "resonator_candidate_count": {
+            "default_value": null,
+            "description": "Number of resonator candidates from CheckResonatorSpectroscopy.",
+            "resolution": "database_required",
+            "ui_group": "Resonator candidates",
+            "ui_group_collapsed": true,
+            "unit": "",
+            "user_override": "forbidden",
+            "value_type": "int"
+          }
+        },
+        "name": "CheckQubitFrequencyMapping",
+        "output_parameters": [
+          "resonator_frequency",
+          "readout_amplitude",
+          "resonator_candidate_index",
+          "coarse_qubit_frequency",
+          "f01_repr_db",
+          "f01_quality_level",
+          "coarse_control_amplitude"
+        ],
+        "run_parameters": {
+          "frequency_range": {
+            "description": "Drive frequency range as [start, stop, step] in GHz. Leave blank to use the connected control box's qubex default: low band [3.0, 5.75, 0.005], high band [6.5, 9.75, 0.005].",
+            "unit": "GHz",
+            "value": null,
+            "value_type": "np.arange"
+          },
+          "interval": {
+            "description": "Time interval between shots",
+            "unit": "ns",
+            "value": 1024.0,
+            "value_type": "float"
+          },
+          "min_score_ratio": {
+            "description": "Minimum ratio of the best candidate's f01 moment to the runner-up's (any candidate with an f01 peak) required to select it. Must be greater than 1. The default 2.0 is a provisional heuristic, not empirically calibrated.",
+            "unit": "",
+            "value": 2.0,
+            "value_type": "float"
+          },
+          "power_range": {
+            "description": "Drive power range as [start, stop, step] in dB. The QDash default is [-60, 0, 5] dB. The stop value is exclusive.",
+            "unit": "dB",
+            "value": [
+              -60,
+              0,
+              5
+            ],
+            "value_type": "np.arange"
+          },
+          "shots": {
+            "description": "Number of shots per sweep point",
+            "unit": "a.u.",
+            "value": 1024,
+            "value_type": "int"
+          },
+          "simultaneous_drive": {
+            "description": "Whether control and readout pulses start together. False starts readout after the control pulse ends.",
+            "unit": "a.u.",
+            "value": true,
+            "value_type": "bool"
+          }
+        },
+        "task_type": "qubit"
+      },
+      {
         "class_name": "CheckQubitSpectroscopy",
         "description": "Task to check the qubit frequencies.\n\nThis task performs qubit spectroscopy with the dedicated 1024 ns Qubex\nreadout pulse and estimates the qubit frequency (f01) and optionally the f12\ntransition frequency from the spectroscopy data. The f12 estimate remains\ndiagnostic and is not published as calibrated anharmonicity.",
         "file_path": "cw/check_qubit_spectroscopy.py",
@@ -5814,16 +5956,31 @@
       },
       {
         "class_name": "CheckResonatorSpectroscopy",
-        "description": "Task to check the resonator spectroscopy.\n\nThis is a MUX-level task that performs spectroscopy on all resonators\nwith the dedicated 8192 ns Qubex spectroscopy pulse. The scheduler executes it once\nper MUX, and the result will be used by all qubits in that MUX.\n\nNote: task_type remains \"qubit\" for frontend compatibility, but\nis_mux_level=True indicates this task runs once per MUX.",
+        "description": "Task to check the resonator spectroscopy.\n\nThis is a MUX-level task that performs spectroscopy on all resonators\nwith the dedicated 8192 ns Qubex spectroscopy pulse. The scheduler executes it once\nper MUX, and the result will be used by all qubits in that MUX.\n\nNote: task_type remains \"qubit\" for frontend compatibility, but\nis_mux_level=True indicates this task runs once per MUX.\n\nWith the ``detection_only`` run parameter set, the task publishes only the\nunassigned candidate set of the MUX (``resonator_candidate_*``) for\nCheckQubitFrequencyMapping and assigns no resonator, readout frequency, or\nreadout amplitude to any qid. Every qid of the MUX then gets the same result,\nand a run without a usable candidate set fails for every qid.",
         "file_path": "cw/check_resonator_spectroscopy.py",
         "input_parameters": {},
         "name": "CheckResonatorSpectroscopy",
         "output_parameters": [
           "resonator_frequency",
           "optimal_power",
-          "readout_amplitude"
+          "readout_amplitude",
+          "resonator_candidate_count",
+          "resonator_candidate_0_frequency",
+          "resonator_candidate_0_readout_amplitude",
+          "resonator_candidate_1_frequency",
+          "resonator_candidate_1_readout_amplitude",
+          "resonator_candidate_2_frequency",
+          "resonator_candidate_2_readout_amplitude",
+          "resonator_candidate_3_frequency",
+          "resonator_candidate_3_readout_amplitude"
         ],
         "run_parameters": {
+          "detection_only": {
+            "description": "Publish only the unassigned resonator candidates of the MUX for CheckQubitFrequencyMapping, without assigning a resonator, readout frequency, or readout amplitude to any qubit. The run fails for every qubit of the MUX when it detects no usable candidate set. False keeps the per-qubit assignment and publishes no candidates.",
+            "unit": "",
+            "value": false,
+            "value_type": "bool"
+          },
           "frequency_range": {
             "description": "Frequency range as [start, stop, step] in GHz. Leave blank to use the connected readout box's qubex default: low band [5.75, 6.75, 0.002], high band [9.75, 10.75, 0.002].",
             "unit": "GHz",
@@ -5847,7 +6004,7 @@
             "value_type": "np.arange"
           },
           "resonator_assignment_order": {
-            "description": "Qubit offsets within each MUX in increasing resonator-frequency order. Enter a JSON array containing each offset from 0 to 3 exactly once. The default is [3, 0, 2, 1]. For 16Q, use [0, 3, 1, 2] when the frequency order is mux[0] < mux[3] < mux[1] < mux[2].",
+            "description": "Qubit offsets within each MUX in increasing resonator-frequency order. Enter a JSON array containing each offset from 0 to 3 exactly once. The default is [3, 0, 2, 1]. For 16Q, use [0, 3, 1, 2] when the frequency order is mux[0] < mux[3] < mux[1] < mux[2]. Ignored when detection_only is true.",
             "unit": "",
             "value": [
               3,

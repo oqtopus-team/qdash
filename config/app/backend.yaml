@@ -76,6 +76,7 @@ backends:
       CW:
         - CheckResonatorSpectroscopy
         - CheckQubitSpectroscopy
+        - CheckQubitFrequencyMapping
         - CheckWaveform
         - CheckControlAmplitude
 

@@ -188,6 +188,19 @@ class MuxDistributor:
                 backend, self._execution_id, run_result, target_qid
             )
 
+            if postprocess_result and postprocess_result.validation_error:
+                # A qid whose postprocess rejects the shared result fails like the
+                # representative would: its figures are kept, its outputs are not
+                # stored or published, and it is not marked completed.
+                if postprocess_result.figures:
+                    png_paths, json_paths = self._data_saver.save_figures(
+                        postprocess_result.figures, task_name, task_type, target_qid
+                    )
+                    self._state_manager.set_figure_paths(
+                        task_name, task_type, target_qid, png_paths, json_paths
+                    )
+                raise ValueError(postprocess_result.validation_error)
+
             if postprocess_result:
                 if postprocess_result.output_parameters:
                     task_model = self._state_manager.get_task(task_name, task_type, target_qid)

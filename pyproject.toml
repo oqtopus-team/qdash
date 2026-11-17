@@ -197,4 +197,8 @@ members = [
 
 [tool.uv.sources]
 qdash-api = { workspace = true }
-qubex = { git = "https://github.com/amachino/qubex.git", branch = "develop" }
+# Temporary pin: head commit of amachino/qubex#472 (refs/pull/472/head), which adds
+# qubex.contrib.multiplexed_readout_qubit_spectroscopy for CheckQubitFrequencyMapping.
+# After the PR merges, switch back to `branch = "develop"` (or the merge commit) and
+# run `uv lock --upgrade-package qubex`.
+qubex = { git = "https://github.com/amachino/qubex.git", rev = "0711dde0ca466d8c76f4ea5614af03a8422d9155" }

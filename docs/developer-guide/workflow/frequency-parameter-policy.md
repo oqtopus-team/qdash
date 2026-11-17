@@ -33,6 +33,7 @@ first is absent. Publication requires enabled output persistence and successful 
 | Task or task family | Drive-frequency input | Frequency result | Published database parameters |
 | --- | --- | --- | --- |
 | `CheckQubitSpectroscopy` | Qubex spectroscopy sweep range; no calibrated control-frequency input | Coarse f01 estimate | `coarse_qubit_frequency`, `control_frequency` |
+| `CheckQubitFrequencyMapping` | Qubex spectroscopy sweep range; no calibrated control-frequency input | Coarse f01 estimate on the selected resonator candidate | `coarse_qubit_frequency`, `control_frequency` |
 | `CheckControlAmplitude` | `control_frequency`; fallback: `coarse_qubit_frequency` | Refined coarse f01 estimate | `coarse_qubit_frequency`, `control_frequency` |
 | `CheckAdaptiveChevron` | `control_frequency`; fallback: `coarse_qubit_frequency` | Measured qubit frequency | `qubit_frequency`, `control_frequency` |
 | `CheckChevron` | `control_frequency`; fallback: `qubit_frequency` | Measured qubit frequency | `qubit_frequency`, `control_frequency` |
@@ -93,7 +94,8 @@ a new QDash execution does not remove those entries.
 
 | Task or task family | Readout-frequency input | Frequency result | Published database parameters |
 | --- | --- | --- | --- |
-| `CheckResonatorSpectroscopy` | Qubex spectroscopy sweep range; no calibrated readout-frequency input | Measured resonator frequency | `resonator_frequency`, `readout_frequency` |
+| `CheckResonatorSpectroscopy` | Qubex spectroscopy sweep range; no calibrated readout-frequency input | Measured resonator frequency; none with `detection_only` | `resonator_frequency`, `readout_frequency`; none with `detection_only` |
+| `CheckQubitFrequencyMapping` | Resonator candidates from `CheckResonatorSpectroscopy`; not `readout_frequency` | Resonator candidate that shows the qubit's response | `resonator_frequency`, `readout_frequency` |
 | `CheckCKP` | `readout_frequency` | Measured resonator frequency and photon-limited optimal drive | `resonator_frequency`, `readout_frequency` |
 | `CheckCoarseReadoutParams` | `readout_frequency`; fallback: `resonator_frequency` | Selected operational readout frequency | `readout_frequency` |
 | Other ordinary measurement and gate tasks | `readout_frequency`; fallback: `resonator_frequency` | No frequency result | None |
@@ -109,6 +111,136 @@ also publishes its fitted Purcell-filter parameters. It rejects every output whe
 finite and strictly greater than `0.7`, or when any required fitted value is invalid.
 
 Update targets are specified per output, not by classifying the entire task as exploration or calibration. Amplitude and other outputs retain their own declared destinations. In particular, Resonator Spectroscopy also produces `readout_amplitude`; maintaining the readout frequency does not imply that every readout setting remains unchanged.
+
+### Qubit frequency mapping
+
+`CheckQubitFrequencyMapping` identifies a qubit's coarse frequency and its resonator in one
+measurement, without trusting the resonator assignment of `CheckResonatorSpectroscopy`. It is an
+opt-in task: only the **Qubit Frequency Mapping** template runs it, the default bringup does not,
+and `CheckQubitSpectroscopy` is unchanged.
+
+The candidates come from `CheckResonatorSpectroscopy` with the run parameter `detection_only` set
+to `true`. In that mode the task assigns nothing: it publishes no `resonator_frequency`,
+`readout_frequency`, `optimal_power`, or `readout_amplitude`, and ignores
+`resonator_assignment_order`. It publishes every detected peak of the MUX, sorted by frequency,
+for each qubit of the MUX:
+
+| Output | Meaning |
+| --- | --- |
+| `resonator_candidate_count` | Number of detected peaks, from 1 to 4 |
+| `resonator_candidate_<i>_frequency` | Frequency of peak `i`, for `i` below the count |
+| `resonator_candidate_<i>_readout_amplitude` | `10**(optimal_power/20)` of the same peak |
+
+The detection result depends only on the MUX measurement, so every qubit of the MUX gets the same
+candidate set or the same failure. A run that detects no peak, more than 4 peaks, or a peak without
+a finite frequency and optimal power fails for the MUX without outputs; a partial detection with
+fewer than 4 valid peaks succeeds, including when the default assignment would fail for some qubit.
+With the default `detection_only: false` the task keeps its per-qubit assignment and publishes no
+candidates. A qubit of the MUX whose postprocessing rejects the shared result is recorded as failed,
+not completed.
+
+`CheckQubitFrequencyMapping` reads the candidates as calibration inputs that cannot be
+overridden. Before any hardware call it rejects a count outside 1 to 4, a missing, non-finite, or
+non-positive candidate value, frequencies that are not strictly increasing, and any candidate whose
+`execution_id` or `task_id` differs from the count's. It then checks the candidate set against the
+`CheckResonatorSpectroscopy` task results of every qubit in the target's MUX on the same chip, using
+the chip's MUX topology. The set is used only when all of these hold:
+
+- the task result named by the count's `task_id` exists for the target qubit, in the count's
+  execution, and completed;
+- every `CheckResonatorSpectroscopy` result of that execution in the MUX completed;
+- no other execution started a `CheckResonatorSpectroscopy` attempt in the MUX at or after that
+  result, whatever the outcome of that attempt.
+
+A failed, partial, or running newer attempt therefore stops the mapping instead of leaving an older
+successful set in use, even though a failed attempt does not remove the older values from the
+calibration database. A newer attempt with `detection_only: false` also stops it. After such an
+attempt, rerun `CheckResonatorSpectroscopy` with `detection_only: true` for the MUX and wait for it to
+complete before running `CheckQubitFrequencyMapping`.
+
+The task pairs candidate `i` with the `i`-th valid readout label of the target's Qubex MUX, sorted
+by label, and calls `qubex.contrib.multiplexed_readout_qubit_spectroscopy` once with one drive target
+and every candidate. The labels are acquisition slots only; the result does not assume that a
+slot's own qubit owns the candidate. Readout candidate frequencies are carrier overrides without LO
+or NCO retuning, so they must be realizable under the current readout configuration. Run the
+qubits of one MUX sequentially, as the [1-qubit scheduler](../architecture/one-qubit-scheduler.md)
+does; two concurrent runs in one MUX would read the same resonators.
+
+Each candidate is analyzed from its `phases` array in the Qubex result, on the result's
+`frequency_range` and `power_range`; the figures in the Qubex result are not read. The task rejects
+the result when an axis is not finite and strictly increasing, differs from the requested sweep, or
+differs from the candidate's own axes, and rejects a candidate whose `readout_label`,
+`candidate_index`, readout frequency, or readout amplitude does not match the request, whose
+`phases` is not a finite real array of shape `(power, frequency)`, or whose `data` differs from
+`phases`. The task builds each candidate's heatmap from the validated arrays and analyzes it with the
+`CheckQubitSpectroscopy` configuration and trimmed retry.
+The task ranks the candidates by the f01 `moment` of that analysis (`F01Result.moment`), the raw
+score from which the analysis derives `quality_level`. It selects the best candidate and publishes
+outputs only when all of these hold:
+
+- its `quality_level` is at least 3; `CheckQubitSpectroscopy` reports levels up to 2 as low
+  quality;
+- its f01 is at least 2.5 GHz;
+- its moment is at least `min_score_ratio` times the runner-up's moment.
+
+The runner-up is the candidate with the next-highest moment among every candidate with an f01 peak,
+low-quality ones included, so a weaker alternative is never hidden. Equal moments rank by candidate
+index, so the decision does not depend on the order of the candidates. An exact or near tie fails
+the ratio test and is rejected as ambiguous. When no other candidate has an f01 peak, or the
+runner-up's moment is 0, the ratio is undefined: the evidence records the runner-up as `absent` or
+`zero`, the ratio as `null`, and the separation test passes. A candidate whose analysis fails, a
+non-finite or negative moment, no response, a best candidate below the quality or frequency gate,
+or a malformed result marks the task failed without outputs.
+
+`min_score_ratio` is a run parameter with the default `2.0`, and it must be greater than 1. The
+default is a provisional heuristic, not an empirically calibrated threshold. The moment is not
+normalized across candidates: it sums the phase magnitude over the detected peak region, weighted
+by drive power, so it grows with the region's size and phase contrast and depends on each
+candidate's readout amplitude and noise level. A candidate read with a stronger
+readout or less noise can score higher for the same qubit response.
+
+Every outcome saves a summary figure first, then the marked figure of every analyzed candidate and
+the data-built raw figure of every valid candidate. The summary figure shows a table of every
+candidate (slot, readout frequency, readout amplitude and power, status or error, f01, moment,
+`quality_level`, rank, selection), each candidate's phase map with its f01 peak, the decision and
+its reason, the runner-up and ratio, and the rule. Its JSON figure carries the same evidence under
+`layout.meta["qubit_frequency_mapping"]`, including the raw moment of every candidate and the
+proposal: the values the selected candidate publishes, or the best candidate's values marked
+`published: false` on rejection. A failed task's message is one line that names the reason and every
+candidate's moment, `quality_level`, and f01.
+
+The decision is deterministic, and the task does not call an AI model. The existing
+[AI evaluation](../copilot/evaluation.md) of a task result reads the first figure and, in the
+evaluation context, the first line of the task message, so a completed or failed mapping result is
+ready for a reviewer to evaluate from **Ask AI** or a bulk run. The message of a completed result is
+the generic completion message, so a completed mapping is reviewed from the summary figure.
+
+On success the selected candidate supplies `resonator_frequency`, `readout_frequency`, and
+`readout_amplitude`. The f01 estimate supplies `coarse_qubit_frequency`, `control_frequency`,
+`f01_repr_db`, `f01_quality_level`, and `coarse_control_amplitude` with the same conversion as
+`CheckQubitSpectroscopy`. `resonator_candidate_index` records the selected peak. Qubits are
+inferred independently, so two qubits of one MUX can select the same candidate; QDash does not
+check that the selections form a one-to-one mapping.
+
+The helper comes from [amachino/qubex#472](https://github.com/amachino/qubex/pull/472), which is
+not merged yet. Until it merges, `[tool.uv.sources]` in the root `pyproject.toml` pins `qubex` to
+the pull request's head commit `0711dde0ca466d8c76f4ea5614af03a8422d9155` on the upstream
+repository, so the workflow environment built from `uv.lock` provides the helper. After the pull
+request merges, point the source back at the upstream `develop` branch, or at the merge commit, and
+run `uv lock --upgrade-package qubex`. With a Qubex revision that lacks the helper, the task
+registers normally and fails at run time with an error naming that prerequisite.
+
+The **Qubit Frequency Mapping** template, `templates/qubit_frequency_mapping.py`, runs the
+pipeline for the selected `mux_ids` in one `BringUp` step. `CheckResonatorSpectroscopy` runs with
+`detection_only: true` on the representative (local slot 0) of each MUX and distributes the
+candidates to every qubit of the MUX before the representative continues. Then
+`CheckQubitFrequencyMapping` runs for each selected qubit of the MUX in slot order. Both calls set
+`update_calibration_parameters: true`, because the mapping reads the candidates from the published
+calibration parameters. `execution_mode` defaults to `sequential`, which drives one qubit at a
+time; `parallel_by_mux` runs MUXes in parallel and keeps each MUX in order. The template rejects
+other modes, because `parallel_by_round` can start a later slot before its representative, and it
+rejects an `exclude_qids` entry that names a MUX representative, because that MUX would run no
+detection.
 
 ### Replacement within the same parameter
 

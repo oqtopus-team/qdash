@@ -25,6 +25,9 @@ from qdash.workflow.calibtasks.qubex.box_setup.dump_box import DumpBox
 from qdash.workflow.calibtasks.qubex.box_setup.link_up import LinkUp
 from qdash.workflow.calibtasks.qubex.box_setup.readout_configure import ReadoutConfigure
 from qdash.workflow.calibtasks.qubex.cw.check_control_amplitude import CheckControlAmplitude
+from qdash.workflow.calibtasks.qubex.cw.check_qubit_frequency_mapping import (
+    CheckQubitFrequencyMapping,
+)
 from qdash.workflow.calibtasks.qubex.cw.check_qubit_spectroscopy import CheckQubitSpectroscopy
 from qdash.workflow.calibtasks.qubex.cw.check_resonator_spectroscopy import (
     CheckResonatorSpectroscopy,
@@ -123,6 +126,7 @@ __all__ = [
     "CheckOptimalReadoutFrequency",
     "CheckPIPulse",
     "CheckQuantumEfficiency",
+    "CheckQubitFrequencyMapping",
     "CheckQubitSpectroscopy",
     "CheckRabi",
     "CheckRamsey",

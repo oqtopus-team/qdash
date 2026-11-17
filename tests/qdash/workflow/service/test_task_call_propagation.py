@@ -563,3 +563,110 @@ def test_coherence_check_runs_one_step_with_per_target_fail_fast(
                 "time_range": {"value": (0, 50_001, 500), "value_type": "np.arange"},
                 "detuning": {"value": 0.0002},
             }
+
+
+def _qubit_frequency_mapping_step(
+    monkeypatch: pytest.MonkeyPatch, execution_mode: str
+) -> tuple[Any, Any]:
+    import importlib
+
+    template = importlib.import_module("qdash.workflow.templates.qubit_frequency_mapping")
+    captured: dict[str, Any] = {}
+
+    class CapturingCalibService:
+        project_id = "project-1"
+
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            pass
+
+        def run(self, targets: Any, *, steps: list[Any]) -> None:
+            captured["targets"] = targets
+            captured["steps"] = steps
+
+    monkeypatch.setattr(template, "CalibService", CapturingCalibService)
+    template.qubit_frequency_mapping(
+        username="alice", chip_id="64Q", mux_ids=[0, 1], execution_mode=execution_mode
+    )
+    (step,) = captured["steps"]
+    return step, captured["targets"]
+
+
+def _assert_mux_detection_precedes_its_mappings(log: list[tuple[str, str, str, str]]) -> None:
+    order = [(task_name, qid) for _, _, task_name, qid in log]
+    for representative, members in (("0", ("0", "1")), ("4", ("4", "5"))):
+        detection = order.index(("CheckResonatorSpectroscopy", representative))
+        assert all(detection < order.index(("CheckQubitFrequencyMapping", qid)) for qid in members)
+    assert [qid for name, qid in order if name == "CheckResonatorSpectroscopy"] == ["0", "4"]
+
+
+def test_qubit_frequency_mapping_drives_one_qubit_at_a_time_by_default(
+    recorder: SimpleNamespace, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Sequential mode finishes each MUX's detection before any of its mappings."""
+    from qdash.workflow.service.session_context import clear_current_session, set_current_session
+
+    step, targets = _qubit_frequency_mapping_step(monkeypatch, "sequential")
+    _schedule(monkeypatch)
+    parent = RecordingSession(recorder.log, recorder.fail)
+    set_current_session(cast("CalibSession", parent))
+    try:
+        ctx = step.execute(_session(), targets, StepContext())
+    finally:
+        clear_current_session()
+
+    # Everything runs in the parent session, one call after another.
+    assert recorder.sessions == []
+    assert [(task_name, qid) for _, _, task_name, qid in recorder.log] == [
+        ("CheckResonatorSpectroscopy", "0"),
+        ("CheckQubitFrequencyMapping", "0"),
+        ("CheckQubitFrequencyMapping", "1"),
+        ("CheckResonatorSpectroscopy", "4"),
+        ("CheckQubitFrequencyMapping", "4"),
+        ("CheckQubitFrequencyMapping", "5"),
+    ]
+    _assert_mux_detection_precedes_its_mappings(recorder.log)
+    detection = step.calls()[0]
+    assert parent.parameters["CheckResonatorSpectroscopy"] == detection.settings()
+    assert detection.settings()["run"]["detection_only"] == {"value": True}
+    assert detection.settings()["update_calibration_parameters"] is True
+    mapping = step.calls()[1]
+    assert parent.parameters["CheckQubitFrequencyMapping"]["update_calibration_parameters"] is True
+    assert parent.parameters["CheckQubitFrequencyMapping"] == mapping.settings()
+    result = ctx.get_step_result("bringup")
+    assert isinstance(result, OneQubitResult)
+    member = result.get_qubit("1")
+    assert member is not None
+    skipped = member.call("CheckResonatorSpectroscopy")
+    assert skipped is not None
+    assert skipped.reason == "not_mux_representative"
+
+
+def test_qubit_frequency_mapping_parallel_by_mux_keeps_each_mux_in_order(
+    recorder: SimpleNamespace, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """MUXes run in their own workers; inside one MUX the qubits still run in turn."""
+    step, targets = _qubit_frequency_mapping_step(monkeypatch, "parallel_by_mux")
+    _schedule(monkeypatch)
+
+    step.execute(_session(), targets, StepContext())
+
+    # One worker per MUX group; each worker logs its MUX's calls in execution order.
+    assert recorder.groups == [["0", "1"], ["4", "5"]]
+    assert len(recorder.sessions) == 2
+    _assert_mux_detection_precedes_its_mappings(recorder.log)
+    per_mux = [
+        [(task_name, qid) for _, _, task_name, qid in recorder.log if qid in group]
+        for group in recorder.groups
+    ]
+    assert per_mux == [
+        [
+            ("CheckResonatorSpectroscopy", "0"),
+            ("CheckQubitFrequencyMapping", "0"),
+            ("CheckQubitFrequencyMapping", "1"),
+        ],
+        [
+            ("CheckResonatorSpectroscopy", "4"),
+            ("CheckQubitFrequencyMapping", "4"),
+            ("CheckQubitFrequencyMapping", "5"),
+        ],
+    ]

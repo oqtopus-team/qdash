@@ -9,6 +9,15 @@
     "function_name": "bringup"
   },
   {
+    "id": "qubit_frequency_mapping",
+    "name": "Qubit Frequency Mapping",
+    "description": "Opt-in MUX bring-up that maps each qubit to its resonator: CheckResonatorSpectroscopy with detection_only once per MUX, then CheckQubitFrequencyMapping for each qubit of the MUX in turn. Both publish calibration parameters. Requires explicit mux_ids and a qubex revision that includes amachino/qubex#472.",
+    "category": "production",
+    "backend": "qubex",
+    "filename": "qubit_frequency_mapping.py",
+    "function_name": "qubit_frequency_mapping"
+  },
+  {
     "id": "box_setup",
     "name": "Box Setup",
     "description": "Box setup with capture delay correction for QuEL-1 and QuEL-3: CorrectCaptureDelay once per MUX. Sweeps the capture delay with a fixed readout tone, then writes capture_delay.yaml (and capture_delay_word.yaml on QuEL-1). Requires explicit mux_ids; run first, before resonator spectroscopy.",
