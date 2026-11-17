@@ -58,6 +58,21 @@ MAPPING_FIGURE_META_KEY = "qubit_frequency_mapping_figure"
 _PAYLOAD_FREQUENCY_ABS_TOL = 1e-9
 _PAYLOAD_AMPLITUDE_REL_TOL = 1e-9
 _AXIS_ABS_TOL = 1e-9
+# The readout candidates of one MUX share one readout AWG channel, where their tones
+# are summed; the sum of the per-tone amplitudes must stay within this full scale.
+MULTIPLEXED_READOUT_AMPLITUDE_BUDGET = 1.0
+
+
+def multiplexed_readout_amplitude_ceiling(count: int) -> float:
+    """Return the per-tone readout amplitude ceiling for ``count`` simultaneous candidates.
+
+    The ceiling is ``1/count`` of the full-scale budget, so ``count`` tones at or below
+    it sum to at most full scale whatever their relative phases. Raises ValueError
+    when ``count`` is not a positive integer.
+    """
+    if isinstance(count, bool) or not isinstance(count, int) or count < 1:
+        raise ValueError(f"count must be a positive integer, got {count!r}")
+    return MULTIPLEXED_READOUT_AMPLITUDE_BUDGET / count
 
 
 def load_multiplexed_readout_qubit_spectroscopy() -> Callable[..., Any]:
@@ -171,10 +186,39 @@ class ResonatorCandidate:
 
 @dataclass(frozen=True)
 class CandidateReadout:
-    """A resonator candidate paired with the readout slot that acquires it."""
+    """A resonator candidate paired with the readout slot that acquires it.
+
+    ``candidate.readout_amplitude`` stays the producer's requested amplitude.
+    ``readout_amplitude`` is the amplitude applied in the multiplexed acquisition:
+    the request capped at ``readout_amplitude_ceiling``, never raised. Raises
+    ValueError when the ceiling is not finite or not in ``(0, 1]``.
+    """
 
     candidate: ResonatorCandidate
     readout_label: str
+    readout_amplitude_ceiling: float
+
+    def __post_init__(self) -> None:
+        ceiling = self.readout_amplitude_ceiling
+        if not (math.isfinite(ceiling) and 0.0 < ceiling <= MULTIPLEXED_READOUT_AMPLITUDE_BUDGET):
+            raise ValueError(
+                f"readout_amplitude_ceiling must be finite and in (0, 1], got {ceiling!r}"
+            )
+
+    @property
+    def requested_readout_amplitude(self) -> float:
+        """The producer's readout amplitude for this candidate (single-tone optimum)."""
+        return self.candidate.readout_amplitude
+
+    @property
+    def readout_amplitude(self) -> float:
+        """The readout amplitude applied in the measurement."""
+        return min(self.requested_readout_amplitude, self.readout_amplitude_ceiling)
+
+    @property
+    def readout_amplitude_capped(self) -> bool:
+        """Whether the ceiling lowered the requested amplitude."""
+        return self.requested_readout_amplitude > self.readout_amplitude_ceiling
 
 
 @dataclass(frozen=True)
@@ -276,6 +320,12 @@ class CheckQubitFrequencyMapping(QubexTask):
     on each candidate's readout amplitude and noise. It does not use the qubit's
     existing readout_frequency, so a wrong resonator assignment does not affect the
     result.
+
+    The candidate tones share the MUX readout AWG channel, so N candidates are read
+    with each amplitude capped at ``1/N`` of full scale: ``min(requested, 1/N)``,
+    never raised. The producer's amplitude is a single-tone optimum and stays the
+    requested value; the payload check, scores, figures, evidence, and the published
+    ``readout_amplitude`` all use the applied amplitude.
 
     When a candidate is selected, the first figure is that candidate's marked map
     with its f01 marker, titled with the qid, the candidate's readout identity and
@@ -435,7 +485,11 @@ class CheckQubitFrequencyMapping(QubexTask):
         ),
         "readout_amplitude": OutputParameterSpec(
             unit="a.u.",
-            description="Readout amplitude of the selected resonator candidate.",
+            description=(
+                "Readout amplitude applied to the selected resonator candidate in the "
+                "multiplexed acquisition: the producer's amplitude capped at 1/N for N "
+                "candidates."
+            ),
         ),
         "resonator_candidate_index": OutputParameterSpec(
             unit="",
@@ -643,10 +697,14 @@ class CheckQubitFrequencyMapping(QubexTask):
         exp = self.get_experiment(backend)
         label = self.get_qubit_label(backend, qid)
         slots = self._readout_slots(exp, label, len(candidates))
+        ceiling = multiplexed_readout_amplitude_ceiling(len(candidates))
         readouts = tuple(
-            CandidateReadout(candidate=candidate, readout_label=slot)
+            CandidateReadout(
+                candidate=candidate, readout_label=slot, readout_amplitude_ceiling=ceiling
+            )
             for candidate, slot in zip(candidates, slots, strict=True)
         )
+        print(f"Qubit frequency mapping for qid={qid}: {_amplitude_ceiling_text(readouts)}")
         frequency_range = self._frequency_range()
         power_range = self.run_parameters["power_range"].get_value()
         result = helper(
@@ -656,7 +714,7 @@ class CheckQubitFrequencyMapping(QubexTask):
                 readout.readout_label: readout.candidate.frequency for readout in readouts
             },
             readout_amplitudes={
-                readout.readout_label: readout.candidate.readout_amplitude for readout in readouts
+                readout.readout_label: readout.readout_amplitude for readout in readouts
             },
             frequency_range=frequency_range,
             power_range=power_range,
@@ -772,7 +830,7 @@ class CheckQubitFrequencyMapping(QubexTask):
         candidate = selected.readout.candidate
         outputs = copy.deepcopy(self.output_parameters)
         outputs["resonator_frequency"].value = candidate.frequency
-        outputs["readout_amplitude"].value = candidate.readout_amplitude
+        outputs["readout_amplitude"].value = selected.readout.readout_amplitude
         outputs["resonator_candidate_index"].value = candidate.index
         outputs["coarse_qubit_frequency"].value = selected.frequency
         outputs["f01_repr_db"].value = selected.repr_db
@@ -783,7 +841,9 @@ class CheckQubitFrequencyMapping(QubexTask):
         print(
             f"Selected resonator candidate {candidate.index} for qid={qid}: "
             f"readout_frequency={candidate.frequency:.6f} GHz, "
-            f"readout_amplitude={candidate.readout_amplitude:.6f} a.u., "
+            f"readout_amplitude={selected.readout.readout_amplitude:.6f} a.u. "
+            f"(requested {selected.readout.requested_readout_amplitude:.6g}, "
+            f"ceiling {selected.readout.readout_amplitude_ceiling:.6g}), "
             f"coarse_qubit_frequency={selected.frequency:.6f} GHz, "
             f"coarse_control_amplitude={coarse_control_amplitude:.6f} a.u. ({decision.reason})"
         )
@@ -893,7 +953,7 @@ class CheckQubitFrequencyMapping(QubexTask):
         """Return one candidate's validated phase map, or why its payload is rejected.
 
         The payload must name the requested readout slot, candidate index, readout
-        frequency, and readout amplitude, carry the common sweep axes, and hold a
+        frequency, and the applied (capped) readout amplitude, carry the common sweep axes, and hold a
         finite real ``phases`` array of shape ``(powers, frequencies)``. A ``data``
         array, which Qubex defines as the same array as ``phases``, must equal it.
         """
@@ -918,10 +978,11 @@ class CheckQubitFrequencyMapping(QubexTask):
         if not math.isclose(frequency, candidate.frequency, abs_tol=_PAYLOAD_FREQUENCY_ABS_TOL):
             return f"readout_frequency {frequency} does not match {candidate.frequency}", None
         if not math.isclose(
-            amplitude, candidate.readout_amplitude, rel_tol=_PAYLOAD_AMPLITUDE_REL_TOL
+            amplitude, readout.readout_amplitude, rel_tol=_PAYLOAD_AMPLITUDE_REL_TOL
         ):
             return (
-                f"readout_amplitude {amplitude} does not match {candidate.readout_amplitude}"
+                f"readout_amplitude {amplitude:.6g} does not match the applied "
+                f"{readout.readout_amplitude:.6g}"
             ), None
         for name, common in (("frequency_range", frequencies), ("power_range", powers)):
             values, error = _finite_axis(candidate_data.get(name), name)
@@ -1077,6 +1138,31 @@ def _runner_up_text(decision: MappingDecision) -> str:
     return f"runner-up candidate {runner_index}, ratio {decision.score_ratio:.6g}"
 
 
+def _amplitude_text(readout: CandidateReadout) -> str:
+    """Return the applied amplitude, with the request and ceiling when it was capped."""
+    if not readout.readout_amplitude_capped:
+        return f"{readout.readout_amplitude:.6g}"
+    return (
+        f"{readout.readout_amplitude:.6g} (requested {readout.requested_readout_amplitude:.6g}, "
+        f"ceiling {readout.readout_amplitude_ceiling:.6g})"
+    )
+
+
+def _amplitude_ceiling_text(readouts: Sequence[CandidateReadout]) -> str:
+    """Return one line naming the ceiling and each candidate's requested and applied amplitude."""
+    count = len(readouts)
+    ceiling = readouts[0].readout_amplitude_ceiling if readouts else math.nan
+    pairs = "; ".join(
+        f"candidate {r.candidate.index} ({r.readout_label}) requested "
+        f"{r.requested_readout_amplitude:.6g} -> applied {r.readout_amplitude:.6g}"
+        for r in readouts
+    )
+    return (
+        f"multiplexed readout amplitude ceiling 1/{count} = {ceiling:.6g} per candidate "
+        f"(applied = min(requested, 1/N)); {pairs}"
+    )
+
+
 def _decision_summary(
     decision: MappingDecision,
     evaluations: Sequence[_CandidateEvaluation],
@@ -1096,7 +1182,7 @@ def _decision_summary(
     candidates = "; ".join(
         f"candidate {e.readout.candidate.index} ({e.readout.readout_label}, "
         f"{e.readout.candidate.frequency:.6f} GHz, "
-        f"amplitude {e.readout.candidate.readout_amplitude:.6g}): {e.describe}"
+        f"amplitude {_amplitude_text(e.readout)}): {e.describe}"
         for e in evaluations
     )
     return " ".join(f"{rule}; {best}, {_runner_up_text(decision)} | {candidates}".split())
@@ -1118,7 +1204,8 @@ def _proposal(evaluation: _CandidateEvaluation | None) -> dict[str, Any] | None:
         "resonator_candidate_index": candidate.index,
         "readout_label": evaluation.readout.readout_label,
         "resonator_frequency": candidate.frequency,
-        "readout_amplitude": candidate.readout_amplitude,
+        "readout_amplitude": evaluation.readout.readout_amplitude,
+        "requested_readout_amplitude": evaluation.readout.requested_readout_amplitude,
         "coarse_qubit_frequency": _json_number(evaluation.frequency),
         "f01_repr_db": evaluation.repr_db,
         "f01_quality_level": evaluation.quality_level,
@@ -1154,7 +1241,8 @@ def mapping_evidence(
 
     It records the rule, the measured sweep, every candidate's raw analysis
     values (moment, quality level, f01) or its error, the moment ranking, the
-    runner-up and ratio, the reason, and the proposal of the selected candidate,
+    runner-up and ratio, the reason, the multiplexed readout amplitude ceiling with
+    each candidate's requested and applied amplitude, and the proposal of the selected candidate,
     or of the best candidate with ``published`` false when nothing is selected.
     A non-finite moment is kept as text in ``moment_raw`` and None in ``moment``.
     """
@@ -1173,8 +1261,10 @@ def mapping_evidence(
                 "candidate_index": candidate.index,
                 "readout_label": e.readout.readout_label,
                 "readout_frequency": candidate.frequency,
-                "readout_amplitude": candidate.readout_amplitude,
-                "readout_power_db": _readout_power_db(candidate.readout_amplitude),
+                "readout_amplitude": e.readout.readout_amplitude,
+                "requested_readout_amplitude": e.readout.requested_readout_amplitude,
+                "readout_amplitude_capped": e.readout.readout_amplitude_capped,
+                "readout_power_db": _readout_power_db(e.readout.readout_amplitude),
                 "status": status,
                 "error": e.error,
                 "f01_frequency": _json_number(e.frequency),
@@ -1206,6 +1296,7 @@ def mapping_evidence(
                 "moments depend on each candidate's readout amplitude and noise"
             ),
         },
+        "readout_amplitude_ceiling": _ceiling_evidence(payload.readouts),
         "sweep": {
             "drive_frequency_ghz": _sweep(frequencies),
             "drive_power_db": _sweep(powers),
@@ -1237,6 +1328,21 @@ def mapping_evidence(
     }
 
 
+def _ceiling_evidence(readouts: Sequence[CandidateReadout]) -> dict[str, Any]:
+    """Return the JSON-safe description of the multiplexed readout amplitude ceiling."""
+    ceilings = {r.readout_amplitude_ceiling for r in readouts}
+    return {
+        "value": ceilings.pop() if len(ceilings) == 1 else None,
+        "active_candidates": len(readouts),
+        "rule": "applied = min(requested, 1/N)",
+        "note": (
+            "requested amplitudes are the single-tone optima of CheckResonatorSpectroscopy; "
+            "the N candidate tones share one readout AWG channel, so each is capped at 1/N "
+            "to keep their sum within full scale. Scores and outputs use the applied amplitude."
+        ),
+    }
+
+
 def _mark_selected_figure(
     fig: Any,
     qid: str,
@@ -1261,7 +1367,7 @@ def _mark_selected_figure(
                 f"Qubit frequency mapping for qid={qid}: SELECTED candidate "
                 f"{candidate.index} ({selected.readout.readout_label})<br>"
                 f"<sup>readout_frequency={candidate.frequency:.6f} GHz, "
-                f"readout_amplitude={candidate.readout_amplitude:.6g}; "
+                f"readout_amplitude={_amplitude_text(selected.readout)}; "
                 f"f01={_format_score(selected.frequency)} GHz, "
                 f"moment={_format_score(selected.moment)}, "
                 f"quality_level={selected.quality_level}<br>"
@@ -1328,6 +1434,7 @@ def _summary_figure(
                     "slot",
                     "readout f (GHz)",
                     "readout amp",
+                    "requested amp",
                     "readout P (dB)",
                     "status",
                     "f01 (GHz)",
@@ -1343,6 +1450,7 @@ def _summary_figure(
                     [cell(r["readout_label"]) for r in rows],
                     [cell(r["readout_frequency"], "{:.6f}") for r in rows],
                     [cell(r["readout_amplitude"]) for r in rows],
+                    [cell(r["requested_readout_amplitude"]) for r in rows],
                     [cell(r["readout_power_db"], "{:.2f}") for r in rows],
                     [cell(r["status"] if r["error"] is None else r["error"]) for r in rows],
                     [cell(r["f01_frequency"], "{:.6f}") for r in rows],
@@ -1471,7 +1579,7 @@ def _candidate_figure(readout: CandidateReadout, candidate_map: _CandidateMap) -
             "text": (
                 f"Candidate {candidate.index} via {readout.readout_label}: "
                 f"readout_frequency={candidate.frequency:.6g} GHz, "
-                f"readout_amplitude={candidate.readout_amplitude:.6g}"
+                f"readout_amplitude={_amplitude_text(readout)}"
             )
         },
         xaxis_title="Drive frequency (GHz)",

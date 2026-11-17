@@ -1091,8 +1091,12 @@ class _SyntheticMeasurement:
         self.responding_qubit = responding_qubit
         self.calls = 0
         self.rng = np.random.default_rng(7)
+        self.schedules: list[Any] = []
 
-    def execute(self, *, frequencies: dict[str, float], **_kwargs: Any) -> SimpleNamespace:
+    def execute(
+        self, *, frequencies: dict[str, float], schedule: Any = None, **_kwargs: Any
+    ) -> SimpleNamespace:
+        self.schedules.append(schedule)
         power = DRIVE_POWERS[self.calls // len(DRIVE_FREQUENCIES)]
         point = self.calls % len(DRIVE_FREQUENCIES)
         self.calls += 1
@@ -1166,3 +1170,222 @@ def test_installed_qubex_helper_result_selects_the_responding_candidate() -> Non
         "no_f01_peak",
     ]
     assert evidence["candidates"][2]["selected"] is True
+
+
+# Multiplexed readout amplitude ceiling ------------------------------------------------
+
+# Single-tone optimum amplitudes from CheckResonatorSpectroscopy; each exceeds 1/4.
+STRONG_AMPLITUDES = [0.4, 0.6, 0.3, 0.9]
+QUARTER = 0.25
+
+
+def _strong_task(amplitudes: list[float] | None = None) -> CheckQubitFrequencyMapping:
+    amplitudes = STRONG_AMPLITUDES if amplitudes is None else amplitudes
+    task = CheckQubitFrequencyMapping()
+    frequencies: list[float | None] = list(READOUT_FREQUENCIES[: len(amplitudes)])
+    _set_candidate_inputs(task, frequencies, list[float | None](amplitudes))
+    return task
+
+
+def _applied_result(amplitudes: list[float], response_slot: str = "RQ02") -> SimpleNamespace:
+    """Return a helper result that echoes ``amplitudes`` as the applied readout amplitudes."""
+    return _contrib_result(
+        {
+            slot: _response_z(RESPONSE_INDEX) if slot == response_slot else _noise_z(index)
+            for index, slot in enumerate(SLOTS[: len(amplitudes)])
+        },
+        amplitudes=amplitudes,
+    )
+
+
+def _readout_awg_waveform(schedule: Any, frequencies: dict[str, float]) -> Any:
+    """Compose the readout tones of one schedule into one AWG sequence and quantize it.
+
+    Uses the installed qxdriver multiplexer and its IQ-magnitude check, which raises
+    the hardware ValueError when the composed waveform exceeds full scale.
+    """
+    converter = pytest.importorskip("qxdriver_quel1.runtime.converter")
+    utils = pytest.importorskip("qxdriver_quel1.e7awg.utils")
+    models = pytest.importorskip("qxdriver_quel1.pulse.models")
+    sampled = schedule.get_sampled_sequences()
+    center = float(np.mean(list(frequencies.values())))
+    sequences = {
+        label: models.GenSampledSequence(
+            target_name=label,
+            sub_sequences=[
+                models.GenSampledSubSequence(
+                    real=np.real(sampled[label]).copy(),
+                    imag=np.imag(sampled[label]).copy(),
+                    repeats=1,
+                    post_blank=0,
+                )
+            ],
+        )
+        for label in frequencies
+    }
+    muxed = converter.Converter.multiplex(
+        sequences=sequences,
+        modfreqs={label: frequency - center for label, frequency in frequencies.items()},
+    )
+    length = len(muxed.sub_sequences[0].real)
+    return utils.WaveSequenceTools.create(
+        sequence=muxed, wait_words=0, repeats=1, interval_samples=2 * length
+    )
+
+
+def test_strong_candidates_are_capped_to_one_quarter_before_the_helper() -> None:
+    """Cap four requested amplitudes above 1/4 to 0.25 each so their sum is at most 1."""
+    _, contrib = _run(_strong_task(), _applied_result([QUARTER] * 4))
+
+    sent = contrib.call_args.kwargs["readout_amplitudes"]
+    assert sent == dict.fromkeys(SLOTS, QUARTER)
+    assert sum(sent.values()) <= 1.0
+
+
+def test_amplitudes_within_the_ceiling_are_not_changed() -> None:
+    """Keep requested amplitudes at or below 1/N and never raise a weaker one."""
+    task = _strong_task([0.1, 0.5, 0.25, 0.2])
+
+    _, contrib = _run(task, _applied_result([0.1, QUARTER, QUARTER, 0.2]))
+
+    assert contrib.call_args.kwargs["readout_amplitudes"] == dict(
+        zip(SLOTS, [0.1, QUARTER, QUARTER, 0.2], strict=True)
+    )
+
+
+@pytest.mark.parametrize(("count", "ceiling"), [(1, 1.0), (2, 0.5), (3, 1 / 3)])
+def test_ceiling_is_one_over_the_number_of_candidates(count, ceiling) -> None:
+    """Use 1/N for N simultaneously read candidates, so one candidate keeps its amplitude."""
+    task = _strong_task([0.9] * count)
+
+    run_result, contrib = _run(task, _applied_result([min(0.9, ceiling)] * count))
+
+    assert contrib.call_args.kwargs["readout_amplitudes"] == dict.fromkeys(
+        SLOTS[:count], pytest.approx(min(0.9, ceiling))
+    )
+    readouts = run_result.raw_result.readouts
+    assert [r.readout_amplitude_ceiling for r in readouts] == pytest.approx([ceiling] * count)
+
+
+def test_capping_keeps_source_candidates_and_inputs_unchanged() -> None:
+    """Record requested and applied amplitudes without changing the producer's values."""
+    task = _strong_task()
+    before = {
+        name: (parameter.value, parameter.execution_id, parameter.task_id)
+        for name, parameter in task.input_parameters.items()
+    }
+
+    run_result, _ = _run(task, _applied_result([QUARTER] * 4))
+
+    after = {
+        name: (parameter.value, parameter.execution_id, parameter.task_id)
+        for name, parameter in task.input_parameters.items()
+    }
+    assert after == before
+    readouts = run_result.raw_result.readouts
+    assert [r.candidate.readout_amplitude for r in readouts] == STRONG_AMPLITUDES
+    assert [r.requested_readout_amplitude for r in readouts] == STRONG_AMPLITUDES
+    assert [r.readout_amplitude for r in readouts] == [QUARTER] * 4
+    assert [r.readout_amplitude_capped for r in readouts] == [True] * 4
+
+
+def test_selected_candidate_publishes_the_applied_amplitude() -> None:
+    """Publish the amplitude the selected candidate was measured with, not the request."""
+    task = _strong_task()
+    run_result, _ = _run(task, _applied_result([QUARTER] * 4, "RQ02"))
+
+    result = _postprocess(task, run_result)
+
+    assert result.validation_error is None
+    outputs = result.output_parameters
+    assert outputs["resonator_candidate_index"].value == 2
+    assert outputs["resonator_frequency"].value == READOUT_FREQUENCIES[2]
+    assert outputs["readout_amplitude"].value == QUARTER
+
+
+def test_payload_with_the_requested_amplitude_is_rejected() -> None:
+    """Reject a result that reports the uncapped amplitude instead of the applied one."""
+    task = _strong_task()
+    run_result, _ = _run(task, _applied_result(list(STRONG_AMPLITUDES), "RQ02"))
+
+    result = _postprocess(task, run_result)
+
+    assert result.output_parameters == {}
+    assert "readout_amplitude 0.3 does not match the applied 0.25" in (
+        result.validation_error or ""
+    )
+
+
+def test_diagnostics_report_requested_applied_and_ceiling(capsys) -> None:
+    """Show the ceiling and each requested and applied amplitude in logs, evidence, and titles."""
+    task = _strong_task()
+    run_result, _ = _run(task, _applied_result([QUARTER] * 4, "RQ02"))
+    with patch(
+        f"{MODULE}.estimate_and_mark_qubit_figure",
+        side_effect=_estimate({"RQ02": 10000.0, "RQ01": 1000.0}),
+    ):
+        result = _postprocess(task, run_result)
+
+    assert result.validation_error is None
+    log = capsys.readouterr().out
+    assert "readout amplitude ceiling 1/4 = 0.25" in log
+    assert "candidate 3 (RQ03) requested 0.9 -> applied 0.25" in log
+    evidence = _evidence(result)
+    ceiling = evidence["readout_amplitude_ceiling"]
+    assert ceiling["value"] == QUARTER
+    assert ceiling["active_candidates"] == 4
+    assert ceiling["rule"] == "applied = min(requested, 1/N)"
+    rows = evidence["candidates"]
+    assert [row["readout_amplitude"] for row in rows] == [QUARTER] * 4
+    assert [row["requested_readout_amplitude"] for row in rows] == STRONG_AMPLITUDES
+    assert [row["readout_amplitude_capped"] for row in rows] == [True] * 4
+    assert [row["readout_power_db"] for row in rows] == pytest.approx([20 * np.log10(QUARTER)] * 4)
+    assert evidence["proposal"]["readout_amplitude"] == QUARTER
+    assert evidence["proposal"]["requested_readout_amplitude"] == 0.3
+    assert result.figures[0].layout.meta["qubit_frequency_mapping"] == evidence
+    title = result.figures[0].layout.title.text
+    assert "readout_amplitude=0.25 (requested 0.3, ceiling 0.25)" in title
+    header = _summary(result).data[0].header.values
+    assert "requested amp" in header
+
+
+def test_installed_helper_with_capped_amplitudes_stays_within_awg_full_scale() -> None:
+    """Compose the helper's real readout schedule within the qxdriver IQ magnitude bound."""
+    task = _strong_task()
+    task.run_parameters = copy.deepcopy(task.run_parameters)
+    task.run_parameters["frequency_range"].value = (4.0, 4.5, 0.005)
+    exp = _offline_experiment("Q02")
+
+    with (
+        patch.object(task, "get_experiment", return_value=exp),
+        patch.object(task, "get_qubit_label", return_value="Q01"),
+        patch.object(task, "_verify_candidate_source"),
+    ):
+        run_result = task.run(cast("QubexBackend", object()), "1")
+    result = _postprocess(task, run_result)
+
+    frequencies = dict(zip(SLOTS, READOUT_FREQUENCIES, strict=True))
+    for schedule in {id(s): s for s in exp.measurement_service.schedules}.values():
+        _readout_awg_waveform(schedule, frequencies)
+    assert result.validation_error is None
+    assert result.output_parameters["resonator_candidate_index"].value == 2
+    assert result.output_parameters["readout_amplitude"].value == QUARTER
+
+
+def test_uncapped_requested_amplitudes_exceed_awg_full_scale() -> None:
+    """Reproduce the hardware error when the requested amplitudes are sent unchanged."""
+    exp = _offline_experiment("Q02")
+    frequencies = dict(zip(SLOTS, READOUT_FREQUENCIES, strict=True))
+
+    load_multiplexed_readout_qubit_spectroscopy()(
+        exp,
+        "Q01",
+        readout_frequencies=frequencies,
+        readout_amplitudes=dict(zip(SLOTS, STRONG_AMPLITUDES, strict=True)),
+        frequency_range=DRIVE_FREQUENCIES[:2],
+        power_range=DRIVE_POWERS[:1],
+        plot=False,
+    )
+
+    with pytest.raises(ValueError, match="magnitude of iq signal must not exceed 1"):
+        _readout_awg_waveform(exp.measurement_service.schedules[0], frequencies)

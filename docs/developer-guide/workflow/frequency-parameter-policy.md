@@ -166,11 +166,23 @@ or NCO retuning, so they must be realizable under the current readout configurat
 qubits of one MUX sequentially, as the [1-qubit scheduler](../architecture/one-qubit-scheduler.md)
 does; two concurrent runs in one MUX would read the same resonators.
 
+The candidate tones of one MUX share one readout AWG channel, where Qubex sums them with
+unit-magnitude phase factors and the driver rejects any I or Q sample above full scale. Each
+`resonator_candidate_<i>_readout_amplitude` is a single-tone detection optimum, so N of them can
+exceed full scale together. The task therefore reads each candidate at `min(requested, 1/N)`:
+a ceiling of 0.25 for four candidates, 1/3 for three, 0.5 for two, and 1 for one. N tones at
+or below `1/N` sum to at most full scale for any phases. The task never raises an amplitude or
+clips a waveform, and it does not change the producer's values. The applied amplitude is the one
+the payload must report and the one the figures, scores, evidence, and the published
+`readout_amplitude` use; the evidence also records each requested amplitude and the ceiling under
+`readout_amplitude_ceiling`. The bound covers the summed readout tones only; it assumes no gain
+between the pulse amplitude and the AWG samples.
+
 Each candidate is analyzed from its `phases` array in the Qubex result, on the result's
 `frequency_range` and `power_range`; the figures in the Qubex result are not read. The task rejects
 the result when an axis is not finite and strictly increasing, differs from the requested sweep, or
 differs from the candidate's own axes, and rejects a candidate whose `readout_label`,
-`candidate_index`, readout frequency, or readout amplitude does not match the request, whose
+`candidate_index`, readout frequency, or applied readout amplitude does not match the request, whose
 `phases` is not a finite real array of shape `(power, frequency)`, or whose `data` differs from
 `phases`. The task builds each candidate's heatmap from the validated arrays and analyzes it with the
 `CheckQubitSpectroscopy` configuration and trimmed retry.
@@ -212,8 +224,8 @@ valid, in candidate order.
 The selected candidate's figure is its own phase map with the f01 marker of the analysis and the
 coarse-amplitude line. Its title names the qid, the candidate index and readout slot, the readout
 frequency and amplitude, the f01, moment, and `quality_level`, and the runner-up margin. The
-summary figure shows a table of every candidate (slot, readout frequency, readout amplitude and
-power, status or error, f01, moment, `quality_level`, rank, selection), each candidate's phase map
+summary figure shows a table of every candidate (slot, readout frequency, applied and requested
+readout amplitude, applied readout power, status or error, f01, moment, `quality_level`, rank, selection), each candidate's phase map
 with its f01 peak, the decision and its reason, the runner-up and ratio, and the rule. Both
 figures carry the same evidence in their JSON under `layout.meta["qubit_frequency_mapping"]`,
 including the raw moment of every candidate and the proposal: the values the selected candidate
@@ -230,7 +242,7 @@ when the selected figure comes first. **Ask AI** on a task result opens with eve
 summary included.
 
 On success the selected candidate supplies `resonator_frequency`, `readout_frequency`, and
-`readout_amplitude`. The f01 estimate supplies `coarse_qubit_frequency`, `control_frequency`,
+`readout_amplitude`, the applied amplitude it was read with. The f01 estimate supplies `coarse_qubit_frequency`, `control_frequency`,
 `f01_repr_db`, `f01_quality_level`, and `coarse_control_amplitude` with the same conversion as
 `CheckQubitSpectroscopy`. `resonator_candidate_index` records the selected peak. Qubits are
 inferred independently, so two qubits of one MUX can select the same candidate; QDash does not

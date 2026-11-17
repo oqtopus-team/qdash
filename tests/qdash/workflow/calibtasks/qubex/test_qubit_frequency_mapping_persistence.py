@@ -310,7 +310,11 @@ def _mapping_payload() -> Any:
     slots = [f"RQ0{i}" for i in range(len(FREQUENCIES_A))]
     amplitudes = [10 ** (power / 20) for power in POWERS]
     readouts = tuple(
-        CandidateReadout(ResonatorCandidate(i, FREQUENCIES_A[i], amplitudes[i]), slots[i])
+        CandidateReadout(
+            ResonatorCandidate(i, FREQUENCIES_A[i], amplitudes[i]),
+            slots[i],
+            readout_amplitude_ceiling=1 / len(slots),
+        )
         for i in range(len(slots))
     )
     zs = [[0.0] * len(DRIVE_FREQUENCIES) for _ in DRIVE_POWERS]
