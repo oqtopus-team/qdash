@@ -2,7 +2,7 @@
 
 import { useMemo, useEffect, useCallback } from "react";
 
-import Select, { type SingleValue, type StylesConfig } from "react-select";
+import Select, { type SingleValue } from "react-select";
 
 import { useListChips } from "@/client/chip/chip";
 import { useGetChipMetrics } from "@/client/metrics/metrics";
@@ -14,6 +14,7 @@ import { QuantumLoader } from "@/components/ui/QuantumLoader";
 import { TimeRangeSelector } from "@/components/ui/TimeRangeSelector";
 import { useCSVExport } from "@/hooks/useCSVExport";
 import { useMetricsConfig } from "@/hooks/useMetricsConfig";
+import { useSelectStyles } from "@/hooks/useSelectStyles";
 import { useMetricsQueryParams } from "@/hooks/useMetricsQueryParams";
 import { useCorrelationUrlState, useRangeModeUrlState } from "@/hooks/useUrlState";
 
@@ -142,29 +143,7 @@ export function CorrelationView() {
     return xSupports || ySupports;
   }, [xMetricConfig, yMetricConfig]);
 
-  // Select styles
-  const metricSelectStyles = useMemo<StylesConfig<MetricOption, false>>(
-    () => ({
-      control: (provided) => ({
-        ...provided,
-        minHeight: 38,
-        height: 38,
-      }),
-      valueContainer: (provided) => ({
-        ...provided,
-        padding: "2px 8px",
-      }),
-      indicatorsContainer: (provided) => ({
-        ...provided,
-        height: 38,
-      }),
-      menu: (provided) => ({
-        ...provided,
-        zIndex: 50,
-      }),
-    }),
-    [],
-  );
+  const metricSelectStyles = useSelectStyles<MetricOption>();
 
   // Auto-switch to latest mode when metrics don't support best mode
   useEffect(() => {
@@ -524,15 +503,15 @@ export function CorrelationView() {
           <div className="flex flex-col gap-3 sm:gap-4">
             {/* Row 1a: Type + Chip */}
             <div className="flex flex-col sm:flex-row flex-wrap items-start gap-2 sm:gap-3">
-              <div className="tabs tabs-boxed bg-base-200 h-8 sm:h-9">
+              <div className="tabs tabs-boxed tabs-sm">
                 <button
-                  className={`tab h-full ${metricType === "qubit" ? "tab-active" : ""}`}
+                  className={`tab ${metricType === "qubit" ? "tab-active" : ""}`}
                   onClick={() => handleMetricTypeChange("qubit")}
                 >
                   1Q
                 </button>
                 <button
-                  className={`tab h-full ${metricType === "coupling" ? "tab-active" : ""}`}
+                  className={`tab ${metricType === "coupling" ? "tab-active" : ""}`}
                   onClick={() => handleMetricTypeChange("coupling")}
                 >
                   2Q
@@ -595,15 +574,15 @@ export function CorrelationView() {
 
             {/* Mode + Export */}
             <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-              <div className="join h-8 sm:h-9">
+              <div className="join">
                 <button
-                  className={`join-item btn btn-xs sm:btn-sm h-full ${selectionMode === "latest" ? "btn-primary" : ""}`}
+                  className={`join-item btn btn-sm ${selectionMode === "latest" ? "btn-primary" : ""}`}
                   onClick={() => setSelectionMode("latest")}
                 >
                   Latest
                 </button>
                 <button
-                  className={`join-item btn btn-xs sm:btn-sm h-full ${selectionMode === "best" ? "btn-primary" : ""} ${!isBestModeSupported ? "btn-disabled" : ""}`}
+                  className={`join-item btn btn-sm ${selectionMode === "best" ? "btn-primary" : ""} ${!isBestModeSupported ? "btn-disabled" : ""}`}
                   onClick={() => setSelectionMode("best")}
                   disabled={!isBestModeSupported}
                   title={!isBestModeSupported ? "Best mode not available" : "Show best values"}
@@ -611,7 +590,7 @@ export function CorrelationView() {
                   Best
                 </button>
                 <button
-                  className={`join-item btn btn-xs sm:btn-sm h-full ${selectionMode === "average" ? "btn-primary" : ""}`}
+                  className={`join-item btn btn-sm ${selectionMode === "average" ? "btn-primary" : ""}`}
                   onClick={() => setSelectionMode("average")}
                   title="Show average values"
                 >
@@ -620,7 +599,7 @@ export function CorrelationView() {
               </div>
 
               <button
-                className="btn btn-outline btn-xs sm:btn-sm h-8 sm:h-9 ml-auto sm:ml-0"
+                className="btn btn-outline btn-sm ml-auto sm:ml-0"
                 onClick={handleExportCSV}
                 disabled={correlationData.length === 0 || isSameParameter}
               >

@@ -182,7 +182,7 @@ export function AdminUsersPanel({
         )}
 
         <div className="space-y-3 sm:hidden">
-          <label className="flex items-center gap-3 rounded-box border border-base-300 bg-base-100 px-3 py-2">
+          <label className="choice-field gap-3 rounded-box border border-base-300 bg-base-100 px-3 py-2">
             <input
               type="checkbox"
               className="checkbox checkbox-sm"
@@ -201,6 +201,7 @@ export function AdminUsersPanel({
                     <input
                       type="checkbox"
                       className="checkbox checkbox-sm mt-1"
+                      aria-label={`Select ${userItem.username}`}
                       checked={selectedUsernames.includes(userItem.username)}
                       disabled={!isUserSelectable(userItem, currentUsername)}
                       onChange={() => onToggleUserSelection(userItem.username)}
@@ -267,6 +268,7 @@ export function AdminUsersPanel({
                   <input
                     type="checkbox"
                     className="checkbox checkbox-sm"
+                    aria-label="Select all removable users in view"
                     checked={allSelectableUsersSelected}
                     onChange={onToggleSelectAll}
                     disabled={selectableFilteredUsersCount === 0}
@@ -288,6 +290,7 @@ export function AdminUsersPanel({
                     <input
                       type="checkbox"
                       className="checkbox checkbox-sm"
+                      aria-label={`Select ${userItem.username}`}
                       checked={selectedUsernames.includes(userItem.username)}
                       disabled={!isUserSelectable(userItem, currentUsername)}
                       onChange={() => onToggleUserSelection(userItem.username)}

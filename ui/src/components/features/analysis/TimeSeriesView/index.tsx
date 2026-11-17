@@ -23,6 +23,7 @@ import { useMetricsConfig } from "@/hooks/useMetricsConfig";
 import { useTimeRange } from "@/hooks/useTimeRange";
 import { useAnalysisUrlState } from "@/hooks/useUrlState";
 import { formatDateTime } from "@/lib/utils/datetime";
+import { SELECT_CONTROL_HEIGHT } from "@/lib/react-select-theme";
 import { useIsDarkTheme } from "@/contexts/ThemeContext";
 import { chartTheme, seriesColor } from "@/lib/chartTheme";
 
@@ -734,15 +735,15 @@ export function TimeSeriesView() {
                 styles={{
                   control: (base) => ({
                     ...base,
-                    minHeight: "38px",
-                    height: "auto",
+                    minHeight: SELECT_CONTROL_HEIGHT,
+                    height: SELECT_CONTROL_HEIGHT,
                     borderRadius: "0.5rem",
                     borderColor: palette.accent,
                     borderWidth: "2px",
                   }),
                   valueContainer: (base) => ({
                     ...base,
-                    padding: "2px 8px",
+                    padding: "0 0.75rem",
                   }),
                   menu: (base) => ({
                     ...base,
@@ -790,15 +791,15 @@ export function TimeSeriesView() {
                   styles={{
                     control: (base) => ({
                       ...base,
-                      minHeight: "38px",
-                      height: "auto",
+                      minHeight: SELECT_CONTROL_HEIGHT,
+                      height: SELECT_CONTROL_HEIGHT,
                       borderRadius: "0.5rem",
                       borderStyle: "dashed",
                       borderColor: palette.secondary,
                     }),
                     valueContainer: (base) => ({
                       ...base,
-                      padding: "2px 8px",
+                      padding: "0 0.75rem",
                     }),
                     menu: (base) => ({
                       ...base,
@@ -832,15 +833,15 @@ export function TimeSeriesView() {
                     styles={{
                       control: (base) => ({
                         ...base,
-                        minHeight: "38px",
-                        height: "auto",
+                        minHeight: SELECT_CONTROL_HEIGHT,
+                        height: SELECT_CONTROL_HEIGHT,
                         borderRadius: "0.5rem",
                         borderColor: palette.secondary,
                         borderWidth: "2px",
                       }),
                       valueContainer: (base) => ({
                         ...base,
-                        padding: "2px 8px",
+                        padding: "0 0.75rem",
                       }),
                       menu: (base) => ({
                         ...base,
@@ -849,9 +850,11 @@ export function TimeSeriesView() {
                     }}
                   />
                   <button
+                    type="button"
                     onClick={handleRemoveSecondaryAxis}
-                    className="btn btn-sm btn-ghost text-error"
+                    className="btn btn-square btn-ghost text-error"
                     title="Remove secondary axis"
+                    aria-label="Remove secondary axis"
                   >
                     <svg
                       xmlns="http://www.w3.org/2000/svg"

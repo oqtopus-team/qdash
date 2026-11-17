@@ -661,7 +661,7 @@ export function Sidebar() {
         {/* Menu Section */}
         <div className="py-2">
           {/* Theme Toggle */}
-          <label className="flex items-center justify-between w-full px-4 h-12 cursor-pointer hover:bg-base-200 rounded-lg">
+          <label className="choice-field items-center justify-between w-full px-4 h-12 hover:bg-base-200 rounded-lg">
             <div className="flex items-center gap-3">
               {isDarkTheme ? <Moon size={18} /> : <Sun size={18} />}
               <span>Dark Mode</span>

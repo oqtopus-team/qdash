@@ -833,14 +833,14 @@ export function CouplingGrid({
                   {selectedForDownload.size} / {availableForDownloadCount} selected
                 </span>
                 <button
-                  className="btn btn-xs btn-ghost"
+                  className="btn btn-sm btn-ghost"
                   onClick={selectAllForDownload}
                   title="Select all"
                 >
                   All
                 </button>
                 <button
-                  className="btn btn-xs btn-ghost"
+                  className="btn btn-sm btn-ghost"
                   onClick={clearDownloadSelection}
                   title="Clear selection"
                 >

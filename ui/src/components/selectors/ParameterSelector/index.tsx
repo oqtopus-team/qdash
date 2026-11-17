@@ -2,6 +2,8 @@
 
 import Select from "react-select";
 
+import { useSelectStyles } from "@/hooks/useSelectStyles";
+
 import type { SingleValue } from "react-select";
 
 interface ParameterOption {
@@ -22,6 +24,7 @@ export function ParameterSelector({
   onParameterSelect,
   disabled = false,
 }: ParameterSelectorProps) {
+  const styles = useSelectStyles<ParameterOption>();
   const options: ParameterOption[] = parameters.map((param) => ({
     value: param,
     label: param,
@@ -33,6 +36,7 @@ export function ParameterSelector({
 
   return (
     <Select<ParameterOption>
+      styles={styles}
       options={options}
       value={options.find((option) => option.value === selectedParameter) ?? null}
       onChange={handleChange}

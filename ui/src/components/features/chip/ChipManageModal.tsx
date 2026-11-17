@@ -228,7 +228,7 @@ export function ChipManageModal({ chipId, onClose, onDeleted }: ChipManageModalP
                     </div>
                   )}
                   {!impact.can_delete_safely && (
-                    <label className="flex items-center gap-2 mt-1 cursor-pointer">
+                    <label className="choice-field mt-1">
                       <input
                         type="checkbox"
                         className="checkbox checkbox-sm checkbox-error"

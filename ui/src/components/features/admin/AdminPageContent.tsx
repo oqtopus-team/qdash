@@ -1117,7 +1117,7 @@ function MembersModal({
                 </label>
 
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <label className="flex items-center gap-2">
+                  <label className="choice-field">
                     <input
                       type="checkbox"
                       className="checkbox checkbox-sm"
@@ -1141,10 +1141,10 @@ function MembersModal({
                     <ul className="divide-y divide-base-300">
                       {filteredAvailableUsers.map((userItem) => (
                         <li key={userItem.username}>
-                          <label className="flex cursor-pointer items-start gap-3 p-3 hover:bg-base-200">
+                          <label className="choice-field gap-3 p-3 hover:bg-base-200">
                             <input
                               type="checkbox"
-                              className="checkbox checkbox-sm mt-1"
+                              className="checkbox checkbox-sm"
                               checked={selectedCandidateUsernames.includes(userItem.username)}
                               onChange={() => handleToggleCandidate(userItem.username)}
                             />
@@ -1395,11 +1395,11 @@ function AssignUsersToProjectModal({
                   <ul className="divide-y divide-base-300">
                     {filteredProjects.map((project) => (
                       <li key={project.project_id}>
-                        <label className="flex cursor-pointer items-start gap-3 p-3 hover:bg-base-200">
+                        <label className="choice-field gap-3 p-3 hover:bg-base-200">
                           <input
                             type="radio"
                             name="assign-project"
-                            className="radio radio-sm mt-1"
+                            className="radio radio-sm"
                             checked={selectedProjectId === project.project_id}
                             onChange={() => setSelectedProjectId(project.project_id)}
                           />

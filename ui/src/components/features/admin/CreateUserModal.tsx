@@ -176,20 +176,18 @@ export function CreateUserModal({ onClose, onSave, isLoading, error }: CreateUse
                 {...register("organization")}
               />
             </div>
-            <label className="block cursor-pointer rounded-lg border border-base-300 bg-base-100 p-3">
-              <div className="flex items-start gap-3">
-                <input
-                  type="checkbox"
-                  className="checkbox checkbox-primary mt-1"
-                  {...register("createDefaultProject")}
-                />
-                <div>
-                  <div className="font-medium">Create default project</div>
-                  <div className="text-sm text-base-content/60">
-                    Provision a personal project for this user and set it as their default project.
-                  </div>
-                </div>
-              </div>
+            <label className="choice-field gap-3 rounded-lg border border-base-300 bg-base-100 p-3">
+              <input
+                type="checkbox"
+                className="checkbox checkbox-primary"
+                {...register("createDefaultProject")}
+              />
+              <span>
+                <span className="block font-medium">Create default project</span>
+                <span className="block text-sm text-base-content/60">
+                  Provision a personal project for this user and set it as their default project.
+                </span>
+              </span>
             </label>
             <div className="modal-action">
               <button type="button" className="btn" onClick={onClose} disabled={isLoading}>

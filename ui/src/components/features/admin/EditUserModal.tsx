@@ -140,17 +140,14 @@ export function EditUserModal({
           </div>
 
           <div className="form-control">
-            <label
-              className="label cursor-pointer justify-start gap-4"
-              htmlFor="edit-user-disabled"
-            >
+            <label className="choice-field gap-3" htmlFor="edit-user-disabled">
               <input
                 id="edit-user-disabled"
                 type="checkbox"
                 className="toggle toggle-error"
                 {...register("disabled")}
               />
-              <span className="label-text">
+              <span>
                 Account Disabled
                 {disabled && <span className="text-error ml-2">(User cannot login)</span>}
               </span>
