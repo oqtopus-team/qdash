@@ -21,7 +21,6 @@ from typing import Any, Literal
 
 from prefect import flow
 
-from qdash.common.mux_mapping import canonical_qid, resolve_chip_mux_mapping
 from qdash.workflow import TaskCall, sweep  # noqa: F401  # used by commented range overrides below
 from qdash.workflow.service import CalibService
 from qdash.workflow.service.calib_service import (
@@ -46,44 +45,6 @@ QUBIT_FREQUENCY_MAPPING_EXECUTION_MODES: tuple[QubitFrequencyMappingExecutionMod
     "sequential",
     "parallel_by_mux",
 )
-
-# Both calls publish their outputs: the mapping reads the candidates from the
-# calibration parameters, and its own result is the readout and coarse qubit values.
-QUBIT_FREQUENCY_MAPPING_TASKS: list[TaskCall] = [
-    TaskCall(
-        name="CheckResonatorSpectroscopy",
-        run={
-            "shots": 1024,
-            "interval": 0,
-            # Publish the unassigned candidates of the MUX instead of assigning a
-            # resonator to each qubit; resonator_assignment_order is ignored.
-            "detection_only": True,
-            # The frequency range defaults to the connected readout box's qubex
-            # default: low band [5.75, 6.75, 0.002] GHz or high band
-            # [9.75, 10.75, 0.002] GHz. The qubex default power range is
-            # [-60, 5, 5] dB (stop is exclusive). Leave each range unset to use its
-            # default, or uncomment to override it.
-            # "frequency_range": sweep.arange(5.75, 6.75, 0.002),
-        },
-        update_calibration_parameters=True,
-    ),
-    TaskCall(
-        name="CheckQubitFrequencyMapping",
-        run={
-            "shots": 1024,
-            "interval": 1024,
-            # The drive frequency range defaults to the connected control box's
-            # qubex default: low band [3.0, 5.75, 0.005] GHz or high band
-            # [6.5, 9.75, 0.005] GHz. The power range defaults to [-60, 0, 5] dB
-            # (stop is exclusive). Readout uses the resonator candidates as carrier
-            # overrides. Leave each range unset to use its default, or uncomment to
-            # override it.
-            # "frequency_range": sweep.arange(3.0, 5.75, 0.005),
-            # "power_range": sweep.arange(-60, 0, 10),
-        },
-        update_calibration_parameters=True,
-    ),
-]
 
 
 @flow(
@@ -122,8 +83,14 @@ def qubit_frequency_mapping(
         username: User name (from UI)
         chip_id: Chip ID (from UI)
         mux_ids: MUX IDs to map (required)
-        exclude_qids: Qubit IDs to skip. A MUX representative (local slot 0) cannot
-            be excluded, because CheckResonatorSpectroscopy runs only on it.
+        exclude_qids: Qubit IDs to skip, applied as in the Bring-up template.
+            CheckResonatorSpectroscopy runs only on a MUX representative (local
+            slot 0), so excluding one runs no detection for its MUX in this run.
+            The other qubits of that MUX then map against the candidates
+            CheckQubitFrequencyMapping accepts from the calibration parameters,
+            which can be a set published by an earlier run; the task decides
+            whether that set is still usable. Remove the MUX from ``mux_ids`` to
+            skip it entirely.
         qids: Not used (for UI compatibility)
         execution_mode: How the qubits run (default: "sequential"):
             - "sequential": one MUX and one qubit at a time, so only one qubit is
@@ -138,8 +105,8 @@ def qubit_frequency_mapping(
         Pipeline results with the bring-up step outputs
 
     Raises:
-        ValueError: If ``mux_ids`` is missing, ``execution_mode`` is not one of
-            the accepted modes, or ``exclude_qids`` names a MUX representative.
+        ValueError: If ``mux_ids`` is missing or ``execution_mode`` is not one of
+            the accepted modes.
     """
     if mux_ids is None:
         raise ValueError("mux_ids is required; select MUX targets before running this flow")
@@ -161,7 +128,43 @@ def qubit_frequency_mapping(
     steps = [
         BringUp(
             execution_mode=execution_mode,
-            tasks=QUBIT_FREQUENCY_MAPPING_TASKS,
+            tasks=[
+                # Both calls publish their outputs: the mapping reads the candidates from the
+                # calibration parameters, and its own result is the readout and coarse qubit values.
+                TaskCall(
+                    name="CheckResonatorSpectroscopy",
+                    run={
+                        "shots": 1024,
+                        "interval": 0,
+                        # Publish the unassigned candidates of the MUX instead of assigning a
+                        # resonator to each qubit; resonator_assignment_order is ignored.
+                        "detection_only": True,
+                        # The frequency range defaults to the connected readout box's qubex
+                        # default: low band [5.75, 6.75, 0.002] GHz or high band
+                        # [9.75, 10.75, 0.002] GHz. The qubex default power range is
+                        # [-60, 5, 5] dB (stop is exclusive). Leave each range unset to use its
+                        # default, or uncomment to override it.
+                        # "frequency_range": sweep.arange(5.75, 6.75, 0.002),
+                    },
+                    update_calibration_parameters=True,
+                ),
+                TaskCall(
+                    name="CheckQubitFrequencyMapping",
+                    run={
+                        "shots": 1024,
+                        "interval": 1024,
+                        # The drive frequency range defaults to the connected control box's
+                        # qubex default: low band [3.0, 5.75, 0.005] GHz or high band
+                        # [6.5, 9.75, 0.005] GHz. The power range defaults to [-60, 0, 5] dB
+                        # (stop is exclusive). Readout uses the resonator candidates as carrier
+                        # overrides. Leave each range unset to use its default, or uncomment to
+                        # override it.
+                        # "frequency_range": sweep.arange(3.0, 5.75, 0.005),
+                        # "power_range": sweep.arange(-60, 0, 10),
+                    },
+                    update_calibration_parameters=True,
+                ),
+            ],
         )
     ]
 
@@ -173,27 +176,4 @@ def qubit_frequency_mapping(
         project_id=project_id,
         default_run_parameters=default_run_parameters,
     )
-    _reject_excluded_representatives(cal.project_id, chip_id, mux_ids, exclude_qids)
     return cal.run(targets, steps=steps)
-
-
-def _reject_excluded_representatives(
-    project_id: str, chip_id: str, mux_ids: list[int], exclude_qids: list[str]
-) -> None:
-    """Raise ValueError when an exclusion would skip a MUX's candidate detection.
-
-    Without its representative, a MUX would run no CheckResonatorSpectroscopy, and
-    its other qubits could map against candidates from an earlier run.
-    """
-    if not exclude_qids:
-        return
-    excluded = {canonical_qid(qid) for qid in exclude_qids}
-    mapping = resolve_chip_mux_mapping(project_id, chip_id)
-    representatives = [mapping.slots_of(mux_id).get(0) for mux_id in mapping.check_mux_ids(mux_ids)]
-    blocked = [qid for qid in representatives if qid is not None and qid in excluded]
-    if blocked:
-        raise ValueError(
-            f"exclude_qids contains MUX representative qubits {blocked}; "
-            "CheckResonatorSpectroscopy runs only on local slot 0 of each MUX. "
-            "Remove the MUX from mux_ids instead of excluding its representative."
-        )

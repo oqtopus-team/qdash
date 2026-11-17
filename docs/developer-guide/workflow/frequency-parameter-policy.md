@@ -238,9 +238,11 @@ candidates to every qubit of the MUX before the representative continues. Then
 `update_calibration_parameters: true`, because the mapping reads the candidates from the published
 calibration parameters. `execution_mode` defaults to `sequential`, which drives one qubit at a
 time; `parallel_by_mux` runs MUXes in parallel and keeps each MUX in order. The template rejects
-other modes, because `parallel_by_round` can start a later slot before its representative, and it
-rejects an `exclude_qids` entry that names a MUX representative, because that MUX would run no
-detection.
+other modes, because `parallel_by_round` can start a later slot before its representative.
+`exclude_qids` follows the Bring-up template. Excluding a MUX representative runs no detection for
+that MUX in the run, so its other qubits map against whatever candidate set
+`CheckQubitFrequencyMapping` accepts from the calibration parameters, which can come from an
+earlier run. The task, not the template, decides whether that set is still usable.
 
 ### Replacement within the same parameter
 

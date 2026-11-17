@@ -11,7 +11,6 @@ import pytest
 from pydantic import TypeAdapter, ValidationError
 
 from qdash.api.services.flow_service.templates import TemplateCatalog
-from qdash.common.mux_mapping import MuxMapping
 from qdash.workflow.calibtasks.qubex import (
     CheckQubitFrequencyMapping,
     CheckResonatorSpectroscopy,
@@ -28,23 +27,14 @@ class FakeCalibService:
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         self.args = args
         self.kwargs = kwargs
-        self.project_id = kwargs.get("project_id") or "default-project"
 
     def run(self, targets: Any, *, steps: list[Any]) -> dict[str, Any]:
         return {"targets": targets, "steps": steps, "kwargs": self.kwargs}
 
 
 @pytest.fixture(autouse=True)
-def mapping_lookups(monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, str]]:
-    lookups: list[tuple[str, str]] = []
-
-    def resolve(project_id: str, chip_id: str) -> MuxMapping:
-        lookups.append((project_id, chip_id))
-        return MuxMapping.legacy()
-
+def fake_calib_service(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(template_module, "CalibService", FakeCalibService)
-    monkeypatch.setattr(template_module, "resolve_chip_mux_mapping", resolve)
-    return lookups
 
 
 def _run(**kwargs: Any) -> dict[str, Any]:
@@ -178,24 +168,9 @@ def test_template_targets_muxes_and_ignores_qids() -> None:
     assert result["kwargs"]["project_id"] == "p"
 
 
-def test_template_preserves_exclusions_of_non_representatives(
-    mapping_lookups: list[tuple[str, str]],
-) -> None:
-    result = _run(mux_ids=[0, 1], exclude_qids=["2", "Q05"], project_id="p")
+@pytest.mark.parametrize("exclude_qids", [["2", "Q05"], ["1", "4"], ["Q04"]])
+def test_template_forwards_exclusions_like_bringup(exclude_qids: list[str]) -> None:
+    """Exclusions, MUX representatives included, reach the targets unchanged."""
+    result = _run(mux_ids=[0, 1], exclude_qids=exclude_qids)
 
-    assert result["targets"].exclude_qids == ["2", "Q05"]
-    assert mapping_lookups == [("p", "16Q")]
-
-
-def test_template_without_exclusions_does_not_read_the_topology(
-    mapping_lookups: list[tuple[str, str]],
-) -> None:
-    _run(mux_ids=[0, 1])
-
-    assert mapping_lookups == []
-
-
-@pytest.mark.parametrize("excluded", ["4", "Q04"])
-def test_template_rejects_excluding_a_mux_representative(excluded: str) -> None:
-    with pytest.raises(ValueError, match=r"MUX representative qubits \['4'\]"):
-        _run(mux_ids=[0, 1], exclude_qids=["1", excluded])
+    assert result["targets"] == MuxTargets(mux_ids=[0, 1], exclude_qids=exclude_qids)
