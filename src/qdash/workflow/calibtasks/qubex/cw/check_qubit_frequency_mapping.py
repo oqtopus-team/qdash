@@ -58,21 +58,13 @@ MAPPING_FIGURE_META_KEY = "qubit_frequency_mapping_figure"
 _PAYLOAD_FREQUENCY_ABS_TOL = 1e-9
 _PAYLOAD_AMPLITUDE_REL_TOL = 1e-9
 _AXIS_ABS_TOL = 1e-9
-# The readout candidates of one MUX share one readout AWG channel, where their tones
-# are summed; the sum of the per-tone amplitudes must stay within this full scale.
+# The readout candidates of one acquisition share one readout AWG channel, where their
+# tones are summed; the sum of the per-tone amplitudes must stay within this full scale.
 MULTIPLEXED_READOUT_AMPLITUDE_BUDGET = 1.0
-
-
-def multiplexed_readout_amplitude_ceiling(count: int) -> float:
-    """Return the per-tone readout amplitude ceiling for ``count`` simultaneous candidates.
-
-    The ceiling is ``1/count`` of the full-scale budget, so ``count`` tones at or below
-    it sum to at most full scale whatever their relative phases. Raises ValueError
-    when ``count`` is not a positive integer.
-    """
-    if isinstance(count, bool) or not isinstance(count, int) or count < 1:
-        raise ValueError(f"count must be a positive integer, got {count!r}")
-    return MULTIPLEXED_READOUT_AMPLITUDE_BUDGET / count
+READOUT_GROUPING_RULE = (
+    "first-fit decreasing by readout amplitude, ties by candidate index; "
+    "each group's amplitude sum <= budget"
+)
 
 
 def load_multiplexed_readout_qubit_spectroscopy() -> Callable[..., Any]:
@@ -186,24 +178,19 @@ class ResonatorCandidate:
 
 @dataclass(frozen=True)
 class CandidateReadout:
-    """A resonator candidate paired with the readout slot that acquires it.
+    """A resonator candidate paired with its readout slot and its acquisition group.
 
-    ``candidate.readout_amplitude`` stays the producer's requested amplitude.
-    ``readout_amplitude`` is the amplitude applied in the multiplexed acquisition:
-    the request capped at ``readout_amplitude_ceiling``, never raised. Raises
-    ValueError when the ceiling is not finite or not in ``(0, 1]``.
+    ``readout_label`` is the candidate's own slot whichever group reads it.
+    ``readout_group`` numbers the helper call that acquires the candidate, and
+    ``readout_group_position`` is the candidate's position in that call, which is the
+    ``candidate_index`` the helper reports for it. The readout amplitude is the
+    producer's requested amplitude, applied unchanged.
     """
 
     candidate: ResonatorCandidate
     readout_label: str
-    readout_amplitude_ceiling: float
-
-    def __post_init__(self) -> None:
-        ceiling = self.readout_amplitude_ceiling
-        if not (math.isfinite(ceiling) and 0.0 < ceiling <= MULTIPLEXED_READOUT_AMPLITUDE_BUDGET):
-            raise ValueError(
-                f"readout_amplitude_ceiling must be finite and in (0, 1], got {ceiling!r}"
-            )
+    readout_group: int
+    readout_group_position: int
 
     @property
     def requested_readout_amplitude(self) -> float:
@@ -212,22 +199,109 @@ class CandidateReadout:
 
     @property
     def readout_amplitude(self) -> float:
-        """The readout amplitude applied in the measurement."""
-        return min(self.requested_readout_amplitude, self.readout_amplitude_ceiling)
+        """The readout amplitude applied in the measurement, equal to the request."""
+        return self.candidate.readout_amplitude
 
-    @property
-    def readout_amplitude_capped(self) -> bool:
-        """Whether the ceiling lowered the requested amplitude."""
-        return self.requested_readout_amplitude > self.readout_amplitude_ceiling
+
+def plan_readout_groups(
+    candidates: Sequence[ResonatorCandidate], slots: Sequence[str]
+) -> tuple[CandidateReadout, ...]:
+    """Pair each candidate with its slot and split them into budget-safe acquisition groups.
+
+    Candidate ``i`` keeps slot ``slots[i]``. Candidates are placed first-fit in
+    decreasing order of readout amplitude, ties broken by candidate index, into the
+    first group whose amplitude sum stays within ``MULTIPLEXED_READOUT_AMPLITUDE_BUDGET``;
+    a candidate that fits no group opens a new one. Groups are numbered in creation
+    order and list their candidates by candidate index. Returns the readouts in
+    candidate order. Raises ValueError when the counts differ or an amplitude is not
+    finite, not positive, or above the budget, since such a tone cannot be read.
+    """
+    if len(candidates) != len(slots):
+        raise ValueError(f"{len(candidates)} candidates do not match {len(slots)} readout slots")
+    for candidate in candidates:
+        amplitude = candidate.readout_amplitude
+        if not (
+            math.isfinite(amplitude) and 0.0 < amplitude <= MULTIPLEXED_READOUT_AMPLITUDE_BUDGET
+        ):
+            raise ValueError(
+                f"resonator_candidate_{candidate.index}_readout_amplitude {amplitude!r} must be "
+                f"finite, positive, and at most the readout full scale "
+                f"{MULTIPLEXED_READOUT_AMPLITUDE_BUDGET:g}"
+            )
+    bins: list[list[ResonatorCandidate]] = []
+    for candidate in sorted(candidates, key=lambda c: (-c.readout_amplitude, c.index)):
+        for members in bins:
+            amplitudes = [m.readout_amplitude for m in members]
+            if math.fsum([*amplitudes, candidate.readout_amplitude]) <= (
+                MULTIPLEXED_READOUT_AMPLITUDE_BUDGET
+            ):
+                members.append(candidate)
+                break
+        else:
+            bins.append([candidate])
+    slot_of = {candidate.index: slot for candidate, slot in zip(candidates, slots, strict=True)}
+    readouts = [
+        CandidateReadout(
+            candidate=candidate,
+            readout_label=slot_of[candidate.index],
+            readout_group=group,
+            readout_group_position=position,
+        )
+        for group, members in enumerate(bins)
+        for position, candidate in enumerate(sorted(members, key=lambda c: c.index))
+    ]
+    return tuple(sorted(readouts, key=lambda r: r.candidate.index))
+
+
+def readout_groups(
+    readouts: Sequence[CandidateReadout],
+) -> tuple[tuple[CandidateReadout, ...], ...]:
+    """Return the readouts of each acquisition group, ordered by position in the group.
+
+    Raises ValueError unless the groups are numbered from 0 without gaps, every group
+    lists positions from 0 without gaps, candidate indices and readout slots are
+    unique, and every group's amplitude sum is within the readout budget.
+    """
+    indices = [r.candidate.index for r in readouts]
+    labels = [r.readout_label for r in readouts]
+    if len(set(indices)) != len(indices) or len(set(labels)) != len(labels):
+        raise ValueError("readout candidates or slots are duplicated")
+    count = 1 + max((r.readout_group for r in readouts), default=-1)
+    groups: list[tuple[CandidateReadout, ...]] = []
+    for group in range(count):
+        members = tuple(
+            sorted(
+                (r for r in readouts if r.readout_group == group),
+                key=lambda r: r.readout_group_position,
+            )
+        )
+        if [r.readout_group_position for r in members] != list(range(len(members))) or (
+            not members
+        ):
+            raise ValueError(f"readout group {group} has inconsistent positions")
+        amplitude_sum = math.fsum(r.readout_amplitude for r in members)
+        if amplitude_sum > MULTIPLEXED_READOUT_AMPLITUDE_BUDGET:
+            raise ValueError(
+                f"readout group {group} amplitude sum {amplitude_sum:.6g} exceeds "
+                f"{MULTIPLEXED_READOUT_AMPLITUDE_BUDGET:g}"
+            )
+        groups.append(members)
+    if sum(len(members) for members in groups) != len(readouts):
+        raise ValueError("readout groups do not cover every candidate")
+    return tuple(groups)
 
 
 @dataclass(frozen=True)
 class FrequencyMappingRunPayload:
-    """The requested candidate pairing and sweep together with the Qubex result."""
+    """The requested candidate readouts and sweep together with one Qubex result per group.
+
+    ``readouts`` are in candidate order; ``results[g]`` is the helper result of
+    readout group ``g``.
+    """
 
     target: str
     readouts: tuple[CandidateReadout, ...]
-    result: Any
+    results: tuple[Any, ...]
     frequency_range: Any = None
     power_range: Any = None
 
@@ -308,7 +382,7 @@ class CheckQubitFrequencyMapping(QubexTask):
     """Task to identify a qubit's coarse frequency and its resonator.
 
     The task drives one qubit and reads every resonator candidate published by the
-    latest CheckResonatorSpectroscopy run of its MUX in one multiplexed qubit
+    latest CheckResonatorSpectroscopy run of its MUX with multiplexed qubit
     spectroscopy. It analyzes each candidate's map with the CheckQubitSpectroscopy
     analysis and ranks the candidates by the raw f01 ``moment`` of that analysis. It
     publishes the readout and coarse qubit values of the best candidate only when its
@@ -317,15 +391,19 @@ class CheckQubitFrequencyMapping(QubexTask):
     the next candidate with any f01 peak, low quality included. Exact and near ties
     are rejected as ambiguous. The default ratio of 2.0 is a provisional heuristic, not
     an empirically calibrated threshold, and the moment is not normalized: it depends
-    on each candidate's readout amplitude and noise. It does not use the qubit's
+    on each candidate's readout amplitude, noise, and readout group. It does not use the qubit's
     existing readout_frequency, so a wrong resonator assignment does not affect the
     result.
 
-    The candidate tones share the MUX readout AWG channel, so N candidates are read
-    with each amplitude capped at ``1/N`` of full scale: ``min(requested, 1/N)``,
-    never raised. The producer's amplitude is a single-tone optimum and stays the
-    requested value; the payload check, scores, figures, evidence, and the published
-    ``readout_amplitude`` all use the applied amplitude.
+    The candidate tones of one acquisition share the MUX readout AWG channel, so
+    their readout amplitudes must sum to at most full scale. The task reads every
+    candidate at the producer's requested amplitude, never scaled, and splits the
+    candidates into acquisition groups whose amplitude sums stay within full scale
+    (first-fit decreasing, ties by candidate index). Each group is one helper call
+    with the same drive sweep; a candidate keeps its readout slot and candidate index
+    whichever group reads it. An amplitude above full scale is rejected before any
+    measurement. A failed group or an inconsistent group result fails the task
+    without outputs.
 
     When a candidate is selected, the first figure is that candidate's marked map
     with its f01 marker, titled with the qid, the candidate's readout identity and
@@ -486,9 +564,8 @@ class CheckQubitFrequencyMapping(QubexTask):
         "readout_amplitude": OutputParameterSpec(
             unit="a.u.",
             description=(
-                "Readout amplitude applied to the selected resonator candidate in the "
-                "multiplexed acquisition: the producer's amplitude capped at 1/N for N "
-                "candidates."
+                "Readout amplitude of the selected resonator candidate: the producer's "
+                "requested amplitude, applied unchanged."
             ),
         ),
         "resonator_candidate_index": OutputParameterSpec(
@@ -534,9 +611,9 @@ class CheckQubitFrequencyMapping(QubexTask):
         """Return the validated, frequency-sorted candidates from one producer result.
 
         Raises ValueError when the count is missing or out of range, when a candidate
-        value is missing, non-finite, or not positive, when frequencies are not strictly
-        increasing, or when any value comes from a different producer result than the
-        count.
+        value is missing, non-finite, or not positive, when a readout amplitude exceeds
+        the readout full scale, when frequencies are not strictly increasing, or when
+        any value comes from a different producer result than the count.
         """
         count_param = self.input_parameters["resonator_candidate_count"]
         count_value = count_param.value
@@ -572,6 +649,13 @@ class CheckQubitFrequencyMapping(QubexTask):
                     or float(value) <= 0.0
                 ):
                     raise ValueError(f"{name} must be finite and positive, got {value!r}")
+                if kind == "readout_amplitude" and float(value) > (
+                    MULTIPLEXED_READOUT_AMPLITUDE_BUDGET
+                ):
+                    raise ValueError(
+                        f"{name} must not exceed the readout full scale "
+                        f"{MULTIPLEXED_READOUT_AMPLITUDE_BUDGET:g}, got {value!r}"
+                    )
                 if (parameter.execution_id, parameter.task_id) != source:
                     raise ValueError(
                         f"{name} does not come from the same CheckResonatorSpectroscopy "
@@ -689,7 +773,12 @@ class CheckQubitFrequencyMapping(QubexTask):
         return ratio
 
     def run(self, backend: QubexBackend, qid: str) -> RunResult:
-        """Drive the qubit once while reading every resonator candidate."""
+        """Drive the qubit with the same sweep once per budget-safe readout group.
+
+        Every group calls the Qubex helper with the same drive target and settings
+        and reads its candidates at their requested amplitudes. Raises RuntimeError
+        naming the group when a helper call fails, so no group result is published.
+        """
         self._min_score_ratio()
         candidates = self._candidate_set()
         self._verify_candidate_source(backend, qid)
@@ -697,38 +786,31 @@ class CheckQubitFrequencyMapping(QubexTask):
         exp = self.get_experiment(backend)
         label = self.get_qubit_label(backend, qid)
         slots = self._readout_slots(exp, label, len(candidates))
-        ceiling = multiplexed_readout_amplitude_ceiling(len(candidates))
-        readouts = tuple(
-            CandidateReadout(
-                candidate=candidate, readout_label=slot, readout_amplitude_ceiling=ceiling
-            )
-            for candidate, slot in zip(candidates, slots, strict=True)
-        )
-        print(f"Qubit frequency mapping for qid={qid}: {_amplitude_ceiling_text(readouts)}")
+        readouts = plan_readout_groups(candidates, slots)
+        groups = readout_groups(readouts)
+        print(f"Qubit frequency mapping for qid={qid}: {_readout_groups_text(groups)}")
         frequency_range = self._frequency_range()
         power_range = self.run_parameters["power_range"].get_value()
-        result = helper(
-            exp,
-            label,
-            readout_frequencies={
-                readout.readout_label: readout.candidate.frequency for readout in readouts
-            },
-            readout_amplitudes={
-                readout.readout_label: readout.readout_amplitude for readout in readouts
-            },
-            frequency_range=frequency_range,
-            power_range=power_range,
-            simultaneous_drive=self.run_parameters["simultaneous_drive"].get_value(),
-            shots=self.run_parameters["shots"].get_value(),
-            interval=self.run_parameters["interval"].get_value(),
-            plot=False,
-            save_image=False,
+        settings = {
+            "frequency_range": frequency_range,
+            "power_range": power_range,
+            "simultaneous_drive": self.run_parameters["simultaneous_drive"].get_value(),
+            "shots": self.run_parameters["shots"].get_value(),
+            "interval": self.run_parameters["interval"].get_value(),
+            "plot": False,
+            "save_image": False,
+        }
+        results = tuple(
+            _measure_readout_group(
+                helper, exp, label, members, group=group, group_count=len(groups), settings=settings
+            )
+            for group, members in enumerate(groups)
         )
         return RunResult(
             raw_result=FrequencyMappingRunPayload(
                 target=label,
                 readouts=readouts,
-                result=result,
+                results=results,
                 frequency_range=frequency_range,
                 power_range=power_range,
             )
@@ -757,8 +839,7 @@ class CheckQubitFrequencyMapping(QubexTask):
         except ValueError as exc:
             return self._reject(f"{exc} for qid={qid}", [])
 
-        data = getattr(payload.result, "data", None)
-        common_error, axes = self._common_axes(payload, data)
+        common_error, axes, candidate_payloads = self._merged_group_results(payload)
         evaluations: list[_CandidateEvaluation] = []
         figures: list[go.Figure] = []
         if common_error is not None or axes is None:
@@ -768,12 +849,11 @@ class CheckQubitFrequencyMapping(QubexTask):
             ]
             decision = MappingDecision(reason=f"Malformed result: {common_error}")
         else:
-            assert isinstance(data, Mapping)
             frequencies, powers = axes
             for readout in payload.readouts:
                 evaluation, candidate_figures = self._evaluate_candidate(
                     readout,
-                    data["candidates"].get(readout.readout_label),
+                    candidate_payloads.get(readout.candidate.index),
                     frequencies,
                     powers,
                 )
@@ -842,8 +922,7 @@ class CheckQubitFrequencyMapping(QubexTask):
             f"Selected resonator candidate {candidate.index} for qid={qid}: "
             f"readout_frequency={candidate.frequency:.6f} GHz, "
             f"readout_amplitude={selected.readout.readout_amplitude:.6f} a.u. "
-            f"(requested {selected.readout.requested_readout_amplitude:.6g}, "
-            f"ceiling {selected.readout.readout_amplitude_ceiling:.6g}), "
+            f"(requested = applied, readout group {selected.readout.readout_group}), "
             f"coarse_qubit_frequency={selected.frequency:.6f} GHz, "
             f"coarse_control_amplitude={coarse_control_amplitude:.6f} a.u. ({decision.reason})"
         )
@@ -856,23 +935,77 @@ class CheckQubitFrequencyMapping(QubexTask):
         print(f"[ERROR] {message}")
         return PostProcessResult(output_parameters={}, figures=figures, validation_error=message)
 
-    @staticmethod
-    def _common_axes(payload: FrequencyMappingRunPayload, data: Any) -> tuple[str | None, Any]:
-        """Return the validated ``(frequencies, powers)`` axes, or why the result is malformed.
+    @classmethod
+    def _merged_group_results(
+        cls, payload: FrequencyMappingRunPayload
+    ) -> tuple[str | None, Any, dict[int, Any]]:
+        """Validate every group result and merge the candidate payloads by candidate index.
 
-        The axes must be finite, strictly increasing, and equal to the requested
-        sweep when the run recorded one.
+        Returns ``(error, axes, payloads)``: ``axes`` are the common validated
+        ``(frequencies, powers)`` and ``payloads`` maps each global candidate index to
+        its group's candidate payload, which still carries the helper-local
+        ``candidate_index``. Any inconsistent group plan, missing or extra group result,
+        malformed group result, or group whose axes differ from the first group's
+        returns an error and no payloads, so no group is published alone.
+        """
+        try:
+            groups = readout_groups(payload.readouts)
+        except ValueError as exc:
+            return f"inconsistent readout groups: {exc}", None, {}
+        if len(payload.results) != len(groups):
+            return (
+                f"{len(payload.results)} group results do not match {len(groups)} readout groups",
+                None,
+                {},
+            )
+        axes: tuple[Any, Any] | None = None
+        merged: dict[int, Any] = {}
+        for group, (members, result) in enumerate(zip(groups, payload.results, strict=True)):
+            data = getattr(result, "data", None)
+            error, group_axes = cls._common_axes(payload, members, data)
+            if error is not None or group_axes is None:
+                return f"readout group {group}: {error}", None, {}
+            if axes is None:
+                axes = group_axes
+            elif not all(
+                _same_axis(mine, first) for mine, first in zip(group_axes, axes, strict=True)
+            ):
+                return (
+                    f"readout group {group}: sweep axes differ from readout group 0",
+                    None,
+                    {},
+                )
+            assert isinstance(data, Mapping)
+            for readout in members:
+                merged[readout.candidate.index] = data["candidates"].get(readout.readout_label)
+        return None, axes, merged
+
+    @staticmethod
+    def _common_axes(
+        payload: FrequencyMappingRunPayload,
+        members: Sequence[CandidateReadout],
+        data: Any,
+    ) -> tuple[str | None, Any]:
+        """Return one group result's validated ``(frequencies, powers)`` axes, or the error.
+
+        The result must name the drive target and exactly the group's readout slots in
+        group order. The axes must be finite, strictly increasing, and equal to the
+        requested sweep when the run recorded one.
         """
         if not isinstance(data, Mapping):
             return "result has no data mapping", None
         if data.get("target") != payload.target:
             return f"target {data.get('target')!r} does not match {payload.target!r}", None
-        requested_labels = [readout.readout_label for readout in payload.readouts]
+        requested_labels = [readout.readout_label for readout in members]
         labels = data.get("readout_labels")
         if labels is None or list(labels) != requested_labels:
             return f"readout_labels {labels!r} do not match {requested_labels}", None
-        if not isinstance(data.get("candidates"), Mapping):
+        candidates = data.get("candidates")
+        if not isinstance(candidates, Mapping):
             return "result has no candidates mapping", None
+        if set(candidates) - set(requested_labels):
+            extra = sorted(set(candidates) - set(requested_labels))
+            return f"candidates {extra} were not requested in this group", None
         axes: list[Any] = []
         for name, requested in (
             ("frequency_range", payload.frequency_range),
@@ -952,10 +1085,12 @@ class CheckQubitFrequencyMapping(QubexTask):
     ) -> tuple[str | None, _CandidateMap | None]:
         """Return one candidate's validated phase map, or why its payload is rejected.
 
-        The payload must name the requested readout slot, candidate index, readout
-        frequency, and the applied (capped) readout amplitude, carry the common sweep axes, and hold a
-        finite real ``phases`` array of shape ``(powers, frequencies)``. A ``data``
-        array, which Qubex defines as the same array as ``phases``, must equal it.
+        The payload must name the requested readout slot, the candidate's position in
+        its readout group (the helper numbers candidates per call), the readout
+        frequency, and the requested readout amplitude, carry the common sweep axes,
+        and hold a finite real ``phases`` array of shape ``(powers, frequencies)``. A
+        ``data`` array, which Qubex defines as the same array as ``phases``, must
+        equal it. The caller keeps the global candidate index of ``readout``.
         """
         candidate = readout.candidate
         if not isinstance(candidate_data, Mapping):
@@ -965,10 +1100,16 @@ class CheckQubitFrequencyMapping(QubexTask):
                 f"readout_label {candidate_data.get('readout_label')!r} "
                 f"does not match {readout.readout_label!r}"
             ), None
-        if candidate_data.get("candidate_index") != candidate.index:
+        local_index = candidate_data.get("candidate_index")
+        if (
+            isinstance(local_index, bool)
+            or not isinstance(local_index, int | np.integer)
+            or local_index != readout.readout_group_position
+        ):
             return (
-                f"candidate_index {candidate_data.get('candidate_index')!r} "
-                f"does not match {candidate.index}"
+                f"candidate_index {local_index!r} does not match position "
+                f"{readout.readout_group_position} of candidate {candidate.index} in "
+                f"readout group {readout.readout_group}"
             ), None
         try:
             frequency = float(candidate_data["readout_frequency"])
@@ -981,7 +1122,7 @@ class CheckQubitFrequencyMapping(QubexTask):
             amplitude, readout.readout_amplitude, rel_tol=_PAYLOAD_AMPLITUDE_REL_TOL
         ):
             return (
-                f"readout_amplitude {amplitude:.6g} does not match the applied "
+                f"readout_amplitude {amplitude:.6g} does not match the requested "
                 f"{readout.readout_amplitude:.6g}"
             ), None
         for name, common in (("frequency_range", frequencies), ("power_range", powers)):
@@ -1118,6 +1259,36 @@ class CheckQubitFrequencyMapping(QubexTask):
         )
 
 
+def _measure_readout_group(
+    helper: Callable[..., Any],
+    exp: Any,
+    target: str,
+    members: Sequence[CandidateReadout],
+    *,
+    group: int,
+    group_count: int,
+    settings: Mapping[str, Any],
+) -> Any:
+    """Acquire one readout group with the helper, or raise RuntimeError naming the group.
+
+    The helper reads the group's slots in group order at their requested amplitudes.
+    """
+    try:
+        return helper(
+            exp,
+            target,
+            readout_frequencies={r.readout_label: r.candidate.frequency for r in members},
+            readout_amplitudes={r.readout_label: r.readout_amplitude for r in members},
+            **settings,
+        )
+    except Exception as exc:
+        raise RuntimeError(
+            f"Readout group {group} of {group_count} "
+            f"(candidates {[r.candidate.index for r in members]}) failed: "
+            f"{type(exc).__name__}: {exc}; no candidate result is published"
+        ) from exc
+
+
 def _format_score(value: float | None) -> str:
     return "none" if value is None else f"{value:.6g}"
 
@@ -1139,27 +1310,24 @@ def _runner_up_text(decision: MappingDecision) -> str:
 
 
 def _amplitude_text(readout: CandidateReadout) -> str:
-    """Return the applied amplitude, with the request and ceiling when it was capped."""
-    if not readout.readout_amplitude_capped:
-        return f"{readout.readout_amplitude:.6g}"
-    return (
-        f"{readout.readout_amplitude:.6g} (requested {readout.requested_readout_amplitude:.6g}, "
-        f"ceiling {readout.readout_amplitude_ceiling:.6g})"
-    )
+    """Return the readout amplitude and the acquisition group that applied it."""
+    return f"{readout.readout_amplitude:.6g} (requested = applied, group {readout.readout_group})"
 
 
-def _amplitude_ceiling_text(readouts: Sequence[CandidateReadout]) -> str:
-    """Return one line naming the ceiling and each candidate's requested and applied amplitude."""
-    count = len(readouts)
-    ceiling = readouts[0].readout_amplitude_ceiling if readouts else math.nan
-    pairs = "; ".join(
-        f"candidate {r.candidate.index} ({r.readout_label}) requested "
-        f"{r.requested_readout_amplitude:.6g} -> applied {r.readout_amplitude:.6g}"
-        for r in readouts
-    )
+def _readout_groups_text(groups: Sequence[Sequence[CandidateReadout]]) -> str:
+    """Return one line naming the budget and each group's candidates, amplitudes, and sum."""
+    parts = []
+    for group, members in enumerate(groups):
+        tones = ", ".join(
+            f"candidate {r.candidate.index} ({r.readout_label}) amplitude {r.readout_amplitude:.6g}"
+            for r in members
+        )
+        amplitude_sum = math.fsum(r.readout_amplitude for r in members)
+        parts.append(f"group {group} [{tones}] sum {amplitude_sum:.6g}")
     return (
-        f"multiplexed readout amplitude ceiling 1/{count} = {ceiling:.6g} per candidate "
-        f"(applied = min(requested, 1/N)); {pairs}"
+        f"{len(groups)} readout group(s) with amplitude sum <= "
+        f"{MULTIPLEXED_READOUT_AMPLITUDE_BUDGET:g} each, requested amplitudes applied "
+        f"unchanged; {'; '.join(parts)}"
     )
 
 
@@ -1206,6 +1374,7 @@ def _proposal(evaluation: _CandidateEvaluation | None) -> dict[str, Any] | None:
         "resonator_frequency": candidate.frequency,
         "readout_amplitude": evaluation.readout.readout_amplitude,
         "requested_readout_amplitude": evaluation.readout.requested_readout_amplitude,
+        "readout_group": evaluation.readout.readout_group,
         "coarse_qubit_frequency": _json_number(evaluation.frequency),
         "f01_repr_db": evaluation.repr_db,
         "f01_quality_level": evaluation.quality_level,
@@ -1241,9 +1410,10 @@ def mapping_evidence(
 
     It records the rule, the measured sweep, every candidate's raw analysis
     values (moment, quality level, f01) or its error, the moment ranking, the
-    runner-up and ratio, the reason, the multiplexed readout amplitude ceiling with
-    each candidate's requested and applied amplitude, and the proposal of the selected candidate,
-    or of the best candidate with ``published`` false when nothing is selected.
+    runner-up and ratio, the reason, the readout groups with the amplitude budget and
+    each candidate's group, position, and requested and applied (equal) amplitude, and
+    the proposal of the selected candidate, or of the best candidate with
+    ``published`` false when nothing is selected.
     A non-finite moment is kept as text in ``moment_raw`` and None in ``moment``.
     """
     rank = {id(e): position for position, e in enumerate(decision.ranking, start=1)}
@@ -1263,7 +1433,8 @@ def mapping_evidence(
                 "readout_frequency": candidate.frequency,
                 "readout_amplitude": e.readout.readout_amplitude,
                 "requested_readout_amplitude": e.readout.requested_readout_amplitude,
-                "readout_amplitude_capped": e.readout.readout_amplitude_capped,
+                "readout_group": e.readout.readout_group,
+                "readout_group_position": e.readout.readout_group_position,
                 "readout_power_db": _readout_power_db(e.readout.readout_amplitude),
                 "status": status,
                 "error": e.error,
@@ -1293,10 +1464,11 @@ def mapping_evidence(
             "calibrated": False,
             "note": (
                 "min_score_ratio is a provisional heuristic, not empirically calibrated; "
-                "moments depend on each candidate's readout amplitude and noise"
+                "moments depend on each candidate's readout amplitude and noise and are "
+                "compared across readout groups without normalization"
             ),
         },
-        "readout_amplitude_ceiling": _ceiling_evidence(payload.readouts),
+        "readout_groups": _readout_groups_evidence(payload.readouts),
         "sweep": {
             "drive_frequency_ghz": _sweep(frequencies),
             "drive_power_db": _sweep(powers),
@@ -1328,17 +1500,33 @@ def mapping_evidence(
     }
 
 
-def _ceiling_evidence(readouts: Sequence[CandidateReadout]) -> dict[str, Any]:
-    """Return the JSON-safe description of the multiplexed readout amplitude ceiling."""
-    ceilings = {r.readout_amplitude_ceiling for r in readouts}
+def _readout_groups_evidence(readouts: Sequence[CandidateReadout]) -> dict[str, Any]:
+    """Return the JSON-safe description of the readout groups that were acquired."""
+    members_of: dict[int, list[CandidateReadout]] = {}
+    for readout in readouts:
+        members_of.setdefault(readout.readout_group, []).append(readout)
+    groups = []
+    for group in sorted(members_of):
+        members = sorted(members_of[group], key=lambda r: r.readout_group_position)
+        groups.append(
+            {
+                "group": group,
+                "candidate_indices": [r.candidate.index for r in members],
+                "readout_labels": [r.readout_label for r in members],
+                "readout_amplitudes": [r.readout_amplitude for r in members],
+                "amplitude_sum": math.fsum(r.readout_amplitude for r in members),
+            }
+        )
     return {
-        "value": ceilings.pop() if len(ceilings) == 1 else None,
-        "active_candidates": len(readouts),
-        "rule": "applied = min(requested, 1/N)",
+        "budget": MULTIPLEXED_READOUT_AMPLITUDE_BUDGET,
+        "count": len(groups),
+        "rule": READOUT_GROUPING_RULE,
+        "groups": groups,
         "note": (
-            "requested amplitudes are the single-tone optima of CheckResonatorSpectroscopy; "
-            "the N candidate tones share one readout AWG channel, so each is capped at 1/N "
-            "to keep their sum within full scale. Scores and outputs use the applied amplitude."
+            "requested amplitudes are the single-tone optima of CheckResonatorSpectroscopy and "
+            "are applied unchanged; tones of one group share one readout AWG channel, so each "
+            "group's amplitude sum stays within full scale. Each group is a separate "
+            "acquisition with the same drive sweep."
         ),
     }
 
@@ -1432,9 +1620,9 @@ def _summary_figure(
                 "values": [
                     "cand",
                     "slot",
+                    "group",
                     "readout f (GHz)",
-                    "readout amp",
-                    "requested amp",
+                    "readout amp (requested = applied)",
                     "readout P (dB)",
                     "status",
                     "f01 (GHz)",
@@ -1448,9 +1636,9 @@ def _summary_figure(
                 "values": [
                     [cell(r["candidate_index"]) for r in rows],
                     [cell(r["readout_label"]) for r in rows],
+                    [cell(r["readout_group"]) for r in rows],
                     [cell(r["readout_frequency"], "{:.6f}") for r in rows],
                     [cell(r["readout_amplitude"]) for r in rows],
-                    [cell(r["requested_readout_amplitude"]) for r in rows],
                     [cell(r["readout_power_db"], "{:.2f}") for r in rows],
                     [cell(r["status"] if r["error"] is None else r["error"]) for r in rows],
                     [cell(r["f01_frequency"], "{:.6f}") for r in rows],
@@ -1498,6 +1686,12 @@ def _summary_figure(
     fig.update_yaxes(title_text="Drive power (dB)", row=2, col=1)
     ratio = evidence["score_ratio"]
     rule = evidence["rule"]
+    grouping = evidence["readout_groups"]
+    groups_text = "; ".join(
+        f"group {g['group']}: candidates {g['candidate_indices']}, "
+        f"amplitude sum {g['amplitude_sum']:.4g}"
+        for g in grouping["groups"]
+    )
     fig.update_layout(
         title={
             "text": (
@@ -1506,12 +1700,14 @@ def _summary_figure(
                 f"ratio={'-' if ratio is None else f'{ratio:.4g}'}<br>Rule: best moment / "
                 f"runner-up >= {rule['min_score_ratio']:g} (provisional, uncalibrated), "
                 f"quality_level >= {rule['min_quality_level']}, "
-                f"f01 >= {rule['min_qubit_frequency']} GHz</sup>"
+                f"f01 >= {rule['min_qubit_frequency']} GHz<br>Readout groups "
+                f"(amplitude sum <= {grouping['budget']:g}, requested amplitudes applied): "
+                f"{groups_text}</sup>"
             )
         },
         width=max(1000, 380 * count),
         height=900,
-        margin={"t": 140},
+        margin={"t": 160},
         meta={MAPPING_EVIDENCE_META_KEY: evidence, MAPPING_FIGURE_META_KEY: "summary"},
         showlegend=False,
     )
@@ -1584,6 +1780,10 @@ def _candidate_figure(readout: CandidateReadout, candidate_map: _CandidateMap) -
         },
         xaxis_title="Drive frequency (GHz)",
         yaxis_title="Drive power (dB)",
-        meta={"readout_label": readout.readout_label, "candidate_index": candidate.index},
+        meta={
+            "readout_label": readout.readout_label,
+            "candidate_index": candidate.index,
+            "readout_group": readout.readout_group,
+        },
     )
     return fig

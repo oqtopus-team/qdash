@@ -302,21 +302,17 @@ DRIVE_POWERS = [-20.0, -10.0]
 def _mapping_payload() -> Any:
     """Return a well-formed run payload whose candidates carry flat phase maps."""
     from qdash.workflow.calibtasks.qubex.cw.check_qubit_frequency_mapping import (
-        CandidateReadout,
         FrequencyMappingRunPayload,
         ResonatorCandidate,
+        plan_readout_groups,
     )
 
     slots = [f"RQ0{i}" for i in range(len(FREQUENCIES_A))]
     amplitudes = [10 ** (power / 20) for power in POWERS]
-    readouts = tuple(
-        CandidateReadout(
-            ResonatorCandidate(i, FREQUENCIES_A[i], amplitudes[i]),
-            slots[i],
-            readout_amplitude_ceiling=1 / len(slots),
-        )
-        for i in range(len(slots))
+    readouts = plan_readout_groups(
+        [ResonatorCandidate(i, FREQUENCIES_A[i], amplitudes[i]) for i in range(len(slots))], slots
     )
+    assert {readout.readout_group for readout in readouts} == {0}
     zs = [[0.0] * len(DRIVE_FREQUENCIES) for _ in DRIVE_POWERS]
     data = {
         "target": "Q01",
@@ -339,7 +335,7 @@ def _mapping_payload() -> Any:
     return FrequencyMappingRunPayload(
         target="Q01",
         readouts=readouts,
-        result=SimpleNamespace(data=data),
+        results=(SimpleNamespace(data=data),),
         frequency_range=DRIVE_FREQUENCIES,
         power_range=DRIVE_POWERS,
     )
