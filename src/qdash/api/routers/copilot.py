@@ -57,6 +57,8 @@ from qdash.api.services.copilot_chat_session_service import (
     ForkedBranch,
     ReleaseStore,
     RuntimeTarget,
+    StopChat,
+    StopOutcome,
 )
 from qdash.api.services.copilot_investigation_service import (
     CopilotInvestigationService,
@@ -98,12 +100,26 @@ async def _runtime_target(username: str, session_id: str) -> RuntimeTarget:
 def _store_release(username: str, *, attempts: int) -> ReleaseStore:
     """Remove a store no session of the user uses any more, stopping deleted chats' turns."""
 
-    async def release(store: str, deleted_chats: list[tuple[str, RuntimeTarget]]) -> bool:
+    async def release(
+        store: str, generation: str, deleted_chats: list[tuple[str, RuntimeTarget]]
+    ) -> bool:
         return await pi_chat_service.remove_runtime_store(
-            username, store, deleted_chats, attempts=attempts
+            username, store, generation, deleted_chats, attempts=attempts
         )
 
     return release
+
+
+def _deleted_chat_stopper(username: str, auth: pi_chat_service.QDashAuth) -> StopChat:
+    """Stop exactly one deleted chat's turn, and the work its store kept for it from
+    before a restart, reporting whether the runtime confirmed it."""
+
+    async def stop(session_id: str, target: RuntimeTarget) -> StopOutcome:
+        return await pi_chat_service.abort_runtime_turn(
+            username, session_id, target, stored_with=auth
+        )
+
+    return stop
 
 
 def _config_with_chat_model(config: CopilotConfig, request: ChatRequest) -> CopilotConfig:
@@ -164,10 +180,10 @@ async def chat_stop(
         target = await pi_chat_service.runtime_target(current_user.username, request.session_id)
     except ChatUnavailableError:
         return ChatStopResponse(stopped=False)
-    stopped = await pi_chat_service.abort_runtime_turn(
+    outcome = await pi_chat_service.abort_runtime_turn(
         current_user.username, request.session_id, target
     )
-    return ChatStopResponse(stopped=stopped)
+    return ChatStopResponse(stopped=outcome == "stopped")
 
 
 @router.post("/chat/steer", include_in_schema=False)
@@ -194,6 +210,7 @@ async def chat_steer(
             current_user.username,
             request.session_id,
             request_id=request.request_id,
+            turn_request_id=request.turn_request_id,
             message=request.message,
             auth=auth,
             target=target,
@@ -383,6 +400,7 @@ async def chat_stream(
 )
 async def list_copilot_chat_sessions(
     current_user: Annotated[User, Depends(get_current_active_user)],
+    credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer_scheme)],
     service: Annotated[CopilotChatSessionService, Depends(get_copilot_chat_session_service)],
 ) -> ListCopilotChatSessionsResponse:
     """Return all persisted chat sessions owned by the current user.
@@ -393,7 +411,17 @@ async def list_copilot_chat_sessions(
     """
     username = current_user.username
     try:
-        await service.reclaim(username=username, release_store=_store_release(username, attempts=1))
+        await service.reclaim(
+            username=username,
+            release_store=_store_release(username, attempts=1),
+            stop_chat=_deleted_chat_stopper(
+                username,
+                pi_chat_service.QDashAuth(
+                    access_token=credentials.credentials,
+                    project_id=current_user.default_project_id,
+                ),
+            ),
+        )
     except Exception:
         logger.warning("Could not clean up chat sessions of %s", username, exc_info=True)
     return await asyncio.to_thread(service.list_sessions, username=username)
@@ -458,6 +486,7 @@ def update_copilot_chat_session(
 async def delete_copilot_chat_session(
     session_id: str,
     current_user: Annotated[User, Depends(get_current_active_user)],
+    credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer_scheme)],
     service: Annotated[CopilotChatSessionService, Depends(get_copilot_chat_session_service)],
 ) -> dict[str, bool]:
     """Delete a chat session owned by the current user.
@@ -470,14 +499,14 @@ async def delete_copilot_chat_session(
     listing of the user's chats.
     """
     username = current_user.username
-
-    async def stop(chat_session_id: str, target: RuntimeTarget) -> None:
-        await pi_chat_service.abort_runtime_turn(username, chat_session_id, target)
-
+    # Only proves the user to the runtime: stopping work kept in the store opens no project data.
+    auth = pi_chat_service.QDashAuth(
+        access_token=credentials.credentials, project_id=current_user.default_project_id
+    )
     await service.delete_session(
         username=username,
         session_id=session_id,
-        stop_chat=stop,
+        stop_chat=_deleted_chat_stopper(username, auth),
         release_store=_store_release(username, attempts=3),
     )
     return {"deleted": True}

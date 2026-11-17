@@ -56,6 +56,12 @@ export interface PendingSteer {
   checking?: boolean;
   /** Delivered, but the conversation changed since, so there is no place to show it. */
   unplaced?: boolean;
+  /**
+   * Placed in the conversation the chat shows, which has not been saved with it
+   * yet. Kept, out of sight, until a save of a transcript holding it is
+   * acknowledged, so a reload after a failed save still places it.
+   */
+  saving?: boolean;
 }
 
 const RANK: Record<PendingSteerStatus, number> = {
@@ -81,8 +87,13 @@ export function isUnresolvedSteer(steer: PendingSteer): boolean {
   return (
     isOpenSteer(steer) ||
     steer.status === "unconfirmed" ||
-    (steer.status === "delivered" && !steer.unplaced)
+    (steer.status === "delivered" && !steer.unplaced && !steer.saving)
   );
+}
+
+/** Whether the chat lists this steer under the answer: not once it is placed in the conversation. */
+export function isListedSteer(steer: PendingSteer): boolean {
+  return !steer.saving;
 }
 
 /** Whether the user can send this steer again: only once the runtime said it was not delivered. */
@@ -119,7 +130,7 @@ export function advanceSteer(
 export function patchSteer(
   steers: PendingSteer[],
   requestId: string,
-  patch: Partial<Pick<PendingSteer, "checking" | "unplaced" | "entryId">>,
+  patch: Partial<Pick<PendingSteer, "checking" | "unplaced" | "entryId" | "saving">>,
 ): PendingSteer[] {
   return steers.map((steer) => (steer.requestId === requestId ? { ...steer, ...patch } : steer));
 }

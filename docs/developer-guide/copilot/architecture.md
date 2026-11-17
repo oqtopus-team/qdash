@@ -137,7 +137,9 @@ caller. The policy wraps `present_results` to note its task while it executes, a
 classifier call only when its parent is that task. A script's parent is the `codemode` call, so a
 script cannot reach the classifier even with Code Mode unfiltered. The note lives in the runtime
 process; a nested call whose parent it cannot match is blocked, and `present_results` then falls
-back to `render_ui` or text.
+back to `render_ui` or text. Its `sources` must name a tool the model is offered, or a listed read
+a script may call (in the agent's `callable` tools), so a script's deferred read counts before
+`tool_search` loads it.
 
 Write tools therefore still run only after the user approves the model's own call on the
 approval card, never from a script. In a script, a listed read resolves to its redacted response

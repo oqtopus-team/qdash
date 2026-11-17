@@ -39,6 +39,8 @@ describe("copilot steers", () => {
     expect(isUnresolvedSteer(steer("unconfirmed"))).toBe(true);
     expect(isUnresolvedSteer(steer("delivered"))).toBe(true);
     expect(isUnresolvedSteer({ ...steer("delivered"), unplaced: true })).toBe(false);
+    // Placed in the conversation the chat shows: resolved there, while its save is awaited.
+    expect(isUnresolvedSteer({ ...steer("delivered"), saving: true })).toBe(false);
     expect(isUnresolvedSteer(steer("withdrawn"))).toBe(false);
     expect(canCheckSteer(steer("unconfirmed"))).toBe(true);
     expect(canCheckSteer({ ...steer("unconfirmed"), checking: true })).toBe(false);

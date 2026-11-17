@@ -292,8 +292,12 @@ describe("ChatTrace", () => {
       />,
     );
     expect(screen.getByText(/Ran a script/)).toBeTruthy();
-    expect(screen.getByText(/qdash_list_cryostats \(3 ms\): QDash answered 503/)).toBeTruthy();
-    expect(screen.getByText("javascript")).toBeTruthy();
+    // Open, not only mounted: folded output stays mounted under aria-hidden="true".
+    const output = screen.getByText(/qdash_list_cryostats \(3 ms\): QDash answered 503/);
+    expect(output.closest("[aria-hidden]")?.getAttribute("aria-hidden")).toBe("false");
+    expect(
+      screen.getByText("javascript").closest("[aria-hidden]")?.getAttribute("aria-hidden"),
+    ).toBe("false");
   });
 
   it("folds a finished workspace step in the summary until it is opened", () => {

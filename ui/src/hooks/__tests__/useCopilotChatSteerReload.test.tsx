@@ -46,6 +46,9 @@ let saved: Record<string, Message[]> = {};
 let steerReply: () => Response = () => Response.json({ status: "queued" });
 let statusReply: () => Response = () => new Response("unavailable", { status: 503 });
 let storedWhenSteerSent: string | null = null;
+// How the fake API answers a transcript save; by default it stores it.
+let patchReply: ((sessionId: string, body: { messages?: Message[] }) => Promise<Response>) | null =
+  null;
 // The signed-in user the provider is given; changed between renders.
 let owner: string | null | undefined = "alice";
 
@@ -59,6 +62,7 @@ beforeEach(() => {
   saved = {};
   owner = "alice";
   storedWhenSteerSent = null;
+  patchReply = null;
   steerReply = () => Response.json({ status: "queued" });
   statusReply = () => new Response("unavailable", { status: 503 });
   localStorage.setItem("qdash_current_project_id", "p1");
@@ -88,6 +92,7 @@ beforeEach(() => {
     const match = /\/copilot\/chat\/sessions\/([^/]+)$/.exec(path);
     if (match && init?.method === "PATCH") {
       const body = JSON.parse(String(init.body)) as { messages?: Message[] };
+      if (patchReply) return patchReply(match[1], body);
       if (body.messages) saved[match[1]] = body.messages;
       return Response.json({});
     }
@@ -262,6 +267,36 @@ describe("unresolved steers across a reload", () => {
     ).toHaveLength(1);
     expect(steerCalls()).toHaveLength(1);
     expect(streamCalls()).toHaveLength(1);
+
+    // The stopped answer, then the steer it read: Continue answers both, the steer kept.
+    expect(r.result.current.chat.canContinue).toBe(true);
+    act(() => r.result.current.chat.continueLast());
+    await waitFor(() => expect(streamCalls()).toHaveLength(2));
+    const continued = calls("/stream")[1].body as {
+      continue_run?: boolean;
+      conversation_history: Array<{ role: string; content: string }>;
+    };
+    expect(continued.continue_run).toBe(true);
+    expect(continued.conversation_history.map((m) => m.role)).toEqual([
+      "user",
+      "assistant",
+      "user",
+    ]);
+    expect(continued.conversation_history[2].content).toBe("Also plot it");
+    stream.push(
+      sse("result", {
+        blocks: [{ type: "text", content: "Plotted.", chart: null }],
+        assessment: null,
+      }),
+    );
+    stream.close();
+    await waitFor(() => expect(r.result.current.chat.isStreaming).toBe(false));
+    expect(r.result.current.chat.messages.map((m) => m.steer?.placement ?? m.role)).toEqual([
+      "user",
+      "assistant",
+      "approximate",
+      "assistant",
+    ]);
   });
 
   it("unlocks Continue after a reload once the store says the steer was withdrawn", async () => {
@@ -398,6 +433,135 @@ describe("unresolved steers across a reload", () => {
   });
 });
 
+describe("saving the conversation a steer was placed in", () => {
+  it("keeps the steer's receipt when the save fails, so a reload places it again", async () => {
+    let r = await mount();
+    const { sessionId, requestId } = await stoppedWithUnconfirmedSteer(r);
+    const before = saved[sessionId];
+    // Every save fails from here on.
+    patchReply = async () => new Response("unavailable", { status: 503 });
+    statusReply = () => Response.json({ status: "applied", entry_id: "4", submission_id: "3" });
+    act(() => r.result.current.chat.checkSteer(requestId));
+    await waitFor(() =>
+      expect(r.result.current.chat.messages.some((m) => m.steer?.requestId === requestId)).toBe(
+        true,
+      ),
+    );
+    await waitFor(() =>
+      expect(
+        fetchMock.mock.calls.filter(
+          ([url, init]) =>
+            String(url).endsWith(`/sessions/${sessionId}`) && init?.method === "PATCH",
+        ).length,
+      ).toBeGreaterThan(0),
+    );
+    // Shown in place, not listed as pending, and Continue is not held back by it.
+    expect(r.result.current.chat.steers).toMatchObject([{ requestId, saving: true }]);
+    expect(r.result.current.chat.canContinue).toBe(true);
+    // The save failed: the server does not have it, and the receipt is kept for a reload.
+    expect(saved[sessionId]).toEqual(before);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(stored()![sessionId]).toEqual([
+      expect.objectContaining({ requestId, status: "delivered", entryId: "4" }),
+    ]);
+
+    // Reloaded with saves working again: placed from the receipt, once, and saved.
+    patchReply = null;
+    r = await reload(r, sessionId);
+    await waitFor(() => expect(r.result.current.chat.steers).toEqual([]));
+    expect(
+      r.result.current.chat.messages.filter((m) => m.steer?.requestId === requestId),
+    ).toHaveLength(1);
+    expect(
+      saved[sessionId].filter(
+        (m) => (m.steer as { request_id?: string } | undefined)?.request_id === requestId,
+      ),
+    ).toHaveLength(1);
+    expect(stored()).toBeNull();
+    expect(steerCalls()).toHaveLength(1);
+  });
+
+  it("sends one save at a time per session, the newest snapshot last", async () => {
+    listed = [{ session_id: "s1" }];
+    saved.s1 = [
+      { role: "user", content: "Q" },
+      {
+        role: "assistant",
+        content: JSON.stringify({
+          blocks: [{ type: "text", content: "A", chart: null }],
+        }),
+      },
+    ];
+    const held: Array<{ body: { messages?: Message[] }; release: () => void }> = [];
+    patchReply = (sessionId, body) =>
+      new Promise<Response>((resolve) => {
+        held.push({
+          body,
+          release: () => {
+            if (body.messages) saved[sessionId] = body.messages;
+            resolve(Response.json({}));
+          },
+        });
+      });
+    const r = await mount();
+    act(() => r.result.current.store.switchSession("s1"));
+    await waitFor(() => expect(r.result.current.chat.messages).toHaveLength(2));
+    const feedbackOf = (body: { messages?: Message[] }) =>
+      (JSON.parse(String(body.messages![1].content)) as { feedback?: string }).feedback;
+
+    act(() => r.result.current.store.setMessageFeedback("s1", 1, "up"));
+    act(() => r.result.current.store.setMessageFeedback("s1", 1, "down"));
+    act(() => r.result.current.store.setMessageFeedback("s1", 1, "up"));
+    await waitFor(() => expect(held).toHaveLength(1));
+    // The later snapshots wait for the first save; the middle one is never sent.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(held).toHaveLength(1);
+    expect(feedbackOf(held[0].body)).toBe("up");
+    await act(async () => held[0].release());
+    await waitFor(() => expect(held).toHaveLength(2));
+    expect(feedbackOf(held[1].body)).toBe("up");
+    // The newest snapshot commits last, whatever order the server would finish them in.
+    act(() => r.result.current.store.setMessageFeedback("s1", 1, "down"));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(held).toHaveLength(2);
+    await act(async () => held[1].release());
+    await waitFor(() => expect(held).toHaveLength(3));
+    await act(async () => held[2].release());
+    expect(feedbackOf({ messages: saved.s1 })).toBe("down");
+  });
+
+  it("never sends a session's waiting save under another user's sign-in", async () => {
+    listed = [{ session_id: "s1" }];
+    saved.s1 = [
+      { role: "user", content: "Q" },
+      {
+        role: "assistant",
+        content: JSON.stringify({
+          blocks: [{ type: "text", content: "A", chart: null }],
+        }),
+      },
+    ];
+    let releaseFirst!: () => void;
+    let patches = 0;
+    patchReply = () => {
+      patches += 1;
+      return new Promise<Response>((resolve) => (releaseFirst = () => resolve(Response.json({}))));
+    };
+    const r = await mount();
+    act(() => r.result.current.store.switchSession("s1"));
+    await waitFor(() => expect(r.result.current.chat.messages).toHaveLength(2));
+    act(() => r.result.current.store.setMessageFeedback("s1", 1, "up"));
+    act(() => r.result.current.store.setMessageFeedback("s1", 1, "down"));
+    await waitFor(() => expect(patches).toBe(1));
+    // Alice signs out while her second save waits.
+    owner = null;
+    r.rerender();
+    await act(async () => releaseFirst());
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(patches).toBe(1);
+  });
+});
+
 /** Like stoppedWithUnconfirmedSteer, in a new session of an already mounted provider. */
 async function stoppedWithUnconfirmedSteerAgain(r: Rendered) {
   stream = controllableStream();
@@ -424,6 +588,38 @@ async function stoppedWithUnconfirmedSteerAgain(r: Rendered) {
   return r.result.current.chat.session!.id;
 }
 
+describe("the start of a turn's own message", () => {
+  it("adds nothing on a normal second turn: the answer before it is already shown", async () => {
+    const r = await mount();
+    const turn = async (text: string, answer: string) => {
+      stream = controllableStream();
+      act(() => r.result.current.chat.send(text));
+      await waitFor(() => expect(r.result.current.chat.isStreaming).toBe(true));
+      // The runtime reports only an answer given since the turn's stream started: none.
+      stream.push(sse("turn_start", { result: { blocks: [], assessment: null } }));
+      stream.push(sse("delta", { text: answer }));
+      stream.push(
+        sse("result", {
+          blocks: [{ type: "text", content: answer, chart: null }],
+          assessment: null,
+        }),
+      );
+      stream.close();
+      await waitFor(() => expect(r.result.current.chat.isStreaming).toBe(false));
+    };
+    await turn("First", "A1");
+    await turn("Second", "A2");
+    const summary = r.result.current.chat.messages.map((m) =>
+      m.role === "user"
+        ? `user:${m.content}`
+        : `assistant:${(JSON.parse(m.content) as { blocks: Array<{ content?: string }> }).blocks
+            .map((b) => b.content ?? "")
+            .join("")}`,
+    );
+    expect(summary).toEqual(["user:First", "assistant:A1", "user:Second", "assistant:A2"]);
+  });
+});
+
 describe("a steer a recovered run placed before the new message", () => {
   it("goes into the turn it was sent to, approximately, never after the new message as exact", async () => {
     let r = await mount();
@@ -443,6 +639,7 @@ describe("a steer a recovered run placed before the new message", () => {
     // which places the steer before the new message, and reports it so.
     act(() => r.result.current.chat.send("New question"));
     await waitFor(() => expect(r.result.current.chat.isStreaming).toBe(true));
+    // What the recovered run streamed before placing the steer: its tool round's text.
     stream.push(
       sse("steer", {
         request_id: requestId,
@@ -450,7 +647,7 @@ describe("a steer a recovered run placed before the new message", () => {
         entry_id: "4",
         text: "Also plot it",
         result: {
-          blocks: [{ type: "text", content: "Plotted.", chart: null }],
+          blocks: [{ type: "text", content: "Calibrated.", chart: null }],
           assessment: null,
         },
         before_turn: true,
@@ -467,6 +664,17 @@ describe("a steer a recovered run placed before the new message", () => {
         before_turn: true,
       }),
     );
+    // The recovered run answers the steers, then this turn's own message is placed.
+    stream.push(sse("delta", { text: "Plotted." }));
+    stream.push(
+      sse("turn_start", {
+        result: {
+          blocks: [{ type: "text", content: "Plotted.", chart: null }],
+          assessment: null,
+        },
+      }),
+    );
+    stream.push(sse("delta", { text: "Answer." }));
     stream.push(
       sse("result", {
         blocks: [{ type: "text", content: "Answer.", chart: null }],
@@ -477,19 +685,30 @@ describe("a steer a recovered run placed before the new message", () => {
     await waitFor(() => expect(r.result.current.chat.isStreaming).toBe(false));
 
     const messages = r.result.current.chat.messages;
+    const textOf = (content: string) =>
+      (JSON.parse(content) as { blocks: Array<{ content?: string | null }> }).blocks
+        .map((b) => b.content ?? "")
+        .join("");
     const summary = messages.map((m) =>
       m.steer
         ? `steer:${m.content}:${m.steer.placement}`
-        : `${m.role}:${m.role === "user" ? m.content : ""}`,
+        : m.role === "user"
+          ? `user:${m.content}`
+          : m.content.startsWith("{")
+            ? `assistant:${textOf(m.content)}`
+            : "assistant:?",
     );
+    // The recovered answer stays with the turn whose steer it answered, before
+    // the new question; the new question's own answer follows it.
     expect(summary).toEqual([
       "user:Long job",
-      "assistant:",
+      "assistant:Working",
+      "assistant:Calibrated.",
       "steer:Also plot it:approximate",
       "steer:From another tab:approximate",
+      "assistant:Plotted.",
       "user:New question",
-      "assistant:",
-      "assistant:",
+      "assistant:Answer.",
     ]);
     expect(messages.filter((m) => m.steer?.requestId === requestId)).toHaveLength(1);
     expect(r.result.current.chat.steers).toEqual([]);

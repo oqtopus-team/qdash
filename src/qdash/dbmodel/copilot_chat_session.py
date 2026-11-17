@@ -107,7 +107,16 @@ class CopilotChatSessionDocument(Document):
         default=None,
         description=(
             "Set when the user deleted the chat: hidden everywhere, kept only while it is the "
-            "last user of its store and the runtime has not yet confirmed removing that store"
+            "last user of its store and the runtime has not yet confirmed removing that store, "
+            "or while stopping its turn is unconfirmed"
+        ),
+    )
+    stop_pending: bool = Field(
+        default=False,
+        description=(
+            "Set on a deleted chat whose turn the runtime could not be told to stop: the "
+            "deleted chat is kept, even while a branch still uses its store, until a retry "
+            "confirms that nothing of it runs"
         ),
     )
     created_at: datetime = Field(default_factory=now)

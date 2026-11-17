@@ -309,10 +309,11 @@ async function scriptsIdle() {
 test("a script beyond the concurrency limit is refused with a message, and the slots are released", async () => {
   // The limit is per process: earlier scripts must have released their workers.
   await scriptsIdle();
-  // Scripts wait in a host tool until every script that may run has started.
+  // Admitted scripts wait in a host tool, holding their workers, until the test
+  // has seen the excess script refused; only then are they released.
   let started = 0;
   let release;
-  const allStarted = new Promise((resolve) => (release = resolve));
+  const held = new Promise((resolve) => (release = resolve));
   const wait = defineTool({
     name: "wait_here",
     description: "Waits",
@@ -320,8 +321,7 @@ test("a script beyond the concurrency limit is refused with a message, and the s
     callers: ["tools"],
     execute: async () => {
       started += 1;
-      if (started === MAX_CONCURRENT_SCRIPTS) release();
-      await Promise.race([allStarted, new Promise((resolve) => setTimeout(resolve, 1_000))]);
+      await held;
       return { output: [{ type: "text", text: "waited" }] };
     },
   });
@@ -336,14 +336,29 @@ test("a script beyond the concurrency limit is refused with a message, and the s
   );
   faux.setResponses([fauxAssistantMessage(calls, { stopReason: "toolUse" }), fauxAssistantMessage(fauxText("done"))]);
   const { harness, conversation } = await open(registry, models, model);
+  const refusedText = /already running \d+ code mode scripts; try again shortly/;
   try {
-    assert.equal((await ask(conversation, "go")).status, "done");
+    const asked = ask(conversation, "go");
+    // A deadline that fails the test when the refusal never shows; it never releases a slot.
+    const deadline = Date.now() + 15_000;
+    for (;;) {
+      const outputs = (await results(conversation)).map((message) => resultText(message));
+      if (outputs.some((text) => refusedText.test(text))) break;
+      assert.ok(Date.now() < deadline, `the excess script was not refused in time (started ${started})`);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    // Refused while every admitted script still held its worker.
+    assert.equal(runningScriptCount(), MAX_CONCURRENT_SCRIPTS);
+    release();
+    assert.equal((await asked).status, "done");
     const outputs = (await results(conversation)).map((message) => resultText(message));
-    const refused = outputs.filter((text) => /already running \d+ code mode scripts; try again shortly/.test(text));
+    const refused = outputs.filter((text) => refusedText.test(text));
     assert.equal(refused.length, 1, outputs.join("\n---\n"));
     assert.equal(outputs.filter((text) => /finished/.test(text)).length, MAX_CONCURRENT_SCRIPTS);
     assert.equal(started, MAX_CONCURRENT_SCRIPTS);
   } finally {
+    // Cleanup only: a failed test must not leave scripts holding workers.
+    release();
     await harness.close(context);
     await sandbox.close();
   }

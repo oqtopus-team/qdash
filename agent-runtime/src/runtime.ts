@@ -12,6 +12,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import {
   AssistantEntry,
+  createRegistry,
   Harness,
   ROOT_CONVERSATION_ID,
   ToolResultEntry,
@@ -43,6 +44,7 @@ import {
 } from "./chat-registry.ts";
 import { BranchError, branchFrom, openBranch } from "./branch.ts";
 import { CHAT_QUEUE_SETTINGS, isUserMessage, readSteerReceipt, type SteerOutcome } from "./chat-control.ts";
+import { removeStore, workspaceMarker } from "./store-identity.ts";
 import {
   CODEMODE_GUIDELINE,
   CODEMODE_TOOL_NAME,
@@ -204,11 +206,6 @@ export interface BranchRequest {
   at: EntryId;
   /** The QDash session the branch belongs to; the same one again returns the same branch. */
   targetSessionId: string;
-}
-
-/** The file beside a session's store that says its workspace directory was created. */
-export function workspaceMarker(storePath: string): string {
-  return `${storePath}.workspace`;
 }
 
 /** Return a stable non-identifying filename for one user's QDash session. */
@@ -709,26 +706,55 @@ export class SharedRuntime {
     );
   }
 
+  /** Where the SQLite store of one owner and store session lives. */
+  storePath(ownerId: string, storeSessionId: string): string {
+    return join(STATE_DIR, sessionStorageName(ownerId, storeSessionId));
+  }
+
   /**
-   * Delete a closed durable store and its workspace. A store holds a chat and
-   * every branch of it, so QDash deletes it only with the last chat session
-   * that uses it; Pi has no way to delete one conversation of a store.
+   * Delete a closed durable store and its workspace, if the store is
+   * `generation` (see store-identity.ts). A store holds a chat and every branch
+   * of it, so QDash deletes it only with the last chat session that uses it; Pi
+   * has no way to delete one conversation of a store. The caller holds the store.
    */
-  async deleteSessionState(ownerId: string, sessionId: string): Promise<void> {
-    const path = join(STATE_DIR, sessionStorageName(ownerId, sessionId));
+  async deleteSessionState(
+    ownerId: string,
+    sessionId: string,
+    generation?: string,
+  ): Promise<"removed" | "absent" | "stale"> {
     // Only a session that used its workspace has a directory to remove; for the
     // others (most evaluations, chats that never ran code) no daemon is started.
-    const marker = workspaceMarker(path);
-    const hadWorkspace = existsSync(marker);
-    for (const suffix of ["", "-wal", "-shm"]) rmSync(`${path}${suffix}`, { force: true });
-    rmSync(marker, { force: true });
-    if (!EXEC_CONFIG || !hadWorkspace) return;
+    const { outcome, hadWorkspace } = removeStore(this.storePath(ownerId, sessionId), generation);
+    if (outcome === "stale" || !EXEC_CONFIG || !hadWorkspace) return outcome;
     try {
       await removeWorkspace(EXEC_CONFIG, ownerId, sessionId);
     } catch (error) {
       // The store is gone either way; a workspace left behind is only disk.
       console.warn(`[agent-runtime] could not remove the workspace of ${sessionId}:`, error);
     }
+    return outcome;
+  }
+
+  /**
+   * Open a store only to cancel work in it (see `stopStoredConversation`):
+   * no extension, so no tool, hook, or extension task of the chat is
+   * registered, no workspace, and no QDash connection. Scheduling starts
+   * paused. The caller holds the store and has checked that it exists.
+   */
+  async openStoreForCleanup(ownerId: string, storeSessionId: string): Promise<{ harness: DurableHarness; close(): Promise<void> }> {
+    const storageName = sessionStorageName(ownerId, storeSessionId);
+    const harness = await Harness.open(
+      await openNodeSqliteStorage(join(STATE_DIR, storageName)),
+      {
+        // Only for a deferred response a stopped run still polls: its abort cancels it.
+        models: this.modelRuntime,
+        registry: createRegistry(),
+        onReport: (report) => logDurableReport(storageName, report),
+        settings: { ...CHAT_QUEUE_SETTINGS },
+      },
+      BACKGROUND_CONTEXT,
+    );
+    return { harness, close: () => harness.close(BACKGROUND_CONTEXT) };
   }
 
   /**

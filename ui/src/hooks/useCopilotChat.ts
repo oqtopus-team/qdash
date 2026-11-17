@@ -109,11 +109,10 @@ export function useCopilotChat(sessionId?: string | null) {
 
   const continueLast = useCallback(() => {
     if (!id || run || !steersSettled || !canContinueMessages(messages)) return;
-    const last = messages[messages.length - 1];
     sendMessage("", {
       sessionId: id,
       continueRun: true,
-      history: isErrorContent(last) ? messages.slice(0, -1) : messages,
+      history: continuationHistory(messages),
       modelOverride,
       thinkingLevel,
       page: currentPage?.() ?? null,
@@ -269,12 +268,32 @@ export function isBranchableAnswer(message: ChatMessage | undefined): boolean {
 }
 
 /**
+ * Where the turn's last answer is: the last message, or the one before the steers
+ * that end the conversation. A steer the answer read just before it was stopped
+ * is placed after it, and is part of the unfinished turn a continue answers.
+ */
+function lastAnswerIndex(messages: ChatMessage[]): number {
+  let i = messages.length - 1;
+  while (i >= 0 && messages[i].role === "user" && messages[i].steer) i--;
+  return i;
+}
+
+/** The history a continue sends: the conversation without a failed answer's error, steers kept. */
+export function continuationHistory(messages: ChatMessage[]): ChatMessage[] {
+  const at = lastAnswerIndex(messages);
+  return isErrorContent(messages[at])
+    ? [...messages.slice(0, at), ...messages.slice(at + 1)]
+    : messages;
+}
+
+/**
  * Whether the last answer ended without finishing (stopped, or an error) so it may be
- * continued. An answer that ended on a question, an approval or a proposed edit is
- * answered instead; the runtime refuses to continue past one as well.
+ * continued, also when steers it read before it stopped follow it. An answer that
+ * ended on a question, an approval or a proposed edit is answered instead; the
+ * runtime refuses to continue past one as well.
  */
 export function canContinueMessages(messages: ChatMessage[]): boolean {
-  const last = messages[messages.length - 1];
+  const last = messages[lastAnswerIndex(messages)];
   if (!last || last.role !== "assistant") return false;
   if (isErrorContent(last)) return messages.some((m) => m.role === "user");
   try {

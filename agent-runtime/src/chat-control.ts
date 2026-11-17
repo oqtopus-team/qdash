@@ -148,10 +148,19 @@ export function steerOutcomeOf(record: SubmissionRecord): SteerOutcome {
 export interface ChatTarget {
   sessionId: string;
   conversation: string;
+  /**
+   * The store's generation the request names (see store-identity.ts); unset
+   * for a legacy request. A request about an older incarnation of the store
+   * never reaches a turn of a newer one.
+   */
+  generation?: string;
 }
 
 export class ActiveChat {
   #open: { harness: Pick<Harness, "submission">; conversation: Conversation } | undefined;
+  /** The conversation a stop aborts: set once it is opened, before the turn's input is admitted. */
+  #stoppable: Pick<Conversation, "abort"> | undefined;
+  #stopRequested = false;
   #ready: Promise<boolean>;
   #settleReady!: (ready: boolean) => void;
   #accepting = true;
@@ -161,32 +170,96 @@ export class ActiveChat {
   /** The runtime's own steers (the wrap-up), awaited like the user's but never reported as theirs. */
   readonly internal: Submission[] = [];
 
+  /**
+   * Steer request IDs a status lookup reported as not found while this turn
+   * ran: never admitted by it afterwards. Kept as long as the turn, without
+   * eviction; no other turn can admit them (see `admits`).
+   */
+  readonly #fenced = new Set<string>();
+
   constructor(
     /** The QDash project the turn's credentials are scoped to; a steer must name the same one. */
     readonly projectId: string | undefined,
     private readonly context: Context,
     /** The chat the turn runs; unset, the turn matches any (one conversation per store). */
     readonly target?: ChatTarget,
+    /**
+     * The request ID of the turn's own chat request. A steer names the turn it
+     * was sent to, and only that turn admits it; unset, the turn admits none.
+     */
+    readonly turnRequestId?: string,
+    /**
+     * Whether a status lookup durably fenced the steer `fenceKey` (see
+     * store-identity.ts `fenceSteer`): also one made while another request of
+     * the same turn ran, or before a restart.
+     */
+    private readonly durablyFenced: (fenceKey: string) => boolean = () => false,
   ) {
     this.#ready = new Promise((resolve) => (this.#settleReady = resolve));
+  }
+
+  /**
+   * Whether this turn may admit a steer sent to turn `turnRequestId` under
+   * `fenceKey`. A steer is bound to the turn it was sent to: one that arrives
+   * after that turn's requests ended is never admitted by a later turn, since
+   * every turn has its own request ID. A request ID may be sent again to
+   * recover the same turn (a retry, or after a restart), so a status lookup
+   * that reported the steer not found fences it durably as well as here:
+   * no request of the turn admits it afterwards.
+   */
+  admits(turnRequestId: string, fenceKey: string): boolean {
+    return (
+      this.turnRequestId !== undefined &&
+      this.turnRequestId === turnRequestId &&
+      !this.#fenced.has(fenceKey) &&
+      !this.durablyFenced(fenceKey)
+    );
+  }
+
+  /** A status lookup reported this steer not found: this turn never admits it from now on. */
+  fence(fenceKey: string): void {
+    this.#fenced.add(fenceKey);
   }
 
   /** Whether this turn runs `target`: the same QDash session and the same durable conversation. */
   runs(target: ChatTarget): boolean {
     return (
       this.target === undefined ||
-      (this.target.sessionId === target.sessionId && this.target.conversation === target.conversation)
+      (this.target.sessionId === target.sessionId &&
+        this.target.conversation === target.conversation &&
+        this.target.generation === target.generation)
     );
   }
 
-  /** The conversation to stop, once the turn has opened it. */
-  get conversation(): Conversation | undefined {
-    return this.#open?.conversation;
+  /**
+   * The turn opened its conversation: a stop reaches it from now on, while
+   * the turn's own input is still being admitted. Steers still wait for
+   * `ready`.
+   */
+  opened(conversation: Pick<Conversation, "abort">): void {
+    this.#stoppable = conversation;
+  }
+
+  /** Whether the user stopped the turn; the turn checks again once its input is admitted. */
+  get stopRequested(): boolean {
+    return this.#stopRequested;
+  }
+
+  /**
+   * Stop the turn at the user's request. It is remembered, so a stop that
+   * arrives before the conversation is open, or while the turn's own input is
+   * still being admitted (which may start a run after this abort), is applied
+   * again by the turn once its input is admitted (see handleChat).
+   */
+  async stop(context: Context): Promise<void> {
+    this.#stopRequested = true;
+    await this.#stoppable?.abort(context);
   }
 
   /** The turn's own input is admitted: steers may follow it. */
   ready(harness: Pick<Harness, "submission">, conversation: Conversation): void {
     this.#open = { harness, conversation };
+    this.#stoppable = conversation;
     this.#settleReady(true);
   }
 
@@ -341,10 +414,16 @@ export async function settleChat(
       break;
     }
   }
+  // Only a steer this turn admitted after its own submission, and placed after
+  // its own message, can end the turn: a request ID retried from an earlier
+  // turn finds that turn's submission, which is older (durable IDs grow in
+  // creation order) and placed earlier. A continue places no message of its
+  // own, so for it the admission order alone is the boundary.
   let final: SettledSubmissionRecord = ownSettled;
-  let last = -1;
+  let last = ownSettled.type === "input" && ownSettled.entry !== undefined ? Number(ownSettled.entry) : -1;
   for (const record of [...steers.values(), ...internal]) {
     if (record.type !== "input" || record.entry === undefined) continue;
+    if (Number(record.id) <= Number(ownSettled.id)) continue;
     const at = Number(record.entry);
     if (at > last) {
       last = at;

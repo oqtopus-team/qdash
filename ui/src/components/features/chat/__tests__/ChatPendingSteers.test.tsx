@@ -5,6 +5,21 @@ import { ChatNotice, ChatPendingSteers } from "../ChatPendingSteers";
 afterEach(cleanup);
 
 describe("ChatPendingSteers", () => {
+  it("does not list a steer already placed in the conversation while it is saved", () => {
+    const { container } = render(
+      <ChatPendingSteers
+        steers={[
+          { requestId: "a", text: "Use Q5", status: "delivered", entryId: "4", saving: true },
+        ]}
+        isStreaming={false}
+        onResend={vi.fn()}
+        onDismiss={vi.fn()}
+      />,
+    );
+    expect(container).toBeEmptyDOMElement();
+    expect(screen.queryByText("Use Q5")).toBeNull();
+  });
+
   it("shows a queued steer without actions and an undelivered one with resend and dismiss", () => {
     const onResend = vi.fn();
     const onDismiss = vi.fn();

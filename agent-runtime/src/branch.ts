@@ -28,6 +28,8 @@ import {
   type ConversationId,
   type EntryId,
   type Harness,
+  type SubmissionRecord,
+  type TaskInspection,
 } from "@earendil-works/pi-durable";
 
 import { awaitsUser } from "./chat-control.ts";
@@ -119,11 +121,90 @@ export async function openBranch(harness: Harness, id: ConversationId, context: 
   return conversation;
 }
 
+/** Unfinished work of one chat conversation, and of the conversations its tasks created. */
+export interface ChatWork {
+  tasks: TaskInspection[];
+  submissions: SubmissionRecord[];
+}
+
+/**
+ * Whether `work` only winds down: every live task carries an abort mark, so
+ * it runs its abort handler next (which calls no model and runs no tool) or
+ * is orphaned, and no input waits to be placed. A run stopped while no
+ * runtime ran it (`stopStoredConversation`) is left like this until the
+ * store's scheduling next starts.
+ */
+export function windsDown(work: ChatWork): boolean {
+  return (
+    work.tasks.every((task) => task.record.abortRequested) &&
+    work.submissions.every((record) => record.status !== "queued")
+  );
+}
+
+/**
+ * The unfinished work of this store by chat conversation: queued or placed
+ * submissions and live tasks, read from the durable store (so also work a
+ * runtime that died left behind, which nothing in memory remembers). Work of
+ * a conversation a task created counts for the chat conversation that owns it.
+ *
+ * Writes nothing and runs nothing; read before `harness.resume()`, while
+ * scheduling is paused, it is what the store held when it was opened.
+ */
+export async function workByChat(
+  harness: Pick<Harness, "inspect" | "commit">,
+  context: Context,
+): Promise<Map<ConversationId, ChatWork>> {
+  const inspection = await harness.inspect(context);
+  const ids = new Set<ConversationId>([
+    ...inspection.submissions.map((record) => record.conversationId),
+    ...inspection.tasks.map((task) => task.record.conversationId),
+  ]);
+  const work = new Map<ConversationId, ChatWork>();
+  if (ids.size === 0) return work;
+  const owners = await harness.commit(async (tx) => {
+    const chats = new Map<ConversationId, ConversationId>();
+    for (const id of ids) {
+      let record = await tx.conversation(id);
+      // A conversation a task created belongs to the task's conversation.
+      for (let depth = 0; record?.owner && depth < 64; depth++) {
+        record = await tx.conversation(record.owner.conversationId);
+      }
+      chats.set(id, record?.id ?? id);
+    }
+    return chats;
+  }, context);
+  const of = (id: ConversationId): ChatWork => {
+    const chat = owners.get(id) ?? id;
+    let entry = work.get(chat);
+    if (!entry) work.set(chat, (entry = { tasks: [], submissions: [] }));
+    return entry;
+  };
+  for (const task of inspection.tasks) of(task.record.conversationId).tasks.push(task);
+  for (const record of inspection.submissions) of(record.conversationId).submissions.push(record);
+  return work;
+}
+
+/**
+ * The chat conversations of this store with unfinished work that may still
+ * run a model or a tool (see `workByChat`): work that only winds down
+ * (`windsDown`) is left out. `except` leaves out one chat conversation, the
+ * one a request is about to recover itself.
+ */
+export async function unfinishedWork(
+  harness: Pick<Harness, "inspect" | "commit">,
+  context: Context,
+  except?: ConversationId,
+): Promise<ConversationId[]> {
+  const work = await workByChat(harness, context);
+  return [...work].filter(([id, chat]) => id !== except && !windsDown(chat)).map(([id]) => id);
+}
+
 /**
  * Fork `source` at `at` as the branch of QDash session `target`.
  *
- * Refused unless the source is idle (no run, also none a crash left behind, no
- * queued input, no live task) and `at` is a completed final answer visible from
+ * Refused unless the source is idle and the store has no unfinished work in
+ * any conversation (no run, also none a crash left behind, no queued input,
+ * no live task) and `at` is a completed final answer visible from
  * the source: an assistant message that stopped normally, without tool calls,
  * with no question, approval, or proposed edit since the last user message.
  * Writes nothing to the source. The caller holds the store exclusively and does
@@ -145,12 +226,9 @@ export async function branchFrom(
   }
 
   const busy = await source.commit(async (tx) => (await tx.doc(LiveDoc, source.id)).run !== undefined, context);
-  const inspection = await harness.inspect(context);
-  if (
-    busy ||
-    inspection.submissions.some((record) => record.conversationId === source.id) ||
-    inspection.tasks.some((task) => task.record.conversationId === source.id)
-  ) {
+  // Any conversation of the store, not only the source: work a crash left in
+  // another branch resumes with the store's next turn and shares its workspace.
+  if (busy || (await unfinishedWork(harness, context)).length > 0) {
     throw new BranchError("busy", "the conversation is still answering or has unfinished work");
   }
 

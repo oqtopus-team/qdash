@@ -25,6 +25,8 @@ from qdash.api.services.copilot_chat_session_service import (
     ForkedBranch,
     ForkSettledError,
     RuntimeTarget,
+    StopOutcome,
+    store_generation,
     store_in_use,
 )
 from qdash.api.services.copilot_chat_session_service import (
@@ -135,30 +137,53 @@ def _target_payload(session_id: str, target: RuntimeTarget | None) -> dict[str, 
 
 
 async def abort_runtime_turn(
-    username: str, session_id: str, target: RuntimeTarget | None = None
-) -> bool:
+    username: str,
+    session_id: str,
+    target: RuntimeTarget | None = None,
+    *,
+    stored_with: QDashAuth | None = None,
+) -> StopOutcome:
     """Stop the turn the runtime is running for this session, if any.
 
     Closing the SSE stream alone does not cancel durable work in the runtime,
     so the chat's Stop button calls this. It stops only this chat's turn, never
-    one of another branch of the same store. Returns False when nothing was
-    running or the runtime could not be reached.
+    one of another branch of the same store. ``stopped``: the runtime stopped
+    the turn, or will as soon as its message is admitted. ``not_running``: the
+    runtime runs no turn of this chat. ``unknown``: the runtime could not be
+    reached or did not answer as expected, so the turn may still run.
+
+    With ``stored_with`` (the user's credentials), for a deleted chat: when no
+    turn of it runs, the work the runtime's store kept for it from before a
+    restart is stopped too, while the runtime holds the store, without running
+    any of it. ``stopped`` then also means that work will run no model or tool
+    again; ``not_running``, that there was none.
     """
     try:
         async with httpx.AsyncClient(timeout=10, trust_env=False) as client:
             response = await client.post(
                 f"{RUNTIME_URL}/chat/abort",
-                headers=_runtime_headers(),
+                headers={
+                    **_runtime_headers(),
+                    **(stored_with.headers() if stored_with is not None else {}),
+                },
                 json={
                     "owner_id": username,
                     "conversation_id": session_id,
                     **_target_payload(session_id, target),
+                    **({"include_stored": True} if stored_with is not None else {}),
                 },
             )
     except (httpx.HTTPError, RuntimeError):
         logger.warning("Could not abort Pi turn for session %s", session_id, exc_info=True)
-        return False
-    return response.status_code == httpx.codes.OK
+        return "unknown"
+    if response.status_code == httpx.codes.OK:
+        return "stopped"
+    if response.status_code == httpx.codes.NOT_FOUND:
+        return "not_running"
+    logger.warning(
+        "Pi runtime answered HTTP %s to stopping session %s", response.status_code, session_id
+    )
+    return "unknown"
 
 
 class SteerRefusedError(Exception):
@@ -178,6 +203,7 @@ async def steer_runtime_turn(
     session_id: str,
     *,
     request_id: str,
+    turn_request_id: str,
     message: str,
     auth: QDashAuth,
     target: RuntimeTarget | None = None,
@@ -186,9 +212,10 @@ async def steer_runtime_turn(
 
     The runtime submits it to the harness the running turn already has open, so
     the turn keeps its own credentials; ``auth`` only proves the caller and must
-    name the same project. Returns the steer's status (``queued``, ``applied``,
-    ``withdrawn``, or ``rejected`` when nothing was running and the runtime's store
-    has never seen this request ID).
+    name the same project. Only the turn whose request ID is ``turn_request_id``
+    admits it. Returns the steer's status (``queued``, ``applied``,
+    ``withdrawn``, or ``rejected`` when that turn is not running and the
+    runtime's store has never seen this request ID).
     """
     return await _post_steer(
         "/chat/steer",
@@ -196,6 +223,7 @@ async def steer_runtime_turn(
             "owner_id": username,
             "conversation_id": session_id,
             "request_id": request_id,
+            "turn_request_id": turn_request_id,
             "message": message,
             **_target_payload(session_id, target),
         },
@@ -214,7 +242,9 @@ async def steer_runtime_status(
     """Where a steer stands, read from the runtime's store without sending it.
 
     Never admits the steer or starts a run. ``not_found`` means it was never
-    admitted, and the runtime will not admit a request with that ID later.
+    admitted, and the runtime will not admit a request with that ID later: only
+    the turn it was sent to could, and the lookup fences it there while that
+    turn runs.
     """
     return await _post_steer(
         "/chat/steer/status",
@@ -271,6 +301,7 @@ async def fork_runtime_branch(
     when the runtime failed it or was never reached, and another
     ``httpx.HTTPError`` when the request may still run there (a timeout).
     """
+    generation = await asyncio.to_thread(store_generation, username, store_session_id)
     try:
         async with httpx.AsyncClient(timeout=FORK_TIMEOUT, trust_env=False) as client:
             response = await client.post(
@@ -279,6 +310,7 @@ async def fork_runtime_branch(
                 json={
                     "owner_id": username,
                     "store_session_id": store_session_id,
+                    "store_generation": generation,
                     **(
                         {"source_conversation_id": source_conversation_id}
                         if source_conversation_id is not None
@@ -310,13 +342,17 @@ async def fork_runtime_branch(
     raise ForkSettledError(msg)
 
 
-async def delete_runtime_session_state(username: str, session_id: str) -> bool:
+async def delete_runtime_session_state(
+    username: str, session_id: str, generation: str | None = None
+) -> bool:
     """Remove a Pi store and workspace no QDash session uses any more; True once removed.
 
     ``session_id`` names the store: the chat's own ID, or for branches the
-    store they share, removed with the last session that uses it. The runtime
-    refuses while a turn, a fork, or another removal holds the store; that and
-    any other failure is logged and answers False.
+    store they share, removed with the last session that uses it. With
+    ``generation``, only that incarnation of the store is removed: True also
+    when it is gone already and the store is a newer one, which stays. The
+    runtime refuses while a turn, a fork, or another removal holds the store;
+    that and any other failure is logged and answers False.
     """
     try:
         async with httpx.AsyncClient(timeout=10, trust_env=False) as client:
@@ -324,7 +360,11 @@ async def delete_runtime_session_state(username: str, session_id: str) -> bool:
                 "DELETE",
                 f"{RUNTIME_URL}/session",
                 headers=_runtime_headers(),
-                json={"owner_id": username, "conversation_id": session_id},
+                json={
+                    "owner_id": username,
+                    "conversation_id": session_id,
+                    **({"store_generation": generation} if generation is not None else {}),
+                },
             )
             response.raise_for_status()
     except (httpx.HTTPError, RuntimeError):
@@ -341,20 +381,23 @@ async def delete_runtime_session_state(username: str, session_id: str) -> bool:
 async def remove_runtime_store(
     username: str,
     store_session_id: str,
+    generation: str,
     deleted_chats: list[tuple[str, RuntimeTarget]],
     *,
     attempts: int = 3,
     retry_delay: float = 0.5,
 ) -> bool:
-    """Remove a store after its last session was deleted; True once the runtime confirmed it.
+    """Remove ``generation`` of a store after its last session was deleted; True once
+    the runtime confirmed it is gone.
 
     When the runtime refuses because a turn still holds the store, the turns
     of ``deleted_chats`` (the deleted chats of that store, each by its exact
     target) are stopped and the removal is tried again, up to ``attempts``
-    times. A chat that is not deleted is never stopped.
+    times. A chat that is not deleted is never stopped. Every call names the
+    generation, so one that arrives late removes nothing newer.
     """
     for attempt in range(attempts):
-        if await delete_runtime_session_state(username, store_session_id):
+        if await delete_runtime_session_state(username, store_session_id, generation):
             return True
         for session_id, target in deleted_chats:
             await abort_runtime_turn(username, session_id, target)
@@ -847,6 +890,14 @@ async def translate(
             if event.get("before_turn") is True:
                 applied["before_turn"] = True
             yield sse_event("steer", applied)
+        elif kind == "turn_start":
+            # This turn's own message was placed. What streamed before it was a run
+            # recovered after the runtime died answering a steer of an earlier turn:
+            # it ends here, and the chat keeps it with that turn.
+            segment = build_blocks_result(str(event.get("answer") or ""), visuals, interactions)
+            visuals = []
+            interactions = []
+            yield sse_event("turn_start", {"result": segment})
         elif kind == "steer":
             # Settled without being placed: the run failed or was stopped first.
             yield sse_event(

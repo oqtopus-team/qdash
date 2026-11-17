@@ -273,4 +273,29 @@ describe("branching from an answer", () => {
     expect(fresh).not.toBe(missing);
     expect(result.current.store.activeSessionId).toBe("b-new");
   });
+
+  it("retries under the same ID when the branch's reply body is lost after its headers", async () => {
+    const result = await openSaved();
+    // HTTP 200 arrived, then the connection dropped while the body was read.
+    branchReply = async () =>
+      new Response(
+        new ReadableStream({
+          start(controller) {
+            controller.error(new TypeError("network error"));
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    await act(async () => {
+      expect(await result.current.store.branchFrom("saved", "5")).toBeNull();
+    });
+    expect(result.current.chat.notice).toMatch(/Could not branch from this answer: .*Try again/);
+    expect(result.current.chat.branchingIndex).toBe(-1);
+    branchReply = async () => Response.json(BRANCH);
+    await act(async () => {
+      expect(await result.current.store.branchFrom("saved", "5")).toBe("b-new");
+    });
+    const [lost, retried] = branchCalls().map((call) => call.body.target_session_id);
+    expect(retried).toBe(lost);
+  });
 });

@@ -581,3 +581,101 @@ test("finish reads a settled turn larger than the window it starts", async () =>
     await harness.close(context);
   }
 });
+
+test("a steer placed first after the watch's first value follows the newest answer that value holds", () => {
+  const answer = (id, text, stopReason = "stop") => ({
+    id,
+    kind: "pi.assistant",
+    model: [{ role: "assistant", content: [{ type: "text", text }], stopReason }],
+  });
+  const steerEntry = (id, requestId = "s" + id) => ({
+    id,
+    kind: "qdash.steer",
+    data: { requestId },
+    model: [{ role: "user", content: "steer " + id }],
+  });
+  const toolResult = (id) => ({
+    id,
+    kind: "pi.toolResult",
+    model: [{ role: "toolResult", toolCallId: "c" + id, toolName: "t", content: [], isError: false }],
+  });
+  const placedAfter = (initial) => {
+    const translator = new ViewEventTranslator(view(initial));
+    const next = steerEntry(100, "late");
+    const placed = translator.advance(view([...initial, next])).find((event) => event.type === "steer_placed");
+    return placed.answer;
+  };
+  const older = answer(2, "Old answer.");
+  const newest = answer(4, "Newest answer.");
+  // By ID, not by the window's order.
+  assert.equal(placedAfter([user, newest, { ...user, id: 3 }, older]), "Newest answer.");
+  assert.equal(placedAfter([user, older]), "Old answer.");
+  // A passive entry the model does not read changes nothing.
+  assert.equal(placedAfter([user, older, { id: 5, kind: "qdash.note", data: {} }]), "Old answer.");
+  // Anything else newest: no answer to follow.
+  assert.equal(placedAfter([user, older, steerEntry(5)]), "");
+  assert.equal(placedAfter([user, older, toolResult(5)]), "");
+  assert.equal(placedAfter([user, older, { ...user, id: 5 }]), "");
+  for (const stop of ["toolUse", "error", "aborted"]) assert.equal(placedAfter([user, older, answer(5, "x", stop)]), "", stop);
+  assert.equal(placedAfter([]), "");
+});
+
+test("a user's message after an answer leaves a steer placed next with no answer to follow", () => {
+  const done = { id: 2, kind: "pi.assistant", model: [{ role: "assistant", content: [{ type: "text", text: "A" }], stopReason: "stop" }] };
+  const translator = new ViewEventTranslator(view([user, done]));
+  const next = { id: 3, kind: "pi.user", model: [{ role: "user", content: "next" }] };
+  const steerEntry = { id: 4, kind: "qdash.steer", data: { requestId: "s" }, model: [{ role: "user", content: "s" }] };
+  const placed = translator.advance(view([user, done, next, steerEntry])).find((event) => event.type === "steer_placed");
+  assert.equal(placed.answer, "");
+});
+
+test("the turn's own message reports only an answer given since the watch started", () => {
+  const answer = (id, text, stopReason = "stop") => ({
+    id,
+    kind: "pi.assistant",
+    byTaskId: 7,
+    model: [{ role: "assistant", content: [{ type: "text", text }], stopReason }],
+  });
+  const userAt = (id, text) => ({ id, kind: "pi.user", model: [{ role: "user", content: text }] });
+  const placedUser = (events) => events.find((event) => event.type === "user_placed");
+
+  // A normal second turn: the history ends in the first answer, which the chat
+  // shows already. The next message must not carry it again.
+  {
+    const initial = [userAt(1, "Q1"), answer(2, "A1")];
+    const translator = new ViewEventTranslator(view(initial));
+    const events = translator.advance(view([...initial, userAt(3, "Q2")]));
+    assert.equal(placedUser(events).answer, "");
+  }
+  // A run recovered after a crash answers after the watch started: that answer
+  // is reported with this turn's message, to be kept with the earlier turn.
+  {
+    const toolRound = answer(2, "", "toolUse");
+    const result = {
+      id: 3,
+      kind: "pi.toolResult",
+      model: [{ role: "toolResult", toolCallId: "c1", toolName: "t", content: [], isError: false }],
+    };
+    const initial = [userAt(1, "Q1"), toolRound, result];
+    const translator = new ViewEventTranslator(view(initial));
+    const events = translator.advance(view([...initial, answer(4, "Recovered."), userAt(5, "Q2")]));
+    assert.equal(placedUser(events).answer, "Recovered.");
+  }
+  // A steer placed first still follows the history's answer; an answer after it is new.
+  {
+    const initial = [userAt(1, "Q1"), answer(2, "A1")];
+    const translator = new ViewEventTranslator(view(initial));
+    const steer = { id: 3, kind: "qdash.steer", data: { requestId: "s" }, model: [{ role: "user", content: "s" }] };
+    const events = translator.advance(view([...initial, steer, answer(4, "A2"), userAt(5, "Q2")]));
+    assert.equal(events.find((event) => event.type === "steer_placed").answer, "A1");
+    assert.equal(placedUser(events).answer, "A2");
+  }
+  // The history's answer is not reported even after entries the model does not read.
+  {
+    const initial = [userAt(1, "Q1"), answer(2, "A1")];
+    const translator = new ViewEventTranslator(view(initial));
+    const note = { id: 3, kind: "qdash.note", data: {} };
+    const events = translator.advance(view([...initial, note, userAt(4, "Q2")]));
+    assert.equal(placedUser(events).answer, "");
+  }
+});

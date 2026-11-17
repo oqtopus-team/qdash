@@ -121,7 +121,9 @@ function writeAll(owner: string, all: StoredSteers): boolean {
 
 /** What is kept of a steer, or null when it is resolved and need not be. */
 function toStoredSteer(steer: PendingSteer): StoredSteer | null {
-  if (!isUnresolvedSteer(steer)) return null;
+  // A steer placed in the conversation but not saved with it yet is kept as
+  // delivered: after a reload it is placed again unless the saved one has it.
+  if (!isUnresolvedSteer(steer) && !(steer.status === "delivered" && steer.saving)) return null;
   return {
     requestId: steer.requestId,
     text: steer.text,

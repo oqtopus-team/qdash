@@ -94,6 +94,21 @@ function stringLeaves(
   return out;
 }
 
+/**
+ * The answer a steer placed right after `entry` follows: the text of an
+ * assistant message that ended its run, or empty after anything else the model
+ * reads (a tool round, a tool result, a failed or stopped attempt, a user's
+ * message or steer). Undefined for an entry the model does not read, which
+ * changes nothing.
+ */
+function answerAfter(entry: EntryRecord): string | undefined {
+  const message = entry.model?.[0] as { role?: unknown; stopReason?: unknown } | undefined;
+  if (message === undefined) return undefined;
+  if (message.role !== "assistant") return "";
+  const stop = message.stopReason;
+  return stop === "toolUse" || stop === "error" || stop === "aborted" ? "" : textOf(message);
+}
+
 export class ViewEventTranslator {
   /** Newest entry the stream has accounted for; earlier entries are history. */
   #lastEntryId: number;
@@ -114,6 +129,13 @@ export class ViewEventTranslator {
   readonly #open = new Map<string, string>();
   /** Text of the answer the newest entry ended a run with; empty after a tool round. */
   #lastAnswer = "";
+  /**
+   * Whether `#lastAnswer` comes from an entry this stream translated, not
+   * from the history the watch started with. Only a steer reports a history
+   * answer (the one it follows); the turn's own message never does, since
+   * the chat already shows every answer of its history.
+   */
+  #lastAnswerStreamed = false;
 
   /** Start from the watch's first value: everything in it is history. */
   constructor(initial: ViewRevision) {
@@ -126,6 +148,10 @@ export class ViewEventTranslator {
       else this.#open.set(slot.callId, slot.name);
     }
     for (const entry of initial.entries) this.#recordCalls(entry.model?.[0]);
+    // A steer placed first after this value follows the newest answer it holds.
+    // The window's order is not relied on: entries are taken by ID.
+    const byId = [...initial.entries].sort((a, b) => Number(a.id) - Number(b.id));
+    for (const entry of byId) this.#lastAnswer = answerAfter(entry) ?? this.#lastAnswer;
     const partial = live.generation?.message;
     if (partial !== undefined && live.run !== undefined) {
       this.#messageKey = `${live.run.taskId}/${live.generation?.attempt ?? 0}`;
@@ -201,7 +227,7 @@ export class ViewEventTranslator {
         text: textOf(entry.model?.[0]),
         answer: this.#lastAnswer,
       };
-      this.#lastAnswer = "";
+      this.#noAnswer();
       return [event];
     }
     const message = entry.model?.[0] as
@@ -223,16 +249,32 @@ export class ViewEventTranslator {
       if (!streamingThis) this.#streamed = new Map();
       // An attempt that failed or was aborted keeps what it showed; its retry streams anew.
       const stop = (message as { stopReason?: unknown }).stopReason;
-      this.#lastAnswer = stop === "toolUse" || stop === "error" || stop === "aborted" ? "" : textOf(message);
+      this.#lastAnswer = answerAfter(entry) ?? "";
+      this.#lastAnswerStreamed = true;
       const changes = stop === "error" || stop === "aborted" ? [] : this.#diffMessage(message);
       if (streamingThis) this.#consumed.add(key);
       this.#streamed = new Map();
       this.#messageKey = undefined;
       return changes.length > 0 ? [{ type: "message_update", changes }] : [];
     }
+    if (message?.role === "user") {
+      // A user's message: the turn's own, or one a run recovered from an earlier
+      // request placed. ViewEventStream tells which; what streamed before the
+      // turn's own message belongs to an earlier turn.
+      // Only an answer given since the watch started: a history answer is shown already.
+      const answer = this.#lastAnswerStreamed ? this.#lastAnswer : "";
+      const event: SessionEventLike = { type: "user_placed", entryId: String(entry.id), answer };
+      this.#noAnswer();
+      return [event];
+    }
+    // Anything else the model reads (a tool result) is no answer.
+    const after = answerAfter(entry);
+    if (after !== undefined) {
+      this.#lastAnswer = after;
+      this.#lastAnswerStreamed = true;
+    }
     if (message?.role === "toolResult" && typeof message.toolCallId === "string") {
       const id = message.toolCallId;
-      this.#lastAnswer = "";
       if (this.#ended.has(id)) return [];
       const name = typeof message.toolName === "string" ? message.toolName : "unknown";
       const out: SessionEventLike[] = [];
@@ -249,6 +291,12 @@ export class ViewEventTranslator {
       return out;
     }
     return [];
+  }
+
+  /** A user's message or steer was placed: no answer precedes what follows it. */
+  #noAnswer(): void {
+    this.#lastAnswer = "";
+    this.#lastAnswerStreamed = true;
   }
 
   #recordCalls(message: unknown): void {
@@ -346,6 +394,7 @@ export class ViewEventStream {
   readonly #emit: (event: SessionEventLike) => void;
   readonly #context: Context;
   readonly #steerBeforeTurn: ((entryId: number) => Promise<boolean>) | undefined;
+  readonly #ownMessage: ((entryId: number) => Promise<boolean>) | undefined;
   #queue: Promise<void> = Promise.resolve();
   #closed = false;
 
@@ -359,12 +408,18 @@ export class ViewEventStream {
      * stream order; its answer is reported as `beforeTurn`.
      */
     steerBeforeTurn?: (entryId: number) => Promise<boolean>,
+    /**
+     * Whether the user's message placed as `entryId` is the turn's own. Once it is, a `turn_started` event says
+     * that what streamed before it (an answer a recovered run gave a steer of an earlier turn) ends there.
+     */
+    ownMessage?: (entryId: number) => Promise<boolean>,
   ) {
     this.#conversation = conversation;
     this.#translator = new ViewEventTranslator(initial);
     this.#emit = emit;
     this.#context = context;
     this.#steerBeforeTurn = steerBeforeTurn;
+    this.#ownMessage = ownMessage;
   }
 
   /**
@@ -423,6 +478,12 @@ export class ViewEventStream {
     for (const event of this.#translator.advance(view, missing)) {
       if (event.type === "steer_placed" && this.#steerBeforeTurn && event.entryId !== undefined) {
         if (await this.#steerBeforeTurn(Number(event.entryId))) event.beforeTurn = true;
+      }
+      if (event.type === "user_placed") {
+        if (this.#ownMessage && event.entryId !== undefined && (await this.#ownMessage(Number(event.entryId)))) {
+          this.#emit({ type: "turn_started", entryId: event.entryId, answer: event.answer ?? "" });
+        }
+        continue;
       }
       this.#emit(event);
     }

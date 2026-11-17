@@ -18,7 +18,28 @@ that count honest when a request fails halfway:
   (``CopilotChatSessionService.reclaim``) removes one nobody retried.
 - A deleted chat that was the last user of its store stays as a hidden
   *tombstone* (``deleted_at``) until the runtime confirms the store is gone;
-  deleting it again, or the cleanup, retries the removal.
+  deleting it again, or the cleanup, retries the removal. A deleted chat whose
+  turn could not be confirmed stopped (``stop_pending``) stays too, also while
+  a branch still uses the store, until a retry confirms that nothing of it runs.
+
+Removing a store is a *teardown* held by one request at a time, for a bounded
+lease (``TEARDOWN_LEASE``), in the ``copilot_store_teardown`` collection. While
+it is held, the store's name is taken, so no chat recreated under the same ID
+can write a new store that the teardown would then remove. A request reads
+whether the store is in use only after it holds the teardown, and calls the
+runtime only while tombstones remain: once a teardown removed the store and its
+tombstones, a later one finds nothing to remove and never calls the runtime.
+
+The lease only keeps teardowns from running at once; it is not what keeps a
+late one from removing a newer store. Every incarnation of a store has its own
+*generation* (``copilot_store_generation``), created when a request first
+needs the store and sent with every runtime request about it. The runtime
+creates, opens, stops, and removes a store only for the generation it was
+created with, and remembers the generations it removed (see the agent
+runtime's ``store-identity.ts``). A teardown removes the generation it read,
+then forgets that generation and only the tombstones it read, so a teardown
+that outlived its lease, or a retry of one, never removes or forgets a chat
+created again under the same ID.
 """
 
 from __future__ import annotations
@@ -29,9 +50,10 @@ import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import HTTPException, status
+from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError
 
 from qdash.api.schemas.copilot_chat_session import (
@@ -67,6 +89,12 @@ BRANCH_LEASE = timedelta(minutes=2)
 
 RECLAIM_LIMIT = 20
 """At most this many pending branches and stores are cleaned up per ``reclaim`` call."""
+
+TEARDOWN_LEASE = timedelta(minutes=5)
+"""How long a request holds a store's teardown: longer than its runtime calls, which time out."""
+
+StopOutcome = Literal["stopped", "not_running", "unknown"]
+"""What stopping a chat's turn did: stopped it, found none running, or could not tell."""
 
 
 def _to_doc_message(msg: CopilotChatMessageSchema) -> CopilotChatMessage:
@@ -117,8 +145,113 @@ def _store_users(username: str, store: str) -> dict[str, Any]:
 
 
 def store_in_use(username: str, store: str) -> bool:
-    """Whether the store's name is taken: a session, pending or deleted but kept, names it."""
-    return CopilotChatSessionDocument.find_one(_store_users(username, store)).run() is not None
+    """Whether the store's name is taken: a session, pending or deleted but kept, names it,
+    or a request is tearing the store down."""
+    return CopilotChatSessionDocument.find_one(
+        _store_users(username, store)
+    ).run() is not None or _teardown_held(username, store)
+
+
+def _teardowns() -> Any:
+    """The store teardowns being run: one per owner and store at most (``_id``)."""
+    return _collection().database["copilot_store_teardown"]
+
+
+def _teardown_key(username: str, store: str) -> str:
+    return f"{username}\x00{store}"
+
+
+def _teardown_held(username: str, store: str) -> bool:
+    """Whether a request holds the store's teardown now."""
+    held = _teardowns().find_one(
+        {"_id": _teardown_key(username, store), "lease_expires_at": {"$gt": now()}}
+    )
+    return held is not None
+
+
+def _acquire_teardown(username: str, store: str, operation_id: str) -> bool:
+    """Hold the store's teardown for ``operation_id``; False while another request holds it.
+
+    One atomic upsert on the store's own ``_id``: it takes a teardown whose lease
+    ran out, and fails on the duplicate ``_id`` of one still held.
+    """
+    timestamp = now()
+    try:
+        _teardowns().find_one_and_update(
+            {"_id": _teardown_key(username, store), "lease_expires_at": {"$lte": timestamp}},
+            {
+                "$set": {
+                    "username": username,
+                    "store_session_id": store,
+                    "operation_id": operation_id,
+                    "lease_expires_at": timestamp + TEARDOWN_LEASE,
+                }
+            },
+            upsert=True,
+        )
+    except DuplicateKeyError:
+        return False
+    return True
+
+
+def _holds_teardown(username: str, store: str, operation_id: str) -> bool:
+    """Whether ``operation_id`` still holds the store's teardown, its lease not over."""
+    held = _teardowns().find_one(
+        {
+            "_id": _teardown_key(username, store),
+            "operation_id": operation_id,
+            "lease_expires_at": {"$gt": now()},
+        }
+    )
+    return held is not None
+
+
+def _release_teardown(username: str, store: str, operation_id: str) -> None:
+    _teardowns().delete_one({"_id": _teardown_key(username, store), "operation_id": operation_id})
+
+
+def _generations() -> Any:
+    """The current generation of each store: one per owner and store (``_id``)."""
+    return _collection().database["copilot_store_generation"]
+
+
+def store_generation(username: str, store: str) -> str:
+    """The generation of the store's current incarnation, created when it has none.
+
+    One atomic upsert on the store's own ``_id``, so concurrent requests agree on
+    one generation. A store created before generations existed gets one here,
+    and the runtime adopts it with the first request that names it.
+    """
+    key = _teardown_key(username, store)
+    for _ in range(2):
+        try:
+            doc = _generations().find_one_and_update(
+                {"_id": key},
+                {
+                    "$setOnInsert": {
+                        "username": username,
+                        "store_session_id": store,
+                        "generation": uuid.uuid4().hex,
+                        "created_at": now(),
+                    }
+                },
+                upsert=True,
+                return_document=ReturnDocument.AFTER,
+            )
+        except DuplicateKeyError:
+            # Another request inserted it first; read theirs.
+            continue
+        return str(doc["generation"])
+    doc = _generations().find_one({"_id": key})
+    if doc is None:
+        msg = f"Could not record a generation for store {store}"
+        raise RuntimeError(msg)
+    return str(doc["generation"])
+
+
+def _forget_generation(username: str, store: str, generation: str) -> None:
+    """Forget ``generation`` once its store is removed; a newer one is kept."""
+    _generations().delete_one({"_id": _teardown_key(username, store), "generation": generation})
 
 
 def _store_live(username: str, store: str) -> bool:
@@ -140,10 +273,15 @@ def _reload(doc_id: Any) -> CopilotChatSessionDocument:
 
 @dataclass(frozen=True)
 class RuntimeTarget:
-    """Where the runtime keeps one chat: its store and its conversation there (None: root)."""
+    """Where the runtime keeps one chat: its store and its conversation there (None: root).
+
+    ``generation`` names the store's incarnation (see the module docstring); None
+    only for a store that is not a chat's, such as a one-off analysis.
+    """
 
     store_session_id: str
     conversation_id: str | None = None
+    generation: str | None = None
 
     def payload(self) -> dict[str, str]:
         """The runtime request fields that name it."""
@@ -154,6 +292,7 @@ class RuntimeTarget:
                 if self.conversation_id is not None
                 else {}
             ),
+            **({"store_generation": self.generation} if self.generation is not None else {}),
         }
 
 
@@ -182,13 +321,17 @@ def resolve_runtime_target(username: str, session_id: str) -> RuntimeTarget:
             raise ChatUnavailableError(404, f"Chat session {session_id} not found")
         if doc.branch is not None and doc.branch.status == "pending":
             raise ChatUnavailableError(409, "This branch is still being created; try again")
-        return RuntimeTarget(store_of(doc), doc.conversation_id)
+        store = store_of(doc)
+        return RuntimeTarget(store, doc.conversation_id, store_generation(username, store))
     in_use = CopilotChatSessionDocument.find_one(
         {"username": username, "store_session_id": session_id}
     ).run()
     if in_use is not None:
         raise ChatUnavailableError(404, f"Chat session {session_id} not found")
-    return RuntimeTarget(session_id)
+    if _teardown_held(username, session_id):
+        # A store of this name is being removed: a new chat must not write it meanwhile.
+        raise ChatUnavailableError(409, "This chat ID is being cleaned up; try again shortly")
+    return RuntimeTarget(session_id, generation=store_generation(username, session_id))
 
 
 async def runtime_target(username: str, session_id: str) -> RuntimeTarget:
@@ -227,11 +370,12 @@ class ForkSettledError(RuntimeError):
 # refused it, ForkSettledError when the request is over and it is not known whether
 # the runtime forked, anything else when the request may still be running there.
 ForkRuntime = Callable[[str, str | None, str, str], Awaitable[ForkedBranch]]
-# Remove a store no session uses any more from the runtime: (store, the deleted chats
-# in it, whose turns may be stopped when they hold it) -> whether the store is gone.
-ReleaseStore = Callable[[str, list[tuple[str, RuntimeTarget]]], Awaitable[bool]]
-# Stop the turn of exactly one chat, if one runs: (session, where it lives).
-StopChat = Callable[[str, RuntimeTarget], Awaitable[object]]
+# Remove a store no session uses any more from the runtime: (store, the generation to
+# remove, the deleted chats in it, whose turns may be stopped when they hold it) ->
+# whether that generation of the store is gone.
+ReleaseStore = Callable[[str, str, list[tuple[str, RuntimeTarget]]], Awaitable[bool]]
+# Stop the turn of exactly one chat, if one runs: (session, where it lives) -> what it did.
+StopChat = Callable[[str, RuntimeTarget], Awaitable[StopOutcome]]
 
 
 @dataclass(frozen=True)
@@ -354,30 +498,60 @@ class CopilotChatSessionService:
         included, uses it, the tombstone goes and the store stays. Otherwise the
         runtime removes the store, and the tombstone stays until it confirmed
         that, so a failure is retried by deleting the session again or by
-        ``reclaim``.
+        ``reclaim``. When the runtime could not say whether it stopped the turn,
+        the tombstone stays even while the store is used, so that a retry can
+        still find the chat and stop it.
         """
         doc = await asyncio.to_thread(self._tombstone_session, username, session_id)
         store = store_of(doc)
         if doc.branch is None or doc.branch.status == "ready":
-            await stop_chat(doc.session_id, RuntimeTarget(store, doc.conversation_id))
+            await self._stop_deleted(doc, stop_chat)
         return await self._settle_store(username, store, release_store)
 
-    async def reclaim(self, *, username: str, release_store: ReleaseStore) -> None:
+    async def reclaim(
+        self,
+        *,
+        username: str,
+        release_store: ReleaseStore,
+        stop_chat: StopChat | None = None,
+    ) -> None:
         """Clean up what failed requests of the user left behind.
 
         A pending branch whose request lease is over is taken over and removed:
         its request failed, or the client lost it, and nobody retried. The
         runtime may have forked it, and that conversation stays in the store
-        until the store is removed. A store whose removal failed is removed
-        again. Bounded by ``RECLAIM_LIMIT`` per call.
+        until the store is removed. A deleted chat whose turn was not confirmed
+        stopped is stopped again (with ``stop_chat``). A store whose removal
+        failed is removed again. Bounded by ``RECLAIM_LIMIT`` per call.
         """
         for doc in await asyncio.to_thread(self._expired_pending, username):
             operation = uuid.uuid4().hex
             claimed = await asyncio.to_thread(self._try_claim, doc, operation)
             if claimed is not None:
                 await self._abandon_branch(claimed, operation, release_store)
+        if stop_chat is not None:
+            for doc in await asyncio.to_thread(self._unstopped, username):
+                await self._stop_deleted(doc, stop_chat)
         for store in await asyncio.to_thread(self._tombstoned_stores, username):
             await self._settle_store(username, store, release_store)
+
+    async def _stop_deleted(self, doc: CopilotChatSessionDocument, stop_chat: StopChat) -> None:
+        """Stop exactly this deleted chat's turn; keep it findable while that is unconfirmed.
+
+        Also work the runtime's store kept for it from before a restart: no
+        later turn of a deleted chat would recover it, and until it is stopped
+        the store's other branches cannot start.
+        """
+        store = store_of(doc)
+        generation = await asyncio.to_thread(store_generation, doc.username, store)
+        outcome = await stop_chat(
+            doc.session_id, RuntimeTarget(store, doc.conversation_id, generation)
+        )
+        await asyncio.to_thread(
+            _collection().update_one,
+            {"_id": doc.id, **_TOMBSTONE},
+            {"$set": {"stop_pending": outcome == "unknown"}},
+        )
 
     def _taken(self, username: str, session_id: str) -> bool:
         """Whether a new chat cannot take the ID: a session, kept or not, or a store uses it."""
@@ -427,31 +601,77 @@ class CopilotChatSessionService:
         """Drop the store's tombstones once it is used by a live session or removed.
 
         Tombstones are marked before this check, so of two last sessions deleted
-        at once at least one sees no live session and removes the store.
+        at once at least one sees no live session and removes the store. The
+        check and the removal run while this request holds the store's teardown
+        (see the module docstring); a request that cannot get it leaves the
+        store to the one that holds it and reports it unsettled.
         """
         tombstones = {**_store_users(username, store), **_TOMBSTONE}
+        operation = uuid.uuid4().hex
+        if not await asyncio.to_thread(_acquire_teardown, username, store, operation):
+            logger.info("Store %s of %s is being torn down by another request", store, username)
+            return False
 
-        def deleted_chats() -> list[tuple[str, RuntimeTarget]] | None:
+        def deleted_chats() -> tuple[str, list[Any], list[tuple[str, RuntimeTarget]]] | None:
             docs = CopilotChatSessionDocument.find(tombstones).to_list()
             if _store_live(username, store):
                 # A concurrent deletion may mark the last live session after this check.
-                # Keep its tombstone so that a failed runtime removal remains retryable.
-                _collection().delete_many({**tombstones, "_id": {"$in": [doc.id for doc in docs]}})
+                # Keep its tombstone so that a failed runtime removal remains retryable,
+                # and keep a chat whose turn was not confirmed stopped, to stop it later.
+                settled = [doc.id for doc in docs if not doc.stop_pending]
+                _collection().delete_many({**tombstones, "_id": {"$in": settled}})
                 return None
-            return [
-                (doc.session_id, RuntimeTarget(store, doc.conversation_id))
-                for doc in docs
-                if doc.branch is None or doc.branch.status == "ready"
-            ]
+            generation = store_generation(username, store)
+            return (
+                generation,
+                [doc.id for doc in docs],
+                [
+                    (doc.session_id, RuntimeTarget(store, doc.conversation_id, generation))
+                    for doc in docs
+                    if doc.branch is None or doc.branch.status == "ready"
+                ],
+            )
 
-        chats = await asyncio.to_thread(deleted_chats)
-        if chats is None:
+        try:
+            remaining = await asyncio.to_thread(
+                lambda: CopilotChatSessionDocument.find_one(tombstones).run() is not None
+            )
+            if not remaining:
+                # An earlier teardown removed the store and its tombstones: nothing is
+                # left to remove, and a store of the same name now is a new chat's.
+                return True
+            found = await asyncio.to_thread(deleted_chats)
+            if found is None:
+                return True
+            generation, read, chats = found
+            if not await asyncio.to_thread(_holds_teardown, username, store, operation):
+                return False
+            if not await release_store(store, generation, chats):
+                logger.warning(
+                    "Runtime store %s of %s is kept for a later removal", store, username
+                )
+                return False
+
+            def forget() -> None:
+                # Only what this teardown read: a call that outlived its lease must
+                # not forget the tombstones or the generation of a chat created again.
+                _collection().delete_many({**tombstones, "_id": {"$in": read}})
+                _forget_generation(username, store, generation)
+
+            await asyncio.to_thread(forget)
             return True
-        if not await release_store(store, chats):
-            logger.warning("Runtime store %s of %s is kept for a later removal", store, username)
-            return False
-        await asyncio.to_thread(_collection().delete_many, tombstones)
-        return True
+        finally:
+            await asyncio.to_thread(_release_teardown, username, store, operation)
+
+    def _unstopped(self, username: str) -> list[CopilotChatSessionDocument]:
+        """Deleted chats whose turn was not confirmed stopped."""
+        return (
+            CopilotChatSessionDocument.find(
+                {"username": username, **_TOMBSTONE, "stop_pending": True}
+            )
+            .limit(RECLAIM_LIMIT)
+            .to_list()
+        )
 
     def _tombstoned_stores(self, username: str) -> list[str]:
         docs = (

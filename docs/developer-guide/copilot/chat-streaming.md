@@ -35,6 +35,7 @@ ui/src/hooks/useCopilotChat.ts
 | `edit` | Included in final `result` | Render a proposed change from `propose_code_edit`, with Apply and Discard. The proposal's `pagePath`, `flowName`, and `chipId` must match the open editor before applying. |
 | `steer` (`applied`) | `steer` with `result` | A message sent during the answer landed in the transcript as `entry_id`. `result` holds the blocks streamed before it, with `answer`, the text it follows when it came after the run's last tool round; the API starts collecting blocks anew. The UI closes the answer so far, inserts the message, and goes on. `before_turn: true` marks a steer a recovered run placed before this turn's message (see below). |
 | `steer` (`withdrawn`) | `steer` | The run failed or was stopped before placing the message; the UI says it was not delivered. |
+| `turn_start` | `turn_start` with `result` | The turn's own message was placed. What streamed before it came from a run recovered after the runtime died, answering a steer of an earlier turn; `result` holds those blocks, with `answer`, the text that run ended with. `answer` holds only an answer committed after the stream started, so on an ordinary turn it is empty and the UI adds nothing. The UI keeps them with the earlier turn, before the new message. |
 | `done` | `status`, `result` | Finish the turn with renderable blocks; `entry_id` names the answer's durable entry. |
 | `noop` | `noop` | A continue found nothing to answer; no model request was sent. The UI keeps the chat as it was and shows a notice. |
 | `error` | `error` | Stop the stream with a user-visible failure. |
@@ -46,8 +47,10 @@ question, or approval also becomes an error so the UI does not appear to hang.
 ## Durable Turns and Cancellation
 
 Closing the browser stream does not cancel work in the Agent Runtime. The Stop action calls the
-separate cancellation path for the active turn. Request IDs let a retry recover an answer that
-the runtime already committed.
+separate cancellation path for the active turn. A stop reaches the turn as soon as it holds the
+store, also while its own message is still being admitted: `ActiveChat.stop` records it, and the
+turn aborts again once its submission is in, before it admits any steer. Request IDs let a retry
+recover an answer that the runtime already committed.
 
 One turn runs per user and store, so per conversation and across a chat's [branches](#branches); a second `/chat` request gets `409`. A message sent
 while the turn runs goes to `POST /copilot/chat/steer` instead, which the runtime's `/chat/steer`
@@ -56,6 +59,8 @@ hands to the turn's `ActiveChat` in `agent-runtime/src/chat-control.ts`:
 - The steer goes to the harness the turn already has open, with the turn's QDash credentials; it
   never opens the session store a second time. The runtime finds the turn by owner, store, and
   exact chat and refuses a request naming another project with `403`.
+- A steer names the turn it was sent to (`turn_request_id`, the turn's own request ID), and only
+  that turn admits it (`ActiveChat.admits`); a steer for any other turn is `rejected`.
 - It is submitted with `whenBusy: "steer"` and `whenIdle: "reject"`, as a `qdash.steer` entry that
   carries its request ID. Its durable request key is `steerKey(projectId, requestId)`, so a
   receipt belongs to one owner, conversation, project, and request. Pi places it after the current tool round, where the model reads it
@@ -64,15 +69,15 @@ hands to the turn's `ActiveChat` in `agent-runtime/src/chat-control.ts`:
 - A steer that arrives after the run's last tool round is placed after that answer and starts
   the next run. `settleChat` waits for every run the turn's steers started, and steers sent
   meanwhile, before the stream ends and the harness closes; `done` then reports the answer of
-  the last run.
+  the last run. Only a steer submitted after the turn's own submission, and placed after its
+  message, can end the turn: a request ID retried from an earlier turn finds that turn's older
+  submission (durable IDs grow in creation order), which never replaces the answer, also for a
+  continue, which places no message of its own.
 - The same request ID returns the same submission, so a retried steer is placed once. When no
   turn runs, or the turn no longer accepts steers, the runtime reads the steer from the store
   (`readSteerReceipt`) and reports it, also after the turn ended or the runtime restarted; only a
-  request ID the store has never seen is `rejected`, and the runtime then refuses that ID for
-  10 minutes so a delayed copy cannot steer a later turn. These fences live in the runtime's
-  memory: a restart drops them, and they do not hold against a client that retries the same
-  request ID after a restart or after they expire. The chat never retries a steer that way; it
-  only asks the status route.
+  request ID the store has never seen is `rejected`. A delayed copy of it cannot steer a later
+  turn, because every turn request has its own ID and the copy names the turn it was sent for.
 - `CHAT_QUEUE_SETTINGS` places every queued steer at the end of a tool round. When a run fails or
   is stopped while the runtime is up, it settles a steer still queued as `withdrawn` instead of
   keeping it for the user's next message.
@@ -81,7 +86,35 @@ hands to the turn's `ActiveChat` in `agent-runtime/src/chat-control.ts`:
   `harness.resume()` only once it watches the conversation. Pi then recovers the interrupted run,
   which places the steer and answers it before the new request's own message. The stream reports
   that steer with `before_turn: true`: its entry precedes the turn's own input entry, or the input
-  is not placed yet. A continue has no input entry, so its steers are never marked.
+  is not placed yet. A continue has no input entry, so its steers are never marked. When the
+  turn's own input entry is placed, the stream reports `turn_start`, so what the recovered run
+  answered stays with the earlier turn. The stream recognizes that entry only as the one the
+  turn's own submission placed: it waits for the submit to return and compares the submission's
+  `entry`, which the placing commit sets together with the entry. A plain user message a recovered
+  run places first, such as an earlier turn's wrap-up, is not the turn's own.
+- After a restart, the store hold is gone, and only the store itself shows work another
+  conversation left unfinished. `handleChat` reads `unfinishedWork` (`branch.ts`, from
+  `Harness.inspect()`) before it resumes scheduling, and refuses a turn of a chat while another
+  conversation of the same store has a queued submission or a live task (`409`,
+  `reason: "store_busy"`). The chat's own unfinished work is recovered as before; the other
+  branch's next request recovers its own. A stop is applied to the turn's conversation only after
+  this check and `harness.resume()` (`ActiveChat.opened`): `Conversation.abort()` starts the
+  store's scheduling, so a stop that came while the check ran stays remembered and is applied
+  after the turn's input is admitted. Work that only winds down (`windsDown`: every live task
+  carries an abort mark, no input queued) does not refuse a turn; it runs only abort handlers.
+- A deleted chat's work a crash left behind is reached by no later turn. Deleting the chat stops
+  it from the store (`stored-stop.ts`): `/chat/abort` with `include_stored: true` and the user's
+  QDash credentials, when no turn of that chat runs, holds the store, opens it with scheduling
+  paused and no extension (`openStoreForCleanup`), withdraws the chat's queued inputs
+  (`Harness.abortSubmission()`), and commits an abort mark on each of its live tasks
+  (`Harness.abortTask()`), which starts nothing. A marked built-in task runs only its abort
+  handler, which records the run and its unfinished calls as aborted and calls no model and runs
+  no tool; a task kind no definition takes is orphaned. Only when no other conversation of the
+  store has runnable work does the request start scheduling and wait, up to
+  `STORED_STOP_SETTLE_MS` (5 seconds), for the work to end (`200`, `settled: true`); otherwise
+  the marks stay and the work winds down with the store's next turn (`settled: false`). No
+  unfinished work is `404`; another hold on the store is `409`, which the API keeps as
+  `stop_pending`.
 
 `POST /copilot/chat/steer/status` (runtime `/chat/steer/status`) reports where a steer stands
 without sending it: `queued`, `applied` with `entry_id`, `withdrawn`, or `not_found`. It reads
@@ -91,8 +124,15 @@ the storage checks the schema version in a `BEGIN IMMEDIATE` transaction, which 
 lock, and closing it checkpoints the write-ahead log. Both wait at most
 `STEER_RECEIPT_BUSY_TIMEOUT_MS` (1 second) for the lock; past that the route answers `503`, which
 the UI treats as unconfirmed, never as `not_found`. A steer stored under another project's key
-is refused with `403`. Before reading, it lets submits already in flight finish and fences the
-request ID, so `not_found` is final: a steer request still on its way is not admitted afterwards.
+is refused with `403`. Before reading, it fences the steer durably: it appends the conversation,
+project, and request ID to `<store>.steer-fences` beside the store (`fenceSteer` in
+`store-identity.ts`) and syncs the file, then fences it in the running turn of that chat, if one
+runs, and lets submits already in flight finish. Every request of the turn the steer was sent to
+checks the file before it admits a steer (`ActiveChat.admits`), also a request that repeats the
+turn's request ID to recover it, after a dropped stream or a restart. Only that turn could admit
+the steer, so `not_found` is final: a steer request still on its way is not admitted afterwards.
+The fence is written whatever the read finds; a steer the store holds is still reported from the
+store when it is sent again. The file is no second writer of the SQLite store and goes with it.
 
 The UI (`CopilotChatSessionContext` with `ui/src/lib/copilotSteer.ts`) treats only a runtime
 answer as settling a steer:
@@ -103,7 +143,9 @@ answer as settling a steer:
 - A steer request that got no reply, or a `5xx`, is `unconfirmed` too. Only `rejected`,
   `withdrawn`, `not_found`, and a `4xx` from the API offer **Send as new message**; an
   unconfirmed steer offers **Check again**, which calls the status route only. Continue waits
-  until no steer is unconfirmed.
+  until no steer is unconfirmed. A steer placed after a stopped answer, as the last message, is
+  part of that answer's turn: Continue stays available (`canContinueMessages`) and sends it in the
+  history; question, approval, and edit cards still block it.
 - Every request about a steer names the project it was sent from.
 - `ui/src/lib/copilotSteerStore.ts` keeps every unresolved steer (sending, queued, unconfirmed,
   or applied but not yet placed) in the tab's `sessionStorage`, written before the steer request
@@ -117,13 +159,19 @@ answer as settling a steer:
   unavailable the steer is still sent, and is kept in memory only.
 - A `steer` event with `before_turn` is not placed after the new message. The UI puts it into the
   earlier turn its pending steer was sent to with `placeLateSteer`, or, for a steer the chat does
-  not know, just before the new message; both are saved as `approximate`. The answer the
-  recovered run streams after it still shows under the new turn.
+  not know, just before the new message; both are saved as `approximate`. The blocks the
+  recovered run streamed before it go right before it, and what it answered, closed by
+  `turn_start`, right after it.
 - A steer the runtime applied that no stream placed is saved once into the session's messages
   with `steer: { request_id, entry_id, placement: "approximate" }` by `placeLateSteer`. The answer
   it interrupted was saved as one message, so the steer goes right after it, ordered by `entry_id`
   among the turn's steers and before the next turn. A steer the stream placed is saved with
   `placement: "exact"`. While another stream runs in the session, placing waits for its end.
+- The UI saves a session's transcript one `PATCH` at a time: a newer snapshot waits for the save
+  in flight and replaces any snapshot still waiting, so an older one never commits last. A save is
+  sent only for the user who wrote it. A placed steer keeps its stored receipt (`saving`, out of
+  the pending list) until a save holding it is acknowledged; when saving fails, a reload restores
+  it as applied and places it again.
 
 A continue is a `/chat` request with `continue: true` (`continue_run` in the API request). The
 runtime submits Pi's `{ type: "continue" }`, which starts a run on the conversation as it is
@@ -160,6 +208,7 @@ entry; `pi.live`, `pi.inbox`, `pi.usage`, and provider state start fresh.
 | `conversation_id` | Durable conversation in that store; unset is the root |
 | `branch` | Source session, source entry, source conversation, project, `pending` or `ready`, and for a pending branch the request holding it (`operation_id`, `lease_expires_at`) |
 | `deleted_at` | Set on a deleted chat kept as a hidden tombstone until the runtime removed its store |
+| `stop_pending` | Set on a tombstone whose turn the runtime could not confirm stopped |
 | `messages[].entry_id` | An answer's durable entry, from the stream's `result` |
 
 Only `CopilotChatSessionService` writes the first three; create and update requests have no such
@@ -211,8 +260,9 @@ per-conversation delete.
 
 The runtime's `handleBranch` holds the store for the whole open, fork, and close.
 `SharedRuntime.forkSession` opens it with the caller's credentials and never resumes scheduling,
-so nothing runs. `branchFrom` in `agent-runtime/src/branch.ts` refuses a source with a run (also
-one a crash left), queued submissions, or live tasks, and accepts only an entry visible from the
+so nothing runs. `branchFrom` in `agent-runtime/src/branch.ts` refuses a source with a run, and
+a store with queued submissions or live tasks in any conversation (also those a crash left,
+which would resume beside the branch's first turn), and accepts only an entry visible from the
 source (`Conversation.entries` bounded to `at`; only then is `Conversation.context({ at })` read,
 so its failure is a storage fault, answered as `500`, never `entry_not_found`) that is an
 assistant message with `stopReason: "stop"`,
@@ -224,11 +274,23 @@ entry for it is `conflict`. No `agent` change is applied at the fork; the next t
 `openSession` configures the model, thinking level, and `cwd` the user chose, so the original
 answer's model is not restored.
 
-One writer per store: `server.ts` keeps one hold per owner and store (a chat turn, a fork, or a
-deletion), so a turn in one branch refuses a turn in another (`409`, `reason: "store_busy"`), a
-fork (`busy`), and a store deletion. Each `ActiveChat` records its QDash session and conversation;
-a steer, a steer status, and a stop reach a turn only when they name exactly that chat
-(`ActiveChat.runs`), so a request for one branch never steers or stops another.
+One writer per store: `server.ts` keeps one hold per owner and store (a chat turn, a fork, a
+stop of stored work, or a deletion), so a turn in one branch refuses a turn in another (`409`,
+`reason: "store_busy"`), a fork (`busy`), and a store deletion. Each `ActiveChat` records its QDash
+session, conversation, and store generation; a steer, a steer status, and a stop reach a turn only
+when they name exactly that chat (`ActiveChat.runs`), so a request for one branch, or for an
+earlier chat of the same ID, never steers or stops another.
+
+Every incarnation of a store has a *generation*. The API creates one per owner and store in the
+`copilot_store_generation` collection (`store_generation`) the first time a request needs the
+store, and sends it as `store_generation` with every runtime request about the store. While it
+holds the store, the runtime records the generation in `<store>.generation` when it creates the
+store, and checks it before it opens the store for a turn, fork, or stop (`claimStore` in
+`store-identity.ts`); another generation is refused with `409`, `reason: "stale_store"`.
+`DELETE /session` removes the store only for its generation (`removeStore`), and retires that
+generation first, so a delayed request of a removed generation cannot create the store again.
+A removal for an older generation answers `200` with `outcome: "stale"` and removes nothing. A
+store from before generations is adopted by the first request that names one.
 `readSteerReceipt` reads the named conversation's receipts. The owner and project checks for
 steers are unchanged.
 
@@ -238,18 +300,33 @@ this order:
 
 1. Marks the session `deleted_at`, a tombstone that is hidden from the list, from reads, and from
    `resolve_runtime_target`, and that no save can bring back.
-2. Stops the chat's own turn by its exact target (`abort_runtime_turn`); a turn of another branch
-   of the store keeps running.
+2. Stops the chat's own turn by its exact target (`abort_runtime_turn`), and, when no turn of it
+   runs, the work its store kept for it from before a restart (`include_stored`, see above); a
+   turn of another branch of the store keeps running. The outcome is `stopped`, `not_running`
+   (`404`), or `unknown` (no answer, or another status); `unknown` marks the tombstone
+   `stop_pending`.
 3. If another session of the user that is not deleted, a pending branch included, uses the
-   store, removes the store's tombstones and keeps the store. Its conversations stay in it.
-4. Otherwise calls `remove_runtime_store`: the runtime's `DELETE /session` removes the store,
+   store, removes the store's tombstones, except `stop_pending` ones, and keeps the store. Its
+   conversations stay in it. A `stop_pending` tombstone stays so that deleting the chat again,
+   or `reclaim`, can stop exactly that chat; a confirmed stop clears it.
+4. Otherwise calls `remove_runtime_store` with the store's generation: the runtime's
+   `DELETE /session` removes that generation of the store,
    every branch conversation in it, and the workspace. The runtime refuses while a turn, a fork,
    or another deletion holds the store; the API then stops the turns of the store's deleted chats
    and tries again, three times in all. Only once the runtime confirmed the removal are the
    tombstones dropped.
 
 Each request marks its tombstone before it checks for other users, so of two last sessions
-deleted at once at least one removes the store. When the removal still fails, the response is
+deleted at once at least one removes the store. Steps 3 and 4 run under the store's teardown, a
+lease (`TEARDOWN_LEASE`, 5 minutes) in the `copilot_store_teardown` collection that one request
+holds at a time; another request leaves the store to it. While the teardown is held, the store's
+name counts as taken, so no chat recreated under the same ID can write a new store meanwhile. A
+teardown reads whether the store is used only once it holds the lease, and calls the runtime only
+while tombstones remain. The lease is not what keeps a late teardown safe: its runtime calls and
+retries can outlast it. The generation is. A teardown removes the generation it read, then drops
+only the tombstones it read and forgets only that generation, so a teardown that outlived its
+lease never removes, or forgets the tombstone or generation of, a chat recreated under the same
+ID. When the removal still fails, the response is
 `200` and the tombstone keeps the store and the deleted chats' targets; deleting the session
 again, or the next listing of the user's chats (`reclaim`, one attempt), retries it.
 
@@ -265,6 +342,10 @@ durable conversation, replaced exchanges included.
 Tests: `agent-runtime/test/branch.test.mjs` forks a real SQLite harness and checks the historical
 context, deferred tools, and Code Mode store, refusals, and idempotency;
 `agent-runtime/test/branch-server.test.mjs` covers the HTTP routes and store holds;
+`agent-runtime/test/chat-recovery-server.test.mjs` covers `turn_start` after history and a
+recovered wrap-up, a stop during the recovery check, stopping a deleted branch's stored work,
+store generations, and durable steer fences; `agent-runtime/test/store-identity.test.mjs` covers
+generations and fences;
 `tests/qdash/api/services/test_copilot_chat_session_service.py` covers the mapping, retries,
 leases and take-over, concurrent requests for one target, the cleanup, tombstones, and store
 removal; `ui/src/hooks/__tests__/useCopilotChatBranch.test.tsx` covers the browser side.

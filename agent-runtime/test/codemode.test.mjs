@@ -38,6 +38,7 @@ import {
   withScriptDeadline,
 } from "../src/codemode.ts";
 import { buildQDashExtension } from "../src/durable-tools.ts";
+import { buildPresentationTools, PRESENT_TOOL, PRESENTATION_INTERNAL_CALLS } from "../src/presentation-tool.ts";
 import { nestedCallSummary, toNdjsonEvents } from "../src/events.ts";
 import { pendingApproval } from "../src/runtime.ts";
 
@@ -88,7 +89,7 @@ function offeredTools(transcript) {
 }
 
 /** A Harness with the chat's QDash tools, Code Mode, tool_search, and the tool policy. */
-async function openChat({ piExtensions, responses, storage = new MemoryStorage(), faux }) {
+async function openChat({ piExtensions, responses, storage = new MemoryStorage(), faux, extraTools = [], internalCalls }) {
   faux ??= fauxProvider({ tokensPerSecond: 0 });
   const models = createModels();
   models.setProvider(faux.provider);
@@ -104,7 +105,8 @@ async function openChat({ piExtensions, responses, storage = new MemoryStorage()
   const sandbox = createCodemodeSandbox();
   const registry = createRegistry();
   registry.install(qdash.extension);
-  for (const extension of buildCodemodeExtensions(sandbox, qdash)) registry.install(extension);
+  if (extraTools.length) registry.install(defineExtension({ name: "extra", tools: extraTools }));
+  for (const extension of buildCodemodeExtensions(sandbox, { ...qdash, internalCalls })) registry.install(extension);
   if (responses) faux.setResponses(responses);
   const harness = await Harness.open(storage, { models, registry, settings: { retry: { enabled: false } } }, context);
   const agent = { model: { provider: model.provider, modelId: model.id } };
@@ -586,5 +588,80 @@ test("a deferred tool rescued by a direct call stays loaded after the session is
   } finally {
     await reopened.close();
     rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("present_results accepts a deferred read a script called, before and after it is loaded", async () => {
+  const compare = piTool("qdash_compare_executions", () => ({ a: { t1_us: 30 }, b: { t1_us: 80 } }));
+  const forum = piTool("qdash_create_forum_post", () => ({ id: "p1" }));
+  // No classifier model in the catalog: present_results falls back, but only after its sources passed.
+  const presentation = buildPresentationTools({
+    provider: "missing",
+    name: "missing",
+    minProbability: 0.6,
+    minMargin: 0.2,
+    timeoutMs: 1000,
+  });
+  const present = (sources, id) =>
+    fauxAssistantMessage(
+      [
+        fauxToolCall(
+          PRESENT_TOOL,
+          {
+            request: "compare the two executions",
+            sources,
+            records: [
+              { subject: "a", values: [{ name: "t1", value: 30 }] },
+              { subject: "b", values: [{ name: "t1", value: 80 }] },
+            ],
+          },
+          { id },
+        ),
+      ],
+      { stopReason: "toolUse" },
+    );
+  const seen = [];
+  const chat = await openChat({
+    piExtensions: [piExtension([compare, forum])],
+    extraTools: [...presentation],
+    internalCalls: PRESENTATION_INTERNAL_CALLS,
+    responses: [
+      fauxAssistantMessage(
+        [fauxToolCall(CODEMODE_TOOL_NAME, { code: "text(JSON.stringify(await tools.qdash_compare_executions({})));" }, { id: "s1" })],
+        { stopReason: "toolUse" },
+      ),
+      (transcript) => {
+        seen.push(offeredTools(transcript));
+        return present(["qdash_compare_executions"], "p1");
+      },
+      // A deferred write tool is no data source, loaded or not.
+      present(["qdash_create_forum_post"], "p2"),
+      fauxAssistantMessage([fauxToolCall(TOOL_SEARCH_TOOL_NAME, { query: "compare executions" }, { id: "t1" })], {
+        stopReason: "toolUse",
+      }),
+      (transcript) => {
+        seen.push(offeredTools(transcript));
+        return present(["qdash_compare_executions"], "p3");
+      },
+      fauxAssistantMessage(fauxText("Compared.")),
+    ],
+  });
+  try {
+    assert.equal((await ask(chat.conversation, "compare")).status, "done");
+    const byId = new Map((await results(chat.conversation)).map((message) => [message.toolCallId, message]));
+    assert.equal(byId.get("s1").isError, false);
+    assert.equal(compare.calls.length, 1);
+    // Before loading: offered to the model it is not, yet the script read it.
+    assert.equal(seen[0].has("qdash_compare_executions"), false);
+    assert.equal(byId.get("p1").isError, false, resultText(byId.get("p1")));
+    assert.equal(byId.get("p1").details.presentation.outcome, "fallback");
+    assert.equal(byId.get("p2").isError, true);
+    assert.match(resultText(byId.get("p2")), /not data tools here: qdash_create_forum_post/);
+    assert.deepEqual(byId.get("t1").details.loaded.includes("qdash_compare_executions"), true);
+    // After loading it is offered, and still accepted.
+    assert.equal(seen[1].has("qdash_compare_executions"), true);
+    assert.equal(byId.get("p3").isError, false, resultText(byId.get("p3")));
+  } finally {
+    await chat.close();
   }
 });

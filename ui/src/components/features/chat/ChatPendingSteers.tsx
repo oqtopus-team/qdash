@@ -4,6 +4,7 @@ import { Clock, CornerDownRight, X } from "lucide-react";
 import {
   canCheckSteer,
   canResendSteer,
+  isListedSteer,
   isOpenSteer,
   steerStatusText,
   type PendingSteer,
@@ -29,10 +30,12 @@ export function ChatPendingSteers({
   onCheck?: (requestId: string) => void;
   onDismiss: (requestId: string) => void;
 }) {
-  if (steers.length === 0) return null;
+  // One placed in the conversation shows there, not here, while it is saved.
+  const listed = steers.filter(isListedSteer);
+  if (listed.length === 0) return null;
   return (
     <ul className="flex flex-col items-end gap-2" aria-label="Messages waiting for the answer">
-      {steers.map((steer) => {
+      {listed.map((steer) => {
         const open = isOpenSteer(steer);
         return (
           <li

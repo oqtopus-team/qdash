@@ -1,6 +1,7 @@
 """Copilot forwards the authenticated user's credentials to Pi on every turn."""
 
 import json
+from dataclasses import replace
 from types import SimpleNamespace
 
 import pytest
@@ -12,7 +13,7 @@ from qdash.api.lib import auth
 from qdash.api.routers import copilot
 from qdash.api.schemas.auth import UserInDB
 from qdash.api.services import pi_chat_service
-from qdash.api.services.copilot_chat_session_service import RuntimeTarget
+from qdash.api.services.copilot_chat_session_service import RuntimeTarget, store_generation
 from qdash.copilot.config import CopilotConfig
 from qdash.copilot.contracts import TaskContext, TaskContextBundle
 
@@ -147,7 +148,7 @@ def test_a_steer_is_sent_for_the_current_user_and_project(monkeypatch, selected_
     monkeypatch.setattr(pi_chat_service, "steer_runtime_turn", steer)
     app = FastAPI()
     app.include_router(copilot.router)
-    body = {"session_id": "s1", "request_id": "r1", "message": "Use Q5"}
+    body = {"session_id": "s1", "request_id": "r1", "turn_request_id": "t1", "message": "Use Q5"}
     headers = {"Authorization": "Bearer alice-token"}
     if selected_project:
         headers["X-Project-Id"] = selected_project
@@ -160,6 +161,8 @@ def test_a_steer_is_sent_for_the_current_user_and_project(monkeypatch, selected_
             "alice-token", selected_project or "default-project"
         )
         assert captured[0]["request_id"] == "r1"
+        # The turn it was sent to goes with it: only that turn admits it.
+        assert captured[0]["turn_request_id"] == "t1"
         # Another project's running answer is refused by the runtime and reported as such.
         refused = client.post(
             "/chat/steer",
@@ -178,6 +181,8 @@ def test_a_steer_is_sent_for_the_current_user_and_project(monkeypatch, selected_
             client.post("/chat/steer", json={**body, "message": ""}, headers=headers).status_code
             == 422
         )
+        without_turn = {key: value for key, value in body.items() if key != "turn_request_id"}
+        assert client.post("/chat/steer", json=without_turn, headers=headers).status_code == 422
         assert len(captured) == 2
 
 
@@ -314,16 +319,21 @@ def test_a_branch_is_made_for_the_users_own_chat_in_a_project_they_can_use(init_
         return ForkedBranch("7", True)
 
     refusing = {"on": False}
+    stopped_with: list[object] = []
 
-    async def delete(username, store):
+    async def delete(username, store, generation=None):
+        # Every removal names the generation of the store it removes.
+        assert generation == store_generation(username, store)
         if refusing["on"]:
             return False
         deleted.append((username, store))
         return True
 
-    async def abort(username, session_id, target=None):
-        stopped.append((username, session_id, target))
-        return False
+    async def abort(username, session_id, target=None, *, stored_with=None):
+        assert target.generation == store_generation(username, target.store_session_id)
+        stopped.append((username, session_id, replace(target, generation=None)))
+        stopped_with.append(stored_with)
+        return "not_running"
 
     monkeypatch.setattr(pi_chat_service, "fork_runtime_branch", fork)
     monkeypatch.setattr(pi_chat_service, "delete_runtime_session_state", delete)
@@ -384,6 +394,8 @@ def test_a_branch_is_made_for_the_users_own_chat_in_a_project_they_can_use(init_
         assert client.delete("/chat/sessions/s1", headers=headers).status_code == 200
         assert deleted == []
         assert stopped == [("alice", "s1", RuntimeTarget("s1"))]
+        # A deleted chat's stop also reaches work its store kept, with the user's credentials.
+        assert stopped_with == [pi_chat_service.QDashAuth("alice-token", "default-project")]
         assert client.delete("/chat/sessions/b1", headers=headers).status_code == 200
         assert deleted == [("alice", "s1")]
         assert stopped[-1] == ("alice", "b1", RuntimeTarget("s1", "7"))

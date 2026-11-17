@@ -20,7 +20,7 @@ import {
 import { openNodeSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/node";
 import { Type } from "typebox";
 
-import { BranchError, branchFrom, branchReceipt, openBranch, parseDurableId } from "../src/branch.ts";
+import { BranchError, branchFrom, branchReceipt, openBranch, parseDurableId, unfinishedWork } from "../src/branch.ts";
 import { CHAT_QUEUE_SETTINGS } from "../src/chat-control.ts";
 import {
   buildCodemodeExtensions,
@@ -407,6 +407,51 @@ test("a running, queued, or dead run refuses a branch; a branch opens only by it
   try {
     assert.equal(await refusal(branchFrom(reopened.harness, reopened.conversation, a1, "dead", context)), "busy");
     assert.equal(await branchReceipt(reopened.harness, "dead", context), undefined);
+    assert.equal((await reopened.harness.inspect(context)).scheduling, "paused");
+  } finally {
+    await reopened.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("work a crash left in a sibling branch refuses a branch from any conversation of the store", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "qdash-branch-sibling-"));
+  const path = join(dir, "session.sqlite");
+  const chat = await openStore(path, { responses: [fauxAssistantMessage(fauxText("A1"))] });
+  let a1;
+  let sibling;
+  try {
+    a1 = (await ask(chat.conversation, "Q1")).answer;
+    sibling = (await branchFrom(chat.harness, chat.conversation, a1, "b", context)).conversationId;
+    assert.deepEqual(await unfinishedWork(chat.harness, context), []);
+  } finally {
+    await chat.close();
+  }
+  // The sibling starts a long tool call, and the runtime dies with it running.
+  const branch = await openStore(path, {
+    conversationId: sibling,
+    responses: [
+      fauxAssistantMessage([fauxToolCall("wait_calibration", {}, { id: "w1" })], { stopReason: "toolUse" }),
+      fauxAssistantMessage(fauxText("never")),
+    ],
+  });
+  try {
+    await branch.conversation.submit({ type: "input", content: "Run it" }, context);
+    for (let i = 0; i < 200 && !release; i++) await new Promise((resolve) => setTimeout(resolve, 10));
+    assert.ok(release, "the tool started");
+  } finally {
+    await branch.close();
+    release = undefined;
+  }
+  // After the restart nothing in memory holds the store: only the store says so.
+  const reopened = await openStore(path, { resume: false });
+  try {
+    assert.deepEqual(await unfinishedWork(reopened.harness, context), [sibling]);
+    // The root itself is idle, yet the store is not.
+    assert.deepEqual(await unfinishedWork(reopened.harness, context, reopened.conversation.id), [sibling]);
+    assert.deepEqual(await unfinishedWork(reopened.harness, context, sibling), []);
+    assert.equal(await refusal(branchFrom(reopened.harness, reopened.conversation, a1, "c", context)), "busy");
+    assert.equal(await branchReceipt(reopened.harness, "c", context), undefined);
     assert.equal((await reopened.harness.inspect(context)).scheduling, "paused");
   } finally {
     await reopened.close();

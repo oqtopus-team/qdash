@@ -62,6 +62,7 @@ const serverScript = (path, phase) => `
     BACKGROUND_CONTEXT,
     SharedRuntime: { create: async () => ({
       listToolNames: () => [],
+      storePath: () => path,
       steerReceipt: (owner, session, project, requestId) =>
         readSteerReceipt(path, project, requestId, BACKGROUND_CONTEXT),
       openSession: async () => {
@@ -101,7 +102,7 @@ const serverScript = (path, phase) => `
   if (phase === "before") {
     post("/chat", { ...turn, request_id: "t1", message: "Calibrate Q4" }).catch(() => {});
     await started;
-    const response = await post("/chat/steer", { owner_id: "alice", conversation_id: "c1", request_id: "s1", message: "Use Q5" });
+    const response = await post("/chat/steer", { owner_id: "alice", conversation_id: "c1", request_id: "s1", message: "Use Q5", turn_request_id: "t1" });
     assert.equal((await response.json()).status, "queued");
     // The parent kills this process now, with the steer queued and the tool running.
     console.log("QUEUED");
@@ -136,6 +137,18 @@ const serverScript = (path, phase) => `
   const done = lines.at(-1);
   assert.equal(done.type, "done", JSON.stringify(lines));
   assert.equal(done.text, "Answer: New question");
+  // The recovered run's answer to the steer streams before this turn's own
+  // message, which the stream marks, so the chat keeps that answer with the
+  // earlier turn instead of showing it after the new question.
+  const kinds = lines.map((line) => line.type);
+  const startAt = kinds.indexOf("turn_start");
+  assert.equal(kinds.filter((kind) => kind === "turn_start").length, 1, JSON.stringify(lines));
+  assert.ok(startAt > kinds.indexOf("steer"), JSON.stringify(lines));
+  assert.equal(lines[startAt].answer, "Answer: Use Q5");
+  const textBefore = lines.slice(0, startAt).filter((line) => line.type === "text_delta").map((line) => line.delta).join("");
+  const textAfter = lines.slice(startAt).filter((line) => line.type === "text_delta").map((line) => line.delta).join("");
+  assert.equal(textBefore, "Answer: Use Q5");
+  assert.equal(textAfter, "Answer: New question");
 
   // The durable transcript agrees: the steer, then its answer, then the new message.
   reply = await post("/chat/steer/status", { owner_id: "alice", conversation_id: "c1", request_id: "s1" });
@@ -168,31 +181,43 @@ test("a steer queued when the runtime is killed is placed by the recovered run, 
   const dir = mkdtempSync(join(tmpdir(), "chat-steer-crash-"));
   const path = join(dir, "session.sqlite");
   const cwd = new URL(".", import.meta.url);
+  // Outside the try, so a failure before the planned kill still ends the child.
+  let before;
+  let timer;
   try {
-    const before = spawn("bun", ["--eval", serverScript(path, "before")], { cwd, stdio: ["ignore", "pipe", "pipe"] });
+    before = spawn("bun", ["--eval", serverScript(path, "before")], { cwd, stdio: ["ignore", "pipe", "pipe"] });
+    const child = before;
     let out = "";
     let err = "";
-    before.stderr.on("data", (chunk) => (err += chunk));
+    child.stderr.on("data", (chunk) => (err += chunk));
     await new Promise((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error(`no QUEUED in time\n${out}\n${err}`)), 30_000);
-      before.stdout.on("data", (chunk) => {
+      timer = setTimeout(() => reject(new Error(`no QUEUED in time\n${out}\n${err}`)), 30_000);
+      child.stdout.on("data", (chunk) => {
         out += chunk;
-        if (out.includes("QUEUED")) {
-          clearTimeout(timer);
-          resolve();
-        }
+        if (out.includes("QUEUED")) resolve();
       });
-      before.on("exit", (code) => reject(new Error(`exited ${code} before the steer was queued\n${out}\n${err}`)));
+      child.on("exit", (code) => reject(new Error(`exited ${code} before the steer was queued\n${out}\n${err}`)));
     });
+    clearTimeout(timer);
     // A genuine crash: no handler runs, nothing settles the run or its steer.
-    const exited = new Promise((resolve) => before.on("exit", (_code, signal) => resolve(signal)));
-    before.kill("SIGKILL");
-    assert.equal(await exited, "SIGKILL");
+    assert.equal(await killed(child), "SIGKILL");
 
     const after = spawnSync("bun", ["--eval", serverScript(path, "after")], { cwd, encoding: "utf8", timeout: 60_000 });
     assert.equal(after.status, 0, `${after.error ?? ""}\n${after.stdout}\n${after.stderr}`);
     assert.match(after.stdout, /RECOVERED/);
   } finally {
+    clearTimeout(timer);
+    // A child still running (the test failed before its planned kill) keeps the
+    // store, a port, and the runner's pipes open: end it before cleaning up.
+    if (before && before.exitCode === null && before.signalCode === null) await killed(before);
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+/** Kill a child with SIGKILL and wait until it has exited; the signal it exited with. */
+function killed(child) {
+  if (child.exitCode !== null || child.signalCode !== null) return Promise.resolve(child.signalCode);
+  const exited = new Promise((resolve) => child.once("exit", (_code, signal) => resolve(signal)));
+  child.kill("SIGKILL");
+  return exited;
+}

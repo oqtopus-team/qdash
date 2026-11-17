@@ -1,9 +1,9 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 
-import { UserEntry, type ConversationId, type EntryId, type Submission } from "@earendil-works/pi-durable";
+import { ROOT_CONVERSATION_ID, UserEntry, type ConversationId, type EntryId, type Submission } from "@earendil-works/pi-durable";
 
 import { requestQDashAuth } from "./auth.ts";
-import { BRANCH_REFUSAL_STATUS, BranchError, parseDurableId } from "./branch.ts";
+import { BRANCH_REFUSAL_STATUS, BranchError, parseDurableId, unfinishedWork } from "./branch.ts";
 import {
   ActiveChat,
   continueBlocker,
@@ -21,6 +21,8 @@ import { hasBearerToken, readJsonBody, RequestError, runtimeToken } from "./http
 import { decisionMessage, type ApprovalRequest } from "./durable-tools.ts";
 import { EvaluationError } from "./evaluate.ts";
 import { ViewEventStream } from "./view-events.ts";
+import { claimStore, fenceSteer, steerFenced } from "./store-identity.ts";
+import { stopStoredConversation } from "./stored-stop.ts";
 import {
   answerText,
   pendingApproval,
@@ -43,6 +45,9 @@ const CHAT_TIMEOUT_MS = Number(process.env.CHAT_TIMEOUT_MS ?? 0);
 // proxies between here and the browser do not take silence for a dead stream.
 const CHAT_PING_MS = Number(process.env.CHAT_PING_MS ?? 15_000);
 const MAX_BODY_BYTES = Number(process.env.MAX_REQUEST_BODY_BYTES ?? 20 * 1024 * 1024);
+// How long a stop of a chat whose work only the store remembers waits for that
+// work to end, when it may start scheduling (see stored-stop.ts).
+const STORED_STOP_SETTLE_MS = Number(process.env.STORED_STOP_SETTLE_MS ?? 5_000);
 const RUNTIME_TOKEN = runtimeToken();
 
 interface ImageBody {
@@ -58,6 +63,12 @@ interface ImageBody {
 interface StoreFields {
   store_session_id?: string;
   store_conversation_id?: string;
+  /**
+   * The incarnation of the store the request is about (see store-identity.ts):
+   * QDash's API gives each one its own. Unset, a legacy request, which reaches
+   * only a store without a generation.
+   */
+  store_generation?: string;
 }
 
 interface ChatBody extends StoreFields {
@@ -91,6 +102,8 @@ interface SteerBody extends StoreFields {
   conversation_id?: string;
   request_id?: string;
   message?: string;
+  /** The request ID of the chat turn the steer was sent to; only that turn admits it. */
+  turn_request_id?: string;
 }
 
 interface DeleteSessionBody extends StoreFields {
@@ -98,9 +111,19 @@ interface DeleteSessionBody extends StoreFields {
   conversation_id?: string;
 }
 
+interface AbortBody extends DeleteSessionBody {
+  /**
+   * When no turn of the chat runs, also stop the work the store holds for it
+   * from before a restart (see stored-stop.ts). QDash's API asks this for a
+   * deleted chat only, whose work no later turn would recover.
+   */
+  include_stored?: boolean;
+}
+
 interface BranchBody {
   owner_id?: string;
   store_session_id?: string;
+  store_generation?: string;
   /** The conversation branched from; unset, the root. */
   source_conversation_id?: string;
   /** The answer's durable entry ID, as the chat stream reported it. */
@@ -199,7 +222,7 @@ function toImageContent(images: ImageBody[] | undefined) {
  * store wait for each other (`409`). A steer and a stop reach a turn through its
  * hold only when they name the turn's exact chat (`ActiveChat.runs`).
  */
-type StoreHold = { kind: "chat"; active: ActiveChat } | { kind: "branch" } | { kind: "delete" };
+type StoreHold = { kind: "chat"; active: ActiveChat } | { kind: "branch" } | { kind: "delete" } | { kind: "stop" };
 const stores = new Map<string, StoreHold>();
 
 function storeKey(ownerId: string, storeSessionId: string): string {
@@ -211,6 +234,14 @@ interface RequestTarget {
   chat: ChatTarget;
   store: StoreTarget;
   key: string;
+  /** The store's SQLite file. */
+  path: string;
+  generation: string | undefined;
+}
+
+/** The store generation a request names, or undefined for a legacy request. */
+function generationOf(value: unknown): string | undefined {
+  return typeof value === "string" && value ? value : undefined;
 }
 
 /** The target of a request, or undefined when its durable conversation ID is malformed. */
@@ -221,10 +252,17 @@ function requestTarget(ownerId: string, sessionId: string, body: StoreFields): R
     conversationId = parseDurableId<ConversationId>(body.store_conversation_id);
     if (conversationId === undefined) return undefined;
   }
+  const generation = generationOf(body.store_generation);
   return {
-    chat: { sessionId, conversation: conversationId === undefined ? "root" : String(conversationId) },
+    chat: {
+      sessionId,
+      conversation: conversationId === undefined ? "root" : String(conversationId),
+      ...(generation === undefined ? {} : { generation }),
+    },
     store: { storeSessionId, ...(conversationId === undefined ? {} : { conversationId }) },
     key: storeKey(ownerId, storeSessionId),
+    path: runtime.storePath(ownerId, storeSessionId),
+    generation,
   };
 }
 
@@ -241,40 +279,17 @@ function storeBusy(hold: StoreHold): { error: string; reason: "store_busy" } {
       ? "Another branch of this chat is answering. Wait for it to finish, or stop it, and try again."
       : hold.kind === "branch"
         ? "A branch of this chat is being created. Try again in a moment."
-        : "This chat is being deleted.";
+        : hold.kind === "stop"
+          ? "A deleted branch of this chat is being stopped. Try again in a moment."
+          : "This chat is being deleted.";
   return { error, reason: "store_busy" };
 }
 
-/**
- * Steer request IDs a status lookup found nowhere, by owner, conversation,
- * project and request ID. The lookup told the user the steer was not sent, so a
- * request with the same ID that was still on its way to this process is not
- * admitted after it.
- *
- * In memory only, for ten minutes. A restart drops every fence, and ends the
- * requests this process was still serving, but it does not discard a steer the
- * store already admitted: a queued one is placed when the conversation's run
- * is recovered (see CHAT_QUEUE_SETTINGS). A fence also does not hold against a
- * client that retries the same request ID after a restart or after it expired;
- * the chat never does, it only asks the status again.
- */
-const fencedSteers = new Map<string, number>();
-const STEER_FENCE_TTL_MS = 10 * 60_000;
-const MAX_STEER_FENCES = 1000;
-
-function fenceSteer(key: string): void {
-  const now = Date.now();
-  for (const [known, expires] of fencedSteers) {
-    if (expires > now && fencedSteers.size < MAX_STEER_FENCES) break;
-    fencedSteers.delete(known);
-  }
-  fencedSteers.set(key, now + STEER_FENCE_TTL_MS);
-}
-
-function isFenced(key: string): boolean {
-  const expires = fencedSteers.get(key);
-  return expires !== undefined && expires > Date.now();
-}
+/** The reply to a request about an incarnation of the store that is gone. */
+const STALE_STORE = {
+  error: "This chat's runtime state belongs to an earlier chat of the same ID. Reload the chat and try again.",
+  reason: "stale_store",
+} as const;
 
 /** What a refused continue tells the user. */
 const CONTINUE_REFUSALS: Record<ContinueBlocker, string> = {
@@ -354,12 +369,21 @@ async function handleChat(req: IncomingMessage, res: ServerResponse): Promise<vo
     );
     return;
   }
-  const active = new ActiveChat(auth.projectId, BACKGROUND_CONTEXT, target.chat);
+  const active = new ActiveChat(auth.projectId, BACKGROUND_CONTEXT, target.chat, body.request_id, (fenceKey) =>
+    steerFenced(target.path, target.chat.conversation, fenceKey),
+  );
   stores.set(target.key, { kind: "chat", active });
   const pageContext = parsePageContext(body.page_context);
 
   let opened;
   try {
+    // Held, so nothing creates or removes the store between this check and the open.
+    if (claimStore(target.path, target.generation, true) === "stale") {
+      active.failed();
+      stores.delete(target.key);
+      sendJson(res, 409, STALE_STORE);
+      return;
+    }
     opened = await runtime.openSession(
       {
         ownerId,
@@ -393,6 +417,20 @@ async function handleChat(req: IncomingMessage, res: ServerResponse): Promise<vo
   let settlement: Awaited<ReturnType<typeof settleChat>> | undefined;
 
   try {
+    // The store's hold above is in memory only. After a restart, a run another
+    // conversation of this store left unfinished is known only to the store,
+    // and `harness.resume()` below would run it beside this turn in the
+    // shared workspace. Refuse until that conversation's own next request
+    // recovers it; this conversation's own unfinished work recovers here.
+    if ((await unfinishedWork(harness, BACKGROUND_CONTEXT, conversation.id)).length > 0) {
+      sendJson(res, 409, {
+        error:
+          "Another branch of this chat has unfinished work from before the assistant restarted. Open that branch and send a message there to let it finish, then try again.",
+        reason: "store_busy",
+      });
+      return;
+    }
+
     let approval: ApprovalRequest | undefined;
     if (body.approval) {
       approval = body.approval.id
@@ -409,6 +447,10 @@ async function handleChat(req: IncomingMessage, res: ServerResponse): Promise<vo
     // A retried continue recovers the submission it made, before the gate below
     // reads a state that submission itself has changed.
     let own: Submission | undefined;
+    // The turn's own submission once its submit returned (undefined if it failed):
+    // the stream tells this turn's own message from any other by it, exactly.
+    let knowOwn!: (submission: Submission | undefined) => void;
+    const ownKnown = new Promise<Submission | undefined>((resolve) => (knowOwn = resolve));
     if (continuing) {
       const known = body.request_id
         ? await submissionByRequest(harness, conversation, body.request_id, BACKGROUND_CONTEXT)
@@ -446,6 +488,15 @@ async function handleChat(req: IncomingMessage, res: ServerResponse): Promise<vo
 
     // Stream what changes in the conversation view; its first value is history.
     const events = await conversation.watch(BACKGROUND_CONTEXT);
+    if (own) knowOwn(own);
+    // Where the turn's own message was placed, once its submit returned. Its
+    // placement commits the entry and the submission's `entry` together, so
+    // by the time the stream sees an entry, the record names it if it is ours.
+    const ownEntry = async (): Promise<number | undefined> => {
+      const submission = await ownKnown;
+      const record = await submission?.status(BACKGROUND_CONTEXT);
+      return record?.type === "input" && record.entry !== undefined ? Number(record.entry) : undefined;
+    };
     const stream = new ViewEventStream(
       conversation,
       events.value,
@@ -457,10 +508,14 @@ async function handleChat(req: IncomingMessage, res: ServerResponse): Promise<vo
       continuing
         ? undefined
         : async (entryId) => {
-            if (!own) return true;
-            const record = await own.status(BACKGROUND_CONTEXT);
-            return record.type !== "input" || record.entry === undefined || Number(record.entry) > entryId;
+            const at = await ownEntry();
+            return at === undefined || at > entryId;
           },
+      // Where this turn's own message lands, so what a recovered run streamed
+      // before it closes there. Only the entry its own submission placed: a
+      // plain user message a recovered run places first (an earlier turn's
+      // wrap-up) is not it.
+      continuing ? undefined : async (entryId) => (await ownEntry()) === entryId,
     );
     events.start(async (call) => {
       if (call.kind !== "value") return;
@@ -468,19 +523,29 @@ async function handleChat(req: IncomingMessage, res: ServerResponse): Promise<vo
         console.warn("[agent-runtime] chat stream revision failed:", error);
       });
     });
-    // Only now, with the conversation watched, may a run recovered from an
-    // earlier request go on: every steer it places is streamed.
-    harness.resume();
-
     try {
-      if (!own && continuing) {
-        own = await conversation.submit(
-          { type: "continue", ...(body.request_id ? { requestId: body.request_id } : {}) },
-          BACKGROUND_CONTEXT,
-        );
-      } else if (!own) {
-        own = await submitInput(body, conversation, approval, opened.writeTools, write);
+      // Only now, with the conversation watched, may a run recovered from an
+      // earlier request go on: every steer it places is streamed.
+      harness.resume();
+      // Abort also resumes scheduling: expose the conversation only after the
+      // store-wide recovery guard and watch are ready. Earlier stops stay queued.
+      active.opened(conversation);
+      try {
+        if (!own && continuing) {
+          own = await conversation.submit(
+            { type: "continue", ...(body.request_id ? { requestId: body.request_id } : {}) },
+            BACKGROUND_CONTEXT,
+          );
+        } else if (!own) {
+          own = await submitInput(body, conversation, approval, opened.writeTools, write);
+        }
+      } finally {
+        knowOwn(own);
       }
+      // A stop that came while the input was admitted may have aborted
+      // nothing yet (the run the submit started came after it): apply it now,
+      // before any steer is admitted.
+      if (active.stopRequested) await conversation.abort(BACKGROUND_CONTEXT);
       // Steers may follow from here: the turn's own input is admitted.
       active.ready(harness, conversation);
       // A steer is placed after the current tool round, so the model reads it
@@ -541,6 +606,8 @@ async function handleChat(req: IncomingMessage, res: ServerResponse): Promise<vo
         message: error instanceof Error ? error.message : String(error),
       });
     } finally {
+      // Whatever ended the turn, no stream revision waits for its submission any more.
+      knowOwn(own);
       if (ping) clearInterval(ping);
       await events.stop();
     }
@@ -626,6 +693,7 @@ interface SteerRequest {
   requestId: string;
   projectId: string | undefined;
   target: RequestTarget;
+  /** Names the steer within its chat: project and request ID. */
   fenceKey: string;
 }
 
@@ -659,7 +727,7 @@ function steerRequest(req: IncomingMessage, res: ServerResponse, body: SteerBody
     requestId: body.request_id,
     projectId: auth.projectId,
     target,
-    fenceKey: `${body.owner_id}\0${body.conversation_id}\0${target.chat.conversation}\0${auth.projectId ?? ""}\0${body.request_id}`,
+    fenceKey: `${auth.projectId ?? ""}\0${body.request_id}`,
   };
 }
 
@@ -700,18 +768,21 @@ async function storedSteer(res: ServerResponse, request: SteerRequest): Promise<
 async function handleSteer(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const body = await readJsonBody<SteerBody>(req, MAX_BODY_BYTES);
   const message = typeof body.message === "string" ? body.message.trim() : "";
-  if (!message) {
-    sendJson(res, 400, { error: "owner_id, conversation_id, request_id and message are required" });
+  const turnRequestId = typeof body.turn_request_id === "string" ? body.turn_request_id : "";
+  if (!message || !turnRequestId) {
+    sendJson(res, 400, {
+      error: "owner_id, conversation_id, request_id, turn_request_id and message are required",
+    });
     return;
   }
   const request = steerRequest(req, res, body);
   if (!request) return;
   const active = activeFor(request.target);
-  // A status lookup already said this request ID was not sent: never admit it now.
-  let outcome: SteerOutcome =
-    active && !isFenced(request.fenceKey)
-      ? await active.steer(request.requestId, message)
-      : { status: "rejected", reason: "idle" };
+  // Only the turn the steer was sent to admits it, and only until a status
+  // lookup said it was not sent (see ActiveChat.admits).
+  let outcome: SteerOutcome = active?.admits(turnRequestId, request.fenceKey)
+    ? await active.steer(request.requestId, message)
+    : { status: "rejected", reason: "idle" };
   if (outcome.status === "rejected") {
     // A submit of the same request ID still in flight lands in the store first.
     await active?.drain();
@@ -719,26 +790,41 @@ async function handleSteer(req: IncomingMessage, res: ServerResponse): Promise<v
     if (!stored) return;
     if (stored.status !== "not_found") outcome = stored;
   }
-  // Told it was not sent: a copy of this request still on its way never steers a later turn.
-  if (outcome.status === "rejected") fenceSteer(request.fenceKey);
   sendJson(res, outcome.status === "rejected" ? 409 : 200, steerJson(outcome));
 }
 
 /**
  * Where a steer stands, without sending it: it opens no harness, so it never
  * admits a steer or starts a run (SQLite may still lock the store briefly; a
- * lock held too long is a 503, never `not_found`). The chat asks after its stream ended (stopped, or the
- * connection dropped) before it saw where the steer landed. A request ID found
- * nowhere is fenced, so a request still on its way cannot admit it after the
- * chat was told it was not sent.
+ * lock held too long is a 503, never `not_found`). The chat asks after its
+ * stream ended (stopped, or the connection dropped) before it saw where the
+ * steer landed.
+ *
+ * `not_found` is final. A steer is admitted only by the turn it was sent to
+ * (`turn_request_id`), and every turn has its own request ID. The same turn
+ * may be requested again with that ID (a retry, or after a restart, to
+ * recover it), so before it reads, the lookup fences the steer: durably,
+ * beside the store (store-identity.ts `fenceSteer`), which every request of
+ * the turn checks before it admits a steer, and in the turn running now.
+ * A steer request still on its way then cannot admit it after the chat was
+ * told it was not sent. The fence is written before the read whatever the
+ * read finds: a steer the store already holds is reported from there anyway.
  */
 async function handleSteerStatus(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const body = await readJsonBody<SteerBody>(req, MAX_BODY_BYTES);
   const request = steerRequest(req, res, body);
   if (!request) return;
   // Fence before reading, and let submits already in flight finish, so none lands after the read.
-  fenceSteer(request.fenceKey);
-  await activeFor(request.target)?.drain();
+  try {
+    fenceSteer(request.target.path, request.target.chat.conversation, request.fenceKey);
+  } catch (error) {
+    console.warn("[agent-runtime] could not fence a steer:", error);
+    sendJson(res, 503, { error: "the conversation's store could not be written" });
+    return;
+  }
+  const active = activeFor(request.target);
+  active?.fence(request.fenceKey);
+  await active?.drain();
   const stored = await storedSteer(res, request);
   if (!stored) return;
   sendJson(res, 200, steerJson(stored));
@@ -750,9 +836,14 @@ async function handleSteerStatus(req: IncomingMessage, res: ServerResponse): Pro
  * A dropped connection alone never cancels durable work (see handleChat), so
  * the chat's Stop button calls this explicitly. The turn then settles as
  * aborted and the next message can start a new one.
+ *
+ * With `include_stored`, a chat no turn runs has the work the store holds for
+ * it from before a restart stopped (see stored-stop.ts), while the request
+ * holds the store: `200` once stopped, `404` when there is none. It needs the
+ * user's QDash credentials, like every request that opens a store.
  */
 async function handleAbortChat(req: IncomingMessage, res: ServerResponse): Promise<void> {
-  const body = await readJsonBody<DeleteSessionBody>(req, MAX_BODY_BYTES);
+  const body = await readJsonBody<AbortBody>(req, MAX_BODY_BYTES);
   if (!body.owner_id || !body.conversation_id) {
     sendJson(res, 400, { error: "owner_id and conversation_id are required" });
     return;
@@ -763,13 +854,61 @@ async function handleAbortChat(req: IncomingMessage, res: ServerResponse): Promi
     return;
   }
   // Only this exact chat's turn: a stop never reaches another branch of the store.
-  const conversation = activeFor(target)?.conversation;
-  if (!conversation) {
+  // From the moment the turn holds the store, also before its input is
+  // admitted: the turn applies the stop once it is (see ActiveChat.stop).
+  const active = activeFor(target);
+  if (active) {
+    await active.stop(BACKGROUND_CONTEXT);
+    sendJson(res, 200, { aborted: true });
+    return;
+  }
+  if (body.include_stored !== true) {
     sendJson(res, 404, { error: "conversation is not running" });
     return;
   }
-  await conversation.abort(BACKGROUND_CONTEXT);
-  sendJson(res, 200, { aborted: true });
+  try {
+    requestQDashAuth(req.headers);
+  } catch {
+    sendJson(res, 401, { error: "QDash user authentication is required" });
+    return;
+  }
+  const hold = stores.get(target.key);
+  if (hold) {
+    // A turn of this chat in a newer incarnation of the store: the one named is gone.
+    if (hold.kind === "chat" && hold.active.target?.sessionId === target.chat.sessionId && hold.active.target.conversation === target.chat.conversation) {
+      sendJson(res, 404, { error: "conversation is not running" });
+      return;
+    }
+    sendJson(res, 409, storeBusy(hold));
+    return;
+  }
+  stores.set(target.key, { kind: "stop" });
+  try {
+    // Held: nothing creates, opens, or removes the store meanwhile.
+    if (claimStore(target.path, target.generation, false) !== "ok") {
+      sendJson(res, 404, { error: "conversation is not running" });
+      return;
+    }
+    const { harness, close } = await runtime.openStoreForCleanup(body.owner_id, target.store.storeSessionId ?? body.conversation_id);
+    let stopped;
+    try {
+      stopped = await stopStoredConversation(
+        harness,
+        target.store.conversationId ?? ROOT_CONVERSATION_ID,
+        BACKGROUND_CONTEXT,
+        STORED_STOP_SETTLE_MS,
+      );
+    } finally {
+      await close();
+    }
+    if (stopped === "none") {
+      sendJson(res, 404, { error: "conversation is not running" });
+      return;
+    }
+    sendJson(res, 200, { aborted: true, settled: stopped === "settled" });
+  } finally {
+    stores.delete(target.key);
+  }
 }
 
 /**
@@ -839,7 +978,9 @@ async function handleEvaluate(req: IncomingMessage, res: ServerResponse): Promis
  * Remove a store and its workspace after the last QDash session that uses it
  * has been deleted: `store_session_id`, or `conversation_id` for a chat that
  * was never branched. QDash's API decides when that is; the runtime only
- * refuses while the store is held.
+ * refuses while the store is held. Only the incarnation `store_generation`
+ * names is removed (see store-identity.ts): a request that arrives after the
+ * chat was created again under the same ID removes nothing, and says so.
  */
 async function handleDeleteSession(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const body = await readJsonBody<DeleteSessionBody>(req, MAX_BODY_BYTES);
@@ -848,19 +989,32 @@ async function handleDeleteSession(req: IncomingMessage, res: ServerResponse): P
     sendJson(res, 400, { error: "owner_id and conversation_id are required" });
     return;
   }
+  const generation = generationOf(body.store_generation);
   const key = storeKey(body.owner_id, storeSessionId);
   const hold = stores.get(key);
   if (hold) {
+    // A turn of a newer incarnation of the store holds it: the one named is gone already.
+    if (hold.kind === "chat" && generation !== undefined && hold.active.target?.generation !== generation) {
+      sendJson(res, 200, { deleted: true, outcome: "stale" });
+      return;
+    }
     sendJson(res, 409, hold.kind === "chat" ? { error: "conversation is still running" } : storeBusy(hold));
     return;
   }
   stores.set(key, { kind: "delete" });
+  let outcome;
   try {
-    await runtime.deleteSessionState(body.owner_id, storeSessionId);
+    // Checked and removed while held: no request creates or opens the store in between.
+    outcome = await runtime.deleteSessionState(body.owner_id, storeSessionId, generation);
   } finally {
     stores.delete(key);
   }
-  sendJson(res, 200, { deleted: true });
+  if (outcome === "stale" && generation === undefined) {
+    sendJson(res, 409, STALE_STORE);
+    return;
+  }
+  // `stale`: the store is a newer incarnation; the one named was removed before.
+  sendJson(res, 200, { deleted: true, outcome });
 }
 
 /**
@@ -906,6 +1060,10 @@ async function handleBranch(req: IncomingMessage, res: ServerResponse): Promise<
   }
   stores.set(key, { kind: "branch" });
   try {
+    if (claimStore(runtime.storePath(body.owner_id, body.store_session_id), generationOf(body.store_generation), false) === "stale") {
+      sendJson(res, 409, STALE_STORE);
+      return;
+    }
     const result = await runtime.forkSession(
       {
         ownerId: body.owner_id,

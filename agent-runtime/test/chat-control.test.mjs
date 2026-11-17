@@ -276,6 +276,95 @@ test("a steer retried with its request ID is placed once, and steers keep their 
   }
 });
 
+test("a steer retried from an earlier turn never becomes a later turn's final answer, for input or continue", async () => {
+  // A waiting tool that can be armed again for each turn.
+  let started;
+  let release;
+  const arm = () => {
+    const s = gate();
+    const r = gate();
+    started = s.promise;
+    release = r.open;
+    return { started: s.open, released: r.promise };
+  };
+  let armed = arm();
+  const tool = defineTool({
+    name: "wait_calibration",
+    description: "Waits (test)",
+    parameters: Type.Object({}),
+    execute: async (_args, _api, toolContext) => {
+      const { started: open, released } = armed;
+      open();
+      await new Promise((resolve, reject) => {
+        released.then(resolve);
+        toolContext.abortSignal?.addEventListener("abort", () => reject(new Error("cancelled")), { once: true });
+      });
+      return { output: [{ type: "text", text: "finished" }] };
+    },
+  });
+  const { harness, conversation, faux } = await openChat({ tools: [tool] });
+  const answering = gate();
+  const hold = gate();
+  const waitCall = (id) => fauxAssistantMessage([fauxToolCall("wait_calibration", {}, { id })], { stopReason: "toolUse" });
+  faux.setResponses([
+    waitCall("w1"),
+    fauxAssistantMessage(fauxText("Answer 1")),
+    waitCall("w2"),
+    fauxAssistantMessage(fauxText("Answer 2")),
+    waitCall("w3"),
+    async () => {
+      answering.open();
+      await hold.promise;
+      return fauxAssistantMessage(fauxText("Answer 3"));
+    },
+  ]);
+  try {
+    // Turn 1 places steer "s-old".
+    const first = new ActiveChat(undefined, context);
+    const own1 = await conversation.submit({ type: "input", content: "Q1" }, context);
+    first.ready(harness, conversation);
+    await started;
+    assert.equal((await first.steer("s-old", "note")).status, "queued");
+    release();
+    await settleChat(first, harness, own1, context);
+
+    // Turn 2: a retry of "s-old" arrives while it runs and finds turn 1's steer.
+    armed = arm();
+    const second = new ActiveChat(undefined, context);
+    const own2 = await conversation.submit({ type: "input", content: "Q2" }, context);
+    second.ready(harness, conversation);
+    await started;
+    assert.equal((await second.steer("s-old", "note")).status, "applied");
+    release();
+    const settled2 = await settleChat(second, harness, own2, context);
+    assert.equal(settled2.final.id, (await own2.status(context)).id);
+    assert.equal(await answerOf(conversation, settled2.final.answer), "Answer 2");
+
+    // Turn 3 is stopped, then continued; the same retry arrives during the continue.
+    armed = arm();
+    const own3 = await conversation.submit({ type: "input", content: "Q3" }, context);
+    await started;
+    await conversation.abort(context);
+    assert.equal((await own3.wait(context)).status, "unanswered");
+    const fourth = new ActiveChat(undefined, context);
+    const own4 = await conversation.submit({ type: "continue" }, context);
+    fourth.ready(harness, conversation);
+    await answering.promise;
+    assert.equal((await fourth.steer("s-old", "note")).status, "applied");
+    hold.open();
+    const settled4 = await settleChat(fourth, harness, own4, context);
+    assert.equal(settled4.final.type, "continue");
+    assert.equal(await answerOf(conversation, settled4.final.answer), "Answer 3");
+  } finally {
+    await harness.close(context);
+  }
+});
+
+async function answerOf(conversation, id) {
+  const entry = await conversation.commit((tx) => tx.entry(AssistantEntry, id), context);
+  return text(entry.model[0]);
+}
+
 test("a steer still queued when the run fails is withdrawn, not kept for the next message", async () => {
   const { harness, conversation, faux } = await openChat();
   const answering = gate();

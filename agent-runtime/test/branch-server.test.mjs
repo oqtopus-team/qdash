@@ -22,6 +22,7 @@ test("branch over HTTP: fork, branch chat, one writer per store, exact steer and
     import { Type } from "typebox";
     import { BranchError, branchFrom, openBranch } from "../src/branch.ts";
     import { CHAT_QUEUE_SETTINGS, readSteerReceipt, steerRequestId } from "../src/chat-control.ts";
+    import { removeStore } from "../src/store-identity.ts";
 
     let server;
     const listen = Server.prototype.listen;
@@ -84,6 +85,7 @@ test("branch over HTTP: fork, branch chat, one writer per store, exact steer and
       BACKGROUND_CONTEXT,
       SharedRuntime: { create: async () => ({
         listToolNames: () => [],
+        storePath: pathOf,
         steerReceipt: (owner, session, project, requestId, target = {}) =>
           readSteerReceipt(pathOf(owner, target.storeSessionId ?? session), project, requestId, BACKGROUND_CONTEXT, target.conversationId ?? ROOT_CONVERSATION_ID),
         openSession: async (request, auth) => {
@@ -116,9 +118,7 @@ test("branch over HTTP: fork, branch chat, one writer per store, exact steer and
             await close();
           }
         },
-        deleteSessionState: async (owner, store) => {
-          for (const suffix of ["", "-wal", "-shm"]) rmSync(pathOf(owner, store) + suffix, { force: true });
-        },
+        deleteSessionState: async (owner, store, generation) => removeStore(pathOf(owner, store), generation).outcome,
       }) },
       answerText: async (conversation, id) => {
         const entry = await conversation.commit((tx) => tx.entry(AssistantEntry, id), BACKGROUND_CONTEXT);
@@ -221,7 +221,7 @@ test("branch over HTTP: fork, branch chat, one writer per store, exact steer and
       const running = post("/chat", { ...root, request_id: "t3", message: "WAIT root" });
       await started;
       const branchRef = { owner_id: "alice", conversation_id: "b1", store_session_id: "c1", store_conversation_id: b1 };
-      response = await post("/chat/steer", { ...branchRef, request_id: "sb0", message: "to the branch" });
+      response = await post("/chat/steer", { ...branchRef, request_id: "sb0", message: "to the branch", turn_request_id: "t3" });
       assert.equal(response.status, 409);
       assert.deepEqual(await response.json(), { status: "rejected", reason: "idle" });
       response = await post("/chat/abort", branchRef);
@@ -235,7 +235,7 @@ test("branch over HTTP: fork, branch chat, one writer per store, exact steer and
       response = await fetch(base + "/session", { method: "DELETE", headers: headers(), body: JSON.stringify({ owner_id: "alice", conversation_id: "c1" }) });
       assert.equal(response.status, 409);
       // The root's own steer still reaches it.
-      response = await post("/chat/steer", { owner_id: "alice", conversation_id: "c1", request_id: "sr1", message: "Use Q5" });
+      response = await post("/chat/steer", { owner_id: "alice", conversation_id: "c1", request_id: "sr1", message: "Use Q5", turn_request_id: "t3" });
       assert.equal((await response.json()).status, "queued");
       // Its receipt is the root's: the branch has no steer of that ID.
       response = await post("/chat/steer/status", { ...branchRef, request_id: "sr1" });
@@ -252,13 +252,13 @@ test("branch over HTTP: fork, branch chat, one writer per store, exact steer and
       arm();
       const branchRun = post("/chat", { ...branch, request_id: "tb3", message: "WAIT branch" });
       await started;
-      response = await post("/chat/steer", { ...branchRef, request_id: "sb1", message: "Use Q7" }, headers("p2"));
+      response = await post("/chat/steer", { ...branchRef, request_id: "sb1", message: "Use Q7", turn_request_id: "tb3" }, headers("p2"));
       assert.equal(response.status, 403);
-      response = await post("/chat/steer", { owner_id: "alice", conversation_id: "c1", request_id: "sr2", message: "to the root" });
+      response = await post("/chat/steer", { owner_id: "alice", conversation_id: "c1", request_id: "sr2", message: "to the root", turn_request_id: "tb3" });
       assert.deepEqual(await response.json(), { status: "rejected", reason: "idle" });
       response = await post("/chat/abort", { owner_id: "alice", conversation_id: "c1" });
       assert.equal(response.status, 404);
-      response = await post("/chat/steer", { ...branchRef, request_id: "sb1", message: "Use Q7" });
+      response = await post("/chat/steer", { ...branchRef, request_id: "sb1", message: "Use Q7", turn_request_id: "tb3" });
       assert.equal((await response.json()).status, "queued");
       releaseTool();
       const branchOut = await lines(await branchRun);
@@ -290,6 +290,39 @@ test("branch over HTTP: fork, branch chat, one writer per store, exact steer and
       const q3 = await chat({ ...turn, conversation_id: "b3", store_session_id: "c1", store_conversation_id: b3, request_id: "t4", message: "Q3" });
       assert.equal(q3.done.text, "Answer: Q3");
       assert.deepEqual(await users("c1", Number(b3)), ["Q1", "QB", "Q3"]);
+
+      // The runtime dies mid-run on the branch: after a restart nothing in
+      // memory holds the store, only the store itself says the run is unfinished.
+      arm();
+      {
+        const { harness, close } = await open("alice", "c1");
+        const conversation = await openBranch(harness, Number(b1), BACKGROUND_CONTEXT);
+        await conversation.configure({ model: { provider: model.provider, modelId: model.id } }, BACKGROUND_CONTEXT);
+        await conversation.submit({ type: "input", content: "WAIT crashed" }, BACKGROUND_CONTEXT);
+        await started;
+        await close();
+      }
+      // A sibling's turn is refused before it resumes the store, so the
+      // branch's recovered run never runs beside it, and writes nothing.
+      const rootBefore = await users("c1", ROOT_CONVERSATION_ID);
+      response = await post("/chat", { ...root, request_id: "t5", message: "Q5" });
+      assert.equal(response.status, 409);
+      assert.equal((await response.json()).reason, "store_busy");
+      response = await post("/chat", { ...turn, conversation_id: "b3", store_session_id: "c1", store_conversation_id: b3, request_id: "t6", message: "Q6" });
+      assert.equal(response.status, 409);
+      assert.equal((await response.json()).reason, "store_busy");
+      assert.deepEqual(await users("c1", ROOT_CONVERSATION_ID), rootBefore);
+      response = await branchRequest({ entry_id: e2, target_session_id: "b4" });
+      assert.equal(response.status, 409);
+      assert.equal((await response.json()).reason, "busy");
+      // The branch's own next request recovers its run first, then answers.
+      releaseTool();
+      const recovered = await chat({ ...branch, request_id: "tb6", message: "QB6" });
+      assert.equal(recovered.done.text, "Answer: QB6");
+      assert.deepEqual((await users("c1", Number(b1))).slice(-2), ["WAIT crashed", "QB6"]);
+      // Then the store is free again.
+      const q5 = await chat({ ...root, request_id: "t5", message: "Q5" });
+      assert.equal(q5.done.text, "Answer: Q5");
 
       // Every request used the caller's own credentials.
       assert.ok(seenAuth.every((project) => project === "p1"), JSON.stringify(seenAuth));

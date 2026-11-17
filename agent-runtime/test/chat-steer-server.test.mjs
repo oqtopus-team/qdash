@@ -64,6 +64,8 @@ test("steer and continue over HTTP: same open harness, owner and project checks,
     ]);
     const dir = mkdtempSync(join(tmpdir(), "chat-steer-"));
     const path = join(dir, "session.sqlite");
+    let submitGate;
+    let submitEntered = () => {};
     let opens = 0;
     let openHarnesses = 0;
     const seenAuth = [];
@@ -71,6 +73,7 @@ test("steer and continue over HTTP: same open harness, owner and project checks,
       BACKGROUND_CONTEXT,
       SharedRuntime: { create: async () => ({
         listToolNames: () => [],
+        storePath: () => path,
         steerReceipt: (owner, session, project, requestId) =>
           readSteerReceipt(path, project, requestId, BACKGROUND_CONTEXT),
         openSession: async (request, auth) => {
@@ -80,8 +83,24 @@ test("steer and continue over HTTP: same open harness, owner and project checks,
           registry.install(defineExtension({ name: "t", tools: [waitTool] }));
           const harness = await Harness.open(await openNodeSqliteStorage(path), { models, registry, settings: { retry: { enabled: false }, ...CHAT_QUEUE_SETTINGS } }, BACKGROUND_CONTEXT);
           openHarnesses++;
-          const conversation = await harness.root(BACKGROUND_CONTEXT, { agent: { model: { provider: model.provider, modelId: model.id } } });
+          const root = await harness.root(BACKGROUND_CONTEXT, { agent: { model: { provider: model.provider, modelId: model.id } } });
           harness.resume();
+          // While submitGate is set, the turn's own submit waits for it: its input is still being admitted.
+          const conversation = new Proxy(root, {
+            get: (target, key) => {
+              if (key === "submit") {
+                return async (...args) => {
+                  if (submitGate) {
+                    submitEntered();
+                    await submitGate;
+                  }
+                  return target.submit(...args);
+                };
+              }
+              const value = target[key];
+              return typeof value === "function" ? value.bind(target) : value;
+            },
+          });
           return { harness, conversation, writeTools: {}, close: async () => { await harness.close(BACKGROUND_CONTEXT); openHarnesses--; } };
         },
       }) },
@@ -107,7 +126,7 @@ test("steer and continue over HTTP: same open harness, owner and project checks,
     });
     const post = (path, body, h) => fetch(base + path, { method: "POST", headers: h, body: JSON.stringify(body) });
     const steer = (body, project = "p1", token) =>
-      post("/chat/steer", { owner_id: "alice", conversation_id: "c1", request_id: "s1", message: "Use Q5", ...body }, headers(project, token));
+      post("/chat/steer", { owner_id: "alice", conversation_id: "c1", request_id: "s1", message: "Use Q5", turn_request_id: "t1", ...body }, headers(project, token));
 
     try {
       // Nothing runs: refused, so the user sends it as a new message (under a new request ID:
@@ -131,6 +150,12 @@ test("steer and continue over HTTP: same open harness, owner and project checks,
       assert.equal((await steer({}, "p1", null)).status, 401);
       assert.equal((await steer({ message: "  " })).status, 400);
       assert.equal((await steer({ request_id: "" })).status, 400);
+      // A steer names the turn it was sent to.
+      assert.equal((await steer({ turn_request_id: undefined })).status, 400);
+      // A steer sent to another turn is not admitted by this one.
+      response = await steer({ request_id: "s-other", turn_request_id: "t0" });
+      assert.equal(response.status, 409);
+      assert.deepEqual(await response.json(), { status: "rejected", reason: "idle" });
       response = await post("/chat/steer", { owner_id: "alice", conversation_id: "c1", request_id: "s1", message: "x" }, { "Content-Type": "application/json", "x-qdash-token": "t" });
       assert.equal(response.status, 401);
       // Another project's credentials cannot steer this run.
@@ -239,23 +264,31 @@ test("steer and continue over HTTP: same open harness, owner and project checks,
       ]);
       const stopTurn = post("/chat", { ...turn, request_id: "t3", message: "Slow one" }, headers("p1")).then(read);
       await started;
-      response = await steer({ request_id: "s3", message: "Admitted then stopped" });
+      response = await steer({ request_id: "s3", message: "Admitted then stopped", turn_request_id: "t3" });
       assert.equal((await response.json()).status, "queued");
       response = await status({ request_id: "s4" });
       assert.deepEqual(await response.json(), { status: "not_found" });
-      response = await steer({ request_id: "s4", message: "Arrived after the lookup" });
+      // The fence lasts as long as the turn: many other lookups do not evict it.
+      for (let i = 0; i < 1010; i++) {
+        assert.equal((await status({ request_id: "flood-" + i }).then((r) => r.json())).status, "not_found");
+      }
+      response = await steer({ request_id: "s4", message: "Arrived after the lookup", turn_request_id: "t3" });
       assert.equal(response.status, 409);
       assert.deepEqual(await status({ request_id: "s4" }).then((r) => r.json()), { status: "not_found" });
       // A request ID refused while nothing ran is not admitted by a later turn either.
       response = await steer({ request_id: "s2", message: "Refused earlier" });
       assert.equal(response.status, 409);
+      // Nor is a steer of an earlier turn that arrives late, never looked up.
+      response = await steer({ request_id: "s6", message: "Sent during t1, delayed" });
+      assert.equal(response.status, 409);
+      assert.deepEqual(await status({ request_id: "s6" }).then((r) => r.json()), { status: "not_found" });
       response = await post("/chat/abort", { owner_id: "alice", conversation_id: "c1" }, headers("p1"));
       assert.equal(response.status, 200);
       const stopped = await stopTurn;
       assert.ok(stopped.some((line) => line.type === "steer" && line.request_id === "s3" && line.status === "withdrawn"), JSON.stringify(stopped));
       const withdrawn = await status({ request_id: "s3" }).then((r) => r.json());
       assert.equal(withdrawn.status, "withdrawn");
-      assert.equal((await steer({ request_id: "s3", message: "Admitted then stopped" }).then((r) => r.json())).status, "withdrawn");
+      assert.equal((await steer({ request_id: "s3", message: "Admitted then stopped", turn_request_id: "t3" }).then((r) => r.json())).status, "withdrawn");
       assert.equal(openHarnesses, 0);
 
       // Stop after the steer was placed: it stays applied, in the stream and in the store.
@@ -267,7 +300,7 @@ test("steer and continue over HTTP: same open harness, owner and project checks,
       ]);
       const placedTurn = post("/chat", { ...turn, request_id: "t4", message: "Two rounds" }, headers("p1")).then(read);
       await started;
-      response = await steer({ request_id: "s5", message: "Placed then stopped" });
+      response = await steer({ request_id: "s5", message: "Placed then stopped", turn_request_id: "t4" });
       assert.equal((await response.json()).status, "queued");
       // Let the first round end, which places the steer; the next round waits.
       const releaseFirst = releaseTool;
@@ -282,8 +315,40 @@ test("steer and continue over HTTP: same open harness, owner and project checks,
       assert.ok(!placedLines.some((line) => line.type === "steer" && line.status === "withdrawn"));
       assert.notEqual(placedLines.at(-1).type, "done");
       assert.deepEqual(await status({ request_id: "s5" }).then((r) => r.json()), {
-        status: "applied", submission_id: (await steer({ request_id: "s5", message: "Placed then stopped" }).then((r) => r.json())).submission_id, entry_id: placedSteer.entry_id,
+        status: "applied", submission_id: (await steer({ request_id: "s5", message: "Placed then stopped", turn_request_id: "t4" }).then((r) => r.json())).submission_id, entry_id: placedSteer.entry_id,
       });
+
+      // Stop while the turn's own input is still being admitted: the stop is
+      // not lost, the turn aborts once its input is in, and a steer sent
+      // meanwhile waits for that and is never placed.
+      arm();
+      faux.setResponses([
+        fauxAssistantMessage([fauxToolCall("wait_calibration", {}, { id: "w5" })], { stopReason: "toolUse" }),
+        (ctx) => fauxAssistantMessage(fauxText("Should not answer: " + lastUser(ctx))),
+      ]);
+      let openSubmit;
+      submitGate = new Promise((resolve) => (openSubmit = resolve));
+      const entered = new Promise((resolve) => (submitEntered = resolve));
+      const early = post("/chat", { ...turn, request_id: "t5", message: "Stop me early" }, headers("p1")).then(read);
+      await entered;
+      let steerSettled = false;
+      const earlySteer = steer({ request_id: "s7", message: "Too early", turn_request_id: "t5" }).then(async (r) => {
+        steerSettled = true;
+        return r.json();
+      });
+      response = await post("/chat/abort", { owner_id: "alice", conversation_id: "c1" }, headers("p1"));
+      assert.equal(response.status, 200);
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      assert.equal(steerSettled, false);
+      submitGate = undefined;
+      openSubmit();
+      const earlyOut = await early;
+      assert.equal(earlyOut.at(-1).type, "error", JSON.stringify(earlyOut));
+      assert.match(earlyOut.at(-1).message, /aborted/);
+      assert.ok(!earlyOut.some((line) => line.type === "done"));
+      assert.notEqual((await earlySteer).status, "applied");
+      assert.notEqual((await status({ request_id: "s7" }).then((r) => r.json())).status, "applied");
+      assert.equal(openHarnesses, 0);
 
       // A store whose lock another connection holds: the lookup says it cannot tell (503), never not_found.
       const { DatabaseSync } = await import("node:sqlite");

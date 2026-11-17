@@ -43,12 +43,16 @@ answer**, and stays there after a reload. If QDash cannot find out, the message 
 confirmed whether the answer read it** with **Check again**; it is not offered for sending again, because the assistant may have read it. Such a message stays shown after you reload the page in the same browser tab, and QDash checks it again.
 
 If the assistant service stopped unexpectedly while a message waited to be read, the assistant reads it when
-you next send a message in that chat, and answers it before your new message. The message then
-moves into the conversation before your new message, with the same note.
+you next send a message in that chat, and answers it before your new message. The message and
+the assistant's answer to it then move into the conversation before your new message, the
+message with the same note.
 
 An answer that the stopped service was still writing is not lost: sending a new message in that
 chat resumes it, finishes it first, and then answers your message. **Continue** is refused for
-such an answer because it is still the chat's current answer; send a new message instead.
+such an answer because it is still the chat's current answer; send a new message instead. Until
+then, the chat's other branches refuse new messages and say that another branch has unfinished
+work; open the branch the answer belongs to and send a message there first, or delete that
+branch, which stops its unfinished answer without running it.
 
 A message the answer never read stays below the conversation with the reason: the answer had
 already finished, was stopped, or ended with an error. **Send as new message** sends it on its
@@ -56,7 +60,8 @@ own, and **Dismiss** removes it.
 
 When an answer was stopped or ended with an error, **Continue** lets the assistant go on from
 where it ended without your message being sent again. **Retry** or **Regenerate** instead sends
-your last message again. Continue is not offered after a complete answer, while a message you
+your last message again. If the answer read a message you sent just before you stopped it,
+Continue also answers that message. Continue is not offered after a complete answer, while a message you
 sent during the answer is still being checked, and it is refused while a question, an approval
 card, or a proposed edit waits for you; answer those instead.
 

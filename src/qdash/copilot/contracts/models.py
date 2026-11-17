@@ -152,6 +152,11 @@ class ChatSteerRequest(BaseModel):
         max_length=200,
         description="Idempotency key: a retry with the same key reports the same steer",
     )
+    turn_request_id: str = Field(
+        min_length=1,
+        max_length=200,
+        description="Request ID of the chat turn it was sent to; only that turn admits it",
+    )
     message: str = Field(min_length=1, max_length=100_000, description="What the user wrote")
 
 

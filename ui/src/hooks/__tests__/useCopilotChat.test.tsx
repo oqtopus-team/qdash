@@ -8,7 +8,7 @@ import {
 } from "@/contexts/CopilotChatSessionContext";
 import type { TaskChatContext, CopilotBlocksResult } from "@/types/copilotChat";
 
-import { canContinueMessages, useCopilotChat } from "../useCopilotChat";
+import { canContinueMessages, continuationHistory, useCopilotChat } from "../useCopilotChat";
 
 const copilotConfig = vi.hoisted(() => ({ current: undefined as object | undefined }));
 vi.mock("@/client/copilot/copilot", () => ({
@@ -673,10 +673,13 @@ describe("steering an answer in progress", () => {
     });
     await waitFor(() => expect(result.current.chat.steers[0]?.status).toBe("queued"));
     const [{ request_id: requestId, ...sent }] = steerCalls();
+    // It names the turn it was sent to: the stream request's own ID.
     expect(sent).toEqual({
       session_id: result.current.chat.session!.id,
+      turn_request_id: streamRequest().body.request_id,
       message: "Use Q5 instead",
     });
+    expect(typeof sent.turn_request_id).toBe("string");
 
     stream.push(sse("tool_end", { id: "w1", tool: "wait_calibration", is_error: false }));
     const placed = {
@@ -1165,5 +1168,47 @@ describe("canContinueMessages", () => {
       ]),
     ).toBe(false);
     expect(canContinueMessages([user, { role: "assistant", content: "plain" }])).toBe(false);
+  });
+
+  it("counts steers the stopped answer read as part of it, keeping every blocker", () => {
+    const user = { role: "user" as const, content: "q" };
+    const steer = (requestId: string) => ({
+      role: "user" as const,
+      content: `steer ${requestId}`,
+      steer: { requestId, entryId: "4", placement: "approximate" as const },
+    });
+    const stoppedAnswer = { role: "assistant" as const, content: stopped([]) };
+    const error = { role: "assistant" as const, content: "Error: x" };
+    expect(canContinueMessages([user, stoppedAnswer, steer("a")])).toBe(true);
+    expect(canContinueMessages([user, stoppedAnswer, steer("a"), steer("b")])).toBe(true);
+    expect(canContinueMessages([user, error, steer("a")])).toBe(true);
+    // A user's own new message is not a steer: there is nothing to continue.
+    expect(canContinueMessages([user, stoppedAnswer, user])).toBe(false);
+    // Only steers: no answer to continue.
+    expect(canContinueMessages([steer("a")])).toBe(false);
+    for (const card of ["ask", "approval", "edit"]) {
+      expect(
+        canContinueMessages([
+          user,
+          { role: "assistant", content: stopped([{ type: card }]) },
+          steer("a"),
+        ]),
+      ).toBe(false);
+    }
+    // A completed answer before a steer is not continued.
+    expect(
+      canContinueMessages([
+        user,
+        { role: "assistant", content: JSON.stringify({ blocks: [], assessment: null }) },
+        steer("a"),
+      ]),
+    ).toBe(false);
+    // The failed answer's error is dropped from what a continue sends; the steer stays.
+    expect(continuationHistory([user, error, steer("a")])).toEqual([user, steer("a")]);
+    expect(continuationHistory([user, stoppedAnswer, steer("a")])).toEqual([
+      user,
+      stoppedAnswer,
+      steer("a"),
+    ]);
   });
 });

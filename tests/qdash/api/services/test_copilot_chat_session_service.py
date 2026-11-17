@@ -1,6 +1,7 @@
 """Persisted chat sessions: steers and answers across a save and a reload, and branches."""
 
 import asyncio
+from dataclasses import replace
 from datetime import timedelta
 
 import pytest
@@ -19,9 +20,11 @@ from qdash.api.services.copilot_chat_session_service import (
     ForkedBranch,
     ForkSettledError,
     RuntimeTarget,
+    StopOutcome,
     _to_doc_message,
     _to_schema_message,
     resolve_runtime_target,
+    store_generation,
 )
 from qdash.common.utils.datetime import now
 from qdash.dbmodel.copilot_chat_session import CopilotChatSessionDocument
@@ -89,8 +92,11 @@ class FakeRuntime:
         self.fail_after_fork: Exception | None = None
         self.release_ok = True
         self.release_calls: list[tuple[str, list[tuple[str, RuntimeTarget]]]] = []
+        # The generation each removal named, in call order.
+        self.release_generations: list[str] = []
         self.released: list[str] = []
         self.stopped: list[tuple[str, RuntimeTarget]] = []
+        self.stop_outcome: StopOutcome = "not_running"
 
     async def fork(
         self, store: str, source: str | None, entry_id: str, target: str
@@ -104,14 +110,28 @@ class FakeRuntime:
             raise self.fail_after_fork
         return ForkedBranch(self.branches[target], created)
 
-    async def release(self, store: str, chats: list[tuple[str, RuntimeTarget]]) -> bool:
-        self.release_calls.append((store, chats))
+    async def release(
+        self, store: str, generation: str, chats: list[tuple[str, RuntimeTarget]]
+    ) -> bool:
+        # Every stop a removal makes names the generation it removes.
+        assert all(target.generation == generation for _, target in chats)
+        self.release_generations.append(generation)
+        self.release_calls.append((store, [(s, replace(t, generation=None)) for s, t in chats]))
         if self.release_ok:
             self.released.append(store)
         return self.release_ok
 
-    async def stop(self, session_id: str, target: RuntimeTarget) -> None:
-        self.stopped.append((session_id, target))
+    async def stop(self, session_id: str, target: RuntimeTarget) -> StopOutcome:
+        assert target.generation == store_generation("alice", target.store_session_id)
+        self.stopped.append((session_id, replace(target, generation=None)))
+        return self.stop_outcome
+
+
+def _target_of(username: str, session_id: str) -> RuntimeTarget:
+    """Where the chat lives, without its store's generation, which every chat's target names."""
+    target = resolve_runtime_target(username, session_id)
+    assert target.generation == store_generation(username, target.store_session_id)
+    return replace(target, generation=None)
 
 
 def _branch(service, runtime, entry_id="5", target="b1", source="s1", username="alice"):
@@ -146,7 +166,9 @@ def _delete(
 
 
 def _reclaim(service, runtime, username: str = "alice") -> None:
-    asyncio.run(service.reclaim(username=username, release_store=runtime.release))
+    asyncio.run(
+        service.reclaim(username=username, release_store=runtime.release, stop_chat=runtime.stop)
+    )
 
 
 def _expire_lease(session_id: str) -> None:
@@ -189,8 +211,8 @@ def test_a_branch_copies_the_chat_through_the_answer_and_maps_to_the_source_stor
     assert doc.branch.project_id == "p1"
     assert doc.branch.status == "ready"
     # The runtime opens the branch's conversation in the source's store.
-    assert resolve_runtime_target("alice", "b1") == RuntimeTarget("s1", "100")
-    assert resolve_runtime_target("alice", "s1") == RuntimeTarget("s1")
+    assert _target_of("alice", "b1") == RuntimeTarget("s1", "100")
+    assert _target_of("alice", "s1") == RuntimeTarget("s1")
     # A branch of the branch names the branch's conversation as its source.
     _branch(service, runtime, source="b1", target="b2")
     assert runtime.calls[-1] == ("s1", "100", "5", "b2")
@@ -254,7 +276,7 @@ def test_a_branch_finishes_on_retry_after_the_runtime_forked_and_saving_failed(
     finished = _branch(service, runtime)
     assert finished.session_id == "b1"
     assert runtime.calls == [("s1", None, "5", "b1")] * 2
-    assert resolve_runtime_target("alice", "b1") == RuntimeTarget("s1", "100")
+    assert _target_of("alice", "b1") == RuntimeTarget("s1", "100")
 
 
 def test_a_refused_branch_leaves_nothing_behind(init_db) -> None:
@@ -305,7 +327,7 @@ def test_the_store_goes_with_the_last_session_that_uses_it(init_db) -> None:
     # Deleting the source keeps the store: its branch uses it.
     assert _delete(service, runtime, "s1")
     assert runtime.released == []
-    assert resolve_runtime_target("alice", "b1") == RuntimeTarget("s1", "100")
+    assert _target_of("alice", "b1") == RuntimeTarget("s1", "100")
     # The deleted chat is not reopened, or recreated, under its old ID.
     with pytest.raises(ChatUnavailableError) as unavailable:
         resolve_runtime_target("alice", "s1")
@@ -371,7 +393,7 @@ def test_an_ambiguous_failure_keeps_the_branch_until_its_lease_ends_then_cleanup
     _reclaim(service, runtime)
     assert CopilotChatSessionDocument.find_one({"session_id": "b1"}).run() is None
     assert runtime.released == []
-    assert resolve_runtime_target("alice", "b2") == RuntimeTarget("s1", "101")
+    assert _target_of("alice", "b2") == RuntimeTarget("s1", "101")
 
 
 def test_a_failure_the_runtime_answered_can_be_retried_at_once(init_db) -> None:
@@ -388,7 +410,7 @@ def test_a_failure_the_runtime_answered_can_be_retried_at_once(init_db) -> None:
     runtime.fail_after_fork = None
     finished = _branch(service, runtime)
     assert finished.session_id == "b1"
-    assert resolve_runtime_target("alice", "b1") == RuntimeTarget("s1", "100")
+    assert _target_of("alice", "b1") == RuntimeTarget("s1", "100")
 
 
 def test_a_pending_branch_of_a_deleted_source_is_removed_with_the_store(init_db) -> None:
@@ -489,7 +511,7 @@ def test_a_duplicate_request_cannot_remove_the_branch_another_request_is_creatin
     created = asyncio.run(scenario())
     assert created.session_id == "b1"
     assert runtime.released == []
-    assert resolve_runtime_target("alice", "b1") == RuntimeTarget("s1", "100")
+    assert _target_of("alice", "b1") == RuntimeTarget("s1", "100")
 
 
 def test_a_request_that_lost_its_branch_does_not_bring_it_back(init_db) -> None:
@@ -529,7 +551,7 @@ def test_a_request_that_lost_its_branch_does_not_bring_it_back(init_db) -> None:
     assert CopilotChatSessionDocument.find_one({"session_id": "b1"}).run() is None
     # The same request again finds the runtime's fork and finishes a new session.
     assert _branch(service, runtime).session_id == "b1"
-    assert resolve_runtime_target("alice", "b1") == RuntimeTarget("s1", "100")
+    assert _target_of("alice", "b1") == RuntimeTarget("s1", "100")
 
 
 def test_a_ready_branch_is_returned_again_whatever_the_source_is_now(init_db) -> None:
@@ -640,8 +662,8 @@ def test_deleting_a_branch_stops_only_its_own_turn_and_keeps_its_siblings(init_d
     assert runtime.stopped == [("b1", RuntimeTarget("s1", "100"))]
     assert runtime.release_calls == []
     assert _visible_ids(service) == {"s1", "b2"}
-    assert resolve_runtime_target("alice", "b2") == RuntimeTarget("s1", "101")
-    assert resolve_runtime_target("alice", "s1") == RuntimeTarget("s1")
+    assert _target_of("alice", "b2") == RuntimeTarget("s1", "101")
+    assert _target_of("alice", "s1") == RuntimeTarget("s1")
     # A save of a deleted chat does not bring it back.
     assert (
         _status(
@@ -677,5 +699,226 @@ def test_a_client_cannot_set_the_store_mapping_or_the_origin(init_db) -> None:
             {"title": "Renamed", "store_session_id": "victim", "conversation_id": "3"}
         ),
     )
-    assert resolve_runtime_target("alice", "s1") == RuntimeTarget("s1")
-    assert resolve_runtime_target("alice", "never-saved") == RuntimeTarget("never-saved")
+    assert _target_of("alice", "s1") == RuntimeTarget("s1")
+    assert _target_of("alice", "never-saved") == RuntimeTarget("never-saved")
+
+
+def test_a_deleted_chat_whose_stop_is_unconfirmed_stays_until_a_retry_confirms_it(init_db) -> None:
+    service = CopilotChatSessionService()
+    _source(service)
+    runtime = FakeRuntime()
+    _branch(service, runtime)
+    # The runtime could not be told to stop the root's turn; the branch still uses the store.
+    runtime.stop_outcome = "unknown"
+    assert _delete(service, runtime, "s1")
+    assert runtime.stopped == [("s1", RuntimeTarget("s1"))]
+    assert runtime.release_calls == []
+    kept = _stored("s1")
+    assert kept.deleted_at is not None and kept.stop_pending
+    # Hidden, and its ID is not reused, but a later delete or cleanup still finds it.
+    assert _visible_ids(service) == {"b1"}
+    with pytest.raises(ChatUnavailableError):
+        resolve_runtime_target("alice", "s1")
+    # Still unknown on the cleanup: kept, and only its own turn was asked to stop.
+    _reclaim(service, runtime)
+    assert runtime.stopped[-1] == ("s1", RuntimeTarget("s1"))
+    assert _stored("s1").stop_pending
+    # Deleting it again confirms it: then it goes, and the store stays for the branch.
+    runtime.stop_outcome = "stopped"
+    assert _delete(service, runtime, "s1")
+    assert CopilotChatSessionDocument.find_one({"session_id": "s1"}).run() is None
+    assert runtime.release_calls == []
+    assert runtime.stopped.count(("b1", RuntimeTarget("s1", "100"))) == 0
+    assert _target_of("alice", "b1") == RuntimeTarget("s1", "100")
+
+
+def test_the_cleanup_confirms_a_stop_left_unknown(init_db) -> None:
+    service = CopilotChatSessionService()
+    _source(service)
+    runtime = FakeRuntime()
+    _branch(service, runtime)
+    runtime.stop_outcome = "unknown"
+    assert _delete(service, runtime, "b1")
+    assert _stored("b1").stop_pending
+    runtime.stop_outcome = "not_running"
+    _reclaim(service, runtime)
+    assert runtime.stopped == [("b1", RuntimeTarget("s1", "100"))] * 2
+    assert CopilotChatSessionDocument.find_one({"session_id": "b1"}).run() is None
+    assert runtime.release_calls == []
+
+
+def test_a_stale_teardown_never_removes_a_store_recreated_under_the_same_id(init_db) -> None:
+    service = CopilotChatSessionService()
+    _source(service)
+    runtime = FakeRuntime()
+    assert _delete(service, runtime, "s1")
+    assert runtime.released == ["s1"]
+    # The ID is free again: a new chat under it runs its first turn before it is saved.
+    assert _target_of("alice", "s1") == RuntimeTarget("s1")
+    # A second teardown that read the store as unused before the first finished
+    # finds nothing left to remove and never asks the runtime.
+    assert asyncio.run(service._settle_store("alice", "s1", runtime.release))
+    assert runtime.release_calls == [("s1", [("s1", RuntimeTarget("s1"))])]
+
+
+def test_a_held_teardown_excludes_another_and_blocks_reusing_the_store_name(init_db) -> None:
+    from qdash.api.services import copilot_chat_session_service as module
+
+    service = CopilotChatSessionService()
+    _source(service)
+    runtime = FakeRuntime()
+    runtime.release_ok = False
+    assert _delete(service, runtime, "s1") is False
+    calls = len(runtime.release_calls)
+    assert module._acquire_teardown("alice", "s1", "other-request")
+    try:
+        # Another request is tearing the store down: this one leaves it to that one.
+        runtime.release_ok = True
+        assert asyncio.run(service._settle_store("alice", "s1", runtime.release)) is False
+        assert len(runtime.release_calls) == calls
+    finally:
+        module._release_teardown("alice", "s1", "other-request")
+    # Once released, the next request settles it.
+    _reclaim(service, runtime)
+    assert runtime.released == ["s1"]
+    assert CopilotChatSessionDocument.find({"username": "alice"}).to_list() == []
+
+
+def test_a_store_being_torn_down_cannot_be_reused_by_a_new_chat(init_db) -> None:
+    from qdash.api.services import copilot_chat_session_service as module
+
+    service = CopilotChatSessionService()
+    assert module._acquire_teardown("alice", "s9", "teardown")
+    try:
+        with pytest.raises(ChatUnavailableError) as raised:
+            resolve_runtime_target("alice", "s9")
+        assert raised.value.status_code == 409
+        assert (
+            _status(
+                lambda: service.create_session(
+                    username="alice", request=CreateCopilotChatSessionRequest(session_id="s9")
+                )
+            )
+            == 409
+        )
+        # Another owner's store of the same name is another store.
+        assert _target_of("bob", "s9") == RuntimeTarget("s9")
+    finally:
+        module._release_teardown("alice", "s9", "teardown")
+    assert _target_of("alice", "s9") == RuntimeTarget("s9")
+
+
+def test_an_expired_teardown_is_taken_over(init_db) -> None:
+    from qdash.api.services import copilot_chat_session_service as module
+
+    assert module._acquire_teardown("alice", "s1", "crashed")
+    assert not module._acquire_teardown("alice", "s1", "next")
+    module._teardowns().update_one(
+        {"_id": module._teardown_key("alice", "s1")},
+        {"$set": {"lease_expires_at": now() - timedelta(seconds=1)}},
+    )
+    assert not module._teardown_held("alice", "s1")
+    assert module._acquire_teardown("alice", "s1", "next")
+    assert module._holds_teardown("alice", "s1", "next")
+    assert not module._holds_teardown("alice", "s1", "crashed")
+
+
+class GenerationRuntime:
+    """The runtime's stores as store-identity.ts keeps them: each with the generation it
+    was created with, removed only for that generation, its removed generations retired."""
+
+    def __init__(self) -> None:
+        self.stores: dict[str, tuple[str, str]] = {}
+        self.retired: dict[str, set[str]] = {}
+
+    def chat(self, store: str, generation: str, data: str) -> None:
+        """A turn opens (and creates) the store; a retired or another generation is refused."""
+        assert generation not in self.retired.get(store, set())
+        current = self.stores.get(store)
+        assert current is None or current[0] == generation
+        self.stores[store] = (generation, data)
+
+    def remove(self, store: str, generation: str) -> bool:
+        current = self.stores.get(store)
+        if current is not None and current[0] != generation:
+            return True  # A newer incarnation: the one named is gone already.
+        self.retired.setdefault(store, set()).add(generation)
+        self.stores.pop(store, None)
+        return True
+
+
+def test_a_teardown_that_outlived_its_lease_never_removes_or_forgets_a_recreated_chat(
+    init_db,
+) -> None:
+    from qdash.api.services import copilot_chat_session_service as module
+
+    service = CopilotChatSessionService()
+    runtime = FakeRuntime()
+    stores = GenerationRuntime()
+    _source(service)
+    first = resolve_runtime_target("alice", "s1").generation
+    assert first is not None
+    stores.chat("s1", first, "old")
+
+    async def scenario() -> None:
+        entered = asyncio.Event()
+        proceed = asyncio.Event()
+
+        async def slow_release(store, generation, chats) -> bool:
+            # The first teardown's runtime call is delayed past its lease.
+            entered.set()
+            await proceed.wait()
+            return stores.remove(store, generation)
+
+        async def release(store, generation, chats) -> bool:
+            return stores.remove(store, generation)
+
+        slow = asyncio.create_task(
+            service.delete_session(
+                username="alice",
+                session_id="s1",
+                stop_chat=runtime.stop,
+                release_store=slow_release,
+            )
+        )
+        await entered.wait()
+        # Its lease runs out; a retry takes the teardown over and removes the store.
+        await asyncio.to_thread(
+            module._teardowns().update_one,
+            {"_id": module._teardown_key("alice", "s1")},
+            {"$set": {"lease_expires_at": now() - timedelta(seconds=1)}},
+        )
+        assert await service._settle_store("alice", "s1", release)
+        assert "s1" not in stores.stores
+        # The chat is created again under the same ID, with a new generation, and
+        # deleted, its removal failing: its tombstone waits for a retry.
+        await asyncio.to_thread(
+            service.create_session,
+            username="alice",
+            request=CreateCopilotChatSessionRequest(session_id="s1"),
+        )
+        second = (await asyncio.to_thread(resolve_runtime_target, "alice", "s1")).generation
+        assert second is not None and second != first
+        stores.chat("s1", second, "new")
+
+        async def failing(store, generation, chats) -> bool:
+            assert generation == second
+            return False
+
+        assert not await service.delete_session(
+            username="alice", session_id="s1", stop_chat=runtime.stop, release_store=failing
+        )
+        # The first teardown's runtime call arrives only now.
+        proceed.set()
+        assert await slow
+        # It removed nothing of the new chat, and forgot neither its tombstone nor its generation.
+        assert stores.stores["s1"] == (second, "new")
+        assert _stored("s1").deleted_at is not None
+        assert store_generation("alice", "s1") == second
+        # A retry of the new chat's removal removes the new store.
+        assert await service._settle_store("alice", "s1", release)
+        assert "s1" not in stores.stores
+        assert stores.retired["s1"] == {first, second}
+
+    asyncio.run(scenario())
+    assert CopilotChatSessionDocument.find({"username": "alice"}).to_list() == []

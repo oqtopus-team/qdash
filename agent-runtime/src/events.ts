@@ -56,6 +56,11 @@ export type NdjsonEvent =
     }
   /** A steer the harness settled without placing: the run failed or was stopped before its next tool round ended. */
   | { type: "steer"; request_id: string; status: "withdrawn"; reason: string }
+  /**
+   * The turn's own message was placed. What streamed before it belongs to an earlier turn: a run recovered after the
+   * runtime died answered a steer of that turn (`before_turn`) first. `answer` is the text that run ended with.
+   */
+  | { type: "turn_start"; answer: string }
   /** `entry_id`: the durable entry of the answer. */
   | { type: "done"; text: string; entry_id?: string }
   /** A continue found nothing to answer: no request was sent and nothing was added. */
@@ -206,6 +211,7 @@ function toolOutput(event: SessionEventLike): { output?: string; exitCode?: numb
  * `done` and `error` are built by the server after `prompt()` settles, not here.
  */
 export function toNdjsonEvents(event: SessionEventLike): NdjsonEvent[] {
+  if (event.type === "turn_started") return [{ type: "turn_start", answer: event.answer ?? "" }];
   if (event.type === "steer_placed") {
     if (typeof event.requestId !== "string" || typeof event.entryId !== "string") return [];
     return [

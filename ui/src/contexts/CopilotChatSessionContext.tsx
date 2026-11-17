@@ -42,6 +42,7 @@ import {
   restoreSteer,
   storeSessionSteers,
 } from "@/lib/copilotSteerStore";
+import type { CreateCopilotChatBranchRequest } from "@/schemas";
 import type {
   TaskChatContext,
   AnswerFeedback,
@@ -387,16 +388,28 @@ async function apiBranchSession(
   targetId: string,
 ): Promise<BranchReply> {
   let res: Response;
+  const request: CreateCopilotChatBranchRequest = {
+    entry_id: entryId,
+    target_session_id: targetId,
+  };
   try {
     res = await fetch(`${BASE_URL}${SESSIONS_PATH}/${encodeURIComponent(sessionId)}/branches`, {
       method: "POST",
       headers: buildHeaders(),
-      body: JSON.stringify({ entry_id: entryId, target_session_id: targetId }),
+      body: JSON.stringify(request),
     });
   } catch {
     return { ok: false, message: "The connection failed. Try again.", retryable: true };
   }
-  if (res.ok) return { ok: true, session: (await res.json()) as ServerSessionDetail };
+  if (res.ok) {
+    try {
+      return { ok: true, session: (await res.json()) as ServerSessionDetail };
+    } catch {
+      // The branch was made, but its reply was lost on the way: the retry, under
+      // the same target ID, gets that branch.
+      return { ok: false, message: "The connection failed. Try again.", retryable: true };
+    }
+  }
   return {
     ok: false,
     message: await readErrorResponse(res),
@@ -416,6 +429,7 @@ function buildTurnRequest(
   thinkingLevel?: ChatThinkingLevel,
   page?: PageContext | null,
   continueRun = false,
+  requestId: string = createRequestId(),
 ): { url: string; body: Record<string, unknown> } {
   const context = session?.context;
   const investigation = session?.investigation;
@@ -460,7 +474,7 @@ function buildTurnRequest(
       // Required by the Pi backend, which restores conversation state from the
       // persisted session rather than from the request body.
       session_id: sessionId,
-      request_id: createRequestId(),
+      request_id: requestId,
       conversation_history: history.map((m) => ({
         role: m.role,
         content: m.content,
@@ -504,6 +518,7 @@ async function readSteerReply(response: Response): Promise<SteerReply> {
 async function apiSteer(
   sessionId: string,
   requestId: string,
+  turnRequestId: string,
   message: string,
   projectId: string | null | undefined,
 ): Promise<SteerReply> {
@@ -511,9 +526,12 @@ async function apiSteer(
     fetch(`${BASE_URL}/copilot/chat/steer`, {
       method: "POST",
       headers: headersFor(projectId),
+      // Only the turn it is sent to admits it: a copy that arrives later never
+      // steers another turn.
       body: JSON.stringify({
         session_id: sessionId,
         request_id: requestId,
+        turn_request_id: turnRequestId,
         message,
       }),
     });
@@ -696,6 +714,8 @@ export function CopilotChatSessionProvider({
   const steerPosts = useRef<Set<string>>(new Set());
   // Where the turn streaming in each session starts in its conversation.
   const turnAnchors = useRef<Map<string, SteerAnchor>>(new Map());
+  // The request ID of the turn streaming in each session; a steer names it.
+  const turnRequests = useRef<Map<string, string>>(new Map());
 
   const updateSteers = useCallback(
     (sessionId: string, update: (list: PendingSteer[]) => PendingSteer[]) => {
@@ -822,6 +842,75 @@ export function CopilotChatSessionProvider({
     [awaitCreate],
   );
 
+  // Transcript saves by session: at most one PATCH in flight, and the newest
+  // snapshot waiting behind it. Each save replaces the whole transcript and the
+  // server keeps no version, so an older snapshot must never land after a newer
+  // one; one still waiting is replaced by the newer, which holds what it held.
+  const saveQueues = useRef<
+    Map<
+      string,
+      {
+        running: boolean;
+        next: {
+          owner: string | null | undefined;
+          messages: ChatMessage[];
+          patch: { messages: ServerMessage[]; title?: string };
+        } | null;
+      }
+    >
+  >(new Map());
+
+  /** A save of `messages` was acknowledged: the steers it holds are saved with it. */
+  const savedTranscript = useRef<(sessionId: string, messages: ChatMessage[]) => void>(() => {});
+
+  const saveTranscript = useCallback(
+    (
+      sessionId: string,
+      messages: ChatMessage[],
+      patch: { messages: ServerMessage[]; title?: string },
+    ) => {
+      let queue = saveQueues.current.get(sessionId);
+      if (!queue) {
+        queue = { running: false, next: null };
+        saveQueues.current.set(sessionId, queue);
+      }
+      const owner = ownerRef.current;
+      const waiting = queue.next;
+      // A derived title the waiting snapshot carried goes with the one replacing it.
+      const title = patch.title ?? (waiting?.owner === owner ? waiting?.patch.title : undefined);
+      queue.next = { owner, messages, patch: title === undefined ? patch : { ...patch, title } };
+      if (queue.running) return;
+      const q = queue;
+      q.running = true;
+      void (async () => {
+        try {
+          while (q.next) {
+            const job = q.next;
+            q.next = null;
+            // Saved only for the user who wrote it: never under another sign-in.
+            if (job.owner !== ownerRef.current) continue;
+            try {
+              await awaitCreate(sessionId);
+              if (job.owner !== ownerRef.current) continue;
+              await apiUpdateSession(sessionId, job.patch);
+            } catch {
+              // Local state is the source of truth until reload; a steer this save
+              // held stays recoverable (see PendingSteer.saving).
+              continue;
+            }
+            savedTranscript.current(sessionId, job.messages);
+          }
+        } finally {
+          q.running = false;
+          if (!q.next && saveQueues.current.get(sessionId) === q) {
+            saveQueues.current.delete(sessionId);
+          }
+        }
+      })();
+    },
+    [awaitCreate],
+  );
+
   const updateSessionMessages = useCallback(
     (sessionId: string, messages: ChatMessage[]) => {
       // Derive a sidebar title from the first user message while the session
@@ -849,14 +938,9 @@ export function CopilotChatSessionProvider({
         messages: messages.map(localMessageToServer),
       };
       if (derivedTitle !== undefined) patch.title = derivedTitle;
-      (async () => {
-        await awaitCreate(sessionId);
-        apiUpdateSession(sessionId, patch).catch(() => {
-          /* swallow — local state is the source of truth until reload */
-        });
-      })();
+      saveTranscript(sessionId, messages, patch);
     },
-    [awaitCreate],
+    [saveTranscript],
   );
 
   const setMessageFeedback = useCallback(
@@ -935,6 +1019,8 @@ export function CopilotChatSessionProvider({
         start: history.length,
         userText: continuing ? null : text,
       });
+      const turnRequestId = createRequestId();
+      turnRequests.current.set(sessionId, turnRequestId);
 
       // The live turn is folded locally and mirrored into state, so the final
       // message is built from what was streamed even if renders lag behind.
@@ -959,6 +1045,11 @@ export function CopilotChatSessionProvider({
         };
         updateSessionMessages(sessionId, [...shown, assistantMsg]);
       };
+
+      // Where the answer of a run recovered from an earlier request goes: after
+      // the last steer it placed before this turn's message, or (none) right
+      // before that message.
+      let recoveredAt: number | null = null;
 
       /**
        * A steer landed in the transcript: the answer so far becomes a message, the
@@ -995,12 +1086,12 @@ export function CopilotChatSessionProvider({
                 },
               ]
             : [];
-        shown = [...shown, ...before];
         if (payload.before_turn === true && userAt >= 0) {
           // A run recovered after the runtime died placed this steer before this
           // turn's message: it belongs to an earlier turn. Put it in the turn it was
           // sent to if the chat remembers it, else just before this turn's message.
           // Either way the answer it interrupted is not split here: approximate.
+          // What that run streamed before it goes before it, in the same turn.
           const anchor =
             pending?.anchor && pending.anchor.start < history.length ? pending.anchor : undefined;
           const placed =
@@ -1017,25 +1108,66 @@ export function CopilotChatSessionProvider({
             shown = [...shown.slice(0, userAt), steerMessage, ...shown.slice(userAt)];
             userAt += 1;
           }
-        } else if (text) {
-          shown = [
-            ...shown,
-            {
-              role: "user",
-              content: text,
-              steer: { requestId, entryId, placement: "exact" },
-            },
-          ];
+          const at = shown.findIndex((m) => m.steer?.requestId === requestId);
+          const into = at >= 0 ? at : userAt;
+          shown = [...shown.slice(0, into), ...before, ...shown.slice(into)];
+          if (into <= userAt) userAt += before.length;
+          // The recovered run's answer to it follows it, up to this turn's own message.
+          recoveredAt = (at >= 0 ? at + before.length : into + before.length - 1) + 1;
+        } else {
+          shown = [...shown, ...before];
+          if (text) {
+            shown = [
+              ...shown,
+              {
+                role: "user",
+                content: text,
+                steer: { requestId, entryId, placement: "exact" },
+              },
+            ];
+          }
         }
+        // Kept, out of sight, until a save holding it is acknowledged.
+        updateSteers(sessionId, (list) =>
+          patchSteer(advanceSteer(list, requestId, "delivered", undefined, entryId), requestId, {
+            saving: true,
+          }),
+        );
         updateSessionMessages(sessionId, shown);
         turn = { steps: [], startedAt: now };
         const next = turn;
         setRun(sessionId, (run) => ({ ...run, turn: next }));
-        updateSteers(sessionId, (list) => list.filter((s) => s.requestId !== requestId));
         steerStreams.current.delete(requestId);
         toReconcile.current.delete(`${sessionId}\0${requestId}`);
       };
       const placedSteers = new Set<string>();
+
+      /**
+       * This turn's own message was placed: what streamed so far was a run
+       * recovered from an earlier request, answering a steer of an earlier turn.
+       * It is closed off and kept with that turn, before this turn's message.
+       */
+      const startTurn = (payload: { result?: unknown }) => {
+        if (userAt < 0) return;
+        const now = Date.now();
+        const trace = toPersistedTrace(turn, now);
+        const segment = payload.result
+          ? resultToBlocks(payload.result as Record<string, unknown>)
+          : { blocks: [], assessment: null };
+        if (!segment.blocks.length && !trace) return;
+        const into = Math.min(recoveredAt ?? userAt, userAt);
+        const message: ChatMessage = {
+          role: "assistant",
+          content: JSON.stringify(trace ? { ...segment, trace } : segment),
+        };
+        shown = [...shown.slice(0, into), message, ...shown.slice(into)];
+        userAt += 1;
+        recoveredAt = null;
+        updateSessionMessages(sessionId, shown);
+        turn = { steps: [], startedAt: now };
+        const next = turn;
+        setRun(sessionId, (run) => ({ ...run, turn: next }));
+      };
 
       (async () => {
         try {
@@ -1051,6 +1183,7 @@ export function CopilotChatSessionProvider({
             options?.thinkingLevel,
             options?.page,
             continuing,
+            turnRequestId,
           );
           const response = await fetch(url, {
             method: "POST",
@@ -1108,6 +1241,8 @@ export function CopilotChatSessionProvider({
                   ...run,
                   statusMessage: payload.message ?? null,
                 }));
+              } else if (evt.event === "turn_start") {
+                startTurn(payload);
               } else if (evt.event === "steer") {
                 if (payload.status === "applied") placeSteer(payload);
                 else if (typeof payload.request_id === "string") {
@@ -1165,6 +1300,9 @@ export function CopilotChatSessionProvider({
         } finally {
           controllers.current.delete(sessionId);
           turnAnchors.current.delete(sessionId);
+          if (turnRequests.current.get(sessionId) === turnRequestId) {
+            turnRequests.current.delete(sessionId);
+          }
           setRun(sessionId, null);
           // The stream ended without saying where these steers landed: a stop or a dropped
           // connection may have come just after the answer read one. Ask the runtime.
@@ -1198,19 +1336,29 @@ export function CopilotChatSessionProvider({
     (sessionId: string, requestId: string) => {
       if (controllers.current.has(sessionId)) return;
       const pending = findSteer(sessionId, requestId);
-      if (!pending || pending.status !== "delivered" || pending.unplaced) return;
+      if (!pending || pending.status !== "delivered" || pending.unplaced || pending.saving) return;
       const session = sessionsRef.current.find((s) => s.id === sessionId);
       const placed = session ? placeLateSteer(session.messages, pending) : null;
       if (!placed) {
         updateSteers(sessionId, (list) => patchSteer(list, requestId, { unplaced: true }));
         return;
       }
-      if (placed !== session!.messages) updateSessionMessages(sessionId, placed);
+      // Kept until a save holding it is acknowledged; saved also when the chat
+      // already shows it, which may not be saved yet.
+      updateSteers(sessionId, (list) => patchSteer(list, requestId, { saving: true }));
       steerStreams.current.delete(requestId);
-      updateSteers(sessionId, (list) => list.filter((s) => s.requestId !== requestId));
+      updateSessionMessages(sessionId, placed);
     },
     [findSteer, updateSessionMessages, updateSteers],
   );
+
+  savedTranscript.current = (sessionId, messages) => {
+    const saved = new Set(messages.flatMap((m) => (m.steer ? [m.steer.requestId] : [])));
+    if (!(steersRef.current[sessionId] ?? []).some((s) => s.saving && saved.has(s.requestId))) {
+      return;
+    }
+    updateSteers(sessionId, (list) => list.filter((s) => !(s.saving && saved.has(s.requestId))));
+  };
 
   /**
    * What a steer request or a status lookup reported. While the steer's stream runs,
@@ -1356,7 +1504,8 @@ export function CopilotChatSessionProvider({
     (sessionId: string, text: string) => {
       const trimmed = text.trim();
       const controller = controllers.current.get(sessionId);
-      if (!trimmed || !controller) return false;
+      const turnRequestId = turnRequests.current.get(sessionId);
+      if (!trimmed || !controller || !turnRequestId) return false;
       const requestId = createRequestId();
       // Every later request about this steer names the project it was sent from.
       const projectId = buildHeaders()["X-Project-Id"] ?? null;
@@ -1372,7 +1521,7 @@ export function CopilotChatSessionProvider({
         },
       ]);
       steerPosts.current.add(requestId);
-      void apiSteer(sessionId, requestId, trimmed, projectId).then((reply) => {
+      void apiSteer(sessionId, requestId, turnRequestId, trimmed, projectId).then((reply) => {
         steerPosts.current.delete(requestId);
         applyReply(sessionId, requestId, reply, 0);
       });
@@ -1434,7 +1583,13 @@ export function CopilotChatSessionProvider({
       const work = (async () => {
         try {
           await awaitCreate(sessionId);
-          const reply = await apiBranchSession(sessionId, entryId, targetId);
+          let reply: BranchReply;
+          try {
+            reply = await apiBranchSession(sessionId, entryId, targetId);
+          } catch {
+            // Whatever failed, the branch may have been made: keep the target for the retry.
+            reply = { ok: false, message: "Something went wrong. Try again.", retryable: true };
+          }
           if (!reply.ok) {
             if (!reply.retryable) branchTargets.current.delete(key);
             setNotices((prev) => ({
