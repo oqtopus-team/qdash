@@ -7,9 +7,10 @@ CheckAdaptiveChevron on the published values. It does not change the Bring-up
 template.
 
 CheckQubitFrequencyMapping needs ``qubex.contrib.multiplexed_readout_qubit_spectroscopy``
-from https://github.com/amachino/qubex/pull/472, included in upstream ``develop``.
-With a Qubex revision that lacks the helper, the mapping
-task fails at run time with an error naming that prerequisite.
+from https://github.com/amachino/qubex/pull/472 with its ``readout_grouping``
+argument, which the Qubex revision pinned in ``uv.lock`` provides. With a Qubex
+revision that lacks either, the mapping task fails at run time with an error
+naming that prerequisite.
 
 Example:
     bringupv2(
@@ -87,7 +88,8 @@ def bringupv2(
     frequency and amplitude, control frequency, and coarse control amplitude the
     mapping publishes. CheckControlAmplitude and CheckAdaptiveChevron keep the
     acquisition settings of the Bring-up template. Requires a Qubex revision that
-    includes https://github.com/amachino/qubex/pull/472.
+    includes https://github.com/amachino/qubex/pull/472 and the helper's
+    ``readout_grouping`` argument.
 
     Args:
         username: User name (from UI)

@@ -11,7 +11,7 @@
   {
     "id": "bringupv2",
     "name": "Bring-up v2",
-    "description": "Opt-in MUX bring-up that maps each qubit to its resonator before calibrating its drive: CheckResonatorSpectroscopy with detection_only once per MUX, then CheckQubitFrequencyMapping, CheckControlAmplitude, and CheckAdaptiveChevron for each qubit of the MUX in turn, with MUXes in parallel by default. A failed mapping skips that qubit's later tasks. Requires explicit mux_ids and a qubex revision that includes amachino/qubex#472.",
+    "description": "Opt-in MUX bring-up that maps each qubit to its resonator before calibrating its drive: CheckResonatorSpectroscopy with detection_only once per MUX, then CheckQubitFrequencyMapping, CheckControlAmplitude, and CheckAdaptiveChevron for each qubit of the MUX in turn, with MUXes in parallel by default. A failed mapping skips that qubit's later tasks. Requires explicit mux_ids and a qubex revision that includes amachino/qubex#472 with the readout_grouping argument.",
     "category": "production",
     "backend": "qubex",
     "filename": "bringupv2.py",

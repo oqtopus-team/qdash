@@ -161,34 +161,52 @@ complete before running `CheckQubitFrequencyMapping`.
 The task pairs candidate `i` with the `i`-th valid readout label of the target's Qubex MUX, sorted
 by label, and calls `qubex.contrib.multiplexed_readout_qubit_spectroscopy` with one drive target
 once per readout group, described below. The labels are acquisition slots only; the result does
-not assume that a slot's own qubit owns the candidate. Readout candidate frequencies are carrier overrides without LO
-or NCO retuning, so they must be realizable under the current readout configuration. Run the
-qubits of one MUX sequentially, as the [1-qubit scheduler](../architecture/one-qubit-scheduler.md)
-does; two concurrent runs in one MUX would read the same resonators.
+not assume that a slot's own qubit owns the candidate. Before measuring a group, the helper
+configures the readout of its slots for the group's candidate frequencies and restores the
+configuration afterwards; it rejects a group whose candidates on one MUX cannot share one readout
+configuration. Run the qubits of one MUX sequentially, as the
+[1-qubit scheduler](../architecture/one-qubit-scheduler.md) does; two concurrent runs in one MUX
+would read the same resonators.
 
-The candidate tones of one helper call share one readout AWG channel, where Qubex sums them with
-unit-magnitude phase factors and the driver rejects any I or Q sample above full scale. Tones whose
-amplitudes sum to at most 1 stay within full scale for any phases. Each
-`resonator_candidate_<i>_readout_amplitude` is a single-tone detection optimum, and the task reads
-every candidate at that requested amplitude without scaling it. It rejects an amplitude above 1
-before any measurement, and otherwise splits the candidates into readout groups with
-`plan_readout_groups`: first-fit in decreasing order of amplitude, ties by candidate index, into the
-first group whose amplitude sum stays at or below 1. For example, amplitudes `[0.2, 0.7, 0.5, 0.3]`
-form group 0 with candidates 1 and 3 (sum 1.0) and group 1 with candidates 0 and 2 (sum 0.7), and
-four candidates of 0.3 form groups of three and one. Candidates whose amplitudes sum to at most 1
-are read in one group.
+A readout group is the set of candidates read together in one acquisition. Their tones share one
+readout AWG channel, where Qubex sums them with unit-magnitude phase factors and the driver rejects
+any I or Q sample above full scale. Tones whose amplitudes sum to at most 1 stay within full scale
+for any phases. Each `resonator_candidate_<i>_readout_amplitude` is a single-tone detection
+optimum, and the task reads every candidate at that requested amplitude without scaling it. It
+rejects an amplitude above 1 before any measurement.
 
-Each group is one helper call with the same drive target, sweep, timing, shots, and interval, run
-in group order. A candidate keeps its readout slot and its candidate index whichever group reads
-it. The helper numbers the candidates of each call from 0, so the task checks each payload's
-`candidate_index` against the candidate's position in its group and then maps the payload back to
-the candidate's own index. A failed helper call fails the task, naming the group; a group result
-whose target, readout labels, candidates, or axes disagree with the plan or with group 0 marks the
-task failed without outputs, so no group is published alone. The evidence records the groups
-under `readout_groups` (budget, rule, and each group's candidates, slots, amplitudes, and sum) and
-each candidate's `readout_group`, `readout_group_position`, and requested and applied amplitude,
-which are equal. The bound covers the summed readout tones only; it assumes no gain between the
-pulse amplitude and the AWG samples.
+The `readout_grouping` run parameter decides which candidates may share a group:
+
+| Value | Candidates that may share a group |
+| --- | --- |
+| `subgroups` (default) | Candidates in the same Qubex qubit subgroup: `exp.util.create_qubit_subgroups` on the slots' qubits, qubit index modulo 4 in {0, 3} first, then {1, 2} |
+| `multiplexed` | Every candidate |
+
+`plan_readout_groups` then packs each subgroup, or all candidates under `multiplexed`, first-fit in
+decreasing order of amplitude, ties by candidate index, into the first group whose amplitude sum
+stays at or below 1. A subgroup is split further only when its tones would exceed full scale, and
+the budget never spans two subgroups, because they are separate acquisitions. For example, four
+candidates of 0.5 form groups `RQ00`+`RQ03` and `RQ01`+`RQ02` under `subgroups`, and `RQ00`+`RQ01`
+and `RQ02`+`RQ03` under `multiplexed`. Amplitudes `[0.7, 0.2, 0.3, 0.4]` under `subgroups` form
+`RQ00`, `RQ03`, and `RQ01`+`RQ02`, because 0.7 + 0.4 exceeds 1. Under `multiplexed`, amplitudes
+`[0.2, 0.7, 0.5, 0.3]` form group 0 with candidates 1 and 3 (sum 1.0) and group 1 with candidates
+0 and 2 (sum 0.7).
+
+Each group is one helper call with the same drive target, sweep, timing, shots, interval, and
+`readout_grouping`, run in group order. A candidate keeps its readout slot and its candidate index
+whichever group reads it. The helper numbers the candidates of each call from 0, so the task checks
+each payload's `candidate_index` against the candidate's position in its group and then maps the
+payload back to the candidate's own index. The helper reports the acquisitions it made in
+`readout_groups` and each candidate's `readout_group_index`; the task requires the requested
+`readout_grouping`, exactly one acquisition holding the group's slots, and index 0, so a helper that
+split a group further is rejected. A failed helper call fails the task, naming the group; a group
+result whose target, readout labels, grouping, candidates, or axes disagree with the plan or with
+group 0 marks the task failed without outputs, so no group is published alone. The evidence records
+the groups under `readout_groups` (mode, budget, rule, and each group's qubit subgroup,
+candidates, slots, amplitudes, and sum) and each candidate's `readout_group`,
+`readout_group_position`, `qubit_subgroup` (null under `multiplexed`), and requested and applied
+amplitude, which are equal. The bound covers the summed readout tones only; it assumes no gain
+between the pulse amplitude and the AWG samples.
 
 Each candidate is analyzed from its `phases` array in its group's Qubex result, on the result's
 `frequency_range` and `power_range`; the figures in the Qubex result are not read. The task rejects
@@ -264,11 +282,13 @@ On success the selected candidate supplies `resonator_frequency`, `readout_frequ
 inferred independently, so two qubits of one MUX can select the same candidate; QDash does not
 check that the selections form a one-to-one mapping.
 
-The helper was added in [amachino/qubex#472](https://github.com/amachino/qubex/pull/472).
-QDash tracks upstream `develop` in `[tool.uv.sources]`; `uv.lock` records the resolved
-revision containing the helper. Run `uv lock --upgrade-package qubex` to refresh it.
-With a Qubex revision that lacks the helper, the task
-registers normally and fails at run time with an error naming that prerequisite.
+The helper was added in [amachino/qubex#472](https://github.com/amachino/qubex/pull/472), and its
+`readout_grouping` argument is not yet in upstream `develop`. `[tool.uv.sources]` therefore pins
+Qubex to commit `dcff0daf2087f7566fdb8c8a125e5ef003c46fbe` of `orangekame3/qubex`, and `uv.lock`
+records that commit for `qubex` and its workspace packages. To move the pin, change the `rev` and run
+`uv lock`. With a Qubex revision whose helper is missing or lacks `readout_grouping`, the task
+registers normally and fails at run time, before any measurement, with an error naming that
+prerequisite.
 
 The **Bring-up v2** template (ID `bringupv2`, `templates/bringupv2.py`) runs the pipeline for the
 selected `mux_ids` in one `BringUp` step:

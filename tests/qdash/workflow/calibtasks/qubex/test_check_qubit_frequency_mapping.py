@@ -1,6 +1,7 @@
 import copy
 import sys
 import types
+from collections.abc import Callable
 from dataclasses import replace
 from datetime import datetime, timedelta
 from types import SimpleNamespace
@@ -10,12 +11,14 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import plotly.graph_objects as go
 import pytest
+from qubex.experiment.experiment_util import ExperimentUtil
 
 from qdash.analysis.spectroscopy.estimate_resonator_frequency import Peak, Resonance
 from qdash.common.config.backend import get_tasks
 from qdash.datamodel.calibration_pipeline import BRINGUP_TASKS
 from qdash.workflow.calibtasks.base import BaseTask, RunResult
 from qdash.workflow.calibtasks.qubex.cw.check_qubit_frequency_mapping import (
+    DEFAULT_READOUT_GROUPING,
     MAX_RESONATOR_CANDIDATES,
     MULTIPLEXED_READOUT_AMPLITUDE_BUDGET,
     CheckQubitFrequencyMapping,
@@ -44,6 +47,23 @@ READOUT_AMPLITUDES = [0.02, 0.03, 0.04, 0.05]
 DRIVE_FREQUENCIES = np.round(np.arange(4.0, 4.5, 0.005), 6)
 DRIVE_POWERS = np.arange(-60.0, 0.0, 5.0)
 RESPONSE_INDEX = 40
+# Qubex create_qubit_subgroups reads qubit indices modulo 4 in {0, 3} first, then {1, 2}.
+SUBGROUPS = [[0, 3], [1, 2]]
+
+
+@pytest.fixture(autouse=True)
+def _qubex_qubit_indices(monkeypatch) -> None:
+    """Let the real Qubex create_qubit_subgroups resolve Qxx labels without a system."""
+    from qubex.experiment import experiment_util
+
+    system = SimpleNamespace(
+        get_qubit=lambda label: SimpleNamespace(label=label, index=int(label[1:]))
+    )
+    monkeypatch.setattr(
+        experiment_util,
+        "SystemManager",
+        SimpleNamespace(shared=lambda: SimpleNamespace(experiment_system=system)),
+    )
 
 
 def _set_candidate_inputs(
@@ -91,7 +111,9 @@ def _contrib_result(
     target: str = "Q01",
     frequencies: list[float] | None = None,
     amplitudes: list[float] | None = None,
+    readout_grouping: str = "multiplexed",
 ) -> SimpleNamespace:
+    """Return a helper result that reads every slot of ``zs_by_slot`` in one acquisition."""
     frequencies = READOUT_FREQUENCIES if frequencies is None else frequencies
     amplitudes = READOUT_AMPLITUDES if amplitudes is None else amplitudes
     slots = list(zs_by_slot)
@@ -99,6 +121,7 @@ def _contrib_result(
         slot: {
             "readout_label": slot,
             "candidate_index": index,
+            "readout_group_index": 0,
             "readout_frequency": frequencies[index],
             "readout_amplitude": amplitudes[index],
             "frequency_range": DRIVE_FREQUENCIES.copy(),
@@ -119,6 +142,8 @@ def _contrib_result(
             "readout_labels": slots,
             "frequency_range": DRIVE_FREQUENCIES.copy(),
             "power_range": DRIVE_POWERS.copy(),
+            "readout_grouping": readout_grouping,
+            "readout_groups": [list(slots)],
             "candidates": candidates,
         },
         figures=figures,
@@ -130,9 +155,41 @@ def _experiment(slots: list[str] | None = None) -> MagicMock:
     exp = MagicMock()
     resonators = [SimpleNamespace(label=label, is_valid=True) for label in (slots or SLOTS)]
     exp.ctx.experiment_system.get_mux_by_qubit.return_value = SimpleNamespace(
-        resonators=tuple(reversed(resonators))
+        index=0, resonators=tuple(reversed(resonators))
     )
+    exp.ctx.resolve_qubit_label.side_effect = lambda label: (
+        label if label.startswith("Q") else "Q" + label[2:]
+    )
+    exp.util = ExperimentUtil
     return exp
+
+
+def _fake_helper(zs_by_slot: dict[str, np.ndarray]) -> Callable[..., SimpleNamespace]:
+    """Return a helper stand-in that reads each call's slots in one acquisition.
+
+    It numbers the candidates of each call from 0 and echoes the requested readout
+    frequencies, amplitudes, and ``readout_grouping``, as the Qubex helper does when
+    every slot of the call falls in one qubit subgroup.
+    """
+
+    def helper(_exp: Any, target: str, **kwargs: Any) -> SimpleNamespace:
+        slots = list(kwargs["readout_frequencies"])
+        return _contrib_result(
+            {slot: zs_by_slot[slot] for slot in slots},
+            target=target,
+            frequencies=[kwargs["readout_frequencies"][slot] for slot in slots],
+            amplitudes=[kwargs["readout_amplitudes"][slot] for slot in slots],
+            readout_grouping=kwargs["readout_grouping"],
+        )
+
+    return helper
+
+
+def _single_response_zs(response_slot: str = "RQ02") -> dict[str, np.ndarray]:
+    return {
+        slot: _response_z(RESPONSE_INDEX) if slot == response_slot else _noise_z(index)
+        for index, slot in enumerate(SLOTS)
+    }
 
 
 def _run(
@@ -140,13 +197,13 @@ def _run(
 ) -> tuple[RunResult, MagicMock]:
     """Run the task with the source-freshness check stubbed; persistence tests cover it.
 
-    ``result`` is the helper result of every call, or a list with one result (or
-    exception) per readout group.
+    ``result`` is the helper result of every call, a list with one result (or
+    exception) per readout group, or a function that builds each call's result.
     """
     exp = exp or _experiment()
     contrib = (
         MagicMock(side_effect=result)
-        if isinstance(result, list)
+        if isinstance(result, list) or callable(result)
         else MagicMock(return_value=result)
     )
     with (
@@ -164,9 +221,20 @@ def _postprocess(task: CheckQubitFrequencyMapping, run_result: RunResult):
     return task.postprocess(cast("QubexBackend", object()), "exec-map", run_result, "1")
 
 
-def _task_with_candidates() -> CheckQubitFrequencyMapping:
+def _set_grouping(task: CheckQubitFrequencyMapping, grouping: str) -> None:
+    task.run_parameters = copy.deepcopy(task.run_parameters)
+    task.run_parameters["readout_grouping"].value = grouping
+
+
+def _task_with_candidates(grouping: str = "multiplexed") -> CheckQubitFrequencyMapping:
+    """Return a task with four small candidates.
+
+    The analysis tests read all four candidates in one multiplexed acquisition so that
+    one helper result covers them; the subgroup tests pass ``grouping="subgroups"``.
+    """
     task = CheckQubitFrequencyMapping()
     _set_candidate_inputs(task, list(READOUT_FREQUENCIES), list(READOUT_AMPLITUDES))
+    _set_grouping(task, grouping)
     return task
 
 
@@ -256,7 +324,11 @@ def test_run_uses_only_as_many_slots_as_candidates() -> None:
 
     _, contrib = _run(task, _single_response_result())
 
-    assert contrib.call_args.kwargs["readout_frequencies"] == {"RQ00": 10.21, "RQ01": 10.29}
+    # RQ00 and RQ01 fall in different Qubex qubit subgroups, so each is its own acquisition.
+    assert [call.kwargs["readout_frequencies"] for call in contrib.call_args_list] == [
+        {"RQ00": 10.21},
+        {"RQ01": 10.29},
+    ]
 
 
 @pytest.mark.parametrize(
@@ -1189,6 +1261,36 @@ def test_installed_qubex_helper_result_selects_the_responding_candidate() -> Non
         "no_f01_peak",
     ]
     assert evidence["candidates"][2]["selected"] is True
+    assert evidence["readout_groups"]["readout_grouping"] == "multiplexed"
+
+
+def test_installed_qubex_helper_reads_default_subgroups_as_separate_acquisitions() -> None:
+    """Run the installed helper offline with the default grouping and its real subgroups."""
+    task = CheckQubitFrequencyMapping()
+    _set_candidate_inputs(task, list(READOUT_FREQUENCIES), list(READOUT_AMPLITUDES))
+    task.run_parameters = copy.deepcopy(task.run_parameters)
+    task.run_parameters["frequency_range"].value = (4.0, 4.5, 0.005)
+    exp = _offline_experiment("Q02")
+
+    with (
+        patch.object(task, "get_experiment", return_value=exp),
+        patch.object(task, "get_qubit_label", return_value="Q01"),
+        patch.object(task, "_verify_candidate_source"),
+    ):
+        run_result = task.run(cast("QubexBackend", object()), "1")
+    result = _postprocess(task, run_result)
+
+    acquisitions = {tuple(f): None for f in exp.measurement_service.readout_frequencies}
+    assert list(acquisitions) == [("RQ00", "RQ03"), ("RQ01", "RQ02")]
+    for group_result in run_result.raw_result.results:
+        assert group_result.data["readout_grouping"] == "subgroups"
+        assert len(group_result.data["readout_groups"]) == 1
+    assert result.validation_error is None
+    assert result.output_parameters["resonator_candidate_index"].value == 2
+    assert result.output_parameters["readout_amplitude"].value == READOUT_AMPLITUDES[2]
+    grouping = _evidence(result)["readout_groups"]
+    assert grouping["readout_grouping"] == "subgroups"
+    assert [g["candidate_indices"] for g in grouping["groups"]] == SUBGROUPS
 
 
 # Budget-safe readout groups ------------------------------------------------------------
@@ -1199,10 +1301,13 @@ MIXED_AMPLITUDES = [0.2, 0.7, 0.5, 0.3]
 MIXED_GROUPS = [[1, 3], [0, 2]]
 
 
-def _amplitude_task(amplitudes: list[float]) -> CheckQubitFrequencyMapping:
+def _amplitude_task(
+    amplitudes: list[float], grouping: str = "multiplexed"
+) -> CheckQubitFrequencyMapping:
     task = CheckQubitFrequencyMapping()
     frequencies: list[float | None] = list(READOUT_FREQUENCIES[: len(amplitudes)])
     _set_candidate_inputs(task, frequencies, list[float | None](amplitudes))
+    _set_grouping(task, grouping)
     return task
 
 
@@ -1518,7 +1623,10 @@ def test_diagnostics_report_groups_budget_and_amplitudes(capsys) -> None:
 
     assert result.validation_error is None
     log = capsys.readouterr().out
-    assert "2 readout group(s) with amplitude sum <= 1 each" in log
+    assert (
+        "readout_grouping=multiplexed: 2 readout group(s), one simultaneous acquisition each, "
+        "with amplitude sum <= 1 each"
+    ) in log
     assert (
         "group 0 [candidate 1 (RQ01) amplitude 0.7, candidate 3 (RQ03) amplitude 0.3] sum 1"
     ) in log
@@ -1595,8 +1703,259 @@ def test_requested_amplitudes_in_one_acquisition_exceed_awg_full_scale() -> None
         readout_amplitudes=dict(zip(SLOTS, MIXED_AMPLITUDES, strict=True)),
         frequency_range=DRIVE_FREQUENCIES[:2],
         power_range=DRIVE_POWERS[:1],
+        readout_grouping="multiplexed",
         plot=False,
     )
 
     with pytest.raises(ValueError, match="magnitude of iq signal must not exceed 1"):
         _readout_awg_waveform(exp.measurement_service.schedules[0], frequencies)
+
+
+# Readout grouping: Qubex qubit subgroups and multiplexed ------------------------------
+
+
+def _calls(contrib: MagicMock) -> list[list[str]]:
+    return [list(call.kwargs["readout_frequencies"]) for call in contrib.call_args_list]
+
+
+def test_readout_grouping_defaults_to_subgroups_and_is_forwarded() -> None:
+    """Read each Qubex qubit subgroup in its own call and pass the mode to every call."""
+    task = CheckQubitFrequencyMapping()
+    _set_candidate_inputs(task, list(READOUT_FREQUENCIES), list(READOUT_AMPLITUDES))
+
+    run_result, contrib = _run(task, _fake_helper(_single_response_zs("RQ02")))
+    result = _postprocess(task, run_result)
+
+    assert CheckQubitFrequencyMapping.run_spec["readout_grouping"].default == "subgroups"
+    assert DEFAULT_READOUT_GROUPING == "subgroups"
+    assert task.run_parameters["readout_grouping"].value == "subgroups"
+    assert _calls(contrib) == [["RQ00", "RQ03"], ["RQ01", "RQ02"]]
+    assert all(call.kwargs["readout_grouping"] == "subgroups" for call in contrib.call_args_list)
+    assert run_result.raw_result.readout_grouping == "subgroups"
+    assert result.validation_error is None
+    assert result.output_parameters["resonator_candidate_index"].value == 2
+    assert result.output_parameters["resonator_frequency"].value == READOUT_FREQUENCIES[2]
+    assert result.output_parameters["readout_amplitude"].value == READOUT_AMPLITUDES[2]
+    evidence = _evidence(result)
+    rows = evidence["candidates"]
+    assert [row["candidate_index"] for row in rows] == [0, 1, 2, 3]
+    assert [row["readout_label"] for row in rows] == SLOTS
+    assert [row["readout_group"] for row in rows] == [0, 1, 1, 0]
+    assert [row["readout_group_position"] for row in rows] == [0, 0, 1, 1]
+    assert [row["qubit_subgroup"] for row in rows] == [0, 1, 1, 0]
+    assert [row["selected"] for row in rows] == [False, False, True, False]
+    grouping = evidence["readout_groups"]
+    assert grouping["readout_grouping"] == "subgroups"
+    assert "create_qubit_subgroups" in grouping["rule"]
+    assert [g["candidate_indices"] for g in grouping["groups"]] == SUBGROUPS
+    assert [g["qubit_subgroup"] for g in grouping["groups"]] == [0, 1]
+    raw = _raw_figures(result)
+    assert [raw[slot].layout.meta["candidate_index"] for slot in SLOTS] == [0, 1, 2, 3]
+
+
+def test_explicit_multiplexed_reads_every_candidate_in_one_call() -> None:
+    """Keep the explicit multiplexed mode: one call with every slot within the budget."""
+    task = _task_with_candidates("multiplexed")
+
+    run_result, contrib = _run(task, _fake_helper(_single_response_zs("RQ02")))
+    result = _postprocess(task, run_result)
+
+    assert _calls(contrib) == [SLOTS]
+    assert contrib.call_args.kwargs["readout_grouping"] == "multiplexed"
+    assert result.validation_error is None
+    assert result.output_parameters["resonator_candidate_index"].value == 2
+    rows = _evidence(result)["candidates"]
+    assert [row["qubit_subgroup"] for row in rows] == [None] * 4
+    assert _evidence(result)["readout_groups"]["readout_grouping"] == "multiplexed"
+
+
+@pytest.mark.parametrize(
+    ("grouping", "calls"),
+    [
+        ("subgroups", [["RQ00", "RQ03"], ["RQ01", "RQ02"]]),
+        ("multiplexed", [["RQ00", "RQ01"], ["RQ02", "RQ03"]]),
+    ],
+)
+def test_four_amplitudes_of_0_5_follow_the_actual_simultaneous_groups(grouping, calls) -> None:
+    """Read four 0.5 tones as the two diagonal subgroups, or as budget pairs when multiplexed."""
+    amplitudes = [0.5] * 4
+    task = _amplitude_task(amplitudes, grouping)
+
+    run_result, contrib = _run(task, _fake_helper(_single_response_zs("RQ02")))
+    result = _postprocess(task, run_result)
+
+    assert _calls(contrib) == calls
+    assert _called_groups(contrib) == [dict.fromkeys(call, 0.5) for call in calls]
+    assert result.validation_error is None
+    assert result.output_parameters["resonator_candidate_index"].value == 2
+    assert result.output_parameters["readout_amplitude"].value == 0.5
+    groups = _evidence(result)["readout_groups"]["groups"]
+    assert [g["readout_labels"] for g in groups] == calls
+    assert [g["amplitude_sum"] for g in groups] == [1.0, 1.0]
+
+
+def test_subgroup_over_the_budget_is_split_further() -> None:
+    """Split only a subgroup whose tones exceed full scale, keeping requested amplitudes."""
+    amplitudes = [0.7, 0.2, 0.3, 0.4]
+    task = _amplitude_task(amplitudes, "subgroups")
+
+    run_result, contrib = _run(task, _fake_helper(_single_response_zs("RQ03")))
+    result = _postprocess(task, run_result)
+
+    # Subgroup {RQ00, RQ03} sums to 1.1, so it is read as two calls; {RQ01, RQ02} fits.
+    assert _calls(contrib) == [["RQ00"], ["RQ03"], ["RQ01", "RQ02"]]
+    assert _called_groups(contrib) == [{"RQ00": 0.7}, {"RQ03": 0.4}, {"RQ01": 0.2, "RQ02": 0.3}]
+    assert result.validation_error is None
+    outputs = result.output_parameters
+    assert outputs["resonator_candidate_index"].value == 3
+    assert outputs["resonator_frequency"].value == READOUT_FREQUENCIES[3]
+    assert outputs["readout_amplitude"].value == 0.4
+    rows = _evidence(result)["candidates"]
+    assert [row["readout_group"] for row in rows] == [0, 2, 2, 1]
+    assert [row["qubit_subgroup"] for row in rows] == [0, 1, 1, 0]
+    assert [row["readout_amplitude"] for row in rows] == amplitudes
+    groups = _evidence(result)["readout_groups"]["groups"]
+    assert [g["qubit_subgroup"] for g in groups] == [0, 0, 1]
+    assert all(g["amplitude_sum"] <= MULTIPLEXED_READOUT_AMPLITUDE_BUDGET for g in groups)
+
+
+def test_plan_never_merges_candidates_across_qubit_subgroups() -> None:
+    """Keep each acquisition inside one Qubex subgroup even when the budget would allow more."""
+    candidates = [ResonatorCandidate(i, READOUT_FREQUENCIES[i], 0.1) for i in range(4)]
+    subgroups = [["RQ00", "RQ03"], ["RQ01", "RQ02"]]
+
+    readouts = plan_readout_groups(candidates, SLOTS, subgroups)
+
+    assert [[r.candidate.index for r in g] for g in readout_groups(readouts)] == SUBGROUPS
+    with pytest.raises(ValueError, match="exactly once"):
+        plan_readout_groups(candidates, SLOTS, [["RQ00", "RQ03"], ["RQ01"]])
+    mixed = (
+        replace(readouts[0], readout_group=0, readout_group_position=0, qubit_subgroup=0),
+        replace(readouts[1], readout_group=0, readout_group_position=1, qubit_subgroup=1),
+    )
+    with pytest.raises(ValueError, match="mixes qubit subgroups"):
+        readout_groups(mixed)
+
+
+@pytest.mark.parametrize("grouping", ["parallel", None, ""])
+def test_invalid_readout_grouping_is_rejected_before_hardware(grouping) -> None:
+    """Reject an unknown readout_grouping before the source check and any helper call."""
+    task = _task_with_candidates()
+    task.run_parameters["readout_grouping"].value = grouping
+    contrib = MagicMock()
+
+    with (
+        patch.object(task, "get_experiment", return_value=_experiment()) as get_experiment,
+        patch.object(task, "_verify_candidate_source") as verify,
+        patch(f"{MODULE}.load_multiplexed_readout_qubit_spectroscopy", return_value=contrib),
+        pytest.raises(ValueError, match="readout_grouping must be one of"),
+    ):
+        task.run(cast("QubexBackend", object()), "1")
+
+    contrib.assert_not_called()
+    verify.assert_not_called()
+    get_experiment.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("corrupt", "match"),
+    [
+        (
+            lambda data: data.update(readout_groups=[["RQ00"], ["RQ03"]]),
+            "are not one acquisition of ['RQ00', 'RQ03']",
+        ),
+        (lambda data: data.pop("readout_groups"), "readout_groups None"),
+        (
+            lambda data: data.update(readout_grouping="multiplexed"),
+            "readout_grouping 'multiplexed' does not match 'subgroups'",
+        ),
+        (
+            lambda data: data["candidates"]["RQ03"].update(readout_group_index=1),
+            "readout_group_index 1 is not the single acquisition 0",
+        ),
+    ],
+)
+def test_helper_result_that_splits_a_group_publishes_nothing(corrupt, match) -> None:
+    """Fail closed when the helper reports a different mode or more than one acquisition."""
+    task = CheckQubitFrequencyMapping()
+    _set_candidate_inputs(task, list(READOUT_FREQUENCIES), list(READOUT_AMPLITUDES))
+    helper = _fake_helper(_single_response_zs("RQ02"))
+
+    def corrupted(*args: Any, **kwargs: Any) -> SimpleNamespace:
+        result = helper(*args, **kwargs)
+        if "RQ00" in kwargs["readout_frequencies"]:
+            corrupt(result.data)
+        return result
+
+    run_result, _ = _run(task, corrupted)
+    result = _postprocess(task, run_result)
+
+    assert result.output_parameters == {}
+    assert match in (result.validation_error or "")
+
+
+def test_helper_without_readout_grouping_raises_the_prerequisite(monkeypatch) -> None:
+    """Reject a Qubex helper that predates readout_grouping before any measurement."""
+    contrib = types.ModuleType("qubex.contrib")
+
+    def multiplexed_readout_qubit_spectroscopy(exp, target, *, readout_frequencies):
+        raise AssertionError("must not be called")
+
+    contrib.multiplexed_readout_qubit_spectroscopy = multiplexed_readout_qubit_spectroscopy  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "qubex.contrib", contrib)
+
+    with pytest.raises(RuntimeError, match="readout_grouping argument"):
+        load_multiplexed_readout_qubit_spectroscopy()
+
+
+def test_grouping_mode_keeps_producer_provenance_unchanged() -> None:
+    """Leave candidate inputs and their producer provenance untouched in both modes."""
+    for grouping in ("subgroups", "multiplexed"):
+        task = _amplitude_task([0.5] * 4, grouping)
+        before = {
+            name: (parameter.value, parameter.execution_id, parameter.task_id)
+            for name, parameter in task.input_parameters.items()
+        }
+
+        _run(task, _fake_helper(_single_response_zs("RQ02")))
+
+        after = {
+            name: (parameter.value, parameter.execution_id, parameter.task_id)
+            for name, parameter in task.input_parameters.items()
+        }
+        assert after == before
+        assert task._candidate_source() == ("exec-resonator", "task-resonator")
+
+
+def test_installed_helper_reads_diagonal_subgroups_within_awg_full_scale() -> None:
+    """Compose each default-subgroup acquisition of four 0.5 tones with qxdriver."""
+    amplitudes = [0.5] * 4
+    task = _amplitude_task(amplitudes, "subgroups")
+    task.run_parameters["frequency_range"].value = (4.0, 4.5, 0.005)
+    exp = _offline_experiment("Q02")
+
+    with (
+        patch.object(task, "get_experiment", return_value=exp),
+        patch.object(task, "get_qubit_label", return_value="Q01"),
+        patch.object(task, "_verify_candidate_source"),
+    ):
+        run_result = task.run(cast("QubexBackend", object()), "1")
+    result = _postprocess(task, run_result)
+
+    service = exp.measurement_service
+    assert list({tuple(f): None for f in service.readout_frequencies}) == [
+        ("RQ00", "RQ03"),
+        ("RQ01", "RQ02"),
+    ]
+    composed = {
+        id(schedule): (schedule, frequencies)
+        for schedule, frequencies in zip(
+            service.schedules, service.readout_frequencies, strict=True
+        )
+    }
+    assert len(composed) == 2 * len(DRIVE_POWERS)
+    for schedule, frequencies in composed.values():
+        _readout_awg_waveform(schedule, frequencies)
+    assert result.validation_error is None
+    assert result.output_parameters["resonator_candidate_index"].value == 2
+    assert result.output_parameters["readout_amplitude"].value == 0.5
