@@ -318,12 +318,12 @@ export function EditProposalCard({ edit, state }: { edit: EditProposal; state: I
         )}
         {canApply && (
           <>
-            <button type="button" className="btn btn-primary btn-xs rounded-full" onClick={apply}>
+            <button type="button" className="btn btn-primary btn-xs" onClick={apply}>
               Apply to editor
             </button>
             <button
               type="button"
-              className="btn btn-ghost btn-xs rounded-full"
+              className="btn btn-ghost btn-xs"
               onClick={() => setOutcome("discarded")}
             >
               Discard

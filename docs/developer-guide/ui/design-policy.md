@@ -91,6 +91,11 @@ Use motion to connect a trigger with its result or to show ongoing work. Avoid c
 large-area animation on dashboards, topology grids, tables, and repeated cards. Respect
 `prefers-reduced-motion`; `globals.css` supplies the global fallback.
 
+Trigger-based UI elements, such as menus, popovers, and tooltips, animate from their trigger rather
+than from the center of the opened element. Set `transform-origin` from the trigger geometry or
+from the origin variable that the shared primitive provides, for example
+`--radix-dropdown-menu-content-transform-origin`, and keep the reduced-motion behavior.
+
 ## Meet the Accessibility Baseline
 
 - Every control has an accessible name.

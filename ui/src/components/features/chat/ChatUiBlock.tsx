@@ -109,7 +109,7 @@ const { registry: baseRegistry } = defineRegistry(uiCatalog, {
               </div>
             )}
             <div className="stat-title text-xs whitespace-normal">{props.label}</div>
-            <div className="stat-value text-xl tabular-nums break-all">
+            <div className="stat-value break-all">
               {String(props.value)}
               {props.unit && (
                 <span className="ml-1 text-sm font-normal text-base-content/60">{props.unit}</span>
@@ -174,7 +174,7 @@ const { registry: baseRegistry } = defineRegistry(uiCatalog, {
     },
     Text: ({ props }) =>
       props.variant === "heading" ? (
-        <h3 className="text-sm font-semibold">{props.text}</h3>
+        <h3 className="text-sm font-medium">{props.text}</h3>
       ) : (
         <p
           className={`text-sm whitespace-pre-wrap break-words ${

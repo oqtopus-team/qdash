@@ -55,8 +55,9 @@
 /* Button active press effect */
 
 /* Button focus ring improvement */
+/* A solid primary ring keeps 3:1 against the surface in every theme. */
 .btn:focus-visible {
-  outline: 2px solid oklch(var(--p) / 0.5);
+  outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }
 
@@ -112,9 +113,16 @@ body {
   font-weight: 500;
 }
 
+/*
+ * Shape follows the active theme's DaisyUI radius tokens: `--radius-box` for boxes (card,
+ * modal, alert, table, popover), `--radius-field` for fields (button, input, select, tab,
+ * tooltip) and `--radius-selector` for badges. Light and dark set the QDash values; every
+ * other selectable theme keeps its own shape.
+ */
+
 /* Flat card: a border carries the edge, the shadow is a hairline. */
 .card {
-  border-radius: 0.75rem;
+  border-radius: var(--radius-box);
   box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.04);
   border: 1px solid color-mix(in oklch, var(--color-base-content) 10%, transparent);
 }
@@ -132,11 +140,15 @@ a.card:hover {
    Button Styles - Rich Interactive
    ---------------------------------------- */
 
-/* Flat buttons: DaisyUI's solid fills, a 0.5rem radius and no shadow, gloss or lift. */
+/* Flat buttons: DaisyUI's solid fills, the theme's field radius and no shadow, gloss or lift. */
 .btn {
-  border-radius: 0.5rem;
   font-weight: 500;
   box-shadow: none;
+}
+
+/* `.btn-circle` keeps DaisyUI's full radius; every other button takes the field radius. */
+.btn:not(.btn-circle) {
+  border-radius: var(--radius-field);
 }
 
 .btn:hover:not(:disabled, [disabled], [aria-disabled="true"], .btn-disabled) {
@@ -153,9 +165,9 @@ a.card:hover {
   background-color: color-mix(in oklch, var(--color-base-content) 8%, transparent);
 }
 
-.btn-xs,
-.btn-sm {
-  border-radius: 0.375rem;
+.btn-xs:not(.btn-circle),
+.btn-sm:not(.btn-circle) {
+  border-radius: calc(var(--radius-field) * 0.75);
 }
 
 /* ----------------------------------------
@@ -237,7 +249,7 @@ a.card:hover {
 .input,
 .select,
 .textarea {
-  border-radius: 0.5rem;
+  border-radius: var(--radius-field);
   border: 1px solid var(--color-base-300);
   background-color: var(--color-base-100);
   transition:
@@ -311,8 +323,9 @@ a.card:hover {
    Badge & Chip Styles - Rich
    ---------------------------------------- */
 
+/* Light and dark keep pill badges through --qdash-radius-badge; other themes use their selector. */
 .badge {
-  border-radius: 9999px;
+  border-radius: var(--qdash-radius-badge, var(--radius-selector));
   font-weight: 500;
   box-shadow: none;
 }
@@ -336,12 +349,12 @@ a.card:hover {
 
 .tabs-boxed {
   background-color: var(--color-base-200);
-  border-radius: 0.5rem;
+  border-radius: var(--radius-field);
   padding: 0.25rem;
 }
 
 .tabs-boxed .tab {
-  border-radius: 0.375rem;
+  border-radius: calc(var(--radius-field) * 0.75);
   transition: all 0.25s ease-out;
   font-weight: 500;
 }
@@ -360,7 +373,7 @@ a.card:hover {
    ---------------------------------------- */
 
 .modal-box {
-  border-radius: 0.75rem;
+  border-radius: var(--radius-box);
   box-shadow: 0 16px 40px -12px rgb(0 0 0 / 0.25);
   border: 1px solid color-mix(in oklch, var(--color-base-content) 10%, transparent);
   will-change: transform, opacity;
@@ -435,7 +448,7 @@ a.card:hover {
    ---------------------------------------- */
 
 .alert {
-  border-radius: 0.5rem;
+  border-radius: var(--radius-box);
   border: 1px solid color-mix(in oklch, currentColor 20%, transparent);
   box-shadow: none;
 }
@@ -445,7 +458,7 @@ a.card:hover {
    ---------------------------------------- */
 
 .table {
-  border-radius: 0.5rem;
+  border-radius: var(--radius-box);
   overflow: hidden;
 }
 
@@ -471,7 +484,7 @@ a.card:hover {
    ---------------------------------------- */
 
 .dropdown-content {
-  border-radius: 0.5rem;
+  border-radius: var(--radius-box);
   box-shadow: 0 8px 24px -8px rgb(0 0 0 / 0.2);
   border: 1px solid color-mix(in oklch, var(--color-base-content) 10%, transparent);
   animation: dropdownFadeIn 0.2s ease-out;
@@ -533,7 +546,7 @@ a.card:hover {
    ---------------------------------------- */
 
 .tooltip::before {
-  border-radius: 0.375rem;
+  border-radius: calc(var(--radius-field) * 0.75);
   box-shadow: 0 2px 8px -2px rgb(0 0 0 / 0.2);
   font-weight: 500;
 }
@@ -555,25 +568,34 @@ html[data-theme="light"],
   --color-base-300: #e2e2e3 !important;
   --color-base-content: #3c3c43 !important;
 
-  /* Primary colors - OQTOPUS brand */
-  --color-primary: #1f1fdd !important;
+  /*
+   * Brand colors - restrained light variants. Each reads at 4.5:1 or more as text on
+   * base-100/200 and as a badge tint, and keeps 4.5:1 against its white foreground on fills.
+   */
+  --color-primary: #3d5a99 !important;
   --color-primary-content: #ffffff !important;
-  --color-secondary: #e21331 !important;
+  --color-secondary: #9b4865 !important;
   --color-secondary-content: #ffffff !important;
-  --color-accent: #3b3be8 !important;
+  --color-accent: #4a6888 !important;
   --color-accent-content: #ffffff !important;
   --color-neutral: #dddde3 !important;
   --color-neutral-content: #3c3c43 !important;
 
-  /* Status colors - VitePress palette */
-  --color-info: #3a5ccc !important;
+  /* Status colors - quieter hues kept apart from each other and from primary */
+  --color-info: #1d6b85 !important;
   --color-info-content: #ffffff !important;
-  --color-success: #18794e !important;
+  --color-success: #2b7350 !important;
   --color-success-content: #ffffff !important;
-  --color-warning: #d97706 !important;
+  --color-warning: #8c5c0e !important;
   --color-warning-content: #ffffff !important;
-  --color-error: #b8272c !important;
+  --color-error: #ad3838 !important;
   --color-error-content: #ffffff !important;
+
+  /* Shape - QDash radius scale; other themes keep their own DaisyUI tokens */
+  --radius-field: 0.5rem !important;
+  --radius-box: 0.75rem !important;
+  --radius-selector: 0.5rem !important;
+  --qdash-radius-badge: 9999px;
 }
 
 /* ----------------------------------------
@@ -583,31 +605,40 @@ html[data-theme="light"],
 html[data-theme="dark"],
 :root[data-theme="dark"],
 [data-theme="dark"] {
-  /* Base colors - VitePress dark mode */
+  /* Base colors - charcoal surfaces */
   --color-base-100: #1b1b1f !important;
   --color-base-200: #161618 !important;
   --color-base-300: #2e2e32 !important;
   --color-base-content: rgba(255, 255, 255, 0.87) !important;
 
-  /* Primary colors - OQTOPUS brand (dark variants) */
-  --color-primary: #5555f0 !important;
-  --color-primary-content: #ffffff !important;
-  --color-secondary: #e21331 !important;
-  --color-secondary-content: #ffffff !important;
-  --color-accent: #6b6bf5 !important;
-  --color-accent-content: #ffffff !important;
+  /*
+   * Brand colors - restrained dark variants. Each reads at 4.5:1 or more as text on
+   * base-100/200 and as a badge tint, so fills pair with the dark base-100 foreground.
+   */
+  --color-primary: #7f9fdc !important;
+  --color-primary-content: #1b1b1f !important;
+  --color-secondary: #d27a82 !important;
+  --color-secondary-content: #1b1b1f !important;
+  --color-accent: #86a9c9 !important;
+  --color-accent-content: #1b1b1f !important;
   --color-neutral: #515c67 !important;
   --color-neutral-content: rgba(255, 255, 255, 0.87) !important;
 
-  /* Status colors - VitePress palette (dark variants) */
-  --color-info: #5c73e7 !important;
-  --color-info-content: #ffffff !important;
-  --color-success: #3dd68c !important;
+  /* Status colors - quieter hues kept apart from each other and from primary */
+  --color-info: #6eaed0 !important;
+  --color-info-content: #1b1b1f !important;
+  --color-success: #62b88c !important;
   --color-success-content: #1b1b1f !important;
-  --color-warning: #fbbf24 !important;
+  --color-warning: #d6a654 !important;
   --color-warning-content: #1b1b1f !important;
-  --color-error: #f66f81 !important;
+  --color-error: #e07a78 !important;
   --color-error-content: #1b1b1f !important;
+
+  /* Shape - same QDash radius scale as light */
+  --radius-field: 0.5rem !important;
+  --radius-box: 0.75rem !important;
+  --radius-selector: 0.5rem !important;
+  --qdash-radius-badge: 9999px;
 }
 
 /* Import DaisyUI themes referenced in code (globals.css selectors + Sidebar darkThemes) */
@@ -630,7 +661,7 @@ html[data-theme="dark"],
 
 /* Login page background gradient - Light mode */
 .login-page-bg {
-  background: linear-gradient(135deg, #f8f9ff 0%, #f0f1ff 25%, #fff5f6 75%, #fff 100%);
+  background: linear-gradient(135deg, #f9f9fb 0%, #f4f5f8 25%, #f9f6f7 75%, #fff 100%);
   position: relative;
 }
 
@@ -642,25 +673,25 @@ html[data-theme="dark"],
   right: 0;
   bottom: 0;
   background:
-    radial-gradient(ellipse at 20% 30%, rgba(31, 31, 221, 0.08) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 70%, rgba(226, 19, 49, 0.06) 0%, transparent 50%);
+    radial-gradient(ellipse at 20% 30%, rgba(61, 90, 153, 0.06) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 70%, rgba(155, 72, 101, 0.04) 0%, transparent 50%);
   pointer-events: none;
 }
 
 /* Login page background gradient - Dark mode */
 [data-theme="dark"] .login-page-bg {
-  background: linear-gradient(135deg, #1b1b1f 0%, #1e1e24 25%, #1f1a1b 75%, #1b1b1f 100%);
+  background: linear-gradient(135deg, #1b1b1f 0%, #1c1d21 25%, #1d1b1c 75%, #1b1b1f 100%);
 }
 
 [data-theme="dark"] .login-page-bg::before {
   background:
-    radial-gradient(ellipse at 20% 30%, rgba(85, 85, 240, 0.12) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 70%, rgba(246, 111, 129, 0.08) 0%, transparent 50%);
+    radial-gradient(ellipse at 20% 30%, rgba(127, 159, 220, 0.08) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 70%, rgba(210, 122, 130, 0.05) 0%, transparent 50%);
 }
 
 /* Login title gradient text - Light mode */
 .login-title-gradient {
-  background: linear-gradient(120deg, #1f1fdd 30%, #e21331 70%);
+  background: linear-gradient(120deg, #3d5a99 30%, #9b4865 70%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -668,7 +699,7 @@ html[data-theme="dark"],
 
 /* Login title gradient text - Dark mode */
 [data-theme="dark"] .login-title-gradient {
-  background: linear-gradient(120deg, #5555f0 30%, #f66f81 70%);
+  background: linear-gradient(120deg, #7f9fdc 30%, #d27a82 70%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -695,11 +726,11 @@ html[data-theme="dark"],
   0%,
   100% {
     opacity: 0.6;
-    filter: drop-shadow(0 0 5px rgba(31, 31, 221, 0.2));
+    filter: drop-shadow(0 0 5px rgba(61, 90, 153, 0.2));
   }
   50% {
     opacity: 0.4;
-    filter: drop-shadow(0 0 15px rgba(31, 31, 221, 0.3));
+    filter: drop-shadow(0 0 15px rgba(61, 90, 153, 0.25));
   }
 }
 
@@ -707,11 +738,11 @@ html[data-theme="dark"],
   0%,
   100% {
     opacity: 0.6;
-    filter: drop-shadow(0 0 5px rgba(85, 85, 240, 0.3));
+    filter: drop-shadow(0 0 5px rgba(127, 159, 220, 0.25));
   }
   50% {
     opacity: 0.4;
-    filter: drop-shadow(0 0 15px rgba(85, 85, 240, 0.4));
+    filter: drop-shadow(0 0 15px rgba(127, 159, 220, 0.3));
   }
 }
 
@@ -726,42 +757,6 @@ html[data-theme="dark"],
     drift 8s ease-in-out infinite,
     pulse-fade-dark 4s ease-in-out infinite;
 }
-/* ========================================
-   Status Animations & Effects
-   ======================================== */
-
-/* Pulse animation for active/running status */
-@keyframes status-pulse {
-  0%,
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.7;
-    transform: scale(1.05);
-  }
-}
-
-.status-pulse {
-  animation: status-pulse 2s ease-in-out infinite;
-}
-
-/* Success pulse - one-time animation */
-@keyframes success-pop {
-  0% {
-    transform: scale(0.8);
-    opacity: 0;
-  }
-  50% {
-    transform: scale(1.1);
-  }
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-}
-
 /* ========================================
    Card Effects
    ======================================== */
@@ -781,14 +776,6 @@ html[data-theme="dark"],
 .card-interactive:hover {
   border-color: color-mix(in oklch, var(--color-primary) 40%, transparent);
   box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.08);
-}
-
-/* ========================================
-   Number/Value Transitions
-   ======================================== */
-
-.value-transition {
-  transition: all 0.3s ease-out;
 }
 
 /* ========================================
@@ -849,103 +836,6 @@ html[data-theme="dark"],
 
 .modal-box {
   animation: modal-slide-up 0.2s ease-out;
-}
-
-/* Dashboard focus styles for hiding non-essential elements */
-.dashboard-focus-timeseries .col-span-3:first-of-type {
-  display: none; /* Hide parameter selection card */
-}
-.dashboard-focus-timeseries .col-span-3:last-of-type {
-  display: none; /* Hide data table */
-}
-.dashboard-focus-timeseries .col-span-3:nth-of-type(2) {
-  grid-column: span 1; /* Make plot take available width */
-}
-
-/* Improve plot sizing for dashboard */
-.dashboard-focus-timeseries .plotly-graph-div,
-.dashboard-focus-histogram .plotly-graph-div,
-.dashboard-focus-cdf .plotly-graph-div {
-  height: 350px !important;
-}
-
-/* Adjust margins for dashboard plots */
-.dashboard-focus-timeseries .js-plotly-plot,
-.dashboard-focus-histogram .js-plotly-plot,
-.dashboard-focus-cdf .js-plotly-plot {
-  margin: 0 !important;
-}
-
-/* Ensure plot containers take full available space */
-.dashboard-focus-timeseries,
-.dashboard-focus-histogram,
-.dashboard-focus-cdf {
-  height: 100%;
-}
-
-.dashboard-focus-timeseries > div,
-.dashboard-focus-histogram > div,
-.dashboard-focus-cdf > div {
-  height: 100%;
-}
-
-.dashboard-focus-histogram .grid-cols-12 > .col-span-4:first-child {
-  display: none; /* Hide parameter selection */
-}
-.dashboard-focus-histogram .grid-cols-12 > .col-span-8 {
-  grid-column: span 12; /* Make plot take full width */
-}
-.dashboard-focus-histogram .card.bg-base-100.shadow-md {
-  display: none; /* Hide data table */
-}
-
-.dashboard-focus-cdf .grid-cols-12 > .col-span-4:first-child {
-  display: none; /* Hide parameter selection */
-}
-.dashboard-focus-cdf .grid-cols-12 > .col-span-8 {
-  grid-column: span 12; /* Make plot take full width */
-}
-.dashboard-focus-cdf .card.bg-base-100.shadow-md {
-  display: none; /* Hide data table */
-}
-
-/* Dashboard focus styles for chip page */
-.dashboard-focus-chip {
-  /* Reduce padding for dashboard view */
-  padding: 1rem;
-}
-
-.dashboard-focus-chip > div {
-  /* Reduce space between sections */
-  gap: 1rem;
-}
-
-/* Hide or minimize certain elements for dashboard view */
-.dashboard-focus-chip .space-y-6 {
-  /* Reduce spacing */
-  gap: 1rem;
-}
-
-/* Optimize content area for dashboard */
-.dashboard-focus-chip .pt-4 {
-  padding-top: 0.5rem;
-}
-
-/* Dashboard focus styles for execution page */
-.dashboard-focus-execution {
-  /* Reduce padding for dashboard view */
-  padding: 1rem;
-}
-
-.dashboard-focus-execution .px-10 {
-  /* Reduce horizontal padding */
-  padding-left: 1rem;
-  padding-right: 1rem;
-}
-
-/* Hide execution stats section in dashboard view */
-.dashboard-focus-execution .pb-6:has(.flex.gap-4) {
-  display: none;
 }
 
 /* ----------------------------------------
@@ -1157,7 +1047,7 @@ html[data-theme="dark"],
   width: 16px;
   height: 16px;
   margin: -8px 0 0 -8px;
-  background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+  background: var(--color-primary);
   border-radius: 50%;
   animation: quantum-core-pulse 2s ease-in-out infinite;
 }
@@ -1175,20 +1065,17 @@ html[data-theme="dark"],
 .quantum-loader-orbit-1 {
   background: var(--color-primary);
   animation: quantum-orbit 1.5s linear infinite;
-  box-shadow: 0 0 8px var(--color-primary);
 }
 
 .quantum-loader-orbit-2 {
-  background: var(--color-secondary);
+  background: color-mix(in oklch, var(--color-primary) 70%, transparent);
   animation: quantum-orbit-reverse 2s linear infinite;
-  box-shadow: 0 0 8px var(--color-secondary);
 }
 
 .quantum-loader-orbit-3 {
-  background: var(--color-accent);
+  background: color-mix(in oklch, var(--color-primary) 45%, transparent);
   animation: quantum-orbit 2.5s linear infinite;
   animation-delay: 0.5s;
-  box-shadow: 0 0 8px var(--color-accent);
 }
 
 /* Quantum trail effect */
@@ -1205,7 +1092,7 @@ html[data-theme="dark"],
 }
 
 .quantum-loader-ring:nth-child(2) {
-  border-top-color: color-mix(in oklch, var(--color-secondary) 30%, transparent);
+  border-top-color: color-mix(in oklch, var(--color-primary) 25%, transparent);
   animation-duration: 2.5s;
   animation-direction: reverse;
 }
@@ -1825,7 +1712,7 @@ html[data-theme="dark"],
   max-width: 20rem;
   padding: 0.75rem 1rem;
   border: 1px solid color-mix(in oklch, var(--color-base-content) 10%, transparent);
-  border-radius: 0.5rem;
+  border-radius: var(--radius-box);
   background: var(--color-base-100);
   color: var(--color-base-content);
   font-family: inherit;
@@ -1891,7 +1778,7 @@ html[data-theme="dark"],
   min-height: 2rem;
   padding: 0.25rem 0.75rem;
   border: 1px solid var(--color-primary);
-  border-radius: 0.5rem;
+  border-radius: calc(var(--radius-field) * 0.75);
   background: var(--color-primary);
   color: var(--color-primary-content);
   font-family: inherit;

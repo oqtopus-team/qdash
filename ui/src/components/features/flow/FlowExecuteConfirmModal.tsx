@@ -198,7 +198,7 @@ export function FlowExecuteConfirmModal({
         if (!open) onClose();
       }}
     >
-      <DialogContent className="flex max-h-[90vh] max-w-3xl flex-col gap-0 rounded-xl p-4 sm:p-6">
+      <DialogContent className="flex max-h-[90vh] max-w-3xl flex-col gap-0 p-4 sm:p-6">
         <DialogTitle>Execute Flow</DialogTitle>
         <DialogDescription className="mt-1 text-sm text-base-content/70">
           Review the settings and the execution plan for this run

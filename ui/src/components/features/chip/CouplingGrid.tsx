@@ -663,7 +663,7 @@ export function CouplingGrid({
                 width: displayCellSize * 0.6,
                 height: displayCellSize * 0.6,
               }}
-              className={`rounded-xl bg-white shadow-md border border-base-300/60 overflow-hidden transition-transform duration-200 hover:shadow-xl hover:border-primary/40 -translate-x-1/2 -translate-y-1/2 ${
+              className={`rounded-xl bg-white shadow-xs border border-base-300/60 overflow-hidden transition-colors duration-200 hover:border-primary/40 -translate-x-1/2 -translate-y-1/2 ${
                 downloadSelectionEnabled && isSelectedForDownload
                   ? "ring-2 ring-primary ring-offset-2"
                   : ""
@@ -719,7 +719,7 @@ export function CouplingGrid({
                 key={index}
                 className={`absolute transition-colors duration-200 rounded-lg flex items-center justify-center z-20 ${
                   isHovered
-                    ? "bg-primary/30 border-2 border-primary shadow-lg"
+                    ? "bg-primary/30 border-2 border-primary"
                     : "bg-primary/5 border-2 border-primary/20 hover:border-primary/40 hover:bg-primary/10"
                 }`}
                 style={{

@@ -300,7 +300,7 @@ export function TaskDetailModal({
             rawDataPaths,
             imagePaths: figures,
           }) && (
-            <div className="mb-6 rounded-xl bg-base-200 p-4">
+            <div className="mb-6 rounded-[var(--radius-box)] bg-base-200 p-4">
               <h4 className="mb-2 font-medium">Artifacts</h4>
               <TaskArtifactDownloads
                 jsonFigurePaths={jsonFigures}
@@ -349,7 +349,7 @@ export function TaskDetailModal({
                   ) : (
                     /* Simple view: single column with navigation */
                     <div className="grid grid-cols-2 gap-8">
-                      <div className="aspect-square bg-base-200/50 rounded-xl p-4">
+                      <div className="aspect-square bg-base-200/50 rounded-[var(--radius-box)] p-4">
                         {currentFigure && (
                           <TaskFigure
                             path={currentFigure}
@@ -390,7 +390,7 @@ export function TaskDetailModal({
                       </div>
                       <div className="space-y-6">
                         {/* Simple view: right column with info */}
-                        <div className="card bg-base-200 p-4 rounded-xl">
+                        <div className="card bg-base-200 p-4">
                           <h4 className="font-medium mb-2">Status</h4>
                           <div
                             className={`badge ${
@@ -405,13 +405,13 @@ export function TaskDetailModal({
                           </div>
                         </div>
                         {task.end_at && (
-                          <div className="card bg-base-200 p-4 rounded-xl">
+                          <div className="card bg-base-200 p-4">
                             <h4 className="font-medium mb-2">Calibrated At</h4>
                             <p className="text-sm">{formatDateTimeUtil(task.end_at)}</p>
                           </div>
                         )}
                         {task.output_parameters && (
-                          <div className="card bg-base-200 p-4 rounded-xl">
+                          <div className="card bg-base-200 p-4">
                             <h4 className="font-medium mb-2">Parameters</h4>
                             <div className="space-y-2">
                               {Object.entries(task.output_parameters).map(([key, value]) => {
@@ -439,7 +439,7 @@ export function TaskDetailModal({
                           </div>
                         )}
                         {task.run_parameters && Object.keys(task.run_parameters).length > 0 && (
-                          <details className="collapse collapse-arrow bg-base-200 rounded-xl">
+                          <details className="collapse collapse-arrow bg-base-200 rounded-[var(--radius-box)]">
                             <summary className="collapse-title font-medium text-sm py-3">
                               Run Parameters
                             </summary>

@@ -95,7 +95,7 @@ describe("metrics grids locked view", () => {
 
   it("wraps the locked qubit metrics grid in a scroller", () => {
     const { container } = render(<QubitMetricsGrid {...commonProps} />);
-    expectLockedScroller(container, ["grid", "rounded-xl"]);
+    expectLockedScroller(container, ["grid"]);
   });
 
   it("restores qubit labels, values and units when the zoomed-out grid is locked", () => {
@@ -124,5 +124,26 @@ describe("metrics grids locked view", () => {
   it("wraps the locked coupling metrics grid in a scroller", () => {
     const { container } = render(<CouplingMetricsGrid {...commonProps} />);
     expectLockedScroller(container, ["relative", "flex-shrink-0"]);
+  });
+
+  it("opens the qubit value tooltip on keyboard focus", () => {
+    render(<QubitMetricsGrid {...commonProps} />);
+
+    const cell = screen.getByText("23").closest("button");
+    expect(cell).not.toBeNull();
+    fireEvent.focus(cell!);
+
+    const tooltip = screen.getByRole("tooltip");
+    expect(tooltip.textContent).toBe("23: No data");
+    expect(cell?.getAttribute("aria-describedby")).toBe(tooltip.id);
+  });
+
+  it("names coupling cells and opens their tooltip on keyboard focus", () => {
+    render(<CouplingMetricsGrid {...commonProps} />);
+
+    const coupling = screen.getByRole("button", { name: "0\u21921: No data" });
+    fireEvent.focus(coupling);
+
+    expect(screen.getByRole("tooltip").textContent).toBe("0\u21921: No data");
   });
 });

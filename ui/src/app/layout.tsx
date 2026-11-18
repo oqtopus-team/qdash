@@ -27,12 +27,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`}>
       <body suppressHydrationWarning>
-        <NextTopLoader
-          color="oklch(var(--p))"
-          height={3}
-          showSpinner={false}
-          shadow="0 0 10px oklch(var(--p)),0 0 5px oklch(var(--p))"
-        />
+        {/* The bar follows the active theme's primary color; surfaces stay flat, so no glow. */}
+        <NextTopLoader color="var(--color-primary)" height={3} showSpinner={false} shadow={false} />
         <Providers>
           <AppLayout>{children}</AppLayout>
         </Providers>

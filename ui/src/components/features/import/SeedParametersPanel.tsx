@@ -1134,7 +1134,7 @@ export function SeedParametersPanel() {
         )}
 
         {data && viewParameterCount > 0 && visibleParameters.length === 0 && (
-          <div className="rounded-xl border border-dashed border-base-300 py-10 text-center">
+          <div className="rounded-[var(--radius-box)] border border-dashed border-base-300 py-10 text-center">
             <Search className="mx-auto mb-2 h-8 w-8 text-base-content/25" aria-hidden="true" />
             <p className="text-sm font-medium">No parameters match this view</p>
             <p className="mt-1 text-xs text-base-content/60">

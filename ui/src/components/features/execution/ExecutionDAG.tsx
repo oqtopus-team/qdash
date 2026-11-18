@@ -44,46 +44,26 @@ interface TaskNode {
   output_parameters?: Record<string, unknown>;
 }
 
-const getStatusStyles = (status: string) => {
+/** Status classes use the theme's semantic colors so nodes stay readable on every theme. */
+const getStatusClasses = (status: string): string => {
   switch (status) {
     case "running":
-      return {
-        background: "hsl(198 93% 60% / 0.1)",
-        borderColor: "hsl(198 93% 60%)",
-        color: "hsl(198 93% 60%)",
-      };
+      return "border-info bg-info/10 text-info";
     case "completed":
-      return {
-        background: "hsl(142 71% 45% / 0.1)",
-        borderColor: "hsl(142 71% 45%)",
-        color: "hsl(142 71% 45%)",
-      };
+      return "border-success bg-success/10 text-success";
     case "scheduled":
-      return {
-        background: "hsl(48 96% 53% / 0.1)",
-        borderColor: "hsl(48 96% 53%)",
-        color: "hsl(48 96% 53%)",
-      };
+      return "border-warning bg-warning/10 text-warning";
     case "failed":
-      return {
-        background: "hsl(0 91% 71% / 0.1)",
-        borderColor: "hsl(0 91% 71%)",
-        color: "hsl(0 91% 71%)",
-      };
+      return "border-error bg-error/10 text-error";
     case "cancelled":
-      return {
-        background: "hsl(220 9% 46% / 0.1)",
-        borderColor: "hsl(220 9% 46%)",
-        color: "hsl(220 9% 46%)",
-      };
+      return "border-base-content/40 bg-base-content/5 text-base-content/60";
     default:
-      return {
-        background: "hsl(220 13% 91%)",
-        borderColor: "hsl(220 13% 91%)",
-        color: "hsl(220 9% 46%)",
-      };
+      return "border-base-300 bg-base-200 text-base-content/60";
   }
 };
+
+/** Edge stroke and arrow follow the theme's content color. */
+const EDGE_COLOR = "color-mix(in oklch, var(--color-base-content) 45%, transparent)";
 
 interface NodeData extends Record<string, unknown> {
   name: string;
@@ -98,20 +78,10 @@ const CustomNode = ({ data }: NodeProps) => {
   const nodeData = data as NodeData;
   return (
     <div
-      className={`group relative cursor-pointer rounded-lg border px-4 shadow-lg transition-shadow ${
-        nodeData.isSelected ? "ring-2 ring-primary ring-offset-2 ring-offset-base-200" : ""
-      }`}
+      className={`group relative flex h-[60px] min-w-[150px] max-w-[300px] cursor-pointer flex-col justify-center rounded-[var(--radius-field)] border-2 px-4 shadow-xs ${getStatusClasses(
+        nodeData.status,
+      )} ${nodeData.isSelected ? "ring-2 ring-primary ring-offset-2 ring-offset-base-200" : ""}`}
       aria-current={nodeData.isSelected ? "true" : undefined}
-      style={{
-        ...getStatusStyles(nodeData.status),
-        borderWidth: "2px",
-        minWidth: "150px",
-        maxWidth: "300px",
-        height: "60px", // Fixed height
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "center",
-      }}
     >
       <Handle type="target" position={Position.Left} />
       <div className="font-medium truncate">{nodeData.name}</div>
@@ -222,11 +192,10 @@ function FlowContent({
       elementsSelectable={false}
       defaultEdgeOptions={{
         type: "smoothstep",
-        animated: true,
         style: { strokeWidth: 2 },
         markerEnd: {
           type: MarkerType.ArrowClosed,
-          color: "#64748b",
+          color: EDGE_COLOR,
         },
       }}
       fitViewOptions={FIT_VIEW_OPTIONS}
@@ -330,8 +299,7 @@ export function ExecutionDAG({ tasks }: ExecutionDAGProps) {
         source: task.upstream_id,
         target: task.task_id,
         type: "smoothstep",
-        animated: true,
-        style: { stroke: "#64748b", strokeWidth: 2 },
+        style: { stroke: EDGE_COLOR, strokeWidth: 2 },
       }));
 
     // Add nodes and edges to dagre graph

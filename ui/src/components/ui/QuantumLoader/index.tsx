@@ -8,7 +8,8 @@ type QuantumLoaderProps = {
 
 /**
  * Quantum-themed loading spinner that visualizes quantum superposition
- * with orbiting particles around a pulsing core.
+ * with orbiting particles around a pulsing core. The loader alone carries the motion and uses
+ * the primary color only; the label stays static so it remains readable.
  */
 export function QuantumLoader({
   size = "md",
@@ -49,7 +50,7 @@ export function QuantumLoader({
         <div className={`quantum-loader-orbit quantum-loader-orbit-3 ${orbitSize[size]}`} />
       </div>
 
-      {showLabel && <span className="text-sm text-base-content/70 animate-pulse">{label}</span>}
+      {showLabel && <span className="text-sm text-base-content/70">{label}</span>}
     </div>
   );
 }

@@ -10,6 +10,7 @@ import { GridFullscreenButton } from "@/components/ui/GridFullscreenButton";
 import { LockedGridScroller } from "@/components/ui/LockedGridScroller";
 import { GridZoomControls } from "@/components/ui/GridZoomControls";
 import { RegionZoomToggle } from "@/components/ui/RegionZoomToggle";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 import { useFullscreenPanel } from "@/hooks/useFullscreenPanel";
 import { useGridLayout } from "@/hooks/useGridLayout";
@@ -434,71 +435,74 @@ export function CouplingMetricsGrid({
             const arrowAngle = (Math.atan2(dy, dx) * 180) / Math.PI;
 
             const valueFontSizes = getCouplingFontSizes(displayCellSize);
+            const tooltipLabel =
+              value !== null && value !== undefined
+                ? `${srcQ}\u2192${tgtQ}: ${value.toFixed(4)} ${unit}`
+                : `${srcQ}\u2192${tgtQ}: No data`;
             return (
-              <button
-                key={couplingId}
-                onClick={() => metric && setSelectedCouplingInfo({ couplingId, metric })}
-                style={{
-                  position: "absolute",
-                  top: centerY,
-                  left: centerX,
-                  width: displayCellSize * 0.75,
-                  height: displayCellSize * 0.5,
-                  backgroundColor: bgColor || undefined,
-                }}
-                className={`rounded-md shadow-md flex flex-col items-center justify-center transition-transform hover:shadow-xl -translate-x-1/2 -translate-y-1/2 relative group cursor-pointer ${
-                  !bgColor ? "bg-base-300/50" : ""
-                }`}
-              >
-                {/* Value Display - LOD controlled */}
-                {value !== null && value !== undefined && showValues && (
-                  <div
-                    className="font-medium text-white drop-shadow-md leading-tight"
-                    style={{ fontSize: valueFontSizes.valueSize }}
-                  >
-                    {value.toFixed(showUnits ? 2 : 1)}
-                  </div>
-                )}
-
-                {/* No data indicator - LOD controlled */}
-                {(value === null || value === undefined) && showValues && (
-                  <div
-                    className="text-base-content/40 font-medium"
-                    style={{ fontSize: valueFontSizes.valueSize }}
-                  >
-                    —
-                  </div>
-                )}
-
-                {/* Direction arrow pointing from source to target qubit */}
-                {showValues && (
-                  <svg
-                    width="14"
-                    height="6"
-                    viewBox="0 0 18 7"
-                    className="mt-px drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]"
+              <Tooltip key={couplingId} disableHoverableContent>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label={tooltipLabel}
+                    onClick={() => metric && setSelectedCouplingInfo({ couplingId, metric })}
                     style={{
-                      transform: `rotate(${arrowAngle}deg)`,
+                      position: "absolute",
+                      top: centerY,
+                      left: centerX,
+                      width: displayCellSize * 0.75,
+                      height: displayCellSize * 0.5,
+                      backgroundColor: bgColor || undefined,
                     }}
+                    className={`rounded-md shadow-xs flex flex-col items-center justify-center -translate-x-1/2 -translate-y-1/2 relative cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-base-content ${
+                      !bgColor ? "bg-base-300/50" : ""
+                    }`}
                   >
-                    <line x1="1" y1="3.5" x2="14" y2="3.5" stroke="white" strokeWidth="1.5" />
-                    <polyline
-                      points="11,0.5 16,3.5 11,6.5"
-                      fill="none"
-                      stroke="white"
-                      strokeWidth="1.5"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                )}
+                    {/* Value Display - LOD controlled */}
+                    {value !== null && value !== undefined && showValues && (
+                      <div
+                        className="font-medium text-white drop-shadow-md leading-tight"
+                        style={{ fontSize: valueFontSizes.valueSize }}
+                      >
+                        {value.toFixed(showUnits ? 2 : 1)}
+                      </div>
+                    )}
 
-                {/* Hover tooltip - always show on hover */}
-                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-base-100 text-base-content text-sm rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
-                  {value !== null && value !== undefined
-                    ? `${srcQ}\u2192${tgtQ}: ${value.toFixed(4)} ${unit}`
-                    : `${srcQ}\u2192${tgtQ}: No data`}
-                </div>
-              </button>
+                    {/* No data indicator - LOD controlled */}
+                    {(value === null || value === undefined) && showValues && (
+                      <div
+                        className="text-base-content/40 font-medium"
+                        style={{ fontSize: valueFontSizes.valueSize }}
+                      >
+                        —
+                      </div>
+                    )}
+
+                    {/* Direction arrow pointing from source to target qubit */}
+                    {showValues && (
+                      <svg
+                        width="14"
+                        height="6"
+                        viewBox="0 0 18 7"
+                        className="mt-px drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]"
+                        style={{
+                          transform: `rotate(${arrowAngle}deg)`,
+                        }}
+                      >
+                        <line x1="1" y1="3.5" x2="14" y2="3.5" stroke="white" strokeWidth="1.5" />
+                        <polyline
+                          points="11,0.5 16,3.5 11,6.5"
+                          fill="none"
+                          stroke="white"
+                          strokeWidth="1.5"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    )}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent className="tabular-nums">{tooltipLabel}</TooltipContent>
+              </Tooltip>
             );
           });
       })()}
@@ -521,7 +525,7 @@ export function CouplingMetricsGrid({
                 key={index}
                 className={`absolute transition-colors duration-200 rounded-lg flex items-center justify-center z-20 ${
                   isHovered
-                    ? "bg-primary/30 border-2 border-primary shadow-lg"
+                    ? "bg-primary/30 border-2 border-primary"
                     : "bg-primary/5 border-2 border-primary/20 hover:border-primary/40 hover:bg-primary/10"
                 }`}
                 style={{
@@ -716,7 +720,10 @@ export function CouplingMetricsGrid({
               {/* Modal Footer */}
               <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-base-300 flex justify-between items-center">
                 <LineageButton
-                  target={{ parameterName: metricKey, qid: selectedCouplingInfo.couplingId }}
+                  target={{
+                    parameterName: metricKey,
+                    qid: selectedCouplingInfo.couplingId,
+                  }}
                   className="btn btn-ghost btn-sm sm:btn-md"
                 >
                   <GitBranch data-icon="inline-start" />

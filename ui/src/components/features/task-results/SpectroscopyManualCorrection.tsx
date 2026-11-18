@@ -160,7 +160,7 @@ export function SpectroscopyManualCorrection({
 
   if (!editing) {
     return (
-      <div className="rounded-xl border border-base-300 bg-base-100 p-4 shadow-sm">
+      <div className="rounded-[var(--radius-box)] border border-base-300 bg-base-100 p-4 shadow-sm">
         {createdTaskId && (
           <div className="alert alert-success mb-4 text-sm">
             <span>Manual correction saved.</span>
@@ -195,7 +195,7 @@ export function SpectroscopyManualCorrection({
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border border-base-300 bg-base-100 shadow-sm">
+    <div className="overflow-hidden rounded-[var(--radius-box)] border border-base-300 bg-base-100 shadow-sm">
       <div className="flex flex-col gap-3 border-b border-base-300 bg-base-200/50 p-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
@@ -388,7 +388,7 @@ export function SpectroscopyManualCorrection({
           </div>
           <div className="min-h-0 flex-1 overflow-auto bg-base-200 p-3 sm:p-5">
             {jsonFigurePaths[0] && (
-              <div className="mx-auto w-fit max-w-full overflow-auto rounded-xl border border-base-300 bg-base-100 p-3 shadow-sm">
+              <div className="mx-auto w-fit max-w-full overflow-auto rounded-[var(--radius-box)] border border-base-300 bg-base-100 p-3 shadow-sm">
                 <PlotlyRenderer
                   fullPath={`/api/executions/figure?path=${encodeURIComponent(jsonFigurePaths[0])}`}
                   onClick={handlePlotClick}

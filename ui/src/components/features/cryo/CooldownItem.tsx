@@ -130,11 +130,13 @@ export const CooldownItem = forwardRef<HTMLDivElement, CooldownItemProps>(functi
   return (
     <div
       ref={ref}
-      className={`rounded-xl border transition-colors ${
+      className={`rounded-[var(--radius-box)] border transition-colors ${
         isActive ? "border-success/40 bg-success/5" : "border-base-300 bg-base-100"
       }`}
     >
-      <div className={`flex items-center ${expanded ? "rounded-t-xl" : "rounded-xl"}`}>
+      <div
+        className={`flex items-center ${expanded ? "rounded-t-xl" : "rounded-[var(--radius-box)]"}`}
+      >
         <button
           type="button"
           onClick={onToggle}

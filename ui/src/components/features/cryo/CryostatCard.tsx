@@ -259,7 +259,7 @@ function ActiveCooldownBanner({
   return (
     <button
       onClick={onSelect}
-      className={`group w-full text-left rounded-xl border bg-success/8 px-4 py-3 transition-colors hover:bg-success/12 ${
+      className={`group w-full text-left rounded-[var(--radius-box)] border bg-success/8 px-4 py-3 transition-colors hover:bg-success/12 ${
         isSelected ? "border-success/60 ring-2 ring-success/30" : "border-success/30"
       }`}
     >
@@ -297,7 +297,7 @@ function ActiveCooldownBanner({
 
 function EmptyCooldowns({ onCreate }: { onCreate: () => void }) {
   return (
-    <div className="rounded-xl border border-dashed border-base-300 bg-base-200/30 px-4 py-8 text-center">
+    <div className="rounded-[var(--radius-box)] border border-dashed border-base-300 bg-base-200/30 px-4 py-8 text-center">
       <div className="text-sm text-base-content/70">No cool-downs yet</div>
       <div className="text-xs text-base-content/50 mt-0.5 mb-3">
         Cool-down cycles tag every calibration write with their{" "}
