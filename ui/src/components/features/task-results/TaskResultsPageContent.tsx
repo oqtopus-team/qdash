@@ -23,8 +23,10 @@ import { useListTaskResults } from "@/client/task-result/task-result";
 import { ChipSelector } from "@/components/selectors/ChipSelector";
 import { TaskSelector } from "@/components/selectors/TaskSelector";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { ErrorCard } from "@/components/ui/ErrorCard";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { RefreshErrorAlert } from "@/components/ui/RefreshErrorAlert";
 import { useSelectStyles } from "@/hooks/useSelectStyles";
 import { formatDateTime } from "@/lib/utils/datetime";
 import type {
@@ -360,10 +362,18 @@ export function TaskResultsPageContent() {
     isLoading,
     isError,
     isFetching,
+    errorUpdateCount,
+    refetch,
   } = useListTaskResults(params, {
     query: { staleTime: 15_000 },
   });
+  // The query key carries every filter and the page, so another scope never shows this data. A
+  // failed background refetch keeps the last data of the same scope on screen.
   const data = response?.data;
+  const retry = () => void refetch();
+  // Retrying a failed first load puts the query back to pending; keep the error in place with
+  // its retry disabled rather than swapping it for the initial loading spinner.
+  const retryingFirstLoad = isLoading && errorUpdateCount > 0;
   const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / PAGE_SIZE));
   const currentPage = Math.floor(skip / PAGE_SIZE) + 1;
 
@@ -570,20 +580,33 @@ export function TaskResultsPageContent() {
               Refreshing
             </span>
           )}
-          {rangeLabel && !isError && <span className="font-mono">{rangeLabel}</span>}
+          {rangeLabel && data && <span className="font-mono">{rangeLabel}</span>}
         </div>
       </div>
 
-      {isError ? (
-        <div className="alert alert-error">
-          <XCircle className="h-5 w-5" aria-hidden="true" />
-          <span>Failed to load task results.</span>
-        </div>
-      ) : isLoading ? (
+      {isError && data && (
+        <RefreshErrorAlert
+          className="mb-3"
+          message="Could not refresh task results. This list may be out of date."
+          onRetry={retry}
+          retrying={isFetching}
+        />
+      )}
+
+      {isLoading && !retryingFirstLoad ? (
         <div className="flex justify-center py-16">
           <span className="loading loading-spinner loading-lg" />
         </div>
-      ) : !data || data.items.length === 0 ? (
+      ) : !data ? (
+        isError || retryingFirstLoad ? (
+          <ErrorCard
+            title="Could not load task results"
+            message="The request failed. Check the connection and try again."
+            onRetry={retry}
+            retrying={isFetching}
+          />
+        ) : null
+      ) : data.items.length === 0 ? (
         hasFilters ? (
           <EmptyState
             title="No task results match these filters"
