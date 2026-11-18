@@ -9,6 +9,9 @@ import type { NotificationResponse } from "@/schemas";
 
 import { NotificationsPageContent } from "../NotificationsPageContent";
 
+const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
+vi.mock("@/components/ui/Toast", () => ({ useToast: () => toast }));
+
 // The generated hooks and a real QueryClient decide what is shown; only the network is faked.
 function notification(id: string, read: boolean): NotificationResponse {
   return {
@@ -28,14 +31,38 @@ function notification(id: string, read: boolean): NotificationResponse {
 
 let inbox: NotificationResponse[] = [];
 let failList = false;
+let failMarkRead = false;
+let failMarkAll = false;
+/** When set, a mark read request waits for this promise to settle before answering. */
+let markReadGate: Promise<void> | null = null;
 const listRequests: Record<string, unknown>[] = [];
 const markAllCalls: string[] = [];
+const markReadCalls: string[] = [];
 const originalAdapter = AXIOS_INSTANCE.defaults.adapter;
 
 const fakeAdapter: AxiosAdapter = async (config: InternalAxiosRequestConfig) => {
   const ok = (data: unknown) => ({ data, status: 200, statusText: "OK", headers: {}, config });
+  const fail = () =>
+    new AxiosError("Request failed", "ERR_BAD_RESPONSE", config, null, {
+      data: { detail: "boom" },
+      status: 500,
+      statusText: "Internal Server Error",
+      headers: {},
+      config,
+    });
+  const markRead = config.url?.match(/^\/notifications\/([^/]+)\/read$/);
+  if (markRead) {
+    markReadCalls.push(markRead[1]);
+    if (markReadGate) await markReadGate.catch(() => undefined);
+    if (failMarkRead) throw fail();
+    inbox = inbox.map((item) =>
+      item.id === markRead[1] ? { ...item, read_at: "2026-11-02T00:00:00Z" } : item,
+    );
+    return ok(inbox.find((item) => item.id === markRead[1]));
+  }
   if (config.url === "/notifications/read-all") {
     markAllCalls.push(String(config.method));
+    if (failMarkAll) throw fail();
     inbox = inbox.map((item) => ({ ...item, read_at: "2026-11-02T00:00:00Z" }));
     return ok({ updated: inbox.length });
   }
@@ -44,23 +71,17 @@ const fakeAdapter: AxiosAdapter = async (config: InternalAxiosRequestConfig) => 
   }
   const params = { ...(config.params as Record<string, unknown>) };
   listRequests.push(params);
-  if (failList) {
-    throw new AxiosError("Request failed", "ERR_BAD_RESPONSE", config, null, {
-      data: { detail: "boom" },
-      status: 500,
-      statusText: "Internal Server Error",
-      headers: {},
-      config,
-    });
-  }
+  if (failList) throw fail();
   const unread = inbox.filter((item) => item.read_at == null);
   const shown = params.unread_only ? unread : inbox;
+  const skip = Number(params.skip ?? 0);
+  const limit = Number(params.limit ?? 50);
   return ok({
-    notifications: shown,
+    notifications: shown.slice(skip, skip + limit),
     total: shown.length,
     unread_count: unread.length,
-    skip: 0,
-    limit: 100,
+    skip,
+    limit,
   });
 };
 
@@ -78,13 +99,23 @@ function setup(searchParams = "") {
 }
 
 const lastRequest = () => listRequests[listRequests.length - 1];
+const lastQuery = (onUrlUpdate: ReturnType<typeof setup>["onUrlUpdate"]) =>
+  onUrlUpdate.mock.calls[onUrlUpdate.mock.calls.length - 1]?.[0];
+/** `count` notifications, newest first, with ids `n1`..`n<count>`. */
+const many = (count: number, read = false) =>
+  Array.from({ length: count }, (_, index) => notification(`n${index + 1}`, read));
 
 beforeEach(() => {
   AXIOS_INSTANCE.defaults.adapter = fakeAdapter;
   inbox = [notification("1", false), notification("2", true)];
   failList = false;
+  failMarkRead = false;
+  failMarkAll = false;
+  markReadGate = null;
   listRequests.length = 0;
   markAllCalls.length = 0;
+  markReadCalls.length = 0;
+  toast.error.mockClear();
 });
 
 afterEach(() => {
@@ -172,5 +203,128 @@ describe("NotificationsPageContent failures", () => {
     await waitFor(() =>
       expect(screen.queryByText(/Could not refresh the inbox/)).not.toBeInTheDocument(),
     );
+  });
+});
+
+describe("NotificationsPageContent pagination", () => {
+  it("pages through the inbox with skip and limit, keeping the page in the URL", async () => {
+    inbox = many(60);
+    const { onUrlUpdate } = setup();
+    expect(await screen.findByText("Notification n50")).toBeInTheDocument();
+    expect(screen.queryByText("Notification n51")).not.toBeInTheDocument();
+    expect(lastRequest()).toMatchObject({ unread_only: false, skip: 0, limit: 50 });
+    expect(screen.getByText("Page 1 of 2")).toBeInTheDocument();
+    expect(screen.getByText("Items 1-50 of 60")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Previous" })).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    expect(await screen.findByText("Notification n51")).toBeInTheDocument();
+    expect(lastRequest()).toMatchObject({ skip: 50, limit: 50 });
+    expect(screen.queryByText("Notification n1")).not.toBeInTheDocument();
+    expect(screen.getByText("Items 51-60 of 60")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Next" })).toBeDisabled();
+    await waitFor(() => expect(lastQuery(onUrlUpdate)?.queryString).toBe("?page=2"));
+    expect(lastQuery(onUrlUpdate)?.options.history).toBe("push");
+  });
+
+  it("returns to the first page when the filter changes", async () => {
+    inbox = many(60);
+    const { onUrlUpdate } = setup("page=2");
+    expect(await screen.findByText("Notification n51")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Unread only" }));
+    await waitFor(() => expect(lastQuery(onUrlUpdate)?.queryString).toBe("?filter=unread"));
+    expect(await screen.findByText("Notification n1")).toBeInTheDocument();
+    expect(lastRequest()).toMatchObject({ unread_only: true, skip: 0 });
+  });
+
+  it("restores the filter and page from the URL", async () => {
+    inbox = many(60);
+    setup("filter=unread&page=2");
+    expect(await screen.findByText("Notification n51")).toBeInTheDocument();
+    expect(listRequests[0]).toMatchObject({ unread_only: true, skip: 50, limit: 50 });
+    expect(screen.getByRole("button", { name: "Unread only" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
+  it("hides the page controls when everything fits on one page", async () => {
+    setup();
+    await screen.findByText("Notification 1");
+    expect(screen.queryByRole("navigation", { name: "Inbox pages" })).not.toBeInTheDocument();
+  });
+
+  it("moves to the last page that has items when the shown page empties", async () => {
+    inbox = many(55);
+    const { onUrlUpdate } = setup("filter=unread&page=2");
+    expect(await screen.findByText("Notification n55")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Mark all read" }));
+    await waitFor(() => expect(lastQuery(onUrlUpdate)?.queryString).toBe("?filter=unread"));
+    // The correction replaces the stale page rather than adding a history entry.
+    expect(lastQuery(onUrlUpdate)?.options.history).toBe("replace");
+    expect(await screen.findByText("You have read everything in your inbox.")).toBeInTheDocument();
+    expect(lastRequest()).toMatchObject({ unread_only: true, skip: 0 });
+  });
+
+  it("corrects a page past the end of an old link", async () => {
+    inbox = many(3);
+    const { onUrlUpdate } = setup("page=9");
+    expect(await screen.findByText("Notification n1")).toBeInTheDocument();
+    await waitFor(() => expect(lastQuery(onUrlUpdate)?.queryString).toBe(""));
+  });
+});
+
+describe("NotificationsPageContent mark read failures", () => {
+  it("reports a failed mark all read and leaves the items unread for a retry", async () => {
+    failMarkAll = true;
+    setup();
+    await screen.findByText("Notification 1");
+
+    fireEvent.click(screen.getByRole("button", { name: "Mark all read" }));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("boom"));
+    expect(screen.getByText("1 unread item")).toBeInTheDocument();
+    expect(screen.getByText("Unread")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Mark all read" })).toBeEnabled(),
+    );
+
+    failMarkAll = false;
+    fireEvent.click(screen.getByRole("button", { name: "Mark all read" }));
+    expect(await screen.findByText("No unread items")).toBeInTheDocument();
+    expect(markAllCalls).toEqual(["patch", "patch"]);
+    expect(toast.error).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports a failed mark read when an unread item is opened", async () => {
+    failMarkRead = true;
+    setup();
+    fireEvent.click(await screen.findByText("Notification 1"));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("boom"));
+    expect(markReadCalls).toEqual(["1"]);
+    expect(screen.getByText("1 unread item")).toBeInTheDocument();
+  });
+
+  it("still reports a failed mark read after opening the notification leaves the inbox", async () => {
+    let rejectMarkRead: () => void = () => undefined;
+    const pending = new Promise<void>((_, reject) => (rejectMarkRead = () => reject()));
+    pending.catch(() => undefined);
+    failMarkRead = true;
+    markReadGate = pending;
+    setup();
+    fireEvent.click(await screen.findByText("Notification 1"));
+    await waitFor(() => expect(markReadCalls).toEqual(["1"]));
+
+    // Opening the link navigates away, which unmounts the inbox before the request settles.
+    cleanup();
+    rejectMarkRead();
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("boom"));
+  });
+
+  it("does not mark an item that is already read", async () => {
+    setup();
+    fireEvent.click(await screen.findByText("Notification 2"));
+    expect(markReadCalls).toEqual([]);
   });
 });
