@@ -80,4 +80,9 @@ class EvaluationRunDocument(Document):
                 [("project_id", ASCENDING), ("chip_id", ASCENDING), ("requested_at", DESCENDING)],
                 name="evaluation_run_chip_requested_idx",
             ),
+            # Project-wide list order: newest first, run ID breaking ties between pages.
+            IndexModel(
+                [("project_id", ASCENDING), ("requested_at", DESCENDING), ("run_id", DESCENDING)],
+                name="evaluation_run_project_requested_idx",
+            ),
         ]

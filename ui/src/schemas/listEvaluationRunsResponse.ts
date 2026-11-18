@@ -8,8 +8,16 @@
 import type { EvaluationRunSummary } from './evaluationRunSummary';
 
 /**
- * Runs, newest first.
+ * One page of runs, newest first.
  */
 export interface ListEvaluationRunsResponse {
   runs: EvaluationRunSummary[];
+  /** Newer runs skipped before this page */
+  skip: number;
+  /** Most runs this page could hold */
+  limit: number;
+  /** Older runs follow this page */
+  has_more: boolean;
+  /** Runs matching the filters across every page */
+  total: number;
 }

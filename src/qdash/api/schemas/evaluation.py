@@ -169,9 +169,13 @@ class CreateEvaluationRunResponse(BaseModel):
 
 
 class ListEvaluationRunsResponse(BaseModel):
-    """Runs, newest first."""
+    """One page of runs, newest first."""
 
     runs: list[EvaluationRunSummary]
+    skip: int = Field(..., description="Newer runs skipped before this page")
+    limit: int = Field(..., description="Most runs this page could hold")
+    has_more: bool = Field(..., description="Older runs follow this page")
+    total: int = Field(..., description="Runs matching the filters across every page")
 
 
 class EvaluationRunDetailResponse(BaseModel):

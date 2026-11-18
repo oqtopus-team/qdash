@@ -135,7 +135,12 @@ export const useCreateEvaluationRun = <TError = HTTPValidationError,
       return useMutation(getCreateEvaluationRunMutationOptions(options), queryClient);
     }
     /**
- * List runs of the project, newest first.
+ * List runs of the project, newest first, one page at a time.
+ *
+ * Runs requested at the same instant are ordered by run ID, so paging with
+ * `skip` and `limit` neither repeats nor drops a run. `has_more` reports
+ * whether older runs follow the page, and `total` counts every run that
+ * matches the filters.
  * @summary List calibration evaluation runs
  */
 export const listEvaluationRuns = (

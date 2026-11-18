@@ -77,6 +77,18 @@ editors can upload a draft.
 
 When the draft improves the judgments, propose the change to the task-knowledge repository.
 
+## Find a Run
+
+**AI Evaluations** lists every run of the current project, newest first, 25 runs per page. Filter
+by **Chip** or **Task** to narrow the list; changing a filter returns to the first page. Use
+**Next** and **Previous** to move through the pages. Every run stays reachable however old it
+is, and the line above the list shows which runs the page holds out of the total that matches
+the filters.
+
+The filters and the page are kept in the address, so reloading, going back, or sharing the link
+opens the same list. A page past the end, for example from an old link after runs were removed,
+opens the last page that has runs.
+
 ## Read a Run
 
 Open **AI Evaluations** and select a run. Each evaluated target shows the model's reading of the
@@ -111,8 +123,10 @@ model reported success.
 
 Use a comparison to measure the effect of a prompt, model, example, or result change:
 
-1. On **AI Evaluations**, select two runs for the same task and choose **Compare**. You can also
-   open one run and select **Compare with…**.
+1. On **AI Evaluations**, select two runs for the same task and choose **Compare**. The runs can
+   be on different pages or under different filters: a picked run stays listed in the bar above
+   the list until you remove it, select **Clear**, or switch to another project, which clears
+   the picks. You can also open one run and select **Compare with…**.
 2. Review the highlighted setting differences and run totals.
 3. Enable **Only differences** to focus on missing or conflicting judgments.
 4. Expand a target to compare both diagnoses and the figure. **Decision differs** means the
