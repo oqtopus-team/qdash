@@ -686,7 +686,7 @@ export function CDFView() {
   return (
     <div className="space-y-4 sm:space-y-6">
       {/* Controls Section */}
-      <div className="card bg-base-100 shadow-md">
+      <div className="card bg-base-100">
         <div className="card-body p-3 sm:p-4 gap-3 sm:gap-4">
           {/* Row 1: Main Controls */}
           <div className="flex flex-col gap-3 sm:gap-4">
@@ -905,7 +905,7 @@ export function CDFView() {
       />
 
       {/* Data Table */}
-      <div className="card bg-base-100 shadow-md">
+      <div className="card bg-base-100">
         <div className="card-body px-2 sm:px-8">
           <DataTable
             title="Data Points"

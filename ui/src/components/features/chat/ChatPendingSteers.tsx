@@ -60,7 +60,7 @@ export function ChatPendingSteers({
                 <button
                   type="button"
                   onClick={() => onCheck(steer.requestId)}
-                  className="btn btn-ghost btn-xs rounded-full"
+                  className="btn btn-ghost btn-xs"
                 >
                   Check again
                 </button>
@@ -69,7 +69,7 @@ export function ChatPendingSteers({
                 <button
                   type="button"
                   onClick={() => onResend(steer.requestId)}
-                  className="btn btn-ghost btn-xs rounded-full"
+                  className="btn btn-ghost btn-xs"
                 >
                   {isStreaming ? "Send again" : "Send as new message"}
                 </button>

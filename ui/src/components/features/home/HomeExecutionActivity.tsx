@@ -122,7 +122,7 @@ export function HomeExecutionActivity() {
     <div className="rounded-lg border border-base-300 bg-base-100 p-4">
       <div className="mb-3 flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
         <p className="flex items-baseline gap-2" data-testid="home-activity-total">
-          <span className="text-2xl font-semibold leading-none tabular-nums">{total}</span>
+          <span className="stat-value leading-none">{total}</span>
           <span className="text-sm text-base-content/60">
             {total === 1 ? "execution" : "executions"}
             {failed > 0 && (

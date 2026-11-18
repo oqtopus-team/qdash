@@ -205,7 +205,7 @@ export function MiniChatWindow() {
 
   return (
     <div
-      className="fixed z-[1100] flex flex-col bg-base-100 border border-base-300 rounded-2xl shadow-2xl overflow-hidden"
+      className="fixed z-[1100] flex flex-col bg-base-100 border border-base-300 rounded-[var(--radius-box)] shadow-2xl overflow-hidden"
       style={{
         left: position.x,
         top: position.y,

@@ -105,7 +105,7 @@ export function CommandDialog({
 }: CommandDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="top-[15vh] max-w-lg translate-y-0 overflow-hidden rounded-lg border-base-300 bg-base-200 p-0">
+      <DialogContent className="top-[15vh] max-w-lg translate-y-0 overflow-hidden border-base-300 bg-base-200 p-0">
         <DialogTitle className="sr-only">{title}</DialogTitle>
         <DialogDescription className="sr-only">{description}</DialogDescription>
         {children}

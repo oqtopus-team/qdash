@@ -120,7 +120,7 @@ export function FigureLightbox({ src, alt, jsonFigurePath, onClose }: FigureLigh
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="h-[calc(100dvh-2rem)] max-h-none max-w-none overflow-hidden rounded-2xl bg-neutral/95 p-0">
+      <DialogContent className="h-[calc(100dvh-2rem)] max-h-none max-w-none overflow-hidden bg-neutral/95 p-0">
         <DialogTitle className="sr-only">Figure preview</DialogTitle>
         <DialogDescription className="sr-only">
           Expanded figure with pan, zoom, and optional interactive controls.
@@ -144,7 +144,7 @@ export function FigureLightbox({ src, alt, jsonFigurePath, onClose }: FigureLigh
             // fits the viewport and the Plotly modebar never sits under those controls.
             <div
               data-testid="figure-lightbox-interactive"
-              className="absolute inset-x-2 top-16 bottom-2 overflow-hidden rounded-xl bg-base-100 p-2 shadow-lg sm:inset-x-4 sm:bottom-4 sm:p-4"
+              className="absolute inset-x-2 top-16 bottom-2 overflow-hidden rounded-[var(--radius-box)] bg-base-100 p-2 shadow-lg sm:inset-x-4 sm:bottom-4 sm:p-4"
             >
               <PlotlyRenderer
                 sizing="container"

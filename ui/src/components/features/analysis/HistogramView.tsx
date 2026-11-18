@@ -678,7 +678,7 @@ export function HistogramView() {
   return (
     <div className="space-y-4 sm:space-y-6">
       {/* Controls Section */}
-      <div className="card bg-base-100 shadow-md">
+      <div className="card bg-base-100">
         <div className="card-body p-3 sm:p-4 gap-3 sm:gap-4">
           {/* Row 1: Main Controls */}
           <div className="flex flex-col gap-3 sm:gap-4">
@@ -890,7 +890,7 @@ export function HistogramView() {
       />
 
       {/* Data Table - All Metrics */}
-      <div className="card bg-base-100 shadow-md">
+      <div className="card bg-base-100">
         <div className="card-body">
           <DataTable
             title={`${metricType === "coupling" ? "2Q" : "1Q"} Metrics Data`}

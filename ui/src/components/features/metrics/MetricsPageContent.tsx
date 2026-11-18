@@ -422,7 +422,7 @@ export function MetricsPageContent() {
 
           <section
             aria-labelledby="metrics-data-scope"
-            className="rounded-xl border border-base-300 bg-base-200/45 p-3 sm:p-4"
+            className="rounded-[var(--radius-box)] border border-base-300 bg-base-200/45 p-3 sm:p-4"
           >
             <h2 id="metrics-data-scope" className="mb-3 text-xs font-medium text-base-content/55">
               Data scope

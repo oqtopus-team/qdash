@@ -413,7 +413,7 @@ interface PanelShellProps {
 /** Card chrome shared by the reanalysis forms: header, form, mutation error and result. */
 function PanelShell({ title, children, mutation, onSubmit, onReset }: PanelShellProps) {
   return (
-    <div className="card bg-base-100 shadow-md border border-base-300">
+    <div className="card bg-base-100 border border-base-300">
       <div className="card-body p-4">
         <div className="flex items-center justify-between mb-2">
           <h4 className="font-medium flex items-center gap-2">

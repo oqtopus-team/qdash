@@ -77,7 +77,9 @@ the shared Radix-based `Dialog`, `DropdownMenu`, and `Tooltip` wrappers when foc
 keyboard navigation, portals, dismissal, or collision handling requires them. Feature code does
 not import another headless primitive to replace an established wrapper. The app root mounts one
 `TooltipProvider`, so moving between neighbouring tooltips skips the open delay; feature code
-does not add its own provider.
+does not add its own provider. An inline autocomplete, such as the mention list in
+`MarkdownEditor`, keeps focus in its text field, which `DropdownMenu` would move into the menu; it
+renders a `listbox` and marks the field as a `combobox` with `aria-activedescendant` instead.
 
 How these boundaries connect: [UI Architecture](./architecture.md).
 
@@ -127,12 +129,20 @@ are short (`Ask a question`, `Search tasks`).
 ## Keep Surfaces Flat
 
 Depth comes from borders and spacing, not from gradients, glow, or motion. `globals.css` sets the
-DaisyUI components once; feature code does not add decoration on top.
+DaisyUI components once; feature code does not add decoration on top. Corner radii come from the
+active theme's DaisyUI tokens (`--radius-field`, `--radius-box`, `--radius-selector`): the light
+and dark themes set `0.5rem` fields and `0.75rem` boxes, and every other theme keeps its own shape.
+Shared primitives use `rounded-[var(--radius-box)]` rather than a fixed `rounded-*` step.
+`globals.css` sets the button radius outside a cascade layer, so a `rounded-*` utility on a `.btn`
+never applies; leave the shape to the theme. Theme colors come from DaisyUI 5 variables such as
+`var(--color-primary)`; the DaisyUI 4 channels (`oklch(var(--p))`) no longer exist and resolve to
+no color. `ui/src/lib/__tests__/designTokens.test.ts` fails on either pattern and on a button
+radius rule that does not exclude `.btn-circle`.
 
 | Surface | Rule |
 | --- | --- |
-| Button | Solid DaisyUI fill, `0.5rem` radius, no shadow, no hover lift |
-| Card, table, alert, dropdown | 1px border in `base-content/10`, hairline shadow, `0.5rem` to `0.75rem` radius |
+| Button | Solid DaisyUI fill, `--radius-field` radius (`.btn-circle` stays round), no shadow, no hover lift |
+| Card, table, alert, dropdown, dialog | 1px border in `base-content/10`, hairline shadow, `--radius-box` radius |
 | Input | 1px border, primary border plus a 3px soft ring on focus |
 | Active navigation or tab | Tinted background (`primary` at 12%) with primary text, not a filled gradient |
 | Floating layer (modal, drawer, menu) | One soft shadow; this is the only place `shadow-md` or larger belongs |

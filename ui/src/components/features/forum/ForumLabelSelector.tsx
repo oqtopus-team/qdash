@@ -158,11 +158,7 @@ export function ForumLabelPicker({
         }}
       >
         <DropdownMenuTrigger asChild>
-          <button
-            type="button"
-            className="btn btn-outline btn-sm rounded-md normal-case"
-            disabled={disabled}
-          >
+          <button type="button" className="btn btn-outline btn-sm normal-case" disabled={disabled}>
             <Tag data-icon="inline-start" />
             Labels
             {selectedLabels.length > 0 && (

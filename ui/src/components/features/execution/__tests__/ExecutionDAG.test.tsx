@@ -461,3 +461,29 @@ describe("ExecutionDAG node interaction", () => {
     expect(nodesAfterClose.every((node) => !node.data.isSelected)).toBe(true);
   });
 });
+
+describe("ExecutionDAG theme", () => {
+  it("colors nodes with semantic status classes and draws static theme-colored edges", () => {
+    render(<ExecutionDAG tasks={tasks} />);
+
+    const nodeTypes = mocks.capturedProps?.nodeTypes as Record<
+      string,
+      (props: { data: Record<string, unknown> }) => ReactNode
+    >;
+    const CustomNode = nodeTypes.custom;
+    const { container } = render(
+      <>{CustomNode({ data: { name: "CheckT1", status: "failed", isSelected: false } })}</>,
+    );
+    const node = container.firstElementChild as HTMLElement;
+    expect(node.className).toContain("border-error");
+    expect(node.className).toContain("text-error");
+    expect(node.getAttribute("style")).toBeNull();
+
+    const edges = mocks.capturedProps?.edges as { animated?: boolean; style: { stroke: string } }[];
+    expect(edges).toHaveLength(1);
+    expect(edges[0].animated).toBeFalsy();
+    expect(edges[0].style.stroke).toContain("--color-base-content");
+    const defaults = mocks.capturedProps?.defaultEdgeOptions as { animated?: boolean };
+    expect(defaults.animated).toBeFalsy();
+  });
+});

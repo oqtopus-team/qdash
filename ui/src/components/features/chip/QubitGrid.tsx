@@ -206,7 +206,7 @@ const GridCell = memo(function GridCell({
           onKeyDown={handleKeyDown}
           aria-label={accessibleName}
           aria-disabled={isUnavailable || undefined}
-          className={`aspect-square rounded-xl bg-white shadow-md border border-base-300/60 overflow-hidden transition-all duration-200 hover:shadow-xl hover:border-primary/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary relative w-full ${muxBgClass} ${
+          className={`aspect-square rounded-xl bg-white shadow-xs border border-base-300/60 overflow-hidden transition-colors duration-200 hover:border-primary/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary relative w-full ${muxBgClass} ${
             isDownloadMode && isSelectedForDownload ? "ring-2 ring-primary ring-offset-2" : ""
           } ${isUnavailable ? "opacity-40 cursor-not-allowed" : ""}`}
         >
@@ -569,7 +569,7 @@ export function QubitGrid({
   // Grid content (extracted for reuse in both view modes)
   const gridContent = (
     <div
-      className="grid bg-base-200/50 rounded-xl relative"
+      className="grid bg-base-200/50 rounded-[var(--radius-box)] relative"
       style={{
         gap: `${gap}px`,
         padding: `${padding / 2}px`,
@@ -700,7 +700,7 @@ export function QubitGrid({
                   key={index}
                   className={`pointer-events-auto transition-colors duration-200 rounded-lg flex items-center justify-center ${
                     isHovered
-                      ? "bg-primary/30 border-2 border-primary shadow-lg z-10"
+                      ? "bg-primary/30 border-2 border-primary z-10"
                       : "bg-primary/5 border-2 border-primary/20 hover:border-primary/40 hover:bg-primary/10"
                   }`}
                   style={{

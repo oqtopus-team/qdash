@@ -256,7 +256,7 @@ function TasksCatalog({ sourceTask }: { sourceTask?: TaskResultResponse }) {
                                 setExecutionTarget(null);
                               }}
                             >
-                              <Braces className="shrink-0 text-purple-400" size={14} />
+                              <Braces className="shrink-0 text-base-content/60" size={14} />
                               <span className="truncate text-sm text-base-content/80">
                                 {task.name}
                               </span>

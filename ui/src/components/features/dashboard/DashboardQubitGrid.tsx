@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 
 import { MessageSquare, StickyNote } from "lucide-react";
 
@@ -82,11 +82,6 @@ export function DashboardQubitGrid({
   presentation = "metric",
   onQubitClick,
 }: DashboardQubitGridProps) {
-  const [hover, setHover] = useState<{
-    qid: string;
-    x: number;
-    y: number;
-  } | null>(null);
   const isSummaryPresentation = presentation === "summary";
   const {
     muxSize = 2,
@@ -207,95 +202,76 @@ export function DashboardQubitGrid({
           (hasForumDiscussion ? " · has linked forum discussion" : "") +
           (onQubitClick ? " (click to edit pinned summary)" : "");
         const Tag = onQubitClick ? "button" : "div";
+        const allNotes = notesByTarget?.[qid] ?? [];
+        const tooltipHeader =
+          value !== null ? `Q${qid}: ${value.toFixed(4)} ${unit}` : `Q${qid}: No data`;
         return (
-          <Tag
+          <DashboardNoteTooltip
             key={`${row}-${col}`}
-            onClick={onQubitClick ? handleClick : undefined}
-            onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
-              const rect = e.currentTarget.getBoundingClientRect();
-              setHover({
-                qid,
-                x: rect.left + rect.width / 2,
-                y: rect.top,
-              });
-            }}
-            onMouseLeave={() => setHover(null)}
-            className={`aspect-square rounded-md flex flex-col items-center justify-center relative shadow-sm text-left transition-colors ${
-              isSummaryPresentation ? `border ${summaryTileClass}` : ""
-            } ${onQubitClick ? "cursor-pointer hover:ring-2 hover:ring-primary/60" : ""}`}
-            style={{
-              backgroundColor: isSummaryPresentation ? undefined : (bg ?? undefined),
-            }}
-            aria-label={titleText}
+            header={tooltipHeader}
+            targetNote={targetNotesByTarget?.[qid]}
+            current={allNotes.find((n) => n.metricKey === metricKey)}
+            others={allNotes.filter((n) => n.metricKey !== metricKey)}
+            forumLinks={forumLinksByTarget?.[qid] ?? []}
           >
-            <span
-              className={
-                isSummaryPresentation
-                  ? "text-sm font-medium leading-none"
-                  : `absolute top-0.5 left-0.5 text-xs font-medium px-1 rounded leading-tight ${
-                      bg ? "bg-black/30 text-white" : "bg-base-200 text-base-content"
-                    }`
-              }
+            <Tag
+              onClick={onQubitClick ? handleClick : undefined}
+              className={`aspect-square rounded-md flex flex-col items-center justify-center relative shadow-sm text-left transition-colors ${
+                isSummaryPresentation ? `border ${summaryTileClass}` : ""
+              } ${onQubitClick ? "cursor-pointer hover:ring-2 hover:ring-primary/60" : ""}`}
+              style={{
+                backgroundColor: isSummaryPresentation ? undefined : (bg ?? undefined),
+              }}
+              aria-label={titleText}
             >
-              {isSummaryPresentation ? `Q${qid}` : qid}
-            </span>
-            {(hasNote || hasTargetNote) && (
               <span
-                className="absolute top-1 right-1 rounded-full bg-warning/90 text-warning-content p-0.5 shadow"
-                title={hasNote ? "Has legacy metric note" : "Has pinned summary"}
+                className={
+                  isSummaryPresentation
+                    ? "text-sm font-medium leading-none"
+                    : `absolute top-0.5 left-0.5 text-xs font-medium px-1 rounded leading-tight ${
+                        bg ? "bg-black/30 text-white" : "bg-base-200 text-base-content"
+                      }`
+                }
               >
-                <StickyNote className="h-3 w-3" />
+                {isSummaryPresentation ? `Q${qid}` : qid}
               </span>
-            )}
-            {hasCrossMetricNote && (
-              <span
-                className="absolute top-1 right-1 rounded-full bg-base-100/80 text-base-content/60 p-0.5 shadow border border-base-300"
-                title="Legacy note exists on another metric"
-              >
-                <StickyNote className="h-3 w-3" />
-              </span>
-            )}
-            {hasForumDiscussion && (
-              <span
-                className="absolute bottom-1 right-1 rounded-full p-0.5 shadow"
-                style={forumMarkerStyle}
-                title="Linked forum discussion"
-              >
-                <MessageSquare className="h-3 w-3" />
-              </span>
-            )}
-            {!isSummaryPresentation &&
-              (value !== null ? (
-                <span className="text-xs font-medium text-white drop-shadow leading-tight mt-1.5">
-                  {value.toFixed(2)}
+              {(hasNote || hasTargetNote) && (
+                <span
+                  className="absolute top-1 right-1 rounded-full bg-warning/90 text-warning-content p-0.5 shadow"
+                  title={hasNote ? "Has legacy metric note" : "Has pinned summary"}
+                >
+                  <StickyNote className="h-3 w-3" />
                 </span>
-              ) : (
-                <span className="text-xs text-base-content/40 mt-1.5">N/A</span>
-              ))}
-          </Tag>
+              )}
+              {hasCrossMetricNote && (
+                <span
+                  className="absolute top-1 right-1 rounded-full bg-base-100/80 text-base-content/60 p-0.5 shadow border border-base-300"
+                  title="Legacy note exists on another metric"
+                >
+                  <StickyNote className="h-3 w-3" />
+                </span>
+              )}
+              {hasForumDiscussion && (
+                <span
+                  className="absolute bottom-1 right-1 rounded-full p-0.5 shadow"
+                  style={forumMarkerStyle}
+                  title="Linked forum discussion"
+                >
+                  <MessageSquare className="h-3 w-3" />
+                </span>
+              )}
+              {!isSummaryPresentation &&
+                (value !== null ? (
+                  <span className="text-xs font-medium text-white drop-shadow leading-tight mt-1.5">
+                    {value.toFixed(2)}
+                  </span>
+                ) : (
+                  <span className="text-xs text-base-content/40 mt-1.5">N/A</span>
+                ))}
+            </Tag>
+          </DashboardNoteTooltip>
         );
       })}
-      {hover &&
-        (() => {
-          const allNotes = notesByTarget?.[hover.qid] ?? [];
-          const targetNote = targetNotesByTarget?.[hover.qid];
-          const forumLinks = forumLinksByTarget?.[hover.qid] ?? [];
-          const current = allNotes.find((n) => n.metricKey === metricKey);
-          const others = allNotes.filter((n) => n.metricKey !== metricKey);
-          const v = metricData?.[hover.qid]?.value ?? null;
-          const header =
-            v !== null ? `Q${hover.qid}: ${v.toFixed(4)} ${unit}` : `Q${hover.qid}: No data`;
-          return (
-            <DashboardNoteTooltip
-              position={{ x: hover.x, y: hover.y }}
-              header={header}
-              targetNote={targetNote}
-              current={current}
-              others={others}
-              forumLinks={forumLinks}
-            />
-          );
-        })()}
     </div>
   );
 }

@@ -48,7 +48,7 @@ export const TooltipContent = forwardRef<
       sideOffset={sideOffset}
       collisionPadding={collisionPadding}
       className={twMerge(
-        "z-[1400] max-w-72 rounded-lg border border-base-content/10 bg-base-100 px-2.5 py-1.5 text-xs text-base-content shadow-lg",
+        "z-[1400] max-w-72 rounded-[var(--radius-field)] border border-base-content/10 bg-base-100 px-2.5 py-1.5 text-xs text-base-content shadow-lg",
         className,
       )}
       {...props}
