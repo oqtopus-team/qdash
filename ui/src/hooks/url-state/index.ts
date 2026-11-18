@@ -7,3 +7,4 @@ export { useCDFUrlState } from "./useCDFUrlState";
 export { useHistogramUrlState } from "./useHistogramUrlState";
 export { useMetricsUrlState } from "./useMetricsUrlState";
 export { useRangeModeUrlState } from "./useRangeModeUrlState";
+export { useEvaluationRunsUrlState } from "./useEvaluationRunsUrlState";
