@@ -2,9 +2,6 @@
 @plugin "@tailwindcss/typography";
 @plugin "daisyui";
 
-/* Streamdown renders chat Markdown; its diagram and caret classes live in the package. */
-@source "../../node_modules/streamdown/dist/*.js";
-
 /* Geist Sans and Geist Mono are self-hosted through next/font in app/layout.tsx. */
 @theme {
   --font-sans:
@@ -1399,6 +1396,149 @@ html[data-theme="dark"],
 
 .chat-table-wrap thead {
   background: color-mix(in oklch, var(--color-base-content) 4%, transparent);
+}
+
+/* Chat answers render with @pierre/words; these rules theme its generated code blocks. */
+.chat-prose [data-markdown="code-block"] {
+  margin: 0.75rem 0;
+  overflow: hidden;
+  border: 1px solid color-mix(in oklch, var(--color-base-300) 70%, transparent);
+  border-radius: var(--radius-box);
+  background: color-mix(in oklch, var(--color-base-200) 80%, transparent);
+}
+
+.chat-prose [data-markdown="code-header"] {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.25rem 0.75rem;
+  border-bottom: 1px solid color-mix(in oklch, var(--color-base-300) 50%, transparent);
+  background: color-mix(in oklch, var(--color-base-300) 30%, transparent);
+  font-size: 0.75rem;
+  line-height: 1rem;
+  color: color-mix(in oklch, var(--color-base-content) 50%, transparent);
+}
+
+.chat-prose [data-markdown="code-header"] > span:first-child {
+  font-family: var(--font-mono);
+  text-transform: lowercase;
+}
+
+.chat-prose [data-markdown="code-header"] button {
+  height: 1.5rem;
+  padding: 0 0.5rem;
+  border-radius: var(--radius-field);
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    color 0.15s,
+    background-color 0.15s;
+}
+
+.chat-prose [data-markdown="code-header"] button:hover:not(:disabled) {
+  color: var(--color-base-content);
+  background: color-mix(in oklch, var(--color-base-content) 8%, transparent);
+}
+
+.chat-prose [data-markdown="code-header"] button[data-copied] {
+  color: var(--color-success);
+}
+
+.chat-prose [data-markdown="code-header"] button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.chat-prose [data-markdown="code-block"] pre {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  overflow-x: auto;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  line-height: 1.625;
+}
+
+.chat-prose [data-markdown="code-block"] pre code {
+  display: block;
+  white-space: pre;
+}
+
+/* Each 64-line group is its own layout block, so a streamed line only lays out its group. */
+.chat-prose [data-markdown="code-lines"] {
+  display: block;
+}
+
+/* Zero width, so the caret never shifts text; the glyph is CSS content, never copied. */
+.chat-prose [data-markdown="caret"] {
+  display: inline-block;
+  width: 0;
+  color: var(--color-primary);
+  user-select: none;
+  animation: chat-caret 1s steps(2, start) infinite;
+}
+
+.chat-prose [data-markdown="caret"]::after {
+  content: "\258d";
+}
+
+@keyframes chat-caret {
+  to {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-prose [data-markdown="caret"] {
+    animation: none;
+  }
+}
+
+.chat-prose img[data-markdown="img"] {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Mermaid diagrams: the canvas carries the pan and zoom transform. */
+.chat-mermaid-viewport {
+  display: flex;
+  justify-content: safe center;
+  overflow: hidden;
+  padding: 1rem;
+}
+
+.chat-mermaid-viewport[data-zoomed] {
+  cursor: grab;
+  touch-action: none;
+}
+
+.chat-mermaid-viewport[data-panning] {
+  cursor: grabbing;
+  user-select: none;
+}
+
+.chat-mermaid-canvas {
+  transform-origin: center;
+}
+
+.chat-mermaid-fullscreen {
+  align-items: center;
+  cursor: grab;
+  touch-action: none;
+}
+
+.chat-mermaid-fullscreen .chat-mermaid-canvas {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.chat-mermaid-fullscreen .chat-mermaid-canvas svg {
+  max-width: none !important;
+  width: min(100%, 64rem);
+  height: auto;
 }
 
 /* Loader keyframes (ui/Loader.tsx, adapted from prompt-kit). */

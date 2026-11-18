@@ -1,8 +1,8 @@
-import type { MermaidConfig as MermaidLibraryConfig } from "mermaid";
-import type { DiagramPlugin } from "streamdown";
+import type { MermaidConfig } from "mermaid";
 
-type MermaidInstance = ReturnType<DiagramPlugin["getMermaid"]>;
-type MermaidConfig = Parameters<MermaidInstance["initialize"]>[0];
+export type MermaidTheme = "dark" | "neutral";
+
+export type MermaidResult = { status: "ok"; svg: string } | { status: "error"; message: string };
 
 /**
  * Settings a chat answer cannot change. `strict` encodes HTML in labels and
@@ -16,6 +16,9 @@ const LOCKED_CONFIG: MermaidConfig = {
 };
 
 const URL_ATTRIBUTES = ["href", "xlink:href", "target"];
+
+/** Rendered diagrams kept for reuse across messages and re-renders. */
+const CACHE_LIMIT = 200;
 
 /**
  * Strips what could navigate or run code from a rendered diagram. Strict mode
@@ -37,37 +40,67 @@ function neutralizeMermaidSvg(svg: string): string {
   return doc.body.innerHTML;
 }
 
+const results = new Map<string, MermaidResult>();
+const inflight = new Map<string, Promise<MermaidResult>>();
+let queue: Promise<unknown> = Promise.resolve();
+let appliedConfig: string | null = null;
+let nextId = 0;
+
+const cacheKey = (source: string, theme: MermaidTheme) => `${theme}\0${source}`;
+
+/** A finished render of the diagram, or undefined when it has not run yet. */
+export function getMermaidResult(source: string, theme: MermaidTheme): MermaidResult | undefined {
+  return results.get(cacheKey(source, theme));
+}
+
+function errorMessage(error: unknown): string {
+  if (error instanceof Error && error.message) return error.message;
+  return typeof error === "string" && error ? error : "Unknown error";
+}
+
 /**
- * A Streamdown diagram plugin that loads Mermaid only when a diagram first
- * renders, so chat pages without diagrams never download it.
+ * Renders a diagram, loading Mermaid on first use so chat pages without
+ * diagrams never download it. Renders run one at a time because Mermaid keeps
+ * global state between `initialize` and `render`.
  */
-export function createLazyMermaidPlugin(): DiagramPlugin {
-  let requested: MermaidConfig = {};
-  let applied: string | null = null;
-  const instance: MermaidInstance = {
-    initialize(config) {
-      requested = config;
-    },
-    async render(id, source) {
+export function renderMermaid(source: string, theme: MermaidTheme): Promise<MermaidResult> {
+  const key = cacheKey(source, theme);
+  const done = results.get(key);
+  if (done) return Promise.resolve(done);
+  const running = inflight.get(key);
+  if (running) return running;
+
+  const task = queue
+    .then(async (): Promise<MermaidResult> => {
       const mermaid = (await import("mermaid")).default;
-      const config = { ...requested, ...LOCKED_CONFIG };
-      const key = JSON.stringify(config);
-      if (applied !== key) {
-        // Streamdown types the config loosely; values come from ChatMarkdown and LOCKED_CONFIG.
-        mermaid.initialize(config as MermaidLibraryConfig);
-        applied = key;
+      const config: MermaidConfig = { theme, ...LOCKED_CONFIG };
+      const configKey = JSON.stringify(config);
+      if (appliedConfig !== configKey) {
+        mermaid.initialize(config);
+        appliedConfig = configKey;
       }
-      const { svg } = await mermaid.render(id, source);
-      return { svg: neutralizeMermaidSvg(svg) };
-    },
-  };
-  return {
-    name: "mermaid",
-    type: "diagram",
-    language: "mermaid",
-    getMermaid(config) {
-      if (config) instance.initialize(config);
-      return instance;
-    },
-  };
+      const { svg } = await mermaid.render(`chat-mermaid-${nextId++}`, source);
+      return { status: "ok", svg: neutralizeMermaidSvg(svg) };
+    })
+    .catch((error: unknown): MermaidResult => ({ status: "error", message: errorMessage(error) }))
+    .then((result) => {
+      inflight.delete(key);
+      if (results.size >= CACHE_LIMIT) {
+        const oldest = results.keys().next().value;
+        if (oldest !== undefined) results.delete(oldest);
+      }
+      results.set(key, result);
+      return result;
+    });
+  queue = task;
+  inflight.set(key, task);
+  return task;
+}
+
+/** Forget rendered diagrams and the applied config. For tests. */
+export function resetMermaidCache(): void {
+  results.clear();
+  inflight.clear();
+  appliedConfig = null;
+  queue = Promise.resolve();
 }
