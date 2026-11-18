@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { dirname, join } from "node:path";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
 
 import type { ExtensionAPI, Theme } from "@earendil-works/pi-coding-agent";
 import {
@@ -26,6 +25,7 @@ import { ansi, boxLinesToWidth, boxed, formatNumber, textComponent } from "./lib
 import { plotSeriesLines, timeseriesPlotComponent, timeseriesPoints } from "./lib/timeseries-plot.js";
 import { installQDashWriteGate } from "./lib/write-gate.js";
 import { installQDashGuidance } from "./lib/guidance-hook.js";
+import { qdashContextPath } from "./lib/context-path.js";
 import { errorStatus, fileContentSourceGuidance, filesTreeSourceGuidance, looksLikeSourcePath } from "./lib/source-guidance.js";
 import { withAbort } from "./lib/abort.js";
 import { qcalContextText, recordedParameters, sweepsOf, type RecordedParameter, type Sweep } from "./lib/qcal-evidence.js";
@@ -142,7 +142,6 @@ type QDashContextState = {
 };
 
 const CONTEXT_ENTRY_TYPE = "qdash-context";
-const GLOBAL_CONTEXT_PATH = join(homedir(), ".pi", "agent", "qdash-context.json");
 let currentContext: QDashContextState = {};
 
 function applyQDashContext<T extends { profile?: string; chipId?: string; sessionId?: string }>(params: T): T {
@@ -202,8 +201,9 @@ function isQDashContextState(value: unknown): value is QDashContextState {
 
 function loadGlobalContext(): QDashContextState {
   try {
-    if (!existsSync(GLOBAL_CONTEXT_PATH)) return {};
-    const data = JSON.parse(readFileSync(GLOBAL_CONTEXT_PATH, "utf8"));
+    const path = qdashContextPath();
+    if (!existsSync(path)) return {};
+    const data = JSON.parse(readFileSync(path, "utf8"));
     return isQDashContextState(data) ? data : {};
   } catch {
     return {};
@@ -212,8 +212,9 @@ function loadGlobalContext(): QDashContextState {
 
 function saveGlobalContext(context: QDashContextState): void {
   const { investigation: _investigation, ...globalContext } = context;
-  mkdirSync(dirname(GLOBAL_CONTEXT_PATH), { recursive: true });
-  writeFileSync(GLOBAL_CONTEXT_PATH, `${JSON.stringify(globalContext, null, 2)}\n`, "utf8");
+  const path = qdashContextPath();
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, `${JSON.stringify(globalContext, null, 2)}\n`, "utf8");
 }
 
 function adoptContextFromToolInput(input: unknown): boolean {

@@ -238,6 +238,8 @@ src/tools/schedule/*
 .mcp.json
 .tmp/*
 /.claude/settings.local.json
+# Isolated pi agent dir of `task pi-local` (generated models.json, sessions).
+/.pi-local/
 docs/internal/*
 docs/papers/*
 config/qubex-config

@@ -104,5 +104,48 @@ pi -e ./packages/pi-qdash
 pi -e ./packages/pi-qcaleval
 ```
 
+To run pi with the Copilot chat model instead of your own pi model settings, use
+`task pi-local`; arguments after `--` go to pi:
+
+```bash
+task pi-local -- -p "Which chip is the default chip?"
+# A checkout without its own .env, such as a worktree:
+task pi-local -- --env-file /path/to/qdash/.env
+```
+
+`agent-runtime/src/local-cli.ts` builds `models.json` from `config/copilot/chat.yaml`
+and `evaluation.yaml`, or from the profile `QDASH_COPILOT_PROFILE` selects, with the
+runtime's `buildModelsConfig`. It loads pi-qdash and starts the first `chat_models`
+entry at the thinking level of its `reasoning_effort`. A first model whose endpoint is
+unset stops the run instead of falling back to another model. `--model <provider/id>`
+starts that model instead, whether or not the default resolves, and `--thinking <level>`
+sets the level. The default's level applies to `--model` only when it names the same
+`provider/id`. Pass these flags and their values as separate arguments, as pi reads them;
+the launcher rejects `--model=<value>`.
+
+The launcher parses `.env` as data, never as shell code, and takes from it only
+`QDASH_COPILOT_PROFILE`, the config path overrides, and the endpoint, key, and
+Cloudflare Access variables the models name. A variable already set in the shell
+wins, even when empty. The parser reads one `NAME=value` per line with an optional
+`export` prefix: single-quoted values are literal, double-quoted values accept the
+`\n`, `\t`, `\r`, `\"`, `\\`, and `\$` escapes, and unquoted values drop a ` #` comment.
+Unquoted and double-quoted values expand `$NAME`, `${NAME}`, `${NAME-default}`, and
+`${NAME:-default}`, taking the shell's value before the file's. Other forms, multi-line
+values, and text after a closing quote are not supported; the launcher skips such a
+line and reports its line number. `models.json` stores keys as `$NAME` references, and pi state goes to the
+ignored `.pi-local/agent/` (or `--agent-dir`), so `~/.pi/agent` is untouched.
+QDash connection settings stay pi-qdash's own: set `QDASH_BASE_URL` with
+`QDASH_API_TOKEN` in the shell, or use a profile in `~/.config/qdash/config.ini`.
+
+pi reads a piped stdin to EOF before it writes its first event, even when the prompt is an
+argument, so a caller that holds stdin open without writing, such as an agent's command tool,
+would stall pi with no output. When stdin is a pipe or socket and the arguments already carry a
+prompt, the launcher relays stdin and, if no byte arrives within 2 seconds, closes pi's stdin and
+warns that the run starts without piped input. Input that starts within that window is passed to
+EOF. Pass `--wait-stdin` to hand stdin to pi unchanged, for a producer that is slower to start;
+a terminal, a file, `/dev/null`, `--mode rpc`, or a run whose only prompt is the piped input is
+always handed over unchanged. The launcher forwards `SIGINT`, `SIGTERM`, and `SIGHUP` to pi, so
+stopping it does not leave pi to run the prompt later.
+
 Use `/reload` in pi after changing extensions or skills. Follow the repository
 [pre-push procedure](../development-flow.md#before-pushing) before submitting changes.

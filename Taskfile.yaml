@@ -289,6 +289,12 @@ tasks:
     cmds:
       - bun run build:client
 
+  pi-local:
+    desc: Run the pi CLI with pi-qdash and the Copilot chat models from .env (args after --)
+    deps: [build-client-ts]
+    cmds:
+      - bun agent-runtime/src/local-cli.ts {{range .CLI_ARGS_LIST}}{{shellQuote .}} {{end}}
+
   test-client-ts:
     desc: Run TypeScript client checks
     dir: clients/typescript
