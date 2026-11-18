@@ -92,15 +92,19 @@ export interface MetricConfig {
  *   - isLoading: Loading state
  *   - isError: Error state
  *   - error: Error object if failed
+ *   - isFetching: A fetch, including a retry, is in flight
+ *   - isRetryingAfterError: A retry of a failed load is in flight (isLoading is true again)
+ *   - refetch: Fetches the configuration again, for example to retry after a failure
  */
 export function useMetricsConfig(enabled = true) {
-  const { data, isLoading, isError, error } = useGetMetricsConfig({
-    query: {
-      enabled,
-      staleTime: Infinity, // Config rarely changes, cache indefinitely
-      gcTime: Infinity, // Keep in cache forever
-    },
-  });
+  const { data, isLoading, isError, error, isFetching, errorUpdateCount, refetch } =
+    useGetMetricsConfig({
+      query: {
+        enabled,
+        staleTime: Infinity, // Config rarely changes, cache indefinitely
+        gcTime: Infinity, // Keep in cache forever
+      },
+    });
 
   // Parse and transform config data
   const parsedConfig = useMemo(() => {
@@ -178,5 +182,8 @@ export function useMetricsConfig(enabled = true) {
     isLoading,
     isError,
     error,
+    isFetching,
+    isRetryingAfterError: isLoading && errorUpdateCount > 0,
+    refetch,
   };
 }

@@ -81,3 +81,17 @@ test("code mode and deferred tools are explained when offered", async () => {
   assert.doesNotMatch(marked, /qdash_list_cryostats/);
   assert.doesNotMatch(buildSystemPrompt("en", "en"), /codemode|tool_search/);
 });
+
+test("the investigation policy shared with pi CLI sits beside the runtime's own rules", async () => {
+  const { investigationPolicyBullets } = await import("@oqtopus-team/pi-qdash/extensions/lib/qdash-guidance.ts");
+  const prompt = buildSystemPrompt("auto", "en");
+  const guidelines = prompt.slice(prompt.indexOf("Guidelines:\n"));
+  for (const bullet of investigationPolicyBullets()) {
+    assert.ok(guidelines.includes(`${bullet}\n`), `missing shared rule: ${bullet}`);
+    assert.equal(prompt.split(bullet).length, 2, `shared rule appears more than once: ${bullet}`);
+  }
+  // Host-specific rules stay in the runtime prompt.
+  assert.match(prompt, /`render_ui`/);
+  assert.match(prompt, /approval card/);
+  assert.match(prompt, /You have no filesystem or shell access\./);
+});

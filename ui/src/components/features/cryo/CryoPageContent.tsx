@@ -199,7 +199,10 @@ function CryoOverview({
       className="grid grid-cols-2 lg:grid-cols-4 gap-2"
     >
       {items.map(({ label, value, icon: Icon, active, warning }) => (
-        <div key={label} className="rounded-xl border border-base-300 bg-base-100 px-3 py-3">
+        <div
+          key={label}
+          className="rounded-[var(--radius-box)] border border-base-300 bg-base-100 px-3 py-3"
+        >
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-medium text-base-content/60">{label}</span>
             <Icon
@@ -213,7 +216,7 @@ function CryoOverview({
               aria-hidden="true"
             />
           </div>
-          <div className="mt-1 text-2xl font-medium tabular-nums">{value}</div>
+          <div className="stat-value mt-1">{value}</div>
         </div>
       ))}
     </section>
@@ -237,14 +240,14 @@ function CryoLoadingSkeleton() {
         </div>
       </div>
       {/* Active banner skeleton */}
-      <div className="h-16 rounded-xl bg-base-200/60" />
+      <div className="h-16 rounded-[var(--radius-box)] bg-base-200/60" />
       {/* Timeline skeleton */}
       <div>
         <div className="h-3 w-20 rounded bg-base-300 mb-2" />
         <div className="h-20 rounded-md bg-base-200/60" />
       </div>
       {/* Detail panel skeleton */}
-      <div className="h-64 rounded-xl bg-base-200/40" />
+      <div className="h-64 rounded-[var(--radius-box)] bg-base-200/40" />
     </div>
   );
 }

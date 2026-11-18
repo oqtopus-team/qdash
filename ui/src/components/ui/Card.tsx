@@ -1,6 +1,6 @@
 import React from "react";
 
-type CardVariant = "default" | "compact" | "elevated";
+type CardVariant = "default" | "compact";
 type CardPadding = "none" | "sm" | "md" | "lg";
 
 interface CardProps {
@@ -22,9 +22,8 @@ interface CardProps {
 }
 
 const variantStyles: Record<CardVariant, string> = {
-  default: "bg-base-100 shadow-sm rounded-xl border border-base-300",
-  compact: "bg-base-100 shadow-sm rounded-lg border border-base-300",
-  elevated: "bg-base-100 shadow-md rounded-xl border border-base-300",
+  default: "bg-base-100 shadow-sm rounded-[var(--radius-box)] border border-base-content/10",
+  compact: "bg-base-100 shadow-sm rounded-[var(--radius-box)] border border-base-content/10",
 };
 
 const paddingStyles: Record<CardPadding, string> = {

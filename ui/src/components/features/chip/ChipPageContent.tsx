@@ -652,10 +652,10 @@ export function ChipPageContent() {
                 return (
                   <div
                     key={muxId}
-                    className={`bg-base-100 shadow-lg rounded-xl overflow-hidden transition-colors duration-200 ${
+                    className={`shadow-xs rounded-[var(--radius-box)] overflow-hidden transition-colors duration-200 ${
                       updateInfo.isRecent
-                        ? "border-2 border-primary animate-pulse-light"
-                        : "bg-base-200"
+                        ? "border-2 border-primary bg-base-100"
+                        : "border border-base-content/10 bg-base-200"
                     }`}
                   >
                     <div
@@ -698,7 +698,7 @@ export function ChipPageContent() {
                                     return (
                                       <div
                                         key={qid}
-                                        className="card bg-base-200/30 shadow-sm rounded-xl overflow-hidden border border-dashed border-base-content/20"
+                                        className="card bg-base-200/30 shadow-sm overflow-hidden border border-dashed border-base-content/20"
                                       >
                                         <div className="card-body p-2">
                                           <div className="text-sm font-medium mb-2">
@@ -729,7 +729,7 @@ export function ChipPageContent() {
                                             });
                                           }
                                         }}
-                                        className="card bg-base-100 shadow-sm rounded-xl overflow-hidden transition-all duration-200 hover:shadow-sm relative w-full"
+                                        className="card bg-base-100 overflow-hidden relative w-full"
                                       >
                                         <div className="card-body p-2">
                                           <div className="text-sm font-medium mb-2">

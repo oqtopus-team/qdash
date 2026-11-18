@@ -8593,7 +8593,7 @@
           "evaluation"
         ],
         "summary": "List calibration evaluation runs",
-        "description": "List runs of the project, newest first.",
+        "description": "List runs of the project, newest first, one page at a time.\n\nRuns requested at the same instant are ordered by run ID, so paging with\n`skip` and `limit` neither repeats nor drops a run. `has_more` reports\nwhether older runs follow the page, and `total` counts every run that\nmatches the filters.",
         "operationId": "listEvaluationRuns",
         "security": [
           {
@@ -8645,11 +8645,24 @@
               "type": "integer",
               "maximum": 200,
               "minimum": 1,
-              "description": "Newest runs to return",
+              "description": "Runs to return",
               "default": 20,
               "title": "Limit"
             },
-            "description": "Newest runs to return"
+            "description": "Runs to return"
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Newer runs to skip first",
+              "default": 0,
+              "title": "Skip"
+            },
+            "description": "Newer runs to skip first"
           },
           {
             "name": "X-Project-Id",
@@ -25339,14 +25352,38 @@
             },
             "type": "array",
             "title": "Runs"
+          },
+          "skip": {
+            "type": "integer",
+            "title": "Skip",
+            "description": "Newer runs skipped before this page"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit",
+            "description": "Most runs this page could hold"
+          },
+          "has_more": {
+            "type": "boolean",
+            "title": "Has More",
+            "description": "Older runs follow this page"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Runs matching the filters across every page"
           }
         },
         "type": "object",
         "required": [
-          "runs"
+          "runs",
+          "skip",
+          "limit",
+          "has_more",
+          "total"
         ],
         "title": "ListEvaluationRunsResponse",
-        "description": "Runs, newest first."
+        "description": "One page of runs, newest first."
       },
       "ListEvaluationsResponse": {
         "properties": {

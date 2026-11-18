@@ -3,7 +3,7 @@ import type { Layout } from "plotly.js";
 import { sansFontFamily } from "@/lib/fonts";
 
 /**
- * One palette for every Plotly chart. The brand indigo leads; the other series colors are muted
+ * One palette for every Plotly chart. The brand primary leads; the other series colors are muted
  * hues chosen to stay apart from each other and from the status colors, which are reserved for
  * pass/fail meaning. Chrome around the chart (grid, ticks, legend) comes from the neutral ramp.
  */
@@ -19,50 +19,54 @@ export interface ChartTheme {
   warn: string;
 }
 
+// Light series are muted, mid-lightness hues that each read at 5:1 or more on base-100.
+// pass/fail/warn match the light status colors.
 const LIGHT: ChartTheme = {
   text: "#3c3c43",
   muted: "rgba(60, 60, 67, 0.6)",
   grid: "rgba(60, 60, 67, 0.1)",
-  accent: "#1f1fdd",
-  secondary: "#b45309",
+  accent: "#3d5a99",
+  secondary: "#a0582b",
   series: [
-    "#1f1fdd",
-    "#b45309",
-    "#0f766e",
-    "#9d174d",
-    "#0e7490",
-    "#6d28d9",
-    "#a16207",
-    "#be123c",
-    "#475569",
-    "#15803d",
+    "#3d5a99",
+    "#a0582b",
+    "#20766f",
+    "#924b86",
+    "#2a6990",
+    "#6c5aa8",
+    "#6e6a18",
+    "#b0475e",
+    "#5b6573",
+    "#4b7a26",
   ],
-  pass: "#16a34a",
-  fail: "#dc2626",
-  warn: "#d97706",
+  pass: "#2b7350",
+  fail: "#ad3838",
+  warn: "#8c5c0e",
 };
 
+// Dark series are lower-chroma than the light set and alternate lightness so neighbours stay
+// apart; each reads at 4.5:1 or more on base-100. pass/fail/warn match the dark status colors.
 const DARK: ChartTheme = {
   text: "#e5e5e7",
   muted: "rgba(229, 229, 231, 0.6)",
   grid: "rgba(229, 229, 231, 0.1)",
-  accent: "#7b7bf7",
-  secondary: "#fbbf24",
+  accent: "#7f9fdc",
+  secondary: "#c98f4a",
   series: [
-    "#7b7bf7",
-    "#fbbf24",
-    "#2dd4bf",
-    "#f472b6",
-    "#22d3ee",
-    "#a78bfa",
-    "#facc15",
-    "#fb7185",
-    "#94a3b8",
-    "#4ade80",
+    "#7f9fdc",
+    "#c98f4a",
+    "#4fa293",
+    "#d39cb9",
+    "#7cc0d8",
+    "#ae9ee0",
+    "#d8c76e",
+    "#c9706f",
+    "#9aa4b2",
+    "#79b77a",
   ],
-  pass: "#4cc38a",
-  fail: "#e5484d",
-  warn: "#f59e0b",
+  pass: "#62b88c",
+  fail: "#e07a78",
+  warn: "#d6a654",
 };
 
 export function chartTheme(isDark: boolean): ChartTheme {

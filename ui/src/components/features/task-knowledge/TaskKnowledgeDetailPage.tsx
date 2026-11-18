@@ -163,7 +163,7 @@ export function TaskKnowledgeDetailPage({ taskName }: { taskName: string }) {
             {detail?.examples?.map((example) => (
               <article
                 key={example.id}
-                className="rounded-xl border border-base-300 bg-base-100 p-5"
+                className="rounded-[var(--radius-box)] border border-base-300 bg-base-100 p-5"
               >
                 <div className="flex flex-wrap items-center gap-2 mb-3">
                   <h3 className="text-sm font-medium">{example.title}</h3>

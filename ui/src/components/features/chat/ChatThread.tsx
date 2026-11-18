@@ -114,7 +114,7 @@ function EmptyState({
             onClick={() => onPick(text)}
             className={
               variant === "panel"
-                ? "btn btn-ghost btn-sm h-auto min-h-8 max-w-full rounded-full bg-base-200/60 px-3 py-1.5 text-base-content/60 font-normal"
+                ? "btn btn-ghost btn-sm h-auto min-h-8 max-w-full bg-base-200/60 px-3 py-1.5 text-base-content/60 font-normal"
                 : "chat-suggestion-pill group"
             }
           >
@@ -346,7 +346,7 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
             {isLoadingMessages && (
               <div className="space-y-6 pt-4" aria-label="Loading messages">
                 <div className="ml-auto h-10 w-1/2 rounded-3xl bg-base-content/5 animate-pulse" />
-                <div className="h-24 w-5/6 rounded-xl bg-base-content/5 animate-pulse" />
+                <div className="h-24 w-5/6 rounded-[var(--radius-box)] bg-base-content/5 animate-pulse" />
               </div>
             )}
             {messages.map((msg, idx) =>

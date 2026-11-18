@@ -31,7 +31,7 @@ export function InteractiveFigureContent({
 
   return (
     <>
-      <div className="w-fit max-w-full h-fit max-h-[78vh] bg-white rounded-xl p-4 shadow overflow-auto">
+      <div className="w-fit max-w-full h-fit max-h-[78vh] bg-white rounded-[var(--radius-box)] p-4 shadow overflow-auto">
         <PlotlyRenderer
           fullPath={`/api/executions/figure?path=${encodeURIComponent(figureJsonPath)}`}
         />

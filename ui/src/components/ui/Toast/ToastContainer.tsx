@@ -35,13 +35,13 @@ export function ToastContainer() {
           // Collapsed toasts behind the front one take its height, so hide their content the way
           // Sonner's styled mode does.
           toast:
-            "flex w-full items-start gap-3 rounded-xl border border-base-content/10 bg-base-100 px-4 py-3 text-sm text-base-content shadow-md [&[data-expanded=false][data-front=false]>*]:opacity-0",
+            "flex w-full items-start gap-3 rounded-[var(--radius-box)] border border-base-content/10 bg-base-100 px-4 py-3 text-sm text-base-content shadow-md [&[data-expanded=false][data-front=false]>*]:opacity-0",
           // The icon slot is relative so Sonner's loader overlay stays inside it; a default toast
           // renders an empty slot, which is hidden.
           icon: "relative flex h-5 w-[18px] shrink-0 items-center justify-center empty:hidden",
           content: "flex min-w-0 flex-1 flex-col gap-0.5",
           title: "font-medium leading-5",
-          description: "text-[13px] leading-5 text-base-content/70",
+          description: "text-xs leading-5 text-base-content/70",
           actionButton: "btn btn-xs -my-0.5 shrink-0",
           cancelButton: "btn btn-ghost btn-xs -my-0.5 shrink-0",
           // Sonner renders the close button first; order-last moves it to the trailing edge.

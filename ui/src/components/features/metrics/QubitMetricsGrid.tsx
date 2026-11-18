@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState, useRef, useCallback, useEffect, memo } from "react";
-import { createPortal } from "react-dom";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 
 import { GitBranch, Lock, ZoomIn } from "lucide-react";
@@ -14,6 +13,7 @@ import { LockedGridScroller } from "@/components/ui/LockedGridScroller";
 import { LineageButton } from "@/components/features/provenance/ParameterLineageDialog";
 import { GridZoomControls } from "@/components/ui/GridZoomControls";
 import { RegionZoomToggle } from "@/components/ui/RegionZoomToggle";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 import { useFullscreenPanel } from "@/hooks/useFullscreenPanel";
 import { useGridLayout } from "@/hooks/useGridLayout";
@@ -111,113 +111,95 @@ const GridCell = memo(function GridCell({
   onClick,
 }: GridCellProps) {
   const fontSizes = getCellFontSizes(cellSize);
-  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
   // When cells are small, hide stddev and unit to prevent text from being crushed
   const effectiveShowUnits = showUnits && !fontSizes.hideExtras;
+  const tooltipLabel =
+    value !== null && value !== undefined
+      ? `${qid}: ${value.toFixed(4)}${stddev != null ? ` ± ${stddev.toFixed(4)}` : ""} ${unit}`
+      : `${qid}: No data`;
 
   return (
-    <button
-      onClick={onClick}
-      onMouseEnter={(e) => {
-        const rect = e.currentTarget.getBoundingClientRect();
-        setTooltipPos({ x: rect.left + rect.width / 2, y: rect.top });
-      }}
-      onMouseLeave={() => setTooltipPos(null)}
-      className={`aspect-square rounded-lg shadow-md flex flex-col items-center justify-center relative cursor-pointer ${
-        !bgColor ? "bg-base-300/50" : ""
-      } ${muxBgClass}`}
-      style={{
-        backgroundColor: bgColor || undefined,
-      }}
-    >
-      {/* QID Label */}
-      {showLabels && (
-        <div
-          className={`absolute top-0.5 left-0.5 px-0.5 py-px rounded font-medium shadow-sm leading-tight ${
-            value !== null && value !== undefined
-              ? "bg-black/30 text-white"
-              : "bg-base-content/20 text-base-content"
-          }`}
-          style={{ fontSize: fontSizes.labelSize }}
-        >
-          {qid}
-        </div>
-      )}
-
-      {/* Unit Label */}
-      {showLabels && effectiveShowUnits && (
-        <div
-          className="absolute top-0.5 right-1 text-white/90 font-medium drop-shadow leading-tight"
-          style={{ fontSize: fontSizes.unitSize }}
-        >
-          ({unit})
-        </div>
-      )}
-
-      {/* Value Display */}
-      {value !== null && value !== undefined && showValues && (
-        <div
-          className="flex flex-col items-center justify-center h-full leading-tight"
+    <Tooltip disableHoverableContent>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          onClick={onClick}
+          className={`aspect-square rounded-lg shadow-xs flex flex-col items-center justify-center relative cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-base-content ${
+            !bgColor ? "bg-base-300/50" : ""
+          } ${muxBgClass}`}
           style={{
-            paddingTop: showLabels ? cellFontSize(cellSize, 0.22) : undefined,
+            backgroundColor: bgColor || undefined,
           }}
         >
-          <div
-            className="font-medium text-white drop-shadow-md"
-            style={{ fontSize: fontSizes.valueSize }}
-          >
-            {value.toFixed(2)}
-          </div>
-          {stddev != null && effectiveShowUnits && (
+          {/* QID Label */}
+          {showLabels && (
             <div
-              className="text-white/80 font-medium drop-shadow"
-              style={{ fontSize: fontSizes.unitSize }}
+              className={`absolute top-0.5 left-0.5 px-0.5 py-px rounded font-medium shadow-sm leading-tight ${
+                value !== null && value !== undefined
+                  ? "bg-black/30 text-white"
+                  : "bg-base-content/20 text-base-content"
+              }`}
+              style={{ fontSize: fontSizes.labelSize }}
             >
-              ± {stddev.toFixed(2)}
+              {qid}
             </div>
           )}
-        </div>
-      )}
 
-      {/* No data indicator */}
-      {(value === null || value === undefined) && showValues && (
-        <div
-          className="flex flex-col items-center justify-center h-full leading-tight"
-          style={{
-            paddingTop: showLabels ? cellFontSize(cellSize, 0.22) : undefined,
-          }}
-        >
-          <div
-            className="text-base-content/40 font-medium"
-            style={{ fontSize: fontSizes.valueSize }}
-          >
-            N/A
-          </div>
-        </div>
-      )}
+          {/* Unit Label */}
+          {showLabels && effectiveShowUnits && (
+            <div
+              className="absolute top-0.5 right-1 text-white/90 font-medium drop-shadow leading-tight"
+              style={{ fontSize: fontSizes.unitSize }}
+            >
+              ({unit})
+            </div>
+          )}
 
-      {/* Hover tooltip - portal to escape overflow-hidden */}
-      {tooltipPos &&
-        typeof document !== "undefined" &&
-        createPortal(
-          <div
-            role="tooltip"
-            className="px-3 py-2 bg-base-100 text-base-content text-sm rounded-lg shadow-lg whitespace-nowrap pointer-events-none border border-base-300"
-            style={{
-              position: "fixed",
-              left: tooltipPos.x,
-              top: tooltipPos.y - 8,
-              transform: "translate(-50%, -100%)",
-              zIndex: 9999,
-            }}
-          >
-            {value !== null && value !== undefined
-              ? `${qid}: ${value.toFixed(4)}${stddev != null ? ` ± ${stddev.toFixed(4)}` : ""} ${unit}`
-              : `${qid}: No data`}
-          </div>,
-          document.body,
-        )}
-    </button>
+          {/* Value Display */}
+          {value !== null && value !== undefined && showValues && (
+            <div
+              className="flex flex-col items-center justify-center h-full leading-tight"
+              style={{
+                paddingTop: showLabels ? cellFontSize(cellSize, 0.22) : undefined,
+              }}
+            >
+              <div
+                className="font-medium text-white drop-shadow-md"
+                style={{ fontSize: fontSizes.valueSize }}
+              >
+                {value.toFixed(2)}
+              </div>
+              {stddev != null && effectiveShowUnits && (
+                <div
+                  className="text-white/80 font-medium drop-shadow"
+                  style={{ fontSize: fontSizes.unitSize }}
+                >
+                  ± {stddev.toFixed(2)}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* No data indicator */}
+          {(value === null || value === undefined) && showValues && (
+            <div
+              className="flex flex-col items-center justify-center h-full leading-tight"
+              style={{
+                paddingTop: showLabels ? cellFontSize(cellSize, 0.22) : undefined,
+              }}
+            >
+              <div
+                className="text-base-content/40 font-medium"
+                style={{ fontSize: fontSizes.valueSize }}
+              >
+                N/A
+              </div>
+            </div>
+          )}
+        </button>
+      </TooltipTrigger>
+      <TooltipContent className="tabular-nums">{tooltipLabel}</TooltipContent>
+    </Tooltip>
   );
 });
 
@@ -472,7 +454,7 @@ export function QubitMetricsGrid({
   const gridContent = useMemo(
     () => (
       <div
-        className="grid bg-base-200/50 rounded-xl relative"
+        className="grid bg-base-200/50 rounded-[var(--radius-box)] relative"
         style={{
           gap: `${gap}px`,
           padding: `${padding / 2}px`,
@@ -575,7 +557,7 @@ export function QubitMetricsGrid({
                     key={index}
                     className={`pointer-events-auto transition-colors duration-200 rounded-lg flex items-center justify-center ${
                       isHovered
-                        ? "bg-primary/30 border-2 border-primary shadow-lg z-10"
+                        ? "bg-primary/30 border-2 border-primary z-10"
                         : "bg-primary/5 border-2 border-primary/20 hover:border-primary/40 hover:bg-primary/10"
                     }`}
                     style={{
@@ -784,7 +766,10 @@ export function QubitMetricsGrid({
               </div>
               <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-base-300 flex justify-between items-center">
                 <LineageButton
-                  target={{ parameterName: metricKey, qid: selectedQubitInfo.qid }}
+                  target={{
+                    parameterName: metricKey,
+                    qid: selectedQubitInfo.qid,
+                  }}
                   className="btn btn-ghost btn-sm sm:btn-md"
                 >
                   <GitBranch data-icon="inline-start" />

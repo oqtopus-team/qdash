@@ -77,7 +77,7 @@ export function CodeBlock({
   return (
     <div
       className={`relative group overflow-hidden border border-base-300/70 bg-base-200/80 not-prose ${
-        compact ? "my-1.5 rounded-lg" : "my-3 rounded-xl"
+        compact ? "my-1.5 rounded-lg" : "my-3 rounded-[var(--radius-box)]"
       }`}
     >
       {/* Header bar */}

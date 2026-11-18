@@ -156,7 +156,7 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
         />
       )}
       {taskResult.task_name === "ManualParameterEdit" && (
-        <div className="mb-4 overflow-hidden rounded-xl border border-success/30 bg-success/5">
+        <div className="mb-4 overflow-hidden rounded-[var(--radius-box)] border border-success/30 bg-success/5">
           <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-start gap-3">
               <div className="rounded-full bg-success/15 p-2 text-success">

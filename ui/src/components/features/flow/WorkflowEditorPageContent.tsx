@@ -1260,7 +1260,7 @@ export function WorkflowEditorPageContent() {
                         openSidePanel(item.id);
                       }
                     }}
-                    className={`btn btn-ghost btn-sm btn-square relative h-9 w-9 rounded-sm ${
+                    className={`btn btn-ghost btn-sm btn-square relative ${
                       isActive ? "bg-base-300 text-primary" : "text-base-content/60"
                     }`}
                     title={item.label}
@@ -1280,7 +1280,7 @@ export function WorkflowEditorPageContent() {
               <button
                 type="button"
                 onClick={() => setShowCommandPalette(true)}
-                className="btn btn-ghost btn-sm btn-square h-9 w-9 rounded-sm text-base-content/60"
+                className="btn btn-ghost btn-sm btn-square text-base-content/60"
                 title="Command Palette"
                 aria-label="Command Palette"
               >

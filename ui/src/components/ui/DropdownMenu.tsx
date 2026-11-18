@@ -19,7 +19,7 @@ export const DropdownMenuContent = forwardRef<
       sideOffset={sideOffset}
       collisionPadding={collisionPadding}
       className={twMerge(
-        "z-[1300] min-w-48 overflow-y-auto rounded-xl border border-base-content/10 bg-base-100 p-1.5 text-base-content shadow-xl outline-none",
+        "z-[1300] min-w-48 overflow-y-auto rounded-[var(--radius-box)] border border-base-content/10 bg-base-100 p-1.5 text-base-content shadow-xl outline-none",
         className,
       )}
       {...props}

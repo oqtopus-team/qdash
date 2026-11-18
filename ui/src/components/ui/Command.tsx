@@ -114,7 +114,7 @@ export function CommandDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       {/* Floats near the top like a launcher; `command-palette*` own the entrance and exit motion. */}
       <DialogContent
-        className="command-palette top-3 w-[calc(100%-1.5rem)] max-w-[40rem] translate-y-0 overflow-hidden rounded-box border-base-content/10 bg-base-100 p-0 sm:top-[12vh]"
+        className="command-palette top-3 w-[calc(100%-1.5rem)] max-w-[40rem] translate-y-0 overflow-hidden border-base-content/10 bg-base-100 p-0 sm:top-[12vh]"
         overlayClassName="command-palette-overlay bg-black/25"
         onOpenAutoFocus={() => {
           returnFocusRef.current =

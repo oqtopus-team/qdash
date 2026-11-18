@@ -1,7 +1,13 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { QubitGrid } from "../QubitGrid";
+
+const { taskResults, downloadFiguresAsZip, toastError } = vi.hoisted(() => ({
+  taskResults: { current: {} as Record<string, unknown> },
+  downloadFiguresAsZip: vi.fn(),
+  toastError: vi.fn(),
+}));
 
 const wideQubits = Object.fromEntries(
   Array.from({ length: 24 }, (_, index) => [
@@ -24,7 +30,7 @@ vi.mock("@/hooks/useTopologyConfig", () => ({
 
 vi.mock("@/hooks/useQubitTaskResults", () => ({
   useQubitTaskResults: () => ({
-    data: { data: { result: {} } },
+    data: { data: { result: taskResults.current } },
     isLoading: false,
     isFetching: false,
     isError: false,
@@ -43,8 +49,10 @@ vi.mock("@/hooks/useGridLayout", () => ({
   }),
 }));
 
-vi.mock("@/client/task-result/task-result", () => ({
-  downloadFiguresAsZip: vi.fn(),
+vi.mock("@/client/task-result/task-result", () => ({ downloadFiguresAsZip }));
+
+vi.mock("@/components/ui/Toast", () => ({
+  useToast: () => ({ error: toastError }),
 }));
 
 vi.mock("@/components/charts/TaskFigure", () => ({
@@ -54,6 +62,14 @@ vi.mock("@/components/charts/TaskFigure", () => ({
 vi.mock("@/components/features/chip/modals/TaskHistoryModal", () => ({
   TaskHistoryModal: () => null,
 }));
+
+afterEach(cleanup);
+
+beforeEach(() => {
+  taskResults.current = {};
+  downloadFiguresAsZip.mockReset();
+  toastError.mockReset();
+});
 
 describe("QubitGrid locked view", () => {
   it("lets a wide non-square grid scroll instead of clipping its cells", () => {
@@ -69,7 +85,7 @@ describe("QubitGrid locked view", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Lock" }));
 
-    const grid = container.querySelector<HTMLElement>(".grid.rounded-xl");
+    const grid = container.querySelector<HTMLElement>(".justify-center-safe > .grid");
     expect(grid?.style.gridTemplateColumns).toContain("repeat(12,");
     expect(grid?.style.gridTemplateRows).toContain("repeat(2,");
     const scroller = grid?.parentElement;
@@ -80,5 +96,66 @@ describe("QubitGrid locked view", () => {
     const fullscreenButton = screen.getByRole("button", { name: "Fullscreen" });
     expect(outerContainer?.contains(fullscreenButton)).toBe(true);
     expect(scroller?.contains(fullscreenButton)).toBe(false);
+  });
+});
+
+describe("QubitGrid artifact download", () => {
+  it("reports a failed download in a toast and keeps the dialog and selection for a retry", async () => {
+    taskResults.current = {
+      "0": {
+        status: "completed",
+        figure_path: [],
+        json_figure_path: [],
+        raw_data_path: ["/raw/a.nc"],
+      },
+    };
+    downloadFiguresAsZip.mockRejectedValueOnce({
+      response: {
+        data: new Blob([JSON.stringify({ detail: "Archive too large" })]),
+      },
+    });
+    const alertSpy = vi.spyOn(window, "alert").mockImplementation(() => undefined);
+
+    render(
+      <QubitGrid
+        chipId="chip"
+        topologyId="wide"
+        selectedTask="CheckT1"
+        selectedDate="latest"
+        gridSize={12}
+      />,
+    );
+
+    fireEvent.click(screen.getByTitle("Select figures to download"));
+    expect(screen.getByText("1 / 1 selected")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Download" }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Download" }));
+
+    await waitFor(() => expect(toastError).toHaveBeenCalledWith("Archive too large"));
+    expect(alertSpy).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByText("1 / 1 selected")).toBeInTheDocument();
+    const retry = within(screen.getByRole("dialog")).getByRole("button", {
+      name: "Download",
+    });
+    expect(retry).toBeEnabled();
+
+    downloadFiguresAsZip.mockResolvedValueOnce({ data: new Blob(["zip"]) });
+    const createObjectURL = vi.fn(() => "blob:zip");
+    const revokeObjectURL = vi.fn();
+    Object.assign(window.URL, { createObjectURL, revokeObjectURL });
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    fireEvent.click(retry);
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(downloadFiguresAsZip).toHaveBeenCalledTimes(2);
+    expect(downloadFiguresAsZip).toHaveBeenLastCalledWith(
+      expect.objectContaining({ paths: ["/raw/a.nc"] }),
+      { responseType: "blob" },
+    );
+    expect(click).toHaveBeenCalled();
+    click.mockRestore();
+    alertSpy.mockRestore();
   });
 });

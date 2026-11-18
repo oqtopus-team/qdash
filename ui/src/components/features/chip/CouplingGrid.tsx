@@ -28,11 +28,13 @@ import {
   gridFullscreenPanelClass,
 } from "@/components/ui/GridFullscreenButton";
 import { LockedGridScroller } from "@/components/ui/LockedGridScroller";
+import { useToast } from "@/components/ui/Toast";
 import { GridZoomControls } from "@/components/ui/GridZoomControls";
 import { RegionZoomToggle } from "@/components/ui/RegionZoomToggle";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import { useCouplingTaskResults } from "@/hooks/useCouplingTaskResults";
 import { useFullscreenPanel } from "@/hooks/useFullscreenPanel";
+import { getApiErrorMessage, parseBlobErrorBody } from "@/lib/utils/apiError";
 import { useGridLayout } from "@/hooks/useGridLayout";
 import { usePanClickGuard } from "@/hooks/usePanClickGuard";
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
@@ -195,6 +197,7 @@ export function CouplingGrid({
   // Download selection mode state
   const [downloadSelectionEnabled, setDownloadSelectionEnabled] = useState(false);
   const [selectedForDownload, setSelectedForDownload] = useState<Set<string>>(new Set());
+  const toast = useToast();
   const [isDownloading, setIsDownloading] = useState(false);
   const [isDownloadConfirmOpen, setIsDownloadConfirmOpen] = useState(false);
   const [downloadOptions, setDownloadOptions] = useState<DownloadOptions>(DEFAULT_DOWNLOAD_OPTIONS);
@@ -457,8 +460,10 @@ export function CouplingGrid({
       setDownloadSelectionEnabled(false);
       setSelectedForDownload(new Set());
     } catch (error) {
-      console.error("Download error:", error);
-      alert("Download failed. Please try again.");
+      // Keep the dialog, options and selection so the download can be retried.
+      toast.error(
+        getApiErrorMessage(await parseBlobErrorBody(error), "Download failed. Please try again."),
+      );
     } finally {
       setIsDownloading(false);
     }
@@ -663,7 +668,7 @@ export function CouplingGrid({
                 width: displayCellSize * 0.6,
                 height: displayCellSize * 0.6,
               }}
-              className={`rounded-xl bg-white shadow-md border border-base-300/60 overflow-hidden transition-transform duration-200 hover:shadow-xl hover:border-primary/40 -translate-x-1/2 -translate-y-1/2 ${
+              className={`rounded-xl bg-white shadow-xs border border-base-300/60 overflow-hidden transition-colors duration-200 hover:border-primary/40 -translate-x-1/2 -translate-y-1/2 ${
                 downloadSelectionEnabled && isSelectedForDownload
                   ? "ring-2 ring-primary ring-offset-2"
                   : ""
@@ -719,7 +724,7 @@ export function CouplingGrid({
                 key={index}
                 className={`absolute transition-colors duration-200 rounded-lg flex items-center justify-center z-20 ${
                   isHovered
-                    ? "bg-primary/30 border-2 border-primary shadow-lg"
+                    ? "bg-primary/30 border-2 border-primary"
                     : "bg-primary/5 border-2 border-primary/20 hover:border-primary/40 hover:bg-primary/10"
                 }`}
                 style={{

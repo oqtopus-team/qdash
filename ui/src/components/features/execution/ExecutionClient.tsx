@@ -289,12 +289,12 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
           )}
         </div>
 
-        <div className="bg-base-100 rounded-lg shadow-md p-6">
+        <div className="card bg-base-100 p-6">
           <h2 className="text-sm font-medium mb-4">Execution Flow</h2>
           <ExecutionDAG tasks={validTasks} />
         </div>
 
-        <div id="parameter-changes" className="bg-base-100 rounded-lg shadow-md p-6">
+        <div id="parameter-changes" className="card bg-base-100 p-6">
           <details className="group" open={parameterChangesOpen}>
             <summary
               className="flex cursor-pointer list-none items-start gap-1.5"
@@ -324,7 +324,7 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
         {execution.note &&
           typeof execution.note === "object" &&
           Object.keys(execution.note).length > 0 && (
-            <div className="bg-base-100 rounded-lg shadow-md p-6">
+            <div className="card bg-base-100 p-6">
               <details className="collapse collapse-arrow border border-base-300">
                 <summary className="collapse-title text-sm font-medium">Execution Note</summary>
                 <div className="collapse-content">
@@ -360,11 +360,7 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
             </div>
           )}
 
-        <div
-          className={
-            isFullscreen ? gridFullscreenPanelClass : "bg-base-100 rounded-lg shadow-md p-4 sm:p-6"
-          }
-        >
+        <div className={isFullscreen ? gridFullscreenPanelClass : "card bg-base-100 p-4 sm:p-6"}>
           <div
             className={`flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 ${
               isFullscreen ? "shrink-0" : "mb-4"

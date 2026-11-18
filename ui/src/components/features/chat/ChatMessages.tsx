@@ -240,7 +240,7 @@ function ImageSentBadge({ imagesSent }: { imagesSent: BlocksResult["images_sent"
             key={key}
             type="button"
             onClick={() => setPreviewSrc(src)}
-            className="flex-shrink-0 rounded-lg border border-base-300 overflow-hidden hover:border-primary/50 hover:shadow-md transition-colors cursor-pointer"
+            className="flex-shrink-0 rounded-lg border border-base-300 overflow-hidden hover:border-primary/50 transition-colors cursor-pointer"
           >
             {/* eslint-disable-next-line @next/next/no-img-element -- runtime-generated API preview */}
             <img
@@ -305,7 +305,10 @@ function BlocksContent({
         }
         if (block.type === "chart" && block.chart) {
           return (
-            <div key={i} className="my-3 rounded-xl border border-base-300/60 overflow-hidden">
+            <div
+              key={i}
+              className="my-3 rounded-[var(--radius-box)] border border-base-300/60 overflow-hidden"
+            >
               <ChatPlotlyChart
                 data={block.chart.data as Record<string, unknown>[]}
                 layout={block.chart.layout as Record<string, unknown>}
@@ -389,14 +392,14 @@ export const UserMessage = memo(function UserMessage({
           className="w-full resize-none bg-transparent border-none outline-none focus:ring-0 text-sm leading-6"
         />
         <div className="flex items-center justify-end gap-2 mt-2">
-          <button type="button" onClick={cancelEdit} className="btn btn-ghost btn-sm rounded-full">
+          <button type="button" onClick={cancelEdit} className="btn btn-ghost btn-sm">
             Cancel
           </button>
           <button
             type="button"
             onClick={submitEdit}
             disabled={!draft.trim()}
-            className="btn btn-primary btn-sm rounded-full"
+            className="btn btn-primary btn-sm"
           >
             Send
           </button>
@@ -415,7 +418,7 @@ export const UserMessage = memo(function UserMessage({
               key={i}
               src={src}
               alt={`Attached figure ${i + 1}`}
-              className="h-24 max-w-[200px] rounded-xl object-contain border border-base-300 bg-base-200"
+              className="h-24 max-w-[200px] rounded-[var(--radius-box)] object-contain border border-base-300 bg-base-200"
             />
           ))}
         </div>
@@ -485,7 +488,7 @@ export const AssistantMessage = memo(function AssistantMessage({
   if (isErrorMessage(message)) {
     return (
       <AssistantRow className="animate-fade-in-up">
-        <div className="flex items-start gap-2 text-sm text-error bg-error/5 rounded-xl px-4 py-3 border border-error/20">
+        <div className="flex items-start gap-2 text-sm text-error bg-error/5 rounded-[var(--radius-box)] px-4 py-3 border border-error/20">
           <XCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
           <span className="break-words min-w-0">{message.content.slice("Error: ".length)}</span>
         </div>
@@ -494,7 +497,7 @@ export const AssistantMessage = memo(function AssistantMessage({
             <button
               type="button"
               onClick={onContinue}
-              className="btn btn-ghost btn-sm rounded-full"
+              className="btn btn-ghost btn-sm"
               title="Go on from where the answer ended, without sending your message again"
             >
               <StepForward data-icon="inline-start" />
@@ -502,7 +505,7 @@ export const AssistantMessage = memo(function AssistantMessage({
             </button>
           )}
           {isLast && canRetry && (
-            <button type="button" onClick={onRetry} className="btn btn-ghost btn-sm rounded-full">
+            <button type="button" onClick={onRetry} className="btn btn-ghost btn-sm">
               <RotateCcw data-icon="inline-start" />
               Retry
             </button>
