@@ -54,6 +54,19 @@ import {
 } from "@earendil-works/pi-durable";
 import { CODEMODE_TOOL_NAME, createCodemodeExtension } from "@earendil-works/pi-durable/codemode";
 import { createToolSearchExtension, TOOL_SEARCH_TOOL_NAME } from "@earendil-works/pi-durable/tool-search";
+import {
+  deferredToolsGuideline,
+  QDASH_SCRIPT_GUIDELINE,
+} from "@oqtopus-team/pi-qdash/extensions/lib/qdash-guidance.ts";
+import {
+  boundScriptData,
+  DEFAULT_SCRIPT_TIMEOUT_MS,
+  MAX_NESTED_DATA_BYTES,
+  MAX_SCRIPT_TIMEOUT_MS,
+  withScriptDeadline as sharedScriptDeadline,
+  nestedBlockMessage,
+  nestedDataTooLargeMessage,
+} from "@oqtopus-team/pi-qdash/extensions/lib/tool-policy.ts";
 
 export { CODEMODE_TOOL_NAME, TOOL_SEARCH_TOOL_NAME };
 
@@ -61,18 +74,15 @@ export { CODEMODE_TOOL_NAME, TOOL_SEARCH_TOOL_NAME };
 export const CODEMODE_MEMORY_LIMIT_BYTES = 128 * 1024 * 1024;
 /** Scripts running at once in this process; each runs in its own worker thread. */
 export const MAX_CONCURRENT_SCRIPTS = 8;
-/** Deadline of a script that sets none. */
-export const DEFAULT_SCRIPT_TIMEOUT_MS = 120_000;
-/** Longest deadline a script may set. */
-export const MAX_SCRIPT_TIMEOUT_MS = 300_000;
-/** Largest `timeout_ms` Code Mode accepts (`setTimeout`'s limit); a larger one is its error to report. */
-const CODEMODE_TIMEOUT_LIMIT_MS = 2_147_483_647;
+/** Script deadlines, shared with the pi CLI. */
+export { DEFAULT_SCRIPT_TIMEOUT_MS, MAX_SCRIPT_TIMEOUT_MS };
 /**
- * Largest value one nested call hands a script, as serialized JSON. Pi
- * journals each nested result until the script ends and its output limits do
- * not bound `structuredOutput`, so a larger response fails the call instead.
+ * Largest value one nested call hands a script, as serialized JSON (shared
+ * with the pi CLI). Pi journals each nested result until the script ends and
+ * its output limits do not bound `structuredOutput`, so a larger response
+ * fails the call instead.
  */
-export const MAX_NESTED_DATA_BYTES = 512 * 1024;
+export { MAX_NESTED_DATA_BYTES };
 
 let wasm: Promise<CodemodeWasmModule> | undefined;
 
@@ -121,41 +131,9 @@ export function createCodemodeSandbox(): CodemodeSandbox {
   });
 }
 
-/**
- * The script source with a bounded deadline: a script without one gets the
- * default, and a longer one is cut to the maximum. A malformed options line,
- * or a `timeout_ms` Code Mode would reject, is left for Code Mode to report.
- */
+/** The script source with a bounded deadline (shared with the pi CLI). */
 export function withScriptDeadline(source: string): string {
-  const newline = source.indexOf("\n");
-  const first = (newline === -1 ? source : source.slice(0, newline)).replace(/\r$/, "");
-  const trimmed = first.trimStart();
-  if (!trimmed.startsWith(CODEMODE_OPTIONS_PREFIX)) {
-    return `${CODEMODE_OPTIONS_PREFIX} ${JSON.stringify({ timeout_ms: DEFAULT_SCRIPT_TIMEOUT_MS })}\n${source}`;
-  }
-  let options: unknown;
-  try {
-    options = JSON.parse(trimmed.slice(CODEMODE_OPTIONS_PREFIX.length).trim());
-  } catch {
-    return source;
-  }
-  if (typeof options !== "object" || options === null || Array.isArray(options)) return source;
-  let timeout: number;
-  if (!Object.hasOwn(options, "timeout_ms")) {
-    timeout = DEFAULT_SCRIPT_TIMEOUT_MS;
-  } else {
-    const requested = (options as { timeout_ms: unknown }).timeout_ms;
-    // Code Mode rejects any other value with its own message.
-    const valid =
-      typeof requested === "number" &&
-      Number.isSafeInteger(requested) &&
-      requested > 0 &&
-      requested <= CODEMODE_TIMEOUT_LIMIT_MS;
-    if (!valid) return source;
-    timeout = Math.min(requested, MAX_SCRIPT_TIMEOUT_MS);
-  }
-  const rest = newline === -1 ? "" : source.slice(newline);
-  return `${CODEMODE_OPTIONS_PREFIX} ${JSON.stringify({ ...options, timeout_ms: timeout })}${rest}`;
+  return sharedScriptDeadline(source, CODEMODE_OPTIONS_PREFIX);
 }
 
 /** The same tool, callable by the model only, unless it already says who may call it. */
@@ -169,19 +147,12 @@ export function modelOnlyTools(extension: Extension): Extension {
   return { ...extension, tools: extension.tools.map((tool) => modelOnly(tool)) };
 }
 
-/** What the model reads when a script tried a tool it may not call. */
-export function nestedBlockMessage(name: string): string {
-  return `${name} cannot be called from a code mode script: scripts may only call QDash's read-only tools. Call ${name} directly instead; write tools then ask the user for approval.`;
-}
+/** Messages shared with the pi CLI (pi-qdash extensions/lib/tool-policy.ts). */
+export { nestedBlockMessage, nestedDataTooLargeMessage };
 
 /** What the model reads when it called a deferred tool it had not loaded. */
 export function deferredRetryMessage(name: string): string {
   return `${name} was not loaded yet, so it did not run. It is loaded now: call ${name} again with the same arguments. Next time, load such tools first with ${TOOL_SEARCH_TOOL_NAME}.`;
-}
-
-/** What a script reads when a nested call returned more data than it may receive. */
-export function nestedDataTooLargeMessage(name: string, bytes: number): string {
-  return `${name} returned ${bytes} bytes of data, more than the ${MAX_NESTED_DATA_BYTES} bytes a script may receive from one call. Narrow the request (a chip, qubit, task, time range, or limit) or split it into several calls.`;
 }
 
 /**
@@ -192,10 +163,10 @@ export function nestedDataTooLargeMessage(name: string, bytes: number): string {
 function boundNestedResult(call: ToolHookCall, result: ToolExecutionResult): ToolExecutionResult {
   const { details: _details, ...rest } = result;
   if (rest.isError || rest.structuredOutput === undefined) return rest;
-  const bytes = Buffer.byteLength(JSON.stringify(rest.structuredOutput) ?? "", "utf8");
-  if (bytes <= MAX_NESTED_DATA_BYTES) return rest;
+  const bounded = boundScriptData(call.name, rest.structuredOutput);
+  if (bounded.ok) return rest;
   const { structuredOutput: _dropped, ...withoutData } = rest;
-  const message = nestedDataTooLargeMessage(call.name, bytes);
+  const message = bounded.message;
   return {
     ...withoutData,
     isError: true,
@@ -344,26 +315,9 @@ export function buildCodemodeExtensions(sandbox: CodemodeSandbox, policy: ToolPo
   ];
 }
 
-/** System prompt guideline for `codemode`. */
-export const CODEMODE_GUIDELINE = [
-  "- Use `codemode` when a question needs many read-only QDash calls or more data than you want to read: write a short JavaScript script that calls the tools as `await tools.qdash_list_chips({})`, filters or aggregates the results, and prints only what you need with `text(...)`. Only the printed output reaches you. In a script, QDash tools resolve to their response data as JSON, not their text answer; print a small sample first when you do not know its shape. Scripts can call only QDash's read-only tools; call write tools, figures, charts, and other tools directly. Use direct tool calls for one or two lookups.",
-].join("\n");
-
 /**
- * System prompt guideline for deferred tools; null when there are none.
- * Tools the tool guide already names (`listed`) are marked there, so only the
- * others are listed here.
+ * System prompt guidelines for `codemode` and deferred tools, shared with the
+ * pi CLI (pi-qdash extensions/lib/qdash-guidance.ts).
  */
-export function deferredToolsGuideline(
-  names: readonly string[],
-  listed: ReadonlySet<string> = new Set(),
-): string | null {
-  if (names.length === 0) return null;
-  const marked = names.some((name) => listed.has(name));
-  const others = names.filter((name) => !listed.has(name)).sort();
-  return [
-    `Deferred tools are not offered until you load them: call \`${TOOL_SEARCH_TOOL_NAME}\` with the tool name or what you need, then call the loaded tool in your next step. Load every tool you need with one search when you can. \`codemode\` scripts can call the read-only ones without loading them.`,
-    ...(marked ? ["Tools marked * in the tool guide are deferred."] : []),
-    ...(others.length ? [`${marked ? "Other deferred tools" : "Deferred tools"}: ${others.join(", ")}`] : []),
-  ].join("\n");
-}
+export const CODEMODE_GUIDELINE = QDASH_SCRIPT_GUIDELINE;
+export { deferredToolsGuideline };

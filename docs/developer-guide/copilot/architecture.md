@@ -119,8 +119,10 @@ code mode version changed, as a Pi upgrade or a new `CODEMODE_MEMORY_LIMIT_BYTES
 
 Scripts hold no credentials and reach QDash only through tools, which run in the runtime with the
 requesting user's connection. A script may call only the bundled pi-qdash reads in
-`NESTED_READ_TOOL_NAMES`: QDash API reads without images, local files, or long waits. Three
-mechanisms enforce the list:
+`NESTED_READ_TOOL_NAMES`: QDash API reads without images, local files, or long waits. The list,
+`DEFERRED_TOOL_NAMES`, the data bound, and the script deadlines come from pi-qdash's
+`extensions/lib/tool-policy.ts`, which pi CLI enforces as well. Three mechanisms enforce the
+list here:
 
 - Each tool's `callers` field. `buildQDashExtension` gives listed reads `["model", "tools"]`; all
   other tools, including writes, trusted extension tools, workspace tools, and the chat's own

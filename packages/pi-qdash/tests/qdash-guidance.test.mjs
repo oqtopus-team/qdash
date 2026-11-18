@@ -175,3 +175,26 @@ test("an unreadable skill leaves the policy in place", async () => {
   assert.doesNotMatch(options.sections[QDASH_GUIDANCE_SECTION], /QDash tool routing/);
   assert.match(BUNDLED_QDASH_SKILL_PATH, /skills\/qdash\/SKILL\.md$/);
 });
+
+test("with pi's codemode and tool_search active, the section gives chat's script and deferred-tool rules", () => {
+  const declared = ["read", "codemode", "tool_search", "qdash_list_chips", "qdash_get_default_chip", "qdash_list_chip_qubits"];
+  const section = buildQDashGuidanceSection(declared, SKILL, { deferredTools: ["qdash_list_cooldowns", "qdash_list_cryostats", "qdash_config_info"] });
+  assert.match(section, /QDash scripts and tool loading:/);
+  assert.match(section, /Use `codemode` when a question needs many read-only QDash calls/);
+  assert.match(section, /call `tool_search` with the tool name/);
+  // Deferred tools the routing guide names are marked there.
+  if (extractToolRouting(SKILL, ["qdash_list_cooldowns"])) assert.match(section, /`qdash_list_cooldowns`\*/);
+  // Without tool_search the deferred tools are unreachable and go unmentioned.
+  const noLoader = buildQDashGuidanceSection(["codemode", "qdash_list_chips"], SKILL, { deferredTools: ["qdash_list_cooldowns"] });
+  assert.doesNotMatch(noLoader, /tool_search|qdash_list_cooldowns/);
+  assert.match(noLoader, /Use `codemode`/);
+  // Neither active: no orchestration rules at all.
+  assert.doesNotMatch(buildQDashGuidanceSection(["qdash_list_chips"], SKILL, { deferredTools: ["qdash_list_cooldowns"] }), RUNTIME_ONLY);
+});
+
+test("chat and the pi CLI give the same script and deferred-tool rules", async () => {
+  const { QDASH_SCRIPT_GUIDELINE, deferredToolsGuideline } = await import("../.test-dist/lib/qdash-guidance.js");
+  const section = buildQDashGuidanceSection(["codemode", "tool_search", "qdash_list_chips"], null, { deferredTools: ["qdash_list_cryostats"] });
+  assert.ok(section.includes(QDASH_SCRIPT_GUIDELINE));
+  assert.ok(section.includes(deferredToolsGuideline(["qdash_list_cryostats"])));
+});

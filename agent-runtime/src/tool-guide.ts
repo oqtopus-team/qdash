@@ -11,21 +11,22 @@
  * Only tools the runtime actually exposes are kept: the allowlist and the
  * write-tools switch drop some pi-qdash tools. Deferred tools, which the
  * model loads with `tool_search` before calling, are marked `*` so the model
- * searches first instead of failing one call per tool; that mark is specific
- * to this runtime and stays out of the shared guide.
+ * searches first instead of failing one call per tool. The pi CLI marks them
+ * the same way when `tool_search` is active (pi-qdash guidance-hook.ts).
  */
 
 import {
+  DEFERRED_MARK,
   extractToolRouting,
+  markDeferredTools,
   QDASH_GUIDANCE_SKILL,
   toolRoutingNames,
 } from "@oqtopus-team/pi-qdash/extensions/lib/qdash-guidance.ts";
 
 export const TOOL_GUIDE_SKILL = QDASH_GUIDANCE_SKILL;
-const TOOL_REF = /`(qdash_[a-z0-9_]+)`/g;
 
 /** Marker after a deferred tool's name in the guide. */
-export const DEFERRED_MARK = "*";
+export { DEFERRED_MARK };
 
 /** The tool names a guide mentions. */
 export const toolGuideNames = toolRoutingNames;
@@ -39,8 +40,6 @@ export function extractToolGuide(
   enabledTools: Iterable<string>,
   deferredTools: Iterable<string> = [],
 ): string | null {
-  const deferred = new Set(deferredTools);
   const guide = extractToolRouting(skillMarkdown, enabledTools);
-  if (!guide) return null;
-  return guide.replace(TOOL_REF, (ref, name: string) => (deferred.has(name) ? `${ref}${DEFERRED_MARK}` : ref));
+  return guide ? markDeferredTools(guide, deferredTools) : null;
 }

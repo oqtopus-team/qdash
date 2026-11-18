@@ -168,6 +168,11 @@ A chat is recorded the same way: when the planner calls `qcal_evaluate`, the dur
 wrapper stamps a `host` record (the figure and reference the runtime filled in) on the result,
 the runtime's `tool_end` event carries it, and the API files it as a run of one with the
 planner's final answer. A figure no tool fetched, such as a user attachment, is not recorded.
+The wrapper fills the call's figure from the newest figure in the conversation that belongs to
+`task_name`: pi-qdash figure tools record the task, so a newer figure of another task is never
+evaluated in its place. The reference and examples come from one knowledge request. pi CLI fills
+`qcal_evaluate` with the same rules; see the
+[pi-qdash reference](../../reference/pi-qdash.md#evaluation-hydration).
 
 ### Knowledge drafts
 

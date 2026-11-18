@@ -111,3 +111,48 @@ function dropEmptyParents(lines: string[]): string[] {
   }
   return out;
 }
+
+// ---------------------------------------------------------------------------
+// Orchestration: code mode scripts and deferred tools
+// ---------------------------------------------------------------------------
+//
+// Both hosts offer pi's `codemode` and `tool_search` tools. Whether they are
+// offered is the host's decision; when they are, the model gets the same
+// QDash-specific advice in both.
+
+/** Name of pi's script tool. */
+export const CODEMODE_TOOL_NAME = "codemode";
+/** Name of pi's tool loader. */
+export const TOOL_SEARCH_TOOL_NAME = "tool_search";
+
+/** Marker after a deferred tool's name in the routing guide. */
+export const DEFERRED_MARK = "*";
+
+/** The guide with each of `deferredTools` marked by `DEFERRED_MARK`. */
+export function markDeferredTools(guide: string, deferredTools: Iterable<string>): string {
+  const deferred = new Set(deferredTools);
+  if (deferred.size === 0) return guide;
+  return guide.replace(TOOL_REF, (ref, name: string) => (deferred.has(name) ? `${ref}${DEFERRED_MARK}` : ref));
+}
+
+/** Rule for QDash data in `codemode` scripts, as one Markdown list item. */
+export const QDASH_SCRIPT_GUIDELINE =
+  "- Use `codemode` when a question needs many read-only QDash calls or more data than you want to read: write a short JavaScript script that calls the tools as `await tools.qdash_list_chips({})`, filters or aggregates the results, and prints only what you need with `text(...)`. Only the printed output reaches you. In a script, QDash tools resolve to their response data as JSON, not their text answer; print a small sample first when you do not know its shape. Scripts can call only QDash's read-only tools; call write tools, figures, charts, and other tools directly. Use direct tool calls for one or two lookups.";
+
+/**
+ * Rule for deferred tools; null when there are none. Tools the routing guide
+ * already names (`listed`) are marked there, so only the others are listed.
+ */
+export function deferredToolsGuideline(
+  names: readonly string[],
+  listed: ReadonlySet<string> = new Set(),
+): string | null {
+  if (names.length === 0) return null;
+  const marked = names.some((name) => listed.has(name));
+  const others = names.filter((name) => !listed.has(name)).sort();
+  return [
+    `Deferred tools are not offered until you load them: call \`${TOOL_SEARCH_TOOL_NAME}\` with the tool name or what you need, then call the loaded tool in your next step. Load every tool you need with one search when you can. \`${CODEMODE_TOOL_NAME}\` scripts can call the read-only ones without loading them.`,
+    ...(marked ? [`Tools marked ${DEFERRED_MARK} in the tool guide are deferred.`] : []),
+    ...(others.length ? [`${marked ? "Other deferred tools" : "Deferred tools"}: ${others.join(", ")}`] : []),
+  ].join("\n");
+}

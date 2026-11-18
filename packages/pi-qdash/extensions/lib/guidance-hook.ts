@@ -3,7 +3,16 @@ import { fileURLToPath } from "node:url";
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
-import { extractToolRouting, investigationPolicyBullets } from "./qdash-guidance.js";
+import {
+  CODEMODE_TOOL_NAME,
+  deferredToolsGuideline,
+  extractToolRouting,
+  investigationPolicyBullets,
+  markDeferredTools,
+  QDASH_SCRIPT_GUIDELINE,
+  TOOL_SEARCH_TOOL_NAME,
+  toolRoutingNames,
+} from "./qdash-guidance.js";
 
 /**
  * pi CLI integration of the shared QDash guidance (qdash-guidance.ts).
@@ -13,6 +22,11 @@ import { extractToolRouting, investigationPolicyBullets } from "./qdash-guidance
  * `--append-system-prompt` and context files around it, and patches the model
  * only when the section text changes, so repeated runs do not accumulate
  * copies. The routing guide follows the tools selected for the run.
+ *
+ * When pi's `codemode` or `tool_search` tool is active, the section also
+ * gives the QDash advice QDash chat gives for them: how scripts receive QDash
+ * data, and which QDash tools are deferred (marked in the routing guide and
+ * loadable with `tool_search`).
  */
 
 /** Name of the system prompt section; pi wraps it in a tag of the same name. */
@@ -34,29 +48,54 @@ function declaredTools(options: GuidancePromptOptions): string[] {
   return (options.selectedTools ?? []).filter((name) => !hidden.has(name));
 }
 
+/** What the run offers beyond its declared tools. */
+export interface GuidanceOrchestration {
+  /** QDash tools registered as deferred and not declared yet; listed only while `tool_search` is declared. */
+  deferredTools?: readonly string[];
+}
+
 /**
- * The guidance section for a run with `availableTools`, or null when no
- * QDash tool is available. `skillMarkdown` is the `qdash` skill, or null when
- * it cannot be read; the policy still applies without a routing guide.
+ * The guidance section for a run with `availableTools` (the declared tools),
+ * or null when no QDash tool is available. `skillMarkdown` is the `qdash`
+ * skill, or null when it cannot be read; the policy still applies without a
+ * routing guide.
  */
 export function buildQDashGuidanceSection(
   availableTools: readonly string[],
   skillMarkdown: string | null,
+  orchestration: GuidanceOrchestration = {},
 ): string | null {
-  if (!availableTools.some((name) => name.startsWith("qdash_"))) return null;
-  const routing = skillMarkdown ? extractToolRouting(skillMarkdown, availableTools) : null;
+  const loader = availableTools.includes(TOOL_SEARCH_TOOL_NAME);
+  const deferred = loader ? [...(orchestration.deferredTools ?? [])] : [];
+  const reachable = [...availableTools, ...deferred];
+  if (!reachable.some((name) => name.startsWith("qdash_"))) return null;
+  const guide = skillMarkdown ? extractToolRouting(skillMarkdown, reachable) : null;
+  const routing = guide ? markDeferredTools(guide, deferred) : null;
+  const scripts = availableTools.includes(CODEMODE_TOOL_NAME) && availableTools.some((name) => name.startsWith("qdash_"));
+  const deferredRule = deferredToolsGuideline(
+    deferred.filter((name) => name.startsWith("qdash_")),
+    toolRoutingNames(routing),
+  );
+  const orchestrationRules = [...(scripts ? [QDASH_SCRIPT_GUIDELINE] : []), ...(deferredRule ? [deferredRule] : [])];
   return [
     "When a request involves QDash data, follow these rules alongside the instructions above.",
     "",
     "Investigation and evidence:",
     ...investigationPolicyBullets(),
     ...(routing ? ["", "QDash tool routing:", routing] : []),
+    ...(orchestrationRules.length ? ["", "QDash scripts and tool loading:", ...orchestrationRules] : []),
   ].join("\n");
 }
 
 /** Set, replace, or remove the guidance section in `options` for the tools it selects. */
-export function applyQDashGuidance(options: GuidancePromptOptions, skillMarkdown: string | null): void {
-  const section = buildQDashGuidanceSection(declaredTools(options), skillMarkdown);
+export function applyQDashGuidance(
+  options: GuidancePromptOptions,
+  skillMarkdown: string | null,
+  orchestration: GuidanceOrchestration = {},
+): void {
+  const declared = declaredTools(options);
+  const deferred = (orchestration.deferredTools ?? []).filter((name) => !declared.includes(name));
+  const section = buildQDashGuidanceSection(declared, skillMarkdown, { deferredTools: deferred });
   if (section) {
     options.sections ??= {};
     options.sections[QDASH_GUIDANCE_SECTION] = section;
@@ -86,6 +125,9 @@ function cachedSkill(path: string): () => string | null {
 export function installQDashGuidance(pi: ExtensionAPI, skillPath: string = BUNDLED_QDASH_SKILL_PATH): void {
   const skill = cachedSkill(skillPath);
   pi.on("before_agent_start", (event) => {
-    applyQDashGuidance(event.systemPromptOptions, skill());
+    const deferredTools = (pi.getAllTools?.() ?? [])
+      .filter((tool) => tool.exposure === "deferred" && tool.name.startsWith("qdash_"))
+      .map((tool) => tool.name);
+    applyQDashGuidance(event.systemPromptOptions, skill(), { deferredTools });
   });
 }
