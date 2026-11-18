@@ -25,6 +25,7 @@ import { toFigureToolResult, toTextToolResult, toToolResult } from "./lib/result
 import { ansi, boxLinesToWidth, boxed, formatNumber, textComponent } from "./lib/render.js";
 import { plotSeriesLines, timeseriesPlotComponent, timeseriesPoints } from "./lib/timeseries-plot.js";
 import { installQDashWriteGate } from "./lib/write-gate.js";
+import { installQDashGuidance } from "./lib/guidance-hook.js";
 import { errorStatus, fileContentSourceGuidance, filesTreeSourceGuidance, looksLikeSourcePath } from "./lib/source-guidance.js";
 import { withAbort } from "./lib/abort.js";
 import { qcalContextText, recordedParameters, sweepsOf, type RecordedParameter, type Sweep } from "./lib/qcal-evidence.js";
@@ -1504,6 +1505,7 @@ function fileContentSourceMiss(params: QDashQueryParams, error: unknown) {
 
 export default function qdashExtension(pi: ExtensionAPI) {
   installQDashWriteGate(pi);
+  installQDashGuidance(pi);
   registerTaskKnowledgeTool(pi, { makeClient });
   registerSourceCodeTools(pi, { makeClient });
   registerCalibrationPipelineTools(pi, {

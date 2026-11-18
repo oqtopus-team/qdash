@@ -10,6 +10,16 @@ session orchestration, tool exposure, and host context. See
 TUI renderers. Shared helpers live under `extensions/lib/`; domain tool registration
 lives under `extensions/tools/`, including `timeseries.ts`.
 
+The investigation policy and tool routing guide that every host gives the model live in
+`extensions/lib/qdash-guidance.ts`. The routing guide is the "Preferred tools" section of
+`skills/qdash/SKILL.md`, limited to the tools the host offers. In pi CLI,
+`extensions/lib/guidance-hook.ts` sets them as the `qdash_guidance` system prompt section before
+each run, from the tools selected for that run. pi keeps its own prompt, `--system-prompt`,
+`--append-system-prompt`, and context files around the section, and the section is replaced
+rather than appended on later runs. The QDash runtime does not run this hook; it composes the
+same policy and guide with its own chat rules in `agent-runtime/src/prompt.ts`. Keep display,
+approval, and orchestration rules for one host out of `qdash-guidance.ts`.
+
 Keep API access through `@oqtopus-team/qdash-client`, redaction, rendering, and
 mechanical evidence extraction in extensions. Keep calibration interpretation,
 diagnosis recipes, thresholds, and runbooks in `packages/pi-qdash/skills/`.

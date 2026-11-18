@@ -97,6 +97,7 @@ Set `QDASH_WEB_URL` when the web UI is not at the API base URL minus `/api`.
 | --- | --- |
 | Secret output | API tokens, passwords, and Cloudflare Access secrets are redacted. |
 | Write tools | Interactive pi asks for confirmation; non-interactive calls require `confirmWrite: true`. |
+| Investigation guidance | While a `qdash_*` tool is selected, the system prompt has a `qdash_guidance` section with evidence rules and the `qdash` skill's tool routing for the tools the model can call directly. |
 
 ## Commands
 
