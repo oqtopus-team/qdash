@@ -18,6 +18,7 @@ import {
   type MermaidAction,
   type ChatDiagramCache,
 } from "@/lib/chatMarkdown";
+import { useCodeHighlighter } from "@/lib/highlight";
 import { resetDiagram, startDiagramPan, zoomDiagram, ZOOM_STEP } from "@/lib/chatMermaidView";
 import { copyText } from "@/lib/utils/clipboard";
 
@@ -123,11 +124,14 @@ export const ChatMarkdown = memo(function ChatMarkdown({
     () => ({ results: new Map(), pending: new Set() }),
     [theme],
   );
+  // Highlights replaces highlight.js once it has loaded.
+  const codeHighlighter = useCodeHighlighter(/`{3}|~{3}|(?:^|\n)(?: {4}|\t)/.test(children));
   const plugins = useMemo(
     () => createChatPlugins(theme, diagramSettled, diagrams),
-    // A new plugin object is what makes the renderer pick up a settled diagram.
+    // A new plugin object is what makes the renderer pick up a settled diagram
+    // or the loaded highlighter.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [theme, diagramRevision, diagrams],
+    [theme, diagramRevision, diagrams, codeHighlighter],
   );
   const source = useMemo(() => prepareChatMarkdown(children, streaming), [children, streaming]);
 
