@@ -33,7 +33,8 @@ task ci-agent-runtime
 The root `bun.lock` covers the runtime, client, and both extensions. Do not create
 package-local lockfiles. `task ci-pi-packages` and `task ci-agent-runtime` build
 the client first; run `task build-client-ts` before using pi CLI directly. Test standalone pi behavior with `pi -e ./packages/pi-qdash` or
-`pi -e ./packages/pi-qcaleval` from the repository root.
+`pi -e ./packages/pi-qcaleval` from the repository root. `task pi-local` runs pi-qdash with the Copilot chat model; see
+[Verify a change](./extensions.md#verify-a-change).
 
 Rebuild the runtime with `docker compose up -d --build agent-runtime` after changing
 an extension or its skills. The [runtime extension loader](./architecture.md#developing-a-pi-extension-against-the-runtime)

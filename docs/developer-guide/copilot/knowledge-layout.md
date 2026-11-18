@@ -37,7 +37,7 @@ and standalone pi. QDash-only interaction rules stay in the runtime prompt.
 ## Rules
 
 - Do not put physics or expected-result descriptions into a skill or into `prompt.ts`. Add them to the task's `task.md` in qdash-task-knowledge (intro, Expected plot, Common failures, Parameters to extract) and have the skill say "read the task knowledge for X". A validated plot with its diagnosis goes under `examples/` as a demonstration.
-- Do not put pi-qdash tool names into `prompt.ts`. The tool routing guide is the "Preferred tools" section of the pi-qdash `qdash` skill; the runtime reads it at startup, keeps only the tools it exposes, and inlines it into the system prompt (`agent-runtime/src/tool-guide.ts`). The rest of that skill and the other skills stay behind `read_skill`.
+- Do not put pi-qdash tool names into `prompt.ts`. The tool routing guide is the "Preferred tools" section of the pi-qdash `qdash` skill. `packages/pi-qdash/extensions/lib/qdash-guidance.ts` extracts it for the tools a host offers, together with the investigation policy that both hosts give the model. The runtime reads the skill at startup, marks deferred tools, and inlines the guide into the system prompt (`agent-runtime/src/tool-guide.ts`); the rest of that skill and the other skills stay behind `read_skill`. pi CLI receives the same policy and guide in a prompt section; see [Pi Extension Design](./extensions.md#pi-qdash).
 - Do not add QDash-only instructions to a pi-qdash skill. pi CLI users get the same skills without the QDash UI.
 - The distribution source for agent skills is pi-qdash. Skills under this repository's `.agents/skills/` are for agents editing QDash's own code, not for sessions, and are never recorded.
 - Update tool skills in `packages/pi-qdash/skills/` and rebuild the runtime; update task knowledge through the checkout under `config/task-knowledge`. Agent sessions record the skill name, version, and hash they ran with.
@@ -51,7 +51,8 @@ The Pi Agent Runtime is the only chat backend. Its system prompt lives in `agent
 | File | Role |
 | --- | --- |
 | `agent-runtime/src/prompt.ts` | Chat and analysis system prompts |
-| `agent-runtime/src/tool-guide.ts` | Extracts the tool routing guide from the pi-qdash `qdash` skill |
+| `packages/pi-qdash/extensions/lib/qdash-guidance.ts` | Investigation policy and tool routing extraction shared by pi CLI and the runtime |
+| `agent-runtime/src/tool-guide.ts` | Applies the shared routing extraction and marks deferred tools |
 | `agent-runtime/src/skill-tool.ts` | `read_skill`, which serves the pi-qdash skills to the model |
 | `agent-runtime/src/allowed-tools.ts` | Which pi-qdash tools the runtime exposes |
 | `src/qdash/datamodel/task_knowledge.py` | Loads `task-knowledge.json` |

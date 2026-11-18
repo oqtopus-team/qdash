@@ -83,3 +83,14 @@ test("deferred tools are marked so the model searches before calling them", asyn
   );
   assert.equal(toolGuideNames(null).size, 0);
 });
+
+test("the runtime guide is the routing pi-qdash shares with pi CLI, plus deferred marks", async () => {
+  const { readFileSync } = await import("node:fs");
+  const { extractToolRouting } = await import("@oqtopus-team/pi-qdash/extensions/lib/qdash-guidance.ts");
+  const skill = readFileSync(new URL("../../packages/pi-qdash/skills/qdash/SKILL.md", import.meta.url), "utf8");
+  const enabled = ["qdash_list_chips", "qdash_get_default_chip", "qdash_list_cryostats", "qdash_list_cooldowns", "qdash_query"];
+  const shared = extractToolRouting(skill, enabled);
+  assert.ok(shared);
+  assert.equal(extractToolGuide(skill, enabled), shared);
+  assert.equal(extractToolGuide(skill, enabled, ["qdash_list_cooldowns"]), shared.replace("`qdash_list_cooldowns`", "`qdash_list_cooldowns`*"));
+});
