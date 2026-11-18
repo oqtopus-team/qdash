@@ -585,18 +585,107 @@ def _figure_kinds(result) -> list[tuple[str, str | None]]:
 @pytest.mark.parametrize(
     ("moment_by_slot", "match"),
     [
-        ({"RQ02": 2000.0}, "quality_level 2 is below 3"),
         ({"RQ02": 0.05}, "No readout candidate"),
         ({}, "No readout candidate"),
     ],
 )
-def test_absolute_quality_gate_still_applies(moment_by_slot, match) -> None:
-    """Reject a best candidate below quality_level 3 or with no response at all."""
+def test_best_candidate_without_a_response_is_rejected(moment_by_slot, match) -> None:
+    """Reject a best candidate with quality_level 0 or no f01 peak at all."""
     result = _postprocess_with(_task_with_candidates(), _estimate(moment_by_slot))
 
     assert result.output_parameters == {}
     assert result.validation_error is not None
     assert match in result.validation_error
+
+
+# A reported hardware run: candidate 1 has the best moment at quality_level 1.
+_LOW_QUALITY_RUN = {"RQ00": 97.5023, "RQ01": 1716.03, "RQ02": 432.34, "RQ03": None}
+_LOW_QUALITY_LEVELS = {"RQ00": 1, "RQ01": 1, "RQ02": 1}
+
+
+def _low_quality_estimate(frequency_by_slot: dict[str, float]):
+    """Return a fake analysis of the reported run with per-slot f01 values."""
+
+    def estimate(fig, *_args, **_kwargs):
+        slot = fig.layout.meta["readout_label"]
+        moment = _LOW_QUALITY_RUN[slot]
+        f01 = (
+            None
+            if moment is None
+            else SimpleNamespace(
+                frequency=frequency_by_slot[slot],
+                repr_db=-30.0,
+                quality_level=_LOW_QUALITY_LEVELS[slot],
+                moment=moment,
+            )
+        )
+        return go.Figure(fig), SimpleNamespace(f01=f01, f12=None, anharmonicity=None)
+
+    return estimate
+
+
+_LOW_QUALITY_F01 = {"RQ00": 7.92, "RQ01": 7.37, "RQ02": 7.5}
+
+
+def test_low_quality_best_candidate_with_clear_separation_is_selected() -> None:
+    """Select a quality_level 1 best candidate whose moment clears the runner-up ratio."""
+    result = _postprocess_with(_task_with_candidates(), _low_quality_estimate(_LOW_QUALITY_F01))
+
+    assert result.validation_error is None
+    outputs = result.output_parameters
+    assert outputs["resonator_candidate_index"].value == 1
+    assert outputs["resonator_frequency"].value == READOUT_FREQUENCIES[1]
+    assert outputs["coarse_qubit_frequency"].value == pytest.approx(7.37)
+    assert outputs["f01_quality_level"].value == 1
+    expected_amplitude, _ = compute_coarse_control_amplitude(-30.0)
+    assert outputs["coarse_control_amplitude"].value == pytest.approx(expected_amplitude)
+    evidence = _evidence(result)
+    assert evidence["outcome"] == "selected"
+    assert evidence["ranking"] == [1, 2, 0]
+    assert evidence["runner_up"] == {"candidate_index": 2, "moment": 432.34, "quality_level": 1}
+    assert evidence["score_ratio"] == pytest.approx(1716.03 / 432.34)
+    assert evidence["score_ratio"] == pytest.approx(3.96917, rel=1e-5)
+    assert "min_quality_level" not in evidence["rule"]
+    assert [row["quality_level"] for row in evidence["candidates"]] == [1, 1, 1, None]
+    assert [row["status"] for row in evidence["candidates"]] == [
+        "f01_detected",
+        "f01_detected",
+        "f01_detected",
+        "no_f01_peak",
+    ]
+    assert [row["selected"] for row in evidence["candidates"]] == [False, True, False, False]
+    proposal = evidence["proposal"]
+    assert proposal["published"] is True
+    assert proposal["resonator_candidate_index"] == 1
+    assert proposal["coarse_qubit_frequency"] == pytest.approx(7.37)
+    assert proposal["f01_quality_level"] == 1
+    assert proposal["coarse_control_amplitude"] == pytest.approx(expected_amplitude)
+    assert _figure_kinds(result)[0] == ("selected", "RQ01")
+    assert "quality_level=1" in result.figures[0].layout.title.text
+    assert result.figures[0].layout.meta["qubit_frequency_mapping"] == evidence
+
+
+def test_low_quality_best_candidate_still_needs_the_score_ratio() -> None:
+    """Reject the same low-quality best candidate when min_score_ratio exceeds its margin."""
+    task = _task_with_candidates()
+    task.run_parameters = copy.deepcopy(task.run_parameters)
+    task.run_parameters["min_score_ratio"].value = 4.0
+
+    result = _postprocess_with(task, _low_quality_estimate(_LOW_QUALITY_F01))
+
+    assert result.output_parameters == {}
+    assert "below min_score_ratio 4" in (result.validation_error or "")
+    assert _evidence(result)["outcome"] == "rejected"
+
+
+def test_low_quality_best_candidate_still_needs_the_minimum_frequency() -> None:
+    """Reject the same low-quality best candidate when its f01 is below 2.5 GHz."""
+    result = _postprocess_with(
+        _task_with_candidates(), _low_quality_estimate({**_LOW_QUALITY_F01, "RQ01": 2.0})
+    )
+
+    assert result.output_parameters == {}
+    assert "2.5 GHz" in (result.validation_error or "")
 
 
 def test_unique_high_score_with_weak_secondary_is_selected() -> None:
@@ -787,7 +876,7 @@ def test_evidence_lists_every_candidate_for_review() -> None:
     evidence = _evidence(result)
     assert evidence["schema"] == "qdash.qubit_frequency_mapping.v1"
     assert evidence["rule"]["calibrated"] is False
-    assert evidence["rule"]["min_quality_level"] == 3
+    assert "min_quality_level" not in evidence["rule"]
     assert evidence["sweep"]["drive_frequency_ghz"]["points"] == len(DRIVE_FREQUENCIES)
     assert evidence["sweep"]["drive_power_db"]["start"] == DRIVE_POWERS[0]
     rows = evidence["candidates"]

@@ -77,8 +77,9 @@ def bringupv2(
     template; two qubits of one MUX are never driven at the same time.
     Each qubit's mapping is independent: QDash does not check that the selections
     of one MUX form a one-to-one mapping. A qubit's mapping fails without outputs
-    unless its best-scoring candidate has quality level 3 or higher and an f01
-    moment at least ``min_score_ratio`` (default 2.0) times the runner-up's; a
+    unless its best-scoring candidate shows a response, has an f01 of at least
+    2.5 GHz, and has an f01 moment at least ``min_score_ratio`` (default 2.0)
+    times the runner-up's; its quality level is a diagnostic, not a gate; a
     failed call skips that qubit's later calls, so the amplitude and Chevron
     tasks never run on values the mapping did not publish in this run.
 

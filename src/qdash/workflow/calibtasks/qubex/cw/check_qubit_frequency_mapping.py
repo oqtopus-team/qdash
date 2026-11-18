@@ -32,7 +32,6 @@ from qdash.workflow.calibtasks.qubex.analysis import (
 )
 from qdash.workflow.calibtasks.qubex.base import QubexTask
 from qdash.workflow.calibtasks.qubex.cw.check_qubit_spectroscopy import (
-    LOW_QUALITY_LEVEL_MAX,
     MIN_VALID_QUBIT_FREQUENCY,
     compute_coarse_control_amplitude,
 )
@@ -484,10 +483,13 @@ class CheckQubitFrequencyMapping(QubexTask):
     latest CheckResonatorSpectroscopy run of its MUX with multiplexed qubit
     spectroscopy. It analyzes each candidate's map with the CheckQubitSpectroscopy
     analysis and ranks the candidates by the raw f01 ``moment`` of that analysis. It
-    publishes the readout and coarse qubit values of the best candidate only when its
-    ``quality_level`` meets the absolute threshold, its f01 is at least 2.5 GHz, and its
+    publishes the readout and coarse qubit values of the best candidate only when it
+    shows a response (``quality_level`` above 0), its f01 is at least 2.5 GHz, and its
     moment is at least ``min_score_ratio`` times the runner-up's, where the runner-up is
-    the next candidate with any f01 peak, low quality included. Exact and near ties
+    the next candidate with any f01 peak, low quality included. The ``quality_level``
+    of each candidate is reported as a diagnostic and is not an acceptance threshold,
+    so a low-quality best candidate is selected when it passes the other gates.
+    Exact and near ties
     are rejected as ambiguous. The default ratio of 2.0 is a provisional heuristic, not
     an empirically calibrated threshold, and the moment is not normalized: it depends
     on each candidate's resonator response, noise, and readout group. It does not use
@@ -674,9 +676,6 @@ class CheckQubitFrequencyMapping(QubexTask):
     }
     _analysis_config: ClassVar[EstimateQubitFrequencyConfig] = EstimateQubitFrequencyConfig()
     _retry_with_trim: ClassVar[bool] = True
-    # CheckQubitSpectroscopy reports quality levels up to LOW_QUALITY_LEVEL_MAX as low
-    # quality; this task accepts only responses above that level.
-    _min_accepted_quality_level: ClassVar[int] = LOW_QUALITY_LEVEL_MAX + 1
     output_spec: ClassVar[dict[str, OutputParameterSpec]] = {
         "resonator_frequency": OutputParameterSpec(
             unit="GHz",
@@ -1005,9 +1004,7 @@ class CheckQubitFrequencyMapping(QubexTask):
                 figures.extend(candidate_figures)
             decision = self._select(evaluations, min_score_ratio)
 
-        summary = _decision_summary(
-            decision, evaluations, min_score_ratio, self._min_accepted_quality_level
-        )
+        summary = _decision_summary(decision, evaluations, min_score_ratio)
         print(f"Qubit frequency mapping for qid={qid}: {summary}")
         selected = decision.selected
         proposal = _proposal(decision.selected or decision.best)
@@ -1018,7 +1015,6 @@ class CheckQubitFrequencyMapping(QubexTask):
             evaluations=evaluations,
             decision=decision,
             min_score_ratio=min_score_ratio,
-            min_quality_level=self._min_accepted_quality_level,
             proposal=proposal,
         )
         summary_figure = _summary_figure(qid, evaluations, decision, evidence)
@@ -1320,10 +1316,10 @@ class CheckQubitFrequencyMapping(QubexTask):
         Any candidate analysis error or a non-finite or negative moment rejects the
         result. Candidates with an f01 peak are ranked by moment, ties broken by
         candidate index so that the decision does not depend on candidate order. The
-        best candidate is selected only when it shows a response, its
-        ``quality_level`` is at least ``_min_accepted_quality_level``, its f01 is
-        finite and at least ``MIN_VALID_QUBIT_FREQUENCY``, and its moment is at least
-        ``min_score_ratio`` times the runner-up's. Without a runner-up, or with a
+        best candidate is selected only when it shows a response (``quality_level``
+        above 0), its f01 is finite and at least ``MIN_VALID_QUBIT_FREQUENCY``, and its
+        moment is at least ``min_score_ratio`` times the runner-up's. A low
+        ``quality_level`` does not reject the best candidate; it stays a diagnostic. Without a runner-up, or with a
         runner-up moment of zero, the separation gate passes and the ratio is None.
         """
         failed = [e for e in evaluations if e.error is not None]
@@ -1375,14 +1371,6 @@ class CheckQubitFrequencyMapping(QubexTask):
             return replace(decision, reason="Ambiguous qubit response: tied best moment scores")
         if best.moment is None or best.moment <= 0:
             return replace(decision, reason="Best candidate has no positive moment score")
-        if best.quality_level < self._min_accepted_quality_level:
-            return replace(
-                decision,
-                reason=(
-                    f"Best candidate {index} quality_level {best.quality_level} is below "
-                    f"{self._min_accepted_quality_level}"
-                ),
-            )
         if not math.isfinite(best.frequency) or best.frequency < MIN_VALID_QUBIT_FREQUENCY:
             return replace(
                 decision,
@@ -1516,12 +1504,12 @@ def _decision_summary(
     decision: MappingDecision,
     evaluations: Sequence[_CandidateEvaluation],
     min_score_ratio: float,
-    min_quality_level: int = LOW_QUALITY_LEVEL_MAX + 1,
 ) -> str:
     """Return one line with the rule, ranking, runner-up margin, and every candidate."""
     rule = (
-        f"rule: rank by f01 moment, select the best if quality_level>={min_quality_level}, "
-        f"f01>={MIN_VALID_QUBIT_FREQUENCY} GHz and best/runner-up moment>={min_score_ratio:g}"
+        f"rule: rank by f01 moment, select the best if it shows a response, "
+        f"f01>={MIN_VALID_QUBIT_FREQUENCY} GHz and best/runner-up moment>={min_score_ratio:g} "
+        f"(quality_level is diagnostic only)"
     )
     best = (
         "best none"
@@ -1584,7 +1572,6 @@ def mapping_evidence(
     evaluations: Sequence[_CandidateEvaluation],
     decision: MappingDecision,
     min_score_ratio: float,
-    min_quality_level: int,
     proposal: dict[str, Any] | None,
 ) -> dict[str, Any]:
     """Return the JSON-safe evidence of one mapping decision for later review.
@@ -1641,7 +1628,7 @@ def mapping_evidence(
         "reason": decision.reason,
         "rule": {
             "score": "F01Result.moment of the CheckQubitSpectroscopy analysis (not normalized)",
-            "min_quality_level": min_quality_level,
+            "quality_level": "diagnostic only; a best candidate needs quality_level > 0",
             "min_qubit_frequency": MIN_VALID_QUBIT_FREQUENCY,
             "min_score_ratio": min_score_ratio,
             "runner_up": "next-highest moment among every candidate with an f01 peak",
@@ -1901,7 +1888,7 @@ def _summary_figure(
                 f"<sup>{decision.reason}<br>Runner-up: {evidence['runner_up_status']}, "
                 f"ratio={'-' if ratio is None else f'{ratio:.4g}'}<br>Rule: best moment / "
                 f"runner-up >= {rule['min_score_ratio']:g} (provisional, uncalibrated), "
-                f"quality_level >= {rule['min_quality_level']}, "
+                f"quality_level diagnostic only, "
                 f"f01 >= {rule['min_qubit_frequency']} GHz<br>Readout groups "
                 f"(readout_grouping={grouping['readout_grouping']}, one acquisition each, "
                 f"amplitude sum <= {grouping['budget']:g}, shared readout amplitude "

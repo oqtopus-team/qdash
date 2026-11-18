@@ -237,10 +237,13 @@ The task ranks the candidates by the f01 `moment` of that analysis (`F01Result.m
 score from which the analysis derives `quality_level`. It selects the best candidate and publishes
 outputs only when all of these hold:
 
-- its `quality_level` is at least 3; `CheckQubitSpectroscopy` reports levels up to 2 as low
-  quality;
+- it shows a response: its `quality_level` is above 0;
 - its f01 is at least 2.5 GHz;
 - its moment is at least `min_score_ratio` times the runner-up's moment.
+
+`quality_level` is a diagnostic, not an acceptance threshold: a best candidate that
+`CheckQubitSpectroscopy` would report as low quality (level 1 or 2) is selected when it passes these
+gates, and its level is published as `f01_quality_level` and recorded in the evidence.
 
 The runner-up is the candidate with the next-highest moment among every candidate with an f01 peak,
 low-quality ones included, so a weaker alternative is never hidden. Equal moments rank by candidate
@@ -248,7 +251,7 @@ index, so the decision does not depend on the order of the candidates. An exact 
 the ratio test and is rejected as ambiguous. When no other candidate has an f01 peak, or the
 runner-up's moment is 0, the ratio is undefined: the evidence records the runner-up as `absent` or
 `zero`, the ratio as `null`, and the separation test passes. A candidate whose analysis fails, a
-non-finite or negative moment, no response, a best candidate below the quality or frequency gate,
+non-finite or negative moment, no response, a best candidate below the frequency gate,
 or a malformed result marks the task failed without outputs.
 
 `min_score_ratio` is a run parameter with the default `2.0`, and it must be greater than 1. The

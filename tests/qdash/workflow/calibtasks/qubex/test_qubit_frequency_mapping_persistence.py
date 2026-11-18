@@ -367,20 +367,26 @@ def _mapping_payload() -> Any:
     )
 
 
-def _fake_analysis(moments: dict[str, float]) -> Any:
+def _fake_analysis(
+    moments: dict[str, float], *, quality_level: int = 4, frequency: float = 4.2
+) -> Any:
     def estimate(fig: Any, *_args: Any, **_kwargs: Any) -> Any:
         moment = moments.get(fig.layout.meta["readout_label"])
         f01 = (
             None
             if moment is None
-            else SimpleNamespace(frequency=4.2, repr_db=-15.0, quality_level=4, moment=moment)
+            else SimpleNamespace(
+                frequency=frequency, repr_db=-15.0, quality_level=quality_level, moment=moment
+            )
         )
         return go.Figure(fig), SimpleNamespace(f01=f01, f12=None, anharmonicity=None)
 
     return estimate
 
 
-def _run_mapping_through_executor(tmp_path: Path, moments: dict[str, float]) -> list[Any]:
+def _run_mapping_through_executor(
+    tmp_path: Path, moments: dict[str, float], **analysis: Any
+) -> list[Any]:
     """Execute the mapping task with the real executor and history; return saved figures."""
     saved: list[Any] = []
 
@@ -422,7 +428,7 @@ def _run_mapping_through_executor(tmp_path: Path, moments: dict[str, float]) -> 
         stack.enter_context(
             patch(
                 CONSUMER_MODULE + "estimate_and_mark_qubit_figure",
-                side_effect=_fake_analysis(moments),
+                side_effect=_fake_analysis(moments, **analysis),
             )
         )
         # A rejected mapping raises after its artifacts and history are recorded.
@@ -490,6 +496,41 @@ def test_selected_mapping_persists_reviewable_evidence(chip_qubits, tmp_path) ->
     summary = _persisted_meta(saved, 1)
     assert summary["qubit_frequency_mapping_figure"] == "summary"
     assert summary["qubit_frequency_mapping"] == evidence
+
+
+def test_low_quality_selected_mapping_persists_its_quality_level(chip_qubits, tmp_path) -> None:
+    """Persist a quality_level 1 selection with the same values in outputs and evidence."""
+    saved = _run_mapping_through_executor(
+        tmp_path,
+        {"RQ00": 97.5023, "RQ01": 1716.03, "RQ02": 432.34},
+        quality_level=1,
+        frequency=7.37,
+    )
+
+    doc = _mapping_history()
+    assert doc.status == "completed"
+    outputs = doc.output_parameters
+    assert outputs["resonator_candidate_index"]["value"] == 1
+    assert outputs["resonator_frequency"]["value"] == FREQUENCIES_A[1]
+    assert outputs["coarse_qubit_frequency"]["value"] == pytest.approx(7.37)
+    assert outputs["f01_quality_level"]["value"] == 1
+    evidence = _persisted_evidence(saved)
+    assert evidence["outcome"] == "selected"
+    assert evidence["score_ratio"] == pytest.approx(3.96917, rel=1e-5)
+    assert "min_quality_level" not in evidence["rule"]
+    assert [row["quality_level"] for row in evidence["candidates"]] == [1, 1, 1, None]
+    proposal = evidence["proposal"]
+    assert proposal["published"] is True
+    for key in (
+        "resonator_candidate_index",
+        "resonator_frequency",
+        "coarse_qubit_frequency",
+        "f01_quality_level",
+        "coarse_control_amplitude",
+    ):
+        assert proposal[key] == pytest.approx(outputs[key]["value"])
+    assert _persisted_meta(saved, 0)["qubit_frequency_mapping_figure"] == "selected"
+    assert _persisted_meta(saved, 1)["qubit_frequency_mapping"] == evidence
 
 
 def test_ambiguous_mapping_persists_evidence_without_calibration(chip_qubits, tmp_path) -> None:
