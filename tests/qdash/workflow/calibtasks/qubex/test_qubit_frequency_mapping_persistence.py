@@ -363,7 +363,7 @@ def _mapping_payload() -> Any:
                 "candidate_index": i,
                 "readout_group_index": 0,
                 "readout_frequency": FREQUENCIES_A[i],
-                "readout_amplitude": amplitudes[i],
+                "readout_amplitude": readouts[i].readout_amplitude,
                 "frequency_range": DRIVE_FREQUENCIES,
                 "power_range": DRIVE_POWERS,
                 "phases": zs,
@@ -485,6 +485,17 @@ def test_selected_mapping_persists_reviewable_evidence(chip_qubits, tmp_path) ->
     assert evidence["proposal"]["published"] is True
     assert [row["moment"] for row in evidence["candidates"]] == [2000.0, None, 12000.0, None]
     assert [row["readout_frequency"] for row in evidence["candidates"]] == FREQUENCIES_A
+    # Every candidate is read at the minimum requested amplitude; requests stay as provenance.
+    requested = [10 ** (power / 20) for power in POWERS]
+    shared = min(requested)
+    assert doc.output_parameters["readout_amplitude"]["value"] == pytest.approx(shared)
+    rows = evidence["candidates"]
+    assert [row["readout_amplitude"] for row in rows] == pytest.approx([shared] * len(POWERS))
+    assert [row["requested_readout_amplitude"] for row in rows] == pytest.approx(requested)
+    assert evidence["readout_groups"]["readout_amplitude"] == pytest.approx(shared)
+    assert evidence["readout_groups"]["readout_amplitude_policy"] == "shared_minimum"
+    assert evidence["proposal"]["readout_amplitude"] == pytest.approx(shared)
+    assert evidence["proposal"]["requested_readout_amplitude"] == pytest.approx(requested[2])
     first = _persisted_meta(saved, 0)
     assert first["qubit_frequency_mapping_figure"] == "selected"
     assert first["qdash_figure_role"] == "marked"

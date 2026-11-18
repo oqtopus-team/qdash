@@ -27,6 +27,7 @@ from qdash.workflow.calibtasks.qubex.cw.check_qubit_frequency_mapping import (
     load_multiplexed_readout_qubit_spectroscopy,
     plan_readout_groups,
     readout_groups,
+    shared_readout_amplitude,
 )
 from qdash.workflow.calibtasks.qubex.cw.check_qubit_spectroscopy import (
     compute_coarse_control_amplitude,
@@ -44,6 +45,8 @@ MODULE = "qdash.workflow.calibtasks.qubex.cw.check_qubit_frequency_mapping"
 SLOTS = ["RQ00", "RQ01", "RQ02", "RQ03"]
 READOUT_FREQUENCIES = [10.21, 10.29, 10.36, 10.43]
 READOUT_AMPLITUDES = [0.02, 0.03, 0.04, 0.05]
+# Every candidate is read at the minimum requested amplitude of the candidate set.
+SHARED_AMPLITUDE = min(READOUT_AMPLITUDES)
 DRIVE_FREQUENCIES = np.round(np.arange(4.0, 4.5, 0.005), 6)
 DRIVE_POWERS = np.arange(-60.0, 0.0, 5.0)
 RESPONSE_INDEX = 40
@@ -115,7 +118,7 @@ def _contrib_result(
 ) -> SimpleNamespace:
     """Return a helper result that reads every slot of ``zs_by_slot`` in one acquisition."""
     frequencies = READOUT_FREQUENCIES if frequencies is None else frequencies
-    amplitudes = READOUT_AMPLITUDES if amplitudes is None else amplitudes
+    amplitudes = [SHARED_AMPLITUDE] * len(frequencies) if amplitudes is None else amplitudes
     slots = list(zs_by_slot)
     candidates = {
         slot: {
@@ -293,7 +296,7 @@ def test_missing_contrib_helper_raises_actionable_error(monkeypatch) -> None:
 
 
 def test_run_drives_one_target_and_reads_every_paired_candidate() -> None:
-    """Pass one drive target and each candidate frequency with its own amplitude."""
+    """Pass one drive target and each candidate frequency at the shared amplitude."""
     task = _task_with_candidates()
     task.run_parameters = copy.deepcopy(task.run_parameters)
     task.run_parameters["frequency_range"].value = (4.0, 4.5, 0.005)
@@ -307,7 +310,7 @@ def test_run_drives_one_target_and_reads_every_paired_candidate() -> None:
     args, kwargs = contrib.call_args
     assert args[1] == "Q01"
     assert kwargs["readout_frequencies"] == dict(zip(SLOTS, READOUT_FREQUENCIES, strict=True))
-    assert kwargs["readout_amplitudes"] == dict(zip(SLOTS, READOUT_AMPLITUDES, strict=True))
+    assert kwargs["readout_amplitudes"] == dict.fromkeys(SLOTS, SHARED_AMPLITUDE)
     assert list(kwargs["readout_frequencies"]) == SLOTS
     assert kwargs["shots"] == 321
     assert kwargs["interval"] == 654.0
@@ -392,7 +395,7 @@ def test_unique_response_identifies_qubit_frequency_and_resonator() -> None:
     assert result.validation_error is None
     assert outputs["resonator_candidate_index"].value == 2
     assert outputs["resonator_frequency"].value == READOUT_FREQUENCIES[2]
-    assert outputs["readout_amplitude"].value == READOUT_AMPLITUDES[2]
+    assert outputs["readout_amplitude"].value == SHARED_AMPLITUDE
     assert outputs["coarse_qubit_frequency"].value == pytest.approx(
         DRIVE_FREQUENCIES[RESPONSE_INDEX]
     )
@@ -805,8 +808,10 @@ def test_evidence_lists_every_candidate_for_review() -> None:
     assert [row["candidate_index"] for row in rows] == [0, 1, 2, 3]
     assert [row["readout_label"] for row in rows] == SLOTS
     assert [row["readout_frequency"] for row in rows] == READOUT_FREQUENCIES
+    assert [row["readout_amplitude"] for row in rows] == [SHARED_AMPLITUDE] * 4
+    assert [row["requested_readout_amplitude"] for row in rows] == READOUT_AMPLITUDES
     assert [row["readout_power_db"] for row in rows] == pytest.approx(
-        [20 * np.log10(a) for a in READOUT_AMPLITUDES]
+        [20 * np.log10(SHARED_AMPLITUDE)] * 4
     )
     assert [row["status"] for row in rows] == [
         "no_f01_peak",
@@ -1287,18 +1292,25 @@ def test_installed_qubex_helper_reads_default_subgroups_as_separate_acquisitions
         assert len(group_result.data["readout_groups"]) == 1
     assert result.validation_error is None
     assert result.output_parameters["resonator_candidate_index"].value == 2
-    assert result.output_parameters["readout_amplitude"].value == READOUT_AMPLITUDES[2]
+    assert result.output_parameters["readout_amplitude"].value == SHARED_AMPLITUDE
     grouping = _evidence(result)["readout_groups"]
     assert grouping["readout_grouping"] == "subgroups"
     assert [g["candidate_indices"] for g in grouping["groups"]] == SUBGROUPS
 
 
-# Budget-safe readout groups ------------------------------------------------------------
+# Shared readout amplitude and budget-safe readout groups ---------------------------------
 
-# Requested amplitudes whose first-fit-decreasing groups reorder the candidates:
-# group 0 reads candidates 1 (0.7) and 3 (0.3); group 1 reads candidates 0 (0.2) and 2 (0.5).
-MIXED_AMPLITUDES = [0.2, 0.7, 0.5, 0.3]
-MIXED_GROUPS = [[1, 3], [0, 2]]
+# Producer requests whose minimum (0.4) is read at every candidate; under multiplexed, the
+# shared amplitude fits two tones per acquisition: group 0 reads candidates 0 and 1, and
+# group 1 reads candidates 2 and 3, where candidate 2 is at helper-local position 0.
+MIXED_AMPLITUDES = [0.4, 0.9, 0.5, 0.6]
+MIXED_SHARED = 0.4
+MIXED_GROUPS = [[0, 1], [2, 3]]
+# Unequal requests whose diagonal pair {0, 3} sums to 1.2 and pair {1, 2} to 0.5: both
+# pairs are read at the global minimum 0.2, not at the minimum of each pair.
+UNEQUAL_AMPLITUDES = [0.8, 0.3, 0.2, 0.4]
+UNEQUAL_SHARED = 0.2
+SUBGROUP_SLOTS = [["RQ00", "RQ03"], ["RQ01", "RQ02"]]
 
 
 def _amplitude_task(
@@ -1312,23 +1324,23 @@ def _amplitude_task(
 
 
 def _group_result(
-    indices: list[int], amplitudes: list[float], response_slot: str = "RQ02"
+    indices: list[int], amplitude: float, response_slot: str = "RQ02"
 ) -> SimpleNamespace:
-    """Return the helper result of one group: its slots in order with helper-local indices."""
+    """Return the helper result of one group: its slots in order at the shared amplitude."""
     return _contrib_result(
         {
             SLOTS[i]: _response_z(RESPONSE_INDEX) if SLOTS[i] == response_slot else _noise_z(i)
             for i in indices
         },
         frequencies=[READOUT_FREQUENCIES[i] for i in indices],
-        amplitudes=[amplitudes[i] for i in indices],
+        amplitudes=[amplitude] * len(indices),
     )
 
 
 def _group_results(
-    groups: list[list[int]], amplitudes: list[float], response_slot: str = "RQ02"
+    groups: list[list[int]], amplitude: float, response_slot: str = "RQ02"
 ) -> list[Any]:
-    return [_group_result(indices, amplitudes, response_slot) for indices in groups]
+    return [_group_result(indices, amplitude, response_slot) for indices in groups]
 
 
 def _called_groups(contrib: MagicMock) -> list[dict[str, float]]:
@@ -1371,69 +1383,112 @@ def _readout_awg_waveform(schedule: Any, frequencies: dict[str, float]) -> Any:
 
 
 @pytest.mark.parametrize(
-    ("amplitudes", "groups"),
+    ("amplitudes", "subgroups", "groups", "shared"),
     [
-        ([0.02, 0.03, 0.04, 0.05], [[0, 1, 2, 3]]),
-        ([0.25, 0.25, 0.25, 0.25], [[0, 1, 2, 3]]),
-        ([0.3, 0.3, 0.3, 0.3], [[0, 1, 2], [3]]),
-        (MIXED_AMPLITUDES, MIXED_GROUPS),
-        ([1.0, 0.5, 0.5], [[0], [1, 2]]),
-        ([0.9, 0.9], [[0], [1]]),
+        ([0.02, 0.03, 0.04, 0.05], None, [[0, 1, 2, 3]], 0.02),
+        ([0.25, 0.25, 0.25, 0.25], None, [[0, 1, 2, 3]], 0.25),
+        ([0.3, 0.9, 0.3, 0.3], None, [[0, 1, 2], [3]], 0.3),
+        (MIXED_AMPLITUDES, None, MIXED_GROUPS, MIXED_SHARED),
+        ([0.6, 0.7, 0.8, 0.9], None, [[0], [1], [2], [3]], 0.6),
+        ([1.0], None, [[0]], 1.0),
+        ([0.5, 0.5, 0.5, 0.5], SUBGROUP_SLOTS, SUBGROUPS, 0.5),
+        (UNEQUAL_AMPLITUDES, SUBGROUP_SLOTS, SUBGROUPS, UNEQUAL_SHARED),
+        ([0.6, 0.6, 0.6, 0.6], SUBGROUP_SLOTS, [[0], [3], [1], [2]], 0.6),
     ],
 )
-def test_plan_readout_groups_is_first_fit_decreasing_within_the_budget(amplitudes, groups) -> None:
-    """Group candidates first-fit by decreasing amplitude, ties by index, each sum at most 1."""
+def test_plan_reads_every_candidate_at_the_global_minimum(
+    amplitudes, subgroups, groups, shared
+) -> None:
+    """Apply the minimum request to every candidate and split only above full scale."""
+    candidates = [
+        ResonatorCandidate(i, READOUT_FREQUENCIES[i], amplitude)
+        for i, amplitude in enumerate(amplitudes)
+    ]
+    slots = SLOTS[: len(amplitudes)]
+
+    readouts = plan_readout_groups(candidates, slots, subgroups)
+
+    assert shared_readout_amplitude(candidates) == shared
+    assert [r.candidate.index for r in readouts] == list(range(len(amplitudes)))
+    assert [r.readout_label for r in readouts] == slots
+    assert [r.readout_amplitude for r in readouts] == [shared] * len(amplitudes)
+    assert [r.requested_readout_amplitude for r in readouts] == amplitudes
+    assert [[r.candidate.index for r in group] for group in readout_groups(readouts)] == groups
+    for group in readout_groups(readouts):
+        assert [r.readout_group_position for r in group] == list(range(len(group)))
+        assert sum(r.readout_amplitude for r in group) <= MULTIPLEXED_READOUT_AMPLITUDE_BUDGET
+
+
+def test_shared_amplitude_is_the_global_minimum_not_the_minimum_of_each_pair() -> None:
+    """Read the {0, 3} pair at the global 0.2, not at its own minimum 0.4, without a split."""
+    candidates = [
+        ResonatorCandidate(i, READOUT_FREQUENCIES[i], amplitude)
+        for i, amplitude in enumerate(UNEQUAL_AMPLITUDES)
+    ]
+
+    readouts = plan_readout_groups(candidates, SLOTS, SUBGROUP_SLOTS)
+
+    pair = [readouts[0], readouts[3]]
+    assert [r.requested_readout_amplitude for r in pair] == [0.8, 0.4]
+    assert [r.readout_amplitude for r in pair] == [UNEQUAL_SHARED, UNEQUAL_SHARED]
+    assert {r.readout_group for r in pair} == {0}
+    assert [r.qubit_subgroup for r in readouts] == [0, 1, 1, 0]
+
+
+@pytest.mark.parametrize(
+    "amplitudes", [[0.2, 0.0], [0.2, -0.1], [0.2, float("nan")], [0.2, float("inf")], [1.2]]
+)
+def test_invalid_requested_amplitude_is_rejected_by_the_plan(amplitudes) -> None:
+    """Reject a zero, negative, non-finite, or above-full-scale request instead of reading it."""
     candidates = [
         ResonatorCandidate(i, READOUT_FREQUENCIES[i], amplitude)
         for i, amplitude in enumerate(amplitudes)
     ]
 
-    readouts = plan_readout_groups(candidates, SLOTS[: len(amplitudes)])
-
-    assert [r.candidate.index for r in readouts] == list(range(len(amplitudes)))
-    assert [r.readout_label for r in readouts] == SLOTS[: len(amplitudes)]
-    assert [[r.candidate.index for r in group] for group in readout_groups(readouts)] == groups
-    for group in readout_groups(readouts):
-        assert [r.readout_group_position for r in group] == list(range(len(group)))
-        assert sum(r.readout_amplitude for r in group) <= MULTIPLEXED_READOUT_AMPLITUDE_BUDGET
-    assert [r.readout_amplitude for r in readouts] == amplitudes
+    with pytest.raises(ValueError, match="must be finite, positive, and at most"):
+        plan_readout_groups(candidates, SLOTS[: len(amplitudes)])
 
 
 def test_candidates_within_the_budget_are_read_in_one_group() -> None:
-    """Call the helper once with every slot when the requested amplitudes sum to at most 1."""
+    """Call the helper once with every slot when the shared amplitudes sum to at most 1."""
     task = _task_with_candidates()
 
     run_result, contrib = _run(task, _single_response_result())
 
-    assert _called_groups(contrib) == [dict(zip(SLOTS, READOUT_AMPLITUDES, strict=True))]
+    assert _called_groups(contrib) == [dict.fromkeys(SLOTS, SHARED_AMPLITUDE)]
     assert len(run_result.raw_result.results) == 1
     result = _postprocess(task, run_result)
     assert result.validation_error is None
     assert _evidence(result)["readout_groups"]["count"] == 1
 
 
-def test_four_amplitudes_of_0_3_are_split_into_two_groups() -> None:
-    """Read three 0.3 tones together and the fourth alone, each at its requested amplitude."""
-    amplitudes = [0.3] * 4
-    task = _amplitude_task(amplitudes)
+@pytest.mark.parametrize(
+    ("grouping", "calls"),
+    [
+        ("multiplexed", [["RQ00"], ["RQ01"], ["RQ02"], ["RQ03"]]),
+        ("subgroups", [["RQ00"], ["RQ03"], ["RQ01"], ["RQ02"]]),
+    ],
+)
+def test_shared_amplitude_above_half_scale_reads_each_candidate_alone(grouping, calls) -> None:
+    """Keep the shared 0.6 and read every tone alone instead of reducing it to fit."""
+    amplitudes = [0.6, 0.7, 0.8, 0.9]
+    task = _amplitude_task(amplitudes, grouping)
 
-    run_result, contrib = _run(task, _group_results([[0, 1, 2], [3]], amplitudes))
-
-    assert _called_groups(contrib) == [
-        {"RQ00": 0.3, "RQ01": 0.3, "RQ02": 0.3},
-        {"RQ03": 0.3},
-    ]
-    for call in contrib.call_args_list:
-        assert call.args[1] == "Q01"
-        assert list(call.kwargs["readout_frequencies"]) == list(call.kwargs["readout_amplitudes"])
+    run_result, contrib = _run(task, _fake_helper(_single_response_zs("RQ02")))
     result = _postprocess(task, run_result)
+
+    assert _calls(contrib) == calls
+    assert _called_groups(contrib) == [dict.fromkeys(call, 0.6) for call in calls]
     assert result.validation_error is None
     assert result.output_parameters["resonator_candidate_index"].value == 2
-    assert result.output_parameters["readout_amplitude"].value == 0.3
+    assert result.output_parameters["readout_amplitude"].value == 0.6
+    rows = _evidence(result)["candidates"]
+    assert [row["readout_amplitude"] for row in rows] == [0.6] * 4
+    assert [row["requested_readout_amplitude"] for row in rows] == amplitudes
 
 
-def test_every_group_uses_the_same_drive_settings() -> None:
-    """Pass the same target, sweep, timing, shots, and interval to every group call."""
+def test_every_group_uses_the_same_drive_and_readout_settings() -> None:
+    """Pass the same target, sweep, timing, shots, interval, and amplitude to every group."""
     task = _amplitude_task(MIXED_AMPLITUDES)
     task.run_parameters = copy.deepcopy(task.run_parameters)
     task.run_parameters["frequency_range"].value = (4.0, 4.5, 0.005)
@@ -1441,7 +1496,7 @@ def test_every_group_uses_the_same_drive_settings() -> None:
     task.run_parameters["interval"].value = 654.0
     task.run_parameters["simultaneous_drive"].value = False
 
-    _, contrib = _run(task, _group_results(MIXED_GROUPS, MIXED_AMPLITUDES))
+    _, contrib = _run(task, _group_results(MIXED_GROUPS, MIXED_SHARED))
 
     assert contrib.call_count == 2
     first, second = contrib.call_args_list
@@ -1450,30 +1505,34 @@ def test_every_group_uses_the_same_drive_settings() -> None:
     assert {k: first.kwargs[k] for k in shared} == {k: second.kwargs[k] for k in shared}
     for name in ("frequency_range", "power_range"):
         assert np.array_equal(first.kwargs[name], second.kwargs[name])
+    assert {a for call in _called_groups(contrib) for a in call.values()} == {MIXED_SHARED}
 
 
-def test_mixed_amplitudes_keep_slots_and_global_candidate_identity() -> None:
-    """Remap helper-local indices of reordered groups to each candidate's own index and slot."""
+def test_split_groups_keep_slots_and_global_candidate_identity() -> None:
+    """Remap helper-local indices of each group to each candidate's own index and slot."""
     task = _amplitude_task(MIXED_AMPLITUDES)
 
-    run_result, contrib = _run(task, _group_results(MIXED_GROUPS, MIXED_AMPLITUDES, "RQ02"))
+    run_result, contrib = _run(task, _group_results(MIXED_GROUPS, MIXED_SHARED, "RQ02"))
     result = _postprocess(task, run_result)
 
     assert [call.kwargs["readout_frequencies"] for call in contrib.call_args_list] == [
-        {"RQ01": READOUT_FREQUENCIES[1], "RQ03": READOUT_FREQUENCIES[3]},
-        {"RQ00": READOUT_FREQUENCIES[0], "RQ02": READOUT_FREQUENCIES[2]},
+        {"RQ00": READOUT_FREQUENCIES[0], "RQ01": READOUT_FREQUENCIES[1]},
+        {"RQ02": READOUT_FREQUENCIES[2], "RQ03": READOUT_FREQUENCIES[3]},
     ]
-    assert _called_groups(contrib) == [{"RQ01": 0.7, "RQ03": 0.3}, {"RQ00": 0.2, "RQ02": 0.5}]
+    assert _called_groups(contrib) == [
+        {"RQ00": MIXED_SHARED, "RQ01": MIXED_SHARED},
+        {"RQ02": MIXED_SHARED, "RQ03": MIXED_SHARED},
+    ]
     assert result.validation_error is None
     outputs = result.output_parameters
     assert outputs["resonator_candidate_index"].value == 2
     assert outputs["resonator_frequency"].value == READOUT_FREQUENCIES[2]
-    assert outputs["readout_amplitude"].value == 0.5
+    assert outputs["readout_amplitude"].value == MIXED_SHARED
     rows = _evidence(result)["candidates"]
     assert [row["candidate_index"] for row in rows] == [0, 1, 2, 3]
     assert [row["readout_label"] for row in rows] == SLOTS
-    assert [row["readout_group"] for row in rows] == [1, 0, 1, 0]
-    assert [row["readout_group_position"] for row in rows] == [0, 0, 1, 1]
+    assert [row["readout_group"] for row in rows] == [0, 0, 1, 1]
+    assert [row["readout_group_position"] for row in rows] == [0, 1, 0, 1]
     assert [row["selected"] for row in rows] == [False, False, True, False]
     raw = _raw_figures(result)
     assert [raw[slot].layout.meta["candidate_index"] for slot in SLOTS] == [0, 1, 2, 3]
@@ -1483,16 +1542,34 @@ def test_mixed_amplitudes_keep_slots_and_global_candidate_identity() -> None:
 def test_group_payload_with_a_global_candidate_index_is_rejected() -> None:
     """Require the helper-local index of each group, not the global candidate index."""
     task = _amplitude_task(MIXED_AMPLITUDES)
-    results = _group_results(MIXED_GROUPS, MIXED_AMPLITUDES)
+    results = _group_results(MIXED_GROUPS, MIXED_SHARED)
     results[1].data["candidates"]["RQ02"]["candidate_index"] = 2
     run_result, _ = _run(task, results)
 
     result = _postprocess(task, run_result)
 
     assert result.output_parameters == {}
-    assert "candidate_index 2 does not match position 1 of candidate 2 in readout group 1" in (
+    assert "candidate_index 2 does not match position 0 of candidate 2 in readout group 1" in (
         result.validation_error or ""
     )
+
+
+def test_payload_at_the_requested_instead_of_the_shared_amplitude_is_rejected() -> None:
+    """Reject a helper result that reports a candidate's own request as its amplitude."""
+    task = _amplitude_task(UNEQUAL_AMPLITUDES, "subgroups")
+    helper = _fake_helper(_single_response_zs("RQ03"))
+
+    def at_requested(*args: Any, **kwargs: Any) -> SimpleNamespace:
+        result = helper(*args, **kwargs)
+        if "RQ03" in result.data["candidates"]:
+            result.data["candidates"]["RQ03"]["readout_amplitude"] = 0.4
+        return result
+
+    run_result, _ = _run(task, at_requested)
+    result = _postprocess(task, run_result)
+
+    assert result.output_parameters == {}
+    assert "readout_amplitude 0.4 does not match the applied 0.2" in (result.validation_error or "")
 
 
 @pytest.mark.parametrize("amplitudes", [[0.2, 1.2], [1.0000001], [0.5, 0.5, 2.0, 0.1]])
@@ -1515,15 +1592,15 @@ def test_amplitude_above_full_scale_is_rejected_before_hardware(amplitudes) -> N
     get_experiment.assert_not_called()
 
 
-def test_grouping_keeps_source_candidates_and_inputs_unchanged() -> None:
-    """Apply every requested amplitude unchanged and leave inputs and provenance intact."""
+def test_shared_amplitude_keeps_source_candidates_and_inputs_unchanged() -> None:
+    """Record each producer request unchanged while every candidate reads the shared value."""
     task = _amplitude_task(MIXED_AMPLITUDES)
     before = {
         name: (parameter.value, parameter.execution_id, parameter.task_id)
         for name, parameter in task.input_parameters.items()
     }
 
-    run_result, _ = _run(task, _group_results(MIXED_GROUPS, MIXED_AMPLITUDES))
+    run_result, _ = _run(task, _group_results(MIXED_GROUPS, MIXED_SHARED))
 
     after = {
         name: (parameter.value, parameter.execution_id, parameter.task_id)
@@ -1534,13 +1611,13 @@ def test_grouping_keeps_source_candidates_and_inputs_unchanged() -> None:
     readouts = run_result.raw_result.readouts
     assert [r.candidate.readout_amplitude for r in readouts] == MIXED_AMPLITUDES
     assert [r.requested_readout_amplitude for r in readouts] == MIXED_AMPLITUDES
-    assert [r.readout_amplitude for r in readouts] == MIXED_AMPLITUDES
+    assert [r.readout_amplitude for r in readouts] == [MIXED_SHARED] * 4
 
 
 def test_failed_group_aborts_the_run_without_a_result() -> None:
     """Raise naming the failed group so no earlier group's result can be published."""
     task = _amplitude_task(MIXED_AMPLITUDES)
-    first = _group_result(MIXED_GROUPS[0], MIXED_AMPLITUDES)
+    first = _group_result(MIXED_GROUPS[0], MIXED_SHARED)
     contrib = MagicMock(side_effect=[first, RuntimeError("AWG error")])
 
     with (
@@ -1548,7 +1625,7 @@ def test_failed_group_aborts_the_run_without_a_result() -> None:
         patch.object(task, "get_qubit_label", return_value="Q01"),
         patch.object(task, "_verify_candidate_source"),
         patch(f"{MODULE}.load_multiplexed_readout_qubit_spectroscopy", return_value=contrib),
-        pytest.raises(RuntimeError, match=r"Readout group 1 of 2 \(candidates \[0, 2\]\)"),
+        pytest.raises(RuntimeError, match=r"Readout group 1 of 2 \(candidates \[2, 3\]\)"),
     ):
         task.run(cast("QubexBackend", object()), "1")
 
@@ -1584,7 +1661,7 @@ def _shift_axis(result: SimpleNamespace, shift: float) -> None:
 def test_inconsistent_group_results_publish_nothing(corrupt, match) -> None:
     """Fail closed when the group results disagree with the plan or with each other."""
     task = _amplitude_task(MIXED_AMPLITUDES)
-    results = _group_results(MIXED_GROUPS, MIXED_AMPLITUDES)
+    results = _group_results(MIXED_GROUPS, MIXED_SHARED)
     run_result, _ = _run(task, results)
     payload = run_result.raw_result
     group_results = list(payload.results)
@@ -1598,67 +1675,118 @@ def test_inconsistent_group_results_publish_nothing(corrupt, match) -> None:
     assert _evidence(result)["outcome"] == "rejected"
 
 
-def test_inconsistent_group_plan_publishes_nothing() -> None:
-    """Fail closed when a payload's group plan exceeds the budget or skips a position."""
-    task = _amplitude_task(MIXED_AMPLITUDES)
-    run_result, _ = _run(task, _group_results(MIXED_GROUPS, MIXED_AMPLITUDES))
+@pytest.mark.parametrize(
+    ("corrupt", "match"),
+    [
+        (
+            lambda readouts: tuple(replace(r, readout_group=0) for r in readouts),
+            "inconsistent positions",
+        ),
+        (
+            lambda readouts: (replace(readouts[0], readout_amplitude=0.4), *readouts[1:]),
+            "are not the shared minimum requested amplitude 0.2",
+        ),
+        (
+            lambda readouts: tuple(replace(r, readout_amplitude=0.4) for r in readouts),
+            "are not the shared minimum requested amplitude 0.2",
+        ),
+    ],
+)
+def test_inconsistent_group_plan_publishes_nothing(corrupt, match) -> None:
+    """Fail closed when a payload's plan skips a position or departs from the shared amplitude."""
+    task = _amplitude_task(UNEQUAL_AMPLITUDES, "subgroups")
+    run_result, _ = _run(task, _fake_helper(_single_response_zs("RQ03")))
     payload = run_result.raw_result
-    merged = tuple(replace(r, readout_group=0) for r in payload.readouts)
 
-    result = _postprocess(task, RunResult(raw_result=replace(payload, readouts=merged)))
+    result = _postprocess(
+        task, RunResult(raw_result=replace(payload, readouts=corrupt(payload.readouts)))
+    )
 
     assert result.output_parameters == {}
     assert "inconsistent readout groups" in (result.validation_error or "")
+    assert match in (result.validation_error or "")
 
 
-def test_diagnostics_report_groups_budget_and_amplitudes(capsys) -> None:
-    """Show the groups, budget, and requested equal applied amplitudes in logs and evidence."""
-    task = _amplitude_task(MIXED_AMPLITUDES)
-    run_result, _ = _run(task, _group_results(MIXED_GROUPS, MIXED_AMPLITUDES, "RQ02"))
+def test_unequal_requests_are_all_read_at_the_global_minimum(capsys) -> None:
+    """Read every candidate at the minimum request and report requested and applied values."""
+    task = _amplitude_task(UNEQUAL_AMPLITUDES, "subgroups")
+    before = {
+        name: (parameter.value, parameter.execution_id, parameter.task_id)
+        for name, parameter in task.input_parameters.items()
+    }
+
+    run_result, contrib = _run(task, _fake_helper(_single_response_zs("RQ03")))
     with patch(
         f"{MODULE}.estimate_and_mark_qubit_figure",
-        side_effect=_estimate({"RQ02": 10000.0, "RQ01": 1000.0}),
+        side_effect=_estimate({"RQ03": 10000.0, "RQ01": 1000.0}),
     ):
         result = _postprocess(task, run_result)
 
+    # The {0, 3} pair requests 1.2 in total, yet the shared 0.2 keeps it one acquisition.
+    assert _calls(contrib) == [["RQ00", "RQ03"], ["RQ01", "RQ02"]]
+    assert _called_groups(contrib) == [
+        {"RQ00": UNEQUAL_SHARED, "RQ03": UNEQUAL_SHARED},
+        {"RQ01": UNEQUAL_SHARED, "RQ02": UNEQUAL_SHARED},
+    ]
+    assert {
+        name: (parameter.value, parameter.execution_id, parameter.task_id)
+        for name, parameter in task.input_parameters.items()
+    } == before
     assert result.validation_error is None
+    outputs = result.output_parameters
+    assert outputs["resonator_candidate_index"].value == 3
+    assert outputs["resonator_frequency"].value == READOUT_FREQUENCIES[3]
+    assert outputs["readout_amplitude"].value == UNEQUAL_SHARED
+
     log = capsys.readouterr().out
     assert (
-        "readout_grouping=multiplexed: 2 readout group(s), one simultaneous acquisition each, "
-        "with amplitude sum <= 1 each"
+        "shared readout amplitude 0.2 (minimum requested) applied to every candidate; "
+        "readout_grouping=subgroups: 2 readout group(s)"
     ) in log
     assert (
-        "group 0 [candidate 1 (RQ01) amplitude 0.7, candidate 3 (RQ03) amplitude 0.3] sum 1"
+        "group 0 (qubit subgroup 0) [candidate 0 (RQ00) requested 0.8, "
+        "candidate 3 (RQ03) requested 0.4] sum 0.4"
     ) in log
-    assert "group 1 [candidate 0 (RQ00) amplitude 0.2, candidate 2 (RQ02) amplitude 0.5]" in log
+    assert "readout_amplitude=0.200000 a.u. (shared minimum, requested 0.400000 a.u." in log
+
     evidence = _evidence(result)
-    assert "readout_amplitude_ceiling" not in evidence
-    grouping = evidence["readout_groups"]
-    assert grouping["budget"] == 1.0
-    assert grouping["count"] == 2
-    assert [g["candidate_indices"] for g in grouping["groups"]] == MIXED_GROUPS
-    assert [g["readout_labels"] for g in grouping["groups"]] == [["RQ01", "RQ03"], ["RQ00", "RQ02"]]
-    assert [g["amplitude_sum"] for g in grouping["groups"]] == pytest.approx([1.0, 0.7])
+    assert evidence["schema"] == "qdash.qubit_frequency_mapping.v1"
     rows = evidence["candidates"]
-    assert [row["readout_amplitude"] for row in rows] == MIXED_AMPLITUDES
-    assert [row["requested_readout_amplitude"] for row in rows] == MIXED_AMPLITUDES
-    assert all("readout_amplitude_capped" not in row for row in rows)
+    assert [row["candidate_index"] for row in rows] == [0, 1, 2, 3]
+    assert [row["readout_label"] for row in rows] == SLOTS
+    assert [row["readout_amplitude"] for row in rows] == [UNEQUAL_SHARED] * 4
+    assert [row["requested_readout_amplitude"] for row in rows] == UNEQUAL_AMPLITUDES
     assert [row["readout_power_db"] for row in rows] == pytest.approx(
-        [20 * np.log10(a) for a in MIXED_AMPLITUDES]
+        [20 * np.log10(UNEQUAL_SHARED)] * 4
     )
-    assert evidence["proposal"]["readout_amplitude"] == 0.5
-    assert evidence["proposal"]["requested_readout_amplitude"] == 0.5
-    assert evidence["proposal"]["readout_group"] == 1
+    assert [row["readout_group"] for row in rows] == [0, 1, 1, 0]
+    grouping = evidence["readout_groups"]
+    assert grouping["readout_amplitude"] == UNEQUAL_SHARED
+    assert grouping["readout_amplitude_policy"] == "shared_minimum"
+    assert "minimum requested amplitude of all candidates" in grouping["readout_amplitude_rule"]
+    assert [g["candidate_indices"] for g in grouping["groups"]] == SUBGROUPS
+    assert [g["readout_amplitudes"] for g in grouping["groups"]] == [[UNEQUAL_SHARED] * 2] * 2
+    assert [g["requested_readout_amplitudes"] for g in grouping["groups"]] == [
+        [0.8, 0.4],
+        [0.3, 0.2],
+    ]
+    assert [g["amplitude_sum"] for g in grouping["groups"]] == pytest.approx([0.4, 0.4])
+    assert "resonator response or noise" in grouping["note"]
+    assert evidence["proposal"]["readout_amplitude"] == UNEQUAL_SHARED
+    assert evidence["proposal"]["requested_readout_amplitude"] == 0.4
+    assert evidence["proposal"]["readout_group"] == 0
     assert result.figures[0].layout.meta["qubit_frequency_mapping"] == evidence
     title = result.figures[0].layout.title.text
-    assert "readout_amplitude=0.5 (requested = applied, group 1)" in title
+    assert "readout_amplitude=0.2 (shared minimum; requested 0.4; group 0)" in title
     summary = _summary(result)
-    assert "group" in summary.data[0].header.values
-    assert "group 0: candidates [1, 3]" in summary.layout.title.text
-    assert all("ceiling" not in fig.to_json() for fig in result.figures)
+    header = list(summary.data[0].header.values)
+    assert "readout amp applied" in header
+    assert "readout amp requested" in header
+    assert "shared readout amplitude 0.2 = minimum requested" in summary.layout.title.text
+    assert all("requested = applied" not in fig.to_json() for fig in result.figures)
 
 
-def test_installed_helper_reads_each_group_within_awg_full_scale() -> None:
+def test_installed_helper_reads_each_group_at_the_shared_amplitude_within_full_scale() -> None:
     """Run the installed helper per group offline and compose each schedule with qxdriver."""
     task = _amplitude_task(MIXED_AMPLITUDES)
     task.run_parameters = copy.deepcopy(task.run_parameters)
@@ -1675,7 +1803,7 @@ def test_installed_helper_reads_each_group_within_awg_full_scale() -> None:
 
     service = exp.measurement_service
     groups = {tuple(frequencies): frequencies for frequencies in service.readout_frequencies}
-    assert list(groups) == [("RQ01", "RQ03"), ("RQ00", "RQ02")]
+    assert list(groups) == [("RQ00", "RQ01"), ("RQ02", "RQ03")]
     composed = {
         id(schedule): (schedule, frequencies)
         for schedule, frequencies in zip(
@@ -1685,14 +1813,17 @@ def test_installed_helper_reads_each_group_within_awg_full_scale() -> None:
     assert len(composed) == 2 * len(DRIVE_POWERS)
     for schedule, frequencies in composed.values():
         _readout_awg_waveform(schedule, frequencies)
+    for group_result in run_result.raw_result.results:
+        reported = [c["readout_amplitude"] for c in group_result.data["candidates"].values()]
+        assert reported == [MIXED_SHARED, MIXED_SHARED]
     assert result.validation_error is None
     assert result.output_parameters["resonator_candidate_index"].value == 2
     assert result.output_parameters["resonator_frequency"].value == READOUT_FREQUENCIES[2]
-    assert result.output_parameters["readout_amplitude"].value == 0.5
+    assert result.output_parameters["readout_amplitude"].value == MIXED_SHARED
 
 
 def test_requested_amplitudes_in_one_acquisition_exceed_awg_full_scale() -> None:
-    """Reproduce the hardware error when the mixed amplitudes share one acquisition."""
+    """Reproduce the hardware error when the requested amplitudes share one acquisition."""
     exp = _offline_experiment("Q02")
     frequencies = dict(zip(SLOTS, READOUT_FREQUENCIES, strict=True))
 
@@ -1735,7 +1866,7 @@ def test_readout_grouping_defaults_to_subgroups_and_is_forwarded() -> None:
     assert result.validation_error is None
     assert result.output_parameters["resonator_candidate_index"].value == 2
     assert result.output_parameters["resonator_frequency"].value == READOUT_FREQUENCIES[2]
-    assert result.output_parameters["readout_amplitude"].value == READOUT_AMPLITUDES[2]
+    assert result.output_parameters["readout_amplitude"].value == SHARED_AMPLITUDE
     evidence = _evidence(result)
     rows = evidence["candidates"]
     assert [row["candidate_index"] for row in rows] == [0, 1, 2, 3]
@@ -1792,31 +1923,6 @@ def test_four_amplitudes_of_0_5_follow_the_actual_simultaneous_groups(grouping, 
     groups = _evidence(result)["readout_groups"]["groups"]
     assert [g["readout_labels"] for g in groups] == calls
     assert [g["amplitude_sum"] for g in groups] == [1.0, 1.0]
-
-
-def test_subgroup_over_the_budget_is_split_further() -> None:
-    """Split only a subgroup whose tones exceed full scale, keeping requested amplitudes."""
-    amplitudes = [0.7, 0.2, 0.3, 0.4]
-    task = _amplitude_task(amplitudes, "subgroups")
-
-    run_result, contrib = _run(task, _fake_helper(_single_response_zs("RQ03")))
-    result = _postprocess(task, run_result)
-
-    # Subgroup {RQ00, RQ03} sums to 1.1, so it is read as two calls; {RQ01, RQ02} fits.
-    assert _calls(contrib) == [["RQ00"], ["RQ03"], ["RQ01", "RQ02"]]
-    assert _called_groups(contrib) == [{"RQ00": 0.7}, {"RQ03": 0.4}, {"RQ01": 0.2, "RQ02": 0.3}]
-    assert result.validation_error is None
-    outputs = result.output_parameters
-    assert outputs["resonator_candidate_index"].value == 3
-    assert outputs["resonator_frequency"].value == READOUT_FREQUENCIES[3]
-    assert outputs["readout_amplitude"].value == 0.4
-    rows = _evidence(result)["candidates"]
-    assert [row["readout_group"] for row in rows] == [0, 2, 2, 1]
-    assert [row["qubit_subgroup"] for row in rows] == [0, 1, 1, 0]
-    assert [row["readout_amplitude"] for row in rows] == amplitudes
-    groups = _evidence(result)["readout_groups"]["groups"]
-    assert [g["qubit_subgroup"] for g in groups] == [0, 0, 1]
-    assert all(g["amplitude_sum"] <= MULTIPLEXED_READOUT_AMPLITUDE_BUDGET for g in groups)
 
 
 def test_plan_never_merges_candidates_across_qubit_subgroups() -> None:

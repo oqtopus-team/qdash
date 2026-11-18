@@ -171,9 +171,16 @@ would read the same resonators.
 A readout group is the set of candidates read together in one acquisition. Their tones share one
 readout AWG channel, where Qubex sums them with unit-magnitude phase factors and the driver rejects
 any I or Q sample above full scale. Tones whose amplitudes sum to at most 1 stay within full scale
-for any phases. Each `resonator_candidate_<i>_readout_amplitude` is a single-tone detection
-optimum, and the task reads every candidate at that requested amplitude without scaling it. It
-rejects an amplitude above 1 before any measurement.
+for any phases.
+
+Every candidate is read at one shared readout amplitude: the minimum of the
+`resonator_candidate_<i>_readout_amplitude` values over the whole candidate set, computed once
+before grouping. Each of those values is a single-tone detection optimum, which the task calls the
+requested amplitude and records as provenance only. Because the selection compares the f01 moments
+of all candidates, a common amplitude keeps the readout drive out of that comparison; it does not
+remove differences in resonator response or noise. For requested amplitudes
+`[0.8, 0.3, 0.2, 0.4]`, every candidate is read at 0.2. The task rejects a requested amplitude
+that is not finite and positive or exceeds 1 before any measurement.
 
 The `readout_grouping` run parameter decides which candidates may share a group:
 
@@ -182,19 +189,20 @@ The `readout_grouping` run parameter decides which candidates may share a group:
 | `subgroups` (default) | Candidates in the same Qubex qubit subgroup: `exp.util.create_qubit_subgroups` on the slots' qubits, qubit index modulo 4 in {0, 3} first, then {1, 2} |
 | `multiplexed` | Every candidate |
 
-`plan_readout_groups` then packs each subgroup, or all candidates under `multiplexed`, first-fit in
-decreasing order of amplitude, ties by candidate index, into the first group whose amplitude sum
-stays at or below 1. A subgroup is split further only when its tones would exceed full scale, and
-the budget never spans two subgroups, because they are separate acquisitions. For example, four
-candidates of 0.5 form groups `RQ00`+`RQ03` and `RQ01`+`RQ02` under `subgroups`, and `RQ00`+`RQ01`
-and `RQ02`+`RQ03` under `multiplexed`. Amplitudes `[0.7, 0.2, 0.3, 0.4]` under `subgroups` form
-`RQ00`, `RQ03`, and `RQ01`+`RQ02`, because 0.7 + 0.4 exceeds 1. Under `multiplexed`, amplitudes
-`[0.2, 0.7, 0.5, 0.3]` form group 0 with candidates 1 and 3 (sum 1.0) and group 1 with candidates
-0 and 2 (sum 0.7).
+`plan_readout_groups` then walks each subgroup, or all candidates under `multiplexed`, in candidate
+index order and adds each candidate to the current group while the group's sum of shared
+amplitudes stays at or below 1; otherwise the candidate opens a new group. A subgroup is split
+further only when its tones would exceed full scale, the shared amplitude is never reduced to fit,
+and the budget never spans two subgroups, because they are separate acquisitions. With the shared
+amplitude 0.2 from the example above, `subgroups` reads `RQ00`+`RQ03` and `RQ01`+`RQ02`, although
+the requested amplitudes of `RQ00` and `RQ03` sum to 1.2, and `multiplexed` reads all four slots
+together. A shared amplitude of 0.5 gives `RQ00`+`RQ03` and `RQ01`+`RQ02` under `subgroups`, and
+`RQ00`+`RQ01` and `RQ02`+`RQ03` under `multiplexed`. A shared amplitude above 0.5, such as 0.6,
+reads every candidate in its own acquisition under either mode.
 
-Each group is one helper call with the same drive target, sweep, timing, shots, interval, and
-`readout_grouping`, run in group order. A candidate keeps its readout slot and its candidate index
-whichever group reads it. The helper numbers the candidates of each call from 0, so the task checks
+Each group is one helper call with the same drive target, sweep, timing, shots, interval, shared
+readout amplitude, and `readout_grouping`, run in group order. A candidate keeps its readout slot
+and its candidate index whichever group reads it. The helper numbers the candidates of each call from 0, so the task checks
 each payload's `candidate_index` against the candidate's position in its group and then maps the
 payload back to the candidate's own index. The helper reports the acquisitions it made in
 `readout_groups` and each candidate's `readout_group_index`; the task requires the requested
@@ -202,17 +210,19 @@ payload back to the candidate's own index. The helper reports the acquisitions i
 split a group further is rejected. A failed helper call fails the task, naming the group; a group
 result whose target, readout labels, grouping, candidates, or axes disagree with the plan or with
 group 0 marks the task failed without outputs, so no group is published alone. The evidence records
-the groups under `readout_groups` (mode, budget, rule, and each group's qubit subgroup,
-candidates, slots, amplitudes, and sum) and each candidate's `readout_group`,
-`readout_group_position`, `qubit_subgroup` (null under `multiplexed`), and requested and applied
-amplitude, which are equal. The bound covers the summed readout tones only; it assumes no gain
-between the pulse amplitude and the AWG samples.
+the groups under `readout_groups`: the mode, the shared `readout_amplitude` with
+`readout_amplitude_policy` `shared_minimum` and its rule, the budget and grouping rule, and each
+group's qubit subgroup, candidates, slots, applied and requested amplitudes, and applied sum. Each
+candidate records its `readout_group`, `readout_group_position`, `qubit_subgroup` (null under
+`multiplexed`), the applied `readout_amplitude`, and its own `requested_readout_amplitude`. The
+bound covers the summed readout tones only; it assumes no gain between the pulse amplitude and the
+AWG samples.
 
 Each candidate is analyzed from its `phases` array in its group's Qubex result, on the result's
 `frequency_range` and `power_range`; the figures in the Qubex result are not read. The task rejects
 the result when an axis is not finite and strictly increasing, differs from the requested sweep, or
 differs from the candidate's own axes, and rejects a candidate whose `readout_label`,
-group position, readout frequency, or requested readout amplitude does not match the request, whose
+group position, readout frequency, or applied readout amplitude does not match the request, whose
 `phases` is not a finite real array of shape `(power, frequency)`, or whose `data` differs from
 `phases`. The task builds each candidate's heatmap from the validated arrays and analyzes it with the
 `CheckQubitSpectroscopy` configuration and trimmed retry.
@@ -237,11 +247,10 @@ or a malformed result marks the task failed without outputs.
 `min_score_ratio` is a run parameter with the default `2.0`, and it must be greater than 1. The
 default is a provisional heuristic, not an empirically calibrated threshold. The moment is not
 normalized across candidates: it sums the phase magnitude over the detected peak region, weighted
-by drive power, so it grows with the region's size and phase contrast and depends on each
-candidate's readout amplitude and noise level. A candidate read with a stronger
-readout or less noise can score higher for the same qubit response. Candidates keep their
-unequal requested amplitudes and can come from different readout groups, which are separate
-acquisitions, and the task does not normalize for either.
+by drive power, so it grows with the region's size and phase contrast. Every candidate is read at
+the shared readout amplitude, but a candidate whose resonator responds more strongly or shows less
+noise can still score higher for the same qubit response. Candidates can also come from different
+readout groups, which are separate acquisitions, and the task does not normalize for either.
 
 The figure order depends on the outcome:
 
@@ -256,10 +265,10 @@ valid, in candidate order.
 The selected candidate's figure is its own phase map with the f01 marker of the analysis and the
 coarse-amplitude line. Its title names the qid, the candidate index and readout slot, the readout
 frequency and amplitude, the f01, moment, and `quality_level`, and the runner-up margin. The
-summary figure shows a table of every candidate (slot, readout group, readout frequency, readout
-amplitude, readout power, status or error, f01, moment, `quality_level`, rank, selection), each
+summary figure shows a table of every candidate (slot, readout group, readout frequency, applied and
+requested readout amplitude, readout power, status or error, f01, moment, `quality_level`, rank, selection), each
 candidate's phase map with its f01 peak, the decision and its reason, the runner-up and ratio, the
-rule, and the readout groups with their amplitude sums. Both
+rule, and the readout groups with the shared readout amplitude and their amplitude sums. Both
 figures carry the same evidence in their JSON under `layout.meta["qubit_frequency_mapping"]`,
 including the raw moment of every candidate and the proposal: the values the selected candidate
 publishes, or the best candidate's values marked `published: false` on rejection.
@@ -275,7 +284,8 @@ when the selected figure comes first. **Ask AI** on a task result opens with eve
 summary included.
 
 On success the selected candidate supplies `resonator_frequency`, `readout_frequency`, and
-`readout_amplitude`, the requested amplitude it was read with. The f01 estimate supplies
+`readout_amplitude`, the shared amplitude every candidate was read with, not the selected
+candidate's requested amplitude. The f01 estimate supplies
 `coarse_qubit_frequency`, `control_frequency`,
 `f01_repr_db`, `f01_quality_level`, and `coarse_control_amplitude` with the same conversion as
 `CheckQubitSpectroscopy`. `resonator_candidate_index` records the selected peak. Qubits are
