@@ -16,7 +16,6 @@ from unittest.mock import MagicMock, patch
 
 import plotly.graph_objects as go
 import pytest
-from qubex.experiment.experiment_util import ExperimentUtil
 
 from qdash.analysis.spectroscopy.estimate_resonator_frequency import Peak, Resonance
 from qdash.common.mux_mapping import MuxMapping
@@ -48,21 +47,6 @@ CONSUMER_MODULE = "qdash.workflow.calibtasks.qubex.cw.check_qubit_frequency_mapp
 FREQUENCIES_A = [10.21, 10.29, 10.36, 10.43]
 FREQUENCIES_B = [10.22, 10.30, 10.37, 10.44]
 POWERS = [-34.0, -30.0, -28.0, -26.0]
-
-
-@pytest.fixture(autouse=True)
-def _qubex_qubit_indices(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Let the real Qubex create_qubit_subgroups resolve Qxx labels without a system."""
-    from qubex.experiment import experiment_util
-
-    system = SimpleNamespace(
-        get_qubit=lambda label: SimpleNamespace(label=label, index=int(label[1:]))
-    )
-    monkeypatch.setattr(
-        experiment_util,
-        "SystemManager",
-        SimpleNamespace(shared=lambda: SimpleNamespace(experiment_system=system)),
-    )
 
 
 @pytest.fixture
@@ -208,7 +192,7 @@ def _run_consumer(qid: str = "1") -> MagicMock:
     """Resolve the consumer inputs from the database and run it up to the Qubex calls.
 
     The consumer keeps its default ``readout_grouping``, so it reads the candidates in
-    one call per Qubex qubit subgroup.
+    one call per frequency pair, never grouping them by qubit index.
     """
     consumer = CheckQubitFrequencyMapping()
     consumer.input_parameters = copy.deepcopy(consumer.input_parameters)
@@ -223,7 +207,7 @@ def _run_consumer(qid: str = "1") -> MagicMock:
         )
     )
     exp.ctx.resolve_qubit_label.side_effect = lambda label: "Q" + label[2:]
-    exp.util = ExperimentUtil
+    exp.util.create_qubit_subgroups.side_effect = AssertionError("qubit-index grouping")
     helper = MagicMock(return_value=SimpleNamespace(data={}, figures={}))
     with (
         patch.object(consumer, "get_experiment", return_value=exp),
@@ -259,10 +243,10 @@ def test_latest_successful_detection_feeds_the_consumer(chip_qubits, tmp_path) -
 
     assert _history("exec-A") == dict.fromkeys(MUX_QIDS, "completed")
     assert [list(call.kwargs["readout_frequencies"]) for call in helper.call_args_list] == [
-        ["RQ00", "RQ03"],
-        ["RQ01", "RQ02"],
+        ["RQ00", "RQ01"],
+        ["RQ02", "RQ03"],
     ]
-    assert all(call.kwargs["readout_grouping"] == "subgroups" for call in helper.call_args_list)
+    assert all(call.kwargs["readout_grouping"] == "multiplexed" for call in helper.call_args_list)
     assert _read_frequencies(helper) == FREQUENCIES_A
 
 
@@ -346,7 +330,9 @@ def _mapping_payload() -> Any:
     amplitudes = [10 ** (power / 20) for power in POWERS]
     # One multiplexed acquisition keeps the payload to one helper result.
     readouts = plan_readout_groups(
-        [ResonatorCandidate(i, FREQUENCIES_A[i], amplitudes[i]) for i in range(len(slots))], slots
+        [ResonatorCandidate(i, FREQUENCIES_A[i], amplitudes[i]) for i in range(len(slots))],
+        slots,
+        "multiplexed",
     )
     assert {readout.readout_group for readout in readouts} == {0}
     zs = [[0.0] * len(DRIVE_FREQUENCIES) for _ in DRIVE_POWERS]

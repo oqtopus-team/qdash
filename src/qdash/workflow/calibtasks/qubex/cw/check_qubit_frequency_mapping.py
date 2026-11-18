@@ -69,22 +69,28 @@ READOUT_AMPLITUDE_POLICY_RULE = (
     "every candidate is read at the minimum requested amplitude of all candidates, computed "
     "once over the whole candidate set before grouping and never reduced to fit the budget"
 )
-# ``readout_grouping`` modes: "subgroups" reads the candidates of each Qubex qubit subgroup
-# (qubit index modulo 4 in {0, 3}, then {1, 2}) together; "multiplexed" reads every
-# candidate together. The budget applies to the tones that are actually read together.
-READOUT_GROUPINGS: tuple[str, ...] = ("subgroups", "multiplexed")
-DEFAULT_READOUT_GROUPING = "subgroups"
+# ``readout_grouping`` modes: "frequency_pairs" reads adjacent candidates in frequency
+# order together (the two lowest, then the next two, and so on); "multiplexed" reads every
+# candidate together. Candidates are not yet assigned to qubits, so their readout slots
+# carry no physical meaning and do not affect grouping. The budget applies to the tones
+# that are actually read together.
+READOUT_GROUPINGS: tuple[str, ...] = ("frequency_pairs", "multiplexed")
+DEFAULT_READOUT_GROUPING = "frequency_pairs"
 READOUT_GROUPING_RULES: dict[str, str] = {
-    "subgroups": (
-        "candidates are partitioned by Qubex create_qubit_subgroups of their readout slots, in "
-        "subgroup order; within each subgroup, candidates in index order join the current "
-        "group while its shared-amplitude sum stays <= budget"
+    "frequency_pairs": (
+        "candidates sorted by frequency (ties by index) are partitioned into adjacent pairs "
+        "from the lowest frequency, with an odd last candidate alone; within each pair, "
+        "candidates in index order join the current group while its shared-amplitude sum "
+        "stays <= budget"
     ),
     "multiplexed": (
         "candidates in index order join the current group while its shared-amplitude sum "
         "stays <= budget"
     ),
 }
+# QDash forms every acquisition itself, so each helper call reads exactly its candidates
+# as one group and the helper never re-partitions them.
+HELPER_READOUT_GROUPING = "multiplexed"
 
 
 def load_multiplexed_readout_qubit_spectroscopy() -> Callable[..., Any]:
@@ -211,9 +217,9 @@ class CandidateReadout:
     ``readout_group`` numbers the helper call that acquires the candidate; every call
     reads its candidates in one simultaneous acquisition. ``readout_group_position``
     is the candidate's position in that call, which is the ``candidate_index`` the
-    helper reports for it. ``qubit_subgroup`` is the index of the Qubex qubit subgroup
-    of the slot when ``readout_grouping`` is ``"subgroups"``, and None when it is
-    ``"multiplexed"``. ``readout_amplitude`` is the amplitude applied in the
+    helper reports for it. ``frequency_pair`` is the index of the candidate's
+    frequency pair (0 for the two lowest frequencies) when ``readout_grouping`` is
+    ``"frequency_pairs"``, and None when it is ``"multiplexed"``. ``readout_amplitude`` is the amplitude applied in the
     measurement, shared by every candidate of the set; the producer's own amplitude
     is kept as ``requested_readout_amplitude`` for provenance only.
     """
@@ -223,7 +229,7 @@ class CandidateReadout:
     readout_group: int
     readout_group_position: int
     readout_amplitude: float
-    qubit_subgroup: int | None = None
+    frequency_pair: int | None = None
 
     @property
     def requested_readout_amplitude(self) -> float:
@@ -252,57 +258,70 @@ def shared_readout_amplitude(candidates: Sequence[ResonatorCandidate]) -> float:
     return min(candidate.readout_amplitude for candidate in candidates)
 
 
+def frequency_pairs(
+    candidates: Sequence[ResonatorCandidate],
+) -> tuple[tuple[ResonatorCandidate, ...], ...]:
+    """Return adjacent candidate pairs in ascending frequency, an odd last one alone.
+
+    Candidates are sorted by frequency, ties by candidate index, and paired from
+    the lowest frequency, so each pair holds the closest neighbours of the sorted
+    order rather than the extremes. Each pair lists its candidates by index.
+    """
+    ordered = sorted(candidates, key=lambda c: (c.frequency, c.index))
+    return tuple(
+        tuple(sorted(ordered[start : start + 2], key=lambda c: c.index))
+        for start in range(0, len(ordered), 2)
+    )
+
+
 def plan_readout_groups(
     candidates: Sequence[ResonatorCandidate],
     slots: Sequence[str],
-    subgroups: Sequence[Sequence[str]] | None = None,
+    grouping: str = DEFAULT_READOUT_GROUPING,
 ) -> tuple[CandidateReadout, ...]:
     """Pair each candidate with its slot and split them into budget-safe acquisition groups.
 
     Every candidate is read at ``shared_readout_amplitude(candidates)``, the minimum
     requested amplitude of the whole set, computed once before grouping. Candidate
-    ``i`` keeps slot ``slots[i]``. ``subgroups`` lists the slots that Qubex reads
-    together under ``readout_grouping="subgroups"``, in Qubex order; None reads every
-    slot together (``"multiplexed"``). Within each subgroup in order, candidates in
-    index order join the current group while its sum of shared amplitudes stays
-    within ``MULTIPLEXED_READOUT_AMPLITUDE_BUDGET`` and otherwise open a new group.
-    A subgroup is therefore one group unless its tones would exceed full scale, and
-    the budget is never applied across subgroups, which are separate acquisitions.
+    ``i`` in input order keeps slot ``slots[i]`` and its own candidate index.
+    ``grouping`` ``"frequency_pairs"`` partitions the candidates with
+    ``frequency_pairs``, from the lowest pair up; ``"multiplexed"`` keeps them in one
+    partition. Within each partition, candidates in index order join the current
+    group while its sum of shared amplitudes stays within
+    ``MULTIPLEXED_READOUT_AMPLITUDE_BUDGET`` and otherwise open a new group. A
+    partition is therefore one group unless its tones would exceed full scale, and
+    the budget is never applied across partitions, which are separate acquisitions.
     The shared amplitude is never reduced to fit the budget. Groups are numbered in
     creation order and list their candidates by candidate index. Returns the
-    readouts in candidate order. Raises ValueError when the counts differ, the
-    subgroups do not cover every slot exactly once, or ``shared_readout_amplitude``
+    readouts in candidate order. Raises ValueError when the counts differ, candidate
+    indices repeat, ``grouping`` is unknown, or ``shared_readout_amplitude``
     rejects a requested amplitude.
     """
     if len(candidates) != len(slots):
         raise ValueError(f"{len(candidates)} candidates do not match {len(slots)} readout slots")
+    if len({candidate.index for candidate in candidates}) != len(candidates):
+        raise ValueError("resonator candidate indices are duplicated")
+    if grouping not in READOUT_GROUPINGS:
+        raise ValueError(
+            f"readout_grouping must be one of {list(READOUT_GROUPINGS)}, got {grouping!r}"
+        )
     amplitude = shared_readout_amplitude(candidates)
-    by_slot = dict(zip(slots, candidates, strict=True))
-    if subgroups is None:
-        partitions: list[tuple[int | None, list[ResonatorCandidate]]] = [(None, list(candidates))]
+    partitions: list[tuple[int | None, Sequence[ResonatorCandidate]]]
+    if grouping == "multiplexed":
+        partitions = [(None, list(candidates))]
     else:
-        listed = [slot for subgroup in subgroups for slot in subgroup]
-        if len(set(listed)) != len(listed) or sorted(listed) != sorted(slots):
-            raise ValueError(
-                f"qubit subgroups {[list(g) for g in subgroups]} do not cover the readout "
-                f"slots {list(slots)} exactly once"
-            )
-        partitions = [
-            (number, [by_slot[slot] for slot in subgroup])
-            for number, subgroup in enumerate(subgroups)
-            if subgroup
-        ]
+        partitions = list(enumerate(frequency_pairs(candidates)))
     bins: list[tuple[int | None, list[ResonatorCandidate]]] = []
-    for subgroup_number, members_of_subgroup in partitions:
-        subgroup_bins: list[list[ResonatorCandidate]] = []
-        for candidate in sorted(members_of_subgroup, key=lambda c: c.index):
-            if subgroup_bins and math.fsum([amplitude] * (len(subgroup_bins[-1]) + 1)) <= (
+    for partition, members_of_partition in partitions:
+        partition_bins: list[list[ResonatorCandidate]] = []
+        for candidate in sorted(members_of_partition, key=lambda c: c.index):
+            if partition_bins and math.fsum([amplitude] * (len(partition_bins[-1]) + 1)) <= (
                 MULTIPLEXED_READOUT_AMPLITUDE_BUDGET
             ):
-                subgroup_bins[-1].append(candidate)
+                partition_bins[-1].append(candidate)
             else:
-                subgroup_bins.append([candidate])
-        bins.extend((subgroup_number, members) for members in subgroup_bins)
+                partition_bins.append([candidate])
+        bins.extend((partition, members) for members in partition_bins)
     slot_of = {candidate.index: slot for candidate, slot in zip(candidates, slots, strict=True)}
     readouts = [
         CandidateReadout(
@@ -311,9 +330,9 @@ def plan_readout_groups(
             readout_group=group,
             readout_group_position=position,
             readout_amplitude=amplitude,
-            qubit_subgroup=subgroup_number,
+            frequency_pair=partition,
         )
-        for group, (subgroup_number, members) in enumerate(bins)
+        for group, (partition, members) in enumerate(bins)
         for position, candidate in enumerate(sorted(members, key=lambda c: c.index))
     ]
     return tuple(sorted(readouts, key=lambda r: r.candidate.index))
@@ -327,7 +346,7 @@ def readout_groups(
     Raises ValueError unless the groups are numbered from 0 without gaps, every group
     lists positions from 0 without gaps, candidate indices and readout slots are
     unique, every candidate is read at the shared amplitude of the set (the minimum
-    requested amplitude), every group's candidates share one qubit subgroup, and
+    requested amplitude), every group's candidates share one frequency pair, and
     every group's amplitude sum is within the readout budget.
     """
     indices = [r.candidate.index for r in readouts]
@@ -355,8 +374,8 @@ def readout_groups(
             not members
         ):
             raise ValueError(f"readout group {group} has inconsistent positions")
-        if len({r.qubit_subgroup for r in members}) != 1:
-            raise ValueError(f"readout group {group} mixes qubit subgroups")
+        if len({r.frequency_pair for r in members}) != 1:
+            raise ValueError(f"readout group {group} mixes frequency pairs")
         amplitude_sum = math.fsum(r.readout_amplitude for r in members)
         if amplitude_sum > MULTIPLEXED_READOUT_AMPLITUDE_BUDGET:
             raise ValueError(
@@ -374,7 +393,8 @@ class FrequencyMappingRunPayload:
     """The requested candidate readouts and sweep together with one Qubex result per group.
 
     ``readouts`` are in candidate order; ``results[g]`` is the helper result of
-    readout group ``g``. ``readout_grouping`` is the mode passed to every helper call.
+    readout group ``g``. ``readout_grouping`` is the task's grouping mode; every helper
+    call uses ``HELPER_READOUT_GROUPING`` so that it reads its group as one acquisition.
     """
 
     target: str
@@ -481,16 +501,18 @@ class CheckQubitFrequencyMapping(QubexTask):
     differences in resonator response or noise between candidates. The candidate
     tones of one acquisition share the MUX readout AWG channel, so their amplitudes
     must sum to at most full scale. The ``readout_grouping`` run parameter selects
-    which candidates are read together: ``subgroups`` (default) first splits them by
-    the Qubex qubit subgroups of their readout slots (qubit index modulo 4 in
-    {0, 3}, then {1, 2}), and ``multiplexed`` reads them all together. Within each
-    subgroup, or within all candidates, candidates in index order join the current
-    acquisition group while its sum of shared amplitudes stays within full scale, so
-    a group is split further only when its tones would exceed full scale; the shared
-    amplitude is never reduced to fit. Each group is one helper call with the same
-    drive sweep, readout amplitude, and ``readout_grouping``, and the helper must
-    report it as one acquisition; a candidate keeps its readout slot and candidate
-    index whichever group reads it. A requested amplitude that is not finite and
+    which candidates are read together: ``frequency_pairs`` (default) sorts them by
+    frequency and reads adjacent pairs, the two lowest and then the two highest of
+    four candidates, so the tones read together stay close; ``multiplexed`` reads
+    them all together. The candidates are not yet assigned to qubits, so their
+    readout slots carry no physical meaning, and grouping never uses qubit indices.
+    Within each pair, or within all candidates, candidates in index order join the
+    current acquisition group while its sum of shared amplitudes stays within full
+    scale, so a group is split further only when its tones would exceed full scale;
+    the shared amplitude is never reduced to fit. Each group is one helper call with
+    the same drive sweep and readout amplitude and ``readout_grouping="multiplexed"``,
+    so the helper reads exactly that group and must report it as one acquisition; a
+    candidate keeps its readout slot and candidate index whichever group reads it. A requested amplitude that is not finite and
     positive or exceeds full scale is rejected before any measurement. A failed group
     or an inconsistent group result fails the task without outputs.
 
@@ -641,10 +663,10 @@ class CheckQubitFrequencyMapping(QubexTask):
             value_type="str",
             default=DEFAULT_READOUT_GROUPING,
             description=(
-                "How resonator candidates are read together: subgroups (default) reads "
-                "the candidates of each Qubex qubit subgroup (qubit index modulo 4 in "
-                "{0, 3}, then {1, 2}) in a separate acquisition; multiplexed reads every "
-                "candidate in one acquisition. Every candidate is read at the minimum "
+                "How resonator candidates are read together: frequency_pairs (default) "
+                "sorts them by frequency and reads adjacent pairs (the two lowest, then the "
+                "next two) in separate acquisitions; multiplexed reads every candidate in "
+                "one acquisition. Every candidate is read at the minimum "
                 "requested readout amplitude of the candidate set, and an acquisition whose "
                 "amplitude sum would exceed full scale is split further."
             ),
@@ -879,7 +901,7 @@ class CheckQubitFrequencyMapping(QubexTask):
     def _readout_grouping(self) -> str:
         """Return the validated ``readout_grouping`` run parameter.
 
-        Raises ValueError unless it is ``"subgroups"`` or ``"multiplexed"``.
+        Raises ValueError unless it is ``"frequency_pairs"`` or ``"multiplexed"``.
         """
         value = self.run_parameters["readout_grouping"].value
         if value not in READOUT_GROUPINGS:
@@ -888,36 +910,14 @@ class CheckQubitFrequencyMapping(QubexTask):
             )
         return str(value)
 
-    @staticmethod
-    def _qubit_subgroups(exp: Any, slots: Sequence[str]) -> list[list[str]]:
-        """Return the slots of each non-empty Qubex qubit subgroup, in Qubex order.
-
-        Uses ``exp.util.create_qubit_subgroups``, the rule the helper applies under
-        ``readout_grouping="subgroups"``, on the qubit label of each slot. Raises
-        ValueError unless every slot falls in exactly one subgroup.
-        """
-        qubit_of = {slot: str(exp.ctx.resolve_qubit_label(slot)) for slot in slots}
-        subgroups = [
-            [slot for slot in slots if qubit_of[slot] in {str(q) for q in subgroup}]
-            for subgroup in exp.util.create_qubit_subgroups(list(qubit_of.values()))
-        ]
-        subgroups = [subgroup for subgroup in subgroups if subgroup]
-        listed = [slot for subgroup in subgroups for slot in subgroup]
-        if sorted(listed) != sorted(slots):
-            raise ValueError(
-                f"Qubex qubit subgroups {subgroups} do not assign every readout slot "
-                f"{list(slots)} exactly once"
-            )
-        return subgroups
-
     def run(self, backend: QubexBackend, qid: str) -> RunResult:
         """Drive the qubit with the same sweep once per budget-safe acquisition group.
 
-        Under ``readout_grouping="subgroups"`` the candidates are first split by the
-        Qubex qubit subgroups of their slots, so the amplitude budget applies to the
-        tones that Qubex reads together. Every group calls the Qubex helper with the
-        same drive target, settings, and ``readout_grouping`` and reads its candidates
-        at the shared readout amplitude of the candidate set. Raises RuntimeError naming the group when a
+        Under ``readout_grouping="frequency_pairs"`` the candidates are first split
+        into adjacent frequency pairs, so the amplitude budget applies to the tones
+        that are read together. Every group calls the Qubex helper with the same drive
+        target and settings and ``readout_grouping="multiplexed"``, so the helper reads
+        exactly that group, at the shared readout amplitude of the candidate set. Raises RuntimeError naming the group when a
         helper call fails, so no group result is published.
         """
         self._min_score_ratio()
@@ -928,8 +928,7 @@ class CheckQubitFrequencyMapping(QubexTask):
         exp = self.get_experiment(backend)
         label = self.get_qubit_label(backend, qid)
         slots = self._readout_slots(exp, label, len(candidates))
-        subgroups = None if grouping == "multiplexed" else self._qubit_subgroups(exp, slots)
-        readouts = plan_readout_groups(candidates, slots, subgroups)
+        readouts = plan_readout_groups(candidates, slots, grouping)
         groups = readout_groups(readouts)
         print(f"Qubit frequency mapping for qid={qid}: {_readout_groups_text(groups, grouping)}")
         frequency_range = self._frequency_range()
@@ -940,7 +939,7 @@ class CheckQubitFrequencyMapping(QubexTask):
             "simultaneous_drive": self.run_parameters["simultaneous_drive"].get_value(),
             "shots": self.run_parameters["shots"].get_value(),
             "interval": self.run_parameters["interval"].get_value(),
-            "readout_grouping": grouping,
+            "readout_grouping": HELPER_READOUT_GROUPING,
             "plot": False,
             "save_image": False,
         }
@@ -1136,7 +1135,7 @@ class CheckQubitFrequencyMapping(QubexTask):
         """Return one group result's validated ``(frequencies, powers)`` axes, or the error.
 
         The result must name the drive target and exactly the group's readout slots in
-        group order, report the requested ``readout_grouping``, and report the group
+        group order, report ``HELPER_READOUT_GROUPING``, and report the group
         as one acquisition in ``readout_groups``, so the helper did not split it. The axes must be finite, strictly increasing, and equal to the
         requested sweep when the run recorded one.
         """
@@ -1148,10 +1147,10 @@ class CheckQubitFrequencyMapping(QubexTask):
         labels = data.get("readout_labels")
         if labels is None or list(labels) != requested_labels:
             return f"readout_labels {labels!r} do not match {requested_labels}", None
-        if data.get("readout_grouping") != payload.readout_grouping:
+        if data.get("readout_grouping") != HELPER_READOUT_GROUPING:
             return (
                 f"readout_grouping {data.get('readout_grouping')!r} does not match "
-                f"{payload.readout_grouping!r}"
+                f"{HELPER_READOUT_GROUPING!r}"
             ), None
         acquisitions = data.get("readout_groups")
         if (
@@ -1495,13 +1494,14 @@ def _readout_groups_text(groups: Sequence[Sequence[CandidateReadout]], grouping:
     parts = []
     for group, members in enumerate(groups):
         tones = ", ".join(
-            f"candidate {r.candidate.index} ({r.readout_label}) requested "
+            f"candidate {r.candidate.index} ({r.readout_label}, "
+            f"{r.candidate.frequency:.6g} GHz) requested "
             f"{r.requested_readout_amplitude:.6g}"
             for r in members
         )
         amplitude_sum = math.fsum(r.readout_amplitude for r in members)
-        subgroup = members[0].qubit_subgroup if members else None
-        origin = "" if subgroup is None else f" (qubit subgroup {subgroup})"
+        pair = members[0].frequency_pair if members else None
+        origin = "" if pair is None else f" (frequency pair {pair})"
         parts.append(f"group {group}{origin} [{tones}] sum {amplitude_sum:.6g}")
     shared = groups[0][0].readout_amplitude if groups and groups[0] else math.nan
     return (
@@ -1593,7 +1593,7 @@ def mapping_evidence(
     values (moment, quality level, f01) or its error, the moment ranking, the
     runner-up and ratio, the reason, the readout grouping mode and readout groups with
     the shared readout amplitude and amplitude budget, and each candidate's group,
-    position, qubit subgroup, applied amplitude (``readout_amplitude``, shared by every
+    position, frequency pair, applied amplitude (``readout_amplitude``, shared by every
     candidate), and producer request (``requested_readout_amplitude``), and the
     proposal of the selected candidate, or of the best candidate with
     ``published`` false when nothing is selected.
@@ -1618,7 +1618,7 @@ def mapping_evidence(
                 "requested_readout_amplitude": e.readout.requested_readout_amplitude,
                 "readout_group": e.readout.readout_group,
                 "readout_group_position": e.readout.readout_group_position,
-                "qubit_subgroup": e.readout.qubit_subgroup,
+                "frequency_pair": e.readout.frequency_pair,
                 "readout_power_db": _readout_power_db(e.readout.readout_amplitude),
                 "status": status,
                 "error": e.error,
@@ -1700,9 +1700,10 @@ def _readout_groups_evidence(readouts: Sequence[CandidateReadout], grouping: str
         groups.append(
             {
                 "group": group,
-                "qubit_subgroup": members[0].qubit_subgroup,
+                "frequency_pair": members[0].frequency_pair,
                 "candidate_indices": [r.candidate.index for r in members],
                 "readout_labels": [r.readout_label for r in members],
+                "readout_frequencies": [r.candidate.frequency for r in members],
                 "readout_amplitudes": [r.readout_amplitude for r in members],
                 "requested_readout_amplitudes": [r.requested_readout_amplitude for r in members],
                 "amplitude_sum": math.fsum(r.readout_amplitude for r in members),

@@ -186,35 +186,42 @@ The `readout_grouping` run parameter decides which candidates may share a group:
 
 | Value | Candidates that may share a group |
 | --- | --- |
-| `subgroups` (default) | Candidates in the same Qubex qubit subgroup: `exp.util.create_qubit_subgroups` on the slots' qubits, qubit index modulo 4 in {0, 3} first, then {1, 2} |
+| `frequency_pairs` (default) | Adjacent candidates in frequency order: the candidates are sorted by frequency, ties by candidate index, and paired from the lowest frequency; with an odd count the highest candidate is alone |
 | `multiplexed` | Every candidate |
 
-`plan_readout_groups` then walks each subgroup, or all candidates under `multiplexed`, in candidate
-index order and adds each candidate to the current group while the group's sum of shared
-amplitudes stays at or below 1; otherwise the candidate opens a new group. A subgroup is split
-further only when its tones would exceed full scale, the shared amplitude is never reduced to fit,
-and the budget never spans two subgroups, because they are separate acquisitions. With the shared
-amplitude 0.2 from the example above, `subgroups` reads `RQ00`+`RQ03` and `RQ01`+`RQ02`, although
-the requested amplitudes of `RQ00` and `RQ03` sum to 1.2, and `multiplexed` reads all four slots
-together. A shared amplitude of 0.5 gives `RQ00`+`RQ03` and `RQ01`+`RQ02` under `subgroups`, and
-`RQ00`+`RQ01` and `RQ02`+`RQ03` under `multiplexed`. A shared amplitude above 0.5, such as 0.6,
-reads every candidate in its own acquisition under either mode.
+Grouping uses frequencies only. The candidates are not yet assigned to qubits, so a slot's qubit
+index says nothing about the candidate it reads, and grouping by qubit index modulo 4, as Qubex
+`create_qubit_subgroups` does for assigned qubits, would pair the lowest and highest of four
+candidates. Pairing neighbours keeps the tones read together close, so they fit one readout
+configuration even when the lowest and highest candidates do not.
 
-Each group is one helper call with the same drive target, sweep, timing, shots, interval, shared
-readout amplitude, and `readout_grouping`, run in group order. A candidate keeps its readout slot
+`plan_readout_groups` then walks each pair, or all candidates under `multiplexed`, in candidate
+index order and adds each candidate to the current group while the group's sum of shared
+amplitudes stays at or below 1; otherwise the candidate opens a new group. A pair is split
+further only when its tones would exceed full scale, the shared amplitude is never reduced to fit,
+and the budget never spans two pairs, because they are separate acquisitions. With the shared
+amplitude 0.2 from the example above, `frequency_pairs` reads `RQ00`+`RQ01` and `RQ02`+`RQ03`,
+although the requested amplitudes of `RQ00` and `RQ01` sum to 1.1, and `multiplexed` reads all
+four slots together. A shared amplitude of 0.5 gives `RQ00`+`RQ01` and `RQ02`+`RQ03` under either
+mode. A shared amplitude above 0.5, such as 0.6, reads every candidate in its own acquisition under
+either mode.
+
+Each group is one helper call with the same drive target, sweep, timing, shots, interval, and
+shared readout amplitude, run in group order. The task passes `readout_grouping="multiplexed"` to
+every call, so the helper reads exactly the group's slots and does not partition them again. A candidate keeps its readout slot
 and its candidate index whichever group reads it. The helper numbers the candidates of each call from 0, so the task checks
 each payload's `candidate_index` against the candidate's position in its group and then maps the
 payload back to the candidate's own index. The helper reports the acquisitions it made in
-`readout_groups` and each candidate's `readout_group_index`; the task requires the requested
-`readout_grouping`, exactly one acquisition holding the group's slots, and index 0, so a helper that
+`readout_groups` and each candidate's `readout_group_index`; the task requires
+`readout_grouping` `multiplexed`, exactly one acquisition holding the group's slots, and index 0, so a helper that
 split a group further is rejected. A failed helper call fails the task, naming the group; a group
 result whose target, readout labels, grouping, candidates, or axes disagree with the plan or with
 group 0 marks the task failed without outputs, so no group is published alone. The evidence records
 the groups under `readout_groups`: the mode, the shared `readout_amplitude` with
 `readout_amplitude_policy` `shared_minimum` and its rule, the budget and grouping rule, and each
-group's qubit subgroup, candidates, slots, applied and requested amplitudes, and applied sum. Each
-candidate records its `readout_group`, `readout_group_position`, `qubit_subgroup` (null under
-`multiplexed`), the applied `readout_amplitude`, and its own `requested_readout_amplitude`. The
+group's frequency pair, candidates, slots, readout frequencies, applied and requested amplitudes,
+and applied sum. Each candidate records its `readout_group`, `readout_group_position`,
+`frequency_pair` (null under `multiplexed`), the applied `readout_amplitude`, and its own `requested_readout_amplitude`. The
 bound covers the summed readout tones only; it assumes no gain between the pulse amplitude and the
 AWG samples.
 
