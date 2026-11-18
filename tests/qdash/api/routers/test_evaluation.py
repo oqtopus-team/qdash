@@ -1025,3 +1025,101 @@ def test_a_drafts_zip_downloads_as_uploaded(test_client, project, drafts):
     assert response.content == data
     missing = test_client.get(f"/evaluations/knowledge-drafts/{'0' * 64}/archive", headers=HEADERS)
     assert missing.status_code == 404
+
+
+def _stored_run(run_id: str, *, requested_at: datetime, **fields: Any) -> None:
+    EvaluationRunDocument(
+        run_id=run_id,
+        project_id=fields.pop("project_id", "eval_project"),
+        chip_id=fields.pop("chip_id", "chip-1"),
+        task_name=fields.pop("task_name", "CheckRabi"),
+        entity_type="qubit",
+        requested_by="eval_user",
+        requested_at=requested_at,
+        status="completed",
+        **fields,
+    ).insert()
+
+
+def _list(test_client: Any, **params: Any) -> dict[str, Any]:
+    response = test_client.get("/evaluations/runs", headers=HEADERS, params=params)
+    assert response.status_code == 200, response.text
+    body: dict[str, Any] = response.json()
+    return body
+
+
+def test_runs_page_past_the_newest_200(test_client, service):
+    start = datetime(2026, 1, 1, tzinfo=UTC)
+    # 230 runs; pairs share a requested_at so the run ID must break the tie.
+    for index in range(230):
+        _stored_run(f"evr_{index:04d}", requested_at=start + timedelta(minutes=index // 2))
+    newest_first = [f"evr_{index:04d}" for index in reversed(range(230))]
+
+    seen: list[str] = []
+    skip = 0
+    while True:
+        page = _list(test_client, limit=25, skip=skip)
+        assert (page["skip"], page["limit"], page["total"]) == (skip, 25, 230)
+        seen.extend(run["run_id"] for run in page["runs"])
+        if not page["has_more"]:
+            break
+        skip += 25
+    assert seen == newest_first
+
+    last = _list(test_client, limit=200, skip=200)
+    assert [run["run_id"] for run in last["runs"]] == newest_first[200:]
+    assert last["has_more"] is False
+    assert _list(test_client, limit=200)["has_more"] is True
+
+    beyond = _list(test_client, limit=25, skip=1000)
+    assert (beyond["runs"], beyond["has_more"], beyond["total"]) == ([], False, 230)
+
+
+def test_runs_pages_keep_filters_and_project_scope(test_client, service):
+    start = datetime(2026, 1, 1, tzinfo=UTC)
+    for index in range(30):
+        _stored_run(
+            f"evr_a{index:03d}",
+            requested_at=start + timedelta(minutes=index),
+            chip_id="chip-1" if index % 2 == 0 else "chip-2",
+            task_name="CheckRabi" if index % 3 == 0 else "CheckT1",
+        )
+    for index in range(5):
+        _stored_run(
+            f"evr_other{index}",
+            requested_at=start + timedelta(hours=1, minutes=index),
+            project_id="other_project",
+        )
+
+    chip_task = [f"evr_a{i:03d}" for i in reversed(range(30)) if i % 2 == 0 and i % 3 == 0]
+    first = _list(test_client, chip_id="chip-1", task="CheckRabi", limit=3)
+    second = _list(test_client, chip_id="chip-1", task="CheckRabi", limit=3, skip=3)
+    assert [r["run_id"] for r in first["runs"] + second["runs"]] == chip_task
+    assert (first["has_more"], second["has_more"]) == (True, False)
+    assert first["total"] == second["total"] == len(chip_task)
+
+    every = _list(test_client, limit=200)
+    assert (len(every["runs"]), every["total"]) == (30, 30)
+    assert all(run["run_id"].startswith("evr_a") for run in every["runs"])
+
+
+def test_runs_list_defaults_and_bounds(test_client, service):
+    start = datetime(2026, 1, 1, tzinfo=UTC)
+    for index in range(22):
+        _stored_run(f"evr_{index:04d}", requested_at=start + timedelta(minutes=index))
+
+    default = _list(test_client)
+    assert len(default["runs"]) == 20
+    assert (default["skip"], default["limit"], default["has_more"]) == (0, 20, True)
+    assert default["runs"][0]["run_id"] == "evr_0021"
+
+    for params in ({"limit": 0}, {"limit": 201}, {"skip": -1}):
+        response = test_client.get("/evaluations/runs", headers=HEADERS, params=params)
+        assert response.status_code == 422, params
+
+    # Direct service callers keep the list-returning API; out-of-range values are clamped.
+    assert len(service.list_runs(project_id="eval_project", limit=500)) == 22
+    assert [r.run_id for r in service.list_runs(project_id="eval_project", limit=2, skip=-5)] == [
+        "evr_0021",
+        "evr_0020",
+    ]

@@ -121,11 +121,21 @@ def list_evaluation_runs(
     service: Annotated[EvaluationService, Depends(get_evaluation_service)],
     chip_id: Annotated[str | None, Query(description="Only runs on this chip")] = None,
     task: Annotated[str | None, Query(description="Only runs of this task")] = None,
-    limit: Annotated[int, Query(ge=1, le=200, description="Newest runs to return")] = 20,
+    limit: Annotated[int, Query(ge=1, le=200, description="Runs to return")] = 20,
+    skip: Annotated[int, Query(ge=0, description="Newer runs to skip first")] = 0,
 ) -> ListEvaluationRunsResponse:
-    """List runs of the project, newest first."""
+    """List runs of the project, newest first, one page at a time.
+
+    Runs requested at the same instant are ordered by run ID, so paging with
+    `skip` and `limit` neither repeats nor drops a run. `has_more` reports
+    whether older runs follow the page, and `total` counts every run that
+    matches the filters.
+    """
+    page = service.list_runs_page(
+        project_id=ctx.project_id, chip_id=chip_id, task=task, limit=limit, skip=skip
+    )
     return ListEvaluationRunsResponse(
-        runs=service.list_runs(project_id=ctx.project_id, chip_id=chip_id, task=task, limit=limit)
+        runs=page.runs, skip=skip, limit=limit, has_more=page.has_more, total=page.total
     )
 
 

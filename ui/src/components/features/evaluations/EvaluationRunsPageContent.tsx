@@ -30,7 +30,7 @@ import {
   runTimingLabel,
   triggerLabel,
 } from "./evaluationDisplay";
-import { RUNS_LIST_MAX, runsPage, runsRequestLimit } from "./evaluationRunsPaging";
+import { lastRunsPage, runsPage, runsPageParams } from "./evaluationRunsPaging";
 
 const EMPTY_TASKS: TaskInfo[] = [];
 /** Runs compared at once: the compare page is A against B. */
@@ -274,7 +274,7 @@ export function EvaluationRunsPageContent() {
     () => ({
       chip_id: chipId || undefined,
       task: taskName || undefined,
-      limit: runsRequestLimit(page),
+      ...runsPageParams(page),
     }),
     [chipId, taskName, page],
   );
@@ -290,8 +290,7 @@ export function EvaluationRunsPageContent() {
       refetchInterval: (query) => (query.state.data?.data.runs.some(runIsActive) ? 10_000 : false),
     },
   });
-  const runs = response?.data.runs;
-  const paging = runs ? runsPage(runs, page) : null;
+  const paging = response ? runsPage(response.data, page) : null;
   const tasks = taskInfoData?.data?.tasks ?? EMPTY_TASKS;
   const hasFilters = Boolean(chipId || taskName);
   const retry = () => void refetch();
@@ -299,11 +298,13 @@ export function EvaluationRunsPageContent() {
   // its retry disabled rather than swapping it for the initial loading spinner.
   const retryingFirstLoad = isLoading && errorUpdateCount > 0;
 
-  // A page past the end (an old link, or runs removed since) moves to the last page with runs.
-  const shownPage = paging?.page;
+  // A page past the end (an old link, or runs removed since) moves to the last page with runs,
+  // replacing the URL; the spinner stays up until that page loads.
+  const correctedPage = paging?.correctedPage ?? null;
   useEffect(() => {
-    if (shownPage !== undefined && shownPage !== page) setPage(shownPage, { replace: true });
-  }, [shownPage, page, setPage]);
+    if (correctedPage !== null && correctedPage !== page) setPage(correctedPage, { replace: true });
+  }, [correctedPage, page, setPage]);
+  const correcting = correctedPage !== null && correctedPage !== page;
 
   const clearFilters = () => {
     setChipId("");
@@ -366,7 +367,7 @@ export function EvaluationRunsPageContent() {
         </PageFiltersBar>
       </div>
 
-      {isLoading && !retryingFirstLoad ? (
+      {(isLoading && !retryingFirstLoad) || correcting ? (
         <div className="flex justify-center py-16">
           <span className="loading loading-spinner loading-lg" />
         </div>
@@ -424,7 +425,7 @@ export function EvaluationRunsPageContent() {
             aria-live="polite"
           >
             <span className="font-mono">
-              Runs {paging.first}-{paging.last}
+              Runs {paging.first}-{paging.last} of {paging.total}
             </span>
             {isFetching && (
               <span className="inline-flex items-center gap-1">
@@ -461,7 +462,9 @@ export function EvaluationRunsPageContent() {
               >
                 Previous
               </button>
-              <span className="text-sm text-base-content/60">Page {paging.page}</span>
+              <span className="text-sm text-base-content/60">
+                Page {paging.page} of {Math.max(paging.page, lastRunsPage(paging.total))}
+              </span>
               <button
                 type="button"
                 className="btn btn-sm btn-ghost"
@@ -471,12 +474,6 @@ export function EvaluationRunsPageContent() {
                 Next
               </button>
             </nav>
-          )}
-          {paging.truncated && (
-            <p className="mt-3 text-center text-xs text-base-content/60">
-              Only the {RUNS_LIST_MAX} newest runs can be listed. Filter by chip or task to reach
-              older runs.
-            </p>
           )}
         </>
       )}

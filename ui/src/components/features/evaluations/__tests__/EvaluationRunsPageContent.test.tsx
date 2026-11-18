@@ -65,19 +65,24 @@ function run(index: number, override: Partial<EvaluationRunSummary> = {}): Evalu
 
 const runs = (count: number) => Array.from({ length: count }, (_, index) => run(index + 1));
 
-type Reply = { runs: EvaluationRunSummary[] } | "error" | Promise<"error" | EvaluationRunSummary[]>;
+// A reply is every run the server holds for the request's filters, newest first; the fake
+// adapter answers with the page that `skip` and `limit` select, as the API does.
+type Reply = EvaluationRunSummary[] | "error" | Promise<"error" | EvaluationRunSummary[]>;
 let reply: (params: Record<string, unknown>) => Reply;
+
+function pageOf(all: EvaluationRunSummary[], params: Record<string, unknown>) {
+  const skip = Number(params.skip ?? 0);
+  const limit = Number(params.limit ?? 20);
+  const page = all.slice(skip, skip + limit);
+  return { runs: page, skip, limit, has_more: skip + page.length < all.length, total: all.length };
+}
 const requests: Record<string, unknown>[] = [];
 const originalAdapter = AXIOS_INSTANCE.defaults.adapter;
 
 const fakeAdapter: AxiosAdapter = async (config: InternalAxiosRequestConfig) => {
   const params = { ...(config.params as Record<string, unknown>) };
   requests.push(params);
-  let answer = reply(params);
-  if (answer instanceof Promise) {
-    const settled = await answer;
-    answer = settled === "error" ? "error" : { runs: settled };
-  }
+  const answer = await reply(params);
   if (answer === "error") {
     throw new AxiosError("Request failed", "ERR_BAD_RESPONSE", config, null, {
       data: { detail: "boom" },
@@ -87,7 +92,7 @@ const fakeAdapter: AxiosAdapter = async (config: InternalAxiosRequestConfig) => 
       config,
     });
   }
-  return { data: answer, status: 200, statusText: "OK", headers: {}, config };
+  return { data: pageOf(answer, params), status: 200, statusText: "OK", headers: {}, config };
 };
 
 function setup(searchParams = "") {
@@ -110,7 +115,7 @@ beforeEach(() => {
   AXIOS_INSTANCE.defaults.adapter = fakeAdapter;
   requests.length = 0;
   mocks.projectId = "project-a";
-  reply = () => ({ runs: runs(30) });
+  reply = () => runs(30);
 });
 
 afterEach(() => {
@@ -119,26 +124,28 @@ afterEach(() => {
 });
 
 describe("EvaluationRunsPageContent filters and pages", () => {
-  it("restores chip, task and page from the URL and requests the newest runs up to that page", async () => {
-    reply = () => ({ runs: runs(60) });
+  it("restores chip, task and page from the URL and requests only that page", async () => {
+    reply = () => runs(60);
     setup("chip=64Qv1&task=CheckT1&page=2");
 
     expect(await screen.findByText("Task26")).toBeInTheDocument();
     expect(screen.queryByText("Task25")).not.toBeInTheDocument();
-    expect(last(requests)).toEqual({ chip_id: "64Qv1", task: "CheckT1", limit: 51 });
-    expect(screen.getByText("Runs 26-50")).toBeInTheDocument();
-    expect(screen.getByText("Page 2")).toBeInTheDocument();
+    expect(screen.queryByText("Task51")).not.toBeInTheDocument();
+    expect(last(requests)).toEqual({ chip_id: "64Qv1", task: "CheckT1", skip: 25, limit: 25 });
+    expect(screen.getByText("Runs 26-50 of 60")).toBeInTheDocument();
+    expect(screen.getByText("Page 2 of 3")).toBeInTheDocument();
   });
 
   it("moves between pages with history entries and returns to page 1 on a filter change", async () => {
-    reply = (params) => ({ runs: runs(Number(params.limit)) });
+    reply = () => runs(60);
     const { onUrlUpdate } = setup();
     await screen.findByText("Task1");
     expect(screen.getByRole("button", { name: "Previous" })).toBeDisabled();
 
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
     expect(await screen.findByText("Task26")).toBeInTheDocument();
-    expect(last(requests)).toMatchObject({ limit: 51 });
+    expect(screen.queryByText("Task1")).not.toBeInTheDocument();
+    expect(last(requests)).toEqual({ skip: 25, limit: 25 });
     await waitFor(() =>
       expect(lastUrl(onUrlUpdate)).toMatchObject({
         queryString: "?page=2",
@@ -148,13 +155,30 @@ describe("EvaluationRunsPageContent filters and pages", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Pick chip 64Qv2" }));
     await waitFor(() => expect(lastUrl(onUrlUpdate)?.queryString).toBe("?chip=64Qv2"));
-    await waitFor(() => expect(last(requests)).toEqual({ chip_id: "64Qv2", limit: 26 }));
+    await waitFor(() => expect(last(requests)).toEqual({ chip_id: "64Qv2", skip: 0, limit: 25 }));
   });
 
-  it("treats an invalid page as the first page", async () => {
-    setup("page=abc");
+  it("browses past the newest 200 runs to the end of the history", async () => {
+    reply = () => runs(230);
+    setup("page=9");
+
+    expect(await screen.findByText("Task201")).toBeInTheDocument();
+    expect(last(requests)).toEqual({ skip: 200, limit: 25 });
+    expect(screen.getByText("Page 9 of 10")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    expect(await screen.findByText("Task230")).toBeInTheDocument();
+    expect(last(requests)).toEqual({ skip: 225, limit: 25 });
+    expect(screen.getByText("Runs 226-230 of 230")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Next" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Previous" })).toBeEnabled();
+    expect(screen.queryByText(/newest runs can be listed/)).not.toBeInTheDocument();
+  });
+
+  it.each(["page=abc", "page=0", "page=-4"])("treats %j as the first page", async (search) => {
+    setup(search);
     await screen.findByText("Task1");
-    expect(last(requests)).toEqual({ limit: 26 });
+    expect(last(requests)).toEqual({ skip: 0, limit: 25 });
   });
 
   it("corrects a page past the end to the last page with runs without a history entry", async () => {
@@ -167,11 +191,26 @@ describe("EvaluationRunsPageContent filters and pages", () => {
       }),
     );
     expect(await screen.findByText("Task30")).toBeInTheDocument();
-    expect(last(requests)).toEqual({ limit: 51 });
+    expect(last(requests)).toEqual({ skip: 25, limit: 25 });
+    expect(screen.queryByText("No evaluation runs")).not.toBeInTheDocument();
+  });
+
+  it("corrects a page of a list with no runs to the first page", async () => {
+    reply = () => [];
+    const { onUrlUpdate } = setup("page=3");
+
+    await waitFor(() =>
+      expect(lastUrl(onUrlUpdate)).toMatchObject({
+        queryString: "",
+        options: { history: "replace" },
+      }),
+    );
+    expect(await screen.findByText("No evaluation runs")).toBeInTheDocument();
+    expect(last(requests)).toEqual({ skip: 0, limit: 25 });
   });
 
   it("shows an empty state for the filters with a way to clear them", async () => {
-    reply = (params) => ({ runs: params.chip_id ? [] : runs(3) });
+    reply = (params) => (params.chip_id ? [] : runs(3));
     const { onUrlUpdate } = setup("chip=missing");
 
     expect(await screen.findByText("No evaluation runs match these filters")).toBeInTheDocument();
@@ -183,7 +222,7 @@ describe("EvaluationRunsPageContent filters and pages", () => {
 
 describe("EvaluationRunsPageContent comparison picks", () => {
   it("keeps a pick listed in the compare bar while another page is shown", async () => {
-    reply = (params) => ({ runs: runs(Number(params.limit)) });
+    reply = () => runs(60);
     setup();
     fireEvent.click(await screen.findByLabelText(/Compare Task1 run/));
 
@@ -202,6 +241,28 @@ describe("EvaluationRunsPageContent comparison picks", () => {
     fireEvent.click(within(bar).getByRole("button", { name: /Remove Task1/ }));
     expect(within(bar).queryByText(/Task1 \(/)).not.toBeInTheDocument();
     expect(screen.getByLabelText(/Compare Task26 run/)).toBeChecked();
+  });
+
+  it("keeps picks across a filter change and back to their page", async () => {
+    reply = (params) =>
+      params.chip_id ? [run(90, { chip_id: "64Qv2", task_name: "Other" })] : runs(60);
+    setup();
+    fireEvent.click(await screen.findByLabelText(/Compare Task2 run/));
+
+    fireEvent.click(screen.getByRole("button", { name: "Pick chip 64Qv2" }));
+    await screen.findByText("Other");
+    fireEvent.click(screen.getByLabelText(/Compare Other run/));
+    const bar = screen.getByTestId("compare-bar");
+    expect(within(bar).getByText(/Task2 \(/)).toBeInTheDocument();
+    expect(within(bar).getByText(/Other \(/)).toBeInTheDocument();
+    expect(
+      within(bar).getByText("Different chips or tasks: entities will not line up."),
+    ).toBeVisible();
+
+    fireEvent.click(screen.getByRole("button", { name: "Clear chip filter" }));
+    expect(await screen.findByLabelText(/Compare Task2 run/)).toBeChecked();
+    // Both slots are taken, so a run that is not picked cannot be added.
+    expect(screen.getByLabelText(/Compare Task3 run/)).toBeDisabled();
   });
 
   it("drops picks made in another project", async () => {
@@ -260,7 +321,7 @@ describe("EvaluationRunsPageContent failures", () => {
     expect(await screen.findByText(/Could not refresh evaluation runs/)).toBeInTheDocument();
     expect(screen.getByText("Task1")).toBeInTheDocument();
 
-    reply = () => ({ runs: [run(1, { task_name: "Fresh" })] });
+    reply = () => [run(1, { task_name: "Fresh" })];
     fireEvent.click(screen.getByRole("button", { name: "Retry" }));
     expect(await screen.findByText("Fresh")).toBeInTheDocument();
     expect(screen.queryByText(/Could not refresh evaluation runs/)).not.toBeInTheDocument();

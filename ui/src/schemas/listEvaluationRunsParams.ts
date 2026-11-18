@@ -16,9 +16,14 @@ chip_id?: string | null;
  */
 task?: string | null;
 /**
- * Newest runs to return
+ * Runs to return
  * @minimum 1
  * @maximum 200
  */
 limit?: number;
+/**
+ * Newer runs to skip first
+ * @minimum 0
+ */
+skip?: number;
 };
