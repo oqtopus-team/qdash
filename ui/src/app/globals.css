@@ -1136,6 +1136,66 @@ html[data-theme="dark"],
   }
 }
 
+/* Command palette (ui/Command.tsx): a quick, small drop-in from above and a quicker exit.
+   Radix keeps the closed panel mounted until the exit animation ends. Only transform and
+   opacity move, so the Tailwind `translate` centering is untouched; the global
+   prefers-reduced-motion rule shortens both to an instant change. */
+@keyframes command-palette-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes command-palette-out {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.99);
+  }
+}
+
+@keyframes command-palette-overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes command-palette-overlay-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.command-palette[data-state="open"] {
+  animation: command-palette-in 150ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.command-palette[data-state="closed"] {
+  animation: command-palette-out 100ms cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+.command-palette-overlay[data-state="open"] {
+  animation: command-palette-overlay-in 150ms ease-out;
+}
+
+.command-palette-overlay[data-state="closed"] {
+  animation: command-palette-overlay-out 100ms ease-in forwards;
+}
+
 /* Fade-in-up animation for new messages */
 @keyframes fadeInUp {
   from {
