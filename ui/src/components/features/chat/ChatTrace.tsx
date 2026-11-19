@@ -23,7 +23,9 @@ import {
 import {
   ExecutionProgress,
   executionIdFromArgs,
+  executionPagePath,
 } from "@/components/features/chat/ExecutionProgress";
+import { ChatLink } from "@/components/features/chat/ChatPreviewLink";
 import {
   ChainOfThought,
   ChainOfThoughtContent,
@@ -200,7 +202,7 @@ function ToolStepRow({ step, now }: { step: ToolStep; now: number }) {
   const open = details && userOpen;
   const failure = open ? null : failureLine(step);
   // While the assistant waits on an execution, show its tasks and figures as they land.
-  const waitingOn = executionIdFromArgs(step.args);
+  const waitingOn = step.tool === "qdash_wait_execution" ? executionIdFromArgs(step.args) : null;
   // One icon per row: what the tool is, or that it failed or never ran.
   const Icon = failed ? CircleX : cancelled ? Ban : toolIcon(step.tool);
 
@@ -255,10 +257,21 @@ function ToolStepRow({ step, now }: { step: ToolStep; now: number }) {
           {failure}
         </p>
       )}
-      {running && step.tool === "qdash_wait_execution" && waitingOn && (
+      {waitingOn && running && (
         <div className={ROW_INDENT}>
           <ExecutionProgress executionId={waitingOn} />
         </div>
+      )}
+      {waitingOn && (failed || step.status === "done") && (
+        // Once the wait ends the live card goes; the execution stays one click away.
+        <p className={`${ROW_INDENT} mt-0.5 text-xs`}>
+          <ChatLink
+            href={executionPagePath(waitingOn)}
+            className="link link-hover text-base-content/60 hover:text-base-content"
+          >
+            View execution {waitingOn}
+          </ChatLink>
+        </p>
       )}
       {step.figures && step.figures.length > 0 && (
         <FigureStrip paths={step.figures} compact className={`${ROW_INDENT} mt-1.5`} />

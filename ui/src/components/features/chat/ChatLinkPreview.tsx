@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { ExternalLink, Loader2 } from "lucide-react";
 import { useGetExecution } from "@/client/execution/execution";
 import { useGetForumPost } from "@/client/forum/forum";
@@ -9,6 +9,7 @@ import { FigureStrip, figureUrl } from "@/components/features/chat/ChatFigures";
 import { ExecutionProgress } from "@/components/features/chat/ExecutionProgress";
 import { LinkHoverCardProvider } from "@/components/features/link-preview/LinkHoverCardProvider";
 import { formatValue } from "@/components/features/link-preview/LinkPreviewCard";
+import { ChatLinkPreviewContext } from "@/components/features/chat/ChatPreviewLink";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 import { ImagePreviewDialog } from "@/components/ui/ImagePreviewDialog";
 import { chatLinkPagePath, classifyChatLink, type ChatLink } from "@/lib/chatLinks";
@@ -18,23 +19,7 @@ type PreviewLink = Extract<
   { kind: "task-result" | "execution" | "forum-post" | "figure" }
 >;
 
-interface ChatLinkPreviewValue {
-  /** Open a preview for the link; false when the link is not previewable. */
-  preview: (href: string) => boolean;
-}
-
-const ChatLinkPreviewContext = createContext<ChatLinkPreviewValue | null>(null);
-
-/** The preview hook, or null outside a provider (links then behave normally). */
-export function useChatLinkPreview(): ChatLinkPreviewValue | null {
-  return useContext(ChatLinkPreviewContext);
-}
-
-/**
- * Previewable links open in a dialog over the chat; the rest are left to the browser.
- * Hover cards come from the app-wide `LinkHoverCardProvider`; it is mounted here as well
- * so the chat keeps them when rendered on its own, and is a no-op under the app root.
- */
+/** Previewable links open in a dialog over the chat; the rest are left to the browser. */
 export function ChatLinkPreviewProvider({ children }: { children: ReactNode }) {
   const [link, setLink] = useState<PreviewLink | null>(null);
 
