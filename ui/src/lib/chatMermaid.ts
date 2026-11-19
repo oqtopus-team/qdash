@@ -1,12 +1,24 @@
 import type { MermaidConfig } from "mermaid";
 
-export type MermaidTheme = "dark" | "neutral";
+/** `default` is the theme of non-chat Markdown; chat picks `dark` or `neutral`. */
+export type MermaidTheme = "dark" | "neutral" | "default";
+
+/**
+ * What happens to links in a rendered diagram. Chat strips their targets so a
+ * diagram cannot navigate away from the conversation; other Markdown keeps the
+ * URLs that strict mode has already sanitized.
+ */
+type MermaidLinks = "strip" | "keep";
+
+export interface MermaidRenderOptions {
+  links?: MermaidLinks;
+}
 
 export type MermaidResult = { status: "ok"; svg: string } | { status: "error"; message: string };
 
 /**
- * Settings a chat answer cannot change. `strict` encodes HTML in labels and
- * disables click callbacks; Mermaid also refuses these keys in `%%{init}%%`
+ * Settings no diagram can change, for every consumer on the page. `strict`
+ * encodes HTML in labels and disables click callbacks; Mermaid also refuses these keys in `%%{init}%%`
  * directives, so a diagram cannot loosen them.
  */
 const LOCKED_CONFIG: MermaidConfig = {
@@ -21,18 +33,22 @@ const URL_ATTRIBUTES = ["href", "xlink:href", "target"];
 const CACHE_LIMIT = 200;
 
 /**
- * Strips what could navigate or run code from a rendered diagram. Strict mode
- * still turns `click A href "..."` into a link, which would navigate away from
- * the conversation, so links keep their label but lose their target.
+ * Strips what could run code from a rendered diagram and, for `strip`, what
+ * could navigate. Strict mode still turns `click A href "..."` into a link,
+ * which would navigate away from the conversation, so stripped links keep
+ * their label but lose their target.
  */
-function neutralizeMermaidSvg(svg: string): string {
+function neutralizeMermaidSvg(svg: string, links: MermaidLinks): string {
   if (typeof DOMParser === "undefined") return svg;
   const doc = new DOMParser().parseFromString(`<body>${svg}</body>`, "text/html");
   for (const script of Array.from(doc.querySelectorAll("script"))) script.remove();
   for (const element of Array.from(doc.body.querySelectorAll("*"))) {
     for (const attribute of Array.from(element.attributes)) {
       const name = attribute.name.toLowerCase();
-      if (name.startsWith("on") || (element.localName === "a" && URL_ATTRIBUTES.includes(name))) {
+      if (
+        name.startsWith("on") ||
+        (links === "strip" && element.localName === "a" && URL_ATTRIBUTES.includes(name))
+      ) {
         element.removeAttribute(attribute.name);
       }
     }
@@ -43,14 +59,18 @@ function neutralizeMermaidSvg(svg: string): string {
 const results = new Map<string, MermaidResult>();
 const inflight = new Map<string, Promise<MermaidResult>>();
 let queue: Promise<unknown> = Promise.resolve();
-let appliedConfig: string | null = null;
 let nextId = 0;
 
-const cacheKey = (source: string, theme: MermaidTheme) => `${theme}\0${source}`;
+const cacheKey = (source: string, theme: MermaidTheme, links: MermaidLinks) =>
+  `${theme}\0${links}\0${source}`;
 
 /** A finished render of the diagram, or undefined when it has not run yet. */
-export function getMermaidResult(source: string, theme: MermaidTheme): MermaidResult | undefined {
-  return results.get(cacheKey(source, theme));
+export function getMermaidResult(
+  source: string,
+  theme: MermaidTheme,
+  { links = "strip" }: MermaidRenderOptions = {},
+): MermaidResult | undefined {
+  return results.get(cacheKey(source, theme, links));
 }
 
 function errorMessage(error: unknown): string {
@@ -59,12 +79,19 @@ function errorMessage(error: unknown): string {
 }
 
 /**
- * Renders a diagram, loading Mermaid on first use so chat pages without
- * diagrams never download it. Renders run one at a time because Mermaid keeps
- * global state between `initialize` and `render`.
+ * Renders a diagram, loading Mermaid on first use so pages without diagrams
+ * never download it. This is the only place in the app that may call
+ * `mermaid.initialize` or `mermaid.render`: Mermaid is a page-wide singleton
+ * that keeps its config between the two calls, so renders run one at a time
+ * and each one initializes the strict config it needs, whichever consumer
+ * rendered last.
  */
-export function renderMermaid(source: string, theme: MermaidTheme): Promise<MermaidResult> {
-  const key = cacheKey(source, theme);
+export function renderMermaid(
+  source: string,
+  theme: MermaidTheme,
+  { links = "strip" }: MermaidRenderOptions = {},
+): Promise<MermaidResult> {
+  const key = cacheKey(source, theme, links);
   const done = results.get(key);
   if (done) return Promise.resolve(done);
   const running = inflight.get(key);
@@ -73,14 +100,9 @@ export function renderMermaid(source: string, theme: MermaidTheme): Promise<Merm
   const task = queue
     .then(async (): Promise<MermaidResult> => {
       const mermaid = (await import("mermaid")).default;
-      const config: MermaidConfig = { theme, ...LOCKED_CONFIG };
-      const configKey = JSON.stringify(config);
-      if (appliedConfig !== configKey) {
-        mermaid.initialize(config);
-        appliedConfig = configKey;
-      }
-      const { svg } = await mermaid.render(`chat-mermaid-${nextId++}`, source);
-      return { status: "ok", svg: neutralizeMermaidSvg(svg) };
+      mermaid.initialize({ theme, ...LOCKED_CONFIG });
+      const { svg } = await mermaid.render(`qdash-mermaid-${nextId++}`, source);
+      return { status: "ok", svg: neutralizeMermaidSvg(svg, links) };
     })
     .catch((error: unknown): MermaidResult => ({ status: "error", message: errorMessage(error) }))
     .then((result) => {
@@ -97,10 +119,9 @@ export function renderMermaid(source: string, theme: MermaidTheme): Promise<Merm
   return task;
 }
 
-/** Forget rendered diagrams and the applied config. For tests. */
+/** Forget rendered diagrams. For tests. */
 export function resetMermaidCache(): void {
   results.clear();
   inflight.clear();
-  appliedConfig = null;
   queue = Promise.resolve();
 }

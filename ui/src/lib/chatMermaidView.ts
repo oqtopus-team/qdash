@@ -74,17 +74,21 @@ export function startDiagramPan(
   if (event.button !== 0 || (!always && !viewport.hasAttribute("data-zoomed"))) return;
   const canvas = canvasOf(viewport);
   if (!canvas) return;
-  const start = readView(canvas);
-  const { clientX, clientY, pointerId } = event;
+  const { pointerId } = event;
+  let previousX = event.clientX;
+  let previousY = event.clientY;
   viewport.setPointerCapture?.(pointerId);
   viewport.setAttribute("data-panning", "");
   const move = (next: PointerEvent) => {
     if (next.pointerId !== pointerId) return;
+    const current = readView(canvas);
     writeView(viewport, canvas, {
-      ...readView(canvas),
-      x: start.x + next.clientX - clientX,
-      y: start.y + next.clientY - clientY,
+      ...current,
+      x: current.x + next.clientX - previousX,
+      y: current.y + next.clientY - previousY,
     });
+    previousX = next.clientX;
+    previousY = next.clientY;
   };
   const end = (next: PointerEvent) => {
     if (next.pointerId !== pointerId) return;

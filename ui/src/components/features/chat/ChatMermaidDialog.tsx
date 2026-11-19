@@ -12,6 +12,8 @@ export interface ChatMermaidDiagram {
   /** Sanitized SVG from `renderMermaid`. */
   svg: string;
   source: string;
+  opener?: HTMLElement;
+  focusFallback?: HTMLElement;
 }
 
 interface ChatMermaidDialogProps {
@@ -53,7 +55,25 @@ export function ChatMermaidDialog({ diagram, onClose }: ChatMermaidDialogProps) 
 
   return (
     <Dialog open={diagram !== null} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="flex h-[calc(100dvh-2rem)] max-w-[calc(100vw-2rem)] flex-col gap-3 overflow-hidden p-4">
+      <DialogContent
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          if (diagram?.opener?.isConnected) {
+            diagram.opener.focus();
+            return;
+          }
+          // If streaming replaced the opener, keep focus in the answer instead.
+          const target = diagram?.focusFallback?.isConnected
+            ? diagram.focusFallback
+            : document.body;
+          const previous = target.getAttribute("tabindex");
+          target.setAttribute("tabindex", "-1");
+          target.focus();
+          if (previous === null) target.removeAttribute("tabindex");
+          else target.setAttribute("tabindex", previous);
+        }}
+        className="flex h-[calc(100dvh-2rem)] max-w-[calc(100vw-2rem)] flex-col gap-3 overflow-hidden p-4"
+      >
         <div className="flex items-center justify-between gap-2">
           <DialogTitle>Diagram</DialogTitle>
           <DialogDescription className="sr-only">
@@ -107,7 +127,9 @@ export function ChatMermaidDialog({ diagram, onClose }: ChatMermaidDialogProps) 
             role="img"
             aria-label="Mermaid chart"
             onPointerDown={(event) =>
-              startDiagramPan(event.currentTarget, event.nativeEvent, { always: true })
+              startDiagramPan(event.currentTarget, event.nativeEvent, {
+                always: true,
+              })
             }
           >
             <div

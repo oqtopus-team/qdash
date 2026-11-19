@@ -276,11 +276,33 @@ describe("ChatMarkdown Mermaid diagrams", () => {
     fireEvent.click(screen.getByRole("button", { name: "Copy diagram source" }));
     expect(copyText).toHaveBeenCalledWith(expect.stringContaining("A[Rabi] --> B[T1]"));
 
-    fireEvent.click(screen.getByRole("button", { name: "Open fullscreen" }));
+    const opener = screen.getByRole("button", { name: "Open fullscreen" });
+    opener.focus();
+    fireEvent.click(opener);
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByTestId("chat-mermaid-fullscreen")).toHaveTextContent("Rabi");
     fireEvent.click(within(dialog).getByRole("button", { name: "Close" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() => expect(opener).toHaveFocus());
+  });
+
+  it("returns focus to the answer when the fullscreen opener is gone", async () => {
+    mermaid.render.mockResolvedValue({ svg: SVG });
+    const { container } = render(<ChatMarkdown>{diagram}</ChatMarkdown>);
+    await screen.findByRole("img", { name: "Mermaid chart" });
+
+    const opener = screen.getByRole("button", { name: "Open fullscreen" });
+    opener.focus();
+    fireEvent.click(opener);
+    const dialog = await screen.findByRole("dialog");
+    // Streaming re-rendered the answer and replaced the button.
+    opener.remove();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Close" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+    const answer = container.querySelector<HTMLElement>(".chat-prose");
+    await waitFor(() => expect(answer).toHaveFocus());
+    expect(answer).not.toHaveAttribute("tabindex");
   });
 
   it("renders diagrams in the dark Mermaid theme on dark themes", async () => {

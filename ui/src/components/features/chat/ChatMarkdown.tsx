@@ -187,6 +187,9 @@ export const ChatMarkdown = memo(function ChatMarkdown({
             setFullscreen({
               svg: canvas?.innerHTML ?? "",
               source: frame.dataset.source ?? "",
+              // Focus returns here on close, or to the answer if streaming replaced it.
+              opener: action,
+              focusFallback: event.currentTarget,
             });
             break;
           }
