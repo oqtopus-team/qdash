@@ -444,6 +444,9 @@ class MetricScriptService:
         self, ctx: ProjectContext, script_id: str, body: MetricScriptUpdateRequest
     ) -> MetricScriptResponse:
         doc = self._get_editable(ctx, script_id)
+        # The stored state this update builds on; the save below is a compare-and-set on it.
+        read_revision = doc.revision
+        read_updated_at = doc.system_info.updated_at
         if body.expected_revision is not None and body.expected_revision != doc.revision:
             raise HTTPException(
                 status_code=409,
@@ -463,6 +466,8 @@ class MetricScriptService:
         if body.source is not None and body.source != doc.source:
             _check_source_size(body.source)
             result = validate_source(body.source)
+            # Pins are read once here; a dashboard that pins an evictable revision while
+            # this save is in flight can still lose that revision to eviction.
             self._apply_source(doc, body.source, result, self._pins(ctx, doc.script_id))
         if body.name is not None:
             doc.name = body.name
@@ -470,7 +475,13 @@ class MetricScriptService:
             doc.description = body.description
         if body.visibility is not None:
             doc.visibility = body.visibility
-        self._repo.save(doc)
+        if not self._repo.save_if_unchanged(
+            doc, revision=read_revision, updated_at=read_updated_at
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail="Script was changed by another save; reload it before saving",
+            )
         return self._to_response(doc, ctx)
 
     def delete(self, ctx: ProjectContext, script_id: str) -> SuccessResponse:

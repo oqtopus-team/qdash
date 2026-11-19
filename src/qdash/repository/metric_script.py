@@ -2,7 +2,19 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
+
+from bunnet.exceptions import DocumentNotFound
+
 from qdash.dbmodel.metric_script import MetricScriptDocument
+
+
+def _bson_millis(value: datetime) -> datetime:
+    """``value`` as BSON stores it: UTC, truncated to whole milliseconds."""
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=UTC)
+    value = value.astimezone(UTC)
+    return value.replace(microsecond=value.microsecond // 1000 * 1000)
 
 
 class MongoMetricScriptRepository:
@@ -39,10 +51,28 @@ class MongoMetricScriptRepository:
         doc.insert()
         return doc
 
-    def save(self, doc: MetricScriptDocument) -> MetricScriptDocument:
+    def save_if_unchanged(
+        self, doc: MetricScriptDocument, *, revision: int, updated_at: datetime
+    ) -> bool:
+        """Replace the stored script only if it still has ``revision`` and ``updated_at``.
+
+        ``revision`` and ``updated_at`` are the values read before ``doc`` was modified. The
+        match and the replace are one atomic operation, so of two saves that started from
+        the same stored state exactly one succeeds. Returns False, writing nothing, when
+        another save landed first.
+        """
         doc.system_info.update_time()
-        doc.save()
-        return doc
+        # BSON keeps milliseconds only: make sure a save within the same millisecond as the
+        # previous one still changes the stored value that later saves compare against.
+        if _bson_millis(doc.system_info.updated_at) <= _bson_millis(updated_at):
+            doc.system_info.updated_at = _bson_millis(updated_at) + timedelta(milliseconds=1)
+        try:
+            MetricScriptDocument.find_one(
+                {"_id": doc.id, "revision": revision, "system_info.updated_at": updated_at}
+            ).replace_one(doc)
+        except DocumentNotFound:
+            return False
+        return True
 
     def delete(self, doc: MetricScriptDocument) -> None:
         doc.delete()

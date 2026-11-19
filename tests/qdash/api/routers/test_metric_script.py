@@ -17,7 +17,9 @@ from qdash.datamodel.note import NoteModel
 from qdash.datamodel.project import ProjectRole
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.chip import ChipDocument
+from qdash.dbmodel.metric_script import MetricScriptDocument
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
+from qdash.repository.metric_script import MongoMetricScriptRepository
 from tests.qdash.api.metric_runtime.fakes import install_inprocess_runtime
 from tests.qdash.api.routers.test_custom_dashboard import (
     PROJECT,
@@ -309,6 +311,177 @@ def test_expected_revision_conflict(test_client, users, runtime):
     assert "revision 2" in stale.json()["detail"]
     current = test_client.get(f"/metric-scripts/{script_id}", headers=editor).json()
     assert current["revision"] == 2
+
+
+SOURCE_A = RATIO + "\n# saved by A\n"
+SOURCE_B = RATIO + "\n# saved by B\n"
+CONFLICT = "Script was changed by another save; reload it before saving"
+
+
+def _stored(script_id: str) -> dict[str, Any] | None:
+    """The raw stored script document."""
+    stored: dict[str, Any] | None = MetricScriptDocument.get_motor_collection().find_one(
+        {"script_id": script_id}
+    )
+    return stored
+
+
+def _interleave(monkeypatch: pytest.MonkeyPatch, target: Any, name: str, other_save: Any) -> None:
+    """Run ``other_save`` inside the first call of ``target.name``, then continue that call."""
+    original = getattr(target, name)
+    calls: list[int] = []
+
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        if not calls:
+            calls.append(1)
+            other_save()
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(target, name, wrapper)
+
+
+def _pinned_panel(script_id: str, revision: int) -> dict[str, Any]:
+    return {
+        "panel_id": "p1",
+        "type": "metric_script",
+        "title": "Pinned",
+        "layout": {"x": 0, "y": 0, "w": 6, "h": 4},
+        "config": {
+            "script_id": script_id,
+            "metric_id": "scaled_frequency",
+            "script_revision": revision,
+        },
+    }
+
+
+@pytest.mark.parametrize("a_expected_revision", [None, 1])
+def test_concurrent_source_saves_reject_the_later_one(
+    test_client, users, runtime, monkeypatch, a_expected_revision
+):
+    editor, owner = users["editor"], users["owner"]
+    script_id = _create(test_client, editor, visibility="project")["script_id"]
+    winner: dict[str, Any] = {}
+
+    def save_b_and_pin() -> None:
+        # B saves while A's source is still validating; a dashboard then pins B's revision.
+        response = test_client.patch(
+            f"/metric-scripts/{script_id}", json={"source": SOURCE_B}, headers=owner
+        )
+        winner["response"] = response
+        dashboard = test_client.post(
+            "/custom-dashboards",
+            json={"name": "Pins", "panels": [_pinned_panel(script_id, 2)]},
+            headers=owner,
+        )
+        assert dashboard.status_code == 201, dashboard.text
+        winner["stored"] = _stored(script_id)
+
+    _interleave(monkeypatch, metric_script_service, "validate_source", save_b_and_pin)
+    body: dict[str, Any] = {"source": SOURCE_A}
+    if a_expected_revision is not None:
+        body["expected_revision"] = a_expected_revision
+    a = test_client.patch(f"/metric-scripts/{script_id}", json=body, headers=editor)
+
+    b = winner["response"]
+    assert b.status_code == 200, b.text
+    assert b.json()["revision"] == 2
+    assert a.status_code == 409
+    assert a.json()["detail"] == CONFLICT
+    assert _stored(script_id) == winner["stored"]
+
+    current = test_client.get(f"/metric-scripts/{script_id}", headers=editor).json()
+    assert current["revision"] == 2
+    assert current["source"] == SOURCE_B
+    assert [(r["revision"], r["source"]) for r in current["revisions"]] == [
+        (1, RATIO),
+        (2, SOURCE_B),
+    ]
+    assert SOURCE_A not in str(_stored(script_id))
+
+
+def test_metadata_update_loses_to_concurrent_source_save(test_client, users, runtime, monkeypatch):
+    editor, owner = users["editor"], users["owner"]
+    script_id = _create(test_client, editor, visibility="project")["script_id"]
+    winner: dict[str, Any] = {}
+
+    def save_b() -> None:
+        winner["response"] = test_client.patch(
+            f"/metric-scripts/{script_id}", json={"source": SOURCE_B}, headers=owner
+        )
+        winner["stored"] = _stored(script_id)
+
+    # A name-only update does not validate; land B's save just before A's write instead.
+    _interleave(monkeypatch, MongoMetricScriptRepository, "save_if_unchanged", save_b)
+    a = test_client.patch(f"/metric-scripts/{script_id}", json={"name": "Renamed"}, headers=editor)
+
+    assert winner["response"].status_code == 200, winner["response"].text
+    assert a.status_code == 409
+    assert a.json()["detail"] == CONFLICT
+    assert _stored(script_id) == winner["stored"]
+    current = test_client.get(f"/metric-scripts/{script_id}", headers=editor).json()
+    assert current["name"] == "Ratio"
+    assert current["revision"] == 2
+    assert current["source"] == SOURCE_B
+
+
+def test_source_save_loses_to_concurrent_metadata_update(test_client, users, runtime, monkeypatch):
+    editor, owner = users["editor"], users["owner"]
+    script_id = _create(test_client, editor, visibility="project")["script_id"]
+    winner: dict[str, Any] = {}
+
+    def rename_b() -> None:
+        winner["response"] = test_client.patch(
+            f"/metric-scripts/{script_id}", json={"name": "Renamed by B"}, headers=owner
+        )
+        winner["stored"] = _stored(script_id)
+
+    _interleave(monkeypatch, metric_script_service, "validate_source", rename_b)
+    a = test_client.patch(f"/metric-scripts/{script_id}", json={"source": SOURCE_A}, headers=editor)
+
+    assert winner["response"].status_code == 200, winner["response"].text
+    assert winner["response"].json()["revision"] == 1
+    assert a.status_code == 409
+    assert _stored(script_id) == winner["stored"]
+    current = test_client.get(f"/metric-scripts/{script_id}", headers=editor).json()
+    assert current["name"] == "Renamed by B"
+    assert current["revision"] == 1
+    assert [(r["revision"], r["source"]) for r in current["revisions"]] == [(1, RATIO)]
+
+
+def test_rejected_save_keeps_pinned_revision_source(test_client, users, runtime, monkeypatch):
+    editor, owner = users["editor"], users["owner"]
+    script_id = _create(test_client, editor, visibility="project")["script_id"]
+    saved = test_client.patch(
+        f"/metric-scripts/{script_id}", json={"source": SOURCE_B}, headers=editor
+    )
+    assert saved.status_code == 200, saved.text
+    dashboard = test_client.post(
+        "/custom-dashboards",
+        json={"name": "Pins", "panels": [_pinned_panel(script_id, 2)]},
+        headers=owner,
+    )
+    assert dashboard.status_code == 201, dashboard.text
+    newest = RATIO + "\n# saved by B again\n"
+    winner: dict[str, Any] = {}
+
+    def save_b() -> None:
+        winner["response"] = test_client.patch(
+            f"/metric-scripts/{script_id}", json={"source": newest}, headers=owner
+        )
+
+    _interleave(monkeypatch, metric_script_service, "validate_source", save_b)
+    a = test_client.patch(f"/metric-scripts/{script_id}", json={"source": SOURCE_A}, headers=editor)
+
+    assert winner["response"].status_code == 200, winner["response"].text
+    assert a.status_code == 409
+    current = test_client.get(f"/metric-scripts/{script_id}", headers=editor).json()
+    sources = {r["revision"]: r["source"] for r in current["revisions"]}
+    assert sources == {1: RATIO, 2: SOURCE_B, 3: newest}
+    # The pinned revision still resolves to the source it had when it was pinned.
+    stored = MetricScriptDocument.find_one({"script_id": script_id}).run()
+    assert stored is not None
+    pinned = stored.find_revision(2)
+    assert pinned is not None and pinned.source == SOURCE_B
 
 
 def test_copy_uses_active_source(test_client, users, runtime):
