@@ -190,7 +190,8 @@ jobs:
         env:
           PI_PACKAGE: ${{ matrix.package }}
         run: |
-          archive="$(echo dist/*.tgz)"
+          # npm reads a bare "dist/x.tgz" as GitHub shorthand, so pass an absolute path.
+          archive="$(realpath dist/*.tgz)"
           # A rerun of a QDash tag finds X.Y.Z already published and skips it.
           tag="$(node .github/scripts/pi-package-release.mjs --publish-tag "$PI_PACKAGE" "$archive")"
           if [ -z "$tag" ]; then
