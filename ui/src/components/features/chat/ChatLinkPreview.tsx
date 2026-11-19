@@ -1,12 +1,13 @@
 "use client";
 
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { ExternalLink, Loader2 } from "lucide-react";
 import { useGetExecution } from "@/client/execution/execution";
 import { useGetForumPost } from "@/client/forum/forum";
 import { useGetTaskResult } from "@/client/task/task";
 import { FigureStrip } from "@/components/features/chat/ChatFigures";
 import { ExecutionProgress } from "@/components/features/chat/ExecutionProgress";
+import { ChatLinkPreviewContext } from "@/components/features/chat/ChatPreviewLink";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 import { ImagePreviewDialog } from "@/components/ui/ImagePreviewDialog";
 import { chatLinkPagePath, classifyChatLink, type ChatLink } from "@/lib/chatLinks";
@@ -16,18 +17,6 @@ type PreviewLink = Extract<
   ChatLink,
   { kind: "task-result" | "execution" | "forum-post" | "figure" }
 >;
-
-interface ChatLinkPreviewValue {
-  /** Open a preview for the link; false when the link is not previewable. */
-  preview: (href: string) => boolean;
-}
-
-const ChatLinkPreviewContext = createContext<ChatLinkPreviewValue | null>(null);
-
-/** The preview hook, or null outside a provider (links then behave normally). */
-export function useChatLinkPreview(): ChatLinkPreviewValue | null {
-  return useContext(ChatLinkPreviewContext);
-}
 
 /** Previewable links open in a dialog over the chat; the rest are left to the browser. */
 export function ChatLinkPreviewProvider({ children }: { children: ReactNode }) {

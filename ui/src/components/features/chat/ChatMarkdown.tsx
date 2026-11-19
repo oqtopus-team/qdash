@@ -4,7 +4,11 @@ import { memo, useCallback, useMemo, useReducer, useState } from "react";
 import type React from "react";
 import { Markdown, type ControlsConfig } from "@pierre/words/react";
 import "katex/dist/katex.min.css";
-import { useChatLinkPreview } from "@/components/features/chat/ChatLinkPreview";
+import {
+  ChatLink,
+  handlePreviewClick,
+  useChatLinkPreview,
+} from "@/components/features/chat/ChatPreviewLink";
 import {
   ChatMermaidDialog,
   type ChatMermaidDiagram,
@@ -24,47 +28,7 @@ import { copyText } from "@/lib/utils/clipboard";
 
 export { normalizeMathDelimiters } from "@/lib/chatMarkdown";
 
-type PreviewHandle = ReturnType<typeof useChatLinkPreview>;
-
-/** Whether a click on `href` should open a preview instead of the browser's default. */
-function handlePreviewClick(
-  event: React.MouseEvent<HTMLElement>,
-  href: string | undefined,
-  preview: PreviewHandle,
-): void {
-  if (event.defaultPrevented || !href || !preview) return;
-  if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
-  if (preview.preview(href)) event.preventDefault();
-}
-
-/**
- * A link in an answer. QDash records (task results, executions, forum posts,
- * figures) open as a preview over the chat; everything else opens in a new
- * tab, so a click never navigates away from the conversation.
- */
-export function ChatLink({
-  href,
-  children,
-  ...props
-}: React.AnchorHTMLAttributes<HTMLAnchorElement> & {
-  children?: React.ReactNode;
-}) {
-  const preview = useChatLinkPreview();
-  return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      {...props}
-      onClick={(event) => {
-        props.onClick?.(event);
-        handlePreviewClick(event, href, preview);
-      }}
-    >
-      {children}
-    </a>
-  );
-}
+export { ChatLink };
 
 // Copy only: the renderer's download button has no counterpart in chat.
 const controls: ControlsConfig = { code: { copy: true, download: false } };
