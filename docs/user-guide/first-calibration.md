@@ -24,6 +24,8 @@ deployment without hardware. For hardware-specific steps, see
    - Otherwise, select **First calibration guide** in the Home header, choose an existing chip or
      **Create a new chip**, and select **Start**.
 
+![Starting the guide from the First calibration guide button on Home: Create a new chip is chosen under Chip to calibrate, Start shows the First calibration card, and Continue opens the Create New Chip dialog on Chip](/images/guides/first-calibration-start.gif)
+
 If the guide cannot load the deployment or its chips, select **Try again**. Fake deployments offer
 only chips matching the 64-qubit virtual device. If that device is unavailable, ask an administrator
 to check the API configuration.
@@ -43,13 +45,24 @@ If you chose an existing chip, continue to [Review and Run](#review-and-run).
 QDash creates the [virtual chip configuration](./setup/fake-backend.md#create-a-chip) and opens
 **New Flow** with the **Fake Backend Calibration** template and the new chip selected.
 
+![Entering demo-64q as the Chip ID in the Create New Chip dialog and selecting Create Chip; QDash confirms the new virtual chip and opens New Flow with the template code](/images/guides/first-calibration-create-chip.gif)
+
 ### Review and Run
 
 1. Next to the code editor, read **What this flow runs**: the tasks in run order and the MUX
    targets that the code declares. A first run can use the template unchanged.
+
+   ![The Review the calibration callout next to What this flow runs, which lists the tasks in order and the targets MUX 0-15 of demo-64q](/images/guides/first-calibration-review-flow.gif)
+
 2. Keep the suggested flow name, or enter another with letters, digits, and underscores.
+
+   ![The Name the flow callout pointing at the Flow Name field, which holds the suggested name first_calibration](/images/guides/first-calibration-name-flow.gif)
+
 3. Select **Save Flow**. The saved flow opens in the flow editor. **New Flow** never replaces an
    existing flow; if the name was taken in the meantime, enter another one and save again.
+
+   ![Selecting Save Flow at the Save the flow callout; the saved flow opens in the flow editor, where the Run the calibration callout points at Execute](/images/guides/first-calibration-save-flow.gif)
+
 4. Select **Execute** once it is highlighted, check the chip ID in the confirmation, and select
    **Execute** to start the run.
 
@@ -98,10 +111,16 @@ The guide follows the same five steps on a Qubex deployment, with these differen
 ## Pause and Resume the Guide
 
 The strip under the top bar shows the current step. Select **Exit guide** or close a callout to
-pause. On **Home**, select:
+pause.
+
+![Closing the Review the calibration callout in New Flow; the callout and the guide strip disappear](/images/guides/first-calibration-pause.gif)
+
+On **Home**, select:
 
 - **Resume** to continue from the recorded step.
 - **Start over** to discard the guide.
+
+![Home shows the First calibration card as Paused at Review and run; selecting Resume: Review the calibration reopens the flow with the Review the calibration callout](/images/guides/first-calibration-resume.gif)
 
 The guide is saved in this browser for your account and project. Work that finishes after you
 switch project, pause, or restart is not added. Deleting a recorded chip, flow, or run returns
