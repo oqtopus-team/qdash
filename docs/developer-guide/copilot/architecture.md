@@ -191,12 +191,18 @@ A chat from the sidebar or the floating window tells the assistant what the user
 Every turn carries `ChatRequest.page` (`PageContext`: route, title, and on the Workflow editor
 the flow's name, chip, and the editor's current text, unsaved changes included); the runtime
 rebuilds a system prompt section from it each turn (`agent-runtime/src/page-context.ts`,
-`buildPageContextSection`). The chat page itself sends none.
+`buildPageContextSection`). The chat page itself sends none. Above the message box, every chat
+surface lists the page with the session's saved task result or investigation
+(`ui/src/components/features/chat/ChatContextBar.tsx`).
 
 Pages register what they show with the chat dock (`ChatDockContext.registerPage`): the
-registration reads the page's state when a turn is sent, so an editor's buffer is current, and
-may accept code back (`applyCode`). Without a registration the dock sends the route and the
-document title.
+registration reads the page's state when a turn is sent (`currentPage`), so an editor's buffer is
+current, and may accept code back (`applyCode`). Without a registration the dock sends the route
+and the document title. `ChatThread` subscribes to a summary of the same page (route, title, and
+whether the editor's code is sent) through `useChatPageSummary`. The dock notifies subscribers
+when a page registers or unregisters, and a registered page calls `refreshPage` after each of its
+commits, so the list follows navigation, the editor finishing loading, and a pane switch. The
+summary holds no code, so a keystroke in the editor does not rerender the chat.
 
 On the Workflow editor the runtime also offers `propose_code_edit`: the model passes the
 complete new file and a one-line summary, the call ends the turn, and the chat renders an

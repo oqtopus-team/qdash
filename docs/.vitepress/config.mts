@@ -163,7 +163,7 @@ export default withMermaid(
             {
               text: "Use AI Assistance",
               items: [
-                { text: "AI Chat", link: "/user-guide/ai-chat" },
+                { text: "Agent", link: "/user-guide/ai-chat" },
                 { text: "AI Evaluations", link: "/user-guide/ai-evaluations" },
                 { text: "Agent Calibration", link: "/user-guide/agent-calibration" },
               ],

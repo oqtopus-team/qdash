@@ -42,7 +42,7 @@ it("keeps chat above the measured safe-area dock and refits after viewport resiz
   const rect = vi.spyOn(dock, "getBoundingClientRect");
   rect.mockReturnValue({ top: 746, height: 98 } as DOMRect);
   render(<MiniChatWindow />);
-  const chat = screen.getByRole("dialog", { name: "AI chat" });
+  const chat = screen.getByRole("dialog", { name: "Agent" });
   expect(parseFloat(chat.style.top) + parseFloat(chat.style.height)).toBe(730);
   vi.stubGlobal("innerWidth", 320);
   vi.stubGlobal("innerHeight", 568);
@@ -69,7 +69,7 @@ it("preserves minimization on resize and fits within an offset visual viewport",
   });
   vi.stubGlobal("visualViewport", viewport);
   render(<MiniChatWindow />);
-  const chat = screen.getByRole("dialog", { name: "AI chat" });
+  const chat = screen.getByRole("dialog", { name: "Agent" });
   expect(parseFloat(chat.style.top)).toBe(316);
   expect(parseFloat(chat.style.height)).toBe(268);
   expect(parseFloat(chat.style.left)).toBe(36);

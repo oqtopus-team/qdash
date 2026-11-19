@@ -38,7 +38,7 @@ describe("MobileTabBar", () => {
       "Dashboard",
       "Workflow",
       "Execution",
-      "AI Chat",
+      "Agent",
     ]);
     expect(links.map((link) => link.getAttribute("href"))).toEqual([
       "/dashboard",
@@ -92,8 +92,8 @@ describe("MobileTabBar", () => {
     ["/workflow/calibrate-all", "Workflow"],
     ["/execution/chip-1/exec-1", "Execution"],
     ["/executions/exec-1", "Execution"],
-    ["/chat", "AI Chat"],
-    ["/chat/session-1", "AI Chat"],
+    ["/chat", "Agent"],
+    ["/chat/session-1", "Agent"],
   ])("marks only the owning tab current on %s", (pathname, label) => {
     mockPathname.mockReturnValue(pathname);
     render(<MobileTabBar />);
@@ -134,6 +134,6 @@ describe("MobileTabBar", () => {
       within(getTabBar())
         .getAllByRole("link")
         .map((link) => link.textContent),
-    ).toEqual(["Dashboard", "Execution", "AI Chat"]);
+    ).toEqual(["Dashboard", "Execution", "Agent"]);
   });
 });

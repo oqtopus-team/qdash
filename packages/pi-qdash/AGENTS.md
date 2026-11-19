@@ -6,6 +6,9 @@ commits, and documentation. See the [pi extension design guide](../../docs/devel
 for architecture and the [package guide](../../docs/developer-guide/copilot/packages.md)
 for development and releases.
 
+- pi CLI and the QDash web Agent are both supported hosts. Shared tools, skills, and domain
+  guidance belong here; presentation, sessions, context, and orchestration belong to each host.
+  See [Supported hosts](../../docs/developer-guide/copilot/extensions.md#supported-hosts).
 - Keep API access, redaction, rendering, and mechanical evidence extraction in `extensions/`.
 - Keep calibration interpretation and workflows in `skills/`.
 - New tools are read-only by default. Writes follow the existing approval gates.

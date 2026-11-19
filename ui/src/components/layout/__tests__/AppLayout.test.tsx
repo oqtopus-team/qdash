@@ -95,12 +95,12 @@ describe("AppLayout navigation chrome", () => {
       "aria-current",
       "page",
     );
-    expect(within(tabBar as HTMLElement).getByRole("link", { name: "AI Chat" })).toHaveAttribute(
+    expect(within(tabBar as HTMLElement).getByRole("link", { name: "Agent" })).toHaveAttribute(
       "href",
       "/chat",
     );
-    // The desktop rail still lists AI Chat; only the mobile menu drops tab destinations.
-    expect(within(rail as HTMLElement).getByRole("link", { name: "AI Chat" })).toBeTruthy();
+    // The desktop rail still lists Agent; only the mobile menu drops tab destinations.
+    expect(within(rail as HTMLElement).getByRole("link", { name: "Agent" })).toBeTruthy();
   });
 
   it("sizes the shell to the visible viewport and pads it by the safe-area insets", () => {
@@ -151,7 +151,7 @@ describe("AppLayout navigation chrome", () => {
     ]) {
       expect(nav.getByRole("link", { name: label })).toBeTruthy();
     }
-    for (const label of ["Dashboard", "Workflow", "Execution", "AI Chat"]) {
+    for (const label of ["Dashboard", "Workflow", "Execution", "Agent"]) {
       expect(nav.queryByRole("link", { name: label })).toBeNull();
     }
 

@@ -28,7 +28,7 @@ export function DockedChatPanel({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <aside className="h-full w-full flex flex-col bg-base-100" aria-label="AI chat">
+    <aside className="h-full w-full flex flex-col bg-base-100" aria-label="Agent">
       <header className="flex items-start gap-2 px-3 py-2.5 border-b border-base-300/70">
         <SurfaceTitle />
         <div className="flex items-center gap-0.5 shrink-0">

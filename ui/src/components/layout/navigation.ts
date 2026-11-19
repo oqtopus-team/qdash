@@ -49,7 +49,7 @@ export function getNavigationSections({ canEdit, isAdmin }: NavigationOptions): 
         { href: "/metrics", label: "Metrics", icon: Gauge },
         { href: "/chip", label: "Chip", icon: Cpu },
         { href: "/analysis", label: "Analysis", icon: BarChart3 },
-        { href: "/chat", label: "AI Chat", icon: Bot },
+        { href: "/chat", label: "Agent", icon: Bot },
       ],
     },
     {

@@ -30,14 +30,14 @@ describe("isPathWithin", () => {
 });
 
 describe("getMobileTabs", () => {
-  it("returns Dashboard, Workflow, Execution, and AI Chat in order for project editors", () => {
+  it("returns Dashboard, Workflow, Execution, and Agent in order for project editors", () => {
     const tabs = getMobileTabs(editor);
 
     expect(tabs.map((tab) => tab.item.label)).toEqual([
       "Dashboard",
       "Workflow",
       "Execution",
-      "AI Chat",
+      "Agent",
     ]);
     expect(tabs.map((tab) => tab.item.href)).toEqual([
       "/dashboard",
@@ -51,7 +51,7 @@ describe("getMobileTabs", () => {
     expect(getMobileTabs(viewer).map((tab) => tab.item.label)).toEqual([
       "Dashboard",
       "Execution",
-      "AI Chat",
+      "Agent",
     ]);
   });
 });

@@ -213,7 +213,7 @@ export function MiniChatWindow() {
         height: minimized ? "auto" : size.height,
       }}
       role="dialog"
-      aria-label="AI chat"
+      aria-label="Agent"
     >
       {/* Draggable header */}
       <div
@@ -224,7 +224,7 @@ export function MiniChatWindow() {
         <GripHorizontal className="w-3.5 h-3.5 mt-1 text-base-content/30 flex-shrink-0" />
         {minimized ? (
           <span className="flex-1 min-w-0 truncate text-sm font-medium">
-            {activeSession?.title ?? "Ask AI"}
+            {activeSession?.title ?? "Agent"}
           </span>
         ) : (
           <SurfaceTitle />
