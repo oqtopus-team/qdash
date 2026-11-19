@@ -216,8 +216,8 @@ services:
       - ${CONFIG_PATH:-./config/qubex-config}:/app/config/qubex-config # Qubex backend configuration repository/data
       - api-logs:/app/logs
       - agent-runtime-auth:/run/agent-runtime-auth:ro
-      # The metric runner's socket (agent-exec): metric scripts run there, not in the API.
-      - agent-exec-socket:/run/agent-exec:ro
+      # The metric runner's socket: metric scripts run in metric-runner, not in the API.
+      - metric-runner-socket:/run/metric-runner:ro
       # Read-only source the Copilot searches when it investigates a failure
       - ./src/qdash:/app/source/qdash:ro
       - ${CALIBTASKS_PATH:-./src/qdash/workflow/calibtasks}:/app/source/qdash/workflow/calibtasks:ro
@@ -243,7 +243,7 @@ services:
         condition: service_completed_successfully
       agent-runtime-auth:
         condition: service_completed_successfully
-      agent-exec:
+      metric-runner:
         condition: service_started
     environment:
       - PYTHONPATH=/app:/app/qdash:/app/qdash/api:/app/qdash/dbmodel:/app/qdash/datamodel:/app/qdash
@@ -255,7 +255,7 @@ services:
       - PI_AGENT_RUNTIME_URL=http://agent-runtime:${AGENT_RUNTIME_PORT:-8002}
       - AGENT_RUNTIME_TOKEN=${AGENT_RUNTIME_TOKEN:-}
       - AGENT_RUNTIME_TOKEN_FILE=/run/agent-runtime-auth/token
-      - METRIC_RUNNER_SOCKET=/run/agent-exec/metric.sock
+      - METRIC_RUNNER_SOCKET=/run/metric-runner/metric.sock
     networks:
       - custom_net
   agent-runtime-auth:
@@ -350,10 +350,7 @@ services:
     # env_file) and has no network. A Unix socket restricted to the runtime's
     # group (bun, gid 1000) prevents workspace users from impersonating others.
     # The server starts one pi-env daemon per conversation as that user's own
-    # uid; see docs/developer-guide/copilot/workspace.md. It also runs the API's
-    # metric script jobs (validate, evaluate) on a second socket, metric.sock,
-    # open to root only: each job runs as a per-slot uid and reads data only
-    # through the API's broker.
+    # uid; see docs/developer-guide/copilot/workspace.md.
     build:
       context: .
       dockerfile: ./agent-runtime/exec/Dockerfile
@@ -364,19 +361,9 @@ services:
     volumes:
       - agent-exec-workspace:/workspace
       - agent-exec-socket:/run/agent-exec
-      # Live metric worker source, the same pattern the api service uses;
-      # production images build this copy in (exec/Dockerfile).
-      - ./src/qdash/api/metric_runtime:/app/metric-runtime/qdash/api/metric_runtime:ro
     environment:
       - AGENT_EXEC_SOCKET=/run/agent-exec/exec.sock
       - AGENT_EXEC_SOCKET_GID=1000
-      - AGENT_EXEC_METRIC_SOCKET=/run/agent-exec/metric.sock
-      # Runner limits come from .env by substitution (this service reads no env_file).
-      - AGENT_EXEC_METRIC_CONCURRENCY=${AGENT_EXEC_METRIC_CONCURRENCY:-2}
-      - AGENT_EXEC_METRIC_QUEUE_LIMIT=${AGENT_EXEC_METRIC_QUEUE_LIMIT:-16}
-      - AGENT_EXEC_METRIC_QUEUE_WAIT_SECONDS=${AGENT_EXEC_METRIC_QUEUE_WAIT_SECONDS:-5}
-      - AGENT_EXEC_METRIC_MAX_TIMEOUT_SECONDS=${AGENT_EXEC_METRIC_MAX_TIMEOUT_SECONDS:-300}
-      - AGENT_EXEC_METRIC_MAX_MEMORY_MB=${AGENT_EXEC_METRIC_MAX_MEMORY_MB:-2048}
     # Root only to chown each owner's directory and drop to that uid (setpriv).
     cap_drop:
       - ALL
@@ -395,6 +382,62 @@ services:
           pids: 512
           memory: ${AGENT_EXEC_MEMORY_LIMIT:-2g}
           cpus: ${AGENT_EXEC_CPU_LIMIT:-2}
+    network_mode: none
+  metric-runner:
+    # Validates and evaluates the API's metric scripts, and nothing else: the
+    # API keeps authentication, data access and persistence, and agent-exec
+    # stays the Copilot workspace. One persistent supervisor (PID 1) runs each
+    # job as a per-slot uid in a fresh directory and relays its data requests
+    # to the API's broker over metric.sock (0660 root:0, so only the API, which
+    # runs as root, connects). It holds no QDash credentials (no env_file, no
+    # source or workspace mounts) and has no network. See
+    # docs/developer-guide/architecture/metric-scripts.md.
+    build:
+      context: .
+      dockerfile: ./agent-runtime/metric-runner/Dockerfile
+    restart: always
+    read_only: true
+    # Job directories live here. tmpfs pages count against the memory limit
+    # below, so the size is part of the memory budget.
+    tmpfs:
+      - /tmp:size=${METRIC_RUNNER_TMPFS_SIZE:-256m}
+    volumes:
+      - metric-runner-socket:/run/metric-runner
+      # Live metric worker source, the same pattern the api service uses;
+      # production images build this copy in (metric-runner/Dockerfile).
+      - ./src/qdash/api/metric_runtime:/app/metric-runtime/qdash/api/metric_runtime:ro
+    environment:
+      - METRIC_RUNNER_SOCKET=/run/metric-runner/metric.sock
+      - METRIC_RUNNER_SOCKET_GID=0
+      # Limits come from .env by substitution (this service reads no env_file).
+      # Budget rule: CONCURRENCY x (MAX_MEMORY_MB + 128 MiB worker baseline)
+      # + 128 MiB supervisor + TMPFS_SIZE <= MEMORY_LIMIT; the defaults use
+      # 2 x (1024 + 128) + 128 + 256 = 2688 MiB of 3 GiB. The runner logs the
+      # budget at startup and warns when it does not fit.
+      - METRIC_RUNNER_CONCURRENCY=${METRIC_RUNNER_CONCURRENCY:-2}
+      - METRIC_RUNNER_QUEUE_LIMIT=${METRIC_RUNNER_QUEUE_LIMIT:-16}
+      - METRIC_RUNNER_QUEUE_WAIT_SECONDS=${METRIC_RUNNER_QUEUE_WAIT_SECONDS:-5}
+      - METRIC_RUNNER_MAX_TIMEOUT_SECONDS=${METRIC_RUNNER_MAX_TIMEOUT_SECONDS:-300}
+      - METRIC_RUNNER_MAX_MEMORY_MB=${METRIC_RUNNER_MAX_MEMORY_MB:-1024}
+    # Root only to prepare each job directory, drop to the job uid (setpriv)
+    # and kill and sweep what the job uid left behind.
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - KILL
+      - SETGID
+      - SETUID
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          pids: ${METRIC_RUNNER_PIDS_LIMIT:-256}
+          memory: ${METRIC_RUNNER_MEMORY_LIMIT:-3g}
+          cpus: ${METRIC_RUNNER_CPU_LIMIT:-2}
     network_mode: none
   ui:
     build:
@@ -441,3 +484,4 @@ volumes:
   agent-runtime-auth:
   agent-exec-workspace:
   agent-exec-socket:
+  metric-runner-socket:

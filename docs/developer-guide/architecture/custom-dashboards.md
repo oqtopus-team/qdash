@@ -12,7 +12,7 @@ The API owns persistence, visibility, and validation of dashboards and metric sc
 no measured values and no computed results: a dashboard describes what to show, a script defines
 how to compute it, and every panel evaluates when it renders. The metric script runtime owns
 code execution: the API's executor and data broker (`src/qdash/api/metric_runtime/`) and the
-metric runner in the `agent-exec` container, described in [Metric Scripts](./metric-scripts.md).
+`metric-runner` container, described in [Metric Scripts](./metric-scripts.md).
 The UI owns layout editing, the script editor, and rendering of evaluation results.
 
 ## Documents
@@ -70,7 +70,13 @@ with the next save.
 The pin is protected on the script side:
 
 - `MetricScriptService._apply_source` keeps at most 50 revisions but never evicts the newest, the
-  active one, or any revision a dashboard in the project pins (`pinned_revisions`).
+  active one, or any revision a dashboard in the project pins (`pinned_revisions`). The pins are
+  read once per save, so a dashboard that pins an old revision while a save is in flight can
+  still lose it to eviction.
+- A save is an atomic compare-and-set on the stored `revision` and `system_info.updated_at`
+  (`MongoMetricScriptRepository.save_if_unchanged`): when another save landed after the document
+  was read, the update returns 409 and writes nothing, even without `expected_revision`. A saved
+  revision's source is therefore never rewritten.
 - Deleting a script returns 409 listing the dashboards that reference it.
 - Making a script private returns 409 while a project-visible dashboard uses it.
 - Duplicating a dashboard copies its pins; copying a script (`POST /metric-scripts/{id}/copy`)

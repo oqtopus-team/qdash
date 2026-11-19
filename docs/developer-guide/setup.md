@@ -177,7 +177,7 @@ The component tasks are:
   `8002`) on `127.0.0.1`
 - `task dev-api-local`: run the FastAPI app with `--reload` on `API_PORT`; it sets
   `METRIC_RUNNER_MODE=local`, so metric scripts run as subprocesses of the host API instead of in
-  the `agent-exec` container
+  the `metric-runner` container
 - `task dev-ui-local` (or `task dev-ui`): run `next dev` on `UI_DEV_PORT`, default `5713`, behind
   Caddy; it needs `task dev-services` running
 

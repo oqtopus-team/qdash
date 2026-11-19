@@ -11,8 +11,15 @@ import {
   REQUEST_MAX_BYTES,
   resultMessage,
   SOURCE_MAX_BYTES,
-} from "../exec/metric-protocol.ts";
-import { metricRunnerOptionsFromEnv } from "../exec/metric-runner.ts";
+} from "../metric-runner/protocol.ts";
+import {
+  memoryBudget,
+  metricRunnerOptionsFromEnv,
+  parseCgroupMemoryLimit,
+  parseTmpfsSizeMb,
+  SUPERVISOR_RSS_MB,
+  WORKER_BASELINE_RSS_MB,
+} from "../metric-runner/runner.ts";
 
 const limits = { maxTimeoutSeconds: 300, maxMemoryMb: 2048 };
 const catalog = { v: 1, mode: "catalog", source: "x = 1\n", timeout_seconds: 60, memory_mb: 1024 };
@@ -142,10 +149,10 @@ test("the line splitter joins chunks and stops at an oversized line", () => {
   assert.deepEqual(raised, ["1234", "overflow"]);
 });
 
-test("runner options come from the environment, and a blank socket disables the runner", () => {
+test("runner options come from the METRIC_RUNNER_* environment", () => {
   const defaults = metricRunnerOptionsFromEnv({}, true);
   assert.deepEqual(defaults, {
-    socketPath: "/run/agent-exec/metric.sock",
+    socketPath: "/run/metric-runner/metric.sock",
     socketGid: 0,
     isolateUsers: true,
     python: "python3",
@@ -155,17 +162,66 @@ test("runner options come from the environment, and a blank socket disables the 
     queueLimit: 16,
     queueWaitSeconds: 5,
     maxTimeoutSeconds: 300,
-    maxMemoryMb: 2048,
+    maxMemoryMb: 1024,
   });
-  assert.equal(metricRunnerOptionsFromEnv({ AGENT_EXEC_METRIC_SOCKET: " " }, true), undefined);
+  // A blank socket path means the default; the runner always listens.
+  assert.equal(metricRunnerOptionsFromEnv({ METRIC_RUNNER_SOCKET: " " }, true).socketPath, "/run/metric-runner/metric.sock");
+  assert.equal(metricRunnerOptionsFromEnv({}, false).isolateUsers, false);
+  assert.equal(metricRunnerOptionsFromEnv({ METRIC_RUNNER_ISOLATE_USERS: "false" }, true).isolateUsers, false);
+  assert.equal(metricRunnerOptionsFromEnv({ METRIC_RUNNER_ISOLATE_USERS: "1" }, false).isolateUsers, true);
   const custom = metricRunnerOptionsFromEnv(
-    { AGENT_EXEC_METRIC_CONCURRENCY: "4", AGENT_EXEC_METRIC_QUEUE_WAIT_SECONDS: "0.5", AGENT_EXEC_METRIC_PYTHON: "" },
+    {
+      METRIC_RUNNER_SOCKET: "/tmp/m.sock",
+      METRIC_RUNNER_CONCURRENCY: "4",
+      METRIC_RUNNER_QUEUE_WAIT_SECONDS: "0.5",
+      METRIC_RUNNER_PYTHON: "",
+      METRIC_RUNNER_MAX_MEMORY_MB: "512",
+    },
     false,
   );
+  assert.equal(custom.socketPath, "/tmp/m.sock");
   assert.equal(custom.concurrency, 4);
   assert.equal(custom.queueWaitSeconds, 0.5);
   assert.equal(custom.python, "python3");
-  assert.throws(() => metricRunnerOptionsFromEnv({ AGENT_EXEC_METRIC_CONCURRENCY: "0" }, true), /CONCURRENCY/);
-  assert.throws(() => metricRunnerOptionsFromEnv({ AGENT_EXEC_METRIC_QUEUE_LIMIT: "-1" }, true), /QUEUE_LIMIT/);
-  assert.throws(() => metricRunnerOptionsFromEnv({ AGENT_EXEC_METRIC_MAX_MEMORY_MB: "64" }, true), /MAX_MEMORY_MB/);
+  assert.equal(custom.maxMemoryMb, 512);
+  // The old agent-exec names are not read any more.
+  assert.equal(metricRunnerOptionsFromEnv({ AGENT_EXEC_METRIC_CONCURRENCY: "7" }, true).concurrency, 2);
+  assert.throws(() => metricRunnerOptionsFromEnv({ METRIC_RUNNER_CONCURRENCY: "0" }, true), /CONCURRENCY/);
+  assert.throws(() => metricRunnerOptionsFromEnv({ METRIC_RUNNER_QUEUE_LIMIT: "-1" }, true), /QUEUE_LIMIT/);
+  assert.throws(() => metricRunnerOptionsFromEnv({ METRIC_RUNNER_MAX_MEMORY_MB: "64" }, true), /MAX_MEMORY_MB/);
+  assert.throws(() => metricRunnerOptionsFromEnv({ METRIC_RUNNER_ISOLATE_USERS: "maybe" }, true), /ISOLATE_USERS/);
+});
+
+test("the memory budget compares every slot's worst case with the container limit", () => {
+  const fits = memoryBudget({ concurrency: 2, maxMemoryMb: 1024, limitMb: 3072, tmpfsMb: 256, workerBaselineMb: 128, supervisorMb: 128 });
+  assert.equal(fits.requiredMb, 2 * (1024 + 128) + 128 + 256);
+  assert.equal(fits.fits, true);
+  assert.match(fits.message, /2 jobs x \(1024 MiB script \+ 128 MiB worker baseline\) \+ 128 MiB supervisor \+ 256 MiB \/tmp = 2688 MiB of a 3072 MiB/);
+
+  const tight = memoryBudget({ concurrency: 2, maxMemoryMb: 2048, limitMb: 2048, tmpfsMb: 0 });
+  assert.equal(tight.fits, false);
+  assert.equal(tight.requiredMb, 2 * (2048 + WORKER_BASELINE_RSS_MB) + SUPERVISOR_RSS_MB);
+  assert.match(tight.message, /exceeds the 2048 MiB container limit/);
+  assert.match(tight.message, /METRIC_RUNNER_CONCURRENCY/);
+
+  const unknown = memoryBudget({ concurrency: 1, maxMemoryMb: 128, limitMb: undefined, tmpfsMb: 0 });
+  assert.equal(unknown.fits, undefined);
+  assert.match(unknown.message, /container limit unknown/);
+});
+
+test("cgroup limits and tmpfs sizes parse, and 'no limit' is unknown", () => {
+  assert.equal(parseCgroupMemoryLimit("3221225472\n"), 3072);
+  assert.equal(parseCgroupMemoryLimit("max\n"), undefined);
+  assert.equal(parseCgroupMemoryLimit("9223372036854771712\n"), undefined);
+  assert.equal(parseCgroupMemoryLimit(""), undefined);
+  const mounts = [
+    "overlay / overlay ro,relatime 0 0",
+    "tmpfs /dev tmpfs rw,nosuid,size=65536k,mode=755 0 0",
+    "tmpfs /tmp tmpfs rw,nosuid,nodev,noexec,relatime,size=262144k 0 0",
+  ].join("\n");
+  assert.equal(parseTmpfsSizeMb(mounts), 256);
+  assert.equal(parseTmpfsSizeMb(mounts, "/dev"), 64);
+  assert.equal(parseTmpfsSizeMb("tmpfs /tmp tmpfs rw,size=1g 0 0"), 1024);
+  assert.equal(parseTmpfsSizeMb("tmpfs /tmp tmpfs rw,relatime 0 0"), undefined);
+  assert.equal(parseTmpfsSizeMb("overlay / overlay ro 0 0"), undefined);
 });

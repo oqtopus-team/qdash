@@ -1,7 +1,7 @@
 """Metric script worker process: ``python -m qdash.api.metric_runtime.worker``.
 
-The metric runner in agent-exec (or the executor's development-only local mode) spawns
-one worker per validation or evaluation. The worker holds no credentials, database
+The metric runner in the ``metric-runner`` container (or the executor's development-only
+local mode) spawns one worker per validation or evaluation. The worker holds no credentials, database
 connection or API client; everything it reads comes through the data broker protocol
 below.
 
@@ -32,7 +32,8 @@ and points fds 0 and 1 at ``/dev/null``, so script output (including output from
 extensions) cannot corrupt the protocol. Python-level ``print`` output goes to a
 :class:`BoundedLog` (16 KiB). Resource limits (address space, CPU time, file size,
 process count) are applied where the platform supports them; unsupported limits are
-skipped (macOS rejects ``RLIMIT_AS``, for example).
+skipped (macOS rejects ``RLIMIT_AS``, for example). The worker also makes itself the
+kernel's first choice for the OOM killer (:func:`apply_limits`).
 
 Evaluation follows qdash-playground ``worker.execute`` (Apache License 2.0): one metric
 over every target, each cell evaluated in its own ``try`` so one failure never hides the
@@ -57,6 +58,8 @@ FILE_SIZE_LIMIT = 1024 * 1024
 MAX_CHECKS = 200
 MAX_ESTIMATES = 200
 MAX_TEXT = 4000
+OOM_SCORE_ADJ = 1000
+OOM_SCORE_ADJ_PATH = "/proc/self/oom_score_adj"
 
 
 class BoundedLog:
@@ -126,17 +129,38 @@ def _address_space_in_use() -> int:
     return 0
 
 
+def raise_oom_score(path: str = OOM_SCORE_ADJ_PATH) -> bool:
+    """Make this process the OOM killer's first choice; return whether that worked.
+
+    Raising ``oom_score_adj`` needs no privilege on Linux. Elsewhere, or when ``/proc`` is
+    not writable, nothing happens.
+    """
+    try:
+        with open(path, "w", encoding="ascii") as adj:
+            adj.write(str(OOM_SCORE_ADJ))
+    except OSError:
+        return False
+    return True
+
+
 def apply_limits(memory_mb: int, timeout_seconds: float) -> list[str]:
-    """Apply rlimits where available; return the names that could not be applied.
+    """Apply per-job limits where available; return the names that could not be applied.
 
     ``memory_mb`` is the address space the script may add on top of the interpreter and
     the preloaded numpy/scipy, which already reserve a large virtual size on Linux.
+    ``RLIMIT_AS`` bounds virtual memory, not the resident set: it is the first, per-job
+    line, which turns most oversized allocations into a ``MemoryError`` inside the script.
+    The hard line is the memory cgroup of the runner's container, shared by every job and
+    the supervisor. ``oom_score_adj`` (``1000``) makes the kernel pick a worker rather than
+    the supervisor when that cgroup runs out, so the failure stays inside a job.
     """
     skipped: list[str] = []
+    if not raise_oom_score():
+        skipped.append("oom_score_adj")
     try:
         import resource
     except ImportError:  # pragma: no cover - non-POSIX platforms
-        return ["resource"]
+        return [*skipped, "resource"]
     memory = _address_space_in_use() + int(memory_mb) * 1024 * 1024
     cpu = math.ceil(float(timeout_seconds)) + 1
     for name, value in (

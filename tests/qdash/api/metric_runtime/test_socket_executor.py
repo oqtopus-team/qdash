@@ -1,6 +1,6 @@
 """Socket-mode executor tests against a scripted fake metric runner.
 
-The fake serves one Unix socket connection the way ``agent-runtime/exec/metric-runner.ts``
+The fake serves one Unix socket connection the way ``agent-runtime/metric-runner/runner.ts``
 does: it reads the request line, then replays a per-test script of lines to send and
 answers to read. No worker process runs.
 """
@@ -374,9 +374,10 @@ def test_oversized_message(serve):
     runner.join()
 
 
-def test_close_without_result(serve):
+def test_close_after_acceptance_is_unavailable(serve):
+    """The runner stopped mid-job (crash or shutdown): an infrastructure fault, not a result."""
     runner = serve(lambda r: r.send(ACCEPTED))
-    with pytest.raises(WorkerFailure, match="without a result"):
+    with pytest.raises(RunnerUnavailableError, match="stopped before the job finished"):
         evaluate(runner)
     runner.join()
 

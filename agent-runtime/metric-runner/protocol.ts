@@ -9,11 +9,11 @@
  * user or project: the API scopes data in its broker before it connects. The
  * worker's own line protocol (stdin/stdout) is documented in
  * src/qdash/api/metric_runtime/worker.py. This file has no dependencies because
- * the exec image ships it without node_modules.
+ * the metric-runner image ships it without node_modules.
  */
 
 export const METRIC_PROTOCOL_VERSION = 1;
-export const DEFAULT_METRIC_SOCKET = "/run/agent-exec/metric.sock";
+export const DEFAULT_METRIC_SOCKET = "/run/metric-runner/metric.sock";
 export const DEFAULT_METRIC_JOB_ROOT = "/tmp/metric-jobs";
 export const DEFAULT_METRIC_PYTHON = "python3";
 export const DEFAULT_METRIC_PYTHONPATH = "/app/metric-runtime";
@@ -32,7 +32,11 @@ export const STDERR_TAIL_BYTES = 4096;
 /** How long a connection may take to send its request line. */
 export const REQUEST_WAIT_MS = 10_000;
 
-/** Job uids: one per slot, outside the owner range (20000–59999) of exec/protocol.ts. */
+/**
+ * Job uids: one per slot. The metric-runner container has no other users; the
+ * base stays outside the chat workspace owner range (20000–59999 in
+ * exec/protocol.ts) so the two never share a uid, even on one host.
+ */
 export const METRIC_UID_BASE = 60000;
 /** Upper bound on slots, so job uids stay far below `nobody` (65534). */
 export const METRIC_MAX_CONCURRENCY = 256;
@@ -41,7 +45,7 @@ export const DEFAULT_METRIC_CONCURRENCY = 2;
 export const DEFAULT_METRIC_QUEUE_LIMIT = 16;
 export const DEFAULT_METRIC_QUEUE_WAIT_SECONDS = 5;
 export const DEFAULT_METRIC_MAX_TIMEOUT_SECONDS = 300;
-export const DEFAULT_METRIC_MAX_MEMORY_MB = 2048;
+export const DEFAULT_METRIC_MAX_MEMORY_MB = 1024;
 export const MIN_METRIC_TIMEOUT_SECONDS = 1;
 export const MIN_METRIC_MEMORY_MB = 128;
 

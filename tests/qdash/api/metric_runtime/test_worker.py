@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+import os
+import subprocess
+import sys
 import time
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
 
-from qdash.api.metric_runtime import executor
+from qdash.api.metric_runtime import executor, worker
 from qdash.api.metric_runtime.executor import (
     QueueFullError,
     RuntimeSettings,
@@ -334,7 +337,7 @@ def test_default_settings_use_the_runner_socket(monkeypatch):
     assert RuntimeSettings().mode == "socket"
     settings = executor.load_settings()
     assert settings.mode == "socket"
-    assert settings.socket_path == "/run/agent-exec/metric.sock"
+    assert settings.socket_path == "/run/metric-runner/metric.sock"
 
 
 def test_runner_mode_and_socket_from_environment(monkeypatch):
@@ -348,3 +351,40 @@ def test_runner_mode_and_socket_from_environment(monkeypatch):
     settings = executor.load_settings()
     assert settings.mode == "socket"
     assert settings.socket_path == executor.DEFAULT_SOCKET_PATH
+
+
+def test_raise_oom_score_writes_the_adjustment(tmp_path):
+    target = tmp_path / "oom_score_adj"
+    target.write_text("0")
+    assert worker.raise_oom_score(str(target)) is True
+    assert target.read_text() == str(worker.OOM_SCORE_ADJ) == "1000"
+    assert worker.raise_oom_score(str(tmp_path / "missing" / "oom_score_adj")) is False
+
+
+def test_apply_limits_raises_the_oom_score_or_reports_it_skipped():
+    """In a child process: apply_limits sets rlimits that must not touch the test runner."""
+    probe = (
+        "import sys\n"
+        "from qdash.api.metric_runtime.worker import apply_limits\n"
+        "skipped = apply_limits(256, 5)\n"
+        "try:\n"
+        "    adj = open('/proc/self/oom_score_adj').read().strip()\n"
+        "except OSError:\n"
+        "    adj = None\n"
+        "print(adj, ','.join(skipped))\n"
+    )
+    done = subprocess.run(  # noqa: S603 - fixed probe, current interpreter
+        [sys.executable, "-c", probe],
+        capture_output=True,
+        text=True,
+        timeout=60,
+        env={**os.environ, "PYTHONPATH": executor.SOURCE_ROOT},
+        check=True,
+    )
+    adj, _, skipped = done.stdout.strip().partition(" ")
+    if sys.platform.startswith("linux"):
+        assert adj == "1000"
+        assert "oom_score_adj" not in skipped
+    else:
+        assert adj == "None"
+        assert "oom_score_adj" in skipped

@@ -1,35 +1,36 @@
 """Run metric script workers and serve their data requests.
 
 Each validation (``catalog``) or evaluation runs ``qdash.api.metric_runtime.worker`` once.
-In the default ``socket`` mode the API is only a client: it sends the job to the metric
-runner in the ``agent-exec`` container over a Unix socket and answers the worker's data
-requests, relayed by the runner, through a
-:class:`~qdash.api.metric_runtime.broker.BrokerHandler` until the runner reports the
-``result`` (protocol in ``agent-runtime/exec/metric-protocol.ts``; the worker's own line
-protocol is in :mod:`.worker`). The ``local`` mode spawns the worker as a subprocess of the
-API process instead and exists for development only.
+In the default ``socket`` mode the API is only a client: it sends the job to the dedicated
+``metric-runner`` container over a Unix socket and answers the worker's data requests,
+relayed by the runner, through a :class:`~qdash.api.metric_runtime.broker.BrokerHandler`
+until the runner reports the ``result`` (protocol in
+``agent-runtime/metric-runner/protocol.ts``; the worker's own line protocol is in
+:mod:`.worker`). The ``local`` mode spawns the worker as a subprocess of the API process
+instead and exists for development only. Socket mode never falls back to local mode: an
+unreachable runner is an error.
 
 Settings (environment variables read per run, with defaults):
 
 ``METRIC_RUNNER_MODE`` (``socket``)
     ``socket`` sends jobs to the metric runner; ``local`` runs the worker inside the API
     process's container (development only, for example the host-side ``dev-api-local``,
-    which has no agent-exec socket).
-``METRIC_RUNNER_SOCKET`` (``/run/agent-exec/metric.sock``)
-    The metric runner's socket. When it is missing or refuses the connection, runs fail
-    with :class:`RunnerUnavailableError` (HTTP 503).
+    which has no metric runner socket).
+``METRIC_RUNNER_SOCKET`` (``/run/metric-runner/metric.sock``)
+    The metric runner's socket. When it is missing or refuses the connection, or the runner
+    stops before a job ends, runs fail with :class:`RunnerUnavailableError` (HTTP 503).
 ``METRIC_SCRIPT_TIMEOUT_SECONDS`` (60)
     Wall-clock limit per run; the worker's processes are killed when it expires. The
     worker also sets ``RLIMIT_CPU`` to this value plus one second. The runner caps it at
-    its own ``AGENT_EXEC_METRIC_MAX_TIMEOUT_SECONDS``.
+    its own ``METRIC_RUNNER_MAX_TIMEOUT_SECONDS``.
 ``METRIC_SCRIPT_MEMORY_MB`` (1024)
     Address space the script may use on top of the interpreter and the preloaded
     numpy/scipy baseline (``RLIMIT_AS``), where the platform supports it. The runner caps
-    it at ``AGENT_EXEC_METRIC_MAX_MEMORY_MB``.
+    it at ``METRIC_RUNNER_MAX_MEMORY_MB``.
 ``METRIC_SCRIPT_CONCURRENCY`` (2)
     Local mode only: workers running at once in this API process. A run that cannot start
     within :data:`QUEUE_WAIT_SECONDS` fails with :class:`QueueFullError` (HTTP 429). In
-    socket mode the runner enforces one global limit (``AGENT_EXEC_METRIC_CONCURRENCY``)
+    socket mode the runner enforces one global limit (``METRIC_RUNNER_CONCURRENCY``)
     across every API process and answers ``queue_full`` instead.
 
 The worker's stdout is bounded to :data:`OUTPUT_LIMIT_BYTES`; script ``print`` output is
@@ -47,21 +48,23 @@ Socket mode (deployments):
   database access. It builds the broker, pinned to the caller's project, the evaluated chip
   and the period, before it connects. The request names no user or project; the runner
   cannot widen the scope, and the worker reads data only through the relayed broker.
-- The runner (``agent-runtime/exec/metric-runner.ts``) runs in ``agent-exec``: no network,
-  read-only root, no credentials. It admits jobs into a few global slots, starts each
-  worker as the slot's own job uid (outside the chat workspace owner range) with no
-  capabilities and ``no_new_privs``, in a fresh private job directory, with an environment
-  that holds only ``PATH``, ``PYTHONPATH``, ``HOME``/``TMPDIR``, locale and BLAS thread
-  variables. On completion, timeout or disconnect it kills every process of the job uid and
-  removes its files before the slot is reused.
+- The runner (``agent-runtime/metric-runner/runner.ts``) is the only process of the
+  ``metric-runner`` container: no network, read-only root, no credentials, and nothing
+  shared with the Copilot workspace. It admits jobs into a few global slots, starts each
+  worker as the slot's own job uid with no capabilities and ``no_new_privs``, in a fresh
+  private job directory, with an environment that holds only ``PATH``, ``PYTHONPATH``,
+  ``HOME``/``TMPDIR``, locale and BLAS thread variables. On completion, timeout or
+  disconnect it kills every process of the job uid and removes its files before the slot
+  is reused.
 - Resource bounds: the worker's rlimits (address space, CPU time, file size, process
   count), the runner's wall clock and stdout bound, and the container's CPU, memory and
-  pids limits, which are shared with chat workspaces (there is no per-job cgroup). The API
-  side also gives up :data:`DEADLINE_GRACE_SECONDS` after the time limit and closes the
-  connection, which makes the runner kill the job.
+  pids limits, which every job shares (there is no per-job cgroup). Workers raise their
+  ``oom_score_adj``, so the kernel kills a job rather than the runner when the container
+  runs out of memory. The API side also gives up :data:`DEADLINE_GRACE_SECONDS` after the
+  time limit and closes the connection, which makes the runner kill the job.
 - Guardrails: an import allowlist and disabled builtins (:mod:`.policy`), which catch
   mistakes and make intent explicit. They are not a sandbox; the boundary is the job uid
-  in ``agent-exec``.
+  in the ``metric-runner`` container.
 
 Local mode (development only): the worker runs as the API container's user with the API's
 network and filesystem view. Its environment is scrubbed (:func:`scrubbed_env`) and the
@@ -100,7 +103,7 @@ DEFAULT_TIMEOUT_SECONDS = 60.0
 DEFAULT_MEMORY_MB = 1024
 DEFAULT_CONCURRENCY = 2
 DEFAULT_RUNNER_MODE: RunnerMode = "socket"
-DEFAULT_SOCKET_PATH = "/run/agent-exec/metric.sock"
+DEFAULT_SOCKET_PATH = "/run/metric-runner/metric.sock"
 WORKER_MODULE = "qdash.api.metric_runtime.worker"
 SOURCE_ROOT = str(Path(__file__).resolve().parents[3])
 """Directory containing the ``qdash`` package; prepended to the worker's PYTHONPATH."""
@@ -279,7 +282,7 @@ def run_worker(
     return _run_socket(request, broker, settings)
 
 
-# -- socket mode: a client of the metric runner in agent-exec -------------------------
+# -- socket mode: a client of the metric-runner container -----------------------------
 
 
 class _Expired(Exception):
@@ -365,7 +368,7 @@ def _connect(path: str) -> socket.socket:
         logger.warning("Metric script runner at %s is not reachable: %s", path, exc)
         raise RunnerUnavailableError(
             "The metric script runner is not available; try again shortly or ask an "
-            "administrator to check the agent-exec service"
+            "administrator to check the metric-runner service"
         ) from exc
     return sock
 
@@ -400,7 +403,7 @@ def _failure(message: dict[str, Any], settings: RuntimeSettings) -> MetricRuntim
     if code == "runner_error":
         logger.warning("Metric script runner could not run the job: %s", text)
         return RunnerUnavailableError(
-            f"{text}; try again shortly or ask an administrator to check the agent-exec service"
+            f"{text}; try again shortly or ask an administrator to check the metric-runner service"
         )
     lines = _text(message.get("stderr_tail")).strip().splitlines()
     tail = f": {lines[-1]}" if lines else ""
@@ -476,7 +479,7 @@ def _converse(
     admission = time.monotonic() + ADMISSION_TIMEOUT_SECONDS
     unavailable = (
         "The metric script runner did not take the job; try again shortly or ask an "
-        "administrator to check the agent-exec service"
+        "administrator to check the metric-runner service"
     )
     try:
         connection.send_line(request_line, admission)
@@ -499,7 +502,15 @@ def _converse(
         while True:
             message = connection.read_message(limit, deadline)
             if message is None:
-                raise WorkerFailure("Metric script runner closed the connection without a result")
+                # The runner ends every job it accepted with `result` or `failed`; a bare
+                # close means it stopped (crash or shutdown), not that the script failed.
+                logger.warning(
+                    "Metric script runner closed job %s without a result", reply.get("job_id")
+                )
+                raise RunnerUnavailableError(
+                    "The metric script runner stopped before the job finished; try again "
+                    "shortly or ask an administrator to check the metric-runner service"
+                )
             kind = message["type"]
             if kind == "call":
                 _relay_call(connection, message, broker, deadline)

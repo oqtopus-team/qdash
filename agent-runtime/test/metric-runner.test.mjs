@@ -8,7 +8,7 @@ import { dirname, join, resolve } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { startMetricRunner } from "../exec/metric-runner.ts";
+import { startMetricRunner } from "../metric-runner/runner.ts";
 
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const python = process.env.METRIC_RUNNER_TEST_PYTHON || join(repo, ".venv", "bin", "python");

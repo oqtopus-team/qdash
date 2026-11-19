@@ -223,8 +223,8 @@ tasks:
         /bin/sh -c '
         mkdir -p .tmp
         echo "$$" > .tmp/dev-api-local.pid
-        # This API is not in the api container, so it cannot reach the agent-exec
-        # metric runner socket: run metric scripts as local subprocesses (development only).
+        # This API is not in the api container, so it cannot reach the metric-runner
+        # container's socket: run metric scripts as local subprocesses (development only).
         export METRIC_RUNNER_MODE="${METRIC_RUNNER_MODE:-local}"
         if [ "${QDASH_DEV_HOST:-}" = devcontainer ]; then
           bind="${QDASH_DEV_BIND:-0.0.0.0}"

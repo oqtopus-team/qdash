@@ -1,8 +1,8 @@
 # Metric Scripts Architecture
 
 The metric script runtime validates and evaluates user-authored Python in a worker process that
-the metric runner in the `agent-exec` container starts as a per-job uid, with no credentials
-and no network; every value the script reads comes from a data broker inside the API process.
+the dedicated `metric-runner` container starts as a per-job uid, with no credentials and no
+network; every value the script reads comes from a data broker inside the API process.
 Persistence, permissions and the dashboard revision policy are in
 [Custom Dashboards](./custom-dashboards.md); writing scripts is in
 [Metric Scripts](../../user-guide/metric-scripts.md).
@@ -13,11 +13,11 @@ Persistence, permissions and the dashboard revision policy are in
 what, resolves the period and the chip topology, builds the broker, and maps runtime failures to
 HTTP errors. The API side of the runtime package (`src/qdash/api/metric_runtime/`) owns the
 executor, a client of the metric runner, and the data broker. The metric runner
-(`agent-runtime/exec/metric-runner.ts`) owns admission, job identity, supervision and cleanup;
-it shares the `agent-exec` container and server process with the
-[Copilot workspace](../copilot/workspace.md#metric-runner). The runtime knows nothing about
-documents or users; the broker knows nothing about script code; the runner knows nothing about
-users, projects or data.
+(`agent-runtime/metric-runner/runner.ts`) owns admission, job identity, supervision and cleanup,
+and is the only process of the `metric-runner` container: it shares no container, socket or
+resource limit with the [Copilot workspace](../copilot/workspace.md) in `agent-exec`. The
+runtime knows nothing about documents or users; the broker knows nothing about script code; the
+runner knows nothing about users, projects or data.
 
 | Module | Responsibility |
 | --- | --- |
@@ -27,12 +27,14 @@ users, projects or data.
 | `executor.py` | Sends each job to the runner over `metric.sock`, answers the relayed data requests through the broker, enforces the API-side deadline, and maps runner messages to exceptions; `METRIC_RUNNER_MODE=local` runs the worker as an API subprocess instead (development only) |
 | `broker.py` | `MetricDataBroker`: the project-scoped data source of one evaluation, and its caps |
 | `template_library.py`, `templates/*.py` | The starter scripts |
-| `agent-runtime/exec/metric-runner.ts` | The runner: global slots and queue, one job uid and job directory per slot, `setpriv`, wall clock, output bound, kill and sweep |
-| `agent-runtime/exec/metric-protocol.ts` | Request validation, limits and message shapes of the API ⇄ runner protocol; no dependencies |
+| `agent-runtime/metric-runner/server.ts` | The container's entrypoint (PID 1): reads `METRIC_RUNNER_*`, logs the [memory budget](#memory-budget), starts the runner, stops on `SIGTERM` |
+| `agent-runtime/metric-runner/runner.ts` | The runner: global slots and queue, one job uid and job directory per slot, `setpriv`, wall clock, output bound, kill and sweep |
+| `agent-runtime/metric-runner/protocol.ts` | Request validation, limits and message shapes of the API ⇄ runner protocol; no dependencies |
 
-The `agent-exec` image ships only `__init__.py`, `sdk.py`, `policy.py` and `worker.py` of the
-package, under `/app/metric-runtime/qdash/api/metric_runtime/`; the broker, executor and
-templates stay in the API.
+The `metric-runner` image (`agent-runtime/metric-runner/Dockerfile`) holds Python with numpy,
+scipy and pint, the bun binary, the three runner files, and only `__init__.py`, `sdk.py`,
+`policy.py` and `worker.py` of the package, under `/app/metric-runtime/qdash/api/metric_runtime/`;
+the broker, executor and templates stay in the API.
 
 ## Evaluation flow
 
@@ -42,7 +44,7 @@ sequenceDiagram
   participant S as MetricScriptService
   participant E as executor (API)
   participant B as MetricDataBroker
-  participant R as metric runner (agent-exec)
+  participant R as metric runner (metric-runner)
   participant W as worker (job uid)
   UI->>S: POST /metric-scripts/:id/evaluate
   S->>S: resolve period, load topology, build broker
@@ -79,7 +81,7 @@ starts, so the same panel moves with time; absolute periods need timezones
 ## Runner protocol
 
 The API opens one connection to `metric.sock` per job and exchanges newline-delimited UTF-8
-JSON, one object per line. `metric-protocol.ts` is the reference; `executor.py` is the client.
+JSON, one object per line. `protocol.ts` is the reference; `executor.py` is the client.
 
 1. **Request** (API → runner, first line): `{"v": 1, "mode": "catalog" | "evaluate", "source",
    "timeout_seconds", "memory_mb"}`, plus `metric_id`, `chip_id`, `start`, `end` and `params`
@@ -87,12 +89,12 @@ JSON, one object per line. `metric-protocol.ts` is the reference; `executor.py` 
    a line over 1 MiB (`REQUEST_MAX_BYTES`) or a source over 256 KiB (`SOURCE_MAX_BYTES`, the
    API's `MAX_SOURCE_BYTES`) with `{"type": "error", "code": "invalid_request"}` and closes.
    A connection that sends no request within 10 s is refused the same way. The runner clamps
-   `timeout_seconds` to `[1, AGENT_EXEC_METRIC_MAX_TIMEOUT_SECONDS]` and `memory_mb` to
-   `[128, AGENT_EXEC_METRIC_MAX_MEMORY_MB]`.
+   `timeout_seconds` to `[1, METRIC_RUNNER_MAX_TIMEOUT_SECONDS]` and `memory_mb` to
+   `[128, METRIC_RUNNER_MAX_MEMORY_MB]`.
 2. **Admission** (runner → API): `{"type": "accepted", "job_id": "<16 hex>"}` once a slot is
    free, or `{"type": "error", "code": "queue_full"}` and close when
-   `AGENT_EXEC_METRIC_QUEUE_LIMIT` jobs are already waiting or no slot frees within
-   `AGENT_EXEC_METRIC_QUEUE_WAIT_SECONDS`. Slots are global: one runner process serves every
+   `METRIC_RUNNER_QUEUE_LIMIT` jobs are already waiting or no slot frees within
+   `METRIC_RUNNER_QUEUE_WAIT_SECONDS`. Slots are global: one runner process serves every
    API worker and caller.
 3. **Relay**: each `CALL` line of the worker becomes `{"type": "call", "op", "args"}`. The API
    answers each call, in order, with exactly one `{"type": "answer", "ok": true, "data"}` or
@@ -172,20 +174,20 @@ Who can run code: project editors and owners, the same people who can save calib
 that run on hardware. Viewers can evaluate only revisions an editor saved and that validated;
 validation and draft evaluation require editor rights.
 
-The boundary is the job uid inside `agent-exec`. The API keeps authentication, authorization,
-period and topology resolution, and all database access; the worker reaches data only through
-the relayed broker.
+The boundary is the job uid inside the `metric-runner` container. The API keeps
+authentication, authorization, period and topology resolution, and all database access; the
+worker reaches data only through the relayed broker.
 
 | Layer | Enforcement |
 | --- | --- |
-| Socket | `metric.sock` is 0660 `root:AGENT_EXEC_METRIC_SOCKET_GID` (gid 0 by default) in the 0750 socket directory it shares with `exec.sock`. The API container runs as root and connects; the Agent Runtime's `bun` user (gid 1000) and workspace uids cannot |
-| Job uid | `60000 + slot` (one uid per slot, at most 256 slots), outside the chat owner range 20000–59999. A slot, and so its uid, is reused only after the previous job's cleanup finished |
+| Socket | `metric.sock` is 0660 `root:METRIC_RUNNER_SOCKET_GID` (gid 0 by default) in a 0750 directory on the `metric-runner-socket` volume, which only `api` (read-only) and `metric-runner` mount. The API container runs as root and connects; job uids cannot reach the directory |
+| Job uid | `60000 + slot` (one uid per slot, at most 256 slots), also outside the chat owner range 20000–59999 of `agent-exec`. A slot, and so its uid, is reused only after the previous job's cleanup finished |
 | Privileges | `setpriv --reuid --regid --clear-groups --inh-caps=-all --no-new-privs`, then `python -u -B -P -s -m qdash.api.metric_runtime.worker` (`-P` keeps the cwd off `sys.path`, `-s` drops user site) |
 | Files | A fresh job directory `/tmp/metric-jobs/<job_id>`, 0700 and owned by the job uid, created and chowned before the worker starts, so the runner never follows a path the worker could have replaced. The job root is 0711 root: the worker reaches its own directory but cannot list or create siblings. The directory is the worker's cwd, `HOME` and `TMPDIR`; umask 077 keeps files it creates elsewhere private |
 | Environment | Only `PATH`, `PYTHONPATH`, `HOME`, `TMPDIR`, `LANG`, `LC_ALL`, `PYTHONDONTWRITEBYTECODE` and single-thread BLAS settings (`workerEnv`); nothing is inherited from the runner, and the container has no credentials to inherit |
 | Network | `network_mode: none` for the whole container |
-| Container | `read_only` root with `/tmp` as tmpfs, `cap_drop: ALL` plus the capabilities the supervisor needs, `no-new-privileges`, and limits of 512 pids, `AGENT_EXEC_MEMORY_LIMIT` memory and `AGENT_EXEC_CPU_LIMIT` CPUs |
-| Worker rlimits | `RLIMIT_AS` (the baseline address space plus `memory_mb`), `RLIMIT_CPU` (timeout + 1 s), `RLIMIT_FSIZE` (1 MiB) and `RLIMIT_NPROC` (0, no child processes) |
+| Container | No `env_file` and no source, workspace or data mounts; `read_only` root with `/tmp` as a `METRIC_RUNNER_TMPFS_SIZE` tmpfs, `cap_drop: ALL` plus the capabilities the supervisor needs, `no-new-privileges`, and limits of `METRIC_RUNNER_PIDS_LIMIT` pids, `METRIC_RUNNER_MEMORY_LIMIT` memory and `METRIC_RUNNER_CPU_LIMIT` CPUs |
+| Worker limits | `RLIMIT_AS` (the baseline address space plus `memory_mb`), `RLIMIT_CPU` (timeout + 1 s), `RLIMIT_FSIZE` (1 MiB), `RLIMIT_NPROC` (0, no child processes), and `oom_score_adj` 1000 |
 | Runner bounds | Wall clock from spawn, 8 MiB of worker stdout, 1 MiB request and 32 MiB answer lines, 256 KiB of source |
 
 When a job ends, times out, or loses its client, `killJob` sends `SIGKILL` to the worker's
@@ -202,16 +204,17 @@ a sandbox, and determined code can escape it into the job uid's full rights.
 
 What is not enforced:
 
-- **Resources are shared with chat workspaces.** CPU, memory and pids limits apply to the
-  whole `agent-exec` container; there is no per-job cgroup. A heavy job slows Copilot shell
-  commands and the reverse, and when the container reaches its memory limit the kernel's OOM
-  killer may choose any process in it, including the server. With the defaults, two jobs at the
-  maximum `memory_mb` of 2048 MiB can exceed the 2 GiB container limit. The container limits
-  do not reserve capacity either, so contention with other services on the host remains.
+- **Jobs share one container.** CPU, memory and pids limits apply to the whole `metric-runner`
+  container; there is no per-job cgroup, so concurrent jobs slow each other. Chat workspaces
+  are not affected: they run in `agent-exec` under their own limits. Container limits do not
+  reserve capacity, so contention with other services on the host remains. Within the
+  container, the failure domain is the job: when the memory cgroup runs out, `oom_score_adj`
+  makes the kernel kill a worker rather than the supervisor, and the job fails with
+  `crash`/`SIGKILL` while the runner keeps serving. A supervisor crash fails every in-flight
+  job, and the API answers 503 until Compose restarts the container.
 - **Readable files.** A job uid can read whatever is world-readable in the container: the
   image, the worker's own source, and files another uid left world-readable in `/tmp` or
-  `/dev/shm`. Owner directories under `/workspace` (0700, root 0711) and other job directories
-  (0700) are closed to it.
+  `/dev/shm`. Other job directories (0700) are closed to it.
 - **The sweep is shallow.** Cleanup removes the uid's processes, its top-level entries of
   `/tmp` and `/dev/shm`, and its job directory; a file it created inside another world-writable
   directory survives until the container restarts.
@@ -226,11 +229,11 @@ What is not enforced:
 | Cause | Exception | HTTP |
 | --- | --- | --- |
 | Runner `queue_full`, or no local slot within 5 s | `QueueFullError` | 429 |
-| Socket missing or refusing, no `accepted` within 30 s, connection closed before acceptance, or `failed`/`runner_error` | `RunnerUnavailableError` | 503 |
+| Socket missing or refusing, no `accepted` within 30 s, connection closed without `result` or `failed` (before or after acceptance), or `failed`/`runner_error` | `RunnerUnavailableError` | 503 |
 | `failed`/`timeout`, the API deadline, `output_limit`, `crash` or `protocol`; `invalid_request`; a malformed runner line | `WorkerFailure` | 422 |
 | The script does not load, unknown metric or parameter, invalid legend | `ScriptFailure` | 422 |
 
-A 503 means nothing ran. `validate_source` re-raises it (and 429) instead of reporting a failed
+A 503 means the runner produced no result. `validate_source` re-raises it (and 429) instead of reporting a failed
 validation, so a save never records a revision as invalid because the runner was down or busy.
 A timeout keeps the local mode's wording, "exceeded the N s time limit", and a crash appends the
 last line of the worker's stderr.
@@ -247,8 +250,8 @@ on macOS `RLIMIT_AS` is rejected, so runs have no memory cap. The executor logs 
 first time local mode runs.
 
 Local mode exists for development only. The `dev-api-local` task sets it, because an API on
-the host cannot reach the container socket. Do not use it where untrusted editors can save
-scripts.
+the host cannot reach the container socket. Socket mode never falls back to it: an unreachable
+runner is a 503. Do not use it where untrusted editors can save scripts.
 
 ## Settings
 
@@ -259,34 +262,75 @@ Operators set them as described in
 | Variable | Default | Meaning |
 | --- | --- | --- |
 | `METRIC_RUNNER_MODE` | `socket` | `socket` sends jobs to the runner; `local` runs them in the API process (development only) |
-| `METRIC_RUNNER_SOCKET` | `/run/agent-exec/metric.sock` | The runner's socket; Compose sets it on `api` with the `agent-exec-socket` volume mounted read-only |
+| `METRIC_RUNNER_SOCKET` | `/run/metric-runner/metric.sock` | The runner's socket; Compose sets it on `api` with the `metric-runner-socket` volume mounted read-only |
 | `METRIC_SCRIPT_TIMEOUT_SECONDS` | `60` | Wall-clock limit of one run (minimum 1); the runner caps it |
 | `METRIC_SCRIPT_MEMORY_MB` | `1024` | Address space the script may add to the interpreter and preloaded numpy/scipy (minimum 128); the runner caps it |
 | `METRIC_SCRIPT_CONCURRENCY` | `2` | Local mode only: runs at once per API process; a run that waits `QUEUE_WAIT_SECONDS = 5` for a slot fails with 429 |
 
-The runner reads its settings from the `agent-exec` environment at startup
-(`metricRunnerOptionsFromEnv`); an invalid value stops the server.
+The runner reads its settings from the `metric-runner` environment at startup
+(`metricRunnerOptionsFromEnv`); an invalid value stops the container.
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `AGENT_EXEC_METRIC_SOCKET` | `/run/agent-exec/metric.sock` | Socket path; blank disables the runner |
-| `AGENT_EXEC_METRIC_SOCKET_GID` | `0` | Group allowed to connect |
-| `AGENT_EXEC_METRIC_CONCURRENCY` | `2` | Jobs running at once across every API process (1–256) |
-| `AGENT_EXEC_METRIC_QUEUE_LIMIT` | `16` | Jobs allowed to wait for a slot; more are refused with `queue_full` |
-| `AGENT_EXEC_METRIC_QUEUE_WAIT_SECONDS` | `5` | How long a job waits for a slot before `queue_full` |
-| `AGENT_EXEC_METRIC_MAX_TIMEOUT_SECONDS` | `300` | Upper clamp of a request's `timeout_seconds` |
-| `AGENT_EXEC_METRIC_MAX_MEMORY_MB` | `2048` | Upper clamp of a request's `memory_mb` |
-| `AGENT_EXEC_METRIC_PYTHON` | `python3` | Interpreter with numpy, scipy and pint |
-| `AGENT_EXEC_METRIC_PYTHONPATH` | `/app/metric-runtime` | Directory holding the worker package copy (set in the image) |
-| `AGENT_EXEC_METRIC_JOB_ROOT` | `/tmp/metric-jobs` | Parent of the job directories |
-| `AGENT_EXEC_ISOLATE_USERS` | on as root | Job uids and `setpriv`; off, jobs run as the server's own user with a warning |
-| `AGENT_EXEC_CPU_LIMIT` | `2` | CPUs of the `agent-exec` container (Compose), shared with chat workspaces |
-| `AGENT_EXEC_MEMORY_LIMIT` | `2g` | Memory of the `agent-exec` container (Compose), shared with chat workspaces |
+| `METRIC_RUNNER_SOCKET` | `/run/metric-runner/metric.sock` | Socket path; a blank value means the default |
+| `METRIC_RUNNER_SOCKET_GID` | `0` | Group allowed to connect |
+| `METRIC_RUNNER_CONCURRENCY` | `2` | Jobs running at once across every API process (1–256) |
+| `METRIC_RUNNER_QUEUE_LIMIT` | `16` | Jobs allowed to wait for a slot; more are refused with `queue_full` |
+| `METRIC_RUNNER_QUEUE_WAIT_SECONDS` | `5` | How long a job waits for a slot before `queue_full` |
+| `METRIC_RUNNER_MAX_TIMEOUT_SECONDS` | `300` | Upper clamp of a request's `timeout_seconds` |
+| `METRIC_RUNNER_MAX_MEMORY_MB` | `1024` | Upper clamp of a request's `memory_mb` |
+| `METRIC_RUNNER_PYTHON` | `python3` | Interpreter with numpy, scipy and pint |
+| `METRIC_RUNNER_PYTHONPATH` | `/app/metric-runtime` | Directory holding the worker package copy (set in the image) |
+| `METRIC_RUNNER_JOB_ROOT` | `/tmp/metric-jobs` | Parent of the job directories |
+| `METRIC_RUNNER_ISOLATE_USERS` | on as root | Job uids and `setpriv`; off, jobs run as the runner's own user with a warning |
 
-`agent-exec` reads no `env_file`; Compose interpolates the concurrency, queue, cap and container
-limit variables from `.env` into its `environment` block, so operators set them there like the
-API's. A `METRIC_SCRIPT_TIMEOUT_SECONDS` or `METRIC_SCRIPT_MEMORY_MB` above the runner's caps is
-clamped silently, so raise the caps with it.
+Compose also reads these from `.env` for the container itself:
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `METRIC_RUNNER_MEMORY_LIMIT` | `3g` | Memory cgroup limit of the container, shared by every job, the supervisor and `/tmp` |
+| `METRIC_RUNNER_CPU_LIMIT` | `2` | CPUs of the container |
+| `METRIC_RUNNER_PIDS_LIMIT` | `256` | Processes of the container |
+| `METRIC_RUNNER_TMPFS_SIZE` | `256m` | Size of the `/tmp` tmpfs that holds the job directories |
+
+`metric-runner` reads no `env_file`; Compose interpolates these variables from `.env` into its
+`environment` block and resource limits, so operators set them there like the API's. A
+`METRIC_SCRIPT_TIMEOUT_SECONDS` or `METRIC_SCRIPT_MEMORY_MB` above the runner's caps is clamped
+silently, so raise the caps with it.
+
+### Memory budget
+
+Every job, the supervisor and the `/tmp` tmpfs are charged to the container's one memory
+cgroup. The settings fit when
+
+```text
+METRIC_RUNNER_CONCURRENCY × (METRIC_RUNNER_MAX_MEMORY_MB + 128 MiB)
+  + 128 MiB + METRIC_RUNNER_TMPFS_SIZE ≤ METRIC_RUNNER_MEMORY_LIMIT
+```
+
+The defaults use 2 × (1024 + 128) + 128 + 256 = 2688 MiB of 3072 MiB. The two 128 MiB terms are
+`WORKER_BASELINE_RSS_MB` and `SUPERVISOR_RSS_MB` in `runner.ts`, rounded up from these
+measurements in the `metric-runner` image on Linux arm64 (Python 3.11, numpy 2.4.6, scipy
+1.17.1, pint 0.25.3):
+
+| Process | VmSize | VmRSS |
+| --- | --- | --- |
+| Worker after its preloads (`worker`, `sdk`, numpy, scipy, pint), when `apply_limits` runs | 107 MiB | 39 MiB |
+| Same, after the script also imports `scipy.optimize`, `scipy.stats`, `scipy.signal` and `scipy.interpolate` | 257 MiB | 103 MiB |
+| Supervisor (`bun server.ts`), idle after startup | 5.7 GiB | 28–37 MiB |
+
+`RLIMIT_AS` caps a worker's virtual size at its size when `apply_limits` runs plus `memory_mb`.
+Because the resident set never exceeds the virtual size, a worker's resident set stays below
+about 107 MiB + `memory_mb`, which the 128 MiB term covers; imports the script makes after the
+limit count against `memory_mb`. `RLIMIT_AS` is a per-job line, which turns most oversized
+allocations into a `MemoryError` inside the script; it does not protect the cgroup. The cgroup
+is the hard line, and `oom_score_adj` keeps its failures inside a job. The queue, output,
+request and answer bounds keep the supervisor's own memory small.
+
+At startup the runner reads the cgroup limit (`/sys/fs/cgroup/memory.max`, or
+`memory.limit_in_bytes` on cgroup v1) and the `/tmp` tmpfs size and logs the budget line. When
+the formula exceeds the limit it logs a warning and still starts; jobs that use their whole
+allowance at the same time can then be OOM-killed.
 
 ## Differences from qdash-playground
 
@@ -310,14 +354,14 @@ The SDK, policy, worker loop and templates are adapted from qdash-playground by 
 - A new data operation is a branch in `MetricDataBroker.handle` plus an accessor in `sdk.py`;
   keep it scoped to `project_id` and `chip_id` and covered by a cap. The runner relays any
   `op` unchanged and needs no change.
-- A new allowed import must ship in both images: `agent-runtime/exec/requirements.txt` for the
-  runner and the API image for local mode and tests. Add it to `ALLOWED_IMPORTS` with a test in
+- A new allowed import must ship in both images: `agent-runtime/metric-runner/requirements.txt`
+  for the runner and the API image for local mode and tests. Add it to `ALLOWED_IMPORTS` with a test in
   `tests/qdash/api/metric_runtime/test_policy.py`.
 - A new module the worker imports from `metric_runtime` must be added to the `COPY` list in
-  `agent-runtime/exec/Dockerfile`, which ships only the worker's files. In Compose, the
-  `agent-exec` service bind-mounts `src/qdash/api/metric_runtime` over that copy, so source
+  `agent-runtime/metric-runner/Dockerfile`, which ships only the worker's files. In Compose, the
+  `metric-runner` service bind-mounts `src/qdash/api/metric_runtime` over that copy, so source
   edits apply without a rebuild.
-- A change to the runner protocol changes `metric-protocol.ts` and `executor.py` together; bump
+- A change to the runner protocol changes `protocol.ts` and `executor.py` together; bump
   `v` (`METRIC_PROTOCOL_VERSION`, `PROTOCOL_VERSION`) when an old API and a new runner could
   meet.
 - A new public SDK name goes into `PUBLIC_NAMES`; document it in the user guide and in the
@@ -329,25 +373,27 @@ The SDK, policy, worker loop and templates are adapted from qdash-playground by 
   legends, history semantics.
 - `tests/qdash/api/metric_runtime/test_policy.py`: imports, builtins, diagnostics.
 - `tests/qdash/api/metric_runtime/test_worker.py`: the real worker process in local mode,
-  protocol, limits, per-cell errors, and the templates.
+  protocol, limits including `oom_score_adj`, per-cell errors, and the templates.
 - `tests/qdash/api/metric_runtime/test_socket_executor.py`: the executor against a fake runner
   on a Unix socket in `tmp_path`: the call relay and answer format, `queue_full`,
   `invalid_request`, each `failed` code, malformed and oversized lines, an unreachable runner,
-  the API deadline, a call after the deadline, and the settings.
+  a runner that closes after acceptance, the API deadline, a call after the deadline, and the
+  settings.
 - `tests/qdash/api/metric_runtime/test_collision_template.py`: the collision template against
   the reference numbers.
 - `tests/qdash/api/routers/test_metric_script.py`: the routes, including the ZX90 median
   end to end through the worker, and 503 on validate, save (no revision) and evaluate when the
   runner is unavailable.
 - `agent-runtime/test/metric-protocol.test.mjs`: request validation and clamping, answers,
-  worker messages, the line splitter, and options from the environment.
+  worker messages, the line splitter, options from the environment, and the memory budget with
+  its cgroup and tmpfs parsing.
 - `agent-runtime/test/metric-runner.test.mjs`: the real runner on a Unix socket: invalid
   requests, the request timeout, the socket's file mode, and a worker that cannot start. Live
   tests run the real worker (catalog, evaluate with relayed calls, `queue_full`, a waiting job,
   timeout, client disconnect, output limit); they skip unless the interpreter in
   `METRIC_RUNNER_TEST_PYTHON` or `.venv/bin/python` imports numpy, scipy and pint. The tests
-  never run as root, so `setpriv`, the `/proc` scan and the sweep have no automated test;
-  check them in the container.
+  never run as root, so `setpriv`, the `/proc` scan, the sweep and the cgroup OOM path have no
+  automated test; check them in the container.
 
 Run `task test-api` (or `uv run pytest tests/qdash/api/metric_runtime`) for the Python side
 and `task ci-agent-runtime` for the runner.
@@ -359,9 +405,9 @@ and `task ci-agent-runtime` for the runner.
 - `src/qdash/api/routers/metric_script.py`, `src/qdash/api/schemas/metric_script.py`
 - `src/qdash/datamodel/metric_script.py`, `src/qdash/dbmodel/metric_script.py`,
   `src/qdash/repository/metric_script.py`
-- `agent-runtime/exec/metric-protocol.ts`, `agent-runtime/exec/metric-runner.ts`; started from
-  `agent-runtime/exec/server.ts`
-- `agent-runtime/exec/Dockerfile`, `agent-runtime/exec/requirements.txt`: the worker copy and
-  its Python packages
-- `compose.yaml`: the `api` and `agent-exec` services and the `agent-exec-socket` volume
+- `agent-runtime/metric-runner/server.ts`, `agent-runtime/metric-runner/runner.ts`,
+  `agent-runtime/metric-runner/protocol.ts`
+- `agent-runtime/metric-runner/Dockerfile`, `agent-runtime/metric-runner/requirements.txt`: the
+  runner image, the worker copy and its Python packages
+- `compose.yaml`: the `api` and `metric-runner` services and the `metric-runner-socket` volume
 - `NOTICE`

@@ -1,15 +1,16 @@
 /**
  * The metric runner: runs metric script jobs (validate a script's catalog,
- * evaluate a metric) for the API, inside the agent-exec container.
+ * evaluate a metric) for the API, in the dedicated metric-runner container,
+ * whose entrypoint (server.ts, PID 1) starts it.
  *
- * The API connects to `metric.sock` once per job (protocol in
- * metric-protocol.ts). The runner admits the job into one of a few global
- * slots, starts `python -m qdash.api.metric_runtime.worker` as the slot's own
- * uid in a fresh job directory, and relays the worker's data requests to the
- * API, which answers them from its broker. The worker gets no credentials and
- * no network; it sees only its stdin and stdout pipes. When the job ends, times
- * out, or the API disconnects, every process and file of the job uid is
- * removed before the slot (and so the uid) is reused. See
+ * The API connects to `metric.sock` once per job (protocol in protocol.ts).
+ * The runner admits the job into one of a few global slots, starts
+ * `python -m qdash.api.metric_runtime.worker` as the slot's own uid in a fresh
+ * job directory, and relays the worker's data requests to the API, which
+ * answers them from its broker. The worker gets no credentials and no network;
+ * it sees only its stdin and stdout pipes. When the job ends, times out, or the
+ * API disconnects, every process and file of the job uid is removed before the
+ * slot (and so the uid) is reused. See
  * docs/developer-guide/architecture/metric-scripts.md.
  */
 import { spawn, type ChildProcess } from "node:child_process";
@@ -46,7 +47,7 @@ import {
   resultMessage,
   type RunnerMessage,
   STDERR_TAIL_BYTES,
-} from "./metric-protocol.ts";
+} from "./protocol.ts";
 
 export interface MetricRunnerOptions {
   socketPath: string;
@@ -107,8 +108,13 @@ export async function startMetricRunner(options: MetricRunnerOptions): Promise<M
   const isRoot = process.getuid?.() === 0;
 
   prepareJobRoot(options.jobRoot, options.isolateUsers);
-  mkdirSync(dirname(options.socketPath), { recursive: true, mode: 0o750 });
+  // Job uids must not reach the socket: the directory is 0750 and the socket
+  // 0660, both owned by root and the client's group.
+  const socketDir = dirname(options.socketPath);
+  mkdirSync(socketDir, { recursive: true, mode: 0o750 });
+  chmodSync(socketDir, 0o750);
   const socketGid = isRoot ? options.socketGid : undefined;
+  if (socketGid !== undefined) chownSync(socketDir, process.getuid!(), socketGid);
   const stale = lstatSync(options.socketPath, { throwIfNoEntry: false });
   if (stale) {
     if (!stale.isSocket()) throw new Error("Refusing to replace a non-socket path");
@@ -612,46 +618,161 @@ function number(name: string, value: string | undefined, fallback: number, min: 
   return parsed;
 }
 
+function flag(name: string, value: string | undefined, fallback: boolean): boolean {
+  if (value === undefined || value.trim() === "") return fallback;
+  const normalized = value.trim().toLowerCase();
+  if (["1", "true", "yes", "on"].includes(normalized)) return true;
+  if (["0", "false", "no", "off"].includes(normalized)) return false;
+  throw new Error(`${name}: expected a boolean, got ${JSON.stringify(value)}`);
+}
+
 /**
- * Runner options from the agent-exec environment, or `undefined` when
- * `AGENT_EXEC_METRIC_SOCKET` is set but blank (the runner is disabled).
+ * Runner options from the metric-runner container's environment
+ * (`METRIC_RUNNER_*`). `root` is the default of `METRIC_RUNNER_ISOLATE_USERS`:
+ * per-job uids need root to `setpriv`.
  */
 export function metricRunnerOptionsFromEnv(
   env: Record<string, string | undefined>,
-  isolateUsers: boolean,
-): MetricRunnerOptions | undefined {
-  const socketPath = env.AGENT_EXEC_METRIC_SOCKET ?? DEFAULT_METRIC_SOCKET;
-  if (socketPath.trim() === "") return undefined;
+  root: boolean,
+): MetricRunnerOptions {
   const text = (name: string, fallback: string) => (env[name]?.trim() ? env[name]!.trim() : fallback);
   return {
-    socketPath,
-    socketGid: number("AGENT_EXEC_METRIC_SOCKET_GID", env.AGENT_EXEC_METRIC_SOCKET_GID, 0, 0, true),
-    isolateUsers,
-    python: text("AGENT_EXEC_METRIC_PYTHON", DEFAULT_METRIC_PYTHON),
-    pythonPath: text("AGENT_EXEC_METRIC_PYTHONPATH", DEFAULT_METRIC_PYTHONPATH),
-    jobRoot: text("AGENT_EXEC_METRIC_JOB_ROOT", DEFAULT_METRIC_JOB_ROOT),
-    concurrency: number("AGENT_EXEC_METRIC_CONCURRENCY", env.AGENT_EXEC_METRIC_CONCURRENCY, DEFAULT_METRIC_CONCURRENCY, 1, true),
-    queueLimit: number("AGENT_EXEC_METRIC_QUEUE_LIMIT", env.AGENT_EXEC_METRIC_QUEUE_LIMIT, DEFAULT_METRIC_QUEUE_LIMIT, 0, true),
+    socketPath: text("METRIC_RUNNER_SOCKET", DEFAULT_METRIC_SOCKET),
+    socketGid: number("METRIC_RUNNER_SOCKET_GID", env.METRIC_RUNNER_SOCKET_GID, 0, 0, true),
+    isolateUsers: flag("METRIC_RUNNER_ISOLATE_USERS", env.METRIC_RUNNER_ISOLATE_USERS, root),
+    python: text("METRIC_RUNNER_PYTHON", DEFAULT_METRIC_PYTHON),
+    pythonPath: text("METRIC_RUNNER_PYTHONPATH", DEFAULT_METRIC_PYTHONPATH),
+    jobRoot: text("METRIC_RUNNER_JOB_ROOT", DEFAULT_METRIC_JOB_ROOT),
+    concurrency: number("METRIC_RUNNER_CONCURRENCY", env.METRIC_RUNNER_CONCURRENCY, DEFAULT_METRIC_CONCURRENCY, 1, true),
+    queueLimit: number("METRIC_RUNNER_QUEUE_LIMIT", env.METRIC_RUNNER_QUEUE_LIMIT, DEFAULT_METRIC_QUEUE_LIMIT, 0, true),
     queueWaitSeconds: number(
-      "AGENT_EXEC_METRIC_QUEUE_WAIT_SECONDS",
-      env.AGENT_EXEC_METRIC_QUEUE_WAIT_SECONDS,
+      "METRIC_RUNNER_QUEUE_WAIT_SECONDS",
+      env.METRIC_RUNNER_QUEUE_WAIT_SECONDS,
       DEFAULT_METRIC_QUEUE_WAIT_SECONDS,
       0,
       false,
     ),
     maxTimeoutSeconds: number(
-      "AGENT_EXEC_METRIC_MAX_TIMEOUT_SECONDS",
-      env.AGENT_EXEC_METRIC_MAX_TIMEOUT_SECONDS,
+      "METRIC_RUNNER_MAX_TIMEOUT_SECONDS",
+      env.METRIC_RUNNER_MAX_TIMEOUT_SECONDS,
       DEFAULT_METRIC_MAX_TIMEOUT_SECONDS,
       MIN_METRIC_TIMEOUT_SECONDS,
       false,
     ),
     maxMemoryMb: number(
-      "AGENT_EXEC_METRIC_MAX_MEMORY_MB",
-      env.AGENT_EXEC_METRIC_MAX_MEMORY_MB,
+      "METRIC_RUNNER_MAX_MEMORY_MB",
+      env.METRIC_RUNNER_MAX_MEMORY_MB,
       DEFAULT_METRIC_MAX_MEMORY_MB,
       MIN_METRIC_MEMORY_MB,
       true,
     ),
   };
+}
+
+/*
+ * Memory budget. A worker's RLIMIT_AS is its virtual size after preloading
+ * numpy and scipy plus `memory_mb`, so the memory a job can add on top of its
+ * baseline resident set is at most `memory_mb`. Every job and the supervisor
+ * share the container's memory cgroup, which also charges the /tmp tmpfs.
+ * The baselines are Linux measurements in the metric-runner image (python
+ * 3.11, numpy 2, scipy 1.16, pint), rounded up generously; see "Memory budget"
+ * in docs/developer-guide/architecture/metric-scripts.md for the numbers.
+ */
+/** Resident set of one worker after its imports, before the script runs. */
+export const WORKER_BASELINE_RSS_MB = 128;
+/** Resident set of the bun supervisor with its queue and buffers. */
+export const SUPERVISOR_RSS_MB = 128;
+
+const MIB = 1024 * 1024;
+/** cgroup v1 reports "no limit" as a page-rounded 2^63 - 1. */
+const UNLIMITED_BYTES = 2 ** 60;
+
+export interface MemoryBudgetInput {
+  concurrency: number;
+  maxMemoryMb: number;
+  /** The container's memory limit, or `undefined` when there is none or it is unreadable. */
+  limitMb: number | undefined;
+  /** Size of the /tmp tmpfs, whose pages count against the same limit. */
+  tmpfsMb: number;
+  workerBaselineMb?: number;
+  supervisorMb?: number;
+}
+
+export interface MemoryBudget {
+  /** Worst case when every slot runs a job that uses its whole allowance. */
+  requiredMb: number;
+  limitMb: number | undefined;
+  /** `undefined` when the limit is unknown. */
+  fits: boolean | undefined;
+  message: string;
+}
+
+/** Compare the worst-case memory of the configured slots with the container limit. */
+export function memoryBudget(input: MemoryBudgetInput): MemoryBudget {
+  const baseline = input.workerBaselineMb ?? WORKER_BASELINE_RSS_MB;
+  const supervisor = input.supervisorMb ?? SUPERVISOR_RSS_MB;
+  const requiredMb = input.concurrency * (input.maxMemoryMb + baseline) + supervisor + input.tmpfsMb;
+  const formula =
+    `${input.concurrency} jobs x (${input.maxMemoryMb} MiB script + ${baseline} MiB worker baseline)` +
+    ` + ${supervisor} MiB supervisor + ${input.tmpfsMb} MiB /tmp = ${requiredMb} MiB`;
+  if (input.limitMb === undefined) {
+    return { requiredMb, limitMb: undefined, fits: undefined, message: `memory budget ${formula}; container limit unknown` };
+  }
+  const fits = requiredMb <= input.limitMb;
+  const message = fits
+    ? `memory budget ${formula} of a ${input.limitMb} MiB container limit`
+    : `memory budget ${formula} exceeds the ${input.limitMb} MiB container limit: jobs that use their whole ` +
+      "allowance at once can be OOM-killed (the job fails; the runner stays up). Lower " +
+      "METRIC_RUNNER_CONCURRENCY or METRIC_RUNNER_MAX_MEMORY_MB, or raise METRIC_RUNNER_MEMORY_LIMIT";
+  return { requiredMb, limitMb: input.limitMb, fits, message };
+}
+
+/** A cgroup memory limit file's content in MiB, or `undefined` for "max" or nonsense. */
+export function parseCgroupMemoryLimit(text: string): number | undefined {
+  const value = text.trim();
+  if (!/^\d+$/.test(value)) return undefined;
+  const bytes = Number(value);
+  if (!Number.isFinite(bytes) || bytes <= 0 || bytes >= UNLIMITED_BYTES) return undefined;
+  return Math.floor(bytes / MIB);
+}
+
+/** The size of the tmpfs mounted at `mountPoint`, in MiB, from /proc/mounts content. */
+export function parseTmpfsSizeMb(mounts: string, mountPoint = "/tmp"): number | undefined {
+  for (const line of mounts.split("\n")) {
+    const [, target, type, options] = line.split(" ");
+    if (target !== mountPoint || type !== "tmpfs" || options === undefined) continue;
+    const size = /(?:^|,)size=(\d+)([kmg]?)(?:,|$)/.exec(options);
+    if (!size) return undefined;
+    const scale = { "": 1 / MIB, k: 1 / 1024, m: 1, g: 1024 }[size[2] as "" | "k" | "m" | "g"];
+    return Math.ceil(Number(size[1]) * scale);
+  }
+  return undefined;
+}
+
+/** The container's memory limit in MiB (cgroup v2, then v1), or `undefined`. */
+export function containerMemoryLimitMb(): number | undefined {
+  for (const path of ["/sys/fs/cgroup/memory.max", "/sys/fs/cgroup/memory/memory.limit_in_bytes"]) {
+    try {
+      return parseCgroupMemoryLimit(readFileSync(path, "utf8"));
+    } catch {
+      // Not this cgroup version, or not Linux.
+    }
+  }
+  return undefined;
+}
+
+/** The budget of `options` against this container; logged once at startup. */
+export function containerMemoryBudget(options: MetricRunnerOptions): MemoryBudget {
+  let tmpfsMb = 0;
+  try {
+    tmpfsMb = parseTmpfsSizeMb(readFileSync("/proc/mounts", "utf8")) ?? 0;
+  } catch {
+    // Not Linux: no tmpfs to count.
+  }
+  return memoryBudget({
+    concurrency: options.concurrency ?? DEFAULT_METRIC_CONCURRENCY,
+    maxMemoryMb: options.maxMemoryMb ?? DEFAULT_METRIC_MAX_MEMORY_MB,
+    limitMb: containerMemoryLimitMb(),
+    tmpfsMb,
+  });
 }
