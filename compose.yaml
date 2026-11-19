@@ -216,6 +216,8 @@ services:
       - ${CONFIG_PATH:-./config/qubex-config}:/app/config/qubex-config # Qubex backend configuration repository/data
       - api-logs:/app/logs
       - agent-runtime-auth:/run/agent-runtime-auth:ro
+      # The metric runner's socket (agent-exec): metric scripts run there, not in the API.
+      - agent-exec-socket:/run/agent-exec:ro
       # Read-only source the Copilot searches when it investigates a failure
       - ./src/qdash:/app/source/qdash:ro
       - ${CALIBTASKS_PATH:-./src/qdash/workflow/calibtasks}:/app/source/qdash/workflow/calibtasks:ro
@@ -241,6 +243,8 @@ services:
         condition: service_completed_successfully
       agent-runtime-auth:
         condition: service_completed_successfully
+      agent-exec:
+        condition: service_started
     environment:
       - PYTHONPATH=/app:/app/qdash:/app/qdash/api:/app/qdash/dbmodel:/app/qdash/datamodel:/app/qdash
       - QDASH_SOURCE_ROOT=/app/source/qdash
@@ -251,6 +255,7 @@ services:
       - PI_AGENT_RUNTIME_URL=http://agent-runtime:${AGENT_RUNTIME_PORT:-8002}
       - AGENT_RUNTIME_TOKEN=${AGENT_RUNTIME_TOKEN:-}
       - AGENT_RUNTIME_TOKEN_FILE=/run/agent-runtime-auth/token
+      - METRIC_RUNNER_SOCKET=/run/agent-exec/metric.sock
     networks:
       - custom_net
   agent-runtime-auth:
@@ -345,7 +350,10 @@ services:
     # env_file) and has no network. A Unix socket restricted to the runtime's
     # group (bun, gid 1000) prevents workspace users from impersonating others.
     # The server starts one pi-env daemon per conversation as that user's own
-    # uid; see docs/developer-guide/copilot/workspace.md.
+    # uid; see docs/developer-guide/copilot/workspace.md. It also runs the API's
+    # metric script jobs (validate, evaluate) on a second socket, metric.sock,
+    # open to root only: each job runs as a per-slot uid and reads data only
+    # through the API's broker.
     build:
       context: .
       dockerfile: ./agent-runtime/exec/Dockerfile
@@ -356,9 +364,19 @@ services:
     volumes:
       - agent-exec-workspace:/workspace
       - agent-exec-socket:/run/agent-exec
+      # Live metric worker source, the same pattern the api service uses;
+      # production images build this copy in (exec/Dockerfile).
+      - ./src/qdash/api/metric_runtime:/app/metric-runtime/qdash/api/metric_runtime:ro
     environment:
       - AGENT_EXEC_SOCKET=/run/agent-exec/exec.sock
       - AGENT_EXEC_SOCKET_GID=1000
+      - AGENT_EXEC_METRIC_SOCKET=/run/agent-exec/metric.sock
+      # Runner limits come from .env by substitution (this service reads no env_file).
+      - AGENT_EXEC_METRIC_CONCURRENCY=${AGENT_EXEC_METRIC_CONCURRENCY:-2}
+      - AGENT_EXEC_METRIC_QUEUE_LIMIT=${AGENT_EXEC_METRIC_QUEUE_LIMIT:-16}
+      - AGENT_EXEC_METRIC_QUEUE_WAIT_SECONDS=${AGENT_EXEC_METRIC_QUEUE_WAIT_SECONDS:-5}
+      - AGENT_EXEC_METRIC_MAX_TIMEOUT_SECONDS=${AGENT_EXEC_METRIC_MAX_TIMEOUT_SECONDS:-300}
+      - AGENT_EXEC_METRIC_MAX_MEMORY_MB=${AGENT_EXEC_METRIC_MAX_MEMORY_MB:-2048}
     # Root only to chown each owner's directory and drop to that uid (setpriv).
     cap_drop:
       - ALL
@@ -376,6 +394,7 @@ services:
         limits:
           pids: 512
           memory: ${AGENT_EXEC_MEMORY_LIMIT:-2g}
+          cpus: ${AGENT_EXEC_CPU_LIMIT:-2}
     network_mode: none
   ui:
     build:

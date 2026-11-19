@@ -208,7 +208,9 @@ A single `history()` read covers at most 400 days and 5,000 measurements, and on
 most 2,000 data reads. A longer span is cut to its most recent 400 days and the preview says so;
 exceeding a count marks the affected targets as errors naming the limit. Narrow the period, or
 read each metric once and reuse it. When several people preview at the same time, a run can be
-refused because the queue is full; try again a moment later.
+refused because the queue is full; try again a moment later. When the container that runs
+scripts is down, validation, saving and previews report that the metric script runner is not
+available and nothing is saved; ask an administrator.
 
 These limits protect the server from mistakes in trusted project members' code; they are not a
 security boundary for untrusted code.

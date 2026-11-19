@@ -8,8 +8,9 @@ from typing import Any
 import pytest
 
 from qdash.api.metric_runtime import executor
-from qdash.api.metric_runtime.executor import QueueFullError
+from qdash.api.metric_runtime.executor import QueueFullError, RunnerUnavailableError
 from qdash.api.metric_runtime.template_library import TEMPLATES
+from qdash.api.services import metric_script_service
 from qdash.common.config.topology import load_topology
 from qdash.common.utils.datetime import now
 from qdash.datamodel.note import NoteModel
@@ -489,8 +490,86 @@ def test_queue_full_returns_429(test_client, users, monkeypatch):
     assert response.json()["detail"] == "Metric script evaluation queue is full"
 
 
-def test_zx90_median_end_to_end_with_real_worker(test_client, users):
+def test_runner_unavailable_returns_503_and_records_nothing(
+    test_client, users, runtime, monkeypatch
+):
+    _seed_chip()
+    editor = users["editor"]
+    script = _create(test_client, editor)
+    script_id = script["script_id"]
+
+    def down(*_args: Any, **_kwargs: Any) -> Any:
+        raise RunnerUnavailableError("The metric script runner is not available")
+
+    monkeypatch.setattr(executor, "run_worker", down)
+    # Template sources are cached after their first validation; start cold.
+    monkeypatch.setattr(metric_script_service, "_template_validation_cache", {})
+
+    def assert_unavailable(response: Any) -> None:
+        assert response.status_code == 503, response.text
+        assert response.json()["detail"] == {
+            "message": "The metric script runner is not available",
+            "diagnostics": [],
+            "log": "",
+        }
+
+    assert_unavailable(
+        test_client.post("/metric-scripts/validate", json={"source": RATIO}, headers=editor)
+    )
+
+    # Neither a new script nor a new revision is recorded while the runner is down.
+    assert_unavailable(
+        test_client.post("/metric-scripts", json={"name": "New", "source": RATIO}, headers=editor)
+    )
+    assert_unavailable(
+        test_client.post(
+            "/metric-scripts", json={"name": "T", "template_id": "zx90_median"}, headers=editor
+        )
+    )
+    assert_unavailable(
+        test_client.patch(
+            f"/metric-scripts/{script_id}", json={"source": RATIO + "\n# v2\n"}, headers=editor
+        )
+    )
+    saved = test_client.get(f"/metric-scripts/{script_id}", headers=editor).json()
+    assert saved["revision"] == 1
+    assert saved["status"] == "valid"
+    assert len(saved["revisions"]) == 1
+    assert test_client.get("/metric-scripts", headers=editor).json()["total"] == 1
+
+    # Dashboard templates create their scripts through the same validation.
+    assert_unavailable(
+        test_client.post(
+            "/custom-dashboards",
+            json={"name": "Collisions", "panels": [], "template_id": "frequency-collision-map"},
+            headers=users["owner"],
+        )
+    )
+    assert test_client.get("/metric-scripts", headers=users["owner"]).json()["total"] == 0
+
+    body = {"metric_id": "scaled_frequency", "chip_id": "chip-1"}
+    assert_unavailable(
+        test_client.post("/metric-scripts/evaluate", json={**body, "source": RATIO}, headers=editor)
+    )
+    assert_unavailable(
+        test_client.post(f"/metric-scripts/{script_id}/evaluate", json=body, headers=editor)
+    )
+
+
+def test_missing_runner_socket_returns_503(test_client, users, monkeypatch, tmp_path):
+    """The real executor in socket mode, with nothing listening at the socket path."""
+    monkeypatch.setenv("METRIC_RUNNER_MODE", "socket")
+    monkeypatch.setenv("METRIC_RUNNER_SOCKET", str(tmp_path / "missing.sock"))
+    response = test_client.post(
+        "/metric-scripts/validate", json={"source": RATIO}, headers=users["editor"]
+    )
+    assert response.status_code == 503, response.text
+    assert "runner is not available" in response.json()["detail"]["message"]
+
+
+def test_zx90_median_end_to_end_with_real_worker(test_client, users, monkeypatch):
     """Runs the real worker subprocess against task results stored in the database."""
+    monkeypatch.setenv("METRIC_RUNNER_MODE", "local")
     _seed_chip()
     couplings = {f"{a}-{b}" for a, b in load_topology(TOPOLOGY).couplings}
     assert "0-1" in couplings

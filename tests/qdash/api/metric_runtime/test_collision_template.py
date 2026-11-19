@@ -261,7 +261,7 @@ def test_resolve_params_validates_names_and_ranges(definitions):
 
 
 def test_whole_chip_through_the_real_worker(evaluate):
-    settings = RuntimeSettings(timeout_seconds=60)
+    settings = RuntimeSettings(mode="local", timeout_seconds=60)
 
     def run(kind: str) -> dict[str, dict[str, Any]]:
         outcome = executor.evaluate(

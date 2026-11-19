@@ -133,6 +133,7 @@ history reads are capped at 5,000 records per call, 2,000 data requests per eval
 - A whole-run failure (HTTP 422 with `message`, `diagnostics`, `log`) means the script did not
   load, the metric or a parameter is invalid, or the run hit the timeout or memory limit.
 - HTTP 429 means the evaluation queue is full; wait and retry instead of changing the code.
+- HTTP 503 means the metric script runner (the `agent-exec` container) is not available; nothing was saved. Tell the user to retry later or ask an administrator; do not change the code.
 - HTTP 409 on save means the script changed since the revision you read (`expectedRevision`);
   read it again and merge rather than overwrite.
 

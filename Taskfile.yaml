@@ -223,6 +223,9 @@ tasks:
         /bin/sh -c '
         mkdir -p .tmp
         echo "$$" > .tmp/dev-api-local.pid
+        # This API is not in the api container, so it cannot reach the agent-exec
+        # metric runner socket: run metric scripts as local subprocesses (development only).
+        export METRIC_RUNNER_MODE="${METRIC_RUNNER_MODE:-local}"
         if [ "${QDASH_DEV_HOST:-}" = devcontainer ]; then
           bind="${QDASH_DEV_BIND:-0.0.0.0}"
           export MONGO_HOST=mongo PREFECT_API_URL=http://prefect-server:4200/api DEPLOYMENT_SERVICE_URL=http://deployment-service:8001 PI_AGENT_RUNTIME_URL="http://agent-runtime:${AGENT_RUNTIME_PORT:-8002}"

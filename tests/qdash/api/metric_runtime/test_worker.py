@@ -1,4 +1,4 @@
-"""Worker and executor tests that spawn the real worker subprocess."""
+"""Worker and executor tests that spawn the real worker subprocess (local mode)."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ from tests.qdash.api.metric_runtime.fakes import FakeBroker, grid_topology
 
 END = datetime(2026, 11, 20, tzinfo=UTC)
 START = END - timedelta(days=14)
-FAST = RuntimeSettings(timeout_seconds=30)
+FAST = RuntimeSettings(mode="local", timeout_seconds=30)
 
 
 def run(source: str, metric_id: str, broker: FakeBroker, **kwargs: Any) -> executor.WorkerOutcome:
@@ -259,7 +259,7 @@ def loop(target, ctx):
 
 
 def test_timeout_kills_the_worker():
-    settings = RuntimeSettings(timeout_seconds=1.5)
+    settings = RuntimeSettings(mode="local", timeout_seconds=1.5)
     started = time.monotonic()
     with pytest.raises(WorkerFailure, match="time limit"):
         run(LOOP, "loop", FakeBroker(topology=line_topology()), settings=settings)
@@ -283,7 +283,7 @@ def test_output_and_log_bounds():
     assert outcome.log_truncated is True
     assert len(outcome.log.encode()) <= 16 * 1024 + 64
     assert outcome.log.startswith("[Earlier log output truncated]")
-    tiny = RuntimeSettings(timeout_seconds=30, output_limit_bytes=2000)
+    tiny = RuntimeSettings(mode="local", timeout_seconds=30, output_limit_bytes=2000)
     with pytest.raises(WorkerFailure, match="output exceeded"):
         run(PRINTER, "printer", FakeBroker(topology=line_topology()), settings=tiny)
 
@@ -306,7 +306,7 @@ def test_worker_environment_is_scrubbed(monkeypatch):
 
 
 def test_queue_full_when_no_slot_frees_up():
-    settings = RuntimeSettings(concurrency=97, queue_wait_seconds=0.1)
+    settings = RuntimeSettings(mode="local", concurrency=97, queue_wait_seconds=0.1)
     slots = executor._semaphore(97)
     taken = [slots.acquire(timeout=1) for _ in range(97)]
     try:
@@ -326,3 +326,25 @@ def test_settings_from_environment(monkeypatch):
     assert settings.timeout_seconds == 12
     assert settings.memory_mb == 512
     assert settings.concurrency == executor.DEFAULT_CONCURRENCY
+
+
+def test_default_settings_use_the_runner_socket(monkeypatch):
+    monkeypatch.delenv("METRIC_RUNNER_MODE", raising=False)
+    monkeypatch.delenv("METRIC_RUNNER_SOCKET", raising=False)
+    assert RuntimeSettings().mode == "socket"
+    settings = executor.load_settings()
+    assert settings.mode == "socket"
+    assert settings.socket_path == "/run/agent-exec/metric.sock"
+
+
+def test_runner_mode_and_socket_from_environment(monkeypatch):
+    monkeypatch.setenv("METRIC_RUNNER_MODE", " Local ")
+    monkeypatch.setenv("METRIC_RUNNER_SOCKET", "/tmp/qdash-metric.sock")
+    settings = executor.load_settings()
+    assert settings.mode == "local"
+    assert settings.socket_path == "/tmp/qdash-metric.sock"
+    monkeypatch.setenv("METRIC_RUNNER_MODE", "bogus")
+    monkeypatch.setenv("METRIC_RUNNER_SOCKET", " ")
+    settings = executor.load_settings()
+    assert settings.mode == "socket"
+    assert settings.socket_path == executor.DEFAULT_SOCKET_PATH

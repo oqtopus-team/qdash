@@ -18,6 +18,7 @@ from qdash.api.metric_runtime.broker import (
 from qdash.api.metric_runtime.executor import (
     MetricRuntimeError,
     QueueFullError,
+    RunnerUnavailableError,
     ScriptFailure,
     WorkerFailure,
 )
@@ -99,6 +100,11 @@ def _check_source_size(source: str) -> None:
 def _raise_runtime(exc: MetricRuntimeError) -> NoReturn:
     if isinstance(exc, QueueFullError):
         raise HTTPException(status_code=429, detail="Metric script evaluation queue is full")
+    if isinstance(exc, RunnerUnavailableError):
+        raise HTTPException(
+            status_code=503,
+            detail={"message": exc.message, "diagnostics": [], "log": ""},
+        )
     raise HTTPException(
         status_code=422,
         detail={
@@ -112,8 +118,12 @@ def _raise_runtime(exc: MetricRuntimeError) -> NoReturn:
 def validate_source(source: str) -> ValidationResult:
     """Compile ``source`` in a worker and return its catalog or diagnostics.
 
+    Nothing is returned when the script did not run, so a save never records an invalid
+    revision because the runner was busy or down.
+
     Raises:
-        HTTPException: 429 when the evaluation queue is full.
+        HTTPException: 429 when the evaluation queue is full, 503 when the metric runner
+            is not available.
     """
     is_template = any(source == template.source for template in TEMPLATES.values())
     key = hashlib.sha256(source.encode("utf-8")).hexdigest()
@@ -121,7 +131,7 @@ def validate_source(source: str) -> ValidationResult:
         return _template_validation_cache[key]
     try:
         outcome = executor.catalog(source)
-    except QueueFullError as exc:
+    except (QueueFullError, RunnerUnavailableError) as exc:
         _raise_runtime(exc)
     except ScriptFailure as exc:
         diagnostics = [ScriptDiagnostic.model_validate(d) for d in exc.diagnostics] or [

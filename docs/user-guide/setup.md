@@ -153,19 +153,37 @@ docker compose up -d ui
 
 ### Limit Metric Script Runs
 
-[Metric scripts](./metric-scripts.md) run in a separate process on the API server for each
-validation and preview. Set these in `.env` to change their limits, then apply them with
-`docker compose up -d api`, which recreates the API container with the new environment.
+[Metric scripts](./metric-scripts.md) run in the `agent-exec` container, the same container as
+the Copilot workspace, with no network and no credentials; the API sends each validation and
+preview there and answers the script's data requests itself. Set these in `.env` to change
+their limits, then apply them with `docker compose up -d api agent-exec`.
 
 | Variable | Meaning | Default |
 | --- | --- | --- |
 | `METRIC_SCRIPT_TIMEOUT_SECONDS` | Wall-clock limit of one run, in seconds | `60` |
-| `METRIC_SCRIPT_MEMORY_MB` | Memory a script may use on top of the Python baseline, in MiB, on hosts that support the limit | `1024` |
-| `METRIC_SCRIPT_CONCURRENCY` | Runs at once per API process; a run that waits more than five seconds for a slot is refused | `2` |
+| `METRIC_SCRIPT_MEMORY_MB` | Memory a script may use on top of the Python baseline, in MiB | `1024` |
+| `AGENT_EXEC_CPU_LIMIT` | CPUs of the `agent-exec` container, shared by metric script runs and Copilot workspaces | `2` |
+| `AGENT_EXEC_MEMORY_LIMIT` | Memory of the `agent-exec` container, shared the same way | `2g` |
 
-Scripts are written by project editors and owners. The run holds no database or API
-credentials, but it is not isolated from the network or from files the API container can read;
-see [Metric Scripts architecture](../developer-guide/architecture/metric-scripts.md#isolation-and-threat-model)
+The metric runner in `agent-exec` has its own limits, also set in `.env`:
+
+| Variable | Meaning | Default |
+| --- | --- | --- |
+| `AGENT_EXEC_METRIC_CONCURRENCY` | Runs at once across the whole deployment | `2` |
+| `AGENT_EXEC_METRIC_QUEUE_LIMIT` | Runs allowed to wait for a free slot; more are refused | `16` |
+| `AGENT_EXEC_METRIC_QUEUE_WAIT_SECONDS` | How long a run waits for a slot before it is refused | `5` |
+| `AGENT_EXEC_METRIC_MAX_TIMEOUT_SECONDS` | Highest time limit the runner accepts; a larger `METRIC_SCRIPT_TIMEOUT_SECONDS` is lowered to it | `300` |
+| `AGENT_EXEC_METRIC_MAX_MEMORY_MB` | Highest memory limit the runner accepts; a larger `METRIC_SCRIPT_MEMORY_MB` is lowered to it | `2048` |
+
+A refused run shows that the queue is full; try again shortly. When the `agent-exec` container
+is not running, validation, saving a script and previews fail with a message that the metric
+script runner is not available (HTTP 503), and nothing is saved. Leave `METRIC_RUNNER_MODE`
+unset: its `local` value, used by the host-side development API, runs scripts inside the API
+without this isolation.
+
+Scripts are written by project editors and owners. Each run has its own user in `agent-exec`,
+but it shares that container's CPU and memory with other runs and with Copilot workspaces; see
+[Metric Scripts architecture](../developer-guide/architecture/metric-scripts.md#isolation-and-threat-model)
 before opening editing to people you would not give shell access.
 
 ### Run Several Deployments on One Host

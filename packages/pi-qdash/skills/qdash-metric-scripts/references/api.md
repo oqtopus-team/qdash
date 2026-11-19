@@ -166,13 +166,14 @@ fail the evaluation (HTTP 422) and fail a dashboard save. Each panel stores its 
   other modules, no relative imports, no other scripts.
 - Disabled builtins: `open`, `exec`, `eval`, `compile`, `input`, `breakpoint`, `help`,
   `exit`, `quit`; `__import__` is checked.
-- No network, database or API access: the data broker in the API process is the only data
-  path, scoped to the caller's project and the evaluated chip.
+- Scripts run in the deployment's `agent-exec` container as a per-run user, with no network,
+  database or API access: the data broker in the API process is the only data path, scoped to
+  the caller's project and the evaluated chip.
 - Limits (deployment defaults): 60 s wall clock (`METRIC_SCRIPT_TIMEOUT_SECONDS`), 1024 MiB
-  of extra address space (`METRIC_SCRIPT_MEMORY_MB`, where the OS supports it), two concurrent
-  runs per API process (`METRIC_SCRIPT_CONCURRENCY`), 8 MiB protocol output, 16 KiB of
-  `print` log, 256 KiB of source. Broker caps: 5,000 records per `history()` call, 2,000 data
-  requests per evaluation, 400-day history span.
+  of extra address space (`METRIC_SCRIPT_MEMORY_MB`), two concurrent runs across the whole
+  deployment with a global queue (`AGENT_EXEC_METRIC_CONCURRENCY`), 8 MiB protocol output,
+  16 KiB of `print` log, 256 KiB of source. Broker caps: 5,000 records per `history()` call,
+  2,000 data requests per evaluation, 400-day history span.
 
 ### Failures
 
@@ -182,7 +183,11 @@ fail the evaluation (HTTP 422) and fail a dashboard save. Each panel stores its 
 - **Whole-run failure** (HTTP 422, `detail = {message, diagnostics, log}`): the script does
   not compile or violates the import policy, the metric ID or a parameter is invalid, the
   legend is invalid, or the worker hit the timeout, memory or output limit.
-- **HTTP 429**: the evaluation queue is full (all worker slots busy for 5 s). Retry later.
+- **HTTP 429**: the evaluation queue is full (all worker slots busy for 5 s, or too many runs
+  waiting). Retry later.
+- **HTTP 503**: the metric script runner is unavailable; nothing ran and a save recorded
+  nothing. Retry later or ask an administrator to check the `agent-exec` service; do not
+  change the script.
 - **HTTP 409** on save: `expected_revision` no longer matches; on evaluation: the chip has no
   usable topology.
 

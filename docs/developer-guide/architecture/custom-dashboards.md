@@ -10,9 +10,10 @@ of a user-authored [metric script](./metric-scripts.md). The user procedures are
 
 The API owns persistence, visibility, and validation of dashboards and metric scripts. It stores
 no measured values and no computed results: a dashboard describes what to show, a script defines
-how to compute it, and every panel evaluates when it renders. The metric script runtime
-(`src/qdash/api/metric_runtime/`, described in [Metric Scripts](./metric-scripts.md)) owns code
-execution. The UI owns layout editing, the script editor, and rendering of evaluation results.
+how to compute it, and every panel evaluates when it renders. The metric script runtime owns
+code execution: the API's executor and data broker (`src/qdash/api/metric_runtime/`) and the
+metric runner in the `agent-exec` container, described in [Metric Scripts](./metric-scripts.md).
+The UI owns layout editing, the script editor, and rendering of evaluation results.
 
 ## Documents
 

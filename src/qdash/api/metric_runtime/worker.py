@@ -1,8 +1,9 @@
 """Metric script worker process: ``python -m qdash.api.metric_runtime.worker``.
 
-The executor spawns one worker per validation or evaluation. The worker holds no
-credentials, database connection or API client; everything it reads comes through the
-data broker protocol below.
+The metric runner in agent-exec (or the executor's development-only local mode) spawns
+one worker per validation or evaluation. The worker holds no credentials, database
+connection or API client; everything it reads comes through the data broker protocol
+below.
 
 Protocol (line-delimited UTF-8 JSON over the worker's stdin and stdout):
 
@@ -361,6 +362,9 @@ def _private_streams() -> tuple[IO[str], IO[str]]:
 
 
 def main() -> None:
+    # Files the script creates (numpy.save, matplotlib caches) stay private to the
+    # job's uid, even in a shared /tmp, until the supervisor sweeps them.
+    os.umask(0o077)
     output, answers = _private_streams()
     channel = Channel(output, answers)
     log = BoundedLog()

@@ -7,14 +7,16 @@
  * as the owner's own uid (`setpriv`) in a 0700 directory, so one user's shell
  * cannot read another user's files. The container holds no QDash credentials
  * and reaches no QDash service. A Unix socket writable only by the runtime's
- * group prevents workspace users from choosing another owner. See
- * docs/developer-guide/copilot/workspace.md.
+ * group prevents workspace users from choosing another owner. The same
+ * process also serves the API's metric script jobs on a second socket
+ * (metric-runner.ts). See docs/developer-guide/copilot/workspace.md.
  */
 import { spawn, type ChildProcess } from "node:child_process";
 import { chmodSync, chownSync, lstatSync, mkdirSync, readdirSync, unlinkSync } from "node:fs";
 import { createServer, type Server, type Socket } from "node:net";
 import { dirname, join } from "node:path";
 
+import { metricRunnerOptionsFromEnv, startMetricRunner } from "./metric-runner.ts";
 import { DEFAULT_EXEC_SOCKET, HELLO_MAX_BYTES, ownerUid, parseHello, UID_BASE, UID_SPAN, workspaceName } from "./protocol.ts";
 
 export interface ExecServerOptions {
@@ -38,7 +40,9 @@ export interface ExecServer {
 export async function startExecServer(options: ExecServerOptions): Promise<ExecServer> {
   const log = options.log ?? ((message: string) => console.log(`[agent-exec] ${message}`));
   mkdirSync(options.workspaceRoot, { recursive: true });
-  if (options.isolateUsers) chmodSync(options.workspaceRoot, 0o755);
+  // Traverse without listing: daemons reach their own directory, while metric
+  // job uids (metric-runner.ts) cannot enumerate owner directory names.
+  if (options.isolateUsers) chmodSync(options.workspaceRoot, 0o711);
   const socketDir = dirname(options.socketPath);
   mkdirSync(socketDir, { recursive: true });
   chmodSync(socketDir, 0o750);
@@ -231,8 +235,17 @@ if (import.meta.main) {
     isolateUsers,
   });
   console.log(`[agent-exec] listening on ${server.socketPath}`);
+  // Metric script jobs for the API, on a second socket; blank AGENT_EXEC_METRIC_SOCKET disables it.
+  const metricOptions = metricRunnerOptionsFromEnv(process.env, isolateUsers);
+  const metricRunner = metricOptions ? await startMetricRunner(metricOptions) : undefined;
+  if (metricRunner) {
+    if (!isolateUsers) {
+      console.warn("[agent-exec] running metric script jobs as the server's own user (no per-job isolation)");
+    }
+    console.log(`[agent-exec] metric runner listening on ${metricRunner.socketPath}`);
+  }
   const stop = () => {
-    void server.close().then(() => process.exit(0));
+    void Promise.all([server.close(), metricRunner?.close()]).then(() => process.exit(0));
   };
   process.on("SIGTERM", stop);
   process.on("SIGINT", stop);
