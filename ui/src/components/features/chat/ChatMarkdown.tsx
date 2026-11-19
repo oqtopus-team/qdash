@@ -1,29 +1,41 @@
 "use client";
 
-import { memo, useMemo } from "react";
+import { memo, useCallback, useMemo, useReducer, useState } from "react";
 import type React from "react";
-import {
-  Streamdown,
-  defaultComponents,
-  defaultRehypePlugins,
-  defaultUrlTransform,
-  useIsCodeFenceIncomplete,
-  type Components,
-  type ControlsConfig,
-  type ExtraProps,
-  type MermaidErrorComponentProps,
-  type PluginConfig,
-} from "streamdown";
-import remarkMath from "remark-math";
-import rehypeKatex from "rehype-katex";
+import { Markdown, type ControlsConfig } from "@pierre/words/react";
 import "katex/dist/katex.min.css";
-import { CodeBlock } from "@/components/features/chat/CodeBlock";
 import { useChatLinkPreview } from "@/components/features/chat/ChatLinkPreview";
+import {
+  ChatMermaidDialog,
+  type ChatMermaidDiagram,
+} from "@/components/features/chat/ChatMermaidDialog";
+import { useToast } from "@/components/ui/Toast";
 import { useIsDarkTheme } from "@/contexts/ThemeContext";
-import { createLazyMermaidPlugin } from "@/lib/chatMermaid";
+import {
+  chatMarkdownComponents,
+  createChatPlugins,
+  prepareChatMarkdown,
+  type MermaidAction,
+  type ChatDiagramCache,
+} from "@/lib/chatMarkdown";
+import { useCodeHighlighter } from "@/lib/highlight";
+import { resetDiagram, startDiagramPan, zoomDiagram, ZOOM_STEP } from "@/lib/chatMermaidView";
+import { copyText } from "@/lib/utils/clipboard";
 
-/** The href Streamdown gives a link whose URL has not finished streaming. */
-const INCOMPLETE_LINK = "streamdown:incomplete-link";
+export { normalizeMathDelimiters } from "@/lib/chatMarkdown";
+
+type PreviewHandle = ReturnType<typeof useChatLinkPreview>;
+
+/** Whether a click on `href` should open a preview instead of the browser's default. */
+function handlePreviewClick(
+  event: React.MouseEvent<HTMLElement>,
+  href: string | undefined,
+  preview: PreviewHandle,
+): void {
+  if (event.defaultPrevented || !href || !preview) return;
+  if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
+  if (preview.preview(href)) event.preventDefault();
+}
 
 /**
  * A link in an answer. QDash records (task results, executions, forum posts,
@@ -34,12 +46,10 @@ export function ChatLink({
   href,
   children,
   ...props
-}: React.AnchorHTMLAttributes<HTMLAnchorElement> & { children?: React.ReactNode }) {
+}: React.AnchorHTMLAttributes<HTMLAnchorElement> & {
+  children?: React.ReactNode;
+}) {
   const preview = useChatLinkPreview();
-  if (href === INCOMPLETE_LINK) {
-    // The URL is still arriving: show the label, link it once it is complete.
-    return <span data-incomplete="true">{children}</span>;
-  }
   return (
     <a
       href={href}
@@ -48,9 +58,7 @@ export function ChatLink({
       {...props}
       onClick={(event) => {
         props.onClick?.(event);
-        if (event.defaultPrevented || !href || !preview) return;
-        if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
-        if (preview.preview(href)) event.preventDefault();
+        handlePreviewClick(event, href, preview);
       }}
     >
       {children}
@@ -58,153 +66,26 @@ export function ChatLink({
   );
 }
 
-type CodeProps = React.JSX.IntrinsicElements["code"] & ExtraProps;
+// Copy only: the renderer's download button has no counterpart in chat.
+const controls: ControlsConfig = { code: { copy: true, download: false } };
 
-function codeText(children: React.ReactNode): string {
-  if (typeof children === "string") return children;
-  if (Array.isArray(children)) return children.map(codeText).join("");
-  return String(children ?? "");
-}
+const COPIED_MS = 2000;
 
-/** Fenced code: highlighted with copy, or a Mermaid diagram once its fence closes. */
-function ChatCodeBlock({ node, className, children, ...props }: CodeProps) {
-  const incomplete = useIsCodeFenceIncomplete();
-  const language = /language-([\w+-]+)/.exec(className ?? "")?.[1];
-  if (language === "mermaid" && !incomplete) {
-    const MermaidCode = defaultComponents.code;
-    return (
-      <MermaidCode node={node} className={className} {...props}>
-        {children}
-      </MermaidCode>
-    );
-  }
-  return (
-    <CodeBlock language={language} caret={incomplete}>
-      {codeText(children).replace(/\n$/, "")}
-    </CodeBlock>
-  );
-}
-
-function ChatInlineCode({ node: _node, className, children, ...props }: CodeProps) {
-  return (
-    <code className={`chat-inline-code ${className ?? ""}`} {...props}>
-      {children}
-    </code>
-  );
-}
-
-function ChatMarkdownLink({
-  node: _node,
-  href,
-  children,
-  ...props
-}: React.JSX.IntrinsicElements["a"] & ExtraProps) {
-  return (
-    <ChatLink href={href} {...props}>
-      {children}
-    </ChatLink>
-  );
-}
-
-function ChatTable({
-  node: _node,
-  children,
-  ...props
-}: React.JSX.IntrinsicElements["table"] & ExtraProps) {
-  return (
-    <div className="chat-table-wrap">
-      <table {...props}>{children}</table>
-    </div>
-  );
-}
-
-function ChatMermaidError({ chart, error }: MermaidErrorComponentProps) {
-  return (
-    <div className="my-3" data-testid="chat-mermaid-error">
-      <p className="mb-1 text-xs text-base-content/50">
-        This diagram could not be displayed: {error}
-      </p>
-      <CodeBlock language="mermaid">{chart}</CodeBlock>
-    </div>
-  );
-}
-
-/**
- * Typography comes from `prose` and `.chat-prose`, so prose elements render as
- * plain tags instead of Streamdown's own Tailwind styling. Paragraphs, `pre`
- * and footnote sections keep Streamdown's renderers, which unwrap code blocks.
- */
-const components: Components = {
-  a: ChatMarkdownLink,
-  code: ChatCodeBlock,
-  inlineCode: ChatInlineCode,
-  table: ChatTable,
-  thead: "thead",
-  tbody: "tbody",
-  tr: "tr",
-  th: "th",
-  td: "td",
-  h1: "h1",
-  h2: "h2",
-  h3: "h3",
-  h4: "h4",
-  h5: "h5",
-  h6: "h6",
-  ol: "ol",
-  ul: "ul",
-  li: "li",
-  hr: "hr",
-  strong: "strong",
-  blockquote: "blockquote",
-  sup: "sup",
-  sub: "sub",
-  img: "img",
-};
-
-/**
- * Sanitize and harden without `rehype-raw`: raw HTML in an answer shows as
- * text, as it did before, instead of becoming elements.
- */
-const rehypePlugins = [defaultRehypePlugins.sanitize, defaultRehypePlugins.harden];
-
-/**
- * remark-math and rehype-katex are the app's existing math pipeline. Streamdown
- * runs the math plugin after sanitizing, so KaTeX markup is kept.
- */
-const plugins: PluginConfig = {
-  math: {
-    name: "katex",
-    type: "math",
-    remarkPlugin: remarkMath,
-    rehypePlugin: [rehypeKatex, { throwOnError: false, strict: false }],
-  },
-  mermaid: createLazyMermaidPlugin(),
-};
-
-// Code copy, tables and links use QDash's own components; only diagrams use Streamdown's controls.
-const controls: ControlsConfig = {
-  code: false,
-  table: false,
-  image: false,
-  mermaid: { copy: true, download: false, fullscreen: true, panZoom: true },
-};
-
-const linkSafety = { enabled: false };
-
-/**
- * Models write LaTeX as \( \) and \[ \] as often as $ and $$, but remark-math
- * only understands dollars. Rewrite the bracket forms outside code spans.
- */
-export function normalizeMathDelimiters(markdown: string): string {
-  return markdown
-    .split(/(```[\s\S]*?(?:```|$)|`[^`\n]*`)/g)
-    .map((part, i) => {
-      if (i % 2 === 1) return part;
-      return part
-        .replace(/\\\[([\s\S]+?)\\\]/g, (_, expr: string) => `\n$$\n${expr.trim()}\n$$\n`)
-        .replace(/\\\(([\s\S]+?)\\\)/g, (_, expr: string) => `$${expr}$`);
-    })
-    .join("");
+/** Show "Copied" on a text button, or a pressed state on an icon button, for a moment. */
+function flashCopied(button: HTMLButtonElement): void {
+  if (button.dataset.copied) return;
+  button.dataset.copied = "true";
+  const label = button.getAttribute("aria-label");
+  const text = button.textContent;
+  const hasText = !button.querySelector("svg");
+  if (hasText) button.textContent = "Copied";
+  button.setAttribute("aria-label", "Copied");
+  window.setTimeout(() => {
+    delete button.dataset.copied;
+    if (hasText) button.textContent = text;
+    if (label === null) button.removeAttribute("aria-label");
+    else button.setAttribute("aria-label", label);
+  }, COPIED_MS);
 }
 
 interface ChatMarkdownProps {
@@ -218,38 +99,138 @@ interface ChatMarkdownProps {
   streaming?: boolean;
 }
 
-/** Markdown for chat answers: GFM, math, highlighted code and Mermaid diagrams. */
+/**
+ * Markdown for chat answers: GFM, math, highlighted code and Mermaid diagrams.
+ *
+ * @pierre/words owns the rendered DOM and patches only what changed as text
+ * streams in, so the interactive parts (link previews, copy buttons, diagram
+ * controls) are handled here by delegation instead of as React components.
+ */
 export const ChatMarkdown = memo(function ChatMarkdown({
   children,
   className,
   streaming = false,
 }: ChatMarkdownProps) {
   const isDark = useIsDarkTheme();
-  const mermaid = useMemo(
-    () => ({
-      config: { theme: isDark ? "dark" : "neutral" },
-      errorComponent: ChatMermaidError,
-    }),
-    [isDark],
+  const theme = isDark ? "dark" : "neutral";
+  const preview = useChatLinkPreview();
+  const toast = useToast();
+  const [fullscreen, setFullscreen] = useState<ChatMermaidDiagram | null>(null);
+  // Bumped when a diagram finishes rendering, so the renderer formats it again.
+  const [diagramRevision, diagramSettled] = useReducer((revision: number) => revision + 1, 0);
+
+  // Retain results for this mounted answer even after the shared cache evicts them.
+  const diagrams = useMemo<ChatDiagramCache>(
+    () => ({ results: new Map(), pending: new Set() }),
+    [theme],
   );
+  // Highlights replaces highlight.js once it has loaded.
+  const codeHighlighter = useCodeHighlighter(/`{3}|~{3}|(?:^|\n)(?: {4}|\t)/.test(children));
+  const plugins = useMemo(
+    () => createChatPlugins(theme, diagramSettled, diagrams),
+    // A new plugin object is what makes the renderer pick up a settled diagram
+    // or the loaded highlighter.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [theme, diagramRevision, diagrams, codeHighlighter],
+  );
+  const source = useMemo(() => prepareChatMarkdown(children, streaming), [children, streaming]);
+
+  const copy = useCallback(
+    (button: HTMLButtonElement, text: string, failure: string) => {
+      copyText(text).then(
+        () => flashCopied(button),
+        () => toast.error(failure),
+      );
+    },
+    [toast],
+  );
+
+  // Runs before the renderer's own copy handler, which only knows the async
+  // Clipboard API; copyText also works on plain-HTTP deployments.
+  const onClickCapture = useCallback(
+    (event: React.MouseEvent<HTMLDivElement>) => {
+      const target = event.target as Element;
+      const button = target.closest<HTMLButtonElement>("button[data-code-action]");
+      if (!button || !event.currentTarget.contains(button)) return;
+      event.stopPropagation();
+      if (button.disabled || button.dataset.codeAction !== "copy") return;
+      const block = button.closest<HTMLElement>('[data-markdown="code-block"]');
+      const code = block?.dataset.code ?? block?.querySelector("pre code")?.textContent ?? "";
+      copy(button, code, "Failed to copy code");
+    },
+    [copy],
+  );
+
+  const onClick = useCallback(
+    (event: React.MouseEvent<HTMLDivElement>) => {
+      const target = event.target as Element;
+      const action = target.closest<HTMLButtonElement>("button[data-mermaid-action]");
+      if (action && event.currentTarget.contains(action)) {
+        const frame = action.closest<HTMLElement>("[data-chat-mermaid]");
+        const viewport = frame?.querySelector<HTMLElement>("[data-mermaid-viewport]");
+        if (!frame || !viewport) return;
+        switch (action.dataset.mermaidAction as MermaidAction) {
+          case "zoom-in":
+            zoomDiagram(viewport, ZOOM_STEP);
+            break;
+          case "zoom-out":
+            zoomDiagram(viewport, 1 / ZOOM_STEP);
+            break;
+          case "reset":
+            resetDiagram(viewport);
+            break;
+          case "copy":
+            copy(action, frame.dataset.source ?? "", "Failed to copy diagram source");
+            break;
+          case "fullscreen": {
+            const canvas = viewport.querySelector("[data-mermaid-canvas]");
+            setFullscreen({
+              svg: canvas?.innerHTML ?? "",
+              source: frame.dataset.source ?? "",
+              // Focus returns here on close, or to the answer if streaming replaced it.
+              opener: action,
+              focusFallback: event.currentTarget,
+            });
+            break;
+          }
+        }
+        return;
+      }
+      const anchor = target.closest<HTMLAnchorElement>("a[href]");
+      if (anchor && event.currentTarget.contains(anchor)) {
+        handlePreviewClick(event, anchor.getAttribute("href") ?? undefined, preview);
+      }
+    },
+    [copy, preview],
+  );
+
+  const onPointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    const viewport = (event.target as Element).closest<HTMLElement>("[data-mermaid-viewport]");
+    if (viewport && event.currentTarget.contains(viewport)) {
+      startDiagramPan(viewport, event.nativeEvent);
+    }
+  }, []);
+
   return (
-    <Streamdown
-      // space-y-0 replaces Streamdown's block spacing; prose sets the margins.
-      className={`space-y-0 chat-prose prose prose-sm max-w-none ${className ?? ""}`}
-      mode={streaming ? "streaming" : "static"}
-      isAnimating={streaming}
-      parseIncompleteMarkdown={streaming}
-      caret={streaming ? "block" : undefined}
-      components={components}
-      rehypePlugins={rehypePlugins}
-      urlTransform={defaultUrlTransform}
-      plugins={plugins}
-      controls={controls}
-      linkSafety={linkSafety}
-      mermaid={mermaid}
-      lineNumbers={false}
-    >
-      {normalizeMathDelimiters(children)}
-    </Streamdown>
+    <>
+      <Markdown
+        className={`chat-prose prose prose-sm max-w-none ${className ?? ""}`}
+        mode={streaming ? "streaming" : "static"}
+        isAnimating={streaming}
+        caret={streaming ? "block" : undefined}
+        cjk
+        math
+        components={chatMarkdownComponents}
+        plugins={plugins}
+        controls={controls}
+        lineNumbers={false}
+        onClickCapture={onClickCapture}
+        onClick={onClick}
+        onPointerDown={onPointerDown}
+      >
+        {source}
+      </Markdown>
+      {fullscreen && <ChatMermaidDialog diagram={fullscreen} onClose={() => setFullscreen(null)} />}
+    </>
   );
 });
