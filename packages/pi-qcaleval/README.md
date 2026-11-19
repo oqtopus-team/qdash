@@ -80,7 +80,7 @@ explains how the runtime supplies figures and task knowledge.
 
 This package lives in the [QDash monorepo](https://github.com/oqtopus-team/qdash/tree/develop/packages/pi-qcaleval).
 Follow the [package development and release guide](https://oqtopus-team.github.io/qdash/developer-guide/copilot/packages)
-for workspace setup, checks, local pi CLI testing, and independent npm releases.
+for workspace setup, checks, local pi CLI testing, and npm releases, which share QDash's version.
 Open pull requests against QDash's `develop` branch and report bugs in
 [QDash issues](https://github.com/oqtopus-team/qdash/issues).
 

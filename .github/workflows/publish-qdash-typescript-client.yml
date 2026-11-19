@@ -1,21 +1,17 @@
 name: Publish @oqtopus-team/qdash-client
 
-# The TypeScript packages workflow owns PR/develop builds so packages share one client
-# version and cannot race a separate client publication for the same commit.
+# Only publish-typescript-packages.yml calls this workflow, for PR, develop, and release
+# tag builds, so packages share one client version. npm Trusted Publishing validates the
+# calling workflow's filename, so a direct trigger here could not publish. After a QDash
+# beta or stable npm publication, the publish job uploads a qdash-client-release record;
+# publish-qdash-client.yml builds the PyPI client from that record when this run completes.
 on:
-  push:
-    tags:
-      - "v[0-9]+.[0-9]+.[0-9]+"
-  workflow_dispatch:
   workflow_call:
     inputs:
       publish:
         description: Publish the built client before dependent pi packages
         type: boolean
         default: false
-    secrets:
-      NPM_TOKEN:
-        required: false
     outputs:
       version:
         description: Exact version of the client tarball from this run
@@ -32,6 +28,7 @@ jobs:
   build:
     outputs:
       version: ${{ steps.version.outputs.version }}
+      python: ${{ steps.version.outputs.python }}
       channel: ${{ steps.version.outputs.channel }}
     name: Build TypeScript client
     runs-on: ubuntu-latest
@@ -41,7 +38,7 @@ jobs:
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           persist-credentials: false
-          # Tags are needed to derive the beta version from the latest release.
+          # Tags and first-parent history derive the shared QDash client version.
           fetch-depth: 0
 
       - name: Set up Bun
@@ -107,15 +104,41 @@ jobs:
           path: dist
 
       - name: Publish package
-        # Keep token publishing until npm Trusted Publishing is configured.
-        # jactionlint ignore=use-trusted-publishing
+        # Authenticates with npm Trusted Publishing (OIDC) as the calling workflow.
         run: |
           case "$CLIENT_CHANNEL" in
-            latest|beta|pi) ;;
+            latest|beta) ;;
             *) echo "This build is validation-only" >&2; exit 1 ;;
           esac
+          # A beta version belongs to a commit, so a rerun finds it already published.
+          if [ "$(npm view "@oqtopus-team/qdash-client@$CLIENT_VERSION" version 2>/dev/null)" = "$CLIENT_VERSION" ]; then
+            echo "@oqtopus-team/qdash-client@$CLIENT_VERSION is already published"
+            exit 0
+          fi
           npm publish ./dist/oqtopus-team-qdash-client-*.tgz --access public --provenance --tag "$CLIENT_CHANNEL"
         env:
           CLIENT_CHANNEL: ${{ needs.build.outputs.channel }}
-          # Used only to bootstrap the package before npm Trusted Publishing can be configured.
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          CLIENT_VERSION: ${{ needs.build.outputs.version }}
+
+      # Hand this run's exact QDash version to the PyPI workflow.
+      - name: Write PyPI release record
+        run: |
+          mkdir release
+          jq -n --arg sha "$GITHUB_SHA" --arg ref "$GITHUB_REF" --arg run_id "$GITHUB_RUN_ID" \
+            --arg channel "$CLIENT_CHANNEL" --arg version "$CLIENT_VERSION" --arg python "$PYTHON_VERSION" \
+            '{sha: $sha, ref: $ref, run_id: $run_id, channel: $channel, version: $version, python: $python}' \
+            > release/release.json
+          cat release/release.json
+        env:
+          CLIENT_CHANNEL: ${{ needs.build.outputs.channel }}
+          CLIENT_VERSION: ${{ needs.build.outputs.version }}
+          PYTHON_VERSION: ${{ needs.build.outputs.python }}
+
+      - name: Upload PyPI release record
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: qdash-client-release
+          # A full rerun recomputes the version; the newest record replaces the old one.
+          overwrite: true
+          path: release/release.json
+          if-no-files-found: error

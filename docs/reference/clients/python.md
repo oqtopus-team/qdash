@@ -11,6 +11,19 @@ pip install qdash-client
 
 The distribution name is `qdash-client`; import it as `qdash.client`.
 
+Each QDash release tag `vX.Y.Z` publishes `qdash-client` `X.Y.Z` to PyPI, the same version as the
+[TypeScript client](./typescript.md). Each change on `develop` that publishes a
+[TypeScript client beta](./typescript.md#installation) also publishes a PEP 440 pre-release,
+`<next QDash patch>b<build>`, where `<build>` counts the first-parent commits on `develop` (for
+example `1.10.3b1278`); the TypeScript client spells the same build `1.10.3-beta.1278`. The
+Python release reuses the version computed for the npm release and publishes after it, so a
+version can reach npm before PyPI.
+pip installs pre-releases only on request:
+
+```bash
+pip install --pre qdash-client
+```
+
 ## Connect to a Deployment
 
 <a id="configuration"></a>

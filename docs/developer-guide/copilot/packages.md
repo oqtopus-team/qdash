@@ -1,13 +1,13 @@
 # Pi Packages
 
-QDash maintains two independently published pi extensions in its root Bun workspace,
+QDash maintains two separately published pi extensions in its root Bun workspace,
 alongside `agent-runtime/` and `clients/typescript/`. The runtime uses the source in the checkout; npm packages
 serve standalone pi CLI users.
 
-| Directory | npm package | Stable tag |
+| Directory | npm package | Stable release |
 | --- | --- | --- |
-| `packages/pi-qdash/` | `@oqtopus-team/pi-qdash` | `pi-qdash/vX.Y.Z` |
-| `packages/pi-qcaleval/` | `@oqtopus-team/pi-qcaleval` | `pi-qcaleval/vX.Y.Z` |
+| `packages/pi-qdash/` | `@oqtopus-team/pi-qdash` | QDash `vX.Y.Z` tag, as `X.Y.Z` |
+| `packages/pi-qcaleval/` | `@oqtopus-team/pi-qcaleval` | QDash `vX.Y.Z` tag, as `X.Y.Z` |
 
 pi-qdash depends on `@oqtopus-team/qdash-client` through `workspace:*`, so API,
 client, and tool changes can be tested in one PR. The root lockfile also owns the
@@ -49,50 +49,88 @@ metadata; npm releases use the versions described below.
 
 ## Distribution
 
-`.github/workflows/publish-typescript-packages.yml` follows the client workflows: validate
-PRs, publish beta builds from `develop`, and publish stable versions from tags.
-It calls `publish-qdash-typescript-client.yml` to build the matching client; when
-publishing pi-qdash, that call must publish the client successfully first.
-Both packages publish under `@oqtopus-team` with independent version lines.
+`.github/workflows/publish-typescript-packages.yml` is the common QDash release pipeline:
+it validates PRs, publishes beta builds from `develop`, and publishes stable versions
+from the QDash `vX.Y.Z` tag pushed after a release PR merges into `main`. Both pi
+packages and both clients share QDash's version, so one QDash tag releases all four as
+`X.Y.Z`; there are no package-specific release tags.
+It calls the reusable `publish-qdash-typescript-client.yml`, which has no triggers of its
+own, to build the matching client; when publishing pi-qdash, that call must publish the
+client successfully first.
+Both packages publish under `@oqtopus-team`.
 pi-qcaleval moves from `@orangekame3/pi-qcaleval` to `@oqtopus-team/pi-qcaleval`;
 pi-qdash keeps its existing name.
 
 | Trigger | Result |
 | --- | --- |
-| PR to `develop` affecting packages, client, API schema, runtime, root dependencies, or release workflow | Typecheck and test both packages and runtime; upload npm tarballs without publishing |
-| Push to `develop` affecting packages, client, API schema, root dependencies, or release workflow | Publish the matching client first, then both pi tarballs, with the `beta` dist-tag |
-| `pi-qdash/vX.Y.Z` or `pi-qcaleval/vX.Y.Z` tag | Validate both packages, then publish only the named package as `latest` |
+| PR to `develop` affecting packages, either client, API schema, runtime, root dependencies, or release workflow | Typecheck and test both packages and runtime; upload npm tarballs without publishing |
+| Push to `develop` affecting packages, either client, API schema, root dependencies, or release workflow | Publish the client beta first, then both pi betas, with the `beta` dist-tag; then publish the same client version to PyPI |
+| QDash `vX.Y.Z` tag | Publish the client, then both pi packages, as `X.Y.Z` under `latest`; then publish the client to PyPI |
 | Manual run on a branch | Build and validate without publishing |
-| Manual run on a package tag | Retry that stable release |
+| Manual run on a QDash tag | Retry that stable release; versions already on npm are skipped |
 
 Before packing pi-qdash, the release script replaces `workspace:*` with the exact
-client version returned by the client workflow. It rejects missing versions and
-`0.0.0`. The source manifests retain their development versions. Artifact checks
+client version returned by the client workflow, so a QDash tag packs pi-qdash `X.Y.Z`
+with client `X.Y.Z`. It rejects missing versions and `0.0.0`. The source manifests
+retain their development versions; releases never read them. Artifact checks
 install the client and pi-qdash tarballs together in a separate npm consumer;
 PR checks therefore do not need the client to exist on npm yet.
 
-Client snapshots on `develop` use `<next QDash patch>-beta.<run ID>.<attempt>`.
-A `pi-qdash/vX.Y.Z` tag publishes a client snapshot from that same commit as
-`<next QDash patch>-pi.<run ID>.<attempt>` under the `pi` dist-tag, so an independent
-extension release does not move the client's `latest` or `beta` tags. pi-qdash pins
-that exact snapshot even for a stable extension release. QDash's `vX.Y.Z` tags
-continue publishing the stable client as `X.Y.Z` under `latest`. A pi-qcaleval-only
-tag builds the client for integration checks without publishing it.
+Client versions follow QDash, as described in the
+[TypeScript client reference](../../reference/clients/typescript.md#installation):
+`X.Y.Z` on a QDash tag and `<next QDash patch>-beta.<build>` on `develop`, where
+`<build>` counts first-parent commits. QDash tags live on `main`, so the next patch
+comes from the highest `vX.Y.Z` tag present when a run starts, and a later run of the
+same commit can compute a later patch. Every package therefore takes its version from
+one computation per run:
 
-Beta versions use the next patch after the highest stable tag for that package, or
-its manifest version if no newer tag exists, followed by
-`-beta.<GitHub run ID>.<attempt>`. QDash's `vX.Y.Z` tags do not affect package versions.
-Run IDs avoid colliding with pi-qdash's previous beta build numbers; attempts
-allow a retry if one package published before the other failed.
+1. The reusable client workflow computes the npm version and its PEP 440 spelling once,
+   publishes the npm client, and then uploads a `qdash-client-release` artifact holding
+   the commit, ref, run ID, channel, and both spellings.
+2. The pi build jobs receive the same client version and derive their own with
+   `releaseVersion` in `.github/scripts/pi-package-release.mjs`.
+3. When this workflow's run completes, `publish-qdash-client.yml` starts through
+   `workflow_run`, verifies the run and its record with `pypiRelease` in
+   `.github/scripts/client-release.mjs`, then checks out the verified commit, builds it,
+   and publishes that exact version to PyPI.
 
-The workflow sets the artifact version at build time, like the TypeScript client.
-A routine change does not need a manifest version bump. For a stable release,
-choose a version newer than the package's current npm `latest` (or at least its
-manifest version for the first publication), tag the reviewed
-QDash commit with the package prefix, and push that tag. Follow the repository's
+pi betas keep a run-based suffix on the same base:
+`<next QDash patch>-beta.<GitHub run ID>.<attempt>` (for example
+`1.10.3-beta.12345678.1` beside client `1.10.3-beta.1278`). The attempt makes a retry
+publishable when one package published before the other failed. pi-qdash pins the
+client beta from the same run.
+
+`workflow_run` reports the triggering ref only as a short name such as `v1.9.21`, which
+can name a branch as well as a tag, and anyone who can push a branch can start this
+workflow's run on it. `publish-qdash-client.yml` therefore runs `pypiRelease` from a
+checkout of the default branch, before it checks out or runs the triggering commit, and
+publishes only in two cases:
+
+| Channel | Accepted run | Remote check |
+| --- | --- | --- |
+| `latest` | Push or manual run of `publish-typescript-packages.yml` on QDash tag `vX.Y.Z` in this repository | `refs/tags/vX.Y.Z` resolves to the run's commit, that commit is on `main`, and no branch `vX.Y.Z` exists |
+| `beta` | Push to `develop` in this repository | The run's commit is on `develop` |
+
+The record must have exactly the expected fields and name the run's commit, ref, and run
+ID, with versions that match the channel; anything else fails before any repository code
+from the triggering commit runs. Who may push `vX.Y.Z` tags and `develop` is a repository
+setting; keep both protected, because an accepted tag publishes its commit to PyPI.
+
+`publish-qdash-client.yml` has no push or tag trigger of its own; on PRs and manual runs
+it only validates. It ignores PR runs of this workflow. Registries and packages publish
+in separate jobs and runs, so a release is not atomic: if the PyPI run fails, rerun that
+run, which reuses the same record; if a pi package fails, rerun the failed jobs. A run
+that fails before publishing the npm client uploads no record, and its PyPI run fails
+at the download step. A rerun on a QDash tag skips every `X.Y.Z` that npm already has,
+through `publishTag` for the pi packages, and PyPI skips an existing version. A tag older
+than a package's npm `latest` fails instead of moving `latest` back. On `develop`, a full rerun
+without a new QDash tag skips the published client and publishes pi betas under the new
+attempt; after a new QDash tag, it computes a new version for every package.
+
+A routine change needs no manifest version bump. To release, merge the release PR into
+`main` and push the QDash `vX.Y.Z` tag; follow the repository's
 [pre-push procedure](../development-flow.md#before-pushing), including `task check`.
-Do not reuse a version that npm already contains. The versioning script rejects
-malformed tags and tags older than a known stable release.
+The versioning script rejects malformed tags and tags older than a known QDash release.
 
 Consumers install packages with:
 
@@ -112,13 +150,20 @@ dependencies.
 ## Publishing configuration
 
 Configure [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers/) for
-both `@oqtopus-team` packages with organization `oqtopus-team`, repository `qdash`, and
-workflow filename `publish-typescript-packages.yml`. The workflow uses a GitHub-hosted
-runner and OIDC for the pi packages. The client workflow retains its existing
-`NPM_TOKEN` fallback. When enabling OIDC for the client, authorize both
-`publish-typescript-packages.yml` (the caller for dependent releases) and
-`publish-qdash-typescript-client.yml` (direct stable releases). This package-owner setting is external
-to the repository; merging the workflow alone does not authorize publishing.
+both pi packages with organization `oqtopus-team`, repository `qdash`, and
+workflow filename `publish-typescript-packages.yml`. Configure the same
+workflow for `@oqtopus-team/qdash-client`. All three packages publish from a
+GitHub-hosted runner with OIDC and no npm token. npm validates the calling workflow,
+not the reusable `publish-qdash-typescript-client.yml` that runs `npm publish`, so
+`publish-typescript-packages.yml` is the only workflow filename to authorize. This
+package-owner setting is external to the repository; merging the workflow alone does
+not authorize publishing.
+
+[PyPI Trusted Publishing](https://docs.pypi.org/trusted-publishers/) for `qdash-client`
+stays registered for workflow filename `publish-qdash-client.yml`. PyPI does not support
+reusable workflows as trusted publishers, so that workflow remains top-level and receives
+the version through `workflow_run` instead of being called by this workflow. PyPI then
+sees `publish-qdash-client.yml` on the default branch, `develop`, for every publication.
 
 ## Retiring the original repositories
 
