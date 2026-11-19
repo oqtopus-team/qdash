@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 from starlette.exceptions import HTTPException
 
 from qdash.api.schemas.custom_dashboard import (
@@ -12,27 +12,32 @@ from qdash.api.schemas.custom_dashboard import (
     CustomDashboardResponse,
     CustomDashboardTemplateResponse,
     CustomDashboardUpdateRequest,
+    DashboardPanelResponse,
     ListCustomDashboardsResponse,
     ListCustomDashboardTemplatesResponse,
 )
 from qdash.api.schemas.success import SuccessResponse
-from qdash.api.services.collision_analysis import CHECKS, resolve_params
 from qdash.api.services.custom_dashboard_templates import (
     TEMPLATES,
     DashboardTemplate,
     instantiate_panels,
 )
+from qdash.api.services.metric_script_service import check_params
 from qdash.datamodel.custom_dashboard import (
     PANEL_CONFIG_MODELS,
-    CollisionPanelConfig,
     DashboardPanelModel,
+    DashboardVisibility,
+    MetricScriptPanelConfig,
 )
 from qdash.datamodel.project import ProjectRole
 from qdash.dbmodel.custom_dashboard import CustomDashboardDocument
 
 if TYPE_CHECKING:
     from qdash.api.lib.project import ProjectContext
+    from qdash.api.services.metric_script_service import MetricScriptService
+    from qdash.dbmodel.metric_script import MetricScriptDocument
     from qdash.repository.custom_dashboard import MongoCustomDashboardRepository
+    from qdash.repository.metric_script import MongoMetricScriptRepository
 
 NOT_FOUND = "Custom dashboard not found"
 MAX_NAME_LENGTH = 200
@@ -57,13 +62,21 @@ def _format_validation_error(exc: ValidationError) -> str:
     return "; ".join(parts)
 
 
-def validate_panels(panels: list[DashboardPanelModel]) -> None:
-    """Validate panel IDs and type-specific configs.
+def _invalid(panel: DashboardPanelModel, reason: str) -> HTTPException:
+    return HTTPException(
+        status_code=422,
+        detail=f"Invalid config for {panel.type} panel {_panel_name(panel)}: {reason}",
+    )
+
+
+def validate_panel_configs(panels: list[DashboardPanelModel]) -> list[BaseModel]:
+    """Validate panel IDs and type-specific configs; return the parsed configs.
 
     Raises:
         HTTPException: 422 naming the first invalid panel.
     """
     seen: set[str] = set()
+    configs: list[BaseModel] = []
     for panel in panels:
         if panel.panel_id in seen:
             raise HTTPException(
@@ -72,40 +85,24 @@ def validate_panels(panels: list[DashboardPanelModel]) -> None:
         seen.add(panel.panel_id)
         model = PANEL_CONFIG_MODELS[panel.type]
         try:
-            config = model.model_validate(panel.config)
+            configs.append(model.model_validate(panel.config))
         except ValidationError as exc:
-            raise HTTPException(
-                status_code=422,
-                detail=(
-                    f"Invalid config for {panel.type} panel {_panel_name(panel)}: "
-                    f"{_format_validation_error(exc)}"
-                ),
-            ) from exc
-        if isinstance(config, CollisionPanelConfig):
-            if config.check not in CHECKS:
-                raise HTTPException(
-                    status_code=422,
-                    detail=(
-                        f"Invalid config for collision_check panel {_panel_name(panel)}: "
-                        f"unknown check '{config.check}'"
-                    ),
-                )
-            try:
-                resolve_params(config.check, config.params)
-            except ValueError as exc:
-                raise HTTPException(
-                    status_code=422,
-                    detail=(
-                        f"Invalid config for collision_check panel {_panel_name(panel)}: {exc}"
-                    ),
-                ) from exc
+            raise _invalid(panel, _format_validation_error(exc)) from exc
+    return configs
 
 
 class CustomDashboardService:
     """CRUD and sharing rules for CustomDashboardDocument."""
 
-    def __init__(self, custom_dashboard_repository: MongoCustomDashboardRepository) -> None:
+    def __init__(
+        self,
+        custom_dashboard_repository: MongoCustomDashboardRepository,
+        metric_script_repository: MongoMetricScriptRepository,
+        metric_script_service: MetricScriptService,
+    ) -> None:
         self._repo = custom_dashboard_repository
+        self._scripts = metric_script_repository
+        self._script_service = metric_script_service
 
     @staticmethod
     def _is_owner(doc: CustomDashboardDocument, ctx: ProjectContext) -> bool:
@@ -119,10 +116,85 @@ class CustomDashboardService:
     def _can_edit(cls, doc: CustomDashboardDocument, ctx: ProjectContext) -> bool:
         return cls._is_owner(doc, ctx) or ctx.role == ProjectRole.OWNER
 
-    @classmethod
+    def _visible_script(
+        self,
+        ctx: ProjectContext,
+        script_id: str,
+        cache: dict[str, MetricScriptDocument | None],
+    ) -> MetricScriptDocument | None:
+        if script_id not in cache:
+            cache[script_id] = self._script_service.find_visible(ctx, script_id)
+        return cache[script_id]
+
+    def validate_panels(
+        self,
+        ctx: ProjectContext,
+        panels: list[DashboardPanelModel],
+        visibility: DashboardVisibility,
+    ) -> None:
+        """Validate configs and the scripts, revisions, metrics and params they reference.
+
+        Raises:
+            HTTPException: 422 naming the first invalid panel.
+        """
+        configs = validate_panel_configs(panels)
+        cache: dict[str, MetricScriptDocument | None] = {}
+        for panel, config in zip(panels, configs, strict=True):
+            if not isinstance(config, MetricScriptPanelConfig):
+                continue
+            script = self._visible_script(ctx, config.script_id, cache)
+            if script is None:
+                raise _invalid(panel, f"metric script '{config.script_id}' not found")
+            if visibility == "project" and script.visibility != "project":
+                raise _invalid(
+                    panel,
+                    f"metric script '{script.name}' is private; share it with the project "
+                    "before using it on a shared dashboard",
+                )
+            revision = script.find_revision(config.script_revision)
+            if revision is None:
+                raise _invalid(
+                    panel, f"revision {config.script_revision} of '{script.name}' not found"
+                )
+            if revision.status != "valid":
+                raise _invalid(
+                    panel, f"revision {config.script_revision} of '{script.name}' is invalid"
+                )
+            metric = next((m for m in revision.metrics if m.id == config.metric_id), None)
+            if metric is None:
+                known = ", ".join(m.id for m in revision.metrics)
+                raise _invalid(
+                    panel,
+                    f"unknown metric '{config.metric_id}' in revision "
+                    f"{config.script_revision}; expected one of: {known}",
+                )
+            try:
+                check_params(metric, dict(config.params))
+            except ValueError as exc:
+                raise _invalid(panel, str(exc)) from exc
+            if metric.target == "pair" and not set(config.hops) <= set(metric.hops):
+                raise _invalid(
+                    panel,
+                    f"hops {config.hops} are outside the metric's declared hops {metric.hops}",
+                )
+
     def _to_response(
-        cls, doc: CustomDashboardDocument, ctx: ProjectContext
+        self,
+        doc: CustomDashboardDocument,
+        ctx: ProjectContext,
+        cache: dict[str, MetricScriptDocument | None] | None = None,
     ) -> CustomDashboardResponse:
+        scripts = cache if cache is not None else {}
+        panels = []
+        for panel in doc.panels:
+            item = DashboardPanelResponse(**panel.model_dump())
+            script_id = panel.config.get("script_id")
+            if panel.type == "metric_script" and isinstance(script_id, str):
+                script = self._visible_script(ctx, script_id, scripts)
+                if script is not None:
+                    item.script_name = script.name
+                    item.latest_revision = script.active_revision
+            panels.append(item)
         return CustomDashboardResponse(
             dashboard_id=doc.dashboard_id,
             project_id=doc.project_id,
@@ -130,10 +202,10 @@ class CustomDashboardService:
             description=doc.description,
             visibility=doc.visibility,
             chip_id=doc.chip_id,
-            panels=doc.panels,
+            panels=panels,
             owner_username=doc.username,
             owner_user_id=doc.user_id,
-            can_edit=cls._can_edit(doc, ctx),
+            can_edit=self._can_edit(doc, ctx),
             created_at=doc.system_info.created_at,
             updated_at=doc.system_info.updated_at,
         )
@@ -155,7 +227,8 @@ class CustomDashboardService:
 
     def list_visible(self, ctx: ProjectContext) -> ListCustomDashboardsResponse:
         docs = self._repo.list_visible(project_id=ctx.project_id, user_id=ctx.user.user_id)
-        dashboards = [self._to_response(doc, ctx) for doc in docs]
+        cache: dict[str, MetricScriptDocument | None] = {}
+        dashboards = [self._to_response(doc, ctx, cache) for doc in docs]
         return ListCustomDashboardsResponse(dashboards=dashboards, total=len(dashboards))
 
     def get(self, ctx: ProjectContext, dashboard_id: str) -> CustomDashboardResponse:
@@ -188,8 +261,15 @@ class CustomDashboardService:
                 )
             if not panels:
                 # Copy on create: the dashboard owns its panels from now on.
-                panels = instantiate_panels(template)
-        validate_panels(panels)
+                scripts = {}
+                for script_template, metrics in template.script_requirements().items():
+                    script = self._script_service.ensure_template_script(
+                        ctx, script_template, metrics
+                    )
+                    assert script.active_revision is not None
+                    scripts[script_template] = (script.script_id, script.active_revision)
+                panels = instantiate_panels(template, scripts)
+        self.validate_panels(ctx, panels, body.visibility)
         doc = CustomDashboardDocument(
             project_id=ctx.project_id,
             user_id=ctx.user.user_id,
@@ -207,9 +287,12 @@ class CustomDashboardService:
         self, ctx: ProjectContext, dashboard_id: str, body: CustomDashboardUpdateRequest
     ) -> CustomDashboardResponse:
         doc = self._get_editable(ctx, dashboard_id)
+        visibility = body.visibility if body.visibility is not None else doc.visibility
         if body.panels is not None:
-            validate_panels(body.panels)
+            self.validate_panels(ctx, body.panels, visibility)
             doc.panels = body.panels
+        elif visibility != doc.visibility:
+            self.validate_panels(ctx, doc.panels, visibility)
         if body.name is not None:
             doc.name = body.name
         if body.description is not None:

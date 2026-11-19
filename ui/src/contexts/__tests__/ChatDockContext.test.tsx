@@ -40,3 +40,34 @@ it("checks the registered editor's current target at application time", () => {
   act(() => unregister());
   expect(apply(edit)).toBe(false);
 });
+
+it("reports editor code for a metric script page and applies a script proposal there", () => {
+  const { result } = renderHook(() => useChatDock(), { wrapper: ChatDockProvider });
+  const page: PageContext = {
+    title: "Metric script: ZX90",
+    path: "/workflow/t1",
+    metricScript: { scriptId: "ms_1", name: "ZX90", code: "old", dirty: false },
+  };
+  const applyCode = vi.fn();
+  act(() => {
+    result.current.registerPage({ current: () => page, applyCode });
+  });
+
+  expect(result.current.pageSummary()).toEqual({
+    path: "/workflow/t1",
+    title: "Metric script: ZX90",
+    withEditorCode: true,
+  });
+  const edit: EditProposal = {
+    summary: "Update",
+    code: "new",
+    target: "metric_script",
+    flowName: "ZX90",
+    chipId: null,
+    scriptId: "ms_1",
+    pagePath: "/workflow/t1",
+  };
+  expect(result.current.applyCode(edit)).toBe(true);
+  expect(applyCode).toHaveBeenLastCalledWith("new");
+  expect(result.current.applyCode({ ...edit, scriptId: "ms_2" })).toBe(false);
+});

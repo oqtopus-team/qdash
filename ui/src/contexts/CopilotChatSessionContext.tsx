@@ -456,6 +456,16 @@ function buildTurnRequest(
                     },
                   }
                 : {}),
+              ...(page.metricScript
+                ? {
+                    metric_script: {
+                      script_id: page.metricScript.scriptId,
+                      name: page.metricScript.name,
+                      code: page.metricScript.code,
+                      dirty: page.metricScript.dirty ?? false,
+                    },
+                  }
+                : {}),
             },
           }
         : {}),

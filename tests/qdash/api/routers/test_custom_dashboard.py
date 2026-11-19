@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+import pytest
+
 from qdash.datamodel.project import ProjectRole
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.project import ProjectDocument
@@ -78,10 +80,10 @@ def _panels() -> list[dict[str, Any]]:
         },
         {
             "panel_id": "p2",
-            "type": "collision_check",
-            "title": "GE-GE",
+            "type": "coupling_metric",
+            "title": "ZX90",
             "layout": {"x": 6, "y": 0, "w": 6, "h": 4},
-            "config": {"check": "Type1A", "params": {"cnot_time": 300}, "hops": [1]},
+            "config": {"metric": "zx90_gate_fidelity"},
         },
         {
             "panel_id": "p3",
@@ -114,7 +116,8 @@ def test_create_get_list_update_delete(test_client, init_db):
     dashboard_id = created["dashboard_id"]
     got = test_client.get(f"/custom-dashboards/{dashboard_id}", headers=owner)
     assert got.status_code == 200
-    assert got.json()["panels"][1]["config"]["params"] == {"cnot_time": 300}
+    assert got.json()["panels"][1]["config"] == {"metric": "zx90_gate_fidelity"}
+    assert got.json()["panels"][1]["script_name"] is None
 
     listed = test_client.get("/custom-dashboards", headers=owner).json()
     assert listed["total"] == 1
@@ -290,29 +293,6 @@ def test_invalid_panel_config_is_rejected(test_client, init_db):
     assert "Qubit frequency" in response.json()["detail"]
     assert "p1" in response.json()["detail"]
 
-    bad_check = _panels()[1:2]
-    bad_check[0]["config"] = {"check": "Type99"}
-    response = test_client.post(
-        "/custom-dashboards", json={"name": "Bad", "panels": bad_check}, headers=owner
-    )
-    assert response.status_code == 422
-    assert "Type99" in response.json()["detail"]
-
-    bad_param = _panels()[1:2]
-    bad_param[0]["config"] = {"check": "Type2C", "params": {"cnot_time": 1}}
-    response = test_client.post(
-        "/custom-dashboards", json={"name": "Bad", "panels": bad_param}, headers=owner
-    )
-    assert response.status_code == 422
-    assert "cnot_time" in response.json()["detail"]
-
-    bad_hops = _panels()[1:2]
-    bad_hops[0]["config"] = {"check": "Type1A", "hops": [3]}
-    response = test_client.post(
-        "/custom-dashboards", json={"name": "Bad", "panels": bad_hops}, headers=owner
-    )
-    assert response.status_code == 422
-
     duplicate_ids = _panels()
     duplicate_ids[1]["panel_id"] = "p1"
     response = test_client.post(
@@ -338,32 +318,233 @@ def test_invalid_panel_config_is_rejected(test_client, init_db):
     assert len(unchanged.json()["panels"]) == 3
 
 
-def test_templates_listed_and_copied_on_create(test_client, init_db):
+def _panel_fields(panel: dict[str, Any]) -> dict[str, Any]:
+    return {key: panel[key] for key in ("panel_id", "type", "title", "layout", "config")}
+
+
+@pytest.fixture
+def runtime(monkeypatch: pytest.MonkeyPatch) -> None:
+    from tests.qdash.api.metric_runtime.fakes import install_inprocess_runtime
+
+    install_inprocess_runtime(monkeypatch)
+
+
+def _script(client: Any, headers: dict[str, str], **body: Any) -> dict[str, Any]:
+    request = {"name": "ZX90", "template_id": "zx90_median", "visibility": "project", **body}
+    response = client.post("/metric-scripts", json=request, headers=headers)
+    assert response.status_code == 201, response.text
+    created: dict[str, Any] = response.json()
+    return created
+
+
+def _script_panel(script_id: str, **config: Any) -> dict[str, Any]:
+    return {
+        "panel_id": "s1",
+        "type": "metric_script",
+        "title": "Median ZX90",
+        "layout": {"x": 0, "y": 0, "w": 6, "h": 4},
+        "config": {
+            "script_id": script_id,
+            "metric_id": "zx90_median",
+            "script_revision": 1,
+            "period": {"kind": "relative", "days": 14},
+            "params": {"min_samples": 2},
+            "view": "table",
+            "direction": "forward",
+            "hops": [1],
+            **config,
+        },
+    }
+
+
+def test_metric_script_panel_is_pinned_and_annotated(test_client, init_db, runtime):
     owner = _create_project_owner()
+    script = _script(test_client, owner)
+    script_id = script["script_id"]
+    created = _create(test_client, owner, name="ZX90", panels=[_script_panel(script_id)])
+    panel = created["panels"][0]
+    assert panel["config"]["script_revision"] == 1
+    assert panel["script_name"] == "ZX90"
+    assert panel["latest_revision"] == 1
+
+    # A newer valid revision is announced, but the pinned panel does not move.
+    source = script["source"] + "\n# tweak\n"
+    test_client.patch(f"/metric-scripts/{script_id}", json={"source": source}, headers=owner)
+    got = test_client.get(f"/custom-dashboards/{created['dashboard_id']}", headers=owner).json()
+    assert got["panels"][0]["config"]["script_revision"] == 1
+    assert got["panels"][0]["latest_revision"] == 2
+    listed = test_client.get("/custom-dashboards", headers=owner).json()
+    assert listed["dashboards"][0]["panels"][0]["latest_revision"] == 2
+    # An invalid save does not advance the announced revision.
+    test_client.patch(
+        f"/metric-scripts/{script_id}", json={"source": "def broken(:\n"}, headers=owner
+    )
+    got = test_client.get(f"/custom-dashboards/{created['dashboard_id']}", headers=owner).json()
+    assert got["panels"][0]["latest_revision"] == 2
+
+    updated = test_client.patch(
+        f"/custom-dashboards/{created['dashboard_id']}",
+        json={"panels": [_script_panel(script_id, script_revision=2)]},
+        headers=owner,
+    )
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["panels"][0]["config"]["script_revision"] == 2
+    # Panels pointing at an invalid revision are rejected.
+    invalid = test_client.patch(
+        f"/custom-dashboards/{created['dashboard_id']}",
+        json={"panels": [_script_panel(script_id, script_revision=3)]},
+        headers=owner,
+    )
+    assert invalid.status_code == 422
+    assert "invalid" in invalid.json()["detail"]
+
+
+def test_metric_script_panel_validation(test_client, init_db, runtime):
+    owner = _create_project_owner()
+    editor = _create_project_member(username="dash_editor")
+    script_id = _script(test_client, owner)["script_id"]
+    private_id = _script(test_client, owner, name="Mine", visibility="private")["script_id"]
+
+    def create(panel: dict[str, Any], headers: dict[str, str] = owner, **body: Any) -> Any:
+        return test_client.post(
+            "/custom-dashboards",
+            json={"name": "Bad", "panels": [panel], **body},
+            headers=headers,
+        )
+
+    cases = [
+        (_script_panel("ms_missing"), "not found"),
+        (_script_panel(script_id, script_revision=7), "revision 7"),
+        (_script_panel(script_id, metric_id="nope"), "unknown metric 'nope'"),
+        (_script_panel(script_id, params={"min_samples": 0}), "min_samples"),
+        (_script_panel(script_id, params={"bogus": 1}), "Unknown parameters: bogus"),
+        (_script_panel(script_id, hops=[2]), "outside the metric's declared hops"),
+        (_script_panel(script_id, view="chart"), "view"),
+        (_script_panel(script_id, direction="sideways"), "direction"),
+        (_script_panel(script_id, period={"kind": "relative", "days": 0}), "period"),
+        (_script_panel(script_id, extra=1), "extra"),
+    ]
+    for panel, message in cases:
+        response = create(panel)
+        assert response.status_code == 422, (message, response.text)
+        assert message in response.json()["detail"], (message, response.text)
+        assert "Median ZX90" in response.json()["detail"]
+    missing_revision = _script_panel(script_id)
+    del missing_revision["config"]["script_revision"]
+    response = create(missing_revision)
+    assert response.status_code == 422
+    assert "script_revision" in response.json()["detail"]
+
+    # Other members cannot reference a private script they cannot see.
+    assert create(_script_panel(private_id), headers=editor).status_code == 422
+    # Private scripts can back private dashboards only.
+    assert create(_script_panel(private_id)).status_code == 201
+    shared = create(_script_panel(private_id), visibility="project")
+    assert shared.status_code == 422
+    assert "share it with the project" in shared.json()["detail"]
+    private = create(_script_panel(private_id)).json()
+    publish = test_client.patch(
+        f"/custom-dashboards/{private['dashboard_id']}",
+        json={"visibility": "project"},
+        headers=owner,
+    )
+    assert publish.status_code == 422
+
+
+def test_duplicate_copies_pins(test_client, init_db, runtime):
+    owner = _create_project_owner()
+    editor = _create_project_member(username="dash_editor")
+    script = _script(test_client, owner)
+    shared = _create(
+        test_client,
+        owner,
+        name="Shared",
+        visibility="project",
+        panels=[_script_panel(script["script_id"])],
+    )
+    test_client.patch(
+        f"/metric-scripts/{script['script_id']}",
+        json={"source": script["source"] + "\n# v2\n"},
+        headers=owner,
+    )
+    copy = test_client.post(
+        f"/custom-dashboards/{shared['dashboard_id']}/duplicate", headers=editor
+    ).json()
+    assert copy["panels"][0]["config"] == shared["panels"][0]["config"]
+    assert copy["panels"][0]["config"]["script_revision"] == 1
+    assert copy["panels"][0]["latest_revision"] == 2
+    # Copying the script does not retarget panels.
+    test_client.post(f"/metric-scripts/{script['script_id']}/copy", headers=editor)
+    again = test_client.get(f"/custom-dashboards/{copy['dashboard_id']}", headers=editor).json()
+    assert again["panels"][0]["config"]["script_id"] == script["script_id"]
+
+
+def test_templates_listed_and_copied_on_create(test_client, init_db, runtime):
+    owner = _create_project_owner()
+    editor = _create_project_member(username="dash_editor")
     listed = test_client.get("/custom-dashboards/templates", headers=owner)
     assert listed.status_code == 200, listed.text
     templates = listed.json()["templates"]
     assert [t["template_id"] for t in templates] == ["frequency-collision-map"]
     assert templates[0]["panel_count"] == 8
-    assert "collision_check" in templates[0]["panel_types"]
+    assert templates[0]["panel_types"] == ["markdown", "metric_script", "qubit_metric"]
 
     first = _create(
         test_client, owner, name="Collisions", panels=[], template_id="frequency-collision-map"
     )
-    second = _create(
-        test_client, owner, name="Collisions 2", panels=[], template_id="frequency-collision-map"
-    )
     assert len(first["panels"]) == 8
-    checks = [p["config"]["check"] for p in first["panels"] if p["type"] == "collision_check"]
-    assert checks == ["Type0A", "Type0B", "Type1A", "Type3A", "Type1C", "Type2C"]
-    # Copy on create: every dashboard gets its own panel IDs.
+    script_panels = [p for p in first["panels"] if p["type"] == "metric_script"]
+    assert [p["config"]["metric_id"] for p in script_panels] == [
+        "Type0A",
+        "Type0B",
+        "Type1A",
+        "Type3A",
+        "Type1C",
+        "Type2C",
+    ]
+    script_ids = {p["config"]["script_id"] for p in script_panels}
+    assert len(script_ids) == 1
+    script_id = script_ids.pop()
+    assert all(p["config"]["script_revision"] == 1 for p in script_panels)
+    assert all(p["script_name"] == "Frequency collision checks" for p in script_panels)
+    assert script_panels[0]["config"]["period"] == {"kind": "relative", "days": 30}
+
+    script = test_client.get(f"/metric-scripts/{script_id}", headers=editor).json()
+    assert script["template_id"] == "collision"
+    assert script["visibility"] == "project"
+    assert script["owner_username"] == "dash_owner"
+
+    # A second dashboard reuses the shared script; panel IDs are fresh.
+    second = _create(
+        test_client, editor, name="Collisions 2", panels=[], template_id="frequency-collision-map"
+    )
+    assert {p["config"]["script_id"] for p in second["panels"] if p["type"] == "metric_script"} == {
+        script_id
+    }
     first_ids = {p["panel_id"] for p in first["panels"]}
     assert len(first_ids) == 8
     assert first_ids.isdisjoint(p["panel_id"] for p in second["panels"])
+    assert test_client.get("/metric-scripts", headers=editor).json()["total"] == 1
+
+    # A shared script that no longer defines the checks is not reused.
+    test_client.patch(
+        f"/metric-scripts/{script_id}",
+        json={
+            "source": "from qdash_metrics import metric\n"
+            "@metric(title='x', unit='GHz')\ndef x(target, ctx):\n    return 1\n"
+        },
+        headers=owner,
+    )
+    third = _create(
+        test_client, owner, name="Collisions 3", panels=[], template_id="frequency-collision-map"
+    )
+    assert {p["config"]["script_id"] for p in third["panels"] if p["type"] == "metric_script"} != {
+        script_id
+    }
 
     # Explicit panels win over the template, and unknown templates are rejected.
     explicit = _create(test_client, owner, name="Mine", template_id="frequency-collision-map")
-    assert explicit["panels"] == _panels()
+    assert [_panel_fields(p) for p in explicit["panels"]] == _panels()
     bad = test_client.post(
         "/custom-dashboards",
         json={"name": "Bad", "template_id": "nope"},

@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { CustomDashboardResponse, DashboardPanelModel } from "@/schemas";
+import type { CustomDashboardResponse, DashboardPanelResponse } from "@/schemas";
 
 import { CustomDashboardPageContent } from "../CustomDashboardPageContent";
 
@@ -10,6 +10,8 @@ const mocks = vi.hoisted(() => ({
   canEdit: true,
   dashboard: null as unknown,
   error: null as unknown,
+  update: vi.fn(),
+  evaluate: vi.fn(),
 }));
 
 vi.mock("next/navigation", () => ({
@@ -34,7 +36,7 @@ vi.mock("@/client/custom-dashboard/custom-dashboard", () => {
       refetch: vi.fn(),
       isRefetching: false,
     }),
-    useUpdateCustomDashboard: mutation,
+    useUpdateCustomDashboard: () => ({ mutate: mocks.update, isPending: false }),
     useDuplicateCustomDashboard: mutation,
     useDeleteCustomDashboard: mutation,
     useListCustomDashboardTemplates: () => ({ data: undefined }),
@@ -48,6 +50,22 @@ vi.mock("@/client/chip/chip", () => ({
   useGetChip: () => ({ data: { data: { chip_id: "chip-1", topology_id: "topo" } } }),
 }));
 
+vi.mock("@/client/metric-script/metric-script", () => ({
+  evaluateMetricScript: mocks.evaluate,
+  useListMetricScripts: () => ({ data: undefined, isLoading: false }),
+  useGetMetricScript: () => ({ data: undefined, isLoading: false }),
+}));
+
+vi.mock("@/hooks/useTopologyConfig", async () => {
+  const { TOPOLOGY: topology } =
+    await import("@/components/features/metric-scripts/__tests__/fixtures");
+  return { useTopologyConfig: () => topology };
+});
+
+vi.mock("@/hooks/useMetricsConfig", () => ({
+  useMetricsConfig: () => ({ colorScale: { colors: [] }, qubitMetrics: [], couplingMetrics: [] }),
+}));
+
 vi.mock("@/components/selectors/ChipSelector", () => ({
   ChipSelector: ({ selectedChip }: { selectedChip: string }) => (
     <div data-testid="chip-selector">{selectedChip}</div>
@@ -58,7 +76,7 @@ vi.mock("@/contexts/ProjectContext", () => ({
   useProject: () => ({ projectId: "project-1", canEdit: mocks.canEdit }),
 }));
 
-function markdownPanel(id: string, x: number, y: number): DashboardPanelModel {
+function markdownPanel(id: string, x: number, y: number): DashboardPanelResponse {
   return {
     panel_id: id,
     type: "markdown",
@@ -111,6 +129,7 @@ describe("CustomDashboardPageContent", () => {
 
   afterEach(() => {
     cleanup();
+    vi.clearAllMocks();
   });
 
   it("renders panels in reading order (y, then x)", () => {
@@ -189,5 +208,76 @@ describe("CustomDashboardPageContent", () => {
       "href",
       "/custom-dashboards",
     );
+  });
+
+  it("evaluates a metric script panel at its pinned revision and offers a newer one", async () => {
+    const { evaluateResponse, pairCell } =
+      await import("@/components/features/metric-scripts/__tests__/fixtures");
+    mocks.evaluate.mockResolvedValue({
+      data: evaluateResponse(
+        "pair",
+        [
+          pairCell("0", "1", { value: 99.2, assessment: { count: 6 } }),
+          pairCell("1", "0", { status: "error", message: "KeyError" }),
+        ],
+        { params: { min_samples: 3 } },
+      ),
+    });
+    mocks.dashboard = dashboard({
+      panels: [
+        {
+          panel_id: "zx",
+          type: "metric_script",
+          title: "ZX90",
+          layout: { x: 0, y: 0, w: 6, h: 4 },
+          config: {
+            script_id: "ms_1",
+            metric_id: "zx90_median",
+            script_revision: 2,
+            period: { kind: "relative", days: 14 },
+            params: {},
+            view: "map",
+            direction: "both",
+            hops: [1],
+          },
+          script_name: "ZX90 median",
+          latest_revision: 3,
+        },
+      ],
+    });
+    renderPage();
+
+    expect(await screen.findByTestId("pair-map")).toBeInTheDocument();
+    expect(mocks.evaluate).toHaveBeenCalledWith(
+      "ms_1",
+      {
+        metric_id: "zx90_median",
+        chip_id: "chip-1",
+        period: { kind: "relative", days: 14 },
+        params: {},
+        revision: 2,
+      },
+      undefined,
+      expect.anything(),
+    );
+    expect(screen.getByText("Newer revision r3 available")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Update to r3" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("metric-script-footer")).toHaveTextContent(
+      "ZX90 median r2 · Median ZX90 gate fidelity · Last 14 days · min samples 3",
+    );
+    // The failed cell stays visible on the map.
+    expect(screen.getByTestId("metric-edge-1>0")).toHaveAttribute("data-status", "error");
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.click(screen.getByRole("button", { name: "Update to r3" }));
+    expect(screen.getByText("Unsaved changes")).toBeInTheDocument();
+    expect(screen.queryByText("Newer revision r3 available")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    const saved = mocks.update.mock.calls[0][0].data.panels[0];
+    expect(saved.config.script_revision).toBe(3);
+    // Response annotations are not sent back.
+    expect(saved).not.toHaveProperty("script_name");
+    expect(saved).not.toHaveProperty("latest_revision");
   });
 });

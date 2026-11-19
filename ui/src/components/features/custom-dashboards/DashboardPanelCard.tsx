@@ -17,7 +17,7 @@ import {
   UnfoldVertical,
 } from "lucide-react";
 
-import type { DashboardPanelModel } from "@/schemas";
+import type { DashboardPanelResponse } from "@/schemas";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,17 +28,13 @@ import {
 } from "@/components/ui/DropdownMenu";
 
 import { canApplyLayoutAction, type LayoutAction, panelHeightPx } from "./layout";
-import {
-  panelTypeMeta,
-  readCollisionConfig,
-  readMarkdownContent,
-  readMetricConfig,
-} from "./panelConfig";
-import { CollisionCheckPanel } from "./panels/CollisionCheckPanel";
+import { panelTypeMeta, readMarkdownContent, readMetricConfig } from "./panelConfig";
 import { MarkdownPanel } from "./panels/MarkdownPanel";
 import { CouplingMetricPanel, QubitMetricPanel } from "./panels/MetricPanels";
+import { MetricScriptPanel } from "./panels/MetricScriptPanel";
 
-export type PanelCommand = LayoutAction | "edit" | "duplicate" | "remove";
+/** `update-revision` moves a metric script panel's pin to the script's active revision. */
+export type PanelCommand = LayoutAction | "edit" | "duplicate" | "remove" | "update-revision";
 
 const LAYOUT_ITEMS: ReadonlyArray<{
   action: LayoutAction;
@@ -59,10 +55,14 @@ function PanelBody({
   panel,
   chipId,
   topologyId,
+  editing,
+  onCommand,
 }: {
-  panel: DashboardPanelModel;
+  panel: DashboardPanelResponse;
   chipId: string;
   topologyId: string;
+  editing: boolean;
+  onCommand: (panelId: string, command: PanelCommand) => void;
 }) {
   switch (panel.type) {
     case "qubit_metric": {
@@ -87,12 +87,14 @@ function PanelBody({
         />
       );
     }
-    case "collision_check":
+    case "metric_script":
       return (
-        <CollisionCheckPanel
+        <MetricScriptPanel
+          panel={panel}
           chipId={chipId}
           topologyId={topologyId}
-          config={readCollisionConfig(panel)}
+          editing={editing}
+          onUpdateRevision={() => onCommand(panel.panel_id, "update-revision")}
         />
       );
     case "markdown":
@@ -101,7 +103,8 @@ function PanelBody({
 }
 
 interface DashboardPanelCardProps {
-  panel: DashboardPanelModel;
+  /** The panel, with the script annotations the API adds to `metric_script` panels. */
+  panel: DashboardPanelResponse;
   chipId: string;
   topologyId: string;
   editing: boolean;
@@ -199,7 +202,13 @@ export function DashboardPanelCard({
           )}
         </header>
         <div className="min-h-0 flex-1">
-          <PanelBody panel={panel} chipId={chipId} topologyId={topologyId} />
+          <PanelBody
+            panel={panel}
+            chipId={chipId}
+            topologyId={topologyId}
+            editing={editing}
+            onCommand={onCommand}
+          />
         </div>
       </div>
     </section>

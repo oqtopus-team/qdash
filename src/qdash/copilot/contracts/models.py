@@ -217,6 +217,17 @@ class FlowEditorContext(BaseModel):
     dirty: bool = Field(default=False, description="The buffer differs from the saved flow")
 
 
+class MetricScriptEditorContext(BaseModel):
+    """The metric script open in the script editor, with the editor's current text."""
+
+    script_id: str = Field(max_length=64)
+    name: str = Field(max_length=200)
+    code: str = Field(
+        max_length=300_000, description="The editor's buffer, unsaved changes included"
+    )
+    dirty: bool = Field(default=False, description="The buffer differs from the saved script")
+
+
 class PageContext(BaseModel):
     """What the user has open in QDash while chatting from the sidebar or floating window."""
 
@@ -224,6 +235,10 @@ class PageContext(BaseModel):
     title: str | None = Field(default=None, max_length=200)
     flow: FlowEditorContext | None = Field(
         default=None, description="Set on the Workflow editor: the flow and its current code"
+    )
+    metric_script: MetricScriptEditorContext | None = Field(
+        default=None,
+        description="Set on the metric script editor: the script and its current code",
     )
 
 

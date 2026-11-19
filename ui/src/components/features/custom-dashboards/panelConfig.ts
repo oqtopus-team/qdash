@@ -1,11 +1,18 @@
-import { FileText, Grid3x3, Network, TriangleAlert, type LucideIcon } from "lucide-react";
+import { FileCode, FileText, Grid3x3, Network, type LucideIcon } from "lucide-react";
 
 import type {
-  CollisionCheckInfo,
   DashboardPanelModel,
   DashboardPanelModelConfig,
   DashboardPanelModelType,
 } from "@/schemas";
+import type { ParamValue } from "@/components/features/metric-scripts/parameters";
+import {
+  type MetricPeriod,
+  periodError,
+  readPeriod,
+} from "@/components/features/metric-scripts/periods";
+import type { ResultViewMode } from "@/components/features/metric-scripts/render/MetricResultView";
+import type { PairDirection } from "@/components/features/metric-scripts/render/PairMap";
 
 export type MetricSelectionMode = "latest" | "best" | "average";
 
@@ -21,14 +28,22 @@ export interface MetricPanelConfig {
   selection_mode: MetricSelectionMode;
 }
 
-/** Config of a `collision_check` panel. */
-export interface CollisionPanelConfig {
-  check: string;
-  params: Record<string, number>;
+/**
+ * Config of a `metric_script` panel, as the API's `MetricScriptPanelConfig` defines it.
+ * `script_revision` is null only while a stored config lacks it; such a panel cannot be saved.
+ */
+export interface MetricScriptPanelConfig {
+  script_id: string;
+  metric_id: string;
+  script_revision: number | null;
+  period: MetricPeriod;
+  params: Record<string, ParamValue>;
+  view: ResultViewMode;
+  direction: PairDirection;
   hops: number[];
 }
 
-export const ALL_HOPS: readonly number[] = [1, 2];
+const KNOWN_HOPS = [1, 2];
 
 export const PANEL_TYPES: ReadonlyArray<{
   value: DashboardPanelModelType;
@@ -37,7 +52,7 @@ export const PANEL_TYPES: ReadonlyArray<{
 }> = [
   { value: "qubit_metric", label: "Qubit metric", icon: Grid3x3 },
   { value: "coupling_metric", label: "Coupling metric", icon: Network },
-  { value: "collision_check", label: "Frequency collision check", icon: TriangleAlert },
+  { value: "metric_script", label: "Metric script", icon: FileCode },
   { value: "markdown", label: "Markdown note", icon: FileText },
 ];
 
@@ -53,7 +68,7 @@ function isSelectionMode(value: unknown): value is MetricSelectionMode {
   return value === "latest" || value === "best" || value === "average";
 }
 
-export function readMetricConfig(panel: DashboardPanelModel): MetricPanelConfig {
+export function readMetricConfig(panel: Pick<DashboardPanelModel, "config">): MetricPanelConfig {
   const config = asRecord(panel.config);
   return {
     metric: typeof config.metric === "string" ? config.metric : "",
@@ -61,71 +76,72 @@ export function readMetricConfig(panel: DashboardPanelModel): MetricPanelConfig 
   };
 }
 
-export function readCollisionConfig(panel: DashboardPanelModel): CollisionPanelConfig {
+function isParamValue(value: unknown): value is ParamValue {
+  return (
+    typeof value === "boolean" ||
+    typeof value === "string" ||
+    (typeof value === "number" && Number.isFinite(value))
+  );
+}
+
+/** A `metric_script` panel's config, with defaults for anything missing or malformed. */
+export function readMetricScriptConfig(
+  panel: Pick<DashboardPanelModel, "config">,
+): MetricScriptPanelConfig {
   const config = asRecord(panel.config);
-  const params: Record<string, number> = {};
+  const params: Record<string, ParamValue> = {};
   if (config.params && typeof config.params === "object") {
     for (const [name, value] of Object.entries(config.params as Record<string, unknown>)) {
-      if (typeof value === "number" && Number.isFinite(value)) params[name] = value;
+      if (isParamValue(value)) params[name] = value;
     }
   }
   const hops = Array.isArray(config.hops)
-    ? ALL_HOPS.filter((hop) => (config.hops as unknown[]).includes(hop))
-    : [...ALL_HOPS];
+    ? KNOWN_HOPS.filter((hop) => (config.hops as unknown[]).includes(hop))
+    : [...KNOWN_HOPS];
+  const revision = config.script_revision;
   return {
-    check: typeof config.check === "string" ? config.check : "",
+    script_id: typeof config.script_id === "string" ? config.script_id : "",
+    metric_id: typeof config.metric_id === "string" ? config.metric_id : "",
+    script_revision:
+      typeof revision === "number" && Number.isInteger(revision) && revision >= 1 ? revision : null,
+    period: readPeriod(config.period),
     params,
-    hops: hops.length > 0 ? hops : [...ALL_HOPS],
+    view: config.view === "table" ? "table" : "map",
+    direction:
+      config.direction === "forward" || config.direction === "reverse" ? config.direction : "both",
+    hops: hops.length > 0 ? hops : [...KNOWN_HOPS],
   };
 }
 
-export function readMarkdownContent(panel: DashboardPanelModel): string {
-  const config = asRecord(panel.config);
-  return typeof config.content === "string" ? config.content : "";
-}
-
-function isSameNumber(a: number, b: number): boolean {
-  return Math.abs(a - b) <= 1e-12 * Math.max(1, Math.abs(b));
+/** Why a `metric_script` config cannot be saved, or null when it can. */
+export function metricScriptConfigError(config: MetricScriptPanelConfig): string | null {
+  if (!config.script_id) return "Choose a script";
+  if (config.script_revision === null) return "The script has no valid revision to pin";
+  if (!config.metric_id) return "Choose a metric";
+  if (config.hops.length === 0) return "Choose at least one pair distance";
+  return periodError(config.period);
 }
 
 /**
- * Parameter overrides worth storing: values that parse to a finite number and
- * differ from the check's default. Unknown names and blank inputs are dropped.
+ * The stored form of a `metric_script` config. The API rejects unknown keys for this panel
+ * type, so only the fields of `MetricScriptPanelConfig` are written.
  */
-export function buildCollisionParams(
-  check: CollisionCheckInfo | undefined,
-  values: Record<string, string>,
-): Record<string, number> {
-  const params: Record<string, number> = {};
-  if (!check) return params;
-  for (const parameter of check.parameters) {
-    const raw = values[parameter.name];
-    if (raw === undefined || raw.trim() === "") continue;
-    const value = Number(raw);
-    if (!Number.isFinite(value) || isSameNumber(value, parameter.default)) continue;
-    params[parameter.name] = value;
-  }
-  return params;
+export function writeMetricScriptConfig(
+  config: MetricScriptPanelConfig,
+): DashboardPanelModelConfig {
+  return {
+    script_id: config.script_id,
+    metric_id: config.metric_id,
+    script_revision: config.script_revision,
+    period: config.period,
+    params: config.params,
+    view: config.view,
+    direction: config.direction,
+    hops: config.hops,
+  };
 }
 
-/** Validation message for one parameter input, or null when it is acceptable. */
-export function collisionParamError(
-  parameter: CollisionCheckInfo["parameters"][number],
-  raw: string | undefined,
-): string | null {
-  if (raw === undefined || raw.trim() === "") return null;
-  const value = Number(raw);
-  if (!Number.isFinite(value)) return "Enter a number";
-  if (parameter.min !== null && parameter.min !== undefined && value < parameter.min) {
-    return `Must be at least ${parameter.min}`;
-  }
-  return null;
-}
-
-/** Trim a number for display without losing small magnitudes. */
-export function formatNumber(value: number): string {
-  if (Number.isInteger(value)) return String(value);
-  const abs = Math.abs(value);
-  if (abs !== 0 && (abs < 0.001 || abs >= 1e6)) return value.toExponential(3);
-  return String(Number(value.toPrecision(6)));
+export function readMarkdownContent(panel: Pick<DashboardPanelModel, "config">): string {
+  const config = asRecord(panel.config);
+  return typeof config.content === "string" ? config.content : "";
 }

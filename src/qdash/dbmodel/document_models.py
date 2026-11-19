@@ -32,6 +32,7 @@ from qdash.dbmodel.forum import (
     ForumPostDocument,
 )
 from qdash.dbmodel.metric_note import MetricNoteDocument
+from qdash.dbmodel.metric_script import MetricScriptDocument
 from qdash.dbmodel.note_event import NoteEventDocument
 from qdash.dbmodel.notification import NotificationDocument
 from qdash.dbmodel.project import ProjectDocument
@@ -95,6 +96,7 @@ def document_models() -> list[Any]:
         NotificationDocument,
         CryostatDocument,
         CustomDashboardDocument,
+        MetricScriptDocument,
         CooldownDocument,
         CooldownWiringEventDocument,
         CopilotChatSessionDocument,

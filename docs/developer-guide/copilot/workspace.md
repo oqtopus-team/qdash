@@ -92,7 +92,8 @@ row also shows the tool's answer (`output` on `tool_end`, the tail when long, wi
 of a failed command). The user's open or closed choice persists as the call starts and finishes.
 While the model writes a call, an expanded row shows the code as it is typed (`tool_draft` and
 `tool_args_delta` in [Chat Streaming](./chat-streaming.md)). A save of a flow
-(`qdash_save_flow`) shows the whole flow as code on its approval card. Components:
+(`qdash_save_flow`) or a metric script (`qdash_save_metric_script`) shows the whole source as
+code on its approval card. Components:
 `ui/src/components/features/chat/ToolStepDetails.tsx`, `ChatInteractionCards.tsx`.
 
 ## Configuration

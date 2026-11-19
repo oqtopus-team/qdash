@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 
 import { useQueryClient } from "@tanstack/react-query";
 import { Copy, LayoutGrid, Plus, Trash2 } from "lucide-react";
+import { parseAsStringLiteral, useQueryState } from "nuqs";
 
 import {
   getListCustomDashboardsQueryKey,
@@ -16,6 +17,8 @@ import {
   useListCustomDashboards,
 } from "@/client/custom-dashboard/custom-dashboard";
 import type { CustomDashboardResponse } from "@/schemas";
+import { MetricScriptList } from "@/components/features/metric-scripts/MetricScriptList";
+import { NewMetricScriptDialog } from "@/components/features/metric-scripts/NewMetricScriptDialog";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorCard } from "@/components/ui/ErrorCard";
@@ -148,13 +151,23 @@ function DashboardGroup({
   );
 }
 
-/** Dashboards the caller owns and those shared with the project. */
+const TABS = ["dashboards", "scripts"] as const;
+type ListTab = (typeof TABS)[number];
+
+const TAB_LABELS: Record<ListTab, string> = { dashboards: "Dashboards", scripts: "Scripts" };
+
+/**
+ * Dashboards the caller owns and those shared with the project, and on the Scripts tab the
+ * metric scripts their panels evaluate.
+ */
 export function CustomDashboardListPageContent() {
   const router = useRouter();
   const toast = useToast();
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { canEdit } = useProject();
+  const [tab, setTab] = useQueryState("tab", parseAsStringLiteral(TABS).withDefault("dashboards"));
+  const [newScriptOpen, setNewScriptOpen] = useState(false);
 
   const { data, isLoading, isError, error, refetch, isRefetching } = useListCustomDashboards();
   const createMutation = useCreateCustomDashboard();
@@ -263,56 +276,98 @@ export function CustomDashboardListPageContent() {
     </button>
   ) : null;
 
+  const newScriptButton = canEdit ? (
+    <button type="button" className="btn btn-primary btn-sm" onClick={() => setNewScriptOpen(true)}>
+      <Plus data-icon="inline-start" aria-hidden="true" />
+      New script
+    </button>
+  ) : null;
+
   const total = mine.length + shared.length;
 
   return (
     <PageContainer maxWidth>
       <PageHeader
         title="Dashboards"
-        description="Panels composed by project members, private or shared with the project"
-        actions={newButton}
+        description={
+          tab === "scripts"
+            ? "Python metric scripts that compute per-qubit and per-pair values for panels"
+            : "Panels composed by project members, private or shared with the project"
+        }
+        actions={tab === "scripts" ? newScriptButton : newButton}
       />
 
-      {isLoading ? (
-        <div className="flex flex-col gap-2" aria-busy="true" aria-label="Loading dashboards">
-          {[0, 1, 2].map((index) => (
-            <div key={index} className="skeleton h-16 w-full" />
-          ))}
-        </div>
-      ) : isError ? (
-        <ErrorCard
-          title="Failed to load dashboards"
-          message={getApiErrorMessage(error, "The dashboard list could not be loaded")}
-          onRetry={() => void refetch()}
-          retrying={isRefetching}
-        />
-      ) : total === 0 ? (
-        <EmptyState
-          emoji="chart"
-          title="No dashboards yet"
-          description={
-            canEdit
-              ? "Create a dashboard and add metric, collision check and note panels"
-              : "Dashboards that project members share will appear here"
-          }
-          action={newButton}
-        />
-      ) : (
-        <div className="flex flex-col gap-6">
-          <DashboardGroup
-            title="Mine"
-            emptyText="You have no dashboards of your own"
-            dashboards={mine}
-            renderRow={renderRow}
+      <div
+        role="tablist"
+        aria-label="Dashboards and scripts"
+        className="tabs tabs-border mb-4 w-fit"
+      >
+        {TABS.map((value) => (
+          <button
+            key={value}
+            type="button"
+            role="tab"
+            id={`custom-dashboards-tab-${value}`}
+            aria-selected={tab === value}
+            aria-controls="custom-dashboards-tabpanel"
+            className={`tab ${tab === value ? "tab-active" : ""}`}
+            onClick={() => void setTab(value === "dashboards" ? null : value)}
+          >
+            {TAB_LABELS[value]}
+          </button>
+        ))}
+      </div>
+
+      <div
+        role="tabpanel"
+        id="custom-dashboards-tabpanel"
+        aria-labelledby={`custom-dashboards-tab-${tab}`}
+      >
+        {tab === "scripts" ? (
+          <MetricScriptList newButton={newScriptButton} />
+        ) : isLoading ? (
+          <div className="flex flex-col gap-2" aria-busy="true" aria-label="Loading dashboards">
+            {[0, 1, 2].map((index) => (
+              <div key={index} className="skeleton h-16 w-full" />
+            ))}
+          </div>
+        ) : isError ? (
+          <ErrorCard
+            title="Failed to load dashboards"
+            message={getApiErrorMessage(error, "The dashboard list could not be loaded")}
+            onRetry={() => void refetch()}
+            retrying={isRefetching}
           />
-          <DashboardGroup
-            title="Shared with project"
-            emptyText="No other member has shared a dashboard"
-            dashboards={shared}
-            renderRow={renderRow}
+        ) : total === 0 ? (
+          <EmptyState
+            emoji="chart"
+            title="No dashboards yet"
+            description={
+              canEdit
+                ? "Create a dashboard and add metric, metric script and note panels"
+                : "Dashboards that project members share will appear here"
+            }
+            action={newButton}
           />
-        </div>
-      )}
+        ) : (
+          <div className="flex flex-col gap-6">
+            <DashboardGroup
+              title="Mine"
+              emptyText="You have no dashboards of your own"
+              dashboards={mine}
+              renderRow={renderRow}
+            />
+            <DashboardGroup
+              title="Shared with project"
+              emptyText="No other member has shared a dashboard"
+              dashboards={shared}
+              renderRow={renderRow}
+            />
+          </div>
+        )}
+      </div>
+
+      {canEdit && <NewMetricScriptDialog open={newScriptOpen} onOpenChange={setNewScriptOpen} />}
 
       {canEdit && (
         <DashboardFormDialog

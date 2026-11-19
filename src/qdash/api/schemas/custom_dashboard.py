@@ -34,6 +34,18 @@ class CustomDashboardUpdateRequest(BaseModel):
     panels: list[DashboardPanelModel] | None = Field(default=None, max_length=MAX_PANELS)
 
 
+class DashboardPanelResponse(DashboardPanelModel):
+    """A panel as returned to the caller.
+
+    For ``metric_script`` panels whose script the caller can view, ``script_name`` and
+    ``latest_revision`` (the script's active, last-good revision) let the UI offer to move
+    the pinned ``config.script_revision`` forward. Both are null for other panels.
+    """
+
+    script_name: str | None = None
+    latest_revision: int | None = None
+
+
 class CustomDashboardResponse(BaseModel):
     """A custom dashboard as seen by the caller."""
 
@@ -43,7 +55,7 @@ class CustomDashboardResponse(BaseModel):
     description: str
     visibility: DashboardVisibility
     chip_id: str | None
-    panels: list[DashboardPanelModel]
+    panels: list[DashboardPanelResponse]
     owner_username: str
     owner_user_id: str | None
     can_edit: bool = Field(..., description="Whether the caller may update or delete it")

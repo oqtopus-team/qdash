@@ -83,13 +83,23 @@ export interface ApprovalRequest {
   args: Record<string, unknown>;
 }
 
-/** A change the assistant proposes to the code open in the Workflow editor; the user applies it there. */
+/**
+ * A change the assistant proposes to the code open in an editor (the Workflow editor or the
+ * metric script editor); the user applies it there.
+ */
 export interface EditProposal {
   summary: string;
   /** The complete new file. */
   code: string;
+  /** Which editor the change is for. Absent on proposals made for flows before scripts existed. */
+  target?: "flow" | "metric_script";
+  /** The flow's name; for a metric script, set to the script's name. */
   flowName: string;
   chipId: string | null;
+  /** The metric script the change is for (target `metric_script`). */
+  scriptId?: string;
+  /** The metric script's name (target `metric_script`). */
+  scriptName?: string;
   pagePath: string;
 }
 
@@ -102,11 +112,21 @@ interface FlowEditorContext {
   dirty: boolean;
 }
 
+/** The metric script open in its editor, read when a turn is sent. */
+export interface MetricScriptEditorContext {
+  scriptId: string;
+  name: string;
+  /** The editor's current text, unsaved changes included. */
+  code: string;
+  dirty?: boolean;
+}
+
 /** What the user has open while chatting from the sidebar or floating window; sent with every turn. */
 export interface PageContext {
   path: string;
   title: string;
   flow?: FlowEditorContext;
+  metricScript?: MetricScriptEditorContext;
 }
 
 export interface ContentBlock {

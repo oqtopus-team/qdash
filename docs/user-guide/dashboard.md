@@ -1,8 +1,10 @@
 # Overview
 
 Use **Overview** to scan every configured metric for one chip, then open a target when a value
-needs investigation or context. To keep a chosen set of metric maps and collision checks in
-your own layout and share it with the project, use [Dashboards](./custom-dashboards.md).
+needs investigation or context. To keep a chosen set of metric maps and the results of your own
+[metric scripts](./metric-scripts.md), such as a median over a period per coupling or the
+collision checks, in your own layout and share it with the project, use
+[Dashboards](./custom-dashboards.md).
 
 ## Select the Data Scope
 

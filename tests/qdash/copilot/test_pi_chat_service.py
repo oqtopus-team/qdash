@@ -754,7 +754,26 @@ def test_the_open_page_travels_with_the_turn(monkeypatch: pytest.MonkeyPatch) ->
         "path": "/workflow/t1",
         "title": "Workflow t1",
         "flow": {"name": "t1", "chip_id": "64Qv3", "code": "x = 1\n", "dirty": True},
+        "metric_script": None,
     }
+    on_script = ChatRequest.model_validate(
+        {
+            "message": "use the median",
+            "session_id": "s1",
+            "page": {
+                "path": "/custom-dashboards/scripts/ms_0123456789ab",
+                "metric_script": {
+                    "script_id": "ms_0123456789ab",
+                    "name": "ZX90",
+                    "code": "x = 1\n",
+                    "dirty": True,
+                },
+            },
+        }
+    )
+    assert pi_chat_service._request_payload(on_script, config, "alice")["page_context"][
+        "metric_script"
+    ] == {"script_id": "ms_0123456789ab", "name": "ZX90", "code": "x = 1\n", "dirty": True}
 
 
 @pytest.mark.parametrize("contents", ["runtime-secret\n", ""])

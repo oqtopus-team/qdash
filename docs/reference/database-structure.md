@@ -81,11 +81,14 @@ runtime lifecycle, reservations, and terminal state handling.
 | `notification` | `NotificationDocument` | `notification.py` |
 | `copilot_chat_session` | `CopilotChatSessionDocument` | `copilot_chat_session.py` |
 | `custom_dashboard` | `CustomDashboardDocument` | `custom_dashboard.py` |
+| `metric_script` | `MetricScriptDocument` | `metric_script.py` |
 | `copilot_store_teardown` | None (raw collection, one lease per owner and store) | `api/services/copilot_chat_session_service.py` |
 | `copilot_store_generation` | None (raw collection, the current generation per owner and store) | `api/services/copilot_chat_session_service.py` |
 
 [Notes Architecture](../developer-guide/architecture/notes.md) explains current-state notes and
 their audit events.
+[Custom Dashboards Architecture](../developer-guide/architecture/custom-dashboards.md) explains
+dashboards, metric scripts, and their revisions.
 
 ## Agent and Provenance
 

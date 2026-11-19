@@ -4,12 +4,14 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from qdash.datamodel.metric_script import MetricPeriod, default_period
 
 GRID_COLUMNS = 12
 """Width of the dashboard grid in columns."""
 
-PanelType = Literal["qubit_metric", "coupling_metric", "collision_check", "markdown"]
+PanelType = Literal["qubit_metric", "coupling_metric", "metric_script", "markdown"]
 DashboardVisibility = Literal["private", "project"]
 
 
@@ -54,16 +56,28 @@ class CouplingMetricPanelConfig(BaseModel):
     metric: str = Field(..., min_length=1, max_length=100)
 
 
-class CollisionPanelConfig(BaseModel):
-    """Config of a ``collision_check`` panel.
+class MetricScriptPanelConfig(BaseModel):
+    """Config of a ``metric_script`` panel.
 
-    ``check`` must name a registered collision check; the service verifies it
-    together with the parameter names.
+    The panel pins ``script_revision``: saving a newer revision of the script never
+    changes what the panel shows until an editor updates the pin. The service checks the
+    script, revision, metric and parameters when the dashboard is saved.
     """
 
-    check: str = Field(..., min_length=1)
-    params: dict[str, float] = Field(default_factory=dict)
-    hops: list[int] = Field(default_factory=lambda: [1, 2])
+    model_config = ConfigDict(extra="forbid")
+
+    script_id: str = Field(..., min_length=1, max_length=64)
+    metric_id: str = Field(..., min_length=1, max_length=200)
+    script_revision: int = Field(..., ge=1, description="Pinned script revision")
+    period: MetricPeriod = Field(default_factory=default_period)
+    params: dict[str, bool | int | float | str] = Field(default_factory=dict)
+    view: Literal["map", "table"] = "map"
+    direction: Literal["both", "forward", "reverse"] = Field(
+        default="both", description="Pair maps: which edge directions to draw"
+    )
+    hops: list[int] = Field(
+        default_factory=lambda: [1, 2], description="Pair distances shown (within declared)"
+    )
 
     @field_validator("hops")
     @classmethod
@@ -84,6 +98,6 @@ class MarkdownPanelConfig(BaseModel):
 PANEL_CONFIG_MODELS: dict[str, type[BaseModel]] = {
     "qubit_metric": QubitMetricPanelConfig,
     "coupling_metric": CouplingMetricPanelConfig,
-    "collision_check": CollisionPanelConfig,
+    "metric_script": MetricScriptPanelConfig,
     "markdown": MarkdownPanelConfig,
 }

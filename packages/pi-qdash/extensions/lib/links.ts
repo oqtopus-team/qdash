@@ -38,6 +38,16 @@ export function forumPostPagePath(postId: string): string {
   return `/forum/${encodeURIComponent(postId)}`;
 }
 
+/** Path of a metric script's editor page. */
+export function metricScriptPagePath(scriptId: string): string {
+  return `/custom-dashboards/scripts/${encodeURIComponent(scriptId)}`;
+}
+
+/** Path of a custom dashboard's page. */
+export function customDashboardPagePath(dashboardId: string): string {
+  return `/custom-dashboards/${encodeURIComponent(dashboardId)}`;
+}
+
 export function qdashObjectLinks(client: QDashClient, object: Record<string, unknown>): Record<string, string> {
   const links: Record<string, string> = {};
   const taskId = firstString(object, ["task_id", "taskId"]);
@@ -45,9 +55,13 @@ export function qdashObjectLinks(client: QDashClient, object: Record<string, unk
   const chipId = firstString(object, ["chip_id", "chipId"]);
   const postId = firstString(object, ["post_id", "forum_post_id", "id"]);
   const sessionId = firstString(object, ["session_id", "sessionId"]);
+  const scriptId = firstString(object, ["script_id", "scriptId"]);
+  const dashboardId = firstString(object, ["dashboard_id", "dashboardId"]);
   if (taskId) links.task_result = qdashWebUrl(client, `/task-results/${encodeURIComponent(taskId)}`);
   if (executionId) links.execution = qdashWebUrl(client, executionPagePath(executionId, chipId));
   if (postId) links.forum_post = qdashWebUrl(client, forumPostPagePath(postId));
+  if (scriptId) links.metric_script = qdashWebUrl(client, metricScriptPagePath(scriptId));
+  if (dashboardId) links.custom_dashboard = qdashWebUrl(client, customDashboardPagePath(dashboardId));
   if (sessionId) links.agent_session = qdashWebUrl(client, `/agent-sessions/${encodeURIComponent(sessionId)}`);
   return links;
 }

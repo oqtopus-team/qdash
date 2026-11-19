@@ -118,6 +118,72 @@ describe("ApprovalCard", () => {
   });
 });
 
+describe("ApprovalCard for metric scripts", () => {
+  it("shows a metric script about to be saved as code", () => {
+    const source =
+      "from qdash_metrics import metric\n\n@metric(title='T1', unit='us')\ndef t1(q, ctx):\n    return None\n";
+    render(
+      <ApprovalCard
+        approval={{
+          id: "call-3",
+          tool: "qdash_save_metric_script",
+          label: "QDash Save Metric Script",
+          args: {
+            scriptId: "ms_1",
+            name: "coherence",
+            visibility: "project",
+            description: "T1 per qubit",
+            source,
+            expectedRevision: 3,
+          },
+        }}
+        state={state()}
+      />,
+    );
+    const preview = screen.getByTestId("metric-script-save-preview");
+    expect(preview.textContent).toContain("Update metric script coherence");
+    expect(preview.textContent).toContain("shared with project");
+    expect(preview.textContent).toContain("T1 per qubit");
+    expect(preview.textContent).toContain("def t1(q, ctx):");
+    expect(screen.queryByText("source", { selector: "dt" })).toBeNull();
+    // Arguments the preview does not show stay in the list.
+    expect(screen.getByText("expectedRevision", { selector: "dt" })).toBeTruthy();
+  });
+});
+
+describe("EditProposalCard for metric scripts", () => {
+  const edit = {
+    summary: "Count observations",
+    code: "new script\n",
+    target: "metric_script" as const,
+    flowName: "zx90",
+    chipId: null,
+    scriptId: "ms_1",
+    scriptName: "zx90_median",
+    pagePath: "/custom-dashboards/scripts/ms_1",
+  };
+
+  it("names the script and its file", () => {
+    render(
+      <EditProposalCard
+        edit={edit}
+        state={state({ applyCode: () => true, currentCode: () => "old script\n" })}
+      />,
+    );
+    expect(screen.getByRole("group", { name: "Proposed change to zx90_median" })).toBeTruthy();
+    expect(screen.getByText(/Proposed change to metric script/)).toBeTruthy();
+    expect(screen.getByTestId("diff").textContent).toBe("old script\n=>new script\n");
+  });
+
+  it("says where to apply it when the script editor is not open", () => {
+    render(<EditProposalCard edit={edit} state={state()} />);
+    expect(
+      screen.getByText("Open this metric script in its editor to apply the change there."),
+    ).toBeTruthy();
+    expect(screen.queryByText(/Workflow editor/)).toBeNull();
+  });
+});
+
 describe("EditProposalCard", () => {
   const edit = {
     summary: "Add a T2 step",

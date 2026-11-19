@@ -23,7 +23,6 @@ import {
 } from "lucide-react";
 import { parseAsString, useQueryState } from "nuqs";
 
-import { useGetChip, useListChips } from "@/client/chip/chip";
 import {
   getGetCustomDashboardQueryKey,
   getListCustomDashboardsQueryKey,
@@ -36,6 +35,7 @@ import type {
   CustomDashboardResponse,
   CustomDashboardUpdateRequest,
   DashboardPanelModel,
+  DashboardPanelResponse,
 } from "@/schemas";
 import { ChipSelector } from "@/components/selectors/ChipSelector";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -46,9 +46,12 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { useToast } from "@/components/ui/Toast";
 import { useProject } from "@/contexts/ProjectContext";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
-import { sortChipsByDefaultPriority } from "@/lib/utils/chips";
 import { copyText } from "@/lib/utils/clipboard";
 import { formatDateTime, formatRelativeTime } from "@/lib/utils/datetime";
+import {
+  useChipTopologyId,
+  useDefaultChipId,
+} from "@/components/features/metric-scripts/useChipTopology";
 
 import { DashboardFormDialog, type DashboardFormValues } from "./DashboardFormDialog";
 import { DashboardPanelCard, type PanelCommand } from "./DashboardPanelCard";
@@ -68,8 +71,17 @@ function newPanelId(): string {
   return `panel-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-function panelsEqual(a: readonly DashboardPanelModel[], b: readonly DashboardPanelModel[]) {
+function panelsEqual(a: readonly DashboardPanelResponse[], b: readonly DashboardPanelResponse[]) {
   return JSON.stringify(a) === JSON.stringify(b);
+}
+
+/** A panel as the API stores it, without the script annotations of the response. */
+function toPanelModel({
+  script_name: _scriptName,
+  latest_revision: _latestRevision,
+  ...panel
+}: DashboardPanelResponse): DashboardPanelModel {
+  return panel;
 }
 
 function NotFoundState() {
@@ -119,19 +131,14 @@ export function CustomDashboardPageContent({ dashboardId }: { dashboardId: strin
 
   // Chip override for this view only; it never changes the stored default.
   const [chipParam, setChipParam] = useQueryState("chip", parseAsString);
-  const { data: chipsResponse } = useListChips();
-  const newestChipId = useMemo(
-    () => sortChipsByDefaultPriority(chipsResponse?.data?.chips ?? [])[0]?.chip_id ?? "",
-    [chipsResponse],
-  );
+  const newestChipId = useDefaultChipId();
   const chipId = chipParam || dashboard?.chip_id || newestChipId;
-  const { data: chipResponse } = useGetChip(chipId, { query: { enabled: !!chipId } });
-  const topologyId =
-    chipResponse?.data?.topology_id ?? `square-lattice-mux-${chipResponse?.data?.size ?? 64}`;
+  const topologyId = useChipTopologyId(chipId);
 
   const mayEdit = canEdit && !!dashboard?.can_edit;
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState<DashboardPanelModel[]>([]);
+  // Panels keep the response's script annotations so a draft can show "newer revision" badges.
+  const [draft, setDraft] = useState<DashboardPanelResponse[]>([]);
   const [editorPanelId, setEditorPanelId] = useState<string | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -203,7 +210,7 @@ export function CustomDashboardPageContent({ dashboardId }: { dashboardId: strin
   const savePanels = () => {
     const submitted = draft;
     update(
-      { panels: submitted },
+      { panels: submitted.map(toPanelModel) },
       {
         success: "Dashboard saved",
         failure: "Failed to save the dashboard",
@@ -283,10 +290,19 @@ export function CustomDashboardPageContent({ dashboardId }: { dashboardId: strin
       const panel = current.find((entry) => entry.panel_id === panelId);
       if (!panel) return current;
       if (command === "remove") return current.filter((entry) => entry.panel_id !== panelId);
+      if (command === "update-revision") {
+        const latest = panel.latest_revision;
+        if (panel.type !== "metric_script" || !latest) return current;
+        return current.map((entry) =>
+          entry.panel_id === panelId
+            ? { ...entry, config: { ...entry.config, script_revision: latest } }
+            : entry,
+        );
+      }
       if (command === "duplicate") {
         if (current.length >= MAX_PANELS) return current;
         const below = nextPanelLayout(current, panel.type);
-        const copy: DashboardPanelModel = {
+        const copy: DashboardPanelResponse = {
           ...panel,
           panel_id: newPanelId(),
           title: panel.title ? `${panel.title} (copy)` : "",
@@ -531,7 +547,7 @@ export function CustomDashboardPageContent({ dashboardId }: { dashboardId: strin
           title="This dashboard has no panels"
           description={
             mayEdit
-              ? "Add metric heatmaps, frequency collision checks or Markdown notes"
+              ? "Add metric heatmaps, metric script results or Markdown notes"
               : "Its owner has not added any panels yet"
           }
           action={
@@ -574,6 +590,7 @@ export function CustomDashboardPageContent({ dashboardId }: { dashboardId: strin
           <PanelEditorDialog
             open={editorOpen}
             panel={editorPanel}
+            dashboardShared={shared}
             onOpenChange={setEditorOpen}
             onSave={handleEditorSave}
           />

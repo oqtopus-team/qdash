@@ -19,7 +19,6 @@ from qdash.api.routers import (
     calibration,
     calibration_pipeline,
     chip,
-    collision_analysis,
     config,
     cooldown,
     cooldown_wiring_event,
@@ -32,6 +31,7 @@ from qdash.api.routers import (
     file,
     flow,
     forum,
+    metric_script,
     metrics,
     note,
     notification,
@@ -97,9 +97,7 @@ PROTECTED_ROUTERS: tuple[RouterRegistration, ...] = (
     RouterRegistration(
         custom_dashboard.router, prefix="/custom-dashboards", tags=("custom-dashboard",)
     ),
-    RouterRegistration(
-        collision_analysis.router, prefix="/collision-analysis", tags=("collision-analysis",)
-    ),
+    RouterRegistration(metric_script.router, prefix="/metric-scripts", tags=("metric-script",)),
     RouterRegistration(topology.router, prefix="/topology", tags=("topology",)),
     RouterRegistration(config.router, tags=("config",)),
     RouterRegistration(provenance.router, prefix="/provenance", tags=("provenance",)),

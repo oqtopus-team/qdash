@@ -151,6 +151,23 @@ docker compose build ui
 docker compose up -d ui
 ```
 
+### Limit Metric Script Runs
+
+[Metric scripts](./metric-scripts.md) run in a separate process on the API server for each
+validation and preview. Set these in `.env` to change their limits, then apply them with
+`docker compose up -d api`, which recreates the API container with the new environment.
+
+| Variable | Meaning | Default |
+| --- | --- | --- |
+| `METRIC_SCRIPT_TIMEOUT_SECONDS` | Wall-clock limit of one run, in seconds | `60` |
+| `METRIC_SCRIPT_MEMORY_MB` | Memory a script may use on top of the Python baseline, in MiB, on hosts that support the limit | `1024` |
+| `METRIC_SCRIPT_CONCURRENCY` | Runs at once per API process; a run that waits more than five seconds for a slot is refused | `2` |
+
+Scripts are written by project editors and owners. The run holds no database or API
+credentials, but it is not isolated from the network or from files the API container can read;
+see [Metric Scripts architecture](../developer-guide/architecture/metric-scripts.md#isolation-and-threat-model)
+before opening editing to people you would not give shell access.
+
 ### Run Several Deployments on One Host
 
 Give each deployment its own checkout and `.env`, with a different `ENV` and `UI_PORT`. Leave the

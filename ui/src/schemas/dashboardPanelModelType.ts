@@ -15,6 +15,6 @@ export type DashboardPanelModelType = typeof DashboardPanelModelType[keyof typeo
 export const DashboardPanelModelType = {
   qubit_metric: 'qubit_metric',
   coupling_metric: 'coupling_metric',
-  collision_check: 'collision_check',
+  metric_script: 'metric_script',
   markdown: 'markdown',
 } as const;

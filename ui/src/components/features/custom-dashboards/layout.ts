@@ -20,7 +20,7 @@ export type LayoutAction =
   | "shorter";
 
 /** Panels in reading order: top to bottom, then left to right. */
-export function sortPanels(panels: readonly DashboardPanelModel[]): DashboardPanelModel[] {
+export function sortPanels<T extends DashboardPanelModel>(panels: readonly T[]): T[] {
   return [...panels].sort((a, b) => a.layout.y - b.layout.y || a.layout.x - b.layout.x || 0);
 }
 
@@ -80,12 +80,12 @@ function overlaps(a: PanelLayoutModel, b: PanelLayoutModel): boolean {
  * keeps its place; every other panel is placed in reading order below the
  * panels it collides with.
  */
-export function resolveCollisions(
-  panels: readonly DashboardPanelModel[],
+export function resolveCollisions<T extends DashboardPanelModel>(
+  panels: readonly T[],
   pinnedId?: string,
-): DashboardPanelModel[] {
+): T[] {
   const pinned = panels.find((panel) => panel.panel_id === pinnedId);
-  const placed: DashboardPanelModel[] = pinned ? [pinned] : [];
+  const placed: T[] = pinned ? [pinned] : [];
   const rest = sortPanels(panels.filter((panel) => panel !== pinned));
   for (const panel of rest) {
     let layout = { ...panel.layout };
@@ -104,7 +104,7 @@ export function resolveCollisions(
 /** Default size of a new panel of `type`. */
 function defaultPanelSize(type: DashboardPanelModelType): { w: number; h: number } {
   switch (type) {
-    case "collision_check":
+    case "metric_script":
       return { w: 6, h: 4 };
     case "markdown":
       return { w: 12, h: 2 };

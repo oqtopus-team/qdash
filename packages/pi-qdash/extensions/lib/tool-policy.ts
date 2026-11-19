@@ -35,6 +35,8 @@ export const REVIEWED_WRITE_TOOL_NAMES = [
   "qdash_run_pipeline",
   "qdash_save_flow",
   "qdash_execute_flow",
+  "qdash_save_metric_script",
+  "qdash_save_custom_dashboard",
 ] as const;
 
 /**
@@ -149,6 +151,11 @@ export const DEFERRED_TOOL_NAMES = [
   "qdash_get_agent_candidate_commit",
   "qdash_apply_agent_candidate_commit",
   "qdash_wait_agent_candidate_apply",
+  // Metric scripts and custom dashboards: validation and previews run code on the server.
+  "qdash_validate_metric_script",
+  "qdash_preview_metric_script",
+  "qdash_save_metric_script",
+  "qdash_save_custom_dashboard",
   // QDash and qubex source code, client configuration.
   "qdash_list_source_roots",
   "qdash_search_source",

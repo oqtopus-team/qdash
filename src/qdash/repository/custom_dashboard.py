@@ -38,3 +38,13 @@ class MongoCustomDashboardRepository:
 
     def delete(self, doc: CustomDashboardDocument) -> None:
         doc.delete()
+
+    def find_referencing_script(
+        self, *, project_id: str, script_id: str
+    ) -> list[CustomDashboardDocument]:
+        """Dashboards of the project with a metric_script panel reading ``script_id``."""
+        return list(
+            CustomDashboardDocument.find(
+                {"project_id": project_id, "panels.config.script_id": script_id}
+            ).run()
+        )

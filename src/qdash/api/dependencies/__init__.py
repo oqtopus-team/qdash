@@ -23,7 +23,6 @@ from qdash.api.services.agent_session_service import AgentSessionService
 from qdash.api.services.auth_service import AuthService
 from qdash.api.services.calibration_service import CalibrationService
 from qdash.api.services.chip import ChipConfigScaffolder, ChipService
-from qdash.api.services.collision_analysis_service import CollisionAnalysisService
 from qdash.api.services.config_service import ConfigService
 from qdash.api.services.cooldown_service import CooldownService
 from qdash.api.services.cooldown_wiring_event_service import CooldownWiringEventService
@@ -38,6 +37,7 @@ from qdash.api.services.file_service import FileService
 from qdash.api.services.forum_service import ForumService
 from qdash.api.services.knowledge_draft_service import KnowledgeDraftStore
 from qdash.api.services.manual_update_service import ManualUpdateService
+from qdash.api.services.metric_script_service import MetricScriptService
 from qdash.api.services.metrics_service import MetricsService
 from qdash.api.services.note_service import NoteService
 from qdash.api.services.notification_service import NotificationService
@@ -70,6 +70,7 @@ from qdash.repository.cryostat import MongoCryostatRepository
 from qdash.repository.custom_dashboard import MongoCustomDashboardRepository
 from qdash.repository.execution_history import MongoExecutionHistoryRepository
 from qdash.repository.execution_lock import MongoExecutionLockRepository
+from qdash.repository.metric_script import MongoMetricScriptRepository
 from qdash.repository.provenance import (
     MongoActivityRepository,
     MongoParameterVersionRepository,
@@ -466,13 +467,29 @@ def get_custom_dashboard_repository() -> MongoCustomDashboardRepository:
 @cached_dependency_provider
 def get_custom_dashboard_service() -> CustomDashboardService:
     """Get the custom dashboard service instance."""
-    return CustomDashboardService(custom_dashboard_repository=get_custom_dashboard_repository())
+    return CustomDashboardService(
+        custom_dashboard_repository=get_custom_dashboard_repository(),
+        metric_script_repository=get_metric_script_repository(),
+        metric_script_service=get_metric_script_service(),
+    )
 
 
 @cached_dependency_provider
-def get_collision_analysis_service() -> CollisionAnalysisService:
-    """Get the frequency collision analysis service instance."""
-    return CollisionAnalysisService(chip_repository=get_chip_repository())
+def get_metric_script_repository() -> MongoMetricScriptRepository:
+    """Get the metric script repository instance."""
+    return MongoMetricScriptRepository()
+
+
+@cached_dependency_provider
+def get_metric_script_service() -> MetricScriptService:
+    """Get the metric script service instance."""
+    return MetricScriptService(
+        metric_script_repository=get_metric_script_repository(),
+        custom_dashboard_repository=get_custom_dashboard_repository(),
+        chip_repository=get_chip_repository(),
+        metrics_service=get_metrics_service(),
+        task_result_repository=get_task_result_repository(),
+    )
 
 
 @cached_dependency_provider

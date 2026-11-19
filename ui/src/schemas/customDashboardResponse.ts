@@ -8,7 +8,7 @@
 import type { CustomDashboardResponseChipId } from './customDashboardResponseChipId';
 import type { CustomDashboardResponseOwnerUserId } from './customDashboardResponseOwnerUserId';
 import type { CustomDashboardResponseVisibility } from './customDashboardResponseVisibility';
-import type { DashboardPanelModel } from './dashboardPanelModel';
+import type { DashboardPanelResponse } from './dashboardPanelResponse';
 
 /**
  * A custom dashboard as seen by the caller.
@@ -20,7 +20,7 @@ export interface CustomDashboardResponse {
   description: string;
   visibility: CustomDashboardResponseVisibility;
   chip_id: CustomDashboardResponseChipId;
-  panels: DashboardPanelModel[];
+  panels: DashboardPanelResponse[];
   owner_username: string;
   owner_user_id: CustomDashboardResponseOwnerUserId;
   /** Whether the caller may update or delete it */

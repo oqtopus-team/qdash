@@ -144,6 +144,7 @@ export default withMermaid(
               items: [
                 { text: "Overview", link: "/user-guide/dashboard" },
                 { text: "Dashboards", link: "/user-guide/custom-dashboards" },
+                { text: "Metric Scripts", link: "/user-guide/metric-scripts" },
                 { text: "Data and Provenance", link: "/user-guide/data-and-provenance" },
                 { text: "Reviewing Results", link: "/user-guide/reviewing-results" },
               ],
@@ -253,6 +254,7 @@ export default withMermaid(
                 { text: "Square Lattice", link: "/developer-guide/architecture/square-lattice-topology" },
                 { text: "Notes", link: "/developer-guide/architecture/notes" },
                 { text: "Custom Dashboards", link: "/developer-guide/architecture/custom-dashboards" },
+                { text: "Metric Scripts", link: "/developer-guide/architecture/metric-scripts" },
                 { text: "Provenance", link: "/developer-guide/architecture/provenance" },
               ],
             },

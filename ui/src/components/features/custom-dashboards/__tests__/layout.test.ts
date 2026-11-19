@@ -52,7 +52,7 @@ describe("layout helpers", () => {
 
   it("places new panels below every existing panel with type-specific sizes", () => {
     const panels = [panel("a", 0, 0, 6, 3), panel("b", 6, 1, 6, 4)];
-    expect(nextPanelLayout(panels, "collision_check")).toEqual({ x: 0, y: 5, w: 6, h: 4 });
+    expect(nextPanelLayout(panels, "metric_script")).toEqual({ x: 0, y: 5, w: 6, h: 4 });
     expect(nextPanelLayout(panels, "markdown")).toEqual({ x: 0, y: 5, w: 12, h: 2 });
     expect(nextPanelLayout([], "qubit_metric")).toEqual({ x: 0, y: 0, w: 6, h: 3 });
   });
