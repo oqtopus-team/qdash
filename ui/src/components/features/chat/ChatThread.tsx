@@ -294,7 +294,7 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
     />
   );
 
-  const pad = variant === "page" ? "px-4" : "px-3";
+  const pad = variant === "page" ? "px-3 sm:px-4" : "px-3";
   const density =
     variant === "page" ? "" : variant === "panel" ? "chat-compact" : "chat-compact chat-compact-xs";
 
@@ -306,7 +306,7 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
         } ${density}`}
       >
         {variant === "page" ? (
-          <div className="w-full max-w-3xl px-4">
+          <div className="w-full max-w-3xl px-3 sm:px-4">
             <EmptyState
               variant={variant}
               context={context}
