@@ -10,15 +10,16 @@ Install the package from npm. Node.js 20 or later is required.
 npm install @oqtopus-team/qdash-client
 ```
 
-Changes to the client, API schema, or pi packages on `develop` publish a prerelease under the `beta` dist-tag, versioned as the next patch release with a `-beta.<run ID>.<attempt>` suffix (for example `1.9.21-beta.12345678.1`). Use it to build against endpoints that are merged but not yet released, and switch back to `latest` once the release is tagged.
+Each QDash release tag `vX.Y.Z` publishes the client as `X.Y.Z` under the `latest` dist-tag, the same version as the [Python client](./python.md). Changes to either client, the API schema, the pi packages, root dependencies, or the release workflows on `develop` publish a prerelease under the `beta` dist-tag, versioned as the next QDash patch with a `-beta.<build>` suffix, where `<build>` counts the first-parent commits on `develop` (for example `1.10.3-beta.1278`). One release run computes this version once and publishes it to npm and, in PEP 440 spelling (`1.10.3b1278`), to PyPI. The two registries publish in sequence, not atomically: the PyPI release follows the npm release and can be missing until a failed PyPI run is retried. Use the beta to build against endpoints that are merged but not yet released, and switch back to `latest` once the release is tagged.
 
 ```bash
 npm install @oqtopus-team/qdash-client@beta
 ```
 
-Independent pi-qdash releases pin a client snapshot from the same commit; the
-`pi` dist-tag identifies those snapshots without changing `latest` or `beta`.
-See [Pi packages](../../developer-guide/copilot/packages.md) for local development
+The pi packages release with the same QDash version, and pi-qdash pins the client
+version built in the same run. Earlier client versions under the `pi` dist-tag came from
+the former independent pi-qdash releases, which no longer exist. See
+[Pi packages](../../developer-guide/copilot/packages.md) for local development
 and release ordering.
 
 ## Connect to a Deployment
