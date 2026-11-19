@@ -142,6 +142,15 @@ def _zx90_doc(
     return SimpleNamespace(data=data)
 
 
+def _assert_single_coupling(
+    couplings: list[tuple[int, int, float]], control: int, target: int, fidelity: float
+) -> None:
+    assert len(couplings) == 1
+    actual_control, actual_target, actual_fidelity = couplings[0]
+    assert (actual_control, actual_target) == (control, target)
+    assert actual_fidelity == pytest.approx(fidelity)
+
+
 def _build_q19_q17(
     coupling_doc: SimpleNamespace, metric: str | None = None
 ) -> list[tuple[int, int, float]]:
@@ -186,13 +195,13 @@ def test_build_couplings_keeps_reliable_zx90_irb() -> None:
     # gate_error 0.0047 >= 0.1 * (3/4 * 0.04) = 0.003
     couplings = _build_q19_q17(_zx90_doc(0.9953, error=0.001, depolarizing_rate=0.04))
 
-    assert couplings == [(1, 0, pytest.approx(0.9953))]
+    _assert_single_coupling(couplings, 1, 0, 0.9953)
 
 
 def test_build_couplings_skips_rb_ratio_check_across_executions() -> None:
     doc = _zx90_doc(0.9953, depolarizing_rate=0.08, depolarizing_execution_id="exec-old")
 
-    assert _build_q19_q17(doc) == [(1, 0, pytest.approx(0.9953))]
+    _assert_single_coupling(_build_q19_q17(doc), 1, 0, 0.9953)
 
 
 def test_build_couplings_does_not_judge_non_irb_metric() -> None:
@@ -202,7 +211,7 @@ def test_build_couplings_does_not_judge_non_irb_metric() -> None:
         extra={"bell_state_fidelity": _param(0.97, error=0.5)},
     )
 
-    assert _build_q19_q17(doc, metric="bell_state_fidelity") == [(1, 0, pytest.approx(0.97))]
+    _assert_single_coupling(_build_q19_q17(doc, metric="bell_state_fidelity"), 1, 0, 0.97)
 
 
 def test_build_couplings_does_not_judge_fallback_value() -> None:

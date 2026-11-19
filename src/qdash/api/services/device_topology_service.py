@@ -340,12 +340,12 @@ class DeviceTopologyService:
                     coupling_doc.data.get(coupling_fidelity_metric, {}) if coupling_doc else {}
                 )
                 use_24h = request.condition.coupling_fidelity.is_within_24h
-                zx90_gate_fidelity = _get_value_within_24h_fallback(
-                    coupling_data, use_24h, fallback=0.25
-                )
+                # Decide freshness once so the published value and the reliability
+                # check below always agree on whether a measured value is used.
                 uses_measured_value = coupling_data.get("value") is not None and (
                     not use_24h or _is_within_24h(coupling_data.get("calibrated_at"))
                 )
+                zx90_gate_fidelity = float(coupling_data["value"]) if uses_measured_value else 0.25
                 if (
                     coupling_fidelity_metric == ZX90_IRB_FIDELITY_METRIC
                     and uses_measured_value
