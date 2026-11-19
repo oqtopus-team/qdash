@@ -202,7 +202,7 @@ class ZX90InterleavedRandomizedBenchmarking(QubexTask):
         "zx90_depolarizing_rate": OutputParameterSpec(
             qid_role="coupling",
             unit="a.u.",
-            description="Depolarization error of the ZX90 gate",
+            description="Depolarizing rate (1 - p) of the reference 2Q Clifford RB in the ZX90 IRB run",
             value_type="float",
         ),
     }

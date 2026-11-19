@@ -119,3 +119,102 @@ def test_build_device_topology_resolves_chip_with_project_scope() -> None:
 
     chip_repo.find_by_id.assert_called_once_with(project_id="proj-1", chip_id="chip-1")
     chip_repo.get_current_chip.assert_not_called()
+
+
+def _param(value: float, *, error: float = 0.0, execution_id: str = "exec-1") -> dict[str, Any]:
+    return {"value": value, "error": error, "calibrated_at": None, "execution_id": execution_id}
+
+
+def _zx90_doc(
+    fidelity: float,
+    *,
+    error: float = 0.0,
+    depolarizing_rate: float | None = None,
+    depolarizing_execution_id: str = "exec-1",
+    extra: dict[str, Any] | None = None,
+) -> SimpleNamespace:
+    data: dict[str, Any] = {"zx90_gate_fidelity": _param(fidelity, error=error)}
+    if depolarizing_rate is not None:
+        data["zx90_depolarizing_rate"] = _param(
+            depolarizing_rate, execution_id=depolarizing_execution_id
+        )
+    data.update(extra or {})
+    return SimpleNamespace(data=data)
+
+
+def _build_q19_q17(
+    coupling_doc: SimpleNamespace, metric: str | None = None
+) -> list[tuple[int, int, float]]:
+    request = DeviceTopologyRequest(qubits=["17", "19"])
+    request.condition.coupling_fidelity.is_within_24h = False
+    request.condition.coupling_fidelity.metric = metric
+    couplings = _service()._build_couplings(
+        request=request,
+        cr_params={"Q19-Q17": {"duration": 100}},
+        coupling_models={"19-17": coupling_doc},
+        topology=SimpleNamespace(num_qubits=64, couplings=[[19, 17]]),
+        id_mapping={"17": 0, "19": 1},
+    )
+    return [(c.control, c.target, c.fidelity) for c in couplings]
+
+
+@pytest.mark.parametrize(
+    ("coupling_doc", "reason_fragment"),
+    [
+        # qubex criterion: gate_error 0.0047 < 0.1 * (3/4 * 0.08) = 0.006
+        (_zx90_doc(0.9953, depolarizing_rate=0.08), "reference RB error"),
+        # fidelity at or above 1
+        (_zx90_doc(1.0004), "not positive"),
+    ],
+)
+def test_build_couplings_excludes_unreliable_zx90_irb(
+    coupling_doc: SimpleNamespace,
+    reason_fragment: str,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    with caplog.at_level("WARNING", logger="qdash.api.services.device_topology_service"):
+        couplings = _build_q19_q17(coupling_doc)
+
+    assert couplings == []
+    warning = next(r.getMessage() for r in caplog.records if r.levelname == "WARNING")
+    assert "Q19->Q17" in warning
+    assert "zx90_gate_fidelity=0.99" in warning or "zx90_gate_fidelity=1.00" in warning
+    assert reason_fragment in warning
+
+
+def test_build_couplings_keeps_reliable_zx90_irb() -> None:
+    # gate_error 0.0047 >= 0.1 * (3/4 * 0.04) = 0.003
+    couplings = _build_q19_q17(_zx90_doc(0.9953, error=0.001, depolarizing_rate=0.04))
+
+    assert couplings == [(1, 0, pytest.approx(0.9953))]
+
+
+def test_build_couplings_skips_rb_ratio_check_across_executions() -> None:
+    doc = _zx90_doc(0.9953, depolarizing_rate=0.08, depolarizing_execution_id="exec-old")
+
+    assert _build_q19_q17(doc) == [(1, 0, pytest.approx(0.9953))]
+
+
+def test_build_couplings_does_not_judge_non_irb_metric() -> None:
+    doc = _zx90_doc(
+        0.9953,
+        depolarizing_rate=0.08,
+        extra={"bell_state_fidelity": _param(0.97, error=0.5)},
+    )
+
+    assert _build_q19_q17(doc, metric="bell_state_fidelity") == [(1, 0, pytest.approx(0.97))]
+
+
+def test_build_couplings_does_not_judge_fallback_value() -> None:
+    request_doc = _zx90_doc(1.0004)
+    request_doc.data["zx90_gate_fidelity"]["calibrated_at"] = "2000-01-01T00:00:00+00:00"
+    request = DeviceTopologyRequest(qubits=["17", "19"])
+    couplings = _service()._build_couplings(
+        request=request,
+        cr_params={"Q19-Q17": {"duration": 100}},
+        coupling_models={"19-17": request_doc},
+        topology=SimpleNamespace(num_qubits=64, couplings=[[19, 17]]),
+        id_mapping={"17": 0, "19": 1},
+    )
+
+    assert [c.fidelity for c in couplings] == [0.25]

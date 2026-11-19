@@ -67,6 +67,51 @@ def _get_value_within_24h_fallback(data: dict[str, Any], use_24h: bool, fallback
     return float(value)
 
 
+# Interleaved RB outputs persisted by ZX90InterleavedRandomizedBenchmarking.
+# ``zx90_depolarizing_rate`` is ``1 - p`` of the *reference* (non-interleaved)
+# 2Q Clifford RB fit from the same run, so the reference RB error is
+# ``(d - 1) / d * depolarizing_rate`` with ``d = 4``.
+ZX90_IRB_FIDELITY_METRIC = "zx90_gate_fidelity"
+ZX90_IRB_REFERENCE_DEPOLARIZING_RATE = "zx90_depolarizing_rate"
+TWO_QUBIT_DIMENSION = 4
+# Same threshold as qubex ``interleaved_randomized_benchmarking`` uses for its
+# "gate error is too low compared to the average gate error (RB)" warning.
+IRB_MIN_GATE_ERROR_RATIO_TO_RB_ERROR = 0.1
+
+
+def _zx90_irb_unreliable_reason(coupling_data: dict[str, Any]) -> str | None:
+    """Return why a stored ZX90 IRB fidelity is unreliable, or None if it passes.
+
+    Checks, in order:
+    1. ``gate_error <= 0``: fidelity at or above 1 is not a physical estimate.
+    2. ``gate_error < 0.1 * reference RB error`` (only when the reference
+       depolarizing rate from the same execution is stored): mirrors the qubex
+       IRB warning; IRB subtracts the reference Clifford error, and a gate error
+       this small relative to it indicates an unstable p_irb / p_rb ratio.
+    """
+    fidelity_data = coupling_data.get(ZX90_IRB_FIDELITY_METRIC, {})
+    value = fidelity_data.get("value")
+    if value is None:
+        return None
+    gate_error = 1.0 - float(value)
+    if gate_error <= 0:
+        return f"gate_error={gate_error:.6g} is not positive"
+
+    depolarizing_data = coupling_data.get(ZX90_IRB_REFERENCE_DEPOLARIZING_RATE, {})
+    depolarizing_rate = depolarizing_data.get("value")
+    fidelity_execution = fidelity_data.get("execution_id") or ""
+    depolarizing_execution = depolarizing_data.get("execution_id") or ""
+    same_run = fidelity_execution == depolarizing_execution
+    if depolarizing_rate is not None and same_run:
+        rb_error = (TWO_QUBIT_DIMENSION - 1) / TWO_QUBIT_DIMENSION * float(depolarizing_rate)
+        if gate_error < IRB_MIN_GATE_ERROR_RATIO_TO_RB_ERROR * rb_error:
+            return (
+                f"gate_error={gate_error:.6g} < "
+                f"{IRB_MIN_GATE_ERROR_RATIO_TO_RB_ERROR} * reference RB error={rb_error:.6g}"
+            )
+    return None
+
+
 def _search_coupling_data_by_control_qid(
     cr_params: dict[str, Any], search_term: str
 ) -> dict[str, Any]:
@@ -268,6 +313,7 @@ class DeviceTopologyService:
         )
         candidate_count = 0
         direction_skipped_count = 0
+        unreliable_skipped_count = 0
         direction_matched_samples: list[str] = []
         for qid in request.qubits:
             search_result = _search_coupling_data_by_control_qid(
@@ -293,11 +339,33 @@ class DeviceTopologyService:
                 coupling_data = (
                     coupling_doc.data.get(coupling_fidelity_metric, {}) if coupling_doc else {}
                 )
+                use_24h = request.condition.coupling_fidelity.is_within_24h
                 zx90_gate_fidelity = _get_value_within_24h_fallback(
-                    coupling_data,
-                    request.condition.coupling_fidelity.is_within_24h,
-                    fallback=0.25,
+                    coupling_data, use_24h, fallback=0.25
                 )
+                uses_measured_value = coupling_data.get("value") is not None and (
+                    not use_24h or _is_within_24h(coupling_data.get("calibrated_at"))
+                )
+                if (
+                    coupling_fidelity_metric == ZX90_IRB_FIDELITY_METRIC
+                    and uses_measured_value
+                    and coupling_doc is not None
+                    and control in id_mapping
+                    and target in id_mapping
+                ):
+                    reason = _zx90_irb_unreliable_reason(coupling_doc.data)
+                    if reason is not None:
+                        unreliable_skipped_count += 1
+                        logger.warning(
+                            "device_topology excluding coupling with unreliable ZX90 IRB "
+                            "estimate: coupling=Q%s->Q%s %s=%.6f reason=%s",
+                            control,
+                            target,
+                            coupling_fidelity_metric,
+                            zx90_gate_fidelity,
+                            reason,
+                        )
+                        continue
 
                 if control in id_mapping and target in id_mapping:
                     current_coupling = _normalize_coupling_key(control, target)
@@ -314,10 +382,12 @@ class DeviceTopologyService:
                             )
                         )
         logger.info(
-            "device_topology CR direction filter: direction=%s candidates=%d skipped_by_direction=%d built=%d sample=%s",
+            "device_topology CR direction filter: direction=%s candidates=%d skipped_by_direction=%d "
+            "skipped_by_unreliable_irb=%d built=%d sample=%s",
             request.condition.cr_direction,
             candidate_count,
             direction_skipped_count,
+            unreliable_skipped_count,
             len(couplings),
             direction_matched_samples,
         )
