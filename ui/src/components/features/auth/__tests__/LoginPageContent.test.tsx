@@ -21,10 +21,6 @@ vi.mock("@/contexts/ThemeContext", () => ({
   useTheme: () => ({ theme: "light", setTheme: mocks.setTheme }),
 }));
 
-vi.mock("@/components/ui/EnvironmentBadge", () => ({
-  EnvironmentBadge: () => null,
-}));
-
 vi.mock("next/image", () => ({
   default: ({ alt }: { alt: string }) => <span role="img" aria-label={alt} />,
 }));
@@ -48,6 +44,23 @@ describe("LoginPageContent", () => {
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
+    vi.unstubAllEnvs();
+  });
+
+  it("shows the configured environment next to the product name", () => {
+    vi.stubEnv("NEXT_PUBLIC_ENV", "staging-lab-01");
+    render(<LoginPageContent />);
+
+    const badge = screen.getByTitle("Environment: staging-lab-01");
+    expect(badge.textContent).toBe("staging-lab-01");
+    expect(badge.closest("section")?.getAttribute("aria-label")).toBe("QDash");
+  });
+
+  it("renders no environment badge when NEXT_PUBLIC_ENV is unset", () => {
+    vi.stubEnv("NEXT_PUBLIC_ENV", "");
+    render(<LoginPageContent />);
+
+    expect(screen.queryByTitle(/^Environment:/)).toBeNull();
   });
 
   it("marks both fields as required for assistive technology", () => {

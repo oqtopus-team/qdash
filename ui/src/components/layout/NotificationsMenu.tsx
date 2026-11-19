@@ -72,11 +72,11 @@ export function NotificationsMenu() {
           <span className="text-sm font-medium">Notifications</span>
           <button
             type="button"
-            className="btn btn-ghost btn-xs gap-1 text-base-content/60"
+            className="btn btn-ghost btn-xs text-base-content/60"
             onClick={() => markAllRead.mutate()}
             disabled={unreadCount === 0 || markAllRead.isPending}
           >
-            <CheckCheck size={14} aria-hidden="true" />
+            <CheckCheck data-icon="inline-start" aria-hidden="true" />
             Mark all read
           </button>
         </div>

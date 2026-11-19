@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 
 import { MessageSquare, StickyNote } from "lucide-react";
 
@@ -78,11 +78,6 @@ export function DashboardCouplingGrid({
   presentation = "metric",
   onCouplingClick,
 }: DashboardCouplingGridProps) {
-  const [hover, setHover] = useState<{
-    key: string;
-    x: number;
-    y: number;
-  } | null>(null);
   const isSummaryPresentation = presentation === "summary";
 
   const {
@@ -236,9 +231,9 @@ export function DashboardCouplingGrid({
           const Tag = onCouplingClick ? "button" : "div";
           const handleClick = () => onCouplingClick?.(couplingId);
           const summaryChipClass = hasTargetNote
-            ? "bg-warning border-warning shadow-md opacity-95"
+            ? "bg-warning border-warning shadow-sm opacity-95"
             : hasForumDiscussion
-              ? "bg-info border-info shadow-md opacity-95"
+              ? "bg-info border-info shadow-sm opacity-95"
               : "bg-base-content/25 border-base-content/20 opacity-70 hover:opacity-100";
           const titleText =
             (isSummaryPresentation
@@ -255,131 +250,113 @@ export function DashboardCouplingGrid({
                   : "") +
             (hasForumDiscussion ? " · has linked forum discussion" : "") +
             (onCouplingClick ? " (click to edit pinned summary)" : "");
+          const allNotes = notesByTarget?.[couplingId] ?? [];
+          const [sourceQid, targetQid] = couplingId.split("-");
+          const tooltipHeader =
+            value !== null
+              ? `Q${sourceQid} → Q${targetQid}: ${value.toFixed(4)} ${unit}`
+              : `Q${sourceQid} → Q${targetQid}: No data`;
           return (
-            <Tag
+            <DashboardNoteTooltip
               key={couplingId}
-              onClick={onCouplingClick ? handleClick : undefined}
-              onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
-                const rect = e.currentTarget.getBoundingClientRect();
-                setHover({
-                  key: couplingId,
-                  x: rect.left + rect.width / 2,
-                  y: rect.top,
-                });
-              }}
-              onMouseLeave={() => setHover(null)}
-              className={`absolute flex items-center justify-center transition-colors ${
-                isSummaryPresentation
-                  ? "rounded-full"
-                  : "rounded-md shadow-sm flex-col -translate-x-1/2 -translate-y-1/2"
-              } ${onCouplingClick ? "cursor-pointer hover:ring-2 hover:ring-primary/60" : ""} ${
-                isSummaryPresentation ? `border ${summaryChipClass}` : !bg ? "bg-base-300/60" : ""
-              }`}
-              style={{
-                top: centerY,
-                left: centerX,
-                width: isSummaryPresentation ? cellSize * 0.74 : cellSize * 0.72,
-                height: isSummaryPresentation ? Math.max(6, cellSize * 0.12) : cellSize * 0.5,
-                backgroundColor: isSummaryPresentation ? undefined : (bg ?? undefined),
-                transform: isSummaryPresentation
-                  ? `translate(-50%, -50%) rotate(${arrowAngle}deg)`
-                  : undefined,
-              }}
-              aria-label={titleText}
+              header={tooltipHeader}
+              targetNote={targetNotesByTarget?.[couplingId]}
+              current={allNotes.find((n) => n.metricKey === metricKey)}
+              others={allNotes.filter((n) => n.metricKey !== metricKey)}
+              forumLinks={forumLinksByTarget?.[couplingId] ?? []}
             >
-              {isSummaryPresentation ? (
-                <span className="sr-only">
-                  Q{qid1}→Q{qid2}
-                </span>
-              ) : value !== null ? (
-                <span className="text-xs font-medium text-white drop-shadow leading-none">
-                  {value.toFixed(2)}
-                </span>
-              ) : (
-                <span className="text-xs text-base-content/50 leading-none">—</span>
-              )}
-              {!isSummaryPresentation && (
-                <svg
-                  width="12"
-                  height="5"
-                  viewBox="0 0 18 7"
-                  className="mt-px drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]"
-                  style={{ transform: `rotate(${arrowAngle}deg)` }}
-                >
-                  <line
-                    x1="1"
-                    y1="3.5"
-                    x2="14"
-                    y2="3.5"
-                    stroke={bg ? "white" : "currentColor"}
-                    strokeWidth="1.5"
-                  />
-                  <polyline
-                    points="11,0.5 16,3.5 11,6.5"
-                    fill="none"
-                    stroke={bg ? "white" : "currentColor"}
-                    strokeWidth="1.5"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              )}
-              {(hasNote || hasTargetNote) && (
-                <span
-                  className={`absolute rounded-full bg-warning text-warning-content p-0.5 shadow ${
-                    isSummaryPresentation ? "-top-2 -right-2" : "-top-1 -right-1"
-                  }`}
-                  title={hasNote ? "Has legacy metric note" : "Has pinned summary"}
-                >
-                  <StickyNote className="h-2.5 w-2.5" />
-                </span>
-              )}
-              {hasCrossMetricNote && (
-                <span
-                  className={`absolute rounded-full bg-base-100/90 text-base-content/60 p-0.5 shadow border border-base-300 ${
-                    isSummaryPresentation ? "-top-2 -right-2" : "-top-1 -right-1"
-                  }`}
-                  title="Legacy note exists on another metric"
-                >
-                  <StickyNote className="h-2.5 w-2.5" />
-                </span>
-              )}
-              {hasForumDiscussion && (
-                <span
-                  className={`absolute rounded-full p-0.5 shadow ${
-                    isSummaryPresentation ? "-bottom-2 -right-2" : "-bottom-1 -right-1"
-                  }`}
-                  style={forumMarkerStyle}
-                  title="Linked forum discussion"
-                >
-                  <MessageSquare className="h-2.5 w-2.5" />
-                </span>
-              )}
-            </Tag>
+              <Tag
+                onClick={onCouplingClick ? handleClick : undefined}
+                className={`absolute flex items-center justify-center transition-colors ${
+                  isSummaryPresentation
+                    ? "rounded-full"
+                    : "rounded-md shadow-sm flex-col -translate-x-1/2 -translate-y-1/2"
+                } ${onCouplingClick ? "cursor-pointer hover:ring-2 hover:ring-primary/60" : ""} ${
+                  isSummaryPresentation ? `border ${summaryChipClass}` : !bg ? "bg-base-300/60" : ""
+                }`}
+                style={{
+                  top: centerY,
+                  left: centerX,
+                  width: isSummaryPresentation ? cellSize * 0.74 : cellSize * 0.72,
+                  height: isSummaryPresentation ? Math.max(6, cellSize * 0.12) : cellSize * 0.5,
+                  backgroundColor: isSummaryPresentation ? undefined : (bg ?? undefined),
+                  transform: isSummaryPresentation
+                    ? `translate(-50%, -50%) rotate(${arrowAngle}deg)`
+                    : undefined,
+                }}
+                aria-label={titleText}
+              >
+                {isSummaryPresentation ? (
+                  <span className="sr-only">
+                    Q{qid1}→Q{qid2}
+                  </span>
+                ) : value !== null ? (
+                  <span className="text-xs font-medium text-white drop-shadow leading-none">
+                    {value.toFixed(2)}
+                  </span>
+                ) : (
+                  <span className="text-xs text-base-content/50 leading-none">—</span>
+                )}
+                {!isSummaryPresentation && (
+                  <svg
+                    width="12"
+                    height="5"
+                    viewBox="0 0 18 7"
+                    className="mt-px drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]"
+                    style={{ transform: `rotate(${arrowAngle}deg)` }}
+                  >
+                    <line
+                      x1="1"
+                      y1="3.5"
+                      x2="14"
+                      y2="3.5"
+                      stroke={bg ? "white" : "currentColor"}
+                      strokeWidth="1.5"
+                    />
+                    <polyline
+                      points="11,0.5 16,3.5 11,6.5"
+                      fill="none"
+                      stroke={bg ? "white" : "currentColor"}
+                      strokeWidth="1.5"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                )}
+                {(hasNote || hasTargetNote) && (
+                  <span
+                    className={`absolute rounded-full bg-warning text-warning-content p-0.5 shadow ${
+                      isSummaryPresentation ? "-top-2 -right-2" : "-top-1 -right-1"
+                    }`}
+                    title={hasNote ? "Has legacy metric note" : "Has pinned summary"}
+                  >
+                    <StickyNote className="h-2.5 w-2.5" />
+                  </span>
+                )}
+                {hasCrossMetricNote && (
+                  <span
+                    className={`absolute rounded-full bg-base-100/90 text-base-content/60 p-0.5 shadow border border-base-300 ${
+                      isSummaryPresentation ? "-top-2 -right-2" : "-top-1 -right-1"
+                    }`}
+                    title="Legacy note exists on another metric"
+                  >
+                    <StickyNote className="h-2.5 w-2.5" />
+                  </span>
+                )}
+                {hasForumDiscussion && (
+                  <span
+                    className={`absolute rounded-full p-0.5 shadow ${
+                      isSummaryPresentation ? "-bottom-2 -right-2" : "-bottom-1 -right-1"
+                    }`}
+                    style={forumMarkerStyle}
+                    title="Linked forum discussion"
+                  >
+                    <MessageSquare className="h-2.5 w-2.5" />
+                  </span>
+                )}
+              </Tag>
+            </DashboardNoteTooltip>
           );
         })}
-
-        {hover &&
-          (() => {
-            const allNotes = notesByTarget?.[hover.key] ?? [];
-            const targetNote = targetNotesByTarget?.[hover.key];
-            const forumLinks = forumLinksByTarget?.[hover.key] ?? [];
-            const current = allNotes.find((n) => n.metricKey === metricKey);
-            const others = allNotes.filter((n) => n.metricKey !== metricKey);
-            const v = metricData?.[hover.key]?.value ?? null;
-            const [a, b] = hover.key.split("-");
-            const header =
-              v !== null ? `Q${a} → Q${b}: ${v.toFixed(4)} ${unit}` : `Q${a} → Q${b}: No data`;
-            return (
-              <DashboardNoteTooltip
-                position={{ x: hover.x, y: hover.y }}
-                header={header}
-                targetNote={targetNote}
-                current={current}
-                others={others}
-                forumLinks={forumLinks}
-              />
-            );
-          })()}
       </div>
     </div>
   );

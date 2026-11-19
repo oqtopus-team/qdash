@@ -520,9 +520,12 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
                       title="Reload current values from the calibration database"
                     >
                       {isReloadingInputs ? (
-                        <span className="loading loading-spinner loading-xs" />
+                        <span
+                          data-icon="inline-start"
+                          className="loading loading-spinner loading-xs"
+                        />
                       ) : (
-                        <RefreshCw size={13} />
+                        <RefreshCw data-icon="inline-start" />
                       )}
                       Reload
                     </button>
@@ -616,7 +619,7 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
                 </div>
               )}
 
-              <label className="label min-w-0 cursor-pointer items-start justify-start gap-3 whitespace-normal">
+              <label className="choice-field gap-3">
                 <input
                   type="checkbox"
                   className="toggle toggle-sm"
@@ -633,10 +636,10 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
                 </span>
               </label>
 
-              <label className="label min-w-0 cursor-pointer items-start justify-start gap-3 whitespace-normal">
+              <label className="choice-field gap-3">
                 <input
                   type="checkbox"
-                  className="toggle toggle-sm toggle-success mt-0.5 shrink-0"
+                  className="toggle toggle-sm toggle-success"
                   checked={updateCalibrationParameters}
                   onChange={(event) => setUpdateCalibrationParameters(event.target.checked)}
                 />
@@ -681,9 +684,13 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
                 title={runDisabledReason ?? "Run task"}
               >
                 {isStarting || isRunInProgress ? (
-                  <span className="loading loading-spinner loading-sm" aria-hidden="true" />
+                  <span
+                    data-icon="inline-start"
+                    className="loading loading-spinner loading-sm"
+                    aria-hidden="true"
+                  />
                 ) : (
-                  <Play size={17} />
+                  <Play data-icon="inline-start" />
                 )}
                 {runLabel}
               </button>
@@ -808,14 +815,14 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
                         setSubmittedTargetQuery(null);
                       }}
                     >
-                      <RotateCcw size={15} />
+                      <RotateCcw data-icon="inline-start" />
                       Adjust and run again
                     </button>
                     <Link
                       className="btn btn-sm btn-outline"
                       href={`/execution/${encodeURIComponent(submittedChipId)}/${encodeURIComponent(executionId)}`}
                     >
-                      <ExternalLink size={15} />
+                      <ExternalLink data-icon="inline-start" />
                       Full execution
                     </Link>
                     {resultTask?.task_id && (

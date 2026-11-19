@@ -75,9 +75,9 @@ export function TaskResultThreads({
         {canEdit && taskName && qid && (
           <Link
             href={newThreadHref({ taskId, taskName, chipId, qid })}
-            className="btn btn-sm btn-outline gap-1"
+            className="btn btn-sm btn-outline"
           >
-            <Plus className="h-4 w-4" />
+            <Plus data-icon="inline-start" />
             New thread
           </Link>
         )}

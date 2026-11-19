@@ -104,7 +104,7 @@ regardless of change size, including documentation-only changes.
 - Keep DaisyUI as the visual and theme foundation. Use the established Radix-based primitives in `ui/src/components/ui/` for interactions that need robust focus management, keyboard navigation, portals, dismissal, or collision-aware positioning.
 - Do not treat Radix as a wholesale DaisyUI replacement. Prefer DaisyUI for buttons, cards, inputs, badges, tables, and semantic colors; add a headless primitive only when the interaction behavior requires it.
 - Use TanStack Query for server state and `nuqs` for URL query state when matching existing patterns.
-- Use Lucide React icons where an icon is appropriate.
+- Use Lucide React icons where an icon is appropriate. Mark a leading or trailing icon in a labeled `.btn` with `data-icon="inline-start"` or `"inline-end"`; see the optical spacing rule in `docs/developer-guide/ui/guidelines.md`.
 - Follow `docs/developer-guide/ui/guidelines.md` and `docs/developer-guide/ui/design-policy.md` for implementation and visual design details.
 
 ## Documentation Conventions

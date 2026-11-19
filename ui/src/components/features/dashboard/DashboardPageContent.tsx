@@ -18,11 +18,13 @@ import { ChipSelector } from "@/components/selectors/ChipSelector";
 import { CooldownSelector } from "@/components/selectors/CooldownSelector";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { ErrorCard } from "@/components/ui/ErrorCard";
 import { LinearGauge } from "@/components/ui/LinearGauge";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageFiltersBar } from "@/components/ui/PageFiltersBar";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { QuantumLoader } from "@/components/ui/QuantumLoader";
+import { RefreshErrorAlert } from "@/components/ui/RefreshErrorAlert";
 import { TimeRangeSelector } from "@/components/ui/TimeRangeSelector";
 import { MetricsPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import type { MentionCandidate } from "@/components/ui/MarkdownEditor";
@@ -158,6 +160,9 @@ export function DashboardPageContent() {
     colorScale,
     isLoading: isConfigLoading,
     isError: isConfigError,
+    isFetching: isConfigFetching,
+    isRetryingAfterError: isConfigRetrying,
+    refetch: refetchConfig,
   } = useMetricsConfig();
 
   const { data: chipsData, isLoading: isChipsLoading } = useListChips();
@@ -268,9 +273,16 @@ export function DashboardPageContent() {
     [queryParams.end_at, queryParams.start_at, selectedCooldownId],
   );
 
-  const { data, isLoading, isError } = useGetChipMetrics(selectedChip, queryParams, {
-    query: { enabled: canFetch, staleTime: 30000 },
-  });
+  // The query key carries the chip, value selection and time range, so another scope never shows
+  // this data. A failed background refetch keeps the last data of the same scope on screen.
+  const { data, isLoading, isError, isFetching, errorUpdateCount, refetch } = useGetChipMetrics(
+    selectedChip,
+    queryParams,
+    { query: { enabled: canFetch, staleTime: 30000 } },
+  );
+  // Retrying a failed first load puts a query back to pending; keep its error in place with the
+  // retry disabled instead of swapping it for the initial loading state.
+  const isMetricsRetrying = isLoading && errorUpdateCount > 0;
 
   const colors = useMemo(
     () => (colorScale.colors && colorScale.colors.length > 0 ? colorScale.colors : FALLBACK_COLORS),
@@ -542,7 +554,7 @@ export function DashboardPageContent() {
     return coverageOf(metricData, metricData ? Object.keys(metricData).length : 0).current === 0;
   }).length;
 
-  if (isConfigLoading || isChipsLoading) {
+  if ((isConfigLoading && !isConfigRetrying) || isChipsLoading) {
     return <MetricsPageSkeleton />;
   }
 
@@ -560,7 +572,7 @@ export function DashboardPageContent() {
         {/* Filters */}
         <section
           aria-labelledby="dashboard-data-scope"
-          className="rounded-xl border border-base-300 bg-base-200/45 p-3 sm:p-4"
+          className="rounded-[var(--radius-box)] border border-base-300 bg-base-200/45 p-3 sm:p-4"
         >
           <h2 id="dashboard-data-scope" className="mb-3 text-xs font-medium text-base-content/55">
             Data scope
@@ -651,33 +663,40 @@ export function DashboardPageContent() {
         </section>
 
         {/* Body */}
-        {!selectedChip ? (
+        {isConfigError || isConfigRetrying ? (
+          <ErrorCard
+            title="Could not load the metrics configuration"
+            message="Metric names, units and scales come from the server. Try loading them again."
+            onRetry={() => void refetchConfig()}
+            retrying={isConfigFetching}
+          />
+        ) : !selectedChip ? (
           <EmptyState
             title="No chip selected"
             description="Select a chip from the dropdown above to view the dashboard"
             emoji="microchip"
             size="lg"
           />
-        ) : isLoading ? (
+        ) : isLoading && !isMetricsRetrying ? (
           <div className="flex items-center justify-center h-96">
             <QuantumLoader size="lg" showLabel label="Loading dashboard…" />
           </div>
-        ) : isConfigError ? (
-          <EmptyState
-            title="Configuration error"
-            description="Failed to load metrics configuration. Please try refreshing the page."
-            emoji="warning"
-            size="lg"
-          />
-        ) : isError ? (
-          <EmptyState
-            title="Data loading failed"
-            description="Failed to load metrics data. Please try again later."
-            emoji="warning"
-            size="lg"
+        ) : (isError || isMetricsRetrying) && !data ? (
+          <ErrorCard
+            title="Could not load dashboard data"
+            message="The request for this chip and time range failed. Try again."
+            onRetry={() => void refetch()}
+            retrying={isFetching}
           />
         ) : (
           <>
+            {isError && (
+              <RefreshErrorAlert
+                message="Could not refresh dashboard data. The values below may be out of date."
+                onRetry={() => void refetch()}
+                retrying={isFetching}
+              />
+            )}
             <DashboardChipNoteCard chipId={selectedChip} noteScopeParams={noteScopeParams} />
 
             {/* Pinned summary topology */}
@@ -758,7 +777,7 @@ export function DashboardPageContent() {
                             : "Showing forward direction"
                         }
                       >
-                        <ArrowRightLeft className="h-3.5 w-3.5" />
+                        <ArrowRightLeft data-icon="inline-start" />
                         <span className="text-xs">
                           {isReverseCouplingDirection ? "Reverse" : "Forward"}
                         </span>
@@ -1023,7 +1042,7 @@ export function DashboardPageContent() {
                         : "Showing forward direction"
                     }
                   >
-                    <ArrowRightLeft className="h-3.5 w-3.5" />
+                    <ArrowRightLeft data-icon="inline-start" />
                     <span className="text-xs">
                       {isReverseCouplingDirection ? "Reverse" : "Forward"}
                     </span>

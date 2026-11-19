@@ -39,11 +39,11 @@ export function FigureJsonPreviewDialog({ path, onClose }: FigureJsonPreviewDial
           </button>
           {path && (
             <a
-              className="btn btn-sm btn-primary gap-1"
+              className="btn btn-sm btn-primary"
               href={artifactUrl(path)}
               download={fileName(path)}
             >
-              <Download className="h-4 w-4" /> Download JSON
+              <Download data-icon="inline-start" /> Download JSON
             </a>
           )}
         </div>

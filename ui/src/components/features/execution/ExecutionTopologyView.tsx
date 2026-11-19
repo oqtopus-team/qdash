@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/TaskTileStatus";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import { useGridLayout } from "@/hooks/useGridLayout";
+import { usePanClickGuard } from "@/hooks/usePanClickGuard";
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
 import { getQubitGridPosition, type TopologyLayoutParams } from "@/lib/utils/grid-position";
 import { calculateGridContainerWidth } from "@/lib/utils/grid-layout";
@@ -137,7 +138,7 @@ const TopologyCell = memo(function TopologyCell({
           onClick={onClick}
           onKeyDown={(event) => handleActivationKey(event, onClick)}
           aria-label={label}
-          className={`aspect-square rounded-xl bg-white shadow-md border border-base-300/60 overflow-hidden transition-all duration-200 hover:shadow-xl hover:border-primary/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary relative w-full ${muxBgClass}`}
+          className={`aspect-square rounded-xl bg-white shadow-xs border border-base-300/60 overflow-hidden transition-colors duration-200 hover:border-primary/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary relative w-full ${muxBgClass}`}
         >
           {figurePath && (
             <div className="absolute inset-1">
@@ -231,7 +232,7 @@ const CouplingMarker = memo(function CouplingMarker({
           onClick={onClick}
           onKeyDown={(event) => handleActivationKey(event, onClick)}
           aria-label={label}
-          className="absolute z-20 rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary bg-white shadow-md border border-base-300/60 overflow-hidden transition-transform duration-200 hover:shadow-xl hover:border-primary/40 -translate-x-1/2 -translate-y-1/2"
+          className="absolute z-20 rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary bg-white shadow-xs border border-base-300/60 overflow-hidden transition-colors duration-200 hover:border-primary/40 -translate-x-1/2 -translate-y-1/2"
           style={{
             left,
             top,
@@ -285,6 +286,7 @@ export function ExecutionTopologyView({
   onToggleFullscreen,
 }: ExecutionTopologyViewProps) {
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
+  const panClickGuard = usePanClickGuard();
   const [currentScale, setCurrentScale] = useState(1);
   const lodTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -427,7 +429,7 @@ export function ExecutionTopologyView({
 
   const gridContent = (
     <div
-      className="grid bg-base-200/50 rounded-xl relative"
+      className="grid bg-base-200/50 rounded-[var(--radius-box)] relative"
       style={{
         gap: `${gap}px`,
         padding: `${padding / 2}px`,
@@ -586,6 +588,7 @@ export function ExecutionTopologyView({
           >
             <GridZoomControls isFullscreen={isFullscreen} className="top-12" />
             <TransformComponent
+              contentProps={panClickGuard}
               wrapperStyle={{
                 width: "100%",
                 height: isFullscreen ? "100%" : undefined,

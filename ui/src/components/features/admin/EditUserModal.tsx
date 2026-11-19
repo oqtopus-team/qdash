@@ -140,17 +140,14 @@ export function EditUserModal({
           </div>
 
           <div className="form-control">
-            <label
-              className="label cursor-pointer justify-start gap-4"
-              htmlFor="edit-user-disabled"
-            >
+            <label className="choice-field gap-3" htmlFor="edit-user-disabled">
               <input
                 id="edit-user-disabled"
                 type="checkbox"
                 className="toggle toggle-error"
                 {...register("disabled")}
               />
-              <span className="label-text">
+              <span>
                 Account Disabled
                 {disabled && <span className="text-error ml-2">(User cannot login)</span>}
               </span>
@@ -199,8 +196,8 @@ export function EditUserModal({
               onClick={() => setShowPasswordReset(true)}
             >
               <svg
+                data-icon="inline-start"
                 xmlns="http://www.w3.org/2000/svg"
-                className="h-4 w-4"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"

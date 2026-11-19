@@ -23,6 +23,7 @@ import { useMetricsConfig } from "@/hooks/useMetricsConfig";
 import { useTimeRange } from "@/hooks/useTimeRange";
 import { useAnalysisUrlState } from "@/hooks/useUrlState";
 import { formatDateTime } from "@/lib/utils/datetime";
+import { SELECT_CONTROL_HEIGHT } from "@/lib/react-select-theme";
 import { useIsDarkTheme } from "@/contexts/ThemeContext";
 import { chartTheme, seriesColor } from "@/lib/chartTheme";
 
@@ -655,7 +656,7 @@ export function TimeSeriesView() {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-8">
       {/* Parameter Selection Card */}
-      <div className="col-span-1 lg:col-span-3 card bg-base-100 shadow-sm rounded-xl p-4 sm:p-8 border border-base-300">
+      <div className="col-span-1 lg:col-span-3 card bg-base-100 shadow-sm p-4 sm:p-8 border border-base-300">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 mb-4 sm:mb-6">
           <h2 className="text-sm font-medium flex items-center gap-2">
             <svg
@@ -676,12 +677,12 @@ export function TimeSeriesView() {
           <button
             onClick={handleRefresh}
             disabled={isLoadingTimeseries || isLoadingTags}
-            className="btn btn-xs sm:btn-sm btn-outline gap-1 sm:gap-2"
+            className="btn btn-xs sm:btn-sm btn-outline"
             title="Refresh data and time range"
           >
             <svg
+              data-icon="inline-start"
               xmlns="http://www.w3.org/2000/svg"
-              className="w-3 h-3 sm:w-4 sm:h-4"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -734,15 +735,15 @@ export function TimeSeriesView() {
                 styles={{
                   control: (base) => ({
                     ...base,
-                    minHeight: "38px",
-                    height: "auto",
+                    minHeight: SELECT_CONTROL_HEIGHT,
+                    height: SELECT_CONTROL_HEIGHT,
                     borderRadius: "0.5rem",
                     borderColor: palette.accent,
                     borderWidth: "2px",
                   }),
                   valueContainer: (base) => ({
                     ...base,
-                    padding: "2px 8px",
+                    padding: "0 0.75rem",
                   }),
                   menu: (base) => ({
                     ...base,
@@ -790,15 +791,15 @@ export function TimeSeriesView() {
                   styles={{
                     control: (base) => ({
                       ...base,
-                      minHeight: "38px",
-                      height: "auto",
+                      minHeight: SELECT_CONTROL_HEIGHT,
+                      height: SELECT_CONTROL_HEIGHT,
                       borderRadius: "0.5rem",
                       borderStyle: "dashed",
                       borderColor: palette.secondary,
                     }),
                     valueContainer: (base) => ({
                       ...base,
-                      padding: "2px 8px",
+                      padding: "0 0.75rem",
                     }),
                     menu: (base) => ({
                       ...base,
@@ -832,15 +833,15 @@ export function TimeSeriesView() {
                     styles={{
                       control: (base) => ({
                         ...base,
-                        minHeight: "38px",
-                        height: "auto",
+                        minHeight: SELECT_CONTROL_HEIGHT,
+                        height: SELECT_CONTROL_HEIGHT,
                         borderRadius: "0.5rem",
                         borderColor: palette.secondary,
                         borderWidth: "2px",
                       }),
                       valueContainer: (base) => ({
                         ...base,
-                        padding: "2px 8px",
+                        padding: "0 0.75rem",
                       }),
                       menu: (base) => ({
                         ...base,
@@ -849,9 +850,11 @@ export function TimeSeriesView() {
                     }}
                   />
                   <button
+                    type="button"
                     onClick={handleRemoveSecondaryAxis}
-                    className="btn btn-sm btn-ghost text-error"
+                    className="btn btn-square btn-ghost text-error"
                     title="Remove secondary axis"
+                    aria-label="Remove secondary axis"
                   >
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
@@ -899,15 +902,15 @@ export function TimeSeriesView() {
                 />
               </div>
               <button
-                className={`btn btn-sm mt-8 gap-2 w-20 ${
+                className={`btn btn-sm mt-8 w-20 ${
                   timeRange.isStartAtLocked ? "btn-primary" : "btn-ghost"
                 }`}
                 onClick={toggleStartAtLock}
                 title={timeRange.isStartAtLocked ? "Unlock start time" : "Lock start time"}
               >
                 <svg
+                  data-icon="inline-start"
                   xmlns="http://www.w3.org/2000/svg"
-                  className="w-4 h-4"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
@@ -940,15 +943,15 @@ export function TimeSeriesView() {
                 />
               </div>
               <button
-                className={`btn btn-sm mt-8 gap-2 w-20 ${
+                className={`btn btn-sm mt-8 w-20 ${
                   timeRange.isEndAtLocked ? "btn-primary" : "btn-ghost"
                 }`}
                 onClick={toggleEndAtLock}
                 title={timeRange.isEndAtLocked ? "Unlock end time" : "Lock end time"}
               >
                 <svg
+                  data-icon="inline-start"
                   xmlns="http://www.w3.org/2000/svg"
-                  className="w-4 h-4"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
@@ -1028,14 +1031,14 @@ export function TimeSeriesView() {
         pageSize={50}
         actions={
           <button
-            className="btn btn-sm btn-outline gap-2"
+            className="btn btn-sm btn-outline"
             onClick={handleDownloadCSV}
             disabled={(showSecondaryAxis ? combinedTableData : tableData).length === 0}
             title="Download all data as CSV"
           >
             <svg
+              data-icon="inline-start"
               xmlns="http://www.w3.org/2000/svg"
-              className="w-4 h-4"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"

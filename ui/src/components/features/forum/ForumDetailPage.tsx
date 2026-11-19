@@ -652,7 +652,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
       <div className="flex flex-col items-center justify-center gap-4 py-16">
         <p className="text-base-content/60">Forum thread not found</p>
         <Link href={forumReturnHref} className="btn btn-sm btn-ghost">
-          <ArrowLeft className="h-4 w-4" />
+          <ArrowLeft data-icon="inline-start" />
           Back to Forum
         </Link>
       </div>
@@ -908,7 +908,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
             {post.task_id && (
               <Link
                 href={`/task-results/${encodeURIComponent(post.task_id)}`}
-                className="btn btn-outline btn-sm w-full justify-start gap-2 rounded-md normal-case"
+                className="btn btn-outline btn-sm w-full justify-start gap-2 normal-case"
                 title={post.task_id}
               >
                 <ClipboardList className="h-3.5 w-3.5" />
@@ -922,7 +922,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
             {targetContext && (
               <Link
                 href={dashboardTargetHref(targetContext)}
-                className="btn btn-outline btn-sm w-full justify-start gap-2 rounded-md normal-case"
+                className="btn btn-outline btn-sm w-full justify-start gap-2 normal-case"
               >
                 <Crosshair className="h-3.5 w-3.5" />
                 <span className="min-w-0 truncate">

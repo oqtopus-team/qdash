@@ -354,11 +354,11 @@ export function FlowFolderSection({
           {folder.flows[0] && (
             <Link
               href={`/workflow/${encodeURIComponent(folder.flows[0].name)}?space=${encodeURIComponent(folder.creator)}`}
-              className="btn btn-ghost btn-xs gap-1"
+              className="btn btn-ghost btn-xs"
               title="Open this space in the editor's Explorer, where folders can be arranged"
               onClick={(event) => event.stopPropagation()}
             >
-              <PanelLeftOpen className="h-4 w-4" />
+              <PanelLeftOpen data-icon="inline-start" />
               <span className="hidden sm:inline">Open in editor</span>
             </Link>
           )}

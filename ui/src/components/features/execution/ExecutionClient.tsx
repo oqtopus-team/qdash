@@ -35,6 +35,7 @@ import { TaskMessagePanel } from "@/components/ui/TaskMessagePanel";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import { useToast } from "@/components/ui/Toast";
 import { useFullscreenPanel } from "@/hooks/useFullscreenPanel";
+import { useSelectStyles } from "@/hooks/useSelectStyles";
 
 type FilterOption = {
   value: string;
@@ -160,27 +161,16 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
     }
   }, [filterTaskName, uniqueTaskNames]);
 
+  const selectStyles = useSelectStyles<FilterOption>();
   const filterSelectStyles = useMemo<StylesConfig<FilterOption, false>>(
     () => ({
-      control: (provided) => ({
-        ...provided,
-        minHeight: 34,
-        height: 34,
-      }),
-      valueContainer: (provided) => ({
-        ...provided,
-        padding: "2px 8px",
-      }),
-      indicatorsContainer: (provided) => ({
-        ...provided,
-        height: 34,
-      }),
-      menu: (provided) => ({
-        ...provided,
+      ...selectStyles,
+      menu: (provided, state) => ({
+        ...(selectStyles.menu?.(provided, state) ?? provided),
         zIndex: 40,
       }),
     }),
-    [],
+    [selectStyles],
   );
 
   // Filter tasks based on selected filters
@@ -229,8 +219,8 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
     <div className="w-full px-4 py-6">
       <div className="space-y-6">
         {/* Back navigation */}
-        <Link href="/execution" className="btn btn-ghost btn-sm gap-2 w-fit">
-          <ArrowLeft size={16} />
+        <Link href="/execution" className="btn btn-ghost btn-sm w-fit">
+          <ArrowLeft data-icon="inline-start" />
           Back to Executions
         </Link>
 
@@ -299,12 +289,12 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
           )}
         </div>
 
-        <div className="bg-base-100 rounded-lg shadow-md p-6">
+        <div className="card bg-base-100 p-6">
           <h2 className="text-sm font-medium mb-4">Execution Flow</h2>
           <ExecutionDAG tasks={validTasks} />
         </div>
 
-        <div id="parameter-changes" className="bg-base-100 rounded-lg shadow-md p-6">
+        <div id="parameter-changes" className="card bg-base-100 p-6">
           <details className="group" open={parameterChangesOpen}>
             <summary
               className="flex cursor-pointer list-none items-start gap-1.5"
@@ -334,7 +324,7 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
         {execution.note &&
           typeof execution.note === "object" &&
           Object.keys(execution.note).length > 0 && (
-            <div className="bg-base-100 rounded-lg shadow-md p-6">
+            <div className="card bg-base-100 p-6">
               <details className="collapse collapse-arrow border border-base-300">
                 <summary className="collapse-title text-sm font-medium">Execution Note</summary>
                 <div className="collapse-content">
@@ -355,9 +345,9 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
                           document.body.removeChild(link);
                           URL.revokeObjectURL(url);
                         }}
-                        className="btn btn-sm btn-primary gap-2"
+                        className="btn btn-sm btn-primary"
                       >
-                        <Download size={14} />
+                        <Download data-icon="inline-start" />
                         Download JSON
                       </button>
                     </div>
@@ -370,11 +360,7 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
             </div>
           )}
 
-        <div
-          className={
-            isFullscreen ? gridFullscreenPanelClass : "bg-base-100 rounded-lg shadow-md p-4 sm:p-6"
-          }
-        >
+        <div className={isFullscreen ? gridFullscreenPanelClass : "card bg-base-100 p-4 sm:p-6"}>
           <div
             className={`flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 ${
               isFullscreen ? "shrink-0" : "mb-4"

@@ -14,6 +14,7 @@ import {
   ArrowUp,
   Check,
   ChevronDown,
+  CornerDownRight,
   Cpu,
   Paperclip,
   Square,
@@ -89,6 +90,11 @@ interface ChatComposerProps {
   onRemoveAttachment?: (id: string) => void;
   /** Narrow surfaces: smaller type and a shorter model label. */
   compact?: boolean;
+  /**
+   * While an answer streams, a message can still be sent: the answer reads it after its
+   * current step (`onSubmit` is called as usual). Figures cannot go with it.
+   */
+  steerable?: boolean;
 }
 
 export interface ChatComposerHandle {
@@ -118,6 +124,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
     onAttach,
     onRemoveAttachment,
     compact = false,
+    steerable = false,
   },
   ref,
 ) {
@@ -155,7 +162,9 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
 
   const canAttach = Boolean(onAttach) && !isStreaming && !disabled;
   const attachmentsFull = (attachments?.length ?? 0) >= MAX_ATTACHMENTS;
-  const canSend = value.trim().length > 0 && !isStreaming && !disabled && !isStaging;
+  const hasText = value.trim().length > 0;
+  const canSteer = isStreaming && steerable && hasText && !disabled && !(attachments?.length ?? 0);
+  const canSend = (hasText && !isStreaming && !disabled && !isStaging) || canSteer;
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -253,7 +262,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
                 <button
                   type="button"
                   onClick={() => onRemoveAttachment(attachment.id)}
-                  className="absolute -top-1.5 -right-1.5 btn btn-circle btn-xs h-5 w-5 min-h-0 bg-base-content text-base-100 border-none opacity-0 group-hover/thumb:opacity-100 focus:opacity-100"
+                  className="absolute -top-1.5 -right-1.5 btn btn-circle btn-xs bg-base-content text-base-100 border-none opacity-0 group-hover/thumb:opacity-100 focus:opacity-100"
                   aria-label={`Remove ${attachment.name}`}
                 >
                   <X className="w-3 h-3" />
@@ -270,7 +279,9 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={handleKeyDown}
         onPaste={handlePaste}
-        placeholder={placeholder}
+        placeholder={
+          isStreaming && steerable ? "Add a note; it is read after the current step" : placeholder
+        }
         rows={1}
         aria-label="Message"
         className="w-full resize-none bg-transparent border-none outline-none focus:ring-0 leading-6 px-1 pt-1 text-sm placeholder:text-base-content/35"
@@ -292,7 +303,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
                   type="button"
                   disabled={!canAttach || attachmentsFull}
                   onClick={() => fileInputRef.current?.click()}
-                  className="btn btn-ghost btn-xs btn-circle h-7 w-7 text-base-content/60"
+                  className="btn btn-ghost btn-sm btn-circle text-base-content/60"
                   aria-label="Attach a figure"
                 >
                   <Paperclip className="w-3.5 h-3.5" />
@@ -322,15 +333,15 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
               <button
                 type="button"
                 disabled={isStreaming || disabled}
-                className="btn btn-ghost btn-xs h-7 gap-1.5 rounded-lg font-normal text-base-content/60"
+                className="btn btn-ghost btn-sm font-normal text-base-content/60"
                 aria-label="Thinking level"
                 title="How much the model thinks before answering"
               >
-                <Brain className="w-3.5 h-3.5 shrink-0" />
+                <Brain data-icon="inline-start" className="shrink-0" />
                 <span className="truncate">
                   {thinkingLabel(thinkingChoice, thinkingModelDefault ?? null, compact)}
                 </span>
-                <ChevronDown className="w-3 h-3 shrink-0" />
+                <ChevronDown data-icon="inline-end" className="shrink-0" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" side="top">
@@ -360,7 +371,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
             <TooltipTrigger asChild>
               <Link
                 href="/settings?tab=copilot"
-                className="btn btn-ghost btn-xs h-7 gap-1 rounded-lg font-normal text-base-content/60"
+                className="btn btn-ghost btn-sm gap-1 font-normal text-base-content/60"
                 aria-label="Your instructions apply"
               >
                 <UserCog className="w-3.5 h-3.5 shrink-0" />
@@ -371,6 +382,21 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
           </Tooltip>
         )}
         <div className="flex-1" />
+        {isStreaming && steerable && hasText && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="submit"
+                disabled={!canSteer}
+                className="btn btn-circle btn-sm btn-primary disabled:bg-base-content/15 disabled:text-base-100"
+                aria-label="Send to the answer in progress"
+              >
+                <CornerDownRight className="w-4 h-4" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Send now: read after the current step (Enter)</TooltipContent>
+          </Tooltip>
+        )}
         {isStreaming ? (
           <Tooltip>
             <TooltipTrigger asChild>
@@ -432,15 +458,14 @@ function ModelControl({
   const fixedReason = fixedModelReason(status, options.length);
   const content = (
     <>
-      <Cpu className="w-3.5 h-3.5 shrink-0" />
+      <Cpu data-icon="inline-start" aria-hidden="true" />
       <span className="truncate">{name}</span>
       {!compact && selected.isConfiguredDefault && status === "ready" && (
         <span className="shrink-0 text-base-content/40">default</span>
       )}
     </>
   );
-  const className =
-    "btn btn-ghost btn-xs h-7 gap-1.5 rounded-lg font-normal text-base-content/60 max-w-[60%]";
+  const className = "btn btn-ghost btn-sm font-normal text-base-content/60 max-w-[60%]";
 
   if (fixedReason) {
     return (
@@ -471,7 +496,7 @@ function ModelControl({
           title="Model for your next message"
         >
           {content}
-          <ChevronDown className="w-3 h-3 shrink-0" />
+          <ChevronDown data-icon="inline-end" aria-hidden="true" />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" side="top">

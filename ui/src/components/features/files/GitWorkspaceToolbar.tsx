@@ -51,11 +51,11 @@ export function GitWorkspaceToolbar({
         <DropdownMenuTrigger asChild>
           <button
             type="button"
-            className={`btn btn-sm btn-ghost ${responsive} gap-1 font-normal`}
+            className={`btn btn-sm btn-ghost ${responsive} font-normal`}
             title={status?.commit_message ?? "Repository"}
             aria-label="Repository menu"
           >
-            <GitBranch size={16} className="shrink-0 opacity-70" />
+            <GitBranch data-icon="inline-start" className="shrink-0 opacity-70" />
             {status?.is_git_repo ? (
               <span className="hidden md:inline">
                 <span className="text-base-content/70">{status.branch || "main"}</span>
@@ -80,7 +80,10 @@ export function GitWorkspaceToolbar({
                 ●
               </span>
             )}
-            <ChevronDown size={14} className={`shrink-0 opacity-60 ${attention ? "" : ""}`} />
+            <ChevronDown
+              data-icon="inline-end"
+              className={`shrink-0 opacity-60 ${attention ? "" : ""}`}
+            />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-64">
@@ -116,11 +119,11 @@ export function GitWorkspaceToolbar({
         title={pushTitle}
       >
         {isPushing ? (
-          <span className="loading loading-spinner loading-xs"></span>
+          <span data-icon="inline-start" className="loading loading-spinner loading-xs"></span>
         ) : (
-          <GitPullRequestArrow size={16} />
+          <GitPullRequestArrow data-icon="inline-start" />
         )}
-        <span className="ml-1">Create PR</span>
+        <span>Create PR</span>
       </button>
     </>
   );
@@ -149,9 +152,9 @@ export function PullRequestBanner({
           href={pr.pr_url}
           target="_blank"
           rel="noopener noreferrer"
-          className="btn btn-xs btn-ghost gap-1"
+          className="btn btn-xs btn-ghost"
         >
-          Open PR <ExternalLink size={12} />
+          Open PR <ExternalLink data-icon="inline-end" />
         </a>
         <button type="button" onClick={onDismiss} className="btn btn-xs btn-ghost">
           ✕

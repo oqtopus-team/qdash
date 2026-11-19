@@ -67,32 +67,35 @@ export const ALLOWED_TOOL_NAMES = [
 ] as const;
 
 /**
- * Reviewed write-capable tools from the bundled pi-qdash package.
- *
- * These stay separate from read tools so every call requires user approval.
- * Raw path access remains excluded.
+ * Reviewed write tools, the reads Code Mode scripts may call, and the
+ * deferred tools come from pi-qdash's host-neutral policy
+ * (extensions/lib/tool-policy.ts), which the pi CLI enforces too. Write
+ * tools stay separate from read tools so every call requires user approval;
+ * raw path access remains excluded.
  */
-export const REVIEWED_WRITE_TOOL_NAMES = [
-  "qdash_create_agent_session",
-  "qdash_submit_agent_action",
-  "qdash_commit_agent_candidate",
-  "qdash_execute_agent_action",
-  "qdash_commit_agent_candidate_set",
-  "qdash_apply_agent_candidate_commit",
-  "qdash_create_forum_post",
-  "qdash_update_forum_post",
-  "qdash_create_forum_evidence_reply",
-  "qdash_create_forum_image_reply",
-  "qdash_run_pipeline",
-  "qdash_save_flow",
-  "qdash_execute_flow",
-] as const;
+export {
+  DEFERRED_TOOL_NAMES,
+  NESTED_READ_TOOL_NAMES,
+  REVIEWED_WRITE_TOOL_NAMES,
+  isDeferredTool,
+  isNestedReadTool,
+  isReviewedWriteTool,
+} from "@oqtopus-team/pi-qdash/extensions/lib/tool-policy.ts";
 
-const REVIEWED_WRITE_TOOLS = new Set<string>(REVIEWED_WRITE_TOOL_NAMES);
+import {
+  DEFERRED_TOOL_NAMES as SHARED_DEFERRED,
+  NESTED_READ_TOOL_NAMES as SHARED_NESTED,
+  REVIEWED_WRITE_TOOL_NAMES as SHARED_WRITES,
+} from "@oqtopus-team/pi-qdash/extensions/lib/tool-policy.ts";
 
-export function isReviewedWriteTool(name: string): boolean {
-  return REVIEWED_WRITE_TOOLS.has(name);
-}
+// Compile-time checks: scripts reach only allowlisted reads, and every
+// deferred tool is an allowlisted read or a reviewed write.
+const _nestedAreAllowed: ReadonlyArray<(typeof ALLOWED_TOOL_NAMES)[number]> = SHARED_NESTED;
+const _deferredAreReviewed: ReadonlyArray<
+  (typeof ALLOWED_TOOL_NAMES)[number] | (typeof SHARED_WRITES)[number]
+> = SHARED_DEFERRED;
+void _nestedAreAllowed;
+void _deferredAreReviewed;
 
 /**
  * Installed pi packages trusted as a whole, like a local checkout: every tool

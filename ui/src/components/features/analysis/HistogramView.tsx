@@ -2,7 +2,7 @@
 
 import { useMemo, useEffect, useCallback } from "react";
 
-import Select, { type SingleValue, type StylesConfig } from "react-select";
+import Select, { type SingleValue } from "react-select";
 
 import { useListChips } from "@/client/chip/chip";
 import { useGetChipMetrics } from "@/client/metrics/metrics";
@@ -14,6 +14,7 @@ import { QuantumLoader } from "@/components/ui/QuantumLoader";
 import { TimeRangeSelector } from "@/components/ui/TimeRangeSelector";
 import { useCSVExport } from "@/hooks/useCSVExport";
 import { useMetricsConfig } from "@/hooks/useMetricsConfig";
+import { useSelectStyles } from "@/hooks/useSelectStyles";
 import { useMetricsQueryParams } from "@/hooks/useMetricsQueryParams";
 import { useHistogramUrlState, useRangeModeUrlState } from "@/hooks/useUrlState";
 import { naturalSortQIDs } from "@/lib/utils/qid";
@@ -117,29 +118,7 @@ export function HistogramView() {
     [currentMetricConfig],
   );
 
-  // Select styles (same as metrics page)
-  const metricSelectStyles = useMemo<StylesConfig<MetricOption, false>>(
-    () => ({
-      control: (provided) => ({
-        ...provided,
-        minHeight: 38,
-        height: 38,
-      }),
-      valueContainer: (provided) => ({
-        ...provided,
-        padding: "2px 8px",
-      }),
-      indicatorsContainer: (provided) => ({
-        ...provided,
-        height: 38,
-      }),
-      menu: (provided) => ({
-        ...provided,
-        zIndex: 50,
-      }),
-    }),
-    [],
-  );
+  const metricSelectStyles = useSelectStyles<MetricOption>();
 
   // Auto-switch to latest mode when metric doesn't support best mode
   useEffect(() => {
@@ -699,21 +678,21 @@ export function HistogramView() {
   return (
     <div className="space-y-4 sm:space-y-6">
       {/* Controls Section */}
-      <div className="card bg-base-100 shadow-md">
+      <div className="card bg-base-100">
         <div className="card-body p-3 sm:p-4 gap-3 sm:gap-4">
           {/* Row 1: Main Controls */}
           <div className="flex flex-col gap-3 sm:gap-4">
             {/* Row 1a: Type + Chip + Metric */}
             <div className="flex flex-col sm:flex-row flex-wrap items-start gap-2 sm:gap-3">
-              <div className="tabs tabs-boxed bg-base-200 h-8 sm:h-9">
+              <div className="tabs tabs-boxed tabs-sm">
                 <button
-                  className={`tab h-full ${metricType === "qubit" ? "tab-active" : ""}`}
+                  className={`tab ${metricType === "qubit" ? "tab-active" : ""}`}
                   onClick={() => handleMetricTypeChange("qubit")}
                 >
                   1Q
                 </button>
                 <button
-                  className={`tab h-full ${metricType === "coupling" ? "tab-active" : ""}`}
+                  className={`tab ${metricType === "coupling" ? "tab-active" : ""}`}
                   onClick={() => handleMetricTypeChange("coupling")}
                 >
                   2Q
@@ -753,15 +732,15 @@ export function HistogramView() {
 
             {/* Mode + Display Toggle + Export */}
             <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-              <div className="join h-8 sm:h-9">
+              <div className="join">
                 <button
-                  className={`join-item btn btn-xs sm:btn-sm h-full ${selectionMode === "latest" ? "btn-primary" : ""}`}
+                  className={`join-item btn btn-sm ${selectionMode === "latest" ? "btn-primary" : ""}`}
                   onClick={() => setSelectionMode("latest")}
                 >
                   Latest
                 </button>
                 <button
-                  className={`join-item btn btn-xs sm:btn-sm h-full ${selectionMode === "best" ? "btn-primary" : ""} ${!isBestModeSupported ? "btn-disabled" : ""}`}
+                  className={`join-item btn btn-sm ${selectionMode === "best" ? "btn-primary" : ""} ${!isBestModeSupported ? "btn-disabled" : ""}`}
                   onClick={() => setSelectionMode("best")}
                   disabled={!isBestModeSupported}
                   title={!isBestModeSupported ? "Best mode not available" : "Show best values"}
@@ -769,7 +748,7 @@ export function HistogramView() {
                   Best
                 </button>
                 <button
-                  className={`join-item btn btn-xs sm:btn-sm h-full ${selectionMode === "average" ? "btn-primary" : ""}`}
+                  className={`join-item btn btn-sm ${selectionMode === "average" ? "btn-primary" : ""}`}
                   onClick={() => setSelectionMode("average")}
                   title="Show average values"
                 >
@@ -778,7 +757,7 @@ export function HistogramView() {
               </div>
 
               {isPercentageMetric(currentMetricConfig?.unit) && (
-                <label className="cursor-pointer flex items-center gap-1 sm:gap-2 h-8 sm:h-9">
+                <label className="choice-field text-sm">
                   <span className="text-sm">Fidelity</span>
                   <input
                     type="checkbox"
@@ -791,7 +770,7 @@ export function HistogramView() {
               )}
 
               <button
-                className="btn btn-outline btn-xs sm:btn-sm h-8 sm:h-9 ml-auto sm:ml-0"
+                className="btn btn-outline btn-sm ml-auto sm:ml-0"
                 onClick={handleExportCSV}
                 disabled={histogramData.length === 0}
               >
@@ -911,7 +890,7 @@ export function HistogramView() {
       />
 
       {/* Data Table - All Metrics */}
-      <div className="card bg-base-100 shadow-md">
+      <div className="card bg-base-100">
         <div className="card-body">
           <DataTable
             title={`${metricType === "coupling" ? "2Q" : "1Q"} Metrics Data`}

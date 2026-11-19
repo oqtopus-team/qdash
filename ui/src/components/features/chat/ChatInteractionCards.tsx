@@ -217,10 +217,10 @@ export function ApprovalCard({
           <>
             <button
               type="button"
-              className="btn btn-primary btn-sm gap-1.5"
+              className="btn btn-primary btn-sm"
               onClick={() => state.onDecide(approval.id, true, approvedText(approval))}
             >
-              <Check className="w-3.5 h-3.5" />
+              <Check data-icon="inline-start" />
               Approve
             </button>
             <button
@@ -318,12 +318,12 @@ export function EditProposalCard({ edit, state }: { edit: EditProposal; state: I
         )}
         {canApply && (
           <>
-            <button type="button" className="btn btn-primary btn-xs rounded-full" onClick={apply}>
+            <button type="button" className="btn btn-primary btn-xs" onClick={apply}>
               Apply to editor
             </button>
             <button
               type="button"
-              className="btn btn-ghost btn-xs rounded-full"
+              className="btn btn-ghost btn-xs"
               onClick={() => setOutcome("discarded")}
             >
               Discard

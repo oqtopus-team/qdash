@@ -23,8 +23,10 @@ import { useListTaskResults } from "@/client/task-result/task-result";
 import { ChipSelector } from "@/components/selectors/ChipSelector";
 import { TaskSelector } from "@/components/selectors/TaskSelector";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { ErrorCard } from "@/components/ui/ErrorCard";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { RefreshErrorAlert } from "@/components/ui/RefreshErrorAlert";
 import { useSelectStyles } from "@/hooks/useSelectStyles";
 import { formatDateTime } from "@/lib/utils/datetime";
 import type {
@@ -250,7 +252,7 @@ function ExecutionFilter({
   const styles = useSelectStyles<ExecutionOption>();
 
   if (isLoading) {
-    return <div className="h-[38px] animate-pulse rounded bg-base-300" />;
+    return <div className="h-10 animate-pulse rounded-lg bg-base-300" />;
   }
 
   const handleChange = (option: SingleValue<ExecutionOption>) => {
@@ -298,7 +300,7 @@ function FilterField({
         {onClear && (
           <button
             type="button"
-            className="btn btn-ghost btn-sm btn-square"
+            className="btn btn-ghost btn-square"
             onClick={onClear}
             aria-label={clearLabel}
             title={clearLabel}
@@ -360,10 +362,18 @@ export function TaskResultsPageContent() {
     isLoading,
     isError,
     isFetching,
+    errorUpdateCount,
+    refetch,
   } = useListTaskResults(params, {
     query: { staleTime: 15_000 },
   });
+  // The query key carries every filter and the page, so another scope never shows this data. A
+  // failed background refetch keeps the last data of the same scope on screen.
   const data = response?.data;
+  const retry = () => void refetch();
+  // Retrying a failed first load puts the query back to pending; keep the error in place with
+  // its retry disabled rather than swapping it for the initial loading spinner.
+  const retryingFirstLoad = isLoading && errorUpdateCount > 0;
   const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / PAGE_SIZE));
   const currentPage = Math.floor(skip / PAGE_SIZE) + 1;
 
@@ -469,7 +479,7 @@ export function TaskResultsPageContent() {
               disabled={tasks.length === 0}
             />
           </FilterField>
-          <div className="flex min-h-[38px] flex-wrap items-center gap-2 sm:col-span-2 xl:col-span-1 xl:justify-end">
+          <div className="flex flex-wrap items-center gap-2 sm:col-span-2 xl:col-span-1 xl:justify-end">
             {hasPendingChanges && (
               <span className="text-xs text-base-content/60" role="status">
                 Unapplied changes
@@ -477,27 +487,28 @@ export function TaskResultsPageContent() {
             )}
             <button
               type="button"
-              className={`btn btn-sm gap-1 ${showMoreFilters ? "btn-neutral" : "btn-ghost"}`}
+              className={`btn ${showMoreFilters ? "btn-neutral" : "btn-ghost"}`}
               aria-expanded={showMoreFilters}
               aria-controls="task-result-more-filters"
               onClick={() => setShowMoreFilters((value) => !value)}
             >
-              <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+              <SlidersHorizontal data-icon="inline-start" aria-hidden="true" />
               More filters
               {(filters.qid || filters.message || filters.username) && (
                 <span className="badge badge-xs badge-primary">Active</span>
               )}
               <ChevronDown
+                data-icon="inline-end"
                 className={`h-3.5 w-3.5 transition-transform ${showMoreFilters ? "rotate-180" : ""}`}
                 aria-hidden="true"
               />
             </button>
-            <button type="submit" className="btn btn-primary btn-sm">
+            <button type="submit" className="btn btn-primary">
               Apply
             </button>
             {(hasFilters || hasPendingChanges) && (
-              <button type="button" className="btn btn-ghost btn-sm gap-1" onClick={clearFilters}>
-                <XCircle className="h-4 w-4" aria-hidden="true" />
+              <button type="button" className="btn btn-ghost" onClick={clearFilters}>
+                <XCircle data-icon="inline-start" aria-hidden="true" />
                 Clear
               </button>
             )}
@@ -511,7 +522,7 @@ export function TaskResultsPageContent() {
             <label className="form-control">
               <span className="mb-1 text-xs font-medium text-base-content/60">QID</span>
               <input
-                className="input input-bordered h-[38px] min-h-[38px] w-full bg-base-100"
+                className="input w-full"
                 value={draftFilters.qid}
                 onChange={(event) =>
                   setDraftFilters((current) => ({ ...current, qid: event.target.value }))
@@ -523,7 +534,7 @@ export function TaskResultsPageContent() {
               <span className="mb-1 text-xs font-medium text-base-content/60">
                 Message contains
               </span>
-              <span className="input input-bordered flex h-[38px] min-h-[38px] items-center gap-2 bg-base-100">
+              <span className="input w-full">
                 <Search className="h-3.5 w-3.5 text-base-content/40" aria-hidden="true" />
                 <input
                   className="grow"
@@ -569,28 +580,41 @@ export function TaskResultsPageContent() {
               Refreshing
             </span>
           )}
-          {rangeLabel && !isError && <span className="font-mono">{rangeLabel}</span>}
+          {rangeLabel && data && <span className="font-mono">{rangeLabel}</span>}
         </div>
       </div>
 
-      {isError ? (
-        <div className="alert alert-error">
-          <XCircle className="h-5 w-5" aria-hidden="true" />
-          <span>Failed to load task results.</span>
-        </div>
-      ) : isLoading ? (
+      {isError && data && (
+        <RefreshErrorAlert
+          className="mb-3"
+          message="Could not refresh task results. This list may be out of date."
+          onRetry={retry}
+          retrying={isFetching}
+        />
+      )}
+
+      {isLoading && !retryingFirstLoad ? (
         <div className="flex justify-center py-16">
           <span className="loading loading-spinner loading-lg" />
         </div>
-      ) : !data || data.items.length === 0 ? (
+      ) : !data ? (
+        isError || retryingFirstLoad ? (
+          <ErrorCard
+            title="Could not load task results"
+            message="The request failed. Check the connection and try again."
+            onRetry={retry}
+            retrying={isFetching}
+          />
+        ) : null
+      ) : data.items.length === 0 ? (
         hasFilters ? (
           <EmptyState
             title="No task results match these filters"
             description="Change the status or filters, or clear them to see every result"
             emoji="magnifying-glass"
             action={
-              <button type="button" className="btn btn-sm gap-1" onClick={clearFilters}>
-                <XCircle className="h-4 w-4" aria-hidden="true" />
+              <button type="button" className="btn btn-sm" onClick={clearFilters}>
+                <XCircle data-icon="inline-start" aria-hidden="true" />
                 Clear filters
               </button>
             }

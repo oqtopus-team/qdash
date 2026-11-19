@@ -216,22 +216,22 @@ export function EvaluationRunDetailPageContent({ runId }: { runId: string }) {
           {runIsActive(run) && (
             <button
               type="button"
-              className="btn btn-ghost btn-sm gap-1"
+              className="btn btn-ghost btn-sm"
               disabled={cancelRun.isPending}
               onClick={() => cancelRun.mutate({ runId }, { onSuccess: refresh })}
             >
-              <Square className="h-3.5 w-3.5" />
+              <Square data-icon="inline-start" />
               Cancel
             </button>
           )}
           {!runIsActive(run) && retryable && (
             <button
               type="button"
-              className="btn btn-ghost btn-sm gap-1"
+              className="btn btn-ghost btn-sm"
               disabled={retryRun.isPending}
               onClick={() => retryRun.mutate({ runId }, { onSuccess: refresh })}
             >
-              <RotateCcw className="h-3.5 w-3.5" />
+              <RotateCcw data-icon="inline-start" />
               Retry unfinished
             </button>
           )}

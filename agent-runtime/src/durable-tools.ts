@@ -19,31 +19,15 @@ import {
   ALLOWED_TOOL_NAMES,
   REVIEWED_WRITE_TOOL_NAMES,
   TRUSTED_EXTENSION_PACKAGES,
+  isDeferredTool,
+  isNestedReadTool,
   isReviewedWriteTool,
 } from "./allowed-tools.ts";
 import type { QDashConnection } from "./auth.ts";
-import {
-  acceptsImages,
-  hasImages,
-  latestFigures,
-  requestedImageCount,
-  withImages,
-} from "./figure-context.ts";
+import { acceptsImages, newestMessages } from "./figure-context.ts";
 import { hostRecord } from "./evaluate.ts";
-import {
-  acceptsCriteria,
-  acceptsKnowledge,
-  fetchTaskExamples,
-  fetchTaskKnowledge,
-  hasExamples,
-  hasKnowledge,
-  referenceOf,
-  requestedTaskName,
-  wantsExamples,
-  withExamples,
-  withKnowledge,
-} from "./knowledge-context.ts";
-import type { LabeledExample, Reference } from "./knowledge-context.ts";
+import { acceptsKnowledge, fetchTaskKnowledgeResponse, referenceOf } from "./knowledge-context.ts";
+import { hydrateEvaluationArgs } from "@oqtopus-team/pi-qdash/extensions/lib/qcal-hydration.ts";
 import { isTrustedExtension } from "./local-extensions.ts";
 import { withParameterOverrides } from "./tool-schemas.ts";
 
@@ -74,6 +58,42 @@ async function conversationModel(
 function asJson(value: unknown): JsonValue | undefined {
   if (value === undefined) return undefined;
   return JSON.parse(JSON.stringify(value)) as JsonValue;
+}
+
+/**
+ * What a Code Mode script receives from a nested QDash tool: the redacted
+ * response data the tool's text summarizes, untruncated, so a script can
+ * filter and aggregate it. Any JSON value.
+ */
+export const QDASH_DATA_SCHEMA = {
+  description:
+    "The tool's redacted QDash response data as JSON: the data its text answer summarizes, not truncated.",
+} as const;
+
+/** Text blocks of a tool result, joined. */
+function textOf(content: ReadonlyArray<{ type: string; text?: string }>): string {
+  return content
+    .map((block) => (block.type === "text" && typeof block.text === "string" ? block.text : ""))
+    .join("\n");
+}
+
+/**
+ * The value a script gets for a nested call: pi-qdash's `details.data`,
+ * else the text answer parsed as JSON, else the text itself.
+ */
+export function nestedDataOf(result: {
+  content: ReadonlyArray<{ type: string; text?: string }>;
+  details?: unknown;
+}): JsonValue {
+  const data = (result.details as { data?: unknown } | undefined)?.data;
+  const json = asJson(data);
+  if (json !== undefined) return json;
+  const text = textOf(result.content);
+  try {
+    return JSON.parse(text) as JsonValue;
+  } catch {
+    return text;
+  }
 }
 
 /** A write call waiting for the user, as stored in the tool result and shown in the UI. */
@@ -199,6 +219,14 @@ export function adaptCodingAgentTool(
     fillImages?: boolean;
     /** Fill an omitted `knowledge` argument (and `criteria`, when declared) with QDash's reference for `task_name`. */
     fillKnowledge?: boolean;
+    /**
+     * Let Code Mode scripts call the tool, which then returns its response
+     * data as structured output. Only audited read-only tools; every other
+     * tool can only be called by the model.
+     */
+    nested?: boolean;
+    /** Offer the tool to the model only once `tool_search` (or a call by name) loaded it. */
+    deferred?: boolean;
   } = {},
 ): ToolRegistration {
   const writesQDash = isReviewedWriteTool(tool.name);
@@ -213,6 +241,11 @@ export function adaptCodingAgentTool(
     // and a write never runs inside the harness, so replaying the call only
     // re-issues the approval request.
     replay: options.replay ?? "safe",
+    // Writes and unaudited tools never run inside a script: their approval
+    // card and rendering only exist for a call the model made.
+    callers: options.nested && !writesQDash ? ["model", "tools"] : ["model"],
+    ...(options.deferred ? { deferred: true as const } : {}),
+    ...(options.nested && !writesQDash ? { structuredOutputSchema: QDASH_DATA_SCHEMA } : {}),
     ...(tool.prepareArguments ? { prepareArguments: tool.prepareArguments } : {}),
     ...(tool.executionMode ? { executionMode: tool.executionMode } : {}),
     execute: async (args, api: ToolExecutionApi, context: Context) => {
@@ -235,44 +268,41 @@ export function adaptCodingAgentTool(
         };
       }
       let callArgs: unknown = args;
-      let figureTaskId: string | undefined;
-      if (options.fillImages) {
+      let hydrated: Awaited<ReturnType<typeof hydrateEvaluationArgs<object>>> | undefined;
+      if (options.fillImages || options.fillKnowledge) {
         // The model names the figure it wants evaluated by having fetched or
-        // received it; the bytes are taken from the transcript, not its call.
-        // Bytes the model copied into the call itself are replaced too: a
-        // model retyping base64 drops or alters characters, and the provider
-        // then rejects the whole request.
-        const page = await api.commit(
-          (tx) => tx.scanEntries({ conversationId: api.conversationId }, FIGURE_SCAN_LIMIT),
-          context,
-        );
-        const found = latestFigures(page.items, requestedImageCount(args));
-        figureTaskId = found.taskId;
-        if (found.images.length || !hasImages(args)) {
-          callArgs = withImages(args as object, found.images);
-        }
-      }
-      const taskName = requestedTaskName(args);
-      let reference: Reference | undefined;
-      if (options.fillKnowledge && taskName && !hasKnowledge(args)) {
-        // The model names the task; the reference it is judged against comes
-        // from QDash, as the user, so every evaluation reads the same one.
-        reference = await fetchTaskKnowledge(connection, taskName, context.abortSignal);
-        if (reference) {
+        // received it, and the task by `task_name`; the bytes come from the
+        // transcript (only a figure of that task) and the reference and
+        // labeled examples from QDash as the user, in one knowledge request.
+        // Bytes the model copied into the call itself are replaced: a model
+        // retyping base64 drops or alters characters, and the provider then
+        // rejects the whole request. The rules are shared with the pi CLI.
+        hydrated = await hydrateEvaluationArgs((args ?? {}) as object, {
+          parameters,
+          fillImages: options.fillImages === true,
+          fillKnowledge: options.fillKnowledge === true,
+          messages: async () => {
+            const page = await api.commit(
+              (tx) => tx.scanEntries({ conversationId: api.conversationId }, FIGURE_SCAN_LIMIT),
+              context,
+            );
+            return newestMessages(page.items);
+          },
+          loadKnowledge: (taskName, signal) =>
+            fetchTaskKnowledgeResponse(connection, taskName, signal),
+          signal: context.abortSignal,
+        });
+        callArgs = hydrated.args;
+        const summary = hydrated.summary;
+        if (summary.knowledge === "host" || summary.examples > 0) {
           console.log(
-            `[agent-runtime] ${tool.name}: reference for ${taskName} (${reference.knowledge.length} chars${reference.criteria ? ", criteria" : ""})`,
+            `[agent-runtime] ${tool.name}: reference for ${summary.task_name} (${hydrated.reference?.knowledge.length ?? 0} chars${summary.criteria ? ", criteria" : ""}; ${summary.examples} labeled example(s))`,
           );
         }
-        callArgs = withKnowledge(callArgs as object, reference, acceptsCriteria(parameters));
       }
-      let examples: LabeledExample[] | undefined;
-      if (options.fillKnowledge && taskName && wantsExamples(args) && !hasExamples(args)) {
-        // The model only asks for examples; the figures and labels come from
-        // QDash's knowledge, never from the model's own call.
-        examples = await fetchTaskExamples(connection, taskName, context.abortSignal);
-        console.log(`[agent-runtime] ${tool.name}: ${examples.length} labeled example(s) for ${taskName}`);
-        callArgs = withExamples(callArgs as object, examples);
-      }
+      const figureTaskId = hydrated?.figureTaskId;
+      const reference = hydrated?.reference;
+      const examples = hydrated?.examples;
       const started = Date.now();
       const result = await runCodingAgentTool(
         tool,
@@ -306,6 +336,10 @@ export function adaptCodingAgentTool(
         ...(result.isError === undefined ? {} : { isError: result.isError }),
         ...(result.usage === undefined ? {} : { usage: result.usage }),
         ...(result.terminate ? { control: { terminate: true as const } } : {}),
+        // An error result carries no value: the script gets its text as the error.
+        ...(options.nested && !writesQDash && !result.isError
+          ? { structuredOutput: nestedDataOf(result) }
+          : {}),
       };
     },
   });
@@ -413,13 +447,22 @@ export function buildQDashExtension(
   connection: QDashConnection,
   localExtensionRoots: readonly string[] = [],
   trustedPackages: readonly string[] = TRUSTED_EXTENSION_PACKAGES,
-): { extension: Extension; writeTools: QDashWriteTools } {
+): {
+  extension: Extension;
+  writeTools: QDashWriteTools;
+  /** Tools Code Mode scripts may call. */
+  nestedTools: string[];
+  /** Tools offered only once loaded. */
+  deferredTools: string[];
+} {
   const allowed = new Set<string>([
     ...ALLOWED_TOOL_NAMES,
     ...REVIEWED_WRITE_TOOL_NAMES,
   ]);
   const tools = new Map<string, ToolRegistration>();
   const writes = new Map<string, CodingAgentTool>();
+  const nested = new Set<string>();
+  const deferred = new Set<string>();
   const trusted = (extension: { path?: string }) =>
     isTrusted(extension, localExtensionRoots, trustedPackages);
   // Pinned extensions first, so a trusted definition is the one that replaces.
@@ -436,19 +479,30 @@ export function buildQDashExtension(
       // Only trusted extensions evaluate figures; pi-qdash tools fetch them.
       const fillImages = local && acceptsImages(registered.definition.parameters);
       const fillKnowledge = local && acceptsKnowledge(registered.definition.parameters);
+      // Only the pinned, audited implementation of a read tool may run from a
+      // script; a trusted checkout's replacement is model-only.
+      const nestedRead = !local && !writeName && isNestedReadTool(name);
+      const deferredTool = isDeferredTool(name);
       tools.set(
         name,
         adaptCodingAgentTool(registered.definition, modelRuntime, cwd, connection, {
           replay,
           fillImages,
           fillKnowledge,
+          nested: nestedRead,
+          deferred: deferredTool,
         }),
       );
+      if (nestedRead) nested.add(name);
+      else nested.delete(name);
+      if (deferredTool) deferred.add(name);
       if (writeName) writes.set(name, registered.definition);
     }
   }
   return {
     extension: defineExtension({ name: "qdash", tools: [...tools.values()] }),
     writeTools: new QDashWriteTools(writes, modelRuntime, cwd, connection),
+    nestedTools: [...nested],
+    deferredTools: [...deferred],
   };
 }

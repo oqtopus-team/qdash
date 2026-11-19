@@ -47,6 +47,8 @@ class TestToolLabel:
 
     def test_keeps_non_qdash_tools_readable(self) -> None:
         assert tool_label("render_chart") == "Render chart"
+        assert tool_label("codemode") == "Code mode script"
+        assert tool_label("tool_search") == "Search tools"
 
 
 class TestTranslate:
@@ -788,3 +790,449 @@ def test_runtime_headers_missing_credentials_fail_closed(monkeypatch, tmp_path):
     monkeypatch.setenv("AGENT_RUNTIME_TOKEN_FILE", str(tmp_path / "missing"))
     with pytest.raises(FileNotFoundError):
         _runtime_headers()
+
+
+class TestSteerAndContinue:
+    @pytest.mark.asyncio
+    async def test_an_applied_steer_closes_the_answer_so_far_and_resets_its_blocks(self) -> None:
+        chart = {"data": [{"x": [1]}], "layout": {}}
+        events = await _collect(
+            {"type": "chart", "chart": chart},
+            {
+                "type": "steer",
+                "request_id": "s1",
+                "status": "applied",
+                "entry_id": "7",
+                "text": "And T2?",
+                "answer": "T1 is 42 us.",
+            },
+            {"type": "text_delta", "delta": "T2 is 30 us."},
+            {"type": "done", "text": "T2 is 30 us.", "entry_id": "9"},
+        )
+
+        assert [name for name, _ in events] == ["steer", "delta", "status", "result"]
+        assert events[0][1] == {
+            "request_id": "s1",
+            "status": "applied",
+            "entry_id": "7",
+            "text": "And T2?",
+            "result": {
+                "blocks": [
+                    {"type": "chart", "content": None, "chart": chart},
+                    {"type": "text", "content": "T1 is 42 us.", "chart": None},
+                ],
+                "assessment": None,
+            },
+        }
+        # The chart belongs to the answer before the steer, not to the final one.
+        assert events[-1][1] == {
+            "blocks": [{"type": "text", "content": "T2 is 30 us.", "chart": None}],
+            "assessment": None,
+            "entry_id": "9",
+        }
+
+    @pytest.mark.asyncio
+    async def test_a_steer_placed_before_the_turn_is_marked(self) -> None:
+        events = await _collect(
+            {
+                "type": "steer",
+                "request_id": "s0",
+                "status": "applied",
+                "entry_id": "4",
+                "text": "Use Q5",
+                "answer": "",
+                "before_turn": True,
+            },
+            {"type": "done", "text": "Answer", "entry_id": "9"},
+        )
+
+        assert events[0][0] == "steer"
+        assert events[0][1]["before_turn"] is True
+        assert events[0][1]["request_id"] == "s0"
+
+    @pytest.mark.asyncio
+    async def test_the_turns_own_message_closes_what_a_recovered_run_answered(self) -> None:
+        chart = {"data": [{"x": [1]}], "layout": {}}
+        events = await _collect(
+            {
+                "type": "steer",
+                "request_id": "s0",
+                "status": "applied",
+                "entry_id": "4",
+                "text": "Use Q5",
+                "answer": "",
+                "before_turn": True,
+            },
+            {"type": "chart", "chart": chart},
+            {"type": "text_delta", "delta": "Plotted."},
+            {"type": "turn_start", "answer": "Plotted."},
+            {"type": "text_delta", "delta": "Answer."},
+            {"type": "done", "text": "Answer.", "entry_id": "9"},
+        )
+
+        assert [name for name, _ in events] == [
+            "steer",
+            "delta",
+            "turn_start",
+            "delta",
+            "status",
+            "result",
+        ]
+        # The recovered answer and its chart end at the turn's own message.
+        assert events[2][1] == {
+            "result": {
+                "blocks": [
+                    {"type": "chart", "content": None, "chart": chart},
+                    {"type": "text", "content": "Plotted.", "chart": None},
+                ],
+                "assessment": None,
+            }
+        }
+        assert events[-1][1] == {
+            "blocks": [{"type": "text", "content": "Answer.", "chart": None}],
+            "assessment": None,
+            "entry_id": "9",
+        }
+
+    @pytest.mark.asyncio
+    async def test_a_withdrawn_steer_is_reported(self) -> None:
+        events = await _collect(
+            {"type": "steer", "request_id": "s1", "status": "withdrawn", "reason": "aborted"},
+            {"type": "error", "message": "conversation was not answered: aborted"},
+        )
+
+        assert events[0] == (
+            "steer",
+            {"request_id": "s1", "status": "withdrawn", "reason": "aborted"},
+        )
+        assert events[1][0] == "error"
+
+    @pytest.mark.asyncio
+    async def test_a_continue_with_nothing_to_answer_is_a_noop_not_an_error(self) -> None:
+        events = await _collect({"type": "noop", "reason": "nothing_to_answer"})
+
+        assert events == [("noop", {"reason": "nothing_to_answer"})]
+
+    @pytest.mark.asyncio
+    async def test_a_steer_without_its_request_id_is_malformed(self) -> None:
+        events = await _collect({"type": "steer", "status": "applied"})
+
+        assert events[0][0] == "error"
+
+
+def test_a_continue_is_forwarded_without_its_message(monkeypatch: pytest.MonkeyPatch) -> None:
+    from qdash.api.services import pi_chat_service
+    from qdash.copilot.config import CopilotConfig, ModelConfig
+    from qdash.copilot.contracts.models import ChatRequest
+
+    monkeypatch.setattr(pi_chat_service, "user_instructions", lambda _username: None)
+    config = CopilotConfig(model=ModelConfig(provider="vllm", name="m"))
+    request = ChatRequest.model_validate(
+        {"message": "", "session_id": "s1", "request_id": "r1", "continue_run": True}
+    )
+    payload = pi_chat_service._request_payload(request, config, "alice")
+
+    assert payload["continue"] is True
+    assert payload["request_id"] == "r1"
+    plain = ChatRequest.model_validate({"message": "hi", "session_id": "s1"})
+    assert "continue" not in pi_chat_service._request_payload(plain, config, "alice")
+
+
+class _RuntimeResponse:
+    def __init__(self, status_code: int, body: Any) -> None:
+        self.status_code = status_code
+        self._body = body
+
+    def json(self) -> Any:
+        if isinstance(self._body, Exception):
+            raise self._body
+        return self._body
+
+
+def _fake_runtime(
+    monkeypatch: pytest.MonkeyPatch, response: _RuntimeResponse, sent: list[dict[str, Any]]
+) -> None:
+    import httpx
+
+    class Client:
+        def __init__(self, **_kwargs: Any) -> None:
+            pass
+
+        async def __aenter__(self) -> Client:
+            return self
+
+        async def __aexit__(self, *_args: Any) -> None:
+            return None
+
+        async def post(self, url: str, *, headers: dict[str, str], json: Any) -> _RuntimeResponse:
+            sent.append({"url": url, "headers": headers, "json": json})
+            return response
+
+    monkeypatch.setattr(httpx, "AsyncClient", Client)
+    monkeypatch.setenv("AGENT_RUNTIME_TOKEN", "runtime-token")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("status_code", "body", "expected"),
+    [
+        (200, {"status": "queued", "submission_id": "5"}, {"status": "queued"}),
+        (
+            200,
+            {"status": "applied", "submission_id": "5", "entry_id": "8"},
+            {"status": "applied", "entry_id": "8"},
+        ),
+        (
+            200,
+            {"status": "withdrawn", "submission_id": "5", "reason": "aborted"},
+            {"status": "withdrawn", "reason": "aborted"},
+        ),
+        (409, {"status": "rejected", "reason": "idle"}, {"status": "rejected", "reason": "idle"}),
+    ],
+)
+async def test_a_steer_reaches_the_runtime_with_the_users_credentials(
+    monkeypatch: pytest.MonkeyPatch, status_code: int, body: Any, expected: dict[str, Any]
+) -> None:
+    from qdash.api.services import pi_chat_service
+
+    sent: list[dict[str, Any]] = []
+    _fake_runtime(monkeypatch, _RuntimeResponse(status_code, body), sent)
+    result = await pi_chat_service.steer_runtime_turn(
+        "alice",
+        "s1",
+        request_id="r1",
+        turn_request_id="t1",
+        message="Use Q5",
+        auth=pi_chat_service.QDashAuth("alice-token", "p1"),
+    )
+
+    assert result == {"reason": None, "entry_id": None, **expected}
+    assert sent[0]["url"].endswith("/chat/steer")
+    assert sent[0]["json"] == {
+        "owner_id": "alice",
+        "conversation_id": "s1",
+        # A chat never branched is its own store's root: no conversation is named.
+        "store_session_id": "s1",
+        "request_id": "r1",
+        "turn_request_id": "t1",
+        "message": "Use Q5",
+    }
+    assert sent[0]["headers"]["X-QDash-Token"] == "alice-token"
+    assert sent[0]["headers"]["X-QDash-Project-Id"] == "p1"
+    assert sent[0]["headers"]["Authorization"] == "Bearer runtime-token"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("status_code", "body", "expected_status"),
+    [(403, {"error": "other project"}, 403), (500, ValueError("not json"), 502)],
+)
+async def test_a_refused_steer_raises(
+    monkeypatch: pytest.MonkeyPatch, status_code: int, body: Any, expected_status: int
+) -> None:
+    from qdash.api.services import pi_chat_service
+
+    _fake_runtime(monkeypatch, _RuntimeResponse(status_code, body), [])
+    with pytest.raises(pi_chat_service.SteerRefusedError) as raised:
+        await pi_chat_service.steer_runtime_turn(
+            "alice",
+            "s1",
+            request_id="r1",
+            turn_request_id="t1",
+            message="x",
+            auth=pi_chat_service.QDashAuth("t"),
+        )
+    assert raised.value.status_code == expected_status
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("status_code", "body", "expected"),
+    [
+        (200, {"status": "not_found"}, {"status": "not_found"}),
+        (
+            200,
+            {"status": "applied", "submission_id": "5", "entry_id": "8"},
+            {"status": "applied", "entry_id": "8"},
+        ),
+        (200, {"status": "queued", "submission_id": "5"}, {"status": "queued"}),
+    ],
+)
+async def test_a_steer_status_only_reads_and_never_sends_the_message(
+    monkeypatch: pytest.MonkeyPatch, status_code: int, body: Any, expected: dict[str, Any]
+) -> None:
+    from qdash.api.services import pi_chat_service
+
+    sent: list[dict[str, Any]] = []
+    _fake_runtime(monkeypatch, _RuntimeResponse(status_code, body), sent)
+    result = await pi_chat_service.steer_runtime_status(
+        "alice", "s1", request_id="r1", auth=pi_chat_service.QDashAuth("alice-token", "p1")
+    )
+
+    assert result == {"reason": None, "entry_id": None, **expected}
+    assert sent[0]["url"].endswith("/chat/steer/status")
+    # No message: the lookup cannot admit anything.
+    assert sent[0]["json"] == {
+        "owner_id": "alice",
+        "conversation_id": "s1",
+        "store_session_id": "s1",
+        "request_id": "r1",
+    }
+    assert sent[0]["headers"]["X-QDash-Project-Id"] == "p1"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("status_code", "body", "expected_status"),
+    [(403, {"error": "another project"}, 403), (503, {"error": "store"}, 502)],
+)
+async def test_a_refused_steer_status_raises(
+    monkeypatch: pytest.MonkeyPatch, status_code: int, body: Any, expected_status: int
+) -> None:
+    from qdash.api.services import pi_chat_service
+
+    _fake_runtime(monkeypatch, _RuntimeResponse(status_code, body), [])
+    with pytest.raises(pi_chat_service.SteerRefusedError) as raised:
+        await pi_chat_service.steer_runtime_status(
+            "alice", "s1", request_id="r1", auth=pi_chat_service.QDashAuth("t", "p2")
+        )
+    assert raised.value.status_code == expected_status
+
+
+def _failing_runtime(monkeypatch: pytest.MonkeyPatch, error: Exception) -> None:
+    import httpx
+
+    class Client:
+        def __init__(self, **_kwargs: Any) -> None:
+            pass
+
+        async def __aenter__(self) -> Client:
+            return self
+
+        async def __aexit__(self, *_args: Any) -> None:
+            return None
+
+        async def post(self, *_args: Any, **_kwargs: Any) -> _RuntimeResponse:
+            raise error
+
+    monkeypatch.setattr(httpx, "AsyncClient", Client)
+
+
+@pytest.mark.asyncio
+async def test_a_fork_failure_says_whether_the_request_may_still_run(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import httpx
+
+    from qdash.api.services import pi_chat_service
+    from qdash.api.services.copilot_chat_session_service import (
+        BranchRefusedError,
+        ForkSettledError,
+    )
+
+    async def fork() -> Any:
+        return await pi_chat_service.fork_runtime_branch(
+            "alice", "s1", None, "5", "b1", auth=pi_chat_service.QDashAuth("t", "p1")
+        )
+
+    # A refusal: the runtime created nothing.
+    _fake_runtime(monkeypatch, _RuntimeResponse(409, {"error": "busy", "reason": "busy"}), [])
+    with pytest.raises(BranchRefusedError) as refused:
+        await fork()
+    assert refused.value.reason == "busy"
+    # A storage fault the runtime answered, or a runtime never reached: over, outcome unknown.
+    _fake_runtime(monkeypatch, _RuntimeResponse(500, {"error": "internal server error"}), [])
+    with pytest.raises(ForkSettledError):
+        await fork()
+    _failing_runtime(monkeypatch, httpx.ConnectError("refused"))
+    with pytest.raises(ForkSettledError):
+        await fork()
+    # A timeout: the runtime may still be forking, so it is not reported as over.
+    _failing_runtime(monkeypatch, httpx.ReadTimeout("slow"))
+    with pytest.raises(httpx.ReadTimeout):
+        await fork()
+
+
+@pytest.mark.asyncio
+async def test_a_store_held_by_a_deleted_chats_turn_is_removed_after_stopping_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from qdash.api.services import pi_chat_service
+    from qdash.api.services.copilot_chat_session_service import RuntimeTarget
+
+    answers = [False, True]
+    deletes: list[tuple[str, str | None]] = []
+    aborts: list[tuple[str, str, RuntimeTarget | None]] = []
+
+    async def delete(username: str, store: str, generation: str | None = None) -> bool:
+        deletes.append((store, generation))
+        return answers.pop(0)
+
+    async def abort(username: str, session_id: str, target: RuntimeTarget | None = None) -> str:
+        aborts.append((username, session_id, target))
+        return "stopped"
+
+    monkeypatch.setattr(pi_chat_service, "delete_runtime_session_state", delete)
+    monkeypatch.setattr(pi_chat_service, "abort_runtime_turn", abort)
+    chats = [("b1", RuntimeTarget("s1", "7", "g1"))]
+    assert await pi_chat_service.remove_runtime_store(
+        "alice", "s1", "g1", chats, attempts=3, retry_delay=0
+    )
+    # Every attempt, a retry included, removes only the generation it was given.
+    assert deletes == [("s1", "g1"), ("s1", "g1")]
+    assert aborts == [("alice", "b1", RuntimeTarget("s1", "7", "g1"))]
+    # Still held after every attempt: reported, so the deleted chat is kept for a retry.
+    answers[:] = [False, False]
+    assert not await pi_chat_service.remove_runtime_store(
+        "alice", "s1", "g1", chats, attempts=2, retry_delay=0
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("status_code", "expected"),
+    [(200, "stopped"), (404, "not_running"), (409, "unknown"), (502, "unknown")],
+)
+async def test_stopping_a_turn_reports_what_the_runtime_confirmed(
+    monkeypatch: pytest.MonkeyPatch, status_code: int, expected: str
+) -> None:
+    from qdash.api.services import pi_chat_service
+    from qdash.api.services.copilot_chat_session_service import RuntimeTarget
+
+    sent: list[dict[str, Any]] = []
+    _fake_runtime(monkeypatch, _RuntimeResponse(status_code, {}), sent)
+    outcome = await pi_chat_service.abort_runtime_turn(
+        "alice", "b1", RuntimeTarget("s1", "7", "g1")
+    )
+    assert outcome == expected
+    # Exactly that chat: its store, that incarnation of it, and its conversation.
+    assert sent[0]["json"] == {
+        "owner_id": "alice",
+        "conversation_id": "b1",
+        "store_session_id": "s1",
+        "store_conversation_id": "7",
+        "store_generation": "g1",
+    }
+    assert "X-QDash-Token" not in sent[0]["headers"]
+    # A deleted chat's stop also asks for work its store kept, with the user's credentials.
+    sent.clear()
+    await pi_chat_service.abort_runtime_turn(
+        "alice",
+        "b1",
+        RuntimeTarget("s1", "7", "g1"),
+        stored_with=pi_chat_service.QDashAuth("alice-token", "p1"),
+    )
+    assert sent[0]["json"]["include_stored"] is True
+    assert sent[0]["headers"]["X-QDash-Token"] == "alice-token"
+
+
+@pytest.mark.asyncio
+async def test_a_stop_the_runtime_never_answered_is_unknown(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import httpx
+
+    from qdash.api.services import pi_chat_service
+
+    _failing_runtime(monkeypatch, httpx.ConnectError("down"))
+    assert await pi_chat_service.abort_runtime_turn("alice", "s1") == "unknown"

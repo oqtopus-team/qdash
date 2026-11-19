@@ -1,17 +1,22 @@
 import type { ReactNode } from "react";
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ExecutionDAG } from "@/components/features/execution/ExecutionDAG";
 
 const mocks = vi.hoisted(() => ({
   capturedProps: null as Record<string, unknown> | null,
+  capturedControlsProps: null as Record<string, unknown> | null,
   fitView: vi.fn(),
 }));
 
 vi.mock("@xyflow/react", () => {
-  type FakeNode = { id: string; data: Record<string, unknown> };
+  type FakeNode = {
+    id: string;
+    data: Record<string, unknown>;
+    position: { x: number; y: number };
+  };
   type FakeReactFlowProps = {
     nodes?: FakeNode[];
     children?: ReactNode;
@@ -38,17 +43,13 @@ vi.mock("@xyflow/react", () => {
       );
     },
     Background: () => null,
-    Controls: ({
-      onInteractiveChange,
-    }: {
-      onInteractiveChange?: (interactive: boolean) => void;
-    }) => (
-      <button
-        type="button"
-        data-testid="controls-interactive"
-        onClick={() => onInteractiveChange?.(true)}
-      >
-        toggle-lock
+    Controls: (props: { children?: ReactNode; [key: string]: unknown }) => {
+      mocks.capturedControlsProps = props;
+      return <div data-testid="controls">{props.children}</div>;
+    },
+    ControlButton: ({ children, ...props }: { children?: ReactNode; [key: string]: unknown }) => (
+      <button type="button" {...props}>
+        {children}
       </button>
     ),
     Handle: () => null,
@@ -124,14 +125,47 @@ const tasks = [
 afterEach(() => {
   cleanup();
   mocks.capturedProps = null;
+  mocks.capturedControlsProps = null;
   mocks.fitView.mockClear();
 });
 
 describe("ExecutionDAG lock control", () => {
-  it("starts locked with pan/zoom and dragging disabled", () => {
+  it("starts unlocked with pan/zoom enabled and node dragging disabled", () => {
     render(<ExecutionDAG tasks={tasks} />);
 
-    expect(screen.getByTestId("controls-interactive")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Lock view" })).toBeTruthy();
+    expect(mocks.capturedProps).toMatchObject({
+      zoomOnScroll: true,
+      panOnScroll: false,
+      panOnDrag: true,
+      zoomOnPinch: true,
+      zoomOnDoubleClick: true,
+      preventScrolling: true,
+      nodesDraggable: false,
+      nodesConnectable: false,
+      elementsSelectable: false,
+    });
+    expect(mocks.capturedControlsProps).toMatchObject({
+      showInteractive: false,
+      showZoom: true,
+      showFitView: true,
+      fitViewOptions: { padding: 0.05, minZoom: 0.1, maxZoom: 1.5 },
+    });
+    expect(screen.getByTitle("Fit to view")).toBeTruthy();
+  });
+
+  it("locks pan/zoom on the first click of the lock control", () => {
+    render(<ExecutionDAG tasks={tasks} />);
+    mocks.fitView.mockClear();
+
+    fireEvent.click(screen.getByRole("button", { name: "Lock view" }));
+
+    expect(mocks.fitView).toHaveBeenCalledWith({
+      padding: 0.05,
+      minZoom: 0.1,
+      maxZoom: 1.5,
+      duration: 0,
+    });
     expect(mocks.capturedProps).toMatchObject({
       zoomOnScroll: false,
       panOnScroll: false,
@@ -143,23 +177,40 @@ describe("ExecutionDAG lock control", () => {
       nodesConnectable: false,
       elementsSelectable: false,
     });
+    expect(mocks.capturedControlsProps).toMatchObject({
+      showInteractive: false,
+      showZoom: false,
+      showFitView: false,
+    });
+    expect(screen.queryByTitle("Fit to view")).toBeNull();
+    expect(screen.getByRole("button", { name: "Unlock view" })).toHaveAttribute(
+      "title",
+      "Unlock view",
+    );
   });
 
-  it("unlocks pan/zoom and dragging when the lock control is toggled", () => {
+  it("restores pan/zoom and the Controls buttons on the second click", () => {
     render(<ExecutionDAG tasks={tasks} />);
 
-    fireEvent.click(screen.getByTestId("controls-interactive"));
+    fireEvent.click(screen.getByRole("button", { name: "Lock view" }));
+    expect(mocks.capturedControlsProps).toMatchObject({ showZoom: false, showFitView: false });
+    mocks.fitView.mockClear();
 
+    fireEvent.click(screen.getByRole("button", { name: "Unlock view" }));
+
+    expect(mocks.fitView).not.toHaveBeenCalled();
+    expect(mocks.capturedControlsProps).toMatchObject({
+      showInteractive: false,
+      showZoom: true,
+      showFitView: true,
+    });
+    expect(screen.getByTitle("Fit to view")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Lock view" })).toBeTruthy();
     expect(mocks.capturedProps).toMatchObject({
       zoomOnScroll: true,
-      panOnScroll: false,
       panOnDrag: true,
-      zoomOnPinch: true,
-      zoomOnDoubleClick: true,
-      preventScrolling: true,
-      nodesDraggable: true,
-      nodesConnectable: false,
-      elementsSelectable: true,
+      nodesDraggable: false,
+      elementsSelectable: false,
     });
   });
 });
@@ -183,6 +234,48 @@ describe("ExecutionDAG fullscreen", () => {
     fireEvent.keyDown(window, { key: "Escape" });
 
     expect(container.firstChild).not.toHaveClass("fixed");
+  });
+
+  it("fits on mount but keeps the user's viewport when fullscreen toggles unlocked", () => {
+    vi.useFakeTimers();
+    try {
+      render(<ExecutionDAG tasks={tasks} />);
+      act(() => {
+        vi.runAllTimers();
+      });
+      expect(mocks.fitView).toHaveBeenCalledWith(expect.objectContaining({ duration: 0 }));
+      mocks.fitView.mockClear();
+
+      fireEvent.click(screen.getByRole("button", { name: "Fullscreen" }));
+      act(() => {
+        vi.runAllTimers();
+      });
+
+      expect(mocks.fitView).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("re-fits the locked graph when fullscreen toggles", () => {
+    vi.useFakeTimers();
+    try {
+      render(<ExecutionDAG tasks={tasks} />);
+      fireEvent.click(screen.getByRole("button", { name: "Lock view" }));
+      act(() => {
+        vi.runAllTimers();
+      });
+      mocks.fitView.mockClear();
+
+      fireEvent.click(screen.getByRole("button", { name: "Fullscreen" }));
+      act(() => {
+        vi.runAllTimers();
+      });
+
+      expect(mocks.fitView).toHaveBeenCalledWith(expect.objectContaining({ duration: 0 }));
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
@@ -208,8 +301,31 @@ describe("ExecutionDAG node interaction", () => {
     expect(screen.queryByRole("link", { name: /^Execution$/ })).toBeNull();
   });
 
-  it("gives the canvas up to the preview and re-fits the graph afterwards", async () => {
+  it("keeps the user's viewport when the preview opens on the unlocked canvas", () => {
+    vi.useFakeTimers();
+    try {
+      render(<ExecutionDAG tasks={tasks} />);
+      const canvas = screen.getByTestId("execution-flow-canvas");
+      act(() => {
+        vi.runAllTimers();
+      });
+      mocks.fitView.mockClear();
+
+      fireEvent.click(screen.getByTestId("node-task-1"));
+      expect(canvas).toHaveClass("lg:mr-[calc(40vw-2.5rem)]");
+      act(() => {
+        vi.runAllTimers();
+      });
+
+      expect(mocks.fitView).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("gives the canvas up to the preview and re-fits the locked graph afterwards", async () => {
     render(<ExecutionDAG tasks={tasks} />);
+    fireEvent.click(screen.getByRole("button", { name: "Lock view" }));
     const canvas = screen.getByTestId("execution-flow-canvas");
     expect(canvas).not.toHaveClass("lg:mr-[calc(40vw-2.5rem)]");
     const fitCallsBefore = mocks.fitView.mock.calls.length;
@@ -224,6 +340,82 @@ describe("ExecutionDAG node interaction", () => {
 
     fireEvent.keyDown(window, { key: "Escape" });
     expect(canvas).not.toHaveClass("lg:mr-[calc(40vw-2.5rem)]");
+  });
+
+  it("cancels the pending preview fit when the canvas is unlocked before it runs", () => {
+    vi.useFakeTimers();
+    try {
+      render(<ExecutionDAG tasks={tasks} />);
+      fireEvent.click(screen.getByRole("button", { name: "Lock view" }));
+      act(() => {
+        vi.runAllTimers();
+      });
+      mocks.fitView.mockClear();
+
+      fireEvent.click(screen.getByTestId("node-task-1"));
+      fireEvent.click(screen.getByRole("button", { name: "Unlock view" }));
+      act(() => {
+        vi.runAllTimers();
+      });
+
+      expect(mocks.fitView).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("fits the final width when the canvas is locked during the preview transition", () => {
+    vi.useFakeTimers();
+    try {
+      render(<ExecutionDAG tasks={tasks} />);
+      act(() => {
+        vi.runAllTimers();
+      });
+      mocks.fitView.mockClear();
+
+      fireEvent.click(screen.getByTestId("node-task-1"));
+      act(() => {
+        vi.advanceTimersByTime(100);
+      });
+      fireEvent.click(screen.getByRole("button", { name: "Lock view" }));
+      // The lock button fits the intermediate width at once.
+      expect(mocks.fitView).toHaveBeenCalledTimes(1);
+      expect(mocks.fitView).toHaveBeenLastCalledWith(expect.objectContaining({ duration: 0 }));
+
+      act(() => {
+        vi.runAllTimers();
+      });
+
+      expect(mocks.fitView).toHaveBeenCalledTimes(2);
+      expect(mocks.fitView).toHaveBeenLastCalledWith(expect.objectContaining({ duration: 300 }));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not re-fit when the canvas is locked after the preview transition", () => {
+    vi.useFakeTimers();
+    try {
+      render(<ExecutionDAG tasks={tasks} />);
+      act(() => {
+        vi.runAllTimers();
+      });
+
+      fireEvent.click(screen.getByTestId("node-task-1"));
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+      mocks.fitView.mockClear();
+      fireEvent.click(screen.getByRole("button", { name: "Lock view" }));
+      act(() => {
+        vi.runAllTimers();
+      });
+
+      expect(mocks.fitView).toHaveBeenCalledTimes(1);
+      expect(mocks.fitView).toHaveBeenLastCalledWith(expect.objectContaining({ duration: 0 }));
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("lets Escape close the preview before it exits fullscreen", () => {
@@ -267,5 +459,31 @@ describe("ExecutionDAG node interaction", () => {
     expect(screen.queryByText("CheckT2")).toBeNull();
     const nodesAfterClose = mocks.capturedProps?.nodes as Array<{ data: { isSelected: boolean } }>;
     expect(nodesAfterClose.every((node) => !node.data.isSelected)).toBe(true);
+  });
+});
+
+describe("ExecutionDAG theme", () => {
+  it("colors nodes with semantic status classes and draws static theme-colored edges", () => {
+    render(<ExecutionDAG tasks={tasks} />);
+
+    const nodeTypes = mocks.capturedProps?.nodeTypes as Record<
+      string,
+      (props: { data: Record<string, unknown> }) => ReactNode
+    >;
+    const CustomNode = nodeTypes.custom;
+    const { container } = render(
+      <>{CustomNode({ data: { name: "CheckT1", status: "failed", isSelected: false } })}</>,
+    );
+    const node = container.firstElementChild as HTMLElement;
+    expect(node.className).toContain("border-error");
+    expect(node.className).toContain("text-error");
+    expect(node.getAttribute("style")).toBeNull();
+
+    const edges = mocks.capturedProps?.edges as { animated?: boolean; style: { stroke: string } }[];
+    expect(edges).toHaveLength(1);
+    expect(edges[0].animated).toBeFalsy();
+    expect(edges[0].style.stroke).toContain("--color-base-content");
+    const defaults = mocks.capturedProps?.defaultEdgeOptions as { animated?: boolean };
+    expect(defaults.animated).toBeFalsy();
   });
 });

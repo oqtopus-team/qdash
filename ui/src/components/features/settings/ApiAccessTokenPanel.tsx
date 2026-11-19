@@ -211,14 +211,18 @@ export function ApiAccessTokenPanel() {
               />
               <div className="flex gap-2">
                 <button className="btn btn-sm flex-1" onClick={() => setShowToken(!showToken)}>
-                  {showToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  {showToken ? (
+                    <EyeOff data-icon="inline-start" />
+                  ) : (
+                    <Eye data-icon="inline-start" />
+                  )}
                   <span className="hidden sm:inline">{showToken ? "Hide" : "Show"}</span>
                 </button>
                 <button
                   className={`btn btn-sm flex-1 ${copied ? "btn-success" : "btn-primary"}`}
                   onClick={handleCopyToken}
                 >
-                  {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                  {copied ? <Check data-icon="inline-start" /> : <Copy data-icon="inline-start" />}
                   <span className="hidden sm:inline">{copied ? "Copied!" : "Copy"}</span>
                 </button>
               </div>
@@ -326,9 +330,9 @@ export function ApiAccessTokenPanel() {
                   type="button"
                 >
                   {isTestingCurl ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <Loader2 data-icon="inline-start" className="animate-spin" />
                   ) : (
-                    <Play className="h-4 w-4" />
+                    <Play data-icon="inline-start" />
                   )}
                   <span className="hidden sm:inline">Run</span>
                 </button>
@@ -337,7 +341,11 @@ export function ApiAccessTokenPanel() {
                   onClick={handleCopyCurl}
                   type="button"
                 >
-                  {copiedCurl ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                  {copiedCurl ? (
+                    <Check data-icon="inline-start" />
+                  ) : (
+                    <Copy data-icon="inline-start" />
+                  )}
                   <span className="hidden sm:inline">{copiedCurl ? "Copied!" : "Copy"}</span>
                 </button>
               </div>
@@ -364,7 +372,11 @@ export function ApiAccessTokenPanel() {
                     onClick={handleCopyResponse}
                     type="button"
                   >
-                    {copiedResponse ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                    {copiedResponse ? (
+                      <Check data-icon="inline-start" />
+                    ) : (
+                      <Copy data-icon="inline-start" />
+                    )}
                     <span className="hidden sm:inline">{copiedResponse ? "Copied!" : "Copy"}</span>
                   </button>
                 </div>

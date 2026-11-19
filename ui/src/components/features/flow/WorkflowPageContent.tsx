@@ -139,7 +139,7 @@ export function WorkflowPageContent() {
         description="Flow definitions shared by this project"
         actions={
           <Link href="/workflow/new" className="btn btn-primary">
-            <Plus size={20} />
+            <Plus data-icon="inline-start" />
             New Flow
           </Link>
         }
@@ -175,7 +175,7 @@ export function WorkflowPageContent() {
               size="lg"
               action={
                 <Link href="/workflow/new" className="btn btn-primary">
-                  <Plus size={20} />
+                  <Plus data-icon="inline-start" />
                   Create Flow
                 </Link>
               }
@@ -198,7 +198,7 @@ export function WorkflowPageContent() {
                       disabled={deleting}
                       onClick={() => setSelected(new Set())}
                     >
-                      <X className="h-4 w-4" />
+                      <X data-icon="inline-start" />
                       Clear
                     </button>
                   )}
@@ -208,7 +208,7 @@ export function WorkflowPageContent() {
                     disabled={deleting || selectedNames.length === 0}
                     onClick={() => setConfirmTargets(selectedNames)}
                   >
-                    <Trash2 className="h-4 w-4" />
+                    <Trash2 data-icon="inline-start" />
                     Delete selected
                   </button>
                 </div>
@@ -242,7 +242,7 @@ export function WorkflowPageContent() {
                       )
                     }
                   >
-                    <RotateCcw className="h-4 w-4" />
+                    <RotateCcw data-icon="inline-start" />
                     Retry
                   </button>
                   <button
@@ -308,7 +308,9 @@ export function WorkflowPageContent() {
                 onClick={() => deleteMutation.mutate(confirmTargets)}
                 disabled={deleting || confirmTargets.length === 0}
               >
-                {deleting && <span className="loading loading-spinner loading-xs" />}
+                {deleting && (
+                  <span data-icon="inline-start" className="loading loading-spinner loading-xs" />
+                )}
                 {confirmTargets.length === 1
                   ? "Delete"
                   : `Delete ${workflowCount(confirmTargets.length)}`}

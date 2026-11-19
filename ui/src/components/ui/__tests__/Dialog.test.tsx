@@ -22,6 +22,6 @@ describe("DialogContent", () => {
     expect(dialog.className).toContain("rounded-none");
     expect(dialog.className).not.toContain("max-w-lg");
     expect(dialog.className).not.toContain("overflow-y-auto");
-    expect(dialog.className).not.toContain("rounded-3xl");
+    expect(dialog.className).not.toContain("rounded-[var(--radius-box)]");
   });
 });

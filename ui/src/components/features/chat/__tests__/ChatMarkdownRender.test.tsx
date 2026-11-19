@@ -1,6 +1,7 @@
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { resetMermaidCache } from "@/lib/chatMermaid";
 import { ChatMarkdown } from "../ChatMarkdown";
 
 const mermaid = vi.hoisted(() => ({
@@ -9,28 +10,21 @@ const mermaid = vi.hoisted(() => ({
 }));
 vi.mock("mermaid", () => ({ default: mermaid }));
 
-beforeAll(() => {
-  // Streamdown renders a diagram once it scrolls into view.
-  class VisibleObserver {
-    constructor(private callback: IntersectionObserverCallback) {}
-    observe(target: Element) {
-      this.callback(
-        [{ isIntersecting: true, target } as IntersectionObserverEntry],
-        this as unknown as IntersectionObserver,
-      );
-    }
-    unobserve() {}
-    disconnect() {}
-    takeRecords() {
-      return [];
-    }
-  }
-  globalThis.IntersectionObserver = VisibleObserver as unknown as typeof IntersectionObserver;
-});
+const theme = vi.hoisted(() => ({ dark: false }));
+vi.mock("@/contexts/ThemeContext", () => ({
+  useIsDarkTheme: () => theme.dark,
+}));
+
+const copyText = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/utils/clipboard", () => ({ copyText }));
 
 beforeEach(() => {
   mermaid.initialize.mockReset();
   mermaid.render.mockReset();
+  copyText.mockReset();
+  copyText.mockResolvedValue(undefined);
+  theme.dark = false;
+  resetMermaidCache();
 });
 
 afterEach(cleanup);
@@ -79,13 +73,44 @@ describe("ChatMarkdown streaming", () => {
     expect(code).toHaveTextContent("print(r'\\(x\\)')");
     expect(container.querySelector("strong")).toBeNull();
     expect(container.querySelector(".katex")).toBeNull();
-    expect(container.querySelector("pre .animate-pulse")).not.toBeNull();
+    expect(container.querySelector('pre [data-markdown="caret"]')).not.toBeNull();
 
     rerender(<ChatMarkdown>{`${partial}\n\`\`\`\n`}</ChatMarkdown>);
-    expect(container.querySelector("pre .animate-pulse")).toBeNull();
-    expect(container.querySelector("pre code.hljs")).not.toBeNull();
-    expect(screen.getByRole("button", { name: "Copy code" })).toBeInTheDocument();
+    expect(container.querySelector('[data-markdown="caret"]')).toBeNull();
+    expect(container.querySelector("pre code .hljs-comment")).toHaveTextContent("# **not bold");
+    expect(screen.getByRole("button", { name: "Copy code" })).toBeEnabled();
     expect(screen.getByText("python")).toBeInTheDocument();
+  });
+
+  it("keeps finished blocks in place while later text streams in", () => {
+    const first = "Intro **bold** paragraph.\n\nSecond paragraph";
+    const { container, rerender } = render(<ChatMarkdown streaming>{first}</ChatMarkdown>);
+    const intro = container.querySelector("p");
+    rerender(<ChatMarkdown streaming>{`${first} keeps growing`}</ChatMarkdown>);
+    rerender(<ChatMarkdown streaming>{`${first} keeps growing.\n\n- a list`}</ChatMarkdown>);
+    // The completed paragraph is the same DOM node, not a re-render.
+    expect(container.querySelector("p")).toBe(intro);
+    expect(container.querySelector("li")).toHaveTextContent("a list");
+  });
+
+  it("renders Japanese emphasis next to CJK punctuation", () => {
+    const { container } = render(
+      <ChatMarkdown>{"**重要。**キャリブレーションは「**完了**」しました。"}</ChatMarkdown>,
+    );
+    const strong = container.querySelectorAll("strong");
+    expect(strong).toHaveLength(2);
+    expect(strong[0]).toHaveTextContent(/^重要。$/);
+    expect(strong[1]).toHaveTextContent(/^完了$/);
+    expect(container).not.toHaveTextContent("**");
+  });
+
+  it("copies code with the shared clipboard helper", async () => {
+    render(<ChatMarkdown>{"```bash\nqdash run\n```"}</ChatMarkdown>);
+    const button = screen.getByRole("button", { name: "Copy code" });
+    fireEvent.click(button);
+    expect(copyText).toHaveBeenCalledWith("qdash run\n");
+    await waitFor(() => expect(button).toHaveTextContent("Copied"));
+    expect(screen.queryByRole("button", { name: /download/i })).toBeNull();
   });
 });
 
@@ -99,6 +124,24 @@ describe("ChatMarkdown content", () => {
     expect(container.querySelectorAll(".katex").length).toBeGreaterThanOrEqual(3);
     expect(container.querySelector(".katex-display")).not.toBeNull();
     expect(container).not.toHaveTextContent("\\(");
+  });
+
+  it("preserves TeX source and decoded entities through the Words math hook", () => {
+    const formulas = [
+      String.raw`a < b > c`,
+      String.raw`\text{A\&B "quoted"}`,
+      String.raw`\frac{1}{\sqrt{2}}`,
+    ];
+    const { container } = render(
+      <ChatMarkdown>{formulas.map((tex) => `$${tex}$`).join("\n\n")}</ChatMarkdown>,
+    );
+    expect(
+      Array.from(
+        container.querySelectorAll('annotation[encoding="application/x-tex"]'),
+        (node) => node.textContent,
+      ),
+    ).toEqual(formulas);
+    expect(container.querySelector(".katex-error")).toBeNull();
   });
 
   it("renders inline code and GFM tables in the chat styles", () => {
@@ -125,13 +168,56 @@ describe("ChatMarkdown content", () => {
     expect(container.querySelector("script")).toBeNull();
     expect(container.querySelector("img")).toBeNull();
     expect(container).toHaveTextContent("<script>alert(2)</script>");
-    expect(container).toHaveTextContent("click [blocked]");
+    expect(container).toHaveTextContent("<img src=x onerror=alert(1)>");
+    expect(container.querySelector('[data-markdown="blocked-link"]')).toHaveTextContent("click");
     expect(container.querySelector("a")).toBeNull();
     expect(container.innerHTML).not.toMatch(/javascript:/i);
+  });
+
+  it("shows block HTML as text and leaves code, math and autolinks alone", () => {
+    const { container } = render(
+      <ChatMarkdown>
+        {[
+          "<details>\n<summary>Fit</summary>\nT1 = 42 us\n</details>",
+          'Use `<qubit id="Q0">` when $a<b$, see <https://qdash.example/docs>.',
+          '```xml\n<chip id="64Qv3"/>\n```',
+        ].join("\n\n")}
+      </ChatMarkdown>,
+    );
+    expect(container.querySelector("details")).toBeNull();
+    expect(container).toHaveTextContent("<details> <summary>Fit</summary> T1 = 42 us </details>");
+    expect(container.querySelector("code.chat-inline-code")).toHaveTextContent(/^<qubit id="Q0">$/);
+    expect(container.querySelector(".katex")).not.toBeNull();
+    expect(container.querySelector("pre code")).toHaveTextContent(/^<chip id="64Qv3"\/>$/);
+    expect(screen.getByRole("link", { name: "https://qdash.example/docs" })).toHaveAttribute(
+      "target",
+      "_blank",
+    );
+    expect(container).not.toHaveTextContent("\\<");
   });
 });
 
 describe("ChatMarkdown Mermaid diagrams", () => {
+  it("retains all diagrams after the shared cache evicts earlier results", async () => {
+    mermaid.render.mockImplementation(async (_id: string, source: string) => ({
+      svg: `<svg><text>${source}</text></svg>`,
+    }));
+    const source = Array.from(
+      { length: 201 },
+      (_, i) => `\`\`\`mermaid\ngraph TD\n A${i}-->B${i}\n\`\`\``,
+    ).join("\n\n");
+    const { container, rerender } = render(<ChatMarkdown>{source}</ChatMarkdown>);
+    await waitFor(
+      () => expect(container.querySelectorAll('[data-chat-mermaid="ready"]')).toHaveLength(201),
+      { timeout: 15000 },
+    );
+    rerender(<ChatMarkdown>{`${source}\n\nFinished.`}</ChatMarkdown>);
+    expect(container.querySelectorAll('[data-chat-mermaid="ready"]')).toHaveLength(201);
+    expect(mermaid.render).toHaveBeenCalledTimes(201);
+  }, 20000);
+
+  const SVG = '<svg viewBox="0 0 100 50"><text>Rabi</text></svg>';
+
   const diagram =
     '```mermaid\ngraph TD\n  A[Rabi] --> B[T1]\n  click A href "https://example.com"\n```';
 
@@ -172,5 +258,60 @@ describe("ChatMarkdown Mermaid diagrams", () => {
     const error = await screen.findByTestId("chat-mermaid-error", {}, { timeout: 3000 });
     expect(error).toHaveTextContent("Parse error on line 2");
     await waitFor(() => expect(error.querySelector("pre code")).toHaveTextContent("graph TD"));
+    expect(within(error).getByRole("button", { name: "Copy code" })).toBeInTheDocument();
+  });
+
+  it("zooms inline, opens fullscreen and copies the source", async () => {
+    mermaid.render.mockResolvedValue({ svg: SVG });
+    render(<ChatMarkdown>{diagram}</ChatMarkdown>);
+    const figure = await screen.findByRole("img", { name: "Mermaid chart" });
+    const canvas = figure.querySelector<HTMLElement>("[data-mermaid-canvas]");
+
+    fireEvent.click(screen.getByRole("button", { name: "Zoom in" }));
+    expect(canvas?.style.transform).toContain("scale(1.25)");
+    expect(figure).toHaveAttribute("data-zoomed");
+    fireEvent.click(screen.getByRole("button", { name: "Reset view" }));
+    expect(canvas?.style.transform).toBe("");
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy diagram source" }));
+    expect(copyText).toHaveBeenCalledWith(expect.stringContaining("A[Rabi] --> B[T1]"));
+
+    const opener = screen.getByRole("button", { name: "Open fullscreen" });
+    opener.focus();
+    fireEvent.click(opener);
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByTestId("chat-mermaid-fullscreen")).toHaveTextContent("Rabi");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Close" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() => expect(opener).toHaveFocus());
+  });
+
+  it("returns focus to the answer when the fullscreen opener is gone", async () => {
+    mermaid.render.mockResolvedValue({ svg: SVG });
+    const { container } = render(<ChatMarkdown>{diagram}</ChatMarkdown>);
+    await screen.findByRole("img", { name: "Mermaid chart" });
+
+    const opener = screen.getByRole("button", { name: "Open fullscreen" });
+    opener.focus();
+    fireEvent.click(opener);
+    const dialog = await screen.findByRole("dialog");
+    // Streaming re-rendered the answer and replaced the button.
+    opener.remove();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Close" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+    const answer = container.querySelector<HTMLElement>(".chat-prose");
+    await waitFor(() => expect(answer).toHaveFocus());
+    expect(answer).not.toHaveAttribute("tabindex");
+  });
+
+  it("renders diagrams in the dark Mermaid theme on dark themes", async () => {
+    theme.dark = true;
+    mermaid.render.mockResolvedValue({ svg: SVG });
+    render(<ChatMarkdown>{diagram}</ChatMarkdown>);
+    await screen.findByRole("img", { name: "Mermaid chart" });
+    expect(mermaid.initialize).toHaveBeenCalledWith(
+      expect.objectContaining({ theme: "dark", securityLevel: "strict" }),
+    );
   });
 });

@@ -90,15 +90,15 @@ function DownloadArchiveButton({ taskName }: { taskName: string }) {
   return (
     <button
       type="button"
-      className="btn btn-sm btn-outline gap-1"
+      className="btn btn-sm btn-outline"
       onClick={download}
       disabled={downloading}
       title="task.md, examples and figures as a zip: edit it locally and upload it as a knowledge draft in an AI evaluation"
     >
       {downloading ? (
-        <span className="loading loading-spinner loading-xs" />
+        <span data-icon="inline-start" className="loading loading-spinner loading-xs" />
       ) : (
-        <Download size={16} />
+        <Download data-icon="inline-start" />
       )}
       Download zip
     </button>
@@ -121,11 +121,8 @@ export function TaskKnowledgeDetailPage({ taskName }: { taskName: string }) {
   if (error || !markdown) {
     return (
       <div className="p-6">
-        <button
-          onClick={() => router.push("/knowledge")}
-          className="btn btn-ghost btn-sm gap-1 mb-4"
-        >
-          <ArrowLeft className="h-4 w-4" />
+        <button onClick={() => router.push("/knowledge")} className="btn btn-ghost btn-sm mb-4">
+          <ArrowLeft data-icon="inline-start" />
           Back
         </button>
         <div className="text-center py-16 text-base-content/50">
@@ -166,7 +163,7 @@ export function TaskKnowledgeDetailPage({ taskName }: { taskName: string }) {
             {detail?.examples?.map((example) => (
               <article
                 key={example.id}
-                className="rounded-xl border border-base-300 bg-base-100 p-5"
+                className="rounded-[var(--radius-box)] border border-base-300 bg-base-100 p-5"
               >
                 <div className="flex flex-wrap items-center gap-2 mb-3">
                   <h3 className="text-sm font-medium">{example.title}</h3>

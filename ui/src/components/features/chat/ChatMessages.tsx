@@ -1,15 +1,17 @@
 "use client";
 
-import React, { memo, useCallback, useEffect, useRef, useState } from "react";
+import React, { memo, useCallback, useEffect, useId, useRef, useState } from "react";
 import {
   AlertTriangle,
   Check,
   CheckCircle2,
   Copy,
+  GitBranch,
   ImageIcon,
   Pencil,
   RotateCcw,
   Square,
+  StepForward,
   ThumbsDown,
   ThumbsUp,
   XCircle,
@@ -17,7 +19,7 @@ import {
 import { ChatPlotlyChart } from "@/components/features/chat/ChatPlotlyChart";
 import { ChatUiBlock } from "@/components/features/chat/ChatUiBlock";
 import { ChatMarkdown } from "@/components/features/chat/ChatMarkdown";
-import { ChatTraceSummary, LiveTrace } from "@/components/features/chat/ChatTrace";
+import { ChatTraceSummary, LiveTrace, TurnActivity } from "@/components/features/chat/ChatTrace";
 import { FigureStrip, figuresInSteps } from "@/components/features/chat/ChatFigures";
 import {
   ApprovalCard,
@@ -28,7 +30,6 @@ import {
 import { useOptionalChatDock } from "@/contexts/ChatDockContext";
 import { matchesEditTarget } from "@/lib/copilotEditTarget";
 import { ImagePreviewDialog } from "@/components/ui/ImagePreviewDialog";
-import { Loader } from "@/components/ui/Loader";
 import { QdashBotAvatar } from "@/components/ui/UserAvatar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import { useToast } from "@/components/ui/Toast";
@@ -84,35 +85,63 @@ function isErrorMessage(message: CopilotMessage): boolean {
 
 function ActionButton({
   label,
+  hint,
   onClick,
-  active = false,
+  active,
+  disabled = false,
   children,
 }: {
   label: string;
+  /** What the action does, shown under the label before the user clicks. */
+  hint?: string;
   onClick: () => void;
-  /** A toggle that is on, e.g. the rating the user gave. */
+  /** A toggle and whether it is on, e.g. the rating the user gave; unset for a plain action. */
   active?: boolean;
+  disabled?: boolean;
   children: React.ReactNode;
 }) {
+  const hintId = useId();
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <button
           type="button"
           onClick={onClick}
+          disabled={disabled}
           className={`btn btn-ghost btn-xs btn-square ${
             active ? "text-primary" : "text-base-content/45 hover:text-base-content"
           }`}
           aria-label={label}
           aria-pressed={active}
+          aria-describedby={hint ? hintId : undefined}
         >
           {children}
         </button>
       </TooltipTrigger>
-      <TooltipContent>{label}</TooltipContent>
+      <TooltipContent>
+        {hint ? (
+          <>
+            <span className="block font-medium">{label}</span>
+            <span className="block text-base-content/70">{hint}</span>
+          </>
+        ) : (
+          label
+        )}
+      </TooltipContent>
+      {hint && (
+        // The description stays in the page for assistive technology while the tooltip is closed.
+        <span id={hintId} className="sr-only">
+          {hint}
+        </span>
+      )}
     </Tooltip>
   );
 }
+
+/** What branching does, shown before the user branches. */
+const BRANCH_HINT =
+  "Starts a new chat with this conversation up to this answer. It shares this chat's workspace " +
+  "files as they are now, not as they were then, and only one of the two can answer at a time.";
 
 /** One assistant turn: full-width text, no avatar, like ChatGPT and Claude. */
 function AssistantRow({ className = "", children, ...rest }: React.HTMLAttributes<HTMLDivElement>) {
@@ -211,7 +240,7 @@ function ImageSentBadge({ imagesSent }: { imagesSent: BlocksResult["images_sent"
             key={key}
             type="button"
             onClick={() => setPreviewSrc(src)}
-            className="flex-shrink-0 rounded-lg border border-base-300 overflow-hidden hover:border-primary/50 hover:shadow-md transition-colors cursor-pointer"
+            className="flex-shrink-0 rounded-lg border border-base-300 overflow-hidden hover:border-primary/50 transition-colors cursor-pointer"
           >
             {/* eslint-disable-next-line @next/next/no-img-element -- runtime-generated API preview */}
             <img
@@ -276,7 +305,10 @@ function BlocksContent({
         }
         if (block.type === "chart" && block.chart) {
           return (
-            <div key={i} className="my-3 rounded-xl border border-base-300/60 overflow-hidden">
+            <div
+              key={i}
+              className="my-3 rounded-[var(--radius-box)] border border-base-300/60 overflow-hidden"
+            >
               <ChatPlotlyChart
                 data={block.chart.data as Record<string, unknown>[]}
                 layout={block.chart.layout as Record<string, unknown>}
@@ -360,14 +392,14 @@ export const UserMessage = memo(function UserMessage({
           className="w-full resize-none bg-transparent border-none outline-none focus:ring-0 text-sm leading-6"
         />
         <div className="flex items-center justify-end gap-2 mt-2">
-          <button type="button" onClick={cancelEdit} className="btn btn-ghost btn-sm rounded-full">
+          <button type="button" onClick={cancelEdit} className="btn btn-ghost btn-sm">
             Cancel
           </button>
           <button
             type="button"
             onClick={submitEdit}
             disabled={!draft.trim()}
-            className="btn btn-primary btn-sm rounded-full"
+            className="btn btn-primary btn-sm"
           >
             Send
           </button>
@@ -386,7 +418,7 @@ export const UserMessage = memo(function UserMessage({
               key={i}
               src={src}
               alt={`Attached figure ${i + 1}`}
-              className="h-24 max-w-[200px] rounded-xl object-contain border border-base-300 bg-base-200"
+              className="h-24 max-w-[200px] rounded-[var(--radius-box)] object-contain border border-base-300 bg-base-200"
             />
           ))}
         </div>
@@ -401,6 +433,11 @@ export const UserMessage = memo(function UserMessage({
       <div className="chat-bubble-user-soft rounded-3xl px-4 py-2.5 max-w-[85%] text-sm leading-relaxed whitespace-pre-wrap break-words">
         {message.content}
       </div>
+      {message.steer?.placement === "approximate" && (
+        <span className="text-xs text-base-content/55">
+          Sent while the answer above was written; it read this during or after that answer
+        </span>
+      )}
       <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
         <CopyButton text={message.content} />
         {canEdit && (
@@ -423,11 +460,24 @@ export const AssistantMessage = memo(function AssistantMessage({
   onDecide,
   onOther,
   onRate,
+  canContinue = false,
+  onContinue,
+  canBranch = false,
+  branching = false,
+  onBranch,
 }: {
   message: CopilotMessage;
   isLast: boolean;
   canRetry: boolean;
   onRetry: () => void;
+  /** The answer stopped or failed and can go on from where it ended, without a new message. */
+  canContinue?: boolean;
+  onContinue?: () => void;
+  /** A new chat can start from this answer: it is complete, saved with its runtime entry, and nothing runs. */
+  canBranch?: boolean;
+  /** A branch from this answer is being created. */
+  branching?: boolean;
+  onBranch?: () => void;
   /** The user message that follows this answer, if any. */
   answer?: string;
   onAnswer: InteractionState["onAnswer"];
@@ -438,20 +488,29 @@ export const AssistantMessage = memo(function AssistantMessage({
   if (isErrorMessage(message)) {
     return (
       <AssistantRow className="animate-fade-in-up">
-        <div className="flex items-start gap-2 text-sm text-error bg-error/5 rounded-xl px-4 py-3 border border-error/20">
+        <div className="flex items-start gap-2 text-sm text-error bg-error/5 rounded-[var(--radius-box)] px-4 py-3 border border-error/20">
           <XCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
           <span className="break-words min-w-0">{message.content.slice("Error: ".length)}</span>
         </div>
-        {isLast && canRetry && (
-          <button
-            type="button"
-            onClick={onRetry}
-            className="btn btn-ghost btn-sm gap-1.5 mt-2 rounded-full"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            Retry
-          </button>
-        )}
+        <div className="flex flex-wrap items-center gap-1 mt-2">
+          {isLast && canContinue && onContinue && (
+            <button
+              type="button"
+              onClick={onContinue}
+              className="btn btn-ghost btn-sm"
+              title="Go on from where the answer ended, without sending your message again"
+            >
+              <StepForward data-icon="inline-start" />
+              Continue
+            </button>
+          )}
+          {isLast && canRetry && (
+            <button type="button" onClick={onRetry} className="btn btn-ghost btn-sm">
+              <RotateCcw data-icon="inline-start" />
+              Retry
+            </button>
+          )}
+        </div>
       </AssistantRow>
     );
   }
@@ -470,7 +529,7 @@ export const AssistantMessage = memo(function AssistantMessage({
       )}
       <div
         className={`mt-1.5 -ml-1.5 flex items-center gap-0.5 transition-opacity ${
-          isLast || feedback
+          isLast || feedback || branching
             ? "opacity-100"
             : "opacity-0 group-hover:opacity-100 focus-within:opacity-100"
         }`}
@@ -490,6 +549,25 @@ export const AssistantMessage = memo(function AssistantMessage({
         >
           <ThumbsDown className="w-3.5 h-3.5" />
         </ActionButton>
+        {isLast && canContinue && onContinue && (
+          <ActionButton label="Continue" onClick={onContinue}>
+            <StepForward className="w-3.5 h-3.5" />
+          </ActionButton>
+        )}
+        {onBranch && (canBranch || branching) && (
+          <ActionButton
+            label={branching ? "Creating branch" : "Branch from here"}
+            hint={BRANCH_HINT}
+            onClick={onBranch}
+            disabled={branching}
+          >
+            {branching ? (
+              <span className="loading loading-spinner loading-xs" aria-hidden="true" />
+            ) : (
+              <GitBranch className="w-3.5 h-3.5" />
+            )}
+          </ActionButton>
+        )}
         {isLast && canRetry && (
           <ActionButton label="Regenerate" onClick={onRetry}>
             <RotateCcw className="w-3.5 h-3.5" />
@@ -519,9 +597,11 @@ export function LiveAssistantMessage({
       (s.kind === "tool" && (s.status === "running" || s.status === "drafting")) ||
       (s.kind === "thinking" && s.endedAt === undefined),
   );
+  const idle = !answer && !busy;
 
   return (
-    <AssistantRow className="animate-fade-in-up" aria-live="polite" aria-busy="true">
+    // The activity footer is the live region; the streaming text itself is not announced.
+    <AssistantRow className="animate-fade-in-up" aria-busy="true">
       <LiveTrace steps={work} />
       {answer && figuresInSteps(work).length > 0 && (
         <FigureStrip paths={figuresInSteps(work)} className="mb-3" />
@@ -533,20 +613,17 @@ export function LiveAssistantMessage({
           <ChatMarkdown key={i}>{block.content}</ChatMarkdown>
         ) : null,
       )}
-      {answer ? (
-        <ChatMarkdown streaming>{answer}</ChatMarkdown>
-      ) : (
-        !busy && (
-          <div className="flex items-center gap-2.5 h-7 text-sm">
-            <QdashBotAvatar size={20} className="chat-avatar-active chat-bot-mark" />
-            {statusMessage ? (
-              <Loader variant="text-shimmer" size="sm" text={statusMessage} />
-            ) : (
-              <Loader variant="typing" size="sm" />
-            )}
-          </div>
-        )
-      )}
+      {answer && <ChatMarkdown streaming>{answer}</ChatMarkdown>}
+      {/* Drawn only when no trace row already shows the activity; always announced. */}
+      <TurnActivity
+        steps={turn.steps}
+        startedAt={turn.startedAt}
+        statusMessage={statusMessage}
+        className={`h-7 gap-2.5 ${idle ? "text-sm" : "mt-1"}`}
+        leading={
+          idle ? <QdashBotAvatar size={20} className="chat-avatar-active chat-bot-mark" /> : null
+        }
+      />
     </AssistantRow>
   );
 }

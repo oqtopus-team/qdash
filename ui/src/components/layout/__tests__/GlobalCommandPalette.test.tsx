@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { GlobalCommandPalette } from "@/components/layout/GlobalCommandPalette";
+import { AVAILABLE_THEMES } from "@/constants/themes";
 
 const push = vi.fn();
 const switchProject = vi.fn();
@@ -10,6 +11,7 @@ const success = vi.fn();
 const error = vi.fn();
 const taskInfoRequests = vi.fn();
 const mockPathname = vi.hoisted(() => vi.fn(() => "/inbox"));
+const mockCanEdit = vi.hoisted(() => vi.fn(() => false));
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push }),
@@ -50,7 +52,7 @@ vi.mock("@/contexts/AuthContext", () => ({
 
 vi.mock("@/contexts/ProjectContext", () => ({
   useProject: () => ({
-    canEdit: false,
+    canEdit: mockCanEdit(),
     projectId: "project-1",
     projects: [
       { project_id: "project-1", name: "Current lab" },
@@ -87,6 +89,7 @@ describe("GlobalCommandPalette", () => {
     vi.clearAllMocks();
     vi.unstubAllGlobals();
     mockPathname.mockReturnValue("/inbox");
+    mockCanEdit.mockReturnValue(false);
     window.history.replaceState({}, "", "/inbox");
   });
 
@@ -268,5 +271,108 @@ describe("GlobalCommandPalette", () => {
     window.history.replaceState({}, "", "/tasks?backend=second");
     rerender(<GlobalCommandPalette />);
     expect(taskInfoRequests).toHaveBeenLastCalledWith({ backend: "second" });
+  });
+  it("lists create actions first and focuses the search input", () => {
+    mockCanEdit.mockReturnValue(true);
+    render(<GlobalCommandPalette />);
+    fireEvent.keyDown(window, { key: "k", metaKey: true });
+
+    const input = screen.getByRole("combobox", { name: "QDash navigation" });
+    expect(document.activeElement).toBe(input);
+    const options = screen.getAllByRole("option");
+    expect(options[0].textContent).toContain("Create new workflow");
+    expect(options[1].textContent).toContain("Create new thread");
+    expect(options[0].getAttribute("aria-selected")).toBe("true");
+  });
+
+  it("opens the new workflow editor without saving anything for an editor", () => {
+    mockCanEdit.mockReturnValue(true);
+    render(<GlobalCommandPalette />);
+    fireEvent.keyDown(window, { key: "k", metaKey: true });
+    fireEvent.keyDown(screen.getByRole("combobox"), { key: "Enter", keyCode: 13 });
+
+    expect(push).toHaveBeenCalledOnce();
+    expect(push).toHaveBeenCalledWith("/workflow/new");
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("offers a viewer only the thread action, since workflows need write access", () => {
+    render(<GlobalCommandPalette />);
+    fireEvent.keyDown(window, { key: "k", metaKey: true });
+
+    expect(screen.queryByRole("option", { name: /Create new workflow/ })).toBeNull();
+    const [first] = screen.getAllByRole("option");
+    expect(first.textContent).toContain("Create new thread");
+    fireEvent.keyDown(screen.getByRole("combobox"), { key: "Enter", keyCode: 13 });
+    expect(push).toHaveBeenCalledWith("/forum/new");
+  });
+
+  it("keeps the forum list filters when creating a thread from the forum", () => {
+    mockPathname.mockReturnValue("/forum");
+    window.history.replaceState({}, "", "/forum?status=open&category=question");
+    render(<GlobalCommandPalette />);
+    fireEvent.keyDown(window, { key: "k", metaKey: true });
+    fireEvent.click(screen.getByRole("option", { name: /Create new thread/ }));
+
+    expect(push).toHaveBeenCalledWith(
+      `/forum/new?from=${encodeURIComponent("status=open&category=question")}`,
+    );
+  });
+
+  it("moves through results with the arrow keys and runs the selection with Enter", async () => {
+    mockCanEdit.mockReturnValue(true);
+    render(<GlobalCommandPalette />);
+    fireEvent.keyDown(window, { key: "k", metaKey: true });
+    const input = screen.getByRole("combobox");
+
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    await waitFor(() =>
+      expect(
+        screen.getByRole("option", { name: /Create new thread/ }).getAttribute("aria-selected"),
+      ).toBe("true"),
+    );
+    // The list loops: up from the first result reaches the last theme.
+    fireEvent.keyDown(input, { key: "ArrowUp" });
+    fireEvent.keyDown(input, { key: "ArrowUp" });
+    const lastTheme = AVAILABLE_THEMES[AVAILABLE_THEMES.length - 1];
+    await waitFor(() =>
+      expect(
+        screen
+          .getByRole("option", { name: `Use ${lastTheme} theme` })
+          .getAttribute("aria-selected"),
+      ).toBe("true"),
+    );
+    fireEvent.keyDown(input, { key: "Enter", keyCode: 13 });
+    expect(setTheme).toHaveBeenCalledWith(lastTheme);
+  });
+
+  it("closes with Escape and returns focus to the trigger", async () => {
+    render(<GlobalCommandPalette />);
+    const trigger = screen.getByRole("button", { name: "Open navigation search" });
+    trigger.focus();
+    fireEvent.click(trigger);
+    const input = screen.getByRole("combobox");
+    expect(document.activeElement).toBe(input);
+
+    fireEvent.keyDown(input, { key: "Escape" });
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() => expect(document.activeElement).toBe(trigger));
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("returns focus to the element focused before the shortcut opened the palette", async () => {
+    const field = document.createElement("input");
+    document.body.appendChild(field);
+    field.focus();
+    render(<GlobalCommandPalette />);
+
+    fireEvent.keyDown(window, { key: "k", ctrlKey: true });
+    expect(document.activeElement).toBe(screen.getByRole("combobox"));
+    fireEvent.keyDown(window, { key: "k", ctrlKey: true });
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() => expect(document.activeElement).toBe(field));
+    field.remove();
   });
 });

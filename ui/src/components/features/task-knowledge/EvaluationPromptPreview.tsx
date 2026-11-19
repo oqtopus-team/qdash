@@ -91,7 +91,7 @@ export function EvaluationPromptPreview({ taskName, exampleCount }: Props) {
           </div>
           <button
             type="button"
-            className="btn btn-sm btn-outline gap-1"
+            className="btn btn-sm btn-outline"
             onClick={() => {
               if (requested) void refetch();
               else setRequested(true);
@@ -99,9 +99,12 @@ export function EvaluationPromptPreview({ taskName, exampleCount }: Props) {
             disabled={isFetching}
           >
             {requested ? (
-              <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
+              <RefreshCw
+                data-icon="inline-start"
+                className={isFetching ? "animate-spin" : undefined}
+              />
             ) : (
-              <Eye className="h-4 w-4" />
+              <Eye data-icon="inline-start" />
             )}
             {requested ? "Refresh" : "Preview"}
           </button>

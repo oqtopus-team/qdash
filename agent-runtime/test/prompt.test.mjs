@@ -62,3 +62,36 @@ test("a language in the user's preferences sets the reply language under auto", 
   assert.match(buildSystemPrompt("auto", "en"), /in a message or in their preferences below/);
   assert.match(buildUserInstructionsSection("Answer in Japanese."), /a language they name here is the reply language/);
 });
+
+test("code mode and deferred tools are explained when offered", async () => {
+  const { CODEMODE_GUIDELINE, deferredToolsGuideline } = await import("../src/codemode.ts");
+  const prompt = buildSystemPrompt("en", "en", [], "Tool list", null, false, null, null, {
+    codemode: CODEMODE_GUIDELINE,
+    deferredTools: deferredToolsGuideline(["qdash_list_cryostats", "qdash_list_cooldowns"]),
+  });
+  assert.match(prompt, /Use `codemode` when a question needs many read-only QDash calls/);
+  assert.match(prompt, /Scripts can call only QDash's read-only tools/);
+  assert.match(prompt, /call `tool_search` with the tool name/);
+  assert.match(prompt, /Deferred tools: qdash_list_cooldowns, qdash_list_cryostats/);
+  assert.equal(deferredToolsGuideline([]), null);
+  // Tools the guide names are marked there, not listed twice.
+  const marked = deferredToolsGuideline(["qdash_list_cryostats", "qdash_list_cooldowns"], new Set(["qdash_list_cryostats"]));
+  assert.match(marked, /Tools marked \* in the tool guide are deferred/);
+  assert.match(marked, /Other deferred tools: qdash_list_cooldowns$/);
+  assert.doesNotMatch(marked, /qdash_list_cryostats/);
+  assert.doesNotMatch(buildSystemPrompt("en", "en"), /codemode|tool_search/);
+});
+
+test("the investigation policy shared with pi CLI sits beside the runtime's own rules", async () => {
+  const { investigationPolicyBullets } = await import("@oqtopus-team/pi-qdash/extensions/lib/qdash-guidance.ts");
+  const prompt = buildSystemPrompt("auto", "en");
+  const guidelines = prompt.slice(prompt.indexOf("Guidelines:\n"));
+  for (const bullet of investigationPolicyBullets()) {
+    assert.ok(guidelines.includes(`${bullet}\n`), `missing shared rule: ${bullet}`);
+    assert.equal(prompt.split(bullet).length, 2, `shared rule appears more than once: ${bullet}`);
+  }
+  // Host-specific rules stay in the runtime prompt.
+  assert.match(prompt, /`render_ui`/);
+  assert.match(prompt, /approval card/);
+  assert.match(prompt, /You have no filesystem or shell access\./);
+});

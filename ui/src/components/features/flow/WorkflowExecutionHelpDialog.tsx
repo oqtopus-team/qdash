@@ -141,9 +141,9 @@ export function HelpAnimation({ media, caption }: { media: HelpMedia; caption: s
             onClick={() => setPlaying((value) => !value)}
           >
             {playing ? (
-              <Pause size={16} aria-hidden="true" />
+              <Pause data-icon="inline-start" aria-hidden="true" />
             ) : (
-              <Play size={16} aria-hidden="true" />
+              <Play data-icon="inline-start" aria-hidden="true" />
             )}
             {playing ? "Pause animation" : "Play animation"}
           </button>

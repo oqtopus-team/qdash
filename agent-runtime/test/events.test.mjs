@@ -315,3 +315,11 @@ test("a proposed edit is emitted before tool_end", () => {
     ],
   );
 });
+
+test("a placed steer becomes a steer line with where it landed", () => {
+  assert.deepEqual(
+    toNdjsonEvents({ type: "steer_placed", requestId: "s1", entryId: "12", text: "Use Q5", answer: "T1 is 42 us." }),
+    [{ type: "steer", request_id: "s1", status: "applied", entry_id: "12", text: "Use Q5", answer: "T1 is 42 us." }],
+  );
+  assert.deepEqual(toNdjsonEvents({ type: "steer_placed", entryId: "12" }), []);
+});

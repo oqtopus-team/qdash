@@ -10,6 +10,8 @@ export type FigureDetails = {
   base64?: string;
   text?: string;
   taskId?: string;
+  /** Task name of the task result the figure belongs to, when known; evaluation hydration matches it. */
+  taskName?: string;
   figurePaths?: string[];
   jsonFigurePaths?: string[];
 };

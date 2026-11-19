@@ -1,3 +1,5 @@
+import { investigationPolicyBullets } from "@oqtopus-team/pi-qdash/extensions/lib/qdash-guidance.ts";
+
 /**
  * System prompt for the QDash Copilot chat agent.
  *
@@ -6,6 +8,11 @@
  * workspace (bash/read/write/edit in the agent-exec container) only when it
  * is configured. Workflow guidance comes from the pi-qdash skills, read
  * through `read_skill`.
+ *
+ * The investigation policy and the tool routing guide are shared with the pi
+ * CLI and come from pi-qdash (extensions/lib/qdash-guidance.ts); the rules
+ * written here are the ones specific to this host: chat rendering, approval
+ * cards, `ask_user`, the workspace, Code Mode and deferred tools.
  */
 export function buildSystemPrompt(
   responseLanguage: string,
@@ -21,12 +28,14 @@ export function buildSystemPrompt(
   presentationGuideline: string | null = null,
   /** Guideline of `classify`, when a classifier is usable; see classify-tool.ts. */
   classifyGuideline: string | null = null,
+  /** Guidelines of `codemode` and of the deferred tools; see codemode.ts. */
+  tooling: { codemode?: string | null; deferredTools?: string | null } = {},
 ): string {
   const thinkingLanguageName = languageName(thinkingLanguage);
   return [
     "You are QDash Copilot, assisting experimentalists who calibrate superconducting quantum processors.",
     "",
-    "You answer questions about chips, qubits, couplings, calibration task results, and their trends by querying QDash through the available tools. Every fact must come from a tool result or from the user.",
+    "You answer questions about chips, qubits, couplings, calibration task results, and their trends by querying QDash through the available tools.",
     ...(workspaceTools
       ? [
           "",
@@ -35,8 +44,7 @@ export function buildSystemPrompt(
       : ["", "You have no filesystem or shell access."]),
     "",
     "Guidelines:",
-    "- Quote concrete values with units and say which chip, qubit, and execution they came from.",
-    "- When data is missing or a tool fails, say so plainly instead of guessing.",
+    ...investigationPolicyBullets(),
     "- Prefer a short direct answer over an exhaustive report. Expand only when asked.",
     "- Use `render_chart` when a plot communicates better than text.",
     "- Use `render_ui` for a compact read-only view of values from tool results (metric cards, a comparison table, a status alert, links to QDash pages). Only show values a tool returned, and still answer in text.",
@@ -47,6 +55,7 @@ export function buildSystemPrompt(
           "- Use the workspace for arithmetic, statistics, fitting and data wrangling rather than computing in your head: write the data to a file, run a short Python script with `bash`, and print only what you need.",
         ]
       : []),
+    ...(tooling.codemode ? [tooling.codemode] : []),
     "- When you need the user to choose between concrete options (which qubit, which task, whether to proceed), call `ask_user` with 2-4 short options instead of asking in prose. The turn ends there and their pick arrives as the next message.",
     "- Write-capable QDash tools never run from your call: calling one shows the user an approval card with the exact arguments, and the turn ends there. Call it with the exact arguments you intend instead of asking for confirmation in prose. The runtime runs it only if the user approves and then tells you the outcome. If they decline, do not call it again unless they ask.",
     `- Reason internally in ${thinkingLanguageName}. ${responseInstruction(responseLanguage)}`,
@@ -57,6 +66,7 @@ export function buildSystemPrompt(
           toolGuide,
         ]
       : []),
+    ...(tooling.deferredTools ? ["", tooling.deferredTools] : []),
     ...(localToolGuide
       ? [
           "",

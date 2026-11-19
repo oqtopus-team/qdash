@@ -56,13 +56,8 @@ export function ChatLinkPreviewProvider({ children }: { children: ReactNode }) {
 
 function OpenPageLink({ href }: { href: string }) {
   return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="btn btn-sm btn-ghost gap-1.5 rounded-full"
-    >
-      <ExternalLink className="w-3.5 h-3.5" />
+    <a href={href} target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-ghost">
+      <ExternalLink data-icon="inline-start" />
       Open page
     </a>
   );

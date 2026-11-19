@@ -533,18 +533,18 @@ function ForumThreadPreviewSidebar({
                         ? `/forum/${post.id}?from=${encodeURIComponent(returnQuery)}`
                         : `/forum/${post.id}`
                     }
-                    className="btn btn-primary btn-sm gap-1"
+                    className="btn btn-primary btn-sm"
                   >
-                    <ExternalLink className="h-3.5 w-3.5" />
+                    <ExternalLink data-icon="inline-start" />
                     Open full page
                   </Link>
                   {canManageMetadata && (
                     <button
                       type="button"
-                      className={`btn btn-sm gap-1 ${editingMetadata ? "btn-neutral" : "btn-outline"}`}
+                      className={`btn btn-sm ${editingMetadata ? "btn-neutral" : "btn-outline"}`}
                       onClick={() => setEditingMetadata((open) => !open)}
                     >
-                      <Pencil className="h-3.5 w-3.5" />
+                      <Pencil data-icon="inline-start" />
                       Edit metadata
                     </button>
                   )}
@@ -1021,31 +1021,31 @@ export function ForumPageContent() {
           <div className="flex flex-wrap gap-2">
             {isOwner && (
               <button
-                className="btn btn-ghost btn-sm gap-2"
+                className="btn btn-ghost btn-sm"
                 onClick={() => setShowCategoryManager((open) => !open)}
               >
-                <Settings className="h-4 w-4" />
+                <Settings data-icon="inline-start" />
                 Categories
               </button>
             )}
             {canEdit && (
               <button
-                className="btn btn-ghost btn-sm gap-2"
+                className="btn btn-ghost btn-sm"
                 onClick={() => setShowLabelManager((open) => !open)}
               >
-                <Tag className="h-4 w-4" />
+                <Tag data-icon="inline-start" />
                 Labels
               </button>
             )}
             <Link
-              className="btn btn-primary btn-sm gap-2"
+              className="btn btn-primary btn-sm"
               href={
                 listReturnQuery
                   ? `/forum/new?from=${encodeURIComponent(listReturnQuery)}`
                   : "/forum/new"
               }
             >
-              <Plus className="h-4 w-4" />
+              <Plus data-icon="inline-start" />
               New Thread
             </Link>
           </div>
@@ -1145,8 +1145,8 @@ export function ForumPageContent() {
         </PageFiltersBar.Group>
         {hasListFilters && (
           <PageFiltersBar.Group position="end">
-            <button type="button" className="btn btn-ghost btn-sm gap-1" onClick={clearFilters}>
-              <XCircle className="h-4 w-4" />
+            <button type="button" className="btn btn-ghost btn-sm" onClick={clearFilters}>
+              <XCircle data-icon="inline-start" />
               Clear
             </button>
           </PageFiltersBar.Group>
@@ -1297,8 +1297,8 @@ export function ForumPageContent() {
             <div className="font-medium">Failed to load forum threads</div>
             <div className="text-sm opacity-80">The discussion list could not be retrieved.</div>
           </div>
-          <button type="button" className="btn btn-sm btn-ghost gap-1" onClick={() => refetch()}>
-            <RotateCcw className="h-4 w-4" aria-hidden="true" />
+          <button type="button" className="btn btn-sm btn-ghost" onClick={() => refetch()}>
+            <RotateCcw data-icon="inline-start" aria-hidden="true" />
             Retry
           </button>
         </div>
@@ -1321,8 +1321,8 @@ export function ForumPageContent() {
                 Clear filters
               </button>
             ) : (
-              <Link href="/forum/new" className="btn btn-sm btn-primary gap-1">
-                <Plus className="h-4 w-4" aria-hidden="true" />
+              <Link href="/forum/new" className="btn btn-sm btn-primary">
+                <Plus data-icon="inline-start" aria-hidden="true" />
                 New thread
               </Link>
             )

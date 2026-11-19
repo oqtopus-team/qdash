@@ -110,27 +110,37 @@ type ExternalNavItem = {
 
 /**
  * QDash home link shared by the desktop rail and the mobile drawer header: the
- * OQTOPUS mark beside the product name. Its left inset matches the nav rows below
- * so the mark lines up with their icons. `min-w-max` keeps the mark and name at
- * full size while the collapsing rail clips them, instead of squeezing them.
+ * OQTOPUS mark in an app-icon tile beside the product name. The tile stays white in
+ * every theme so the dark symbol keeps its contrast, and it is the same 36px as the
+ * former bare mark, so the header height and icon alignment are unchanged. Its left
+ * inset matches the nav rows below so the tile lines up with their icons.
+ * `min-w-max` keeps the tile and name at full size while the collapsing rail clips
+ * them, instead of squeezing them.
  */
 function SidebarLogo({ onClick }: { onClick: () => void }) {
   return (
     <Link
       href="/"
-      className="mx-1 flex min-w-max flex-1 items-center gap-2 rounded-lg px-3 py-1"
+      className="mx-1 flex min-w-max flex-1 items-center gap-2.5 rounded-lg px-3 py-1"
       aria-label="QDash home"
       onClick={onClick}
     >
-      <Image
-        src="/oqtopus_logo.png"
-        alt=""
-        width={36}
-        height={36}
-        className="h-9 w-9 shrink-0 object-contain"
-        priority
-      />
-      <span className="truncate text-lg font-semibold tracking-tight text-base-content">QDash</span>
+      <span
+        data-testid="sidebar-logo-tile"
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-base-content/10 bg-white shadow-xs"
+      >
+        <Image
+          src="/oqtopus_logo.svg"
+          alt=""
+          width={30}
+          height={30}
+          className="h-[30px] w-[30px] object-contain"
+          priority
+        />
+      </span>
+      <span className="truncate text-lg font-semibold leading-none tracking-tight text-base-content">
+        QDash
+      </span>
     </Link>
   );
 }
@@ -661,7 +671,7 @@ export function Sidebar() {
         {/* Menu Section */}
         <div className="py-2">
           {/* Theme Toggle */}
-          <label className="flex items-center justify-between w-full px-4 h-12 cursor-pointer hover:bg-base-200 rounded-lg">
+          <label className="choice-field items-center justify-between w-full px-4 h-12 hover:bg-base-200 rounded-lg">
             <div className="flex items-center gap-3">
               {isDarkTheme ? <Moon size={18} /> : <Sun size={18} />}
               <span>Dark Mode</span>

@@ -67,18 +67,16 @@ export function HardwareReadinessCheck({
           }
         />
       </ul>
-      <div className="flex items-start gap-2">
+      <label htmlFor={checkboxId} className="choice-field">
         <input
           id={checkboxId}
           type="checkbox"
-          className="checkbox checkbox-sm mt-0.5"
+          className="checkbox checkbox-sm"
           checked={confirmed}
           onChange={(event) => onConfirmedChange(event.target.checked)}
         />
-        <label htmlFor={checkboxId} className="min-w-0 cursor-pointer break-words">
-          Wiring and device parameters of {chipId} match the connected hardware
-        </label>
-      </div>
+        <span>Wiring and device parameters of {chipId} match the connected hardware</span>
+      </label>
     </div>
   );
 }

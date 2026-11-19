@@ -72,6 +72,8 @@ STALE_AFTER = timedelta(
 )
 HEARTBEAT_SECONDS = max(5, int(os.environ.get("EVALUATION_HEARTBEAT_SECONDS", "30")))
 MAX_SNAPSHOT_BYTES = 10 * 1024 * 1024
+# Most runs one list request returns; older runs are reached with `skip`.
+MAX_RUNS_PAGE = 200
 # A task result is evaluable once the calibration has stopped touching it.
 TERMINAL_STATUSES = frozenset({"completed", "failed"})
 TRIGGERS = frozenset({"bulk", "single", "chat"})
@@ -125,6 +127,15 @@ def _model_from_identity(identity: str | None) -> dict[str, str] | None:
         return None
     provider, name = identity.split("/", 1)
     return {"provider": provider, "name": name}
+
+
+@dataclass
+class RunsPage:
+    """One page of runs, newest first."""
+
+    runs: list[EvaluationRunSummary]
+    has_more: bool
+    total: int
 
 
 @dataclass
@@ -914,8 +925,29 @@ class EvaluationService:
         chip_id: str | None = None,
         task: str | None = None,
         limit: int = 20,
+        skip: int = 0,
     ) -> list[EvaluationRunSummary]:
         """Runs of a project, newest first, optionally for one chip or task."""
+        return self.list_runs_page(
+            project_id=project_id, chip_id=chip_id, task=task, limit=limit, skip=skip
+        ).runs
+
+    def list_runs_page(
+        self,
+        *,
+        project_id: str,
+        chip_id: str | None = None,
+        task: str | None = None,
+        limit: int = 20,
+        skip: int = 0,
+    ) -> RunsPage:
+        """One page of the project's runs, newest first, with whether older runs follow it.
+
+        Runs requested at the same instant are ordered by run ID, so consecutive pages
+        neither repeat nor drop a run. `limit` is clamped to 1..MAX_RUNS_PAGE and `skip`
+        to at least 0; there is no cap on how far back `skip` reaches.
+        """
+        size = max(1, min(limit, MAX_RUNS_PAGE))
         query: dict[str, Any] = {"project_id": project_id}
         if chip_id:
             query["chip_id"] = chip_id
@@ -923,12 +955,18 @@ class EvaluationService:
             query["task_name"] = task
         runs = (
             EvaluationRunDocument.find(query)
-            .sort([("requested_at", SortDirection.DESCENDING)])
-            .limit(max(1, min(limit, 200)))
+            .sort(
+                [("requested_at", SortDirection.DESCENDING), ("run_id", SortDirection.DESCENDING)]
+            )
+            .skip(max(0, skip))
+            .limit(size + 1)
             .to_list()
         )
+        has_more = len(runs) > size
+        runs = runs[:size]
+        total = EvaluationRunDocument.find(query).count()
         if not runs:
-            return []
+            return RunsPage(runs=[], has_more=False, total=total)
         for index, run in enumerate(runs):
             if self._reconcile_run(run):
                 refreshed = EvaluationRunDocument.find_one(
@@ -939,7 +977,11 @@ class EvaluationService:
         by_run: dict[str, list[EvaluationDocument]] = {run.run_id: [] for run in runs}
         for doc in EvaluationDocument.find({"run_id": {"$in": list(by_run)}}).to_list():
             by_run.setdefault(doc.run_id, []).append(doc)
-        return [_summary(run, by_run[run.run_id]) for run in runs]
+        return RunsPage(
+            runs=[_summary(run, by_run[run.run_id]) for run in runs],
+            has_more=has_more,
+            total=total,
+        )
 
     def get_run(self, *, project_id: str, run_id: str) -> EvaluationRunDetailResponse:
         """One run with its evaluations in entity order."""

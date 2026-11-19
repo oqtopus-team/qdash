@@ -150,14 +150,14 @@ function RadioCards<T extends string | boolean>({
       {options.map((option) => (
         <label
           key={String(option.value)}
-          className={`flex cursor-pointer gap-3 rounded-lg border p-3 ${
+          className={`choice-field gap-3 rounded-lg border p-3 ${
             value === option.value ? "border-primary bg-primary/5" : "border-base-300"
           }`}
         >
           <input
             type="radio"
             name={name}
-            className="radio radio-primary radio-sm mt-0.5"
+            className="radio radio-primary radio-sm"
             checked={value === option.value}
             onChange={() => onChange(option.value)}
             disabled={disabled}
@@ -282,9 +282,9 @@ function TargetPicker({
           return (
             <label
               key={target.qid}
-              className={`flex cursor-pointer items-center gap-1 rounded border px-1.5 py-0.5 font-mono text-xs ${
+              className={`choice-field items-center gap-1 rounded border px-1.5 py-0.5 font-mono text-xs ${
                 target.blocked
-                  ? "cursor-not-allowed border-base-300 text-base-content/40"
+                  ? "border-base-300 text-base-content/40"
                   : selected
                     ? "border-primary bg-primary/10"
                     : "border-base-300"
@@ -582,14 +582,14 @@ export function EvaluationRequestModal({
           </button>
           <button
             type="button"
-            className="btn btn-sm btn-primary gap-2"
+            className="btn btn-sm btn-primary"
             onClick={submit}
             disabled={isSubmitting || (!chatting && nothingChosen)}
           >
             {isSubmitting ? (
-              <span className="loading loading-spinner loading-xs" />
+              <span data-icon="inline-start" className="loading loading-spinner loading-xs" />
             ) : (
-              <Bot className="h-4 w-4" />
+              <Bot data-icon="inline-start" />
             )}
             {chatting ? "Open chat" : "Evaluate"}
           </button>

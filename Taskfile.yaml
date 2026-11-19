@@ -289,6 +289,12 @@ tasks:
     cmds:
       - bun run build:client
 
+  pi-local:
+    desc: Run the pi CLI with pi-qdash and the Copilot chat models from .env (args after --)
+    deps: [build-client-ts]
+    cmds:
+      - bun agent-runtime/src/local-cli.ts {{range .CLI_ARGS_LIST}}{{shellQuote .}} {{end}}
+
   test-client-ts:
     desc: Run TypeScript client checks
     dir: clients/typescript
@@ -526,7 +532,9 @@ tasks:
       - bun run fmt:check
       - bun run knip
       # Bun <1.4 cannot read the current lockfile format, even when other UI commands succeed.
-      - bunx bun@1.4.0 audit
+      # The wrapper adds time-limited advisory exceptions and fails once any of them expires.
+      - node --test ../.github/scripts/audit-exceptions.test.mjs
+      - node ../.github/scripts/audit-exceptions.mjs -- bunx bun@1.4.0 audit
 
   ci-pi-packages:
     desc: Typecheck and test the independently published pi packages

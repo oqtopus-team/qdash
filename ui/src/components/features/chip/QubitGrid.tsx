@@ -18,6 +18,7 @@ import {
   GridFullscreenButton,
   gridFullscreenPanelClass,
 } from "@/components/ui/GridFullscreenButton";
+import { LockedGridScroller } from "@/components/ui/LockedGridScroller";
 import { GridZoomControls } from "@/components/ui/GridZoomControls";
 import { RegionZoomToggle } from "@/components/ui/RegionZoomToggle";
 import {
@@ -26,8 +27,11 @@ import {
   taskTileStatusFill,
 } from "@/components/ui/TaskTileStatus";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
+import { useToast } from "@/components/ui/Toast";
 import { useFullscreenPanel } from "@/hooks/useFullscreenPanel";
+import { getApiErrorMessage, parseBlobErrorBody } from "@/lib/utils/apiError";
 import { useGridLayout } from "@/hooks/useGridLayout";
+import { usePanClickGuard } from "@/hooks/usePanClickGuard";
 import { useQubitTaskResults } from "@/hooks/useQubitTaskResults";
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
 import { getQubitGridPosition, type TopologyLayoutParams } from "@/lib/utils/grid-position";
@@ -204,7 +208,7 @@ const GridCell = memo(function GridCell({
           onKeyDown={handleKeyDown}
           aria-label={accessibleName}
           aria-disabled={isUnavailable || undefined}
-          className={`aspect-square rounded-xl bg-white shadow-md border border-base-300/60 overflow-hidden transition-all duration-200 hover:shadow-xl hover:border-primary/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary relative w-full ${muxBgClass} ${
+          className={`aspect-square rounded-xl bg-white shadow-xs border border-base-300/60 overflow-hidden transition-colors duration-200 hover:border-primary/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary relative w-full ${muxBgClass} ${
             isDownloadMode && isSelectedForDownload ? "ring-2 ring-primary ring-offset-2" : ""
           } ${isUnavailable ? "opacity-40 cursor-not-allowed" : ""}`}
         >
@@ -318,6 +322,7 @@ export function QubitGrid({
   // Download selection mode state
   const [downloadSelectionEnabled, setDownloadSelectionEnabled] = useState(false);
   const [selectedForDownload, setSelectedForDownload] = useState<Set<string>>(new Set());
+  const toast = useToast();
   const [isDownloading, setIsDownloading] = useState(false);
   const [isDownloadConfirmOpen, setIsDownloadConfirmOpen] = useState(false);
   const [downloadOptions, setDownloadOptions] = useState<DownloadOptions>(DEFAULT_DOWNLOAD_OPTIONS);
@@ -352,7 +357,7 @@ export function QubitGrid({
   }, [selectedForDownload, taskResponse?.data?.result]);
 
   // View mode state: 'pan-zoom' for DOM with pan/zoom, 'region' for region zoom
-  const [viewMode, setViewMode] = useState<"pan-zoom" | "region">("region");
+  const [viewMode, setViewMode] = useState<"pan-zoom" | "region">("pan-zoom");
   const [regionSelectionEnabled, setRegionSelectionEnabled] = useState(false);
   const [zoomMode, setZoomMode] = useState<"full" | "region">("full");
   const [selectedRegion, setSelectedRegion] = useState<{
@@ -364,6 +369,7 @@ export function QubitGrid({
     col: number;
   } | null>(null);
   const { isFullscreen, toggleFullscreen, exitFullscreen } = useFullscreenPanel();
+  const panClickGuard = usePanClickGuard();
 
   // LOD: store zoom scale, compute visibility flags from effective cell size.
   // Initialize to a conservative value; will be updated on first transform.
@@ -381,12 +387,15 @@ export function QubitGrid({
   const numRegions = Math.floor(gridSize / regionSize);
   const isSquareGrid = gridRows === gridCols;
 
-  // Region tab is only available for square grids; fall back to pan-zoom otherwise.
+  // Lock works for every topology, but region zoom assumes a square grid; leave it when the
+  // grid is not square.
   useEffect(() => {
-    if (!isSquareGrid && viewMode === "region") {
-      setViewMode("pan-zoom");
+    if (!isSquareGrid) {
+      setZoomMode("full");
+      setSelectedRegion(null);
+      setRegionSelectionEnabled(false);
     }
-  }, [isSquareGrid, viewMode]);
+  }, [isSquareGrid]);
 
   // Calculate displayed grid size based on zoom mode
   const displayCols = zoomMode === "region" ? regionSize : gridCols;
@@ -521,8 +530,10 @@ export function QubitGrid({
       setDownloadSelectionEnabled(false);
       setSelectedForDownload(new Set());
     } catch (error) {
-      console.error("Download error:", error);
-      alert("Download failed. Please try again.");
+      // Keep the dialog, options and selection so the download can be retried.
+      toast.error(
+        getApiErrorMessage(await parseBlobErrorBody(error), "Download failed. Please try again."),
+      );
     } finally {
       setIsDownloading(false);
     }
@@ -563,7 +574,7 @@ export function QubitGrid({
   // Grid content (extracted for reuse in both view modes)
   const gridContent = (
     <div
-      className="grid bg-base-200/50 rounded-xl relative"
+      className="grid bg-base-200/50 rounded-[var(--radius-box)] relative"
       style={{
         gap: `${gap}px`,
         padding: `${padding / 2}px`,
@@ -694,7 +705,7 @@ export function QubitGrid({
                   key={index}
                   className={`pointer-events-auto transition-colors duration-200 rounded-lg flex items-center justify-center ${
                     isHovered
-                      ? "bg-primary/30 border-2 border-primary shadow-lg z-10"
+                      ? "bg-primary/30 border-2 border-primary z-10"
                       : "bg-primary/5 border-2 border-primary/20 hover:border-primary/40 hover:bg-primary/10"
                   }`}
                   style={{
@@ -744,18 +755,16 @@ export function QubitGrid({
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg py-2">
         <div className="flex items-center gap-4">
           <div className="tabs tabs-boxed bg-base-300 w-fit">
-            {isSquareGrid && (
-              <button
-                type="button"
-                className={`tab gap-2 ${viewMode === "region" ? "tab-active" : ""}`}
-                onClick={() => setViewMode("region")}
-                title="Lock"
-                aria-label="Lock"
-              >
-                <Lock className="h-4 w-4" />
-                <span className="hidden sm:inline">Lock</span>
-              </button>
-            )}
+            <button
+              type="button"
+              className={`tab gap-2 ${viewMode === "region" ? "tab-active" : ""}`}
+              onClick={() => setViewMode("region")}
+              title="Lock"
+              aria-label="Lock"
+            >
+              <Lock className="h-4 w-4" />
+              <span className="hidden sm:inline">Lock</span>
+            </button>
             <button
               type="button"
               className={`tab gap-2 ${viewMode === "pan-zoom" ? "tab-active" : ""}`}
@@ -799,28 +808,28 @@ export function QubitGrid({
                   {selectedForDownload.size} / {availableForDownloadCount} selected
                 </span>
                 <button
-                  className="btn btn-xs btn-ghost"
+                  className="btn btn-sm btn-ghost"
                   onClick={selectAllForDownload}
                   title="Select all"
                 >
                   All
                 </button>
                 <button
-                  className="btn btn-xs btn-ghost"
+                  className="btn btn-sm btn-ghost"
                   onClick={clearDownloadSelection}
                   title="Clear selection"
                 >
                   Clear
                 </button>
                 <button
-                  className="btn btn-sm btn-primary gap-1"
+                  className="btn btn-sm btn-primary"
                   onClick={() => setIsDownloadConfirmOpen(true)}
                   disabled={selectedForDownload.size === 0 || isDownloading}
                 >
                   {isDownloading ? (
-                    <span className="loading loading-spinner loading-xs" />
+                    <span data-icon="inline-start" className="loading loading-spinner loading-xs" />
                   ) : (
-                    <Download size={16} />
+                    <Download data-icon="inline-start" />
                   )}
                   Download
                 </button>
@@ -838,7 +847,7 @@ export function QubitGrid({
             ) : (
               <div className="flex items-center gap-2">
                 <button
-                  className="btn btn-sm btn-outline gap-2"
+                  className="btn btn-sm btn-outline"
                   onClick={() => {
                     setDownloadSelectionEnabled(true);
                     setRegionSelectionEnabled(false);
@@ -847,7 +856,7 @@ export function QubitGrid({
                   title="Select figures to download"
                   disabled={availableForDownloadCount === 0}
                 >
-                  <Download size={16} />
+                  <Download data-icon="inline-start" />
                   Download
                 </button>
               </div>
@@ -918,6 +927,7 @@ export function QubitGrid({
           >
             <GridZoomControls isFullscreen={isFullscreen} className="top-12" />
             <TransformComponent
+              contentProps={panClickGuard}
               wrapperStyle={{ width: "100%", height: "100%" }}
               contentStyle={{
                 display: "flex",
@@ -929,7 +939,7 @@ export function QubitGrid({
             </TransformComponent>
           </TransformWrapper>
         ) : (
-          gridContent
+          <LockedGridScroller>{gridContent}</LockedGridScroller>
         )}
       </div>
 

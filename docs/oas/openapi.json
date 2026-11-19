@@ -4388,7 +4388,7 @@
           "copilot"
         ],
         "summary": "List the current user's chat sessions",
-        "description": "Return all persisted chat sessions owned by the current user.",
+        "description": "Return all persisted chat sessions owned by the current user.\n\nFirst cleans up, best effort, what failed requests of the user left: a\nbranch still pending after its request's lease, and a deleted chat's store\nthe runtime could not remove yet.",
         "operationId": "listCopilotChatSessions",
         "responses": {
           "200": {
@@ -4562,7 +4562,7 @@
           "copilot"
         ],
         "summary": "Delete a chat session",
-        "description": "Delete a chat session owned by the current user.",
+        "description": "Delete a chat session owned by the current user.\n\nThe chat's own running turn is stopped; a turn of another branch is not.\nIts runtime store and workspace are removed with the last session that uses\nthem: a chat and its branches share one, so it stays while one is left.\nWhen the runtime cannot remove the store yet, the deleted chat is kept,\nhidden, and the removal is retried by deleting it again or by the next\nlisting of the user's chats.",
         "operationId": "deleteCopilotChatSession",
         "security": [
           {
@@ -4591,6 +4591,80 @@
                     "type": "boolean"
                   },
                   "title": "Response Deletecopilotchatsession"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/copilot/chat/sessions/{session_id}/branches": {
+      "post": {
+        "tags": [
+          "copilot"
+        ],
+        "summary": "Branch a chat session from one of its answers",
+        "description": "Start a new chat session from a saved answer of one of the user's chats.\n\nThe new session continues the conversation as it was at that answer, in the\nsame runtime store: it shares the chat's current workspace files, and the\nchat and its branches answer one at a time. Only a completed answer the chat\nsaved with its runtime entry ID qualifies, and only while nothing runs in\nthe chat or its branches. The same request again returns the same session.",
+        "operationId": "branchCopilotChatSession",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCopilotChatBranchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CopilotChatSessionResponse"
                 }
               }
             }
@@ -8519,7 +8593,7 @@
           "evaluation"
         ],
         "summary": "List calibration evaluation runs",
-        "description": "List runs of the project, newest first.",
+        "description": "List runs of the project, newest first, one page at a time.\n\nRuns requested at the same instant are ordered by run ID, so paging with\n`skip` and `limit` neither repeats nor drops a run. `has_more` reports\nwhether older runs follow the page, and `total` counts every run that\nmatches the filters.",
         "operationId": "listEvaluationRuns",
         "security": [
           {
@@ -8571,11 +8645,24 @@
               "type": "integer",
               "maximum": 200,
               "minimum": 1,
-              "description": "Newest runs to return",
+              "description": "Runs to return",
               "default": 20,
               "title": "Limit"
             },
-            "description": "Newest runs to return"
+            "description": "Runs to return"
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Newer runs to skip first",
+              "default": 0,
+              "title": "Skip"
+            },
+            "description": "Newer runs to skip first"
           },
           {
             "name": "X-Project-Id",
@@ -19613,6 +19700,27 @@
         "title": "CooldownWiringEventResponse",
         "description": "One wiring-history entry for a cool-down."
       },
+      "CopilotChatBranchSchema": {
+        "properties": {
+          "source_session_id": {
+            "type": "string",
+            "title": "Source Session Id",
+            "description": "The chat session it was branched from"
+          },
+          "source_entry_id": {
+            "type": "string",
+            "title": "Source Entry Id",
+            "description": "The answer it was branched at"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_session_id",
+          "source_entry_id"
+        ],
+        "title": "CopilotChatBranchSchema",
+        "description": "Where a branched chat came from."
+      },
       "CopilotChatMessageSchema": {
         "properties": {
           "role": {
@@ -19635,6 +19743,30 @@
               }
             ],
             "title": "Attached Image"
+          },
+          "steer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CopilotChatSteerSchema"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Set on a user message sent while an answer was written"
+          },
+          "entry_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9]{1,15}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entry Id",
+            "description": "An assistant answer's entry in the runtime's transcript, from the chat stream's result; the chat can be branched from that answer"
           },
           "created_at": {
             "anyOf": [
@@ -19686,6 +19818,16 @@
             "type": "array",
             "title": "Messages"
           },
+          "branch": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CopilotChatBranchSchema"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -19734,6 +19876,16 @@
             "title": "Message Count",
             "default": 0
           },
+          "branch": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CopilotChatBranchSchema"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -19754,6 +19906,44 @@
         ],
         "title": "CopilotChatSessionSummary",
         "description": "Lightweight session entry used in the session list."
+      },
+      "CopilotChatSteerSchema": {
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Request Id"
+          },
+          "entry_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entry Id"
+          },
+          "placement": {
+            "type": "string",
+            "enum": [
+              "exact",
+              "approximate"
+            ],
+            "title": "Placement",
+            "description": "exact: the chat saw where it landed. approximate: it was confirmed after the answer it interrupted was saved as one message, and follows that message.",
+            "default": "exact"
+          }
+        },
+        "type": "object",
+        "required": [
+          "request_id"
+        ],
+        "title": "CopilotChatSteerSchema",
+        "description": "Where a user message sent while an answer was written landed in the conversation."
       },
       "CopilotPreferences": {
         "properties": {
@@ -20082,6 +20272,30 @@
         ],
         "title": "CreateChipResponse",
         "description": "A created chip plus what happened to its configuration directory."
+      },
+      "CreateCopilotChatBranchRequest": {
+        "properties": {
+          "entry_id": {
+            "type": "string",
+            "pattern": "^[0-9]{1,15}$",
+            "title": "Entry Id",
+            "description": "The saved answer to branch at: its runtime entry ID"
+          },
+          "target_session_id": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Target Session Id",
+            "description": "Client-generated ID of the new chat session; sending the same request again returns the same branch"
+          }
+        },
+        "type": "object",
+        "required": [
+          "entry_id",
+          "target_session_id"
+        ],
+        "title": "CreateCopilotChatBranchRequest",
+        "description": "Body for POST /copilot/chat/sessions/{session_id}/branches."
       },
       "CreateCopilotChatSessionRequest": {
         "properties": {
@@ -25138,14 +25352,38 @@
             },
             "type": "array",
             "title": "Runs"
+          },
+          "skip": {
+            "type": "integer",
+            "title": "Skip",
+            "description": "Newer runs skipped before this page"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit",
+            "description": "Most runs this page could hold"
+          },
+          "has_more": {
+            "type": "boolean",
+            "title": "Has More",
+            "description": "Older runs follow this page"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Runs matching the filters across every page"
           }
         },
         "type": "object",
         "required": [
-          "runs"
+          "runs",
+          "skip",
+          "limit",
+          "has_more",
+          "total"
         ],
         "title": "ListEvaluationRunsResponse",
-        "description": "Runs, newest first."
+        "description": "One page of runs, newest first."
       },
       "ListEvaluationsResponse": {
         "properties": {

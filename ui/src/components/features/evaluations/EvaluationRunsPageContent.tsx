@@ -1,17 +1,21 @@
 "use client";
 
-import { ArrowLeftRight, ChevronRight, XCircle } from "lucide-react";
+import { ArrowLeftRight, ChevronRight, RefreshCw, X, XCircle } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { useListEvaluationRuns } from "@/client/evaluation/evaluation";
 import { useGetTaskFileSettings, useListTaskInfo } from "@/client/task-file/task-file";
 import { ChipSelector } from "@/components/selectors/ChipSelector";
 import { TaskSelector } from "@/components/selectors/TaskSelector";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { ErrorCard } from "@/components/ui/ErrorCard";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageFiltersBar } from "@/components/ui/PageFiltersBar";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { RefreshErrorAlert } from "@/components/ui/RefreshErrorAlert";
+import { useProject } from "@/contexts/ProjectContext";
+import { useEvaluationRunsUrlState } from "@/hooks/url-state";
 import { formatDateTime } from "@/lib/utils/datetime";
 import type { EvaluationRunSummary, TaskInfo } from "@/schemas";
 
@@ -26,8 +30,8 @@ import {
   runTimingLabel,
   triggerLabel,
 } from "./evaluationDisplay";
+import { lastRunsPage, runsPage, runsPageParams } from "./evaluationRunsPaging";
 
-const PAGE_SIZE = 50;
 const EMPTY_TASKS: TaskInfo[] = [];
 /** Runs compared at once: the compare page is A against B. */
 const COMPARE_SLOTS = 2;
@@ -161,17 +165,15 @@ function RunCard({
 
 /** The runs picked for comparison, and the way to the compare page once there are two. */
 function CompareBar({
-  selected,
-  runs,
+  picked,
+  onRemove,
   onClear,
 }: {
-  selected: string[];
-  runs: EvaluationRunSummary[];
+  /** Picked runs in pick order. They stay listed here when another page or filter hides them. */
+  picked: EvaluationRunSummary[];
+  onRemove: (runId: string) => void;
   onClear: () => void;
 }) {
-  const picked = selected
-    .map((runId) => runs.find((run) => run.run_id === runId))
-    .filter((run): run is EvaluationRunSummary => run !== undefined);
   const ready = picked.length === COMPARE_SLOTS;
   const sameSelection =
     ready && picked[0].chip_id === picked[1].chip_id && picked[0].task_name === picked[1].task_name;
@@ -182,14 +184,28 @@ function CompareBar({
     >
       <span className="text-sm">
         <strong>{picked.length}</strong> of {COMPARE_SLOTS} runs picked
-        {picked.length > 0 && (
-          <span className="ml-2 text-xs text-base-content/60">
-            {picked
-              .map((run) => `${run.task_name} (${formatDateTime(run.requested_at)})`)
-              .join(" vs ")}
-          </span>
-        )}
       </span>
+      <ul className="flex flex-wrap items-center gap-2" aria-label="Runs picked for comparison">
+        {picked.map((run) => {
+          const label = `${run.task_name} (${formatDateTime(run.requested_at)})`;
+          return (
+            <li key={run.run_id} className="badge badge-outline gap-1 pr-1 text-xs">
+              <span>
+                {label} · {run.chip_id}
+              </span>
+              <button
+                type="button"
+                className="btn btn-ghost btn-xs btn-circle"
+                onClick={() => onRemove(run.run_id)}
+                aria-label={`Remove ${label} from comparison`}
+                title="Remove from comparison"
+              >
+                <X className="h-3 w-3" aria-hidden="true" />
+              </button>
+            </li>
+          );
+        })}
+      </ul>
       {ready && !sameSelection && (
         <span className="text-xs text-warning">
           Different chips or tasks: entities will not line up.
@@ -202,14 +218,14 @@ function CompareBar({
         {ready ? (
           <Link
             href={compareHref(picked[0].run_id, picked[1].run_id)}
-            className="btn btn-primary btn-sm gap-1"
+            className="btn btn-primary btn-sm"
           >
-            <ArrowLeftRight className="h-4 w-4" />
+            <ArrowLeftRight data-icon="inline-start" />
             Compare
           </Link>
         ) : (
-          <button type="button" className="btn btn-primary btn-sm gap-1" disabled>
-            <ArrowLeftRight className="h-4 w-4" />
+          <button type="button" className="btn btn-primary btn-sm" disabled>
+            <ArrowLeftRight data-icon="inline-start" />
             Compare
           </button>
         )}
@@ -218,21 +234,39 @@ function CompareBar({
   );
 }
 
+/** Runs picked for comparison, kept with the project they were picked in. */
+interface CompareSelection {
+  projectId: string | null;
+  runs: EvaluationRunSummary[];
+}
+
 /** Evaluation runs of the project, newest first, filtered by chip and task. */
 export function EvaluationRunsPageContent() {
   const { data: taskFileSettings } = useGetTaskFileSettings();
   const defaultBackend = taskFileSettings?.data?.default_backend || "qubex";
   const { data: taskInfoData } = useListTaskInfo({ backend: defaultBackend });
-  const [chipId, setChipId] = useState("");
-  const [taskName, setTaskName] = useState("");
-  // Runs picked for comparison, in pick order (A, then B).
-  const [selected, setSelected] = useState<string[]>([]);
-  const toggleSelected = (runId: string) =>
-    setSelected((current) =>
-      current.includes(runId)
-        ? current.filter((id) => id !== runId)
+  const { projectId } = useProject();
+  const { chipId, taskName, page, setChipId, setTaskName, setPage } = useEvaluationRunsUrlState();
+
+  // Runs picked for comparison, in pick order (A, then B). The summaries are kept, not only the
+  // IDs, so a pick stays visible in the compare bar while another page or filter is shown. A
+  // pick from another project is dropped, since its run cannot be opened there.
+  const [selection, setSelection] = useState<CompareSelection>({ projectId, runs: [] });
+  if (selection.projectId !== projectId) {
+    setSelection({ projectId, runs: [] });
+  }
+  const picked = selection.projectId === projectId ? selection.runs : [];
+  const setPicked = (update: (current: EvaluationRunSummary[]) => EvaluationRunSummary[]) =>
+    setSelection((current) => ({
+      projectId,
+      runs: update(current.projectId === projectId ? current.runs : []),
+    }));
+  const toggleSelected = (run: EvaluationRunSummary) =>
+    setPicked((current) =>
+      current.some((item) => item.run_id === run.run_id)
+        ? current.filter((item) => item.run_id !== run.run_id)
         : current.length < COMPARE_SLOTS
-          ? [...current, runId]
+          ? [...current, run]
           : current,
     );
 
@@ -240,36 +274,56 @@ export function EvaluationRunsPageContent() {
     () => ({
       chip_id: chipId || undefined,
       task: taskName || undefined,
-      limit: PAGE_SIZE,
+      ...runsPageParams(page),
     }),
-    [chipId, taskName],
+    [chipId, taskName, page],
   );
   const {
     data: response,
     isLoading,
     isError,
+    isFetching,
+    errorUpdateCount,
+    refetch,
   } = useListEvaluationRuns(params, {
     query: {
       refetchInterval: (query) => (query.state.data?.data.runs.some(runIsActive) ? 10_000 : false),
     },
   });
-  const runs = response?.data.runs ?? [];
+  const paging = response ? runsPage(response.data, page) : null;
   const tasks = taskInfoData?.data?.tasks ?? EMPTY_TASKS;
+  const hasFilters = Boolean(chipId || taskName);
+  const retry = () => void refetch();
+  // Retrying a failed first load puts the query back to pending; keep the error in place with
+  // its retry disabled rather than swapping it for the initial loading spinner.
+  const retryingFirstLoad = isLoading && errorUpdateCount > 0;
+
+  // A page past the end (an old link, or runs removed since) moves to the last page with runs,
+  // replacing the URL; the spinner stays up until that page loads.
+  const correctedPage = paging?.correctedPage ?? null;
+  useEffect(() => {
+    if (correctedPage !== null && correctedPage !== page) setPage(correctedPage, { replace: true });
+  }, [correctedPage, page, setPage]);
+  const correcting = correctedPage !== null && correctedPage !== page;
+
+  const clearFilters = () => {
+    setChipId("");
+    setTaskName("");
+  };
 
   return (
     <PageContainer maxWidth>
       <PageHeader
         title="AI Evaluations"
         description="Runs of the evaluation model over task results, with your agreement recorded per evaluation"
-        actions={
-          <span className="badge badge-neutral gap-1">
-            <strong>{runs.length}</strong> runs
-          </span>
-        }
       />
 
-      {selected.length > 0 && (
-        <CompareBar selected={selected} runs={runs} onClear={() => setSelected([])} />
+      {picked.length > 0 && (
+        <CompareBar
+          picked={picked}
+          onRemove={(runId) => setPicked((current) => current.filter((r) => r.run_id !== runId))}
+          onClear={() => setPicked(() => [])}
+        />
       )}
 
       <div className="mb-4 rounded-lg border border-base-300 bg-base-100 p-3">
@@ -313,33 +367,115 @@ export function EvaluationRunsPageContent() {
         </PageFiltersBar>
       </div>
 
-      {isLoading ? (
+      {(isLoading && !retryingFirstLoad) || correcting ? (
         <div className="flex justify-center py-16">
           <span className="loading loading-spinner loading-lg" />
         </div>
-      ) : isError ? (
-        <div className="alert alert-error">
-          <XCircle className="h-5 w-5" />
-          <span>Failed to load evaluation runs.</span>
-        </div>
-      ) : runs.length === 0 ? (
-        <EmptyState
-          title="No evaluation runs"
-          description="Start one from the chip page (Evaluate) or from a task result."
-          emoji="robot"
-        />
-      ) : (
-        <div className="space-y-3">
-          {runs.map((run) => (
-            <RunCard
-              key={run.run_id}
-              run={run}
-              selected={selected.includes(run.run_id)}
-              selectable={selected.length < COMPARE_SLOTS}
-              onToggle={() => toggleSelected(run.run_id)}
+      ) : !paging ? (
+        isError || retryingFirstLoad ? (
+          <ErrorCard
+            title="Could not load evaluation runs"
+            message="The request failed. Check the connection and try again."
+            onRetry={retry}
+            retrying={isFetching}
+          />
+        ) : null
+      ) : paging.items.length === 0 ? (
+        <>
+          {isError && (
+            <RefreshErrorAlert
+              className="mb-3"
+              message="Could not refresh evaluation runs. This list may be out of date."
+              onRetry={retry}
+              retrying={isFetching}
             />
-          ))}
-        </div>
+          )}
+          {hasFilters ? (
+            <EmptyState
+              title="No evaluation runs match these filters"
+              description="Change the chip or task, or clear the filters to see every run."
+              emoji="magnifying-glass"
+              action={
+                <button type="button" className="btn btn-sm" onClick={clearFilters}>
+                  <XCircle data-icon="inline-start" aria-hidden="true" />
+                  Clear filters
+                </button>
+              }
+            />
+          ) : (
+            <EmptyState
+              title="No evaluation runs"
+              description="Start one from the chip page (Evaluate) or from a task result."
+              emoji="robot"
+            />
+          )}
+        </>
+      ) : (
+        <>
+          {isError && (
+            <RefreshErrorAlert
+              className="mb-3"
+              message="Could not refresh evaluation runs. This list may be out of date."
+              onRetry={retry}
+              retrying={isFetching}
+            />
+          )}
+          <div
+            className="mb-2 flex items-center gap-3 text-xs text-base-content/60"
+            aria-live="polite"
+          >
+            <span className="font-mono">
+              Runs {paging.first}-{paging.last} of {paging.total}
+            </span>
+            {isFetching && (
+              <span className="inline-flex items-center gap-1">
+                <RefreshCw className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                Refreshing
+              </span>
+            )}
+          </div>
+          <div className="space-y-3">
+            {paging.items.map((run) => {
+              const selected = picked.some((item) => item.run_id === run.run_id);
+              return (
+                <RunCard
+                  key={run.run_id}
+                  run={run}
+                  selected={selected}
+                  selectable={picked.length < COMPARE_SLOTS}
+                  onToggle={() => toggleSelected(run)}
+                />
+              );
+            })}
+          </div>
+
+          {(paging.hasPrevious || paging.hasNext) && (
+            <nav
+              className="mt-6 flex items-center justify-center gap-3"
+              aria-label="Evaluation runs pages"
+            >
+              <button
+                type="button"
+                className="btn btn-sm btn-ghost"
+                disabled={!paging.hasPrevious}
+                onClick={() => setPage(paging.page - 1)}
+              >
+                Previous
+              </button>
+              <span className="text-sm text-base-content/60">
+                Page {paging.page} of {Math.max(paging.page, lastRunsPage(paging.total))}
+              </span>
+              <button
+                type="button"
+                className="btn btn-sm btn-ghost"
+                disabled={!paging.hasNext}
+                onClick={() => setPage(paging.page + 1)}
+              >
+                Next
+              </button>
+            </nav>
+          )}
+        </>
       )}
     </PageContainer>
   );

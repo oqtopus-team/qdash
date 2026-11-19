@@ -2,30 +2,9 @@
 
 import { useState, useCallback, useMemo } from "react";
 import { Copy, Check } from "lucide-react";
-import hljs from "highlight.js/lib/core";
-import bash from "highlight.js/lib/languages/bash";
-import javascript from "highlight.js/lib/languages/javascript";
-import json from "highlight.js/lib/languages/json";
-import python from "highlight.js/lib/languages/python";
-import sql from "highlight.js/lib/languages/sql";
-import typescript from "highlight.js/lib/languages/typescript";
-import yaml from "highlight.js/lib/languages/yaml";
-
 import { useToast } from "@/components/ui/Toast";
+import { highlightCode, useCodeHighlighter } from "@/lib/highlight";
 import { copyText } from "@/lib/utils/clipboard";
-
-hljs.registerLanguage("bash", bash);
-hljs.registerLanguage("javascript", javascript);
-hljs.registerLanguage("json", json);
-hljs.registerLanguage("python", python);
-hljs.registerLanguage("sql", sql);
-hljs.registerLanguage("typescript", typescript);
-hljs.registerLanguage("yaml", yaml);
-hljs.registerAliases(["py"], { languageName: "python" });
-hljs.registerAliases(["sh", "shell", "zsh", "console"], { languageName: "bash" });
-hljs.registerAliases(["js", "jsx"], { languageName: "javascript" });
-hljs.registerAliases(["ts", "tsx"], { languageName: "typescript" });
-hljs.registerAliases(["yml"], { languageName: "yaml" });
 
 interface CodeBlockProps {
   language?: string;
@@ -36,16 +15,6 @@ interface CodeBlockProps {
   title?: string;
   /** A blinking caret after the code, while it is still being written. */
   caret?: boolean;
-}
-
-/** Highlighted HTML for a known language, or null to render the code as plain text. */
-function highlight(code: string, language?: string): string | null {
-  if (!language || !hljs.getLanguage(language)) return null;
-  try {
-    return hljs.highlight(code, { language, ignoreIllegals: true }).value;
-  } catch {
-    return null;
-  }
 }
 
 export function CodeBlock({
@@ -72,12 +41,18 @@ export function CodeBlock({
     );
   }, [children, toast]);
 
-  const html = useMemo(() => highlight(children, language), [children, language]);
+  // Highlights replaces highlight.js once it has loaded.
+  const highlighter = useCodeHighlighter();
+  const html = useMemo(
+    () => highlightCode(children, language),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [children, language, highlighter],
+  );
 
   return (
     <div
       className={`relative group overflow-hidden border border-base-300/70 bg-base-200/80 not-prose ${
-        compact ? "my-1.5 rounded-lg" : "my-3 rounded-xl"
+        compact ? "my-1.5 rounded-lg" : "my-3 rounded-[var(--radius-box)]"
       }`}
     >
       {/* Header bar */}
@@ -102,12 +77,12 @@ export function CodeBlock({
         >
           {copied ? (
             <>
-              <Check className="w-3 h-3" />
+              <Check data-icon="inline-start" />
               <span aria-live="polite">Copied</span>
             </>
           ) : (
             <>
-              <Copy className="w-3 h-3" />
+              <Copy data-icon="inline-start" />
               Copy
             </>
           )}
@@ -120,8 +95,8 @@ export function CodeBlock({
         }`}
       >
         {html !== null ? (
-          // hljs escapes the source, so its output is safe to inject.
-          <code className="hljs" dangerouslySetInnerHTML={{ __html: html }} />
+          // Both highlighters escape the source, so their output is safe to inject.
+          <code className="qd-code" dangerouslySetInnerHTML={{ __html: html }} />
         ) : (
           <code>{children}</code>
         )}

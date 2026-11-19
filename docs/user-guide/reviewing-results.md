@@ -13,6 +13,10 @@ project when follow-up is needed.
 Start from **Execution** instead when task dependencies or run-wide progress matter. Start from
 **Chip** when you want the latest result for one task across the topology.
 
+If the list cannot load, select **Try Again**. If a later refresh fails, the rows already shown
+stay in place under a warning that they may be out of date; select **Retry** to load them again.
+Changing a filter or page never shows the rows of the previous one while the new list loads.
+
 ## Inspect the Evidence
 
 Review the status and message first, then compare the input, run, and output parameters. Open the
@@ -75,8 +79,20 @@ figure, raw data, task knowledge, and current calibration context. See
 
 Mentions, replies, and system events arrive at the bell in the top bar, which shows the unread
 count. Select the bell to preview the five newest notifications and open one, or select **View
-all** to open **Inbox** with the full list. Opening a notification marks it read; **Mark all read**
-clears the rest. Open the linked record to recover its project and result context.
+all** to open **Inbox** with every notification, newest first. Open the linked record to recover
+its project and result context.
+
+On **Inbox**, select **Unread only** to hide notifications you have read, or **All** to show them
+again. The inbox shows 50 notifications per page; use **Previous** and **Next** to move between
+pages. The filter and page are part of the page address, so reloading, going back, or sharing the
+link returns to the same view. Changing the filter returns to the first page. The unread count
+covers every page, not only the one shown.
+
+Opening a notification marks it read; **Mark all read** marks every unread notification read,
+on every page. When marking read leaves the current page of **Unread only** empty, the inbox
+moves to the last page that still has notifications. If marking read fails, an error message
+appears and the notifications stay unread; open the notification or select **Mark all read**
+again to retry.
 
 ## Share and Hand Off a Result
 

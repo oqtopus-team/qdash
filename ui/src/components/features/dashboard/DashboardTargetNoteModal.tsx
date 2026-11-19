@@ -305,9 +305,9 @@ export function DashboardTargetNoteModal({
               </div>
               <Link
                 href={forumDraftHref(chipId, targetId, cooldownId)}
-                className="btn btn-xs btn-outline gap-1"
+                className="btn btn-xs btn-outline"
               >
-                <MessageSquarePlus className="h-3.5 w-3.5" />
+                <MessageSquarePlus data-icon="inline-start" />
                 New
               </Link>
             </div>
@@ -444,7 +444,7 @@ export function DashboardTargetNoteModal({
                                 Cancel
                               </button>
                               <button
-                                className="btn btn-xs btn-primary gap-1"
+                                className="btn btn-xs btn-primary"
                                 onClick={() => handleUpdateEntry(entryId)}
                                 disabled={
                                   !editingEntryDraft.trim() ||
@@ -453,7 +453,7 @@ export function DashboardTargetNoteModal({
                                 }
                                 type="button"
                               >
-                                <Save className="h-3.5 w-3.5" />
+                                <Save data-icon="inline-start" />
                                 Save
                               </button>
                             </div>
@@ -495,12 +495,12 @@ export function DashboardTargetNoteModal({
             />
             <div className="flex justify-end">
               <button
-                className="btn btn-sm btn-primary gap-1"
+                className="btn btn-sm btn-primary"
                 onClick={handleCreateEntry}
                 disabled={!entryDraft.trim() || isEntryTooLong || mutationPending}
                 type="button"
               >
-                <Send className="h-3.5 w-3.5" />
+                <Send data-icon="inline-start" />
                 Post
               </button>
             </div>
