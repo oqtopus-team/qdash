@@ -6,7 +6,7 @@ import { useGetExecution } from "@/client/execution/execution";
 import { useGetForumPost } from "@/client/forum/forum";
 import { useGetTaskResult } from "@/client/task/task";
 import { figureLabel, figureUrl } from "@/components/features/chat/ChatFigures";
-import type { ChatLink } from "@/lib/chatLinks";
+import type { LinkDescription } from "@/lib/linkPreview";
 import { formatDateTimeCompact } from "@/lib/utils/datetime";
 
 /** A parameter value as text: numbers to five significant digits, `{value, unit}` with its unit. */
@@ -25,8 +25,8 @@ export function formatValue(value: unknown): string {
   return String(value);
 }
 
-// The record queries share their keys and stale times with the click-to-open dialog, so
-// opening the dialog after hovering reuses the fetched record.
+// The record queries share their keys and stale times with the chat's click-to-open dialog,
+// so opening the dialog after hovering reuses the fetched record.
 const TASK_RESULT_STALE_MS = 30_000;
 const EXECUTION_STALE_MS = 5_000;
 const FORUM_POST_STALE_MS = 30_000;
@@ -204,35 +204,87 @@ function FigureCard({ path }: { path: string }) {
   );
 }
 
-/** Where a link goes, without fetching anything from it. */
-function DestinationCard({ link }: { link: Extract<ChatLink, { kind: "internal" | "external" }> }) {
-  let url: URL | null = null;
-  try {
-    url = new URL(link.href, window.location.origin);
-  } catch {
-    // Unparseable: show the href as written.
-  }
-  if (link.kind === "internal") {
-    const path = url ? `${url.pathname}${url.search}${url.hash}` : link.href;
-    return (
-      <CardFrame kind="QDash page" title={<span className="font-mono">{path}</span>}>
-        <p className="text-xs text-base-content/50">Opens in a new tab</p>
-      </CardFrame>
-    );
-  }
+function NewTabNote({ newTab }: { newTab: boolean }) {
+  return newTab ? <p className="text-xs text-base-content/50">Opens in a new tab</p> : null;
+}
+
+function UrlLine({ children }: { children: ReactNode }) {
   return (
-    <CardFrame kind="External link" title={url?.hostname || link.href}>
-      <p className="line-clamp-2 break-all font-mono text-xs text-base-content/60">{link.href}</p>
-      <p className="text-xs text-base-content/50">Opens in a new tab</p>
-    </CardFrame>
+    <p className="line-clamp-2 break-all font-mono text-xs text-base-content/60">{children}</p>
   );
 }
 
+type DestinationLink = Exclude<LinkDescription, { kind: RecordKind }>;
+type RecordKind = "task-result" | "execution" | "forum-post" | "figure";
+
+/** Where a link goes, from its URL alone: nothing is fetched and nothing is opened. */
+function DestinationCard({ link }: { link: DestinationLink }) {
+  switch (link.kind) {
+    case "fragment":
+      return (
+        <CardFrame kind="Section on this page" title={link.label || `#${link.id}`}>
+          {link.label && <UrlLine>#{link.id}</UrlLine>}
+        </CardFrame>
+      );
+    case "page":
+      return (
+        <CardFrame
+          kind="QDash page"
+          title={link.section ?? <span className="font-mono">{link.path}</span>}
+        >
+          {link.section && <UrlLine>{link.path}</UrlLine>}
+          <NewTabNote newTab={link.newTab} />
+        </CardFrame>
+      );
+    case "api":
+      return (
+        <CardFrame kind="QDash API" title={<span className="font-mono">{link.path}</span>}>
+          <NewTabNote newTab={link.newTab} />
+        </CardFrame>
+      );
+    case "download":
+      return (
+        <CardFrame kind="Download" title={link.filename}>
+          <UrlLine>{link.href}</UrlLine>
+          <p className="text-xs text-base-content/50">Saves a file</p>
+        </CardFrame>
+      );
+    case "email":
+      return (
+        <CardFrame kind="Email" title={link.address || link.href}>
+          <p className="text-xs text-base-content/50">Opens your email app</p>
+        </CardFrame>
+      );
+    case "phone":
+      return (
+        <CardFrame kind="Phone" title={link.number || link.href}>
+          <p className="text-xs text-base-content/50">Opens your phone app</p>
+        </CardFrame>
+      );
+    case "external":
+      return (
+        <CardFrame kind="External link" title={link.host || link.href}>
+          <UrlLine>{link.href}</UrlLine>
+          <NewTabNote newTab={link.newTab} />
+        </CardFrame>
+      );
+    case "other":
+      return (
+        <CardFrame
+          kind={`${link.scheme}: link`}
+          title={<span className="font-mono">{link.href}</span>}
+        >
+          <p className="text-xs text-base-content/50">Opens in another app</p>
+        </CardFrame>
+      );
+  }
+}
+
 /**
- * The hover card body for a chat link. Record cards fetch only when they mount, which is
- * when the card opens; other links describe their destination without a request.
+ * The hover card body for a link. Record cards fetch only when they mount, which is when
+ * the card opens; other links describe their destination without a request.
  */
-export function ChatLinkCard({ link }: { link: ChatLink }) {
+export function LinkPreviewCard({ link }: { link: LinkDescription }) {
   switch (link.kind) {
     case "task-result":
       return <TaskResultCard taskId={link.taskId} />;

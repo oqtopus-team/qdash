@@ -1,26 +1,16 @@
 "use client";
 
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useId,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
+import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 import { ExternalLink, Loader2 } from "lucide-react";
 import { useGetExecution } from "@/client/execution/execution";
 import { useGetForumPost } from "@/client/forum/forum";
 import { useGetTaskResult } from "@/client/task/task";
-import { ChatLinkCard, formatValue } from "@/components/features/chat/ChatLinkCard";
 import { FigureStrip, figureUrl } from "@/components/features/chat/ChatFigures";
 import { ExecutionProgress } from "@/components/features/chat/ExecutionProgress";
+import { LinkHoverCardProvider } from "@/components/features/link-preview/LinkHoverCardProvider";
+import { formatValue } from "@/components/features/link-preview/LinkPreviewCard";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 import { ImagePreviewDialog } from "@/components/ui/ImagePreviewDialog";
-import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/Popover";
 import { chatLinkPagePath, classifyChatLink, type ChatLink } from "@/lib/chatLinks";
 
 type PreviewLink = Extract<
@@ -28,20 +18,9 @@ type PreviewLink = Extract<
   { kind: "task-result" | "execution" | "forum-post" | "figure" }
 >;
 
-/** How a link was reached: a hovering pointer waits for the open delay, keyboard focus does not. */
-export type ChatLinkHoverSource = "pointer" | "focus";
-
 interface ChatLinkPreviewValue {
   /** Open a preview for the link; false when the link is not previewable. */
   preview: (href: string) => boolean;
-  /** The pointer or keyboard focus reached a link: show its hover card. */
-  enterLink: (anchor: HTMLAnchorElement, source: ChatLinkHoverSource) => void;
-  /** The pointer or focus left a link: hide its card unless the pointer moves into it. */
-  leaveLink: (anchor: HTMLAnchorElement, source?: ChatLinkHoverSource) => void;
-  /** A press began on a link: close its card, and do not reopen it for the focus that follows. */
-  pressLink: (anchor: HTMLAnchorElement) => void;
-  /** Close the hover card now. */
-  dismissCard: () => void;
 }
 
 const ChatLinkPreviewContext = createContext<ChatLinkPreviewValue | null>(null);
@@ -51,171 +30,34 @@ export function useChatLinkPreview(): ChatLinkPreviewValue | null {
   return useContext(ChatLinkPreviewContext);
 }
 
-/** Hover before a card opens, so a pointer crossing the answer does not flash cards. */
-export const CARD_OPEN_DELAY_MS = 400;
-/** Grace period for the pointer to travel from the link into its card. */
-export const CARD_CLOSE_DELAY_MS = 150;
-
-interface HoverCardState {
-  anchor: HTMLAnchorElement;
-  link: ChatLink;
-}
-
-/** Whether `anchor` is a link the chat should describe in a hover card. */
-function isHoverCardLink(anchor: HTMLAnchorElement): boolean {
-  const href = anchor.getAttribute("href");
-  return Boolean(href);
-}
-
 /**
  * Previewable links open in a dialog over the chat; the rest are left to the browser.
- * Every link also shows a compact hover card on pointer hover or keyboard focus.
+ * Hover cards come from the app-wide `LinkHoverCardProvider`; it is mounted here as well
+ * so the chat keeps them when rendered on its own, and is a no-op under the app root.
  */
 export function ChatLinkPreviewProvider({ children }: { children: ReactNode }) {
   const [link, setLink] = useState<PreviewLink | null>(null);
-  const [card, setCard] = useState<HoverCardState | null>(null);
-  const cardRef = useRef<HoverCardState | null>(null);
-  const timerRef = useRef<number | null>(null);
-  const pressedRef = useRef<HTMLAnchorElement | null>(null);
-  const insideCardRef = useRef(false);
-  const focusedLinkRef = useRef<HTMLAnchorElement | null>(null);
-  const hoveredLinkRef = useRef<HTMLAnchorElement | null>(null);
-  const cardId = useId();
 
-  const clearTimer = useCallback(() => {
-    if (timerRef.current !== null) window.clearTimeout(timerRef.current);
-    timerRef.current = null;
+  const preview = useCallback((href: string) => {
+    const classified = classifyChatLink(href);
+    if (classified.kind === "internal" || classified.kind === "external") return false;
+    setLink(classified);
+    return true;
   }, []);
 
-  const showCard = useCallback((next: HoverCardState | null) => {
-    cardRef.current = next;
-    setCard(next);
-  }, []);
-
-  const dismissCard = useCallback(() => {
-    clearTimer();
-    insideCardRef.current = false;
-    showCard(null);
-  }, [clearTimer, showCard]);
-
-  const enterLink = useCallback(
-    (anchor: HTMLAnchorElement, source: ChatLinkHoverSource) => {
-      if (!isHoverCardLink(anchor)) return;
-      if (source === "focus") focusedLinkRef.current = anchor;
-      else hoveredLinkRef.current = anchor;
-      if (source === "focus" && pressedRef.current === anchor) return;
-      clearTimer();
-      if (cardRef.current?.anchor === anchor) return;
-      const open = () => {
-        timerRef.current = null;
-        if (!anchor.isConnected) return;
-        showCard({ anchor, link: classifyChatLink(anchor.getAttribute("href")!) });
-      };
-      // Focus opens at once; moving between links while a card is open switches at once too.
-      if (source === "focus" || cardRef.current) open();
-      else timerRef.current = window.setTimeout(open, CARD_OPEN_DELAY_MS);
-    },
-    [clearTimer, showCard],
-  );
-
-  const leaveLink = useCallback(
-    (anchor: HTMLAnchorElement, source?: ChatLinkHoverSource) => {
-      if (source === "focus" && focusedLinkRef.current === anchor) focusedLinkRef.current = null;
-      if (source === "pointer" && hoveredLinkRef.current === anchor) hoveredLinkRef.current = null;
-      if (focusedLinkRef.current === anchor || hoveredLinkRef.current === anchor) return;
-      if (pressedRef.current === anchor) pressedRef.current = null;
-      if (cardRef.current?.anchor !== anchor) {
-        clearTimer(); // a pending open for this link
-        return;
-      }
-      if (insideCardRef.current) return;
-      clearTimer();
-      timerRef.current = window.setTimeout(() => {
-        timerRef.current = null;
-        showCard(null);
-      }, CARD_CLOSE_DELAY_MS);
-    },
-    [clearTimer, showCard],
-  );
-
-  const pressLink = useCallback(
-    (anchor: HTMLAnchorElement) => {
-      pressedRef.current = anchor;
-      dismissCard();
-    },
-    [dismissCard],
-  );
-
-  const preview = useCallback(
-    (href: string) => {
-      const classified = classifyChatLink(href);
-      if (classified.kind === "internal" || classified.kind === "external") return false;
-      dismissCard();
-      setLink(classified);
-      return true;
-    },
-    [dismissCard],
-  );
-
-  useEffect(() => clearTimer, [clearTimer]);
-
-  // Describe the link by its card while the card is open.
-  useEffect(() => {
-    const anchor = card?.anchor;
-    if (!anchor) return;
-    const previous = anchor.getAttribute("aria-describedby");
-    anchor.setAttribute("aria-describedby", cardId);
-    return () => {
-      if (previous === null) anchor.removeAttribute("aria-describedby");
-      else anchor.setAttribute("aria-describedby", previous);
-    };
-  }, [card, cardId]);
-
-  const value = useMemo(
-    () => ({ preview, enterLink, leaveLink, pressLink, dismissCard }),
-    [preview, enterLink, leaveLink, pressLink, dismissCard],
-  );
-
-  const anchorRef = useMemo(() => ({ current: card?.anchor ?? null }), [card]);
+  const value = useMemo(() => ({ preview }), [preview]);
 
   return (
-    <ChatLinkPreviewContext.Provider value={value}>
-      {children}
-      <Popover open={card !== null} onOpenChange={(open) => !open && dismissCard()}>
-        <PopoverAnchor virtualRef={anchorRef} />
-        {card && (
-          <PopoverContent
-            id={cardId}
-            role="tooltip"
-            side="top"
-            align="start"
-            hideWhenDetached
-            data-testid="chat-link-card"
-            className="w-[min(20rem,calc(100vw-1.5rem))] p-3"
-            // The card is supplementary: focus stays on the link, and leaving the link by
-            // keyboard is handled by the link's blur.
-            onOpenAutoFocus={(event) => event.preventDefault()}
-            onCloseAutoFocus={(event) => event.preventDefault()}
-            onFocusOutside={(event) => event.preventDefault()}
-            onPointerEnter={() => {
-              insideCardRef.current = true;
-              clearTimer();
-            }}
-            onPointerLeave={() => {
-              insideCardRef.current = false;
-              leaveLink(card.anchor);
-            }}
-          >
-            <ChatLinkCard link={card.link} />
-          </PopoverContent>
+    <LinkHoverCardProvider>
+      <ChatLinkPreviewContext.Provider value={value}>
+        {children}
+        {link?.kind === "figure" ? (
+          <ImagePreviewDialog src={figureUrl(link.path)} onClose={() => setLink(null)} />
+        ) : (
+          <ChatLinkPreviewDialog link={link} onClose={() => setLink(null)} />
         )}
-      </Popover>
-      {link?.kind === "figure" ? (
-        <ImagePreviewDialog src={figureUrl(link.path)} onClose={() => setLink(null)} />
-      ) : (
-        <ChatLinkPreviewDialog link={link} onClose={() => setLink(null)} />
-      )}
-    </ChatLinkPreviewContext.Provider>
+      </ChatLinkPreviewContext.Provider>
+    </LinkHoverCardProvider>
   );
 }
 

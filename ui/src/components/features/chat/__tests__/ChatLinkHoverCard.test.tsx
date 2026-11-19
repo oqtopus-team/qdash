@@ -6,8 +6,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   CARD_CLOSE_DELAY_MS,
   CARD_OPEN_DELAY_MS,
-  ChatLinkPreviewProvider,
-} from "../ChatLinkPreview";
+} from "@/components/features/link-preview/LinkHoverCardProvider";
+import { ChatLinkPreviewProvider } from "../ChatLinkPreview";
 import { ChatLink, ChatMarkdown } from "../ChatMarkdown";
 
 const useGetTaskResult = vi.fn();
