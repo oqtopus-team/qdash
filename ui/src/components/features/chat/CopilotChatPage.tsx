@@ -112,7 +112,9 @@ export function CopilotChatPage() {
   const hasMessages = Boolean(activeSession && activeSession.messages.length > 0);
 
   return (
-    <div className="relative flex h-[calc(100vh-64px)] bg-base-100 overflow-hidden">
+    // Fill the area AppLayout leaves under the navbar; on phones that excludes the tab bar,
+    // which a fixed viewport height would push the composer under.
+    <div className="relative flex h-full bg-base-100 overflow-hidden">
       {showSidebar && (
         <>
           {isMobile && (

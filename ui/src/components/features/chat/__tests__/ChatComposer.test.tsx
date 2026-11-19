@@ -1,4 +1,12 @@
-import { act, cleanup, createEvent, fireEvent, render, screen } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  createEvent,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ChatComposer } from "../ChatComposer";
 
@@ -151,6 +159,68 @@ describe("ChatComposer instructions indicator", () => {
     expect(screen.getByRole("link", { name: "Your instructions apply" }).getAttribute("href")).toBe(
       "/settings?tab=copilot",
     );
+  });
+});
+
+describe("ChatComposer narrow layout", () => {
+  // jsdom has no layout, so these pin the flex contract that keeps a phone-width
+  // composer inside its frame: the selectors shrink and truncate, the send controls do not.
+  const option = {
+    key: "default",
+    label: "a-very-long-configured-model-name",
+    model: null,
+    isConfiguredDefault: true,
+    resolvedModel: null,
+  };
+  const other = { key: "other", label: "other", model: null };
+
+  it("keeps the selectors in a shrinkable group apart from the send button", () => {
+    render(
+      <ChatComposer
+        {...props()}
+        modelOptions={[option, other]}
+        selectedModelKey="default"
+        thinkingChoice="auto"
+        thinkingModelDefault="medium"
+        onThinkingChange={vi.fn()}
+        instructionsActive
+      />,
+    );
+    const group = screen.getByRole("group", { name: "Message options" });
+    expect(group).toHaveClass("min-w-0", "flex-1");
+
+    for (const name of [/Chat model/, "Thinking level"]) {
+      const trigger = screen.getByRole("button", { name });
+      expect(group).toContainElement(trigger);
+      expect(trigger).toHaveClass("min-w-0", "shrink");
+    }
+    expect(group).toContainElement(screen.getByRole("link", { name: "Your instructions apply" }));
+
+    const send = screen.getByRole("button", { name: "Send message" });
+    expect(group).not.toContainElement(send);
+    expect(send.parentElement).toHaveClass("shrink-0");
+  });
+
+  it("shows the short thinking label until the composer is wide enough for the full one", () => {
+    render(
+      <ChatComposer
+        {...props()}
+        thinkingChoice="auto"
+        thinkingModelDefault="medium"
+        onThinkingChange={vi.fn()}
+      />,
+    );
+    const trigger = screen.getByRole("button", { name: "Thinking level" });
+    expect(within(trigger).getByText("Auto · medium")).toHaveClass("truncate", "@md:hidden");
+    expect(within(trigger).getByText("Thinking: Auto (medium)")).toHaveClass(
+      "hidden",
+      "@md:inline",
+    );
+  });
+
+  it("uses a 16px input on phones so focusing it does not zoom the page", () => {
+    render(<ChatComposer {...props()} />);
+    expect(screen.getByRole("textbox")).toHaveClass("text-base", "sm:text-sm");
   });
 });
 

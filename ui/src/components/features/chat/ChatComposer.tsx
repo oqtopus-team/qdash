@@ -225,7 +225,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
 
   return (
     <form
-      className={`chat-composer ${dragging ? "ring-2 ring-primary/40" : ""}`}
+      className={`chat-composer @container ${dragging ? "ring-2 ring-primary/40" : ""}`}
       onSubmit={(e) => {
         e.preventDefault();
         if (canSend) onSubmit();
@@ -284,143 +284,166 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
         }
         rows={1}
         aria-label="Message"
-        className="w-full resize-none bg-transparent border-none outline-none focus:ring-0 leading-6 px-1 pt-1 text-sm placeholder:text-base-content/35"
+        className="w-full max-h-[40dvh] resize-none bg-transparent border-none outline-none focus:ring-0 leading-6 px-1 pt-1 text-base sm:text-sm placeholder:text-base-content/35"
       />
       <div className="flex items-center gap-2 pt-1">
-        {onAttach && (
-          <>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept={ACCEPT_ATTRIBUTE}
-              multiple
-              hidden
-              onChange={handleFilesPicked}
+        {/* The selectors share the room left of the send controls and truncate there,
+            so a narrow composer never pushes them past its edge. */}
+        <div
+          role="group"
+          aria-label="Message options"
+          className="flex min-w-0 flex-1 items-center gap-1 @md:gap-2"
+        >
+          {onAttach && (
+            <>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept={ACCEPT_ATTRIBUTE}
+                multiple
+                hidden
+                onChange={handleFilesPicked}
+              />
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    disabled={!canAttach || attachmentsFull}
+                    onClick={() => fileInputRef.current?.click()}
+                    className="btn btn-ghost btn-sm btn-circle shrink-0 text-base-content/60"
+                    aria-label="Attach a figure"
+                  >
+                    <Paperclip className="w-3.5 h-3.5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {attachmentsFull
+                    ? `Up to ${MAX_ATTACHMENTS} figures per message`
+                    : "Attach a figure (PNG/JPEG, or paste a screenshot)"}
+                </TooltipContent>
+              </Tooltip>
+            </>
+          )}
+          {selected && (
+            <ModelControl
+              options={modelOptions}
+              selected={selected}
+              status={modelStatus}
+              onChange={onModelChange}
+              disabled={isStreaming || disabled}
+              compact={compact}
             />
+          )}
+          {thinkingChoice && onThinkingChange && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  disabled={isStreaming || disabled}
+                  className="btn btn-ghost btn-sm min-w-0 max-w-[45%] shrink font-normal text-base-content/60"
+                  aria-label="Thinking level"
+                  title="How much the model thinks before answering"
+                >
+                  <Brain data-icon="inline-start" className="shrink-0" />
+                  {compact ? (
+                    <span className="truncate">
+                      {thinkingLabel(thinkingChoice, thinkingModelDefault ?? null, true)}
+                    </span>
+                  ) : (
+                    <>
+                      {/* The full label needs a wide composer; a phone gets the short one. */}
+                      <span className="truncate @md:hidden">
+                        {thinkingLabel(thinkingChoice, thinkingModelDefault ?? null, true)}
+                      </span>
+                      <span className="hidden truncate @md:inline">
+                        {thinkingLabel(thinkingChoice, thinkingModelDefault ?? null)}
+                      </span>
+                    </>
+                  )}
+                  <ChevronDown data-icon="inline-end" className="shrink-0" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" side="top">
+                {THINKING_CHOICES.map((choice) => (
+                  <DropdownMenuItem
+                    key={choice.value}
+                    onSelect={() => onThinkingChange(choice.value)}
+                  >
+                    <span className="flex-1">
+                      <span className="block">
+                        {choice.value === "auto" && thinkingModelDefault
+                          ? `Auto (${thinkingModelDefault})`
+                          : choice.label}
+                      </span>
+                      <span className="block text-xs text-base-content/50">
+                        {choice.description}
+                      </span>
+                    </span>
+                    {choice.value === thinkingChoice && (
+                      <Check className="w-3.5 h-3.5 text-primary" />
+                    )}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+          {instructionsActive && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Link
+                  href="/settings?tab=copilot"
+                  className="btn btn-ghost btn-sm shrink-0 gap-1 font-normal text-base-content/60"
+                  aria-label="Your instructions apply"
+                >
+                  <UserCog className="w-3.5 h-3.5 shrink-0" />
+                  {!compact && <span className="hidden @lg:inline">Your instructions</span>}
+                </Link>
+              </TooltipTrigger>
+              <TooltipContent>Your instructions from Settings apply to this chat</TooltipContent>
+            </Tooltip>
+          )}
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          {isStreaming && steerable && hasText && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="submit"
+                  disabled={!canSteer}
+                  className="btn btn-circle btn-sm btn-primary disabled:bg-base-content/15 disabled:text-base-100"
+                  aria-label="Send to the answer in progress"
+                >
+                  <CornerDownRight className="w-4 h-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Send now: read after the current step (Enter)</TooltipContent>
+            </Tooltip>
+          )}
+          {isStreaming ? (
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
                   type="button"
-                  disabled={!canAttach || attachmentsFull}
-                  onClick={() => fileInputRef.current?.click()}
-                  className="btn btn-ghost btn-sm btn-circle text-base-content/60"
-                  aria-label="Attach a figure"
+                  onClick={onStop}
+                  className="btn btn-circle btn-sm bg-base-content text-base-100 hover:bg-base-content/80 border-none"
+                  aria-label="Stop generating"
                 >
-                  <Paperclip className="w-3.5 h-3.5" />
+                  <Square className="w-3 h-3 fill-current" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent>
-                {attachmentsFull
-                  ? `Up to ${MAX_ATTACHMENTS} figures per message`
-                  : "Attach a figure (PNG/JPEG, or paste a screenshot)"}
-              </TooltipContent>
+              <TooltipContent>Stop (Esc)</TooltipContent>
             </Tooltip>
-          </>
-        )}
-        {selected && (
-          <ModelControl
-            options={modelOptions}
-            selected={selected}
-            status={modelStatus}
-            onChange={onModelChange}
-            disabled={isStreaming || disabled}
-            compact={compact}
-          />
-        )}
-        {thinkingChoice && onThinkingChange && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                disabled={isStreaming || disabled}
-                className="btn btn-ghost btn-sm font-normal text-base-content/60"
-                aria-label="Thinking level"
-                title="How much the model thinks before answering"
-              >
-                <Brain data-icon="inline-start" className="shrink-0" />
-                <span className="truncate">
-                  {thinkingLabel(thinkingChoice, thinkingModelDefault ?? null, compact)}
-                </span>
-                <ChevronDown data-icon="inline-end" className="shrink-0" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" side="top">
-              {THINKING_CHOICES.map((choice) => (
-                <DropdownMenuItem
-                  key={choice.value}
-                  onSelect={() => onThinkingChange(choice.value)}
-                >
-                  <span className="flex-1">
-                    <span className="block">
-                      {choice.value === "auto" && thinkingModelDefault
-                        ? `Auto (${thinkingModelDefault})`
-                        : choice.label}
-                    </span>
-                    <span className="block text-xs text-base-content/50">{choice.description}</span>
-                  </span>
-                  {choice.value === thinkingChoice && (
-                    <Check className="w-3.5 h-3.5 text-primary" />
-                  )}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
-        {instructionsActive && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Link
-                href="/settings?tab=copilot"
-                className="btn btn-ghost btn-sm gap-1 font-normal text-base-content/60"
-                aria-label="Your instructions apply"
-              >
-                <UserCog className="w-3.5 h-3.5 shrink-0" />
-                {!compact && <span>Your instructions</span>}
-              </Link>
-            </TooltipTrigger>
-            <TooltipContent>Your instructions from Settings apply to this chat</TooltipContent>
-          </Tooltip>
-        )}
-        <div className="flex-1" />
-        {isStreaming && steerable && hasText && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                type="submit"
-                disabled={!canSteer}
-                className="btn btn-circle btn-sm btn-primary disabled:bg-base-content/15 disabled:text-base-100"
-                aria-label="Send to the answer in progress"
-              >
-                <CornerDownRight className="w-4 h-4" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent>Send now: read after the current step (Enter)</TooltipContent>
-          </Tooltip>
-        )}
-        {isStreaming ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                type="button"
-                onClick={onStop}
-                className="btn btn-circle btn-sm bg-base-content text-base-100 hover:bg-base-content/80 border-none"
-                aria-label="Stop generating"
-              >
-                <Square className="w-3 h-3 fill-current" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent>Stop (Esc)</TooltipContent>
-          </Tooltip>
-        ) : (
-          <button
-            type="submit"
-            disabled={!canSend}
-            className="btn btn-circle btn-sm btn-primary disabled:bg-base-content/15 disabled:text-base-100"
-            aria-label="Send message"
-          >
-            <ArrowUp className="w-4 h-4" />
-          </button>
-        )}
+          ) : (
+            <button
+              type="submit"
+              disabled={!canSend}
+              className="btn btn-circle btn-sm btn-primary disabled:bg-base-content/15 disabled:text-base-100"
+              aria-label="Send message"
+            >
+              <ArrowUp className="w-4 h-4" />
+            </button>
+          )}
+        </div>
       </div>
     </form>
   );
@@ -461,11 +484,12 @@ function ModelControl({
       <Cpu data-icon="inline-start" aria-hidden="true" />
       <span className="truncate">{name}</span>
       {!compact && selected.isConfiguredDefault && status === "ready" && (
-        <span className="shrink-0 text-base-content/40">default</span>
+        <span className="hidden shrink-0 text-base-content/40 @md:inline">default</span>
       )}
     </>
   );
-  const className = "btn btn-ghost btn-sm font-normal text-base-content/60 max-w-[60%]";
+  const className =
+    "btn btn-ghost btn-sm min-w-0 max-w-[60%] shrink font-normal text-base-content/60";
 
   if (fixedReason) {
     return (
