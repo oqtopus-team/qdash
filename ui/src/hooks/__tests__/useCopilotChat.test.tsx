@@ -805,9 +805,12 @@ describe("steering an answer in progress", () => {
 
   it("after a stop, keeps a steer unconfirmed until the store says, then offers to resend one never read", async () => {
     replyToSteers(() => Response.json({ status: "queued" }));
-    let withdrawn = false;
+    // The first lookup answers when the test says, so the wait after it is the chat's alone.
+    let answerFirst!: (reply: Response) => void;
     replyToStatus(() =>
-      Response.json(withdrawn ? { status: "withdrawn", reason: "aborted" } : { status: "queued" }),
+      statusCalls().length === 1
+        ? new Promise<Response>((resolve) => (answerFirst = resolve))
+        : Response.json({ status: "withdrawn", reason: "aborted" }),
     );
     const result = await renderChat();
     const requestId = await steeredTurn(result);
@@ -822,8 +825,18 @@ describe("steering an answer in progress", () => {
       session_id: result.current.chat.session!.id,
       request_id: requestId,
     });
-    // Still queued while the runtime stops: asked again until it settles.
-    withdrawn = true;
+    // Still queued while the runtime stops: asked again, after a wait, until it settles.
+    // Fake timers make that wait end when the test says, not when the runner gets to it.
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      await act(async () => answerFirst(Response.json({ status: "queued" })));
+      await vi.waitUntil(() => vi.getTimerCount() === 1);
+      expect(result.current.chat.steers[0].status).toBe("unconfirmed");
+      expect(statusCalls()).toHaveLength(1);
+      await act(() => vi.runOnlyPendingTimersAsync());
+    } finally {
+      vi.useRealTimers();
+    }
     await waitFor(() =>
       expect(result.current.chat.steers).toMatchObject([
         { text: "Also plot it", status: "withdrawn", reason: "aborted" },

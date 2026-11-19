@@ -1,38 +1,50 @@
 name: Publish TypeScript packages
 
+# This is the common QDash release pipeline. Its client job computes one QDash version
+# per run and publishes the npm client; both pi packages derive their versions from it,
+# so a QDash vX.Y.Z tag releases all of them as X.Y.Z. The client job also uploads a
+# qdash-client-release record, and publish-qdash-client.yml publishes the PyPI client
+# from it when this run completes. The paths therefore include the Python client.
 on:
   pull_request:
     branches: [develop]
     paths:
-      - "packages/**"
+      - "clients/python/**"
       - "clients/typescript/**"
+      - "packages/**"
       - "docs/oas/openapi.json"
       - "ui/src/schemas/**"
       - "Taskfile.yaml"
       - "agent-runtime/**"
+      - "pyproject.toml"
+      - "uv.lock"
       - "package.json"
       - "bun.lock"
-      - ".github/scripts/pi-package-*"
       - ".github/scripts/client-release*"
+      - ".github/scripts/pi-package-*"
+      - ".github/workflows/publish-qdash-client.yml"
       - ".github/workflows/publish-qdash-typescript-client.yml"
       - ".github/workflows/publish-typescript-packages.yml"
   push:
     branches: [develop]
     paths:
-      - "packages/**"
+      - "clients/python/**"
       - "clients/typescript/**"
+      - "packages/**"
       - "docs/oas/openapi.json"
       - "ui/src/schemas/**"
       - "Taskfile.yaml"
+      - "pyproject.toml"
+      - "uv.lock"
       - "package.json"
       - "bun.lock"
-      - ".github/scripts/pi-package-*"
       - ".github/scripts/client-release*"
+      - ".github/scripts/pi-package-*"
+      - ".github/workflows/publish-qdash-client.yml"
       - ".github/workflows/publish-qdash-typescript-client.yml"
       - ".github/workflows/publish-typescript-packages.yml"
     tags:
-      - "pi-qdash/v*"
-      - "pi-qcaleval/v*"
+      - "v[0-9]+.[0-9]+.[0-9]+"
   workflow_dispatch:
 
 permissions:
@@ -50,9 +62,8 @@ jobs:
       contents: read
       id-token: write
     with:
-      publish: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/develop') || startsWith(github.ref, 'refs/tags/pi-qdash/v') }}
-    secrets:
-      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+      # The called workflow also publishes the stable client for QDash vX.Y.Z tags.
+      publish: ${{ github.event_name == 'push' && github.ref == 'refs/heads/develop' }}
 
   build:
     needs: client
@@ -145,9 +156,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: [client, build]
+    # QDash vX.Y.Z tags are the only stable path; every package releases as X.Y.Z.
     if: >-
-      startsWith(github.ref, 'refs/tags/pi-qdash/v') ||
-      startsWith(github.ref, 'refs/tags/pi-qcaleval/v') ||
+      startsWith(github.ref, 'refs/tags/v') ||
       (github.event_name == 'push' && github.ref == 'refs/heads/develop')
     strategy:
       fail-fast: false
@@ -157,6 +168,12 @@ jobs:
       contents: read
       id-token: write
     steps:
+      - name: Checkout release scripts
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+
       - name: Set up Node.js
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
@@ -170,10 +187,14 @@ jobs:
           path: dist
 
       - name: Publish package
-        if: >-
-          github.ref == 'refs/heads/develop' ||
-          startsWith(github.ref, format('refs/tags/{0}/v', matrix.package))
+        env:
+          PI_PACKAGE: ${{ matrix.package }}
         run: |
-          tag=latest
-          if [ "$GITHUB_REF" = "refs/heads/develop" ]; then tag=beta; fi
-          npm publish ./dist/*.tgz --access public --provenance --tag "$tag"
+          archive="$(echo dist/*.tgz)"
+          # A rerun of a QDash tag finds X.Y.Z already published and skips it.
+          tag="$(node .github/scripts/pi-package-release.mjs --publish-tag "$PI_PACKAGE" "$archive")"
+          if [ -z "$tag" ]; then
+            echo "Skipping $PI_PACKAGE: no new version to publish for $GITHUB_REF"
+            exit 0
+          fi
+          npm publish "$archive" --access public --provenance --tag "$tag"
