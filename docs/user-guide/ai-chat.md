@@ -1,17 +1,17 @@
-# AI Chat
+# Agent
 
-Use AI chat to ask questions about a project's calibration data, investigate a failure, or have
+Use the Agent to ask questions about a project's calibration data, investigate a failure, or have
 the assistant draft a workflow change or a calibration run for you to approve. The assistant reads
 QDash records with your permissions; it does not replace operator judgment.
 
-AI chat needs a chat model endpoint; an administrator configures it as described in
+The Agent needs a chat model endpoint; an administrator configures it as described in
 [AI Setup](./setup/ai.md). Without one, the rest of QDash works unchanged.
 
 ## Choose an Entry Point
 
 | Entry point | Use it for |
 | --- | --- |
-| **AI Chat** in the sidebar | A project-wide conversation with cited QDash records |
+| **Agent** in the sidebar | A project-wide conversation with cited QDash records |
 | **Ask AI** on the right edge of any page | The same chat beside the page you are on |
 | **Ask AI** on a task result | Discussing or evaluating one result |
 | **Investigate with AI** in an **Error Log** | Finding the likely cause of a failed execution or task |
@@ -19,12 +19,29 @@ AI chat needs a chat model endpoint; an administrator configures it as described
 
 ## Start a Conversation
 
-Open **AI Chat** for a project-wide conversation. Start a new session when the chip,
+Open **Agent** for a project-wide conversation. Start a new session when the chip,
 investigation, or goal changes substantially. QDash stores sessions so you can return to earlier
 analysis.
 
 The assistant can inspect chips, metrics, task results, forum threads, workflows, and provenance.
 Confirm the active project and chip, then check important conclusions against the cited records.
+
+### Check What the Agent Uses
+
+Above the message box, the chat lists what your next message carries besides its text. The list
+shows only what QDash knows and sends; a general chat on the **Agent** page shows none.
+
+| Item | Shown when | What it means |
+| --- | --- | --- |
+| **Result** | The chat is about one task result | The task, qubit, and chip saved with this chat; every message names them |
+| **Investigating** | The chat investigates a failure | The failed execution, with the task, qubit, and chip when known, saved with this chat |
+| **Page** | You chat from the **Ask AI** sidebar or the floating window | The page you have open now; it follows you as you navigate, and adds **with editor code** on the **Workflow** editor |
+
+Hover over an item for its full details. The link icon on **Result** or **Investigating** opens
+the execution. The saved result or investigation cannot be removed from a chat; start a general
+chat with **New chat** on the **Agent** page instead. In the sidebar and the floating window,
+**New chat** keeps the result the current chat is about. The chat does not send a time range;
+name one in your message when it matters.
 
 ### Add to an Answer in Progress, or Continue One
 

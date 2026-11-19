@@ -124,7 +124,7 @@ const MODE_OPTIONS: ReadonlyArray<Option<EvaluationMode>> = [
     value: "planner",
     title: "Via Copilot",
     description:
-      "Copilot (the chat planner) summarises the result and calls the evaluation itself, as AI Chat does. Slower; what Copilot did and answered is recorded too.",
+      "Copilot (the chat planner) summarises the result and calls the evaluation itself, as Agent does. Slower; what Copilot did and answered is recorded too.",
   },
 ];
 

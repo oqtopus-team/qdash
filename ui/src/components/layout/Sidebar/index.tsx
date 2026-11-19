@@ -769,7 +769,7 @@ export function Sidebar() {
       </aside>
 
       {/* Mobile menu: the header menu button opens it below `lg`. The tab bar covers
-          Dashboard, Workflow, Execution, and AI Chat, so the drawer lists every other
+          Dashboard, Workflow, Execution, and Agent, so the drawer lists every other
           destination. Radix traps focus, closes on Escape or an outside press, and
           returns focus to the button that opened it. */}
       <Dialog open={isMobileOpen} onOpenChange={setMobileSidebarOpen}>

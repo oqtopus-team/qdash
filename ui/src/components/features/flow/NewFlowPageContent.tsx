@@ -129,11 +129,13 @@ export function NewFlowPageContent() {
   const journeyChipId = fromJourney ? journeyState.chipId : null;
 
   // The chat sidebar sees the flow being written here and can propose its code.
-  const { registerPage } = useChatDock();
+  const { registerPage, refreshPage } = useChatDock();
   const pageState = useRef({ name, chipId, code });
-  // Written after each commit, never during render; the provider below reads it when a turn is sent.
+  // Written after each commit, never during render; the provider below reads it when a turn is
+  // sent, and the chat refreshes the page it shows (it rerenders only when that summary changes).
   useEffect(() => {
     pageState.current = { name, chipId, code };
+    refreshPage();
   });
   useEffect(
     () =>

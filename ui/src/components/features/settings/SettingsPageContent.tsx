@@ -88,7 +88,7 @@ function CopilotSettingsPanel() {
                 : status === "error"
                   ? "Could not load the chat models. Chats use the configured default model."
                   : options.length > 1
-                    ? "AI Chat sends your messages to this model. You can also switch it from the chat input. The choices come from chat_models in chat.yaml."
+                    ? "Agent sends your messages to this model. You can also switch it from the chat input. The choices come from chat_models in chat.yaml."
                     : "Only one chat model is configured, so there is nothing to switch to. An operator can offer more by adding entries to chat_models in chat.yaml."}
             </p>
             {unavailableModel && (

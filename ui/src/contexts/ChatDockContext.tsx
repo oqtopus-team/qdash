@@ -8,6 +8,7 @@ import React, {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 import { usePathname } from "next/navigation";
 import { useCopilotChatSessionContext } from "@/contexts/CopilotChatSessionContext";
@@ -35,6 +36,26 @@ export interface PageContextProvider {
   current(): PageContext | null;
   /** Replace the page's editable code, for an edit the assistant proposed. */
   applyCode?(code: string): void;
+}
+
+/**
+ * What the chat shows about the page next to its composer: the route, title, and whether a
+ * turn sent now carries an editor's code. Unlike the page context, it holds no code, so an
+ * editor keystroke leaves it unchanged.
+ */
+export interface PageContextSummary {
+  path: string;
+  title: string;
+  withEditorCode: boolean;
+}
+
+function summarizePage(page: PageContext | null): PageContextSummary | null {
+  return page ? { path: page.path, title: page.title, withEditorCode: Boolean(page.flow) } : null;
+}
+
+function sameSummary(a: PageContextSummary | null, b: PageContextSummary | null): boolean {
+  if (a === null || b === null) return a === b;
+  return a.path === b.path && a.title === b.title && a.withEditorCode === b.withEditorCode;
 }
 
 /**
@@ -76,6 +97,15 @@ interface ChatDockValue {
 
   /** Tell the chat what this page shows; returns the unregister function for unmount. */
   registerPage: (provider: PageContextProvider) => () => void;
+  /**
+   * Tell the chat the registered page's state may have changed, e.g. after each commit of its
+   * editor. Cheap to call often: the chat rerenders only when its page summary changes.
+   */
+  refreshPage: () => void;
+  /** Subscribe to page summary changes; returns the unsubscribe function. */
+  subscribePage: (listener: () => void) => () => void;
+  /** The summary of currentPage(), the same object until a shown field changes. */
+  pageSummary: () => PageContextSummary | null;
   /** The page a turn sent now would describe; null on the chat page itself. */
   currentPage: () => PageContext | null;
   /** Hand proposed code to the open editor; false when no page takes code. */
@@ -100,16 +130,33 @@ export function ChatDockProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const pageProvider = useRef<PageContextProvider | null>(null);
   const [canApplyCode, setCanApplyCode] = useState(false);
+  const pageListeners = useRef(new Set<() => void>());
 
-  const registerPage = useCallback((provider: PageContextProvider) => {
-    pageProvider.current = provider;
-    setCanApplyCode(Boolean(provider.applyCode));
+  const refreshPage = useCallback(() => {
+    for (const listener of pageListeners.current) listener();
+  }, []);
+
+  const subscribePage = useCallback((listener: () => void) => {
+    pageListeners.current.add(listener);
     return () => {
-      if (pageProvider.current !== provider) return;
-      pageProvider.current = null;
-      setCanApplyCode(false);
+      pageListeners.current.delete(listener);
     };
   }, []);
+
+  const registerPage = useCallback(
+    (provider: PageContextProvider) => {
+      pageProvider.current = provider;
+      setCanApplyCode(Boolean(provider.applyCode));
+      refreshPage();
+      return () => {
+        if (pageProvider.current !== provider) return;
+        pageProvider.current = null;
+        setCanApplyCode(false);
+        refreshPage();
+      };
+    },
+    [refreshPage],
+  );
 
   const currentPage = useCallback((): PageContext | null => {
     // The chat page is the chat; there is nothing else on it to describe.
@@ -121,6 +168,14 @@ export function ChatDockProvider({ children }: { children: React.ReactNode }) {
       title: typeof document === "undefined" ? "" : document.title,
     };
   }, [pathname]);
+
+  // The last summary handed out, so an unchanged page returns the same object.
+  const lastSummary = useRef<PageContextSummary | null>(null);
+  const pageSummary = useCallback((): PageContextSummary | null => {
+    const next = summarizePage(currentPage());
+    if (!sameSummary(lastSummary.current, next)) lastSummary.current = next;
+    return lastSummary.current;
+  }, [currentPage]);
 
   const applyCode = useCallback((edit: EditProposal): boolean => {
     const provider = pageProvider.current;
@@ -306,6 +361,9 @@ export function ChatDockProvider({ children }: { children: React.ReactNode }) {
       investigate,
       endInvestigation,
       registerPage,
+      refreshPage,
+      subscribePage,
+      pageSummary,
       currentPage,
       applyCode,
       canApplyCode,
@@ -324,6 +382,9 @@ export function ChatDockProvider({ children }: { children: React.ReactNode }) {
       investigate,
       endInvestigation,
       registerPage,
+      refreshPage,
+      subscribePage,
+      pageSummary,
       currentPage,
       applyCode,
       canApplyCode,
@@ -344,4 +405,18 @@ export function useChatDock() {
 /** The dock when there is one; null where the chat renders without it (tests, isolated pages). */
 export function useOptionalChatDock(): ChatDockValue | null {
   return useContext(ChatDockCtx);
+}
+
+const noDock = () => () => undefined;
+const noPage = () => null;
+
+/**
+ * The summary of the page a turn sent now would describe, kept current as the page registers,
+ * updates, or unregisters and as the route changes; null without a dock or on the chat page.
+ */
+export function useChatPageSummary(): PageContextSummary | null {
+  const dock = useContext(ChatDockCtx);
+  const subscribe = dock?.subscribePage ?? noDock;
+  const snapshot = dock?.pageSummary ?? noPage;
+  return useSyncExternalStore(subscribe, snapshot, snapshot);
 }

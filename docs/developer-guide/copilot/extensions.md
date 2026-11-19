@@ -4,6 +4,33 @@ The bundled pi extensions own tool execution and skills; the QDash runtime owns
 session orchestration, tool exposure, and host context. See
 [Pi Packages](./packages.md) for workspace setup and release procedures.
 
+## Supported hosts
+
+pi-qdash is the agent capability shared by two supported hosts: pi CLI, and the QDash
+web application's **Agent** through the agent runtime. The hosts share capability, not
+presentation, and their features differ; document a difference where the feature is
+described instead of implying parity.
+
+| Concern | Owner |
+| --- | --- |
+| QDash tools, skills, investigation policy, tool routing guide, and tool policy lists | pi-qdash, for both hosts |
+| Presentation, sessions, the context a turn carries, orchestration, and which tools are exposed | Each host |
+
+- **Permissions.** Both hosts apply the same rule: reads run directly, and a reviewed write
+  runs only after the user approves that call. Each host keeps its own gate. pi CLI asks in
+  its UI, or requires `confirmWrite: true` without one (`extensions/lib/write-gate.ts`); the
+  runtime shows an approval card and runs the approved call with the arguments the user saw
+  (`QDashWriteTools.runApproved` in `agent-runtime/src/durable-tools.ts`).
+- **Results.** A tool returns readable text in `content` and reusable structured data in
+  `details` (`extensions/lib/results.ts`), so a host without a renderer for a result still
+  shows its text.
+- **Host context.** Context such as the open page or a task result comes from the host,
+  not from pi-qdash; see [Page context and editor edits](./architecture.md#page-context-and-editor-edits)
+  for the web application.
+- **Verification.** A change to shared behavior is checked in both hosts, as described in
+  [Verify a change](#verify-a-change). A feature or limit specific to one host, such as pi
+  CLI slash commands or the web application's approval cards, is stated as such.
+
 ## pi-qdash
 
 `packages/pi-qdash/extensions/qdash.ts` registers QDash tools, slash commands, and
