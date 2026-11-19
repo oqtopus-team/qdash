@@ -18,6 +18,10 @@ interface SweepParameterFieldProps {
   parts: readonly string[];
   /** The explicit points as a JSON array, used by the `list` form. */
   listValue: string;
+  /** The validation message shown under the field after a failed submit. */
+  error?: string;
+  /** The id of the validation message, referenced by aria-describedby. */
+  errorId: string;
   onTypeChange: (type: SweepFormType) => void;
   onPartChange: (index: number, value: string) => void;
   onListChange: (value: string) => void;
@@ -50,6 +54,8 @@ export function SweepParameterField({
   type,
   parts,
   listValue,
+  error,
+  errorId,
   onTypeChange,
   onPartChange,
   onListChange,
@@ -80,6 +86,8 @@ export function SweepParameterField({
       </select>
       {type === "list" ? (
         <input
+          aria-invalid={Boolean(error)}
+          aria-describedby={error ? errorId : undefined}
           aria-label={`${name} values`}
           className="input input-sm input-bordered mt-2 w-full font-mono"
           value={listValue}
@@ -92,6 +100,8 @@ export function SweepParameterField({
             <label key={argument} className="flex min-w-0 flex-col gap-1">
               <span className="truncate text-xs text-base-content/50">{argument}</span>
               <input
+                aria-invalid={Boolean(error)}
+                aria-describedby={error ? errorId : undefined}
                 aria-label={`${name} ${argument}`}
                 className="input input-sm input-bordered w-full min-w-0 px-2 font-mono"
                 value={parts[index] ?? ""}
@@ -100,6 +110,11 @@ export function SweepParameterField({
             </label>
           ))}
         </div>
+      )}
+      {error && (
+        <span id={errorId} className="text-error text-xs">
+          {error}
+        </span>
       )}
       <span className="mt-1 break-words text-xs text-base-content/45">
         {isBlank ? (

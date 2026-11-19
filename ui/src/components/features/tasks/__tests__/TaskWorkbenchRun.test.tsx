@@ -300,12 +300,41 @@ describe("TaskWorkbench run availability", () => {
     });
     expect(screen.getByText("Enter numbers that produce a sweep.")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Run task" }));
-    await waitFor(() =>
-      expect(mocks.toast.error).toHaveBeenCalledWith(
-        "Enter numbers that produce a range sweep for time_range",
-      ),
+    const field = screen.getByRole("textbox", { name: "time_range step" });
+    await waitFor(() => expect(field).toHaveAttribute("aria-invalid", "true"));
+    expect(document.getElementById(field.getAttribute("aria-describedby")!)).toHaveTextContent(
+      "Enter numbers that produce a range sweep for time_range",
     );
+    expect(mocks.toast.error).not.toHaveBeenCalled();
     expect(mocks.post).not.toHaveBeenCalled();
+
+    fireEvent.change(field, { target: { value: "8" } });
+    await waitFor(() => expect(field).not.toHaveAttribute("aria-invalid", "true"));
+    expect(field).not.toHaveAttribute("aria-describedby");
+  });
+
+  it("does not turn restored explicit points into arguments of another form", async () => {
+    renderWorkbench(
+      {
+        run_parameters: {
+          time_range: { value: [0, 401, 8], value_type: "range", unit: "ns" },
+        },
+      },
+      undefined,
+      {
+        ...source,
+        run_parameters: {
+          time_range: { value: [1, 2, 4], value_type: "list", unit: "ns" },
+        },
+      },
+    );
+    fireEvent.change(screen.getByRole("combobox", { name: "time_range type" }), {
+      target: { value: "range" },
+    });
+    expect(screen.getByRole("textbox", { name: "time_range start" })).toHaveValue("");
+    fireEvent.click(screen.getByRole("button", { name: "Run task" }));
+    await waitFor(() => expect(mocks.post).toHaveBeenCalled());
+    expect(mocks.post.mock.calls[0][1].run_parameter_overrides).toEqual({});
   });
 
   it("restores the sweep form of a source result", () => {
@@ -387,7 +416,12 @@ describe("TaskWorkbench run availability", () => {
       target: { value: "1.5" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Run task" }));
-    await waitFor(() => expect(mocks.toast.error).toHaveBeenCalled());
+    const field = screen.getByRole("textbox", { name: "shots" });
+    await waitFor(() => expect(field).toHaveAttribute("aria-invalid", "true"));
+    expect(document.getElementById(field.getAttribute("aria-describedby")!)).toHaveTextContent(
+      'Expected an integer, got "1.5"',
+    );
+    expect(mocks.toast.error).not.toHaveBeenCalled();
     expect(mocks.post).not.toHaveBeenCalled();
   });
 
@@ -748,7 +782,26 @@ describe("TaskWorkbench run availability", () => {
     renderWorkbench();
     fireEvent.click(screen.getByRole("button", { name: "Run task" }));
     expect(screen.getByRole("button", { name: "Starting…" })).toBeDisabled();
+    await waitFor(() => expect(mocks.post).toHaveBeenCalled());
+    expect(screen.getByRole("button", { name: "Starting…" })).toBeDisabled();
     await act(async () => resolve({ data: { execution_id: "execution-1" } }));
+  });
+
+  it("starts one execution when Run is clicked twice", async () => {
+    let resolve!: (value: unknown) => void;
+    mocks.post.mockImplementationOnce(
+      () =>
+        new Promise((done) => {
+          resolve = done;
+        }),
+    );
+    renderWorkbench();
+    const button = screen.getByRole("button", { name: "Run task" });
+    fireEvent.click(button);
+    fireEvent.click(button);
+    await waitFor(() => expect(mocks.post).toHaveBeenCalledTimes(1));
+    await act(async () => resolve({ data: { execution_id: "execution-1" } }));
+    expect(mocks.post).toHaveBeenCalledTimes(1);
   });
 
   it.each([

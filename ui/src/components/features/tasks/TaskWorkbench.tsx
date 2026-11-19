@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { type FormEvent, useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { useQueryClient } from "@tanstack/react-query";
 import { ExternalLink, LockKeyhole, Play, RefreshCw, RotateCcw } from "lucide-react";
@@ -23,25 +25,19 @@ import { getApiErrorMessage } from "@/lib/utils/apiError";
 import { sortChipsByDefaultPriority } from "@/lib/utils/chips";
 import {
   convertSweep,
-  expandSweep,
   getTaskParameterUiGroup,
   isSweepFormType,
   isSweepValueType,
-  parseTaskParameter,
   type SweepFormType,
 } from "@/lib/utils/task-parameters";
 import { SweepParameterField, sweepFieldValue } from "./SweepParameterField";
 import { buildTaskPrefill } from "./task-prefill";
-
-function sweepParts(raw: string): string[] {
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    if (Array.isArray(parsed) && parsed.length === 3) return parsed.map(String);
-  } catch {
-    // A blank or malformed value starts with empty arguments.
-  }
-  return ["", "", ""];
-}
+import {
+  buildTaskRunDefaults,
+  buildTaskRunSchema,
+  type TaskRunInput,
+  type TaskRunOutput,
+} from "./taskRunSchema";
 
 interface TaskWorkbenchProps {
   task: TaskInfo;
@@ -57,6 +53,7 @@ function badgeClass(status?: string | null) {
   return "badge-warning";
 }
 
+/** Configures and starts a task execution and displays its results. */
 export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps) {
   const runDisabledReasonId = useId();
   const toast = useToast();
@@ -84,17 +81,26 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
   const executionId = executionIdQuery ?? "";
   const submittedChipId = submittedChipIdQuery ?? "";
   const submittedTarget = submittedTargetQuery ?? "";
-  const [inputValues, setInputValues] = useState<Record<string, string>>({});
-  const [runValues, setRunValues] = useState<Record<string, string>>({});
-  const [runTypes, setRunTypes] = useState<Record<string, SweepFormType>>({});
-  const [runSweepParts, setRunSweepParts] = useState<Record<string, string[]>>({});
-  const [reconfigure, setReconfigure] = useState(false);
-  const [updateCalibrationParameters, setUpdateCalibrationParameters] = useState(false);
-  const [isStarting, setIsStarting] = useState(false);
   const [isReloadingInputs, setIsReloadingInputs] = useState(false);
   const previousTask = useRef(`${backend}:${task.name}`);
   const initializedTask = useRef<string | null>(null);
   const prefill = useMemo(() => buildTaskPrefill(task, sourceTask), [task, sourceTask]);
+  const schema = useMemo(() => buildTaskRunSchema(task), [task]);
+  const {
+    register,
+    handleSubmit,
+    reset,
+    setValue,
+    trigger,
+    watch,
+    formState: { errors, isSubmitted, isSubmitting: isStarting },
+  } = useForm<TaskRunInput, unknown, TaskRunOutput>({
+    resolver: zodResolver(schema),
+    defaultValues: buildTaskRunDefaults(task, prefill),
+  });
+  const isSubmitLocked = useRef(false);
+  const runs = watch("runs");
+  const updateCalibrationParameters = watch("updateCalibrationParameters");
   const availability = useExecutionAvailability(
     { parameters: { chip_id: chipId, qid: target.trim() } },
     Boolean(chipId && target.trim() && task.enabled),
@@ -105,21 +111,16 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
   }, [sourceTask, chipIdQuery, defaultChipId, setChipIdQuery]);
 
   useEffect(() => {
-    const formKey = `${backend}:${task.name}:${sourceTask?.task_id ?? ""}`;
+    const formKey = JSON.stringify([
+      backend,
+      task.name,
+      sourceTask?.task_id ?? "",
+      Object.keys(task.input_parameters ?? {}),
+      Object.keys(task.run_parameters ?? {}),
+    ]);
     if (initializedTask.current === formKey) return;
     initializedTask.current = formKey;
-    setRunValues(prefill.run);
-    setRunTypes(prefill.runTypes);
-    setRunSweepParts(
-      Object.fromEntries(
-        Object.entries(prefill.runTypes)
-          .filter(([, type]) => type !== "list")
-          .map(([name]) => [name, sweepParts(prefill.run[name] ?? "")]),
-      ),
-    );
-    setReconfigure(false);
-    setUpdateCalibrationParameters(false);
-    setInputValues(prefill.input);
+    reset(buildTaskRunDefaults(task, prefill));
     const taskKey = `${backend}:${task.name}`;
     if (previousTask.current !== taskKey) {
       setTargetQuery(null);
@@ -130,6 +131,7 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
     }
   }, [
     backend,
+    reset,
     setExecutionIdQuery,
     setSubmittedChipIdQuery,
     setSubmittedTargetQuery,
@@ -204,40 +206,21 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
       ? [resultTask.json_figure_path]
       : [];
 
-  const handleRun = async () => {
+  /** Starts an execution with validated overrides. */
+  const handleRun = async (values: TaskRunOutput) => {
     if (runDisabledReason) return;
     const requestedTarget = target.trim();
-    setIsStarting(true);
     try {
-      const runParameterOverrides = Object.fromEntries(
-        Object.entries(task.run_parameters ?? {}).flatMap(([name, parameter]) => {
-          const override = buildRunOverride(name, parameter.value_type);
-          return override === undefined ? [] : [[name, override]];
-        }),
-      );
-      const inputParameterOverrides = Object.fromEntries(
-        Object.entries(inputValues)
-          .filter(
-            ([name, value]) =>
-              name in (task.input_parameters ?? {}) &&
-              task.input_parameters?.[name]?.user_override !== "forbidden" &&
-              value.trim() !== "",
-          )
-          .map(([name, value]) => [
-            name,
-            parseTaskParameter(value, task.input_parameters?.[name]?.value_type ?? "float"),
-          ]),
-      );
       const response = await AXIOS_INSTANCE.post(
         `/tasks/${encodeURIComponent(task.name)}/execute`,
         {
           chip_id: chipId,
           qid: requestedTarget,
           backend_name: backend,
-          input_parameter_overrides: inputParameterOverrides,
-          run_parameter_overrides: runParameterOverrides,
-          reconfigure,
-          update_calibration_parameters: updateCalibrationParameters,
+          input_parameter_overrides: values.inputParameterOverrides,
+          run_parameter_overrides: values.runParameterOverrides,
+          reconfigure: values.reconfigure,
+          update_calibration_parameters: values.updateCalibrationParameters,
           update_params: false,
           ...(sourceTask ? { source_task_id: sourceTask.task_id } : {}),
         },
@@ -255,53 +238,42 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
         }),
         queryClient.invalidateQueries({ queryKey: ["execution-availability"] }),
       ]);
-      setIsStarting(false);
     }
   };
 
-  /** The run override one field sends, or undefined when the field is blank. */
-  const buildRunOverride = (name: string, declaredType: unknown): unknown => {
-    if (!isSweepValueType(declaredType)) {
-      const raw = runValues[name] ?? "";
-      return raw.trim() === "" ? undefined : parseTaskParameter(raw, declaredType);
-    }
-    const type = runTypes[name] ?? declaredType;
-    const parts = runSweepParts[name] ?? ["", "", ""];
-    const listValue = runValues[name] ?? "";
-    const isBlank =
-      type === "list" ? listValue.trim() === "" : parts.every((part) => part.trim() === "");
-    if (isBlank) return undefined;
-    const value = sweepFieldValue(type, parts, listValue);
-    if (value === null || expandSweep(type, value) === null) {
-      throw new Error(`Enter numbers that produce a ${type} sweep for ${name}`);
-    }
-    return type === declaredType ? value : { value, value_type: type };
+  /** Submits the run form once at a time while Run is enabled. */
+  const handleFormSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (runDisabledReason || isSubmitLocked.current) return;
+    isSubmitLocked.current = true;
+    void handleSubmit(handleRun)(event).finally(() => {
+      isSubmitLocked.current = false;
+    });
   };
 
-  const handleSweepTypeChange = (name: string, type: SweepFormType) => {
-    const previous = runTypes[name] ?? task.run_parameters?.[name]?.value_type;
-    if (isSweepFormType(previous) && previous !== type) {
-      // The new form starts from the sweep the old form produced.
+  /** Revalidates a sweep after its type or arguments change. */
+  const revalidateSweep = (index: number) => {
+    if (isSubmitted) void trigger(`runs.${index}.value`);
+  };
+
+  /** Converts the current sweep when its type changes. */
+  const handleSweepTypeChange = (index: number, type: SweepFormType) => {
+    const field = runs[index];
+    if (isSweepFormType(field.type) && field.type !== type) {
       const converted = convertSweep(
-        previous,
-        sweepFieldValue(previous, runSweepParts[name] ?? [], runValues[name] ?? ""),
+        field.type,
+        sweepFieldValue(field.type, field.parts, field.value),
         type,
       );
-      if (type === "list") {
-        setRunValues((current) => ({
-          ...current,
-          [name]: converted === null ? "" : JSON.stringify(converted),
-        }));
-      } else if (converted !== null) {
-        setRunSweepParts((current) => ({
-          ...current,
-          [name]: converted.map(String),
-        }));
-      }
+      if (type === "list")
+        setValue(`runs.${index}.value`, converted === null ? "" : JSON.stringify(converted));
+      else if (converted !== null) setValue(`runs.${index}.parts`, converted.map(String));
     }
-    setRunTypes((current) => ({ ...current, [name]: type }));
+    setValue(`runs.${index}.type`, type);
+    revalidateSweep(index);
   };
 
+  /** Reloads current calibration values into the input fields. */
   const handleReloadInputParameters = async () => {
     if (!chipId || !target.trim()) return;
     setIsReloadingInputs(true);
@@ -357,7 +329,11 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
           return [name, Array.isArray(value) ? JSON.stringify(value) : String(value)];
         }),
       );
-      setInputValues(loadedValues);
+      Object.keys(task.input_parameters ?? {}).forEach((name, index) =>
+        setValue(`inputs.${index}.value`, loadedValues[name] ?? "", {
+          shouldValidate: isSubmitted,
+        }),
+      );
       if (loadedCount > 0) {
         toast.success(
           `Loaded ${loadedCount} current input parameter${loadedCount === 1 ? "" : "s"}`,
@@ -395,33 +371,40 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
       });
     }
   }
-  const renderInputParameterField = ([name, parameter]: (typeof inputParameterEntries)[number]) => (
-    <label key={name} className="form-control min-w-0">
-      <span className="label-text mb-1 flex min-w-0 items-start justify-between gap-2">
-        <span className="min-w-0 break-words">{name}</span>
-        <span className="max-w-[45%] shrink-0 break-all text-right text-base-content/40">
-          {String(parameter.unit ?? "")}
+  /** Renders an input override in its definition order. */
+  const renderInputParameterField = ([name, parameter]: (typeof inputParameterEntries)[number]) => {
+    const index = inputParameterEntries.findIndex(([key]) => key === name);
+    const error = errors.inputs?.[index]?.value?.message;
+    const errorId = `${runDisabledReasonId}-input-${index}-error`;
+    return (
+      <label key={name} className="form-control min-w-0">
+        <span className="label-text mb-1 flex min-w-0 items-start justify-between gap-2">
+          <span className="min-w-0 break-words">{name}</span>
+          <span className="max-w-[45%] shrink-0 break-all text-right text-base-content/40">
+            {String(parameter.unit ?? "")}
+          </span>
         </span>
-      </span>
-      <input
-        className="input input-sm input-bordered font-mono"
-        value={inputValues[name] ?? ""}
-        disabled={parameter.user_override === "forbidden"}
-        onChange={(event) =>
-          setInputValues((current) => ({
-            ...current,
-            [name]: event.target.value,
-          }))
-        }
-        placeholder="Use current value"
-      />
-      {Boolean(parameter.description) && (
-        <span className="mt-1 break-words text-xs text-base-content/45">
-          {String(parameter.description)}
-        </span>
-      )}
-    </label>
-  );
+        <input
+          className="input input-sm input-bordered font-mono"
+          {...register(`inputs.${index}.value`)}
+          aria-invalid={Boolean(error)}
+          aria-describedby={error ? errorId : undefined}
+          disabled={parameter.user_override === "forbidden"}
+          placeholder="Use current value"
+        />
+        {error && (
+          <span id={errorId} className="text-error text-xs">
+            {error}
+          </span>
+        )}
+        {Boolean(parameter.description) && (
+          <span className="mt-1 break-words text-xs text-base-content/45">
+            {String(parameter.description)}
+          </span>
+        )}
+      </label>
+    );
+  };
 
   return (
     <div className="h-full overflow-y-auto bg-base-200 p-3 sm:p-4">
@@ -464,7 +447,7 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
 
         <div className="grid items-start gap-4 lg:grid-cols-[300px_minmax(0,1fr)]">
           <section className="min-w-0 rounded-box border border-base-300 bg-base-100 p-4 shadow-sm">
-            <div className="flex min-w-0 flex-col gap-4">
+            <form onSubmit={handleFormSubmit} className="flex min-w-0 flex-col gap-4">
               <h2 className="text-sm font-medium">Setup</h2>
               <div className="grid gap-3">
                 <label className="form-control min-w-0">
@@ -563,7 +546,7 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
                 <div>
                   <h3 className="mb-2 text-xs font-medium text-base-content/60">Run parameters</h3>
                   <div className="grid max-h-80 gap-3 overflow-y-auto rounded-lg border border-base-300 p-3">
-                    {Object.entries(task.run_parameters ?? {}).map(([name, parameter]) =>
+                    {Object.entries(task.run_parameters ?? {}).map(([name, parameter], index) =>
                       isSweepValueType(parameter.value_type) ? (
                         <SweepParameterField
                           key={name}
@@ -571,22 +554,18 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
                           unit={String(parameter.unit ?? "")}
                           description={String(parameter.description ?? "")}
                           declaredType={parameter.value_type}
-                          type={runTypes[name] ?? parameter.value_type}
-                          parts={runSweepParts[name] ?? ["", "", ""]}
-                          listValue={runValues[name] ?? ""}
-                          onTypeChange={(type) => handleSweepTypeChange(name, type)}
-                          onPartChange={(index, value) =>
-                            setRunSweepParts((current) => {
-                              const parts = [...(current[name] ?? ["", "", ""])];
-                              parts[index] = value;
-                              return { ...current, [name]: parts };
-                            })
-                          }
+                          type={runs[index]?.type ?? parameter.value_type}
+                          parts={runs[index]?.parts ?? ["", "", ""]}
+                          listValue={runs[index]?.value ?? ""}
+                          error={errors.runs?.[index]?.value?.message}
+                          errorId={`${runDisabledReasonId}-run-${index}-error`}
+                          onTypeChange={(type) => handleSweepTypeChange(index, type)}
+                          onPartChange={(partIndex, value) => {
+                            setValue(`runs.${index}.parts.${partIndex}`, value);
+                            revalidateSweep(index);
+                          }}
                           onListChange={(value) =>
-                            setRunValues((current) => ({
-                              ...current,
-                              [name]: value,
-                            }))
+                            setValue(`runs.${index}.value`, value, { shouldValidate: isSubmitted })
                           }
                         />
                       ) : (
@@ -599,14 +578,22 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
                           </span>
                           <input
                             className="input input-sm input-bordered font-mono"
-                            value={runValues[name] ?? ""}
-                            onChange={(event) =>
-                              setRunValues((current) => ({
-                                ...current,
-                                [name]: event.target.value,
-                              }))
+                            {...register(`runs.${index}.value`)}
+                            aria-invalid={Boolean(errors.runs?.[index]?.value)}
+                            aria-describedby={
+                              errors.runs?.[index]?.value
+                                ? `${runDisabledReasonId}-run-${index}-error`
+                                : undefined
                             }
                           />
+                          {errors.runs?.[index]?.value?.message && (
+                            <span
+                              id={`${runDisabledReasonId}-run-${index}-error`}
+                              className="text-error text-xs"
+                            >
+                              {errors.runs[index]?.value?.message}
+                            </span>
+                          )}
                           {Boolean(parameter.description) && (
                             <span className="mt-1 break-words text-xs text-base-content/45">
                               {String(parameter.description)}
@@ -620,12 +607,7 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
               )}
 
               <label className="choice-field gap-3">
-                <input
-                  type="checkbox"
-                  className="toggle toggle-sm"
-                  checked={reconfigure}
-                  onChange={(event) => setReconfigure(event.target.checked)}
-                />
+                <input type="checkbox" className="toggle toggle-sm" {...register("reconfigure")} />
                 <span className="min-w-0 break-words">
                   <span className="block break-words text-sm font-medium">
                     Reconfigure hardware first
@@ -640,8 +622,7 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
                 <input
                   type="checkbox"
                   className="toggle toggle-sm toggle-success"
-                  checked={updateCalibrationParameters}
-                  onChange={(event) => setUpdateCalibrationParameters(event.target.checked)}
+                  {...register("updateCalibrationParameters")}
                 />
                 <span className="min-w-0 break-words">
                   <span className="block break-words text-sm font-medium">
@@ -678,7 +659,7 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
 
               <button
                 className="btn btn-primary"
-                onClick={handleRun}
+                type="submit"
                 disabled={Boolean(runDisabledReason)}
                 aria-describedby={runDisabledReason ? runDisabledReasonId : undefined}
                 title={runDisabledReason ?? "Run task"}
@@ -694,7 +675,7 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
                 )}
                 {runLabel}
               </button>
-            </div>
+            </form>
           </section>
 
           <section className="min-h-[38rem] min-w-0 rounded-box border border-base-300 bg-base-100 p-4 shadow-sm sm:p-5">
