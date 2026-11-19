@@ -32,15 +32,58 @@ function handlePreviewClick(
   href: string | undefined,
   preview: PreviewHandle,
 ): void {
+  preview?.dismissCard();
   if (event.defaultPrevented || !href || !preview) return;
   if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
   if (preview.preview(href)) event.preventDefault();
 }
 
+/** The link an event happened on, if it is inside `container`. */
+function eventLink(target: EventTarget | null, container: Element): HTMLAnchorElement | null {
+  if (!(target instanceof Element)) return null;
+  const anchor = target.closest<HTMLAnchorElement>("a[href]");
+  return anchor && container.contains(anchor) ? anchor : null;
+}
+
+/**
+ * Hover-card handlers for links under one element: a single link (`ChatLink`) or every link
+ * in a rendered answer, found by delegation. Touch pointers never hover, so they only click.
+ */
+function linkCardHandlers(preview: PreviewHandle) {
+  if (!preview) return {};
+  return {
+    onPointerOver(event: React.PointerEvent<HTMLElement>) {
+      if (event.pointerType === "touch") return;
+      const anchor = eventLink(event.target, event.currentTarget);
+      if (anchor) preview.enterLink(anchor, "pointer");
+    },
+    onPointerOut(event: React.PointerEvent<HTMLElement>) {
+      const anchor = eventLink(event.target, event.currentTarget);
+      // Moving between a link's own children is not leaving it.
+      if (!anchor || (event.relatedTarget instanceof Node && anchor.contains(event.relatedTarget)))
+        return;
+      preview.leaveLink(anchor, "pointer");
+    },
+    onPointerDownCapture(event: React.PointerEvent<HTMLElement>) {
+      const anchor = eventLink(event.target, event.currentTarget);
+      if (anchor) preview.pressLink(anchor);
+    },
+    onFocus(event: React.FocusEvent<HTMLElement>) {
+      const anchor = eventLink(event.target, event.currentTarget);
+      if (anchor) preview.enterLink(anchor, "focus");
+    },
+    onBlur(event: React.FocusEvent<HTMLElement>) {
+      const anchor = eventLink(event.target, event.currentTarget);
+      if (anchor) preview.leaveLink(anchor, "focus");
+    },
+  };
+}
+
 /**
  * A link in an answer. QDash records (task results, executions, forum posts,
  * figures) open as a preview over the chat; everything else opens in a new
- * tab, so a click never navigates away from the conversation.
+ * tab, so a click never navigates away from the conversation. Hovering or
+ * focusing any link shows a compact card describing where it goes.
  */
 export function ChatLink({
   href,
@@ -56,6 +99,7 @@ export function ChatLink({
       target="_blank"
       rel="noopener noreferrer"
       {...props}
+      {...linkCardHandlers(preview)}
       onClick={(event) => {
         props.onClick?.(event);
         handlePreviewClick(event, href, preview);
@@ -103,8 +147,9 @@ interface ChatMarkdownProps {
  * Markdown for chat answers: GFM, math, highlighted code and Mermaid diagrams.
  *
  * @pierre/words owns the rendered DOM and patches only what changed as text
- * streams in, so the interactive parts (link previews, copy buttons, diagram
- * controls) are handled here by delegation instead of as React components.
+ * streams in, so the interactive parts (link previews and hover cards, copy
+ * buttons, diagram controls) are handled here by delegation instead of as
+ * React components.
  */
 export const ChatMarkdown = memo(function ChatMarkdown({
   children,
@@ -204,6 +249,8 @@ export const ChatMarkdown = memo(function ChatMarkdown({
     [copy, preview],
   );
 
+  const cardHandlers = useMemo(() => linkCardHandlers(preview), [preview]);
+
   const onPointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     const viewport = (event.target as Element).closest<HTMLElement>("[data-mermaid-viewport]");
     if (viewport && event.currentTarget.contains(viewport)) {
@@ -227,6 +274,7 @@ export const ChatMarkdown = memo(function ChatMarkdown({
         onClickCapture={onClickCapture}
         onClick={onClick}
         onPointerDown={onPointerDown}
+        {...cardHandlers}
       >
         {source}
       </Markdown>
