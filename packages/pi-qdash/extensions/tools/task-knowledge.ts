@@ -93,7 +93,7 @@ export function similarTaskNames(taskName: string, names: string[], limit = 5): 
     .slice(0, limit);
 }
 
-function notFound(error: unknown): boolean {
+export function notFound(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
   const value = error as { status?: unknown; statusCode?: unknown; response?: { status?: unknown }; message?: unknown };
   return value.status === 404 || value.statusCode === 404 || value.response?.status === 404 || /\b404\b|not found/i.test(String(value.message ?? ""));

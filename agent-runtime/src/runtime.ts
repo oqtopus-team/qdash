@@ -99,7 +99,8 @@ import {
 } from "./evaluate.ts";
 import { formatSettledDetail } from "./events.ts";
 import { logDurableReport } from "./durable-report.ts";
-import { fetchKnowledgeDraft, fetchTaskExamples, fetchTaskKnowledge } from "./knowledge-context.ts";
+import { examplesOf, fetchKnowledgeDraft, fetchTaskKnowledgeResponse, renderReference } from "./knowledge-context.ts";
+import type { TaskKnowledgeLike } from "./knowledge-context.ts";
 import { resolveCopilotModelFiles } from "./copilot-profile.ts";
 import { chatCompactionOverrides, PROVIDER_ALIASES, writeModelsConfig } from "./models-config.ts";
 import type { PageContext } from "./page-context.ts";
@@ -216,9 +217,25 @@ export function sessionStorageName(ownerId: string, sessionId: string): string {
 /** Where an evaluation reads its knowledge: an uploaded draft when named, else the task's shared knowledge. */
 function knowledgeSource(connection: QDashConnection, draftId: string | undefined, signal?: AbortSignal) {
   if (draftId) return draftKnowledge(() => fetchKnowledgeDraft(connection, draftId, signal));
+  // One knowledge request per task serves both the reference and the examples.
+  const responses = new Map<string, Promise<TaskKnowledgeLike | undefined>>();
+  const load = (taskName: string) => {
+    let pending = responses.get(taskName);
+    if (!pending) {
+      pending = fetchTaskKnowledgeResponse(connection, taskName, signal);
+      responses.set(taskName, pending);
+    }
+    return pending;
+  };
   return {
-    fetchKnowledge: (taskName: string) => fetchTaskKnowledge(connection, taskName, signal),
-    fetchExamples: (taskName: string) => fetchTaskExamples(connection, taskName, signal),
+    fetchKnowledge: async (taskName: string) => {
+      const knowledge = await load(taskName);
+      return knowledge ? renderReference(knowledge) : undefined;
+    },
+    fetchExamples: async (taskName: string) => {
+      const knowledge = await load(taskName);
+      return knowledge ? examplesOf(knowledge) : [];
+    },
   };
 }
 

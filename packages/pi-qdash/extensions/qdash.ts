@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { dirname, join } from "node:path";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
 
 import type { ExtensionAPI, Theme } from "@earendil-works/pi-coding-agent";
 import {
@@ -25,13 +24,18 @@ import { toFigureToolResult, toTextToolResult, toToolResult } from "./lib/result
 import { ansi, boxLinesToWidth, boxed, formatNumber, textComponent } from "./lib/render.js";
 import { plotSeriesLines, timeseriesPlotComponent, timeseriesPoints } from "./lib/timeseries-plot.js";
 import { installQDashWriteGate } from "./lib/write-gate.js";
+import { installQDashGuidance } from "./lib/guidance-hook.js";
+import { qdashContextPath } from "./lib/context-path.js";
 import { errorStatus, fileContentSourceGuidance, filesTreeSourceGuidance, looksLikeSourcePath } from "./lib/source-guidance.js";
 import { withAbort } from "./lib/abort.js";
 import { qcalContextText, recordedParameters, sweepsOf, type RecordedParameter, type Sweep } from "./lib/qcal-evidence.js";
 import { registerCalibrationPipelineTools } from "./tools/calibration-pipeline.js";
 import { registerFlowAuthoringTools } from "./tools/flow-authoring.js";
 import { registerSourceCodeTools } from "./tools/source-code.js";
-import { registerTaskKnowledgeTool } from "./tools/task-knowledge.js";
+import { notFound, registerTaskKnowledgeTool } from "./tools/task-knowledge.js";
+import { installQDashToolPolicy } from "./lib/script-policy.js";
+import { installQcalHydration } from "./lib/qcal-hydration-hook.js";
+import type { TaskKnowledgeLike } from "./lib/qcal-hydration.js";
 import { registerTimeseriesComparisonTool } from "./tools/timeseries.js";
 import { analyzeWiringMarkdown, wiringInsightLines, type WiringInsights } from "./lib/wiring-analysis.js";
 
@@ -141,7 +145,6 @@ type QDashContextState = {
 };
 
 const CONTEXT_ENTRY_TYPE = "qdash-context";
-const GLOBAL_CONTEXT_PATH = join(homedir(), ".pi", "agent", "qdash-context.json");
 let currentContext: QDashContextState = {};
 
 function applyQDashContext<T extends { profile?: string; chipId?: string; sessionId?: string }>(params: T): T {
@@ -201,8 +204,9 @@ function isQDashContextState(value: unknown): value is QDashContextState {
 
 function loadGlobalContext(): QDashContextState {
   try {
-    if (!existsSync(GLOBAL_CONTEXT_PATH)) return {};
-    const data = JSON.parse(readFileSync(GLOBAL_CONTEXT_PATH, "utf8"));
+    const path = qdashContextPath();
+    if (!existsSync(path)) return {};
+    const data = JSON.parse(readFileSync(path, "utf8"));
     return isQDashContextState(data) ? data : {};
   } catch {
     return {};
@@ -211,8 +215,9 @@ function loadGlobalContext(): QDashContextState {
 
 function saveGlobalContext(context: QDashContextState): void {
   const { investigation: _investigation, ...globalContext } = context;
-  mkdirSync(dirname(GLOBAL_CONTEXT_PATH), { recursive: true });
-  writeFileSync(GLOBAL_CONTEXT_PATH, `${JSON.stringify(globalContext, null, 2)}\n`, "utf8");
+  const path = qdashContextPath();
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, `${JSON.stringify(globalContext, null, 2)}\n`, "utf8");
 }
 
 function adoptContextFromToolInput(input: unknown): boolean {
@@ -402,6 +407,24 @@ type TaskResultFigureFile = DownloadedFile & {
   figurePaths: string[];
   jsonFigurePaths: string[];
 };
+
+/** A figure of a task result already read, selected as `client.getTaskResultFigure` selects it. */
+async function taskResultFigure(
+  client: QDashClient,
+  taskId: string,
+  task: Record<string, unknown>,
+  options: TaskResultFigureOptions = {},
+): Promise<TaskResultFigureFile> {
+  const strings = (value: unknown) => (Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : []);
+  const figurePaths = strings(task.figure_path);
+  const jsonFigurePaths = strings(task.json_figure_path);
+  const paths = options.preferJson && jsonFigurePaths.length > 0 ? jsonFigurePaths : figurePaths;
+  const index = options.index ?? 0;
+  const path = paths[index];
+  if (!path) throw new Error(`No figure at index ${index} for task result '${taskId}'`);
+  const file = await client.getExecutionFigure(path);
+  return { ...file, path, figurePaths, jsonFigurePaths };
+}
 
 type CalibrationEvidence = {
   id?: string;
@@ -1502,8 +1525,30 @@ function fileContentSourceMiss(params: QDashQueryParams, error: unknown) {
   return toTextToolResult(fileContentSourceGuidance(path, reason), { error: reason }, { action: params.action, path, misdirected: true });
 }
 
-export default function qdashExtension(pi: ExtensionAPI) {
+/** QDash's knowledge response for a task as the configured user, for evaluation hydration. */
+async function loadTaskKnowledge(taskName: string, signal?: AbortSignal): Promise<TaskKnowledgeLike | undefined> {
+  const client = await makeClient({});
+  try {
+    return await withAbort(
+      client.getTaskKnowledge(taskName) as unknown as Promise<TaskKnowledgeLike>,
+      signal,
+      `Task knowledge for ${taskName}`,
+    );
+  } catch (error) {
+    if (signal?.aborted) throw error;
+    // No knowledge, or QDash unreachable: the evaluation runs on the model's context alone.
+    if (!notFound(error)) console.warn(`[pi-qdash] task knowledge for ${taskName} unavailable: ${error instanceof Error ? error.name : "error"}`);
+    return undefined;
+  }
+}
+
+export default function qdashExtension(host: ExtensionAPI) {
+  // Every tool registers through the policy: deferred loading, script data,
+  // and model-only exposure for tools scripts must not reach.
+  const pi = installQDashToolPolicy(host, { entry: import.meta.url });
   installQDashWriteGate(pi);
+  installQDashGuidance(pi);
+  installQcalHydration(pi, { loadTaskKnowledge });
   registerTaskKnowledgeTool(pi, { makeClient });
   registerSourceCodeTools(pi, { makeClient });
   registerCalibrationPipelineTools(pi, {
@@ -2525,10 +2570,11 @@ export default function qdashExtension(pi: ExtensionAPI) {
       const task = tasks[params.taskIndex ?? 0];
       const taskId = task && firstString(task, ["task_id", "taskId"]);
       if (!taskId) throw new Error("No recent calibration task result with a task ID was found");
+      const taskName = firstString(task, ["task_name", "taskName", "name"]);
       const file: TaskResultFigureFile = await client.getTaskResultFigure(taskId, { index: params.figureIndex ?? 0 });
       const bytes = Buffer.from(file.data);
       const mediaType = file.mediaType || mediaTypeForPath(file.path ?? "");
-      const details: FigureDetails = { tool: "qdash_recent_calibration_figure", taskId, path: file.path ?? "", mediaType, sizeBytes: bytes.byteLength, figurePaths: file.figurePaths ?? [], jsonFigurePaths: file.jsonFigurePaths ?? [] };
+      const details: FigureDetails = { tool: "qdash_recent_calibration_figure", taskId, ...(taskName ? { taskName } : {}), path: file.path ?? "", mediaType, sizeBytes: bytes.byteLength, figurePaths: file.figurePaths ?? [], jsonFigurePaths: file.jsonFigurePaths ?? [] };
       if (mediaType.startsWith("image/")) details.base64 = bytes.toString("base64");
       else details.text = bytes.toString("utf8");
       return toFigureToolResult(figureResultText(details), details, { task, selectedPath: details.path }, details);
@@ -2573,13 +2619,17 @@ export default function qdashExtension(pi: ExtensionAPI) {
     async execute(_toolCallId, params: { profile?: string; configPath?: string; useEnv?: boolean; taskId: string; index?: number; preferJson?: boolean }) {
       const client = await makeClient(params);
       try {
-        const options: TaskResultFigureOptions = { index: params.index, preferJson: params.preferJson };
-        const file: TaskResultFigureFile = await client.getTaskResultFigure(params.taskId, options);
+        // The task result is read once for its figure paths and its task name,
+        // which evaluation hydration uses to keep figures with their task.
+        const task = await client.getTaskResult(params.taskId) as unknown as Record<string, unknown>;
+        const file = await taskResultFigure(client, params.taskId, task, { index: params.index, preferJson: params.preferJson });
+        const taskName = firstString(task, ["task_name", "taskName", "name"]);
         const bytes = Buffer.from(file.data);
         const mediaType = file.mediaType || mediaTypeForPath(file.path ?? "");
         const details: FigureDetails = {
           tool: "qdash_get_task_figures",
           taskId: params.taskId,
+          ...(taskName ? { taskName } : {}),
           path: file.path ?? "",
           mediaType,
           sizeBytes: bytes.byteLength,
@@ -2746,7 +2796,7 @@ export default function qdashExtension(pi: ExtensionAPI) {
       const result = toTextToolResult(
         qcalEvidenceText(evidence, { inputs: params.includeInputs === true, metrics: params.includeMetrics === true }),
         { evidence },
-        { tool: "qdash_build_qcal_evidence", taskId: params.taskId, evidence },
+        { tool: "qdash_build_qcal_evidence", taskId: params.taskId, ...(evidence.task?.name ? { taskName: evidence.task.name } : {}), evidence },
       );
       return { ...result, content: [...result.content, ...images] };
     },
