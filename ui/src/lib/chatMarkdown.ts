@@ -1,5 +1,5 @@
 import katex from "katex";
-import type { CodeHighlighterPlugin, Components, PluginConfig } from "@pierre/words/react";
+import type { Components, PluginConfig } from "@pierre/words/react";
 
 import {
   getMermaidResult,
@@ -7,7 +7,7 @@ import {
   type MermaidTheme,
   type MermaidResult,
 } from "@/lib/chatMermaid";
-import { balanceHighlightedLines, highlightCode } from "@/lib/highlight";
+import { getChatCodePlugin } from "@/lib/highlight";
 
 /**
  * Chat answers render with @pierre/words, which takes HTML-string hooks and
@@ -251,14 +251,6 @@ export const chatMarkdownComponents: Components = {
   svg: mathHook,
 };
 
-/** highlight.js, with the same languages as `CodeBlock`. */
-const chatCodePlugin: CodeHighlighterPlugin = {
-  highlight({ code, language }) {
-    const html = highlightCode(code, language);
-    return html === null ? null : balanceHighlightedLines(html);
-  },
-};
-
 // Lucide icon paths (ISC license), inlined because diagram controls are HTML strings.
 const ICON_PATHS = {
   zoomIn:
@@ -303,10 +295,12 @@ function mermaidErrorHtml(source: string, message: string): string {
 const MERMAID_LOADING = `<div class="${DIAGRAM_FRAME}" data-chat-mermaid="loading"><div class="flex items-center gap-2 px-3 py-6 text-xs text-base-content/50"><span class="loading loading-spinner loading-xs" aria-hidden="true"></span>Rendering diagram</div></div>`;
 
 /**
- * Plugins for one answer. Mermaid renders asynchronously, but the renderer
- * wants HTML now: a diagram that has not rendered yet shows a loading frame,
- * and `onSettled` asks for a new plugin object once it has, which makes the
- * renderer format the answer again with the cached result.
+ * Plugins for one answer. Code uses the highlighter that is loaded when they
+ * are created, so callers create them again once Highlights is ready. Mermaid
+ * renders asynchronously, but the renderer wants HTML now: a diagram that has
+ * not rendered yet shows a loading frame, and `onSettled` asks for a new
+ * plugin object once it has, which makes the renderer format the answer again
+ * with the cached result.
  */
 export interface ChatDiagramCache {
   results: Map<string, MermaidResult>;
@@ -319,7 +313,7 @@ export function createChatPlugins(
   diagrams: ChatDiagramCache,
 ): PluginConfig {
   return {
-    code: chatCodePlugin,
+    code: getChatCodePlugin(),
     renderers: [
       {
         language: "mermaid",

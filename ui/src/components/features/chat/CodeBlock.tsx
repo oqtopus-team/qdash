@@ -3,7 +3,7 @@
 import { useState, useCallback, useMemo } from "react";
 import { Copy, Check } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
-import { highlightCode } from "@/lib/highlight";
+import { highlightCode, useCodeHighlighter } from "@/lib/highlight";
 import { copyText } from "@/lib/utils/clipboard";
 
 interface CodeBlockProps {
@@ -41,7 +41,13 @@ export function CodeBlock({
     );
   }, [children, toast]);
 
-  const html = useMemo(() => highlightCode(children, language), [children, language]);
+  // Highlights replaces highlight.js once it has loaded.
+  const highlighter = useCodeHighlighter();
+  const html = useMemo(
+    () => highlightCode(children, language),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [children, language, highlighter],
+  );
 
   return (
     <div
@@ -89,8 +95,8 @@ export function CodeBlock({
         }`}
       >
         {html !== null ? (
-          // hljs escapes the source, so its output is safe to inject.
-          <code className="hljs" dangerouslySetInnerHTML={{ __html: html }} />
+          // Both highlighters escape the source, so their output is safe to inject.
+          <code className="qd-code" dangerouslySetInnerHTML={{ __html: html }} />
         ) : (
           <code>{children}</code>
         )}

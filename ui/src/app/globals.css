@@ -1790,6 +1790,19 @@ html[data-theme="dark"],
   padding: 0.5rem 0.5rem 0.4rem 0.625rem;
 }
 
+/* Highlights palette (CODE_THEME in src/lib/highlight.ts) mapped onto the active DaisyUI theme,
+   with the same roles as the highlight.js tokens below. */
+.chat-prose,
+.qd-code {
+  --qd-code-keyword: var(--color-primary);
+  --qd-code-string: var(--color-success);
+  --qd-code-number: var(--color-info);
+  --qd-code-title: var(--color-secondary);
+  --qd-code-comment: color-mix(in oklch, var(--color-base-content) 45%, transparent);
+  --qd-code-deletion: var(--color-error);
+  --qd-code-foreground: currentColor;
+}
+
 /* highlight.js tokens mapped onto the active DaisyUI theme. */
 .hljs-keyword,
 .hljs-selector-tag,
