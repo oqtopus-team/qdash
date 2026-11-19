@@ -112,6 +112,40 @@ def test_single_task_publication_follows_persistence_and_integration(
     assert session.finished is True
 
 
+@pytest.mark.parametrize("persist", [False, True])
+@pytest.mark.parametrize("force", [False, True])
+@pytest.mark.parametrize(
+    ("default_backend", "backend_name"),
+    [("qubex", "qibocal"), ("qibocal", None), ("qibocal", "qibocal")],
+)
+def test_single_task_on_the_qibocal_backend_never_touches_github(
+    monkeypatch, sessions, persist, force, default_backend, backend_name
+):
+    """Emulator runs neither pull nor push the configuration repository."""
+    from qdash.workflow.service.single_task_flow import single_task_executor
+
+    monkeypatch.setenv("DEFAULT_BACKEND", default_backend)
+    monkeypatch.setattr(
+        "qdash.common.config.loader.ConfigLoader.load_workflow",
+        lambda: {"github": {"enabled": True, "branch": "calibration"}},
+    )
+
+    single_task_executor(
+        username="alice",
+        chip_id="chip-1",
+        qid="0",
+        task_name="QibocalRabiAmplitude",
+        backend_name=backend_name,
+        update_calibration_parameters=persist,
+        update_params=force,
+    )
+
+    settings = _session(sessions).settings
+    assert settings.backend_name == "qibocal"
+    assert settings.github.pull is False
+    assert settings.github.push.enabled is False
+
+
 def test_single_task_executor_owns_its_execution_and_reservation(monkeypatch, sessions):
     """The run reserves its target and closes its Execution without a caller finish."""
     from qdash.workflow.service.single_task_flow import single_task_executor

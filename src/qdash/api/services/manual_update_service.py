@@ -84,6 +84,15 @@ class ManualUpdateService:
         username: str,
     ) -> ManualParameterUpdateResponse:
         """Update calibration parameters and record provenance."""
+        from qdash.common.simulation_binding import (
+            check_hardware_export,
+            check_parameters_for_chip,
+            chip_binding,
+        )
+
+        binding = chip_binding(project_id, request.chip_id)
+        check_hardware_export(binding, request.chip_id, "manual hardware calibration edits")
+        check_parameters_for_chip(binding, request.chip_id, request.parameters)
         is_coupling = "-" in request.qid
         source_doc = self._validate_source_task(request, project_id)
         execution_id = f"manual-edit-{uuid.uuid4().hex[:8]}"

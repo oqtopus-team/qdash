@@ -19,7 +19,11 @@ def create_backend(
         return _load_qubex_backend(config, mux_mapping)
     if backend == "fake":
         return _load_fake_backend(config)
-    raise ValueError(f"Unsupported BACKEND: {backend}. Supported backends are 'qubex' and 'fake'.")
+    if backend == "qibocal":
+        return _load_qibocal_backend(config)
+    raise ValueError(
+        f"Unsupported BACKEND: {backend}. Supported backends are 'qubex', 'fake', and 'qibocal'."
+    )
 
 
 def _load_qubex_backend(config: dict[str, Any], mux_mapping: "MuxMapping | None") -> BaseBackend:
@@ -36,3 +40,10 @@ def _load_fake_backend(config: dict[str, Any]) -> BaseBackend:
     from qdash.workflow.engine.backend.fake import FakeBackend
 
     return FakeBackend(config)
+
+
+def _load_qibocal_backend(config: dict[str, Any]) -> BaseBackend:
+    # Imports only the subprocess client; Qibocal itself runs in its own environment.
+    from qdash.workflow.engine.backend.qibocal import QibocalBackend
+
+    return QibocalBackend(config)

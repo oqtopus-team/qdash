@@ -1,0 +1,13 @@
+[project]
+name = "qdash-qibocal-runner"
+version = "0.1.0"
+description = "Isolated environment for the QDash Qibocal runner; never installed into QDash"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    "qibocal==0.2.6",
+    "qibolab[emulator]==0.2.16",
+    "qibo==0.3.3",
+]
+
+[tool.uv]
+package = false

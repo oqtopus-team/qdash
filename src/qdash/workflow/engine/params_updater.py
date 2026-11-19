@@ -37,37 +37,10 @@ def get_params_updater(
     """Resolve a backend-specific params updater for the given backend."""
     if backend is None:
         return None
-    qubex_updater = _resolve_qubex_updater(backend, chip_id)
-    if qubex_updater is not None:
-        return qubex_updater
-    fake_updater = _resolve_fake_updater(backend, chip_id)
-    if fake_updater is not None:
-        return fake_updater
-    return None
+    from qdash.workflow.engine.backend.persistence import require_persistence_policy
 
-
-def _resolve_qubex_updater(backend: BaseBackend, chip_id: str | None) -> ParamsUpdater | None:
-    try:
-        from qdash.workflow.engine.backend.qubex import QubexBackend
-    except ImportError:
-        return None
-
-    if not isinstance(backend, QubexBackend):
-        return None
-
-    return _QubexParamsUpdater(backend, chip_id)
-
-
-def _resolve_fake_updater(backend: BaseBackend, chip_id: str | None) -> ParamsUpdater | None:
-    try:
-        from qdash.workflow.engine.backend.fake import FakeBackend
-    except ImportError:
-        return None
-
-    if not isinstance(backend, FakeBackend):
-        return None
-
-    return _QubexParamsUpdater(backend, chip_id)
+    require_persistence_policy(backend)
+    return backend.create_params_updater(chip_id)
 
 
 class _QubexParamsUpdater(YamlParamsUpdater):

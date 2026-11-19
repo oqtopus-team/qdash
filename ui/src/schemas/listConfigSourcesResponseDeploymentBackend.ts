@@ -7,6 +7,6 @@
  */
 
 /**
- * Backend this deployment calibrates with (DEFAULT_BACKEND), e.g. qubex or fake
+ * Backend this deployment calibrates with (DEFAULT_BACKEND), e.g. qubex, fake or qibocal
  */
 export type ListConfigSourcesResponseDeploymentBackend = string | null;

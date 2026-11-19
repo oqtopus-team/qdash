@@ -82,6 +82,9 @@ class QubitDocument(Document):
         project_id: str | None,
     ) -> "QubitDocument":
         """Update the QubitDocument's calibration data with new values."""
+        from qdash.common.simulation_binding import check_calibration_write
+
+        check_calibration_write(project_id, chip_id, output_parameters)
         if project_id is not None:
             query = {"project_id": project_id, "qid": qid, "chip_id": chip_id}
         else:

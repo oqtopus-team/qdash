@@ -15,6 +15,7 @@ from qdash.datamodel.task import (
     TaskStatusModel,
 )
 from qdash.workflow.calibtasks.base import PostProcessResult, PreProcessResult, RunResult
+from qdash.workflow.engine.backend.persistence import PersistencePolicy
 from qdash.workflow.engine.task.executor import TaskExecutor
 from qdash.workflow.engine.task.result_processor import (
     FidelityValidationError,
@@ -344,6 +345,7 @@ class TestTaskExecutorExecuteTask:
         execution_service.merge_calib_data.return_value = execution_service
         backend: Any = MagicMock()
         backend.name = "fake"
+        backend.persistence_policy = PersistencePolicy.QUBEX_COMPATIBLE
 
         with (
             patch("qdash.repository.MongoQubitCalibrationRepository") as qubit_repo,

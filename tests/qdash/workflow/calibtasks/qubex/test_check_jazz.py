@@ -11,6 +11,7 @@ import pytest
 from qdash.workflow.calibtasks.active_protocols import generate_task_instances
 from qdash.workflow.calibtasks.base import RunResult
 from qdash.workflow.calibtasks.qubex.two_qubit.check_jazz import CheckJAZZ
+from qdash.workflow.engine.backend.persistence import PersistencePolicy
 from qdash.workflow.engine.task.backend_saver import BackendSaver
 
 
@@ -86,6 +87,7 @@ def test_registered_task_saves_static_zz_to_coupling_metric() -> None:
     execution = SimpleNamespace(execution_id="exec-1", chip_id="chip-1", project_id="proj-1")
     backend = MagicMock(name="backend")
     backend.name = "qubex"
+    backend.persistence_policy = PersistencePolicy.QUBEX_COMPATIBLE
     saver = BackendSaver(state_manager, "alice", "/tmp/calib", "tm-1")
 
     with patch("qdash.repository.MongoCouplingCalibrationRepository") as repository:

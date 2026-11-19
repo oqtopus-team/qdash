@@ -13,7 +13,8 @@ import type { JourneyState } from "@/lib/firstCalibrationJourney";
 import type { ExecutionResponseDetail, Task } from "@/schemas";
 
 const FAKE: ChipSetupMode = {
-  kind: "fake",
+  kind: "preset",
+  backend: "fake",
   configAvailable: true,
   preset: {
     preset_id: "fake",
@@ -288,7 +289,7 @@ describe("deriveJourneyProgress", () => {
     ["a failed deployment check", { kind: "pending", failed: true } as ChipSetupMode],
     [
       "a fake deployment without its preset",
-      { kind: "fake", preset: null, configAvailable: true } as ChipSetupMode,
+      { kind: "preset", backend: "fake", preset: null, configAvailable: true } as ChipSetupMode,
     ],
   ])("never guesses the editor path for %s", (_label, setup) => {
     const chosen = { ...state, flowName: null, executionId: null };

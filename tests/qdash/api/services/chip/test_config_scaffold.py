@@ -493,3 +493,52 @@ def test_fake_preset_keeps_an_existing_directory(tree):
 def test_unknown_preset_is_rejected(tree):
     with pytest.raises(ChipConfigError, match="Unknown configuration preset"):
         _fake_scaffolder(tree).scaffold(chip_id="x-chip", n_qubits=64, preset="nope")
+
+
+# ------------------------------------------------------------------ qibocal preset
+
+
+def test_qibocal_preset_is_offered_only_on_a_qibocal_deployment(tree):
+    assert [p.preset_id for p in _fake_scaffolder(tree, backend="qibocal").list_presets()] == [
+        "qibocal"
+    ]
+    assert "qibocal" not in [p.preset_id for p in _fake_scaffolder(tree).list_presets()]
+    with pytest.raises(ChipConfigError, match="only when the deployment backend is 'qibocal'"):
+        _fake_scaffolder(tree, backend="fake").resolve_preset("qibocal")
+
+
+def test_qibocal_preset_is_the_one_qubit_emulator_platform():
+    from qdash.api.services.chip.config_scaffold import QIBOCAL_PRESET
+    from qdash.common.config.loader import ConfigLoader
+    from qdash.common.config.topology import load_topology
+
+    assert QIBOCAL_PRESET.n_qubits == 1
+    assert QIBOCAL_PRESET.mux_count == 0
+    assert QIBOCAL_PRESET.requires_config_tree is False
+    assert QIBOCAL_PRESET.workflow_template_id == "qibocal_emulator_calibration"
+    topology_file = (
+        ConfigLoader.LOCAL_CONFIG_DIR / "domain/topologies" / f"{QIBOCAL_PRESET.topology_id}.yaml"
+    )
+    data = yaml.safe_load(topology_file.read_text(encoding="utf-8"))
+    assert data["num_qubits"] == 1
+    assert list(data["qubits"]) == [0]
+    assert data["couplings"] == []
+    load_topology.cache_clear()
+
+
+def test_qibocal_preset_writes_nothing_even_without_a_mounted_tree(tmp_path):
+    scaffolder = _fake_scaffolder(tmp_path / "missing", backend="qibocal")
+
+    result = scaffolder.scaffold(chip_id="QIBOCAL", n_qubits=1, preset="qibocal")
+
+    assert result.status == "skipped"
+    assert result.preset == "qibocal"
+    assert result.files == []
+    assert not (tmp_path / "missing").exists()
+
+
+def test_qibocal_preset_needs_its_single_qubit(tree):
+    with pytest.raises(ChipConfigError, match="1-qubit chip"):
+        _fake_scaffolder(tree, backend="qibocal").scaffold(
+            chip_id="QIBOCAL", n_qubits=64, preset="qibocal"
+        )

@@ -485,3 +485,19 @@ data:
         q05_pos = content.find("Q05:")
 
         assert q02_pos < q03_pos < q05_pos, "Q03 should be between Q02 and Q05"
+
+
+def test_db_only_backend_has_no_native_updater():
+    from qdash.workflow.engine.backend.qibocal import QibocalBackend
+
+    backend = QibocalBackend({})
+    assert get_params_updater(backend, "emulator") is None
+    assert not backend.is_connected
+
+
+def test_native_factory_rejects_undeclared_policy():
+    backend = MagicMock()
+    backend.persistence_policy = None
+    with pytest.raises(ValueError, match="persistence policy"):
+        get_params_updater(backend, "chip")
+    backend.create_params_updater.assert_not_called()

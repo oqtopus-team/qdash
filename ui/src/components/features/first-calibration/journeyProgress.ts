@@ -1,4 +1,8 @@
-import type { ChipSetupMode } from "@/components/features/chip/chipSetupMode";
+import {
+  type ChipSetupMode,
+  presetBackendLabel,
+  presetTemplateName,
+} from "@/components/features/chip/chipSetupMode";
 import type { ExecutionResponseDetail, Task } from "@/schemas";
 import { isExecutionInProgress } from "@/lib/executionStatus";
 import {
@@ -273,14 +277,15 @@ export function chipOverviewHref(chipId: string): string {
 }
 
 /**
- * New Flow editor opened for the journey: on the fake template on a fake deployment, and with the
- * template choice left to the user on hardware. Null while the deployment kind is unknown, or on a
- * fake deployment that does not offer its preset, so the guide never guesses a hardware path.
+ * New Flow editor opened for the journey: on the preset's template on a preset deployment (fake or
+ * qibocal), and with the template choice left to the user on hardware. Null while the deployment
+ * kind is unknown, or on a preset deployment that does not offer its preset, so the guide never
+ * guesses a hardware path.
  */
 export function journeyNewFlowHref(setup: ChipSetupMode, chipId: string): string | null {
-  if (setup.kind === "fake") {
+  if (setup.kind === "preset") {
     if (!setup.preset) return null;
-    const href = newFlowTemplateHref("fake", setup.preset.workflow_template_id, chipId);
+    const href = newFlowTemplateHref(setup.backend, setup.preset.workflow_template_id, chipId);
     return `${href}&journey=${JOURNEY_QUERY_VALUE}`;
   }
   if (setup.kind !== "hardware") return null;
@@ -399,8 +404,8 @@ export function journeyStageHint(
       ? "QDash could not check how this deployment runs calibrations. Try again on Home."
       : "Checking how this deployment runs calibrations.";
   }
-  if (progress.stage === "flow" && setup.kind === "fake" && !setup.preset) {
-    return "This deployment runs the fake backend but does not offer its virtual device. Ask an administrator to check the API configuration.";
+  if (progress.stage === "flow" && setup.kind === "preset" && !setup.preset) {
+    return `This deployment runs the ${presetBackendLabel(setup.backend)} but does not offer its device. Ask an administrator to check the API configuration.`;
   }
   switch (progress.stage) {
     case "chip":
@@ -409,8 +414,8 @@ export function journeyStageHint(
       if (awaitsHardwareConfirmation(state, setup)) {
         return `Confirm that the configuration of ${state.chipId} matches the hardware before you prepare the calibration.`;
       }
-      return setup.kind === "fake"
-        ? `Review the Fake Backend Calibration for ${state.chipId}, then save it as a flow.`
+      return setup.kind === "preset"
+        ? `Review the ${presetTemplateName(setup)} for ${state.chipId}, then save it as a flow.`
         : `Pick a calibration template for ${state.chipId}, review it, then save it as a flow.`;
     case "run":
       return awaitsHardwareConfirmation(state, setup)

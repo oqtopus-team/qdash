@@ -16,8 +16,8 @@ export interface ListConfigSourcesResponse {
   /** Whether a Qubex configuration tree is mounted */
   available: boolean;
   sources: ConfigSourceResponse[];
-  /** Backend this deployment calibrates with (DEFAULT_BACKEND), e.g. qubex or fake */
+  /** Backend this deployment calibrates with (DEFAULT_BACKEND), e.g. qubex, fake or qibocal */
   deployment_backend?: ListConfigSourcesResponseDeploymentBackend;
-  /** Presets of the deployment backend, listed even when no tree is mounted; the fake preset only on the fake backend */
+  /** Presets of the deployment backend, listed even when no tree is mounted; the fake preset only on the fake backend and the qibocal preset only on the qibocal backend */
   presets?: ConfigPresetResponse[];
 }

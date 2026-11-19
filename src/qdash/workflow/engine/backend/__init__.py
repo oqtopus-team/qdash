@@ -22,6 +22,10 @@ QubexBackend
     Not exported by default to avoid import errors when qubex is not installed.
     Import directly: ``from qdash.workflow.engine.backend.qubex import QubexBackend``
 
+QibocalBackend
+    Runs Qibocal protocols on a Qibolab emulator in an isolated runner subprocess.
+    Import directly: ``from qdash.workflow.engine.backend.qibocal import QibocalBackend``
+
 create_backend
     Factory function to create backends by name.
 

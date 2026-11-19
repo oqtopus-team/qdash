@@ -3,6 +3,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from qdash.datamodel.simulation import SimulationBindingModel
 from qdash.datamodel.system_info import SystemInfoModel
 
 
@@ -35,3 +36,7 @@ class ChipModel(BaseModel):
     installed_at: datetime = Field(..., description="The time when the chip was installed")
 
     system_info: SystemInfoModel = Field(..., description="The system information")
+    simulation_binding: SimulationBindingModel | None = Field(
+        None,
+        description="Set only for chips created from a simulation preset; None means unknown simulation identity",
+    )

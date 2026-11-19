@@ -5,7 +5,8 @@ import { useChipPageJourney } from "@/components/features/first-calibration/useC
 import { journeyStorageKey } from "@/lib/firstCalibrationJourney";
 
 const FAKE_SETUP = {
-  kind: "fake",
+  kind: "preset",
+  backend: "fake",
   configAvailable: true,
   preset: {
     preset_id: "fake",

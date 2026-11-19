@@ -11,6 +11,10 @@ from qdash.workflow.engine.backend.qubex import QubexBackend
 def test_update_note_keeps_base_and_transition_labels(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setattr(
+        "qdash.common.simulation_binding.chip_binding",
+        lambda *_args: None,
+    )
     backend = QubexBackend({})
     repository = MagicMock()
     backend._calibration_note_repo = repository

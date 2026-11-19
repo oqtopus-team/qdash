@@ -22,7 +22,7 @@ class CalibConfig:
         chip_id: Target chip ID
         qids: List of qubit IDs to calibrate
         execution_id: Unique execution identifier (e.g., "20240101-001")
-        backend_name: Backend type ('qubex' or 'fake')
+        backend_name: Backend type ('qubex', 'fake', or 'qibocal')
         flow_name: Flow name for display
         tags: Tags for categorization
         note: Additional notes

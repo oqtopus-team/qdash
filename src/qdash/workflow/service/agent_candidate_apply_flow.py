@@ -73,6 +73,11 @@ def agent_candidate_apply(
     updater = None
     params_snapshot: dict[str, bytes | None] | None = None
     try:
+        from qdash.common.simulation_binding import check_hardware_export, chip_binding
+
+        check_hardware_export(
+            chip_binding(project_id, commit.chip_id), commit.chip_id, "agent hardware apply"
+        )
         if commit.after_snapshot is None:
             raise ValueError("Candidate commit has no authoritative after snapshot")
         backend_name = get_default_backend()

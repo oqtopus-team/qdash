@@ -29,6 +29,13 @@ class CalibrationGitHubService:
     """Push only mapped files; a remote failure never undoes local calibration."""
 
     def sync(self, result: TaskResultHistoryDocument) -> CalibrationGitHubSync:
+        from qdash.common.simulation_binding import check_hardware_export, chip_binding
+
+        check_hardware_export(
+            chip_binding(result.project_id, result.chip_id),
+            result.chip_id,
+            "GitHub calibration publication",
+        )
         sync = CalibrationGitHubSync()
         try:
             settings: dict[str, Any] = ConfigLoader.load_workflow().get("github", {})

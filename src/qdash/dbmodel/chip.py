@@ -7,6 +7,7 @@ from pymongo import ASCENDING, DESCENDING, IndexModel
 
 from qdash.common.utils.datetime import now
 from qdash.datamodel.note import NoteModel
+from qdash.datamodel.simulation import SimulationBindingModel
 from qdash.datamodel.system_info import SystemInfoModel
 
 
@@ -56,6 +57,13 @@ class ChipDocument(Document):
     )
 
     system_info: SystemInfoModel = Field(..., description="The system information")
+    simulation_binding: SimulationBindingModel | None = Field(
+        default=None,
+        description=(
+            "Written only when the chip is created from a simulation preset and never updated. "
+            "None means simulation identity is unknown; existing hardware/fake behavior is retained."
+        ),
+    )
 
     model_config = ConfigDict(
         from_attributes=True,

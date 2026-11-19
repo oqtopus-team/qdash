@@ -144,6 +144,15 @@
     "function_name": "fake_calibration"
   },
   {
+    "id": "qibocal_emulator_calibration",
+    "name": "Qibocal Emulator Calibration",
+    "description": "BringUp seeds missing calibration values, then official Qibocal Rabi and Flipping calibrate the bound emulator chip. Validated values are saved only to that simulation chip; each task reads current QDash database values.",
+    "category": "testing",
+    "backend": "qibocal",
+    "filename": "qibocal_emulator.py",
+    "function_name": "qibocal_rabi_amplitude"
+  },
+  {
     "id": "coherence_limit",
     "name": "Gate Coherence Limit",
     "description": "Calculate theoretical fidelity limit of 1Q and 2Q gates for explicitly selected mux_ids or qids from T1, T2 coherence times and gate duration.",

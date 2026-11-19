@@ -13,12 +13,14 @@ from qdash.common.mux_mapping import (
 from qdash.datamodel.calibration_note import CalibrationNoteModel
 from qdash.datamodel.task import TaskTypes
 from qdash.workflow.engine.backend.base import BaseBackend
+from qdash.workflow.engine.backend.persistence import PersistencePolicy
 from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
 from qdash.workflow.engine.progress import ProgressPlan, ProgressReporter
 
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
+    from qdash.common.config.params_updater import ParamsUpdater
     from qdash.repository.protocols import CalibrationNoteRepository
 
 
@@ -26,6 +28,7 @@ class QubexBackend(BaseBackend):
     """Backend management for Qubex experiments."""
 
     name: str = "qubex"
+    persistence_policy = PersistencePolicy.QUBEX_COMPATIBLE
 
     def capture_progress(
         self,
@@ -42,6 +45,12 @@ class QubexBackend(BaseBackend):
         return capture_qubex_progress(reporter, task_name=task_name, plan=plan)
 
     from qubex import Experiment
+
+    def create_params_updater(self, chip_id: str | None = None) -> "ParamsUpdater":
+        """Synchronize QUBEX-compatible YAML without opening a session."""
+        from qdash.workflow.engine.params_updater import _QubexParamsUpdater
+
+        return _QubexParamsUpdater(self, chip_id)
 
     def __init__(
         self,
@@ -303,6 +312,9 @@ class QubexBackend(BaseBackend):
             task_manager_id is kept as a parameter for backward compatibility but not used.
             Only the master note (task_id="master") is updated.
         """
+        from qdash.common.simulation_binding import check_hardware_export, chip_binding
+
+        check_hardware_export(chip_binding(project_id, chip_id), chip_id, "Qubex calibration note")
         raw_note = self.get_note()
         calib_note = json.loads(raw_note)
 

@@ -17,6 +17,7 @@ from qdash.workflow.calibtasks.base import RunResult
 from qdash.workflow.calibtasks.qubex.one_qubit_fine.check_adaptive_ef_chevron import (
     CheckAdaptiveEFChevron,
 )
+from qdash.workflow.engine.backend.persistence import PersistencePolicy
 from qdash.workflow.engine.task.backend_saver import BackendSaver
 
 
@@ -196,6 +197,7 @@ def test_registered_task_saves_both_qubit_metrics() -> None:
     execution = SimpleNamespace(execution_id="exec-1", chip_id="chip-1", project_id="proj-1")
     backend = MagicMock()
     backend.name = "qubex"
+    backend.persistence_policy = PersistencePolicy.QUBEX_COMPATIBLE
     saver = BackendSaver(state_manager, "alice", "/tmp/calib", "tm-1")
     with patch("qdash.repository.MongoQubitCalibrationRepository") as repository:
         repository.return_value.get_calibration_data_for_update.return_value = {}

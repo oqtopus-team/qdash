@@ -212,6 +212,8 @@ mongo_data/data/db/*
 !mongo_data/data/db/.gitkeep
 calib_data/*
 !calib_data/.gitkeep
+# Data directories of .env.example.qibocal.
+qibocal_data/
 src/qdash/workflow/user_flows/*/
 *.env
 docker_node_modules/

@@ -520,7 +520,7 @@ describe("HomePageContent", () => {
       render(<HomePageContent />);
       fireEvent.click(screen.getByRole("button", { name: "First calibration guide" }));
 
-      expect(screen.getByRole("alert").textContent).toContain("does not offer its virtual device");
+      expect(screen.getByRole("alert").textContent).toContain("does not offer its device");
       expect(screen.queryByLabelText("Chip to calibrate")).toBeNull();
       expect(screen.queryByRole("button", { name: "Start" })).toBeNull();
     });

@@ -355,6 +355,7 @@ class ChipService:
                     "activity_status": s.get("activity_status", "active"),
                     "current_cooldown_id": s.get("current_cooldown_id"),
                     "note": s.get("note") or {},
+                    "simulation_binding": s.get("simulation_binding"),
                 }
             )
             for s in summaries
@@ -390,6 +391,7 @@ class ChipService:
                 "activity_status": summary.get("activity_status", "active"),
                 "current_cooldown_id": summary.get("current_cooldown_id"),
                 "note": summary.get("note") or {},
+                "simulation_binding": summary.get("simulation_binding"),
             }
         )
 
@@ -410,6 +412,12 @@ class ChipService:
         if doc is None:
             raise HTTPException(status_code=404, detail="Chip not found")
         if body.topology_id is not None:
+            if doc.simulation_binding is not None and body.topology_id != doc.topology_id:
+                # The binding fixes the simulated device, including its qubits.
+                raise HTTPException(
+                    status_code=400,
+                    detail="The topology of a simulation chip is fixed by its preset",
+                )
             try:
                 ChipInitializer.ensure_topology_documents(
                     project_id=project_id,

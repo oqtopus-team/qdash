@@ -1,13 +1,23 @@
 from abc import ABC, abstractmethod
 from contextlib import AbstractContextManager, nullcontext
+from typing import TYPE_CHECKING
 
+from qdash.workflow.engine.backend.persistence import PersistencePolicy
 from qdash.workflow.engine.progress import ProgressPlan, ProgressReporter
+
+if TYPE_CHECKING:
+    from qdash.common.config.params_updater import ParamsUpdater
 
 
 class BaseBackend(ABC):
     """Abstract base class for backend management."""
 
     name: str = "base"
+    persistence_policy: PersistencePolicy | None = None
+
+    def create_params_updater(self, chip_id: str | None = None) -> "ParamsUpdater | None":
+        """Return native parameter synchronization, or None for a DB-only backend."""
+        return None
 
     @abstractmethod
     def connect(self) -> None: ...

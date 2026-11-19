@@ -15,6 +15,10 @@ class BackendDefinition(BaseModel):
 
     description: str = ""
     tasks: dict[str, list[str]] = Field(default_factory=dict)
+    # Whether runs are scheduled from the chip's Qubex wiring (MUXes and boxes). A backend
+    # without hardware, such as the Qibocal emulator, sets this to false: its chips have no
+    # wiring, MUX targets are rejected, and explicit qubit targets run without the scheduler.
+    requires_wiring: bool = True
 
 
 class BackendConfig(BaseModel):
@@ -60,6 +64,12 @@ def get_default_backend() -> str:
     if env_backend:
         return env_backend
     return load_backend_config().default_backend
+
+
+def backend_requires_wiring(backend: str) -> bool:
+    """Whether runs on ``backend`` are scheduled from Qubex wiring; true when unknown."""
+    backend_def = load_backend_config().backends.get(backend)
+    return backend_def.requires_wiring if backend_def is not None else True
 
 
 def is_task_available(task_name: str, backend: str) -> bool:

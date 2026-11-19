@@ -22,9 +22,14 @@ logs/
 calib_data/
 mongo_data/
 postgres_data/
+# Data directories of .env.example.qibocal.
+qibocal_data/
 # Qubex config checkout: mounted at runtime, never copied into an image, and
 # containers write files there that the building user may not be able to read.
 config/qubex-config/
 config/quelware-client/
 # Local pi extension checkouts (see compose.extensions.yaml).
 agent-runtime/extensions/
+
+# Host-side Qibocal runner environment; images build their own from the lock.
+src/qdash/workflow/qibocal_runner/.venv/
