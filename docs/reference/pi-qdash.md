@@ -98,7 +98,44 @@ Set `QDASH_WEB_URL` when the web UI is not at the API base URL minus `/api`.
 | Secret output | API tokens, passwords, and Cloudflare Access secrets are redacted. |
 | Write tools | Interactive pi asks for confirmation; non-interactive calls require `confirmWrite: true`. |
 | Saved profile and chip | The profile and chip selection outside a session is saved in `qdash-context.json` in pi's agent directory: `PI_CODING_AGENT_DIR` when set, otherwise `~/.pi/agent`. |
-| Investigation guidance | While a `qdash_*` tool is selected, the system prompt has a `qdash_guidance` section with evidence rules and the `qdash` skill's tool routing for the tools the model can call directly. |
+| Investigation guidance | While a `qdash_*` tool is selected, the system prompt has a `qdash_guidance` section with evidence rules and the `qdash` skill's tool routing for the tools the model can call directly or load with `tool_search`. While `codemode` or `tool_search` is active, the section also gives QDash chat's script and deferred-tool rules. |
+
+## Scripts and deferred tools
+
+pi-qdash applies the tool policy QDash chat uses (`extensions/lib/tool-policy.ts`) to pi's built-in `codemode` and `tool_search` tools.
+
+| Contract | Behavior |
+| --- | --- |
+| Activation | For a new user, pi-qdash activates pi's `tool_search` when it has deferred tools, and `codemode`, if pi registered them and neither is `hidden`. `PI_QDASH_CODEMODE=off` skips `codemode` by default. |
+| Selection | A selection the user makes is kept across reloads, new sessions, forks, and resumes, in the order below. |
+| Without `tool_search` | When no `tool_search` tool is registered or it is inactive, deferred tools are registered again as direct tools, so the model can still call them without loading. |
+| Deferred tools | Tools in `DEFERRED_TOOL_NAMES` (cryostat and wiring, forum, pipelines, agent workflow state, source code, configuration, and similar) use `exposure: "deferred"`. The model loads them with `tool_search`; the routing guide marks them with `*`. |
+| Script data | In a `codemode` script, the audited reads in `NESTED_READ_TOOL_NAMES` resolve to their redacted response data as JSON. A call returning more than 512 KiB of JSON fails with a request to narrow it. |
+| Script limits | Scripts without `timeout_ms` get 120 seconds; longer deadlines are cut to 300 seconds. |
+| Blocked from scripts | Write tools, figure tools, `qdash_raw_get`, and other unaudited QDash tools are model-only or blocked. While pi-qdash is loaded, a script may call another extension's tool only when it declares `readOnlyHint` and is not destructive; `bash`, `powershell`, `write`, and `edit` are always blocked. Call these tools directly. |
+| Name collisions | A tool another extension registers under a `qdash_*` or reviewed write name is blocked from scripts, whatever its annotations. A QDash name keeps script access only while pi's `getAllTools()` reports the `parameters` object pi-qdash registered, from pi-qdash's extension entry file (`extensions/lib/extension-identity.ts`). |
+| Missing identity | Without pi's registry or a file source for a tool, scripts reach no QDash tool. A second loaded copy of pi-qdash sees the first copy's tools as foreign, so load one copy. |
+
+At each session start, pi-qdash decides `codemode` and `tool_search` separately; the first rule that applies wins:
+
+1. A reload keeps the active tools.
+2. The session's branch: pi's own tool loadout records, which pi restores itself, or the latest `pi-qdash-tool-selection` entry, which pi-qdash appends when a run starts or the session ends with a selection the branch does not record.
+3. For a new session or fork whose branch records nothing, the selection the replaced session had when it ended. Persisted sessions pair by session file and in-memory forks by session manager. A new in-memory session with no matching session file or manager uses its own settings and defaults.
+4. A `defaultTools` setting entry: `codemode` or `+codemode` activates, `-codemode` leaves it inactive; the same for `tool_search`.
+5. The default activation above.
+
+## Evaluation hydration
+
+When pi-qcaleval is installed, pi-qdash fills each `qcal_evaluate` call the model makes before it runs, with the rules QDash chat uses (`extensions/lib/qcal-hydration.ts`).
+
+| Argument | Source |
+| --- | --- |
+| `images` | Newest figure of the session's active branch that belongs to `task_name`. A figure recorded for another task is skipped, and so is an unlabeled figure older than it. Placeholders and base64 that is not a PNG, JPEG, GIF, or WebP image are dropped. |
+| `knowledge`, `criteria` | Missing `knowledge` is filled from the task's QDash reference. Valid explicit `criteria` are preserved; otherwise the reference supplies them. |
+| `examples` | The task's labeled examples when `use_examples` is `true` and the call passes none. |
+| Record | `details.hydration` lists the figure origin and count, the figure's task result, the reference source, and the example count; it holds no bytes or text. |
+
+The reference and examples come from one knowledge request as the configured QDash user. Figure tools record `taskId` and `taskName` in their details so the figure can be matched.
 
 ## Commands
 

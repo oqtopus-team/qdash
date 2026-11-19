@@ -32,13 +32,20 @@ runs. Shared gate logic lives in `extensions/lib/write-gate.ts`; output redactio
 lives in `extensions/lib/results.ts`. Keep credentials out of fixtures and examples.
 The runtime additionally controls which tools it exposes, as described in
 [Copilot Architecture](./architecture.md#developing-a-pi-extension-against-the-runtime).
-To expose a new pi-qdash tool in Copilot, add its reviewed name to the appropriate
-read or write list in `agent-runtime/src/allowed-tools.ts` and update the runtime
-allowlist checks in `agent-runtime/test/bundled-extensions.test.mjs`. Decide also
-whether `codemode` scripts may call a read tool (`NESTED_READ_TOOL_NAMES`) and
-whether the model loads it on demand (`DEFERRED_TOOL_NAMES`); see
-[Code Mode and deferred tools](./architecture.md#code-mode-and-deferred-tools). Standalone pi
-users can load the extension without this runtime list.
+To expose a new pi-qdash tool in Copilot, add its reviewed read name to
+`ALLOWED_TOOL_NAMES` in `agent-runtime/src/allowed-tools.ts` and update the runtime
+allowlist checks in `agent-runtime/test/bundled-extensions.test.mjs`. The write list
+(`REVIEWED_WRITE_TOOL_NAMES`), the reads `codemode` scripts may call
+(`NESTED_READ_TOOL_NAMES`), and the tools the model loads on demand
+(`DEFERRED_TOOL_NAMES`) live in `extensions/lib/tool-policy.ts`, which both hosts enforce;
+see [Code Mode and deferred tools](./architecture.md#code-mode-and-deferred-tools).
+In pi CLI, `extensions/lib/script-policy.ts` applies them through pi's tool exposure and
+`tool_call` and `tool_result` hooks. It trusts a QDash name in a script only while pi runs
+pi-qdash's own registration (`extensions/lib/extension-identity.ts`), and it keeps the user's
+`codemode` and `tool_search` selection across pi's session lifecycle
+(`extensions/lib/tool-selection.ts`), as listed in the
+[pi-qdash reference](../../reference/pi-qdash.md#scripts-and-deferred-tools). Standalone pi
+users need no runtime allowlist.
 
 Figure tools return PNGs as image content so the model can inspect the curve;
 Plotly JSON stays text. `qdash_build_qcal_evidence` keeps fitted outputs out of
@@ -65,7 +72,9 @@ separate from API calls so tests can exercise them without a live QDash deployme
 `packages/pi-qcaleval/extensions/qcaleval.ts` owns model selection, question templates,
 request construction, and answer parsing. It has no QDash client dependency.
 The host supplies task knowledge, figures, and labeled examples; the planner keeps
-the conversation. The [pi-qcaleval reference](../../reference/pi-qcaleval.md) defines
+the conversation. Both hosts fill them with `extensions/lib/qcal-hydration.ts` in pi-qdash:
+the runtime in `agent-runtime/src/durable-tools.ts`, and pi CLI in
+`extensions/lib/qcal-hydration-hook.ts` when pi-qdash is loaded next to pi-qcaleval. The [pi-qcaleval reference](../../reference/pi-qcaleval.md) defines
 the tool contract and standalone model configuration.
 
 For standalone pi use, declare the evaluation model in pi's `models.json` with

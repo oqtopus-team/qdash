@@ -123,3 +123,15 @@ test("the newest figures remember the task result a tool fetched them for", () =
   });
   assert.deepEqual(latestFigures([]), { images: [] });
 });
+
+test("with a task name, a newer figure of another task is not supplied", () => {
+  const rabi = { type: "image", data: "rabi", mimeType: "image/png" };
+  const t1 = { type: "image", data: "t1", mimeType: "image/png" };
+  const entries = [
+    { model: [{ role: "toolResult", content: [t1], details: { taskId: "b", taskName: "CheckT1" } }] },
+    { model: [{ role: "toolResult", content: [rabi], details: { taskId: "a", taskName: "CheckRabi" } }] },
+  ];
+  assert.deepEqual(latestFigures(entries, 1, "CheckRabi"), { images: [rabi], taskId: "a", taskName: "CheckRabi" });
+  assert.deepEqual(latestFigures(entries, 1, "CheckRamsey"), { images: [] });
+  assert.deepEqual(latestFigures(entries, 1).images, [t1]);
+});
