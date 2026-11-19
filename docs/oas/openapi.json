@@ -16288,6 +16288,542 @@
         }
       }
     },
+    "/custom-dashboards": {
+      "get": {
+        "tags": [
+          "custom-dashboard"
+        ],
+        "summary": "List custom dashboards visible to the caller",
+        "description": "Return project-shared dashboards and the caller's own, newest update first.",
+        "operationId": "listCustomDashboards",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListCustomDashboardsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "custom-dashboard"
+        ],
+        "summary": "Create a custom dashboard",
+        "description": "Create a dashboard owned by the caller.",
+        "operationId": "createCustomDashboard",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomDashboardCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomDashboardResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/custom-dashboards/templates": {
+      "get": {
+        "tags": [
+          "custom-dashboard"
+        ],
+        "summary": "List starter templates for custom dashboards",
+        "description": "Return the templates a new dashboard can copy its panels from.",
+        "operationId": "listCustomDashboardTemplates",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListCustomDashboardTemplatesResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/custom-dashboards/{dashboard_id}": {
+      "get": {
+        "tags": [
+          "custom-dashboard"
+        ],
+        "summary": "Get a custom dashboard",
+        "description": "Return a dashboard the caller owns or that is shared with the project.",
+        "operationId": "getCustomDashboard",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "dashboard_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Dashboard Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomDashboardResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "custom-dashboard"
+        ],
+        "summary": "Update a custom dashboard",
+        "description": "Update a dashboard. A provided ``panels`` list replaces the previous one.",
+        "operationId": "updateCustomDashboard",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "dashboard_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Dashboard Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomDashboardUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomDashboardResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "custom-dashboard"
+        ],
+        "summary": "Delete a custom dashboard",
+        "description": "Delete a dashboard owned by the caller, or any dashboard as project owner.",
+        "operationId": "deleteCustomDashboard",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "dashboard_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Dashboard Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/custom-dashboards/{dashboard_id}/duplicate": {
+      "post": {
+        "tags": [
+          "custom-dashboard"
+        ],
+        "summary": "Duplicate a custom dashboard",
+        "description": "Copy a visible dashboard into a private dashboard owned by the caller.",
+        "operationId": "duplicateCustomDashboard",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "dashboard_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Dashboard Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomDashboardResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/collision-analysis/checks": {
+      "get": {
+        "tags": [
+          "collision-analysis"
+        ],
+        "summary": "List collision checks",
+        "description": "Return the qubex-compatible collision checks with parameters and legends.",
+        "operationId": "listCollisionChecks",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListCollisionChecksResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/collision-analysis/chips/{chip_id}/evaluate": {
+      "post": {
+        "tags": [
+          "collision-analysis"
+        ],
+        "summary": "Evaluate a collision check on a chip",
+        "description": "Evaluate one check for every qubit or directed pair of the chip's topology.",
+        "operationId": "evaluateCollisionCheck",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CollisionEvaluateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollisionEvaluateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/topology/list": {
       "get": {
         "tags": [
@@ -19229,6 +19765,339 @@
         "title": "ChipResponse",
         "description": "Chip response model.\n\nQubit and coupling data are stored in separate collections for scalability\nand should be fetched via dedicated endpoints (/chips/{chip_id}/qubits, etc.).\n\nAttributes\n----------\n    chip_id (str): The ID of the chip.\n    size (int): The size of the chip.\n    topology_id (str | None): Topology template ID.\n    qubit_count (int): Number of qubits in the chip.\n    coupling_count (int): Number of couplings in the chip.\n    installed_at (datetime | None): Installation timestamp."
       },
+      "CollisionCellResponse": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "'Q5' for a qubit, '5-6' for a directed pair"
+          },
+          "qid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qid",
+            "description": "Qubit ID for qubit checks"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source",
+            "description": "Control qubit of a pair"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target",
+            "description": "Target qubit of a pair"
+          },
+          "hops": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hops",
+            "description": "Coupling-graph distance of a pair"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value",
+            "description": "Score or detuning; null when not evaluated"
+          },
+          "color": {
+            "type": "string",
+            "title": "Color"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/CollisionCheckItem"
+            },
+            "type": "array",
+            "title": "Checks"
+          },
+          "estimates": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Estimates",
+            "description": "Defaults and approximations used"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "value",
+          "color",
+          "label",
+          "checks",
+          "estimates"
+        ],
+        "title": "CollisionCellResponse",
+        "description": "Result of a check for one qubit or one directed pair."
+      },
+      "CollisionCheckInfo": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind",
+            "description": "Check identifier, e.g. 'Type1A'"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "description": "e.g. 'Type0A — Qubit quality'"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "target": {
+            "type": "string",
+            "enum": [
+              "qubit",
+              "pair"
+            ],
+            "title": "Target"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit",
+            "description": "'dimensionless' (threshold ratio) or 'MHz' (Type2C)"
+          },
+          "parameters": {
+            "items": {
+              "$ref": "#/components/schemas/CollisionParameterInfo"
+            },
+            "type": "array",
+            "title": "Parameters"
+          },
+          "legend": {
+            "items": {
+              "$ref": "#/components/schemas/LegendEntry"
+            },
+            "type": "array",
+            "title": "Legend"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "title",
+          "description",
+          "target",
+          "unit",
+          "parameters",
+          "legend"
+        ],
+        "title": "CollisionCheckInfo",
+        "description": "Catalog entry of one collision check."
+      },
+      "CollisionCheckItem": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value",
+            "description": "Ratio to the limit, or null if not finite"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "value"
+        ],
+        "title": "CollisionCheckItem",
+        "description": "One sub-check contributing to a cell's score."
+      },
+      "CollisionEvaluateRequest": {
+        "properties": {
+          "check": {
+            "type": "string",
+            "title": "Check",
+            "description": "Check identifier from the catalog"
+          },
+          "params": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Params",
+            "description": "Overrides of the check's parameter defaults"
+          },
+          "hops": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Hops",
+            "description": "Pair distances to evaluate (subset of 1, 2)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "check"
+        ],
+        "title": "CollisionEvaluateRequest",
+        "description": "Body for evaluating one collision check on a chip."
+      },
+      "CollisionEvaluateResponse": {
+        "properties": {
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id"
+          },
+          "check": {
+            "type": "string",
+            "title": "Check"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "target": {
+            "type": "string",
+            "enum": [
+              "qubit",
+              "pair"
+            ],
+            "title": "Target"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          },
+          "legend": {
+            "items": {
+              "$ref": "#/components/schemas/LegendEntry"
+            },
+            "type": "array",
+            "title": "Legend"
+          },
+          "parameters": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Parameters",
+            "description": "Effective parameter values used"
+          },
+          "cells": {
+            "items": {
+              "$ref": "#/components/schemas/CollisionCellResponse"
+            },
+            "type": "array",
+            "title": "Cells"
+          },
+          "evaluated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Evaluated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "chip_id",
+          "check",
+          "title",
+          "description",
+          "target",
+          "unit",
+          "legend",
+          "parameters",
+          "cells",
+          "evaluated_at"
+        ],
+        "title": "CollisionEvaluateResponse",
+        "description": "Cells of one collision check over a chip."
+      },
+      "CollisionParameterInfo": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "default": {
+            "type": "number",
+            "title": "Default"
+          },
+          "min": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit",
+            "description": "Display unit; values are not converted",
+            "default": ""
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "default",
+          "label"
+        ],
+        "title": "CollisionParameterInfo",
+        "description": "An adjustable numeric input of a collision check."
+      },
       "CommitAgentCandidateRequest": {
         "properties": {
           "idempotency_key": {
@@ -20696,6 +21565,320 @@
         "type": "object",
         "title": "CryostatUpdateRequest",
         "description": "Body for updating a cryostat. All fields optional."
+      },
+      "CustomDashboardCreateRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "Description",
+            "default": ""
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "private",
+              "project"
+            ],
+            "title": "Visibility",
+            "default": "private"
+          },
+          "chip_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chip Id"
+          },
+          "panels": {
+            "items": {
+              "$ref": "#/components/schemas/DashboardPanelModel"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "Panels"
+          },
+          "template_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Template Id",
+            "description": "Template whose panels are copied into the dashboard when panels is empty"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "CustomDashboardCreateRequest",
+        "description": "Body for creating a custom dashboard."
+      },
+      "CustomDashboardResponse": {
+        "properties": {
+          "dashboard_id": {
+            "type": "string",
+            "title": "Dashboard Id"
+          },
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "private",
+              "project"
+            ],
+            "title": "Visibility"
+          },
+          "chip_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chip Id"
+          },
+          "panels": {
+            "items": {
+              "$ref": "#/components/schemas/DashboardPanelModel"
+            },
+            "type": "array",
+            "title": "Panels"
+          },
+          "owner_username": {
+            "type": "string",
+            "title": "Owner Username"
+          },
+          "owner_user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner User Id"
+          },
+          "can_edit": {
+            "type": "boolean",
+            "title": "Can Edit",
+            "description": "Whether the caller may update or delete it"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "dashboard_id",
+          "project_id",
+          "name",
+          "description",
+          "visibility",
+          "chip_id",
+          "panels",
+          "owner_username",
+          "owner_user_id",
+          "can_edit",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "CustomDashboardResponse",
+        "description": "A custom dashboard as seen by the caller."
+      },
+      "CustomDashboardTemplateResponse": {
+        "properties": {
+          "template_id": {
+            "type": "string",
+            "title": "Template Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "panel_count": {
+            "type": "integer",
+            "title": "Panel Count"
+          },
+          "panel_types": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Panel Types"
+          }
+        },
+        "type": "object",
+        "required": [
+          "template_id",
+          "name",
+          "description",
+          "panel_count",
+          "panel_types"
+        ],
+        "title": "CustomDashboardTemplateResponse",
+        "description": "A starter template; its panels are copied into a dashboard on creation."
+      },
+      "CustomDashboardUpdateRequest": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "visibility": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "private",
+                  "project"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visibility"
+          },
+          "chip_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chip Id"
+          },
+          "panels": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/DashboardPanelModel"
+                },
+                "type": "array",
+                "maxItems": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Panels"
+          }
+        },
+        "type": "object",
+        "title": "CustomDashboardUpdateRequest",
+        "description": "Body for updating a custom dashboard. ``panels`` replaces the whole list."
+      },
+      "DashboardPanelModel": {
+        "properties": {
+          "panel_id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Panel Id",
+            "description": "Dashboard-unique ID"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "qubit_metric",
+              "coupling_metric",
+              "collision_check",
+              "markdown"
+            ],
+            "title": "Type",
+            "description": "Panel kind"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Title",
+            "description": "Panel heading",
+            "default": ""
+          },
+          "layout": {
+            "$ref": "#/components/schemas/PanelLayoutModel"
+          },
+          "config": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Config",
+            "description": "Type-specific settings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "panel_id",
+          "type",
+          "layout"
+        ],
+        "title": "DashboardPanelModel",
+        "description": "One panel of a custom dashboard.\n\n``config`` is stored as given; its shape depends on ``type`` and is validated\nagainst the matching ``*PanelConfig`` model when the dashboard is saved."
       },
       "DegradationTrendResponse": {
         "properties": {
@@ -25008,6 +26191,25 @@
         "title": "LatestTaskResultResponse",
         "description": "Response model for fetching the latest tasks grouped by qid/coupling_id."
       },
+      "LegendEntry": {
+        "properties": {
+          "color": {
+            "type": "string",
+            "title": "Color"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          }
+        },
+        "type": "object",
+        "required": [
+          "color",
+          "label"
+        ],
+        "title": "LegendEntry",
+        "description": "Meaning of one cell color."
+      },
       "LineageEdgeResponse": {
         "properties": {
           "relation_type": {
@@ -25204,6 +26406,23 @@
         "title": "ListChipsResponse",
         "description": "Response model for listing chips."
       },
+      "ListCollisionChecksResponse": {
+        "properties": {
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/CollisionCheckInfo"
+            },
+            "type": "array",
+            "title": "Checks"
+          }
+        },
+        "type": "object",
+        "required": [
+          "checks"
+        ],
+        "title": "ListCollisionChecksResponse",
+        "description": "All collision checks in catalog order."
+      },
       "ListConfigSourcesResponse": {
         "properties": {
           "available": {
@@ -25343,6 +26562,45 @@
           "cryostats"
         ],
         "title": "ListCryostatsResponse"
+      },
+      "ListCustomDashboardTemplatesResponse": {
+        "properties": {
+          "templates": {
+            "items": {
+              "$ref": "#/components/schemas/CustomDashboardTemplateResponse"
+            },
+            "type": "array",
+            "title": "Templates"
+          }
+        },
+        "type": "object",
+        "required": [
+          "templates"
+        ],
+        "title": "ListCustomDashboardTemplatesResponse",
+        "description": "Available starter templates."
+      },
+      "ListCustomDashboardsResponse": {
+        "properties": {
+          "dashboards": {
+            "items": {
+              "$ref": "#/components/schemas/CustomDashboardResponse"
+            },
+            "type": "array",
+            "title": "Dashboards"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "dashboards",
+          "total"
+        ],
+        "title": "ListCustomDashboardsResponse",
+        "description": "Dashboards visible to the caller."
       },
       "ListEvaluationRunsResponse": {
         "properties": {
@@ -27580,6 +28838,46 @@
         "type": "object",
         "title": "NumericBounds",
         "description": "Inclusive numeric bounds for one agent-controlled parameter."
+      },
+      "PanelLayoutModel": {
+        "properties": {
+          "x": {
+            "type": "integer",
+            "exclusiveMaximum": 12.0,
+            "minimum": 0.0,
+            "title": "X",
+            "description": "Column of the left edge"
+          },
+          "y": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Y",
+            "description": "Row of the top edge"
+          },
+          "w": {
+            "type": "integer",
+            "maximum": 12.0,
+            "minimum": 1.0,
+            "title": "W",
+            "description": "Width in columns"
+          },
+          "h": {
+            "type": "integer",
+            "maximum": 12.0,
+            "minimum": 1.0,
+            "title": "H",
+            "description": "Height in rows"
+          }
+        },
+        "type": "object",
+        "required": [
+          "x",
+          "y",
+          "w",
+          "h"
+        ],
+        "title": "PanelLayoutModel",
+        "description": "Position and size of a panel on the 12-column grid."
       },
       "ParameterChangeResponse": {
         "properties": {

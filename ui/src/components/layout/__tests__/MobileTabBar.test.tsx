@@ -35,7 +35,7 @@ describe("MobileTabBar", () => {
     const links = within(getTabBar()).getAllByRole("link");
 
     expect(links.map((link) => link.textContent)).toEqual([
-      "Dashboard",
+      "Overview",
       "Workflow",
       "Execution",
       "Agent",
@@ -87,7 +87,7 @@ describe("MobileTabBar", () => {
   });
 
   it.each([
-    ["/dashboard", "Dashboard"],
+    ["/dashboard", "Overview"],
     ["/workflow/new", "Workflow"],
     ["/workflow/calibrate-all", "Workflow"],
     ["/execution/chip-1/exec-1", "Execution"],
@@ -134,6 +134,6 @@ describe("MobileTabBar", () => {
       within(getTabBar())
         .getAllByRole("link")
         .map((link) => link.textContent),
-    ).toEqual(["Dashboard", "Execution", "Agent"]);
+    ).toEqual(["Overview", "Execution", "Agent"]);
   });
 });

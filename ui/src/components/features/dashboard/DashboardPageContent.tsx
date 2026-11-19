@@ -563,7 +563,7 @@ export function DashboardPageContent() {
       <div className="h-full flex flex-col gap-4 md:gap-6">
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <PageHeader
-            title="Dashboard"
+            title="Overview"
             description="Every metric of the selected chip on one page"
             className="mb-0"
           />

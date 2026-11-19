@@ -11,6 +11,7 @@ import {
   Gauge,
   House,
   LayoutDashboard,
+  LayoutGrid,
   ListTodo,
   MessagesSquare,
   Settings,
@@ -42,10 +43,16 @@ interface NavigationOptions {
 export function getNavigationSections({ canEdit, isAdmin }: NavigationOptions): NavSection[] {
   return [
     {
-      label: "Overview",
+      label: "Explore",
       items: [
         { href: "/home", label: "Home", icon: House },
-        { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+        { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
+        {
+          href: "/custom-dashboards",
+          label: "Dashboards",
+          icon: LayoutGrid,
+          match: "prefix",
+        },
         { href: "/metrics", label: "Metrics", icon: Gauge },
         { href: "/chip", label: "Chip", icon: Cpu },
         { href: "/analysis", label: "Analysis", icon: BarChart3 },

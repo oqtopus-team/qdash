@@ -19,11 +19,13 @@ from qdash.api.routers import (
     calibration,
     calibration_pipeline,
     chip,
+    collision_analysis,
     config,
     cooldown,
     cooldown_wiring_event,
     copilot,
     cryostat,
+    custom_dashboard,
     device_topology,
     evaluation,
     execution,
@@ -92,6 +94,12 @@ PROTECTED_ROUTERS: tuple[RouterRegistration, ...] = (
     RouterRegistration(cryostat.router, tags=("cryostat",)),
     RouterRegistration(cooldown.router, tags=("cooldown",)),
     RouterRegistration(cooldown_wiring_event.router, tags=("cooldown-wiring",)),
+    RouterRegistration(
+        custom_dashboard.router, prefix="/custom-dashboards", tags=("custom-dashboard",)
+    ),
+    RouterRegistration(
+        collision_analysis.router, prefix="/collision-analysis", tags=("collision-analysis",)
+    ),
     RouterRegistration(topology.router, prefix="/topology", tags=("topology",)),
     RouterRegistration(config.router, tags=("config",)),
     RouterRegistration(provenance.router, prefix="/provenance", tags=("provenance",)),

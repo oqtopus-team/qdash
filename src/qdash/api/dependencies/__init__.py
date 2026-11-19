@@ -23,12 +23,14 @@ from qdash.api.services.agent_session_service import AgentSessionService
 from qdash.api.services.auth_service import AuthService
 from qdash.api.services.calibration_service import CalibrationService
 from qdash.api.services.chip import ChipConfigScaffolder, ChipService
+from qdash.api.services.collision_analysis_service import CollisionAnalysisService
 from qdash.api.services.config_service import ConfigService
 from qdash.api.services.cooldown_service import CooldownService
 from qdash.api.services.cooldown_wiring_event_service import CooldownWiringEventService
 from qdash.api.services.copilot_chat_session_service import CopilotChatSessionService
 from qdash.api.services.copilot_investigation_service import CopilotInvestigationService
 from qdash.api.services.cryostat_service import CryostatService
+from qdash.api.services.custom_dashboard_service import CustomDashboardService
 from qdash.api.services.device_topology_service import DeviceTopologyService
 from qdash.api.services.evaluation_service import EvaluationService
 from qdash.api.services.execution_service import ExecutionService
@@ -65,6 +67,7 @@ from qdash.repository.cooldown import MongoCooldownRepository
 from qdash.repository.cooldown_wiring_event import MongoCooldownWiringEventRepository
 from qdash.repository.coupling import MongoCouplingCalibrationRepository
 from qdash.repository.cryostat import MongoCryostatRepository
+from qdash.repository.custom_dashboard import MongoCustomDashboardRepository
 from qdash.repository.execution_history import MongoExecutionHistoryRepository
 from qdash.repository.execution_lock import MongoExecutionLockRepository
 from qdash.repository.provenance import (
@@ -452,6 +455,24 @@ def get_cryostat_repository() -> MongoCryostatRepository:
 def get_cryostat_service() -> CryostatService:
     """Get the cryostat service instance."""
     return CryostatService(cryostat_repository=get_cryostat_repository())
+
+
+@cached_dependency_provider
+def get_custom_dashboard_repository() -> MongoCustomDashboardRepository:
+    """Get the custom dashboard repository instance."""
+    return MongoCustomDashboardRepository()
+
+
+@cached_dependency_provider
+def get_custom_dashboard_service() -> CustomDashboardService:
+    """Get the custom dashboard service instance."""
+    return CustomDashboardService(custom_dashboard_repository=get_custom_dashboard_repository())
+
+
+@cached_dependency_provider
+def get_collision_analysis_service() -> CollisionAnalysisService:
+    """Get the frequency collision analysis service instance."""
+    return CollisionAnalysisService(chip_repository=get_chip_repository())
 
 
 @cached_dependency_provider

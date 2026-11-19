@@ -38,7 +38,7 @@ Find pages and their guides in the [Application Tour](./application-tour.md).
 
 | Goal | Guide |
 | --- | --- |
-| Scan chip health | [Dashboard](./dashboard.md) |
+| Scan chip health | [Overview](./dashboard.md) |
 | Investigate state, history, or provenance | [Calibration Data and Provenance](./data-and-provenance.md) |
 | Review, discuss, or hand off a result | [Reviewing and Sharing Results](./reviewing-results.md) |
 

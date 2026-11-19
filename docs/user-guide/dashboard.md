@@ -1,11 +1,12 @@
-# Dashboard
+# Overview
 
-Use **Dashboard** to scan every configured metric for one chip, then open a target when a value
-needs investigation or context.
+Use **Overview** to scan every configured metric for one chip, then open a target when a value
+needs investigation or context. To keep a chosen set of metric maps and collision checks in
+your own layout and share it with the project, use [Dashboards](./custom-dashboards.md).
 
 ## Select the Data Scope
 
-1. Open **Dashboard** and select a chip.
+1. Open **Overview** and select a chip.
 2. Select a relative or absolute time range, or choose a cool-down.
 3. Set **Value selection** to latest, best, or average.
 
@@ -14,9 +15,9 @@ them when sharing an observation because another scope can show a different reco
 
 <!-- MEDIA PLACEHOLDER
 File: /images/guides/dashboard-scope-and-metrics.gif
-Start: Dashboard for a populated chip with the default scope visible.
+Start: Overview for a populated chip with the default scope visible.
 Sequence: Select a cool-down, change Value selection, and expand one populated metric.
-Alt: Dashboard scope controls above the chip summary and expanded metric topology.
+Alt: Overview scope controls above the chip summary and expanded metric topology.
 -->
 
 ## Scan Chip Health
@@ -54,7 +55,7 @@ such as an anomaly or the reason for a parameter choice.
 3. Select a task result in the history view to add a note about that measurement.
 
 The notes summary gathers the notes visible in the current scope. Select a target summary to
-return to its dashboard view, or select a task-result note to open the result. Notes are shared
+return to its overview, or select a task-result note to open the result. Notes are shared
 with the project, and QDash records the last editor.
 
 Existing per-metric notes remain visible as read-only context. Add new context as a pinned summary

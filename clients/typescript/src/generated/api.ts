@@ -33,6 +33,8 @@ import type {
   ChipMetricsResponse,
   ChipNotesSummaryResponse,
   ChipResponse,
+  CollisionEvaluateRequest,
+  CollisionEvaluateResponse,
   CommitAgentCandidateRequest,
   CommitAgentCandidateSetRequest,
   CompareExecutionsParams,
@@ -61,6 +63,9 @@ import type {
   CryostatCreateRequest,
   CryostatResponse,
   CryostatUpdateRequest,
+  CustomDashboardCreateRequest,
+  CustomDashboardResponse,
+  CustomDashboardUpdateRequest,
   DegradationTrendsResponse,
   DeleteChipNoteParams,
   DeleteChipParams,
@@ -164,6 +169,7 @@ import type {
   ListChipNoteEventsParams,
   ListChipQubitsParams,
   ListChipsResponse,
+  ListCollisionChecksResponse,
   ListConfigSourcesResponse,
   ListCooldownWiringEventsParams,
   ListCooldownWiringEventsResponse,
@@ -172,6 +178,8 @@ import type {
   ListCopilotChatSessionsResponse,
   ListCouplingsResponse,
   ListCryostatsResponse,
+  ListCustomDashboardTemplatesResponse,
+  ListCustomDashboardsResponse,
   ListEvaluationRunsParams,
   ListEvaluationRunsResponse,
   ListEvaluationsParams,
@@ -4512,6 +4520,131 @@ const listCooldownWiringEvents = (
     }
 
 /**
+ * Return project-shared dashboards and the caller's own, newest update first.
+ * @summary List custom dashboards visible to the caller
+ */
+const listCustomDashboards = (
+
+ options?: SecondParameter<typeof qdashRequest<ListCustomDashboardsResponse>>,) => {
+      return qdashRequest<ListCustomDashboardsResponse>(
+      {url: `/custom-dashboards`, method: 'GET'
+    },
+      options);
+    }
+
+/**
+ * Create a dashboard owned by the caller.
+ * @summary Create a custom dashboard
+ */
+const createCustomDashboard = (
+    customDashboardCreateRequest: CustomDashboardCreateRequest,
+ options?: SecondParameter<typeof qdashRequest<CustomDashboardResponse>>,) => {
+      return qdashRequest<CustomDashboardResponse>(
+      {url: `/custom-dashboards`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: customDashboardCreateRequest
+    },
+      options);
+    }
+
+/**
+ * Return the templates a new dashboard can copy its panels from.
+ * @summary List starter templates for custom dashboards
+ */
+const listCustomDashboardTemplates = (
+
+ options?: SecondParameter<typeof qdashRequest<ListCustomDashboardTemplatesResponse>>,) => {
+      return qdashRequest<ListCustomDashboardTemplatesResponse>(
+      {url: `/custom-dashboards/templates`, method: 'GET'
+    },
+      options);
+    }
+
+/**
+ * Return a dashboard the caller owns or that is shared with the project.
+ * @summary Get a custom dashboard
+ */
+const getCustomDashboard = (
+    dashboardId: string,
+ options?: SecondParameter<typeof qdashRequest<CustomDashboardResponse>>,) => {
+      return qdashRequest<CustomDashboardResponse>(
+      {url: `/custom-dashboards/${dashboardId}`, method: 'GET'
+    },
+      options);
+    }
+
+/**
+ * Update a dashboard. A provided ``panels`` list replaces the previous one.
+ * @summary Update a custom dashboard
+ */
+const updateCustomDashboard = (
+    dashboardId: string,
+    customDashboardUpdateRequest: CustomDashboardUpdateRequest,
+ options?: SecondParameter<typeof qdashRequest<CustomDashboardResponse>>,) => {
+      return qdashRequest<CustomDashboardResponse>(
+      {url: `/custom-dashboards/${dashboardId}`, method: 'PATCH',
+      headers: {'Content-Type': 'application/json', },
+      data: customDashboardUpdateRequest
+    },
+      options);
+    }
+
+/**
+ * Delete a dashboard owned by the caller, or any dashboard as project owner.
+ * @summary Delete a custom dashboard
+ */
+const deleteCustomDashboard = (
+    dashboardId: string,
+ options?: SecondParameter<typeof qdashRequest<SuccessResponse>>,) => {
+      return qdashRequest<SuccessResponse>(
+      {url: `/custom-dashboards/${dashboardId}`, method: 'DELETE'
+    },
+      options);
+    }
+
+/**
+ * Copy a visible dashboard into a private dashboard owned by the caller.
+ * @summary Duplicate a custom dashboard
+ */
+const duplicateCustomDashboard = (
+    dashboardId: string,
+ options?: SecondParameter<typeof qdashRequest<CustomDashboardResponse>>,) => {
+      return qdashRequest<CustomDashboardResponse>(
+      {url: `/custom-dashboards/${dashboardId}/duplicate`, method: 'POST'
+    },
+      options);
+    }
+
+/**
+ * Return the qubex-compatible collision checks with parameters and legends.
+ * @summary List collision checks
+ */
+const listCollisionChecks = (
+
+ options?: SecondParameter<typeof qdashRequest<ListCollisionChecksResponse>>,) => {
+      return qdashRequest<ListCollisionChecksResponse>(
+      {url: `/collision-analysis/checks`, method: 'GET'
+    },
+      options);
+    }
+
+/**
+ * Evaluate one check for every qubit or directed pair of the chip's topology.
+ * @summary Evaluate a collision check on a chip
+ */
+const evaluateCollisionCheck = (
+    chipId: string,
+    collisionEvaluateRequest: CollisionEvaluateRequest,
+ options?: SecondParameter<typeof qdashRequest<CollisionEvaluateResponse>>,) => {
+      return qdashRequest<CollisionEvaluateResponse>(
+      {url: `/collision-analysis/chips/${chipId}/evaluate`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: collisionEvaluateRequest
+    },
+      options);
+    }
+
+/**
  * List all available topology definitions.
  *
  * Args:
@@ -4962,7 +5095,7 @@ const listUserAvatars = (
       options);
     }
 
-return {login,registerUser,getCurrentUser,updateCurrentUserProfile,logout,changePassword,resetPassword,reloadConfigCaches,listAllUsers,getUserDetails,updateUserSettings,deleteUser,bulkImportUsers,listAllProjects,adminDeleteProject,listProjectMembersAdmin,addProjectMemberAdmin,removeProjectMemberAdmin,createProjectForUser,listProjects,createProject,getProject,updateProject,deleteProject,listProjectMembers,inviteProjectMember,updateProjectMember,removeProjectMember,transferProjectOwnership,getFigureByPath,downloadArtifactByPath,downloadArtifactsAsArchive,previewArtifactByPath,getExecutionLockStatus,checkExecutionAvailability,listExecutions,getExecutionActivity,getExecution,cancelExecution,downloadFile,downloadZipFile,getFileTree,getFileContent,saveFileContent,getFileImage,validateFileContent,getGitStatus,gitPullConfig,gitPushConfig,createAgentSession,getAgentSession,evaluateAgentCandidateGate,submitAgentAction,listAgentActions,listAgentActionCandidates,commitAgentActionCandidate,commitAgentCandidateSet,getAgentCandidateSetCommit,getAgentCandidateCommit,applyAgentCandidateCommit,getAgentAction,executeAgentAction,retryCalibrationGitHubSync,getCalibrationNote,importSeedParameters,getAvailableSeedParameters,compareSeedValues,updateCalibrationParameters,deleteCalibrationParameter,getManualEdits,getCalibrationPipelineCatalog,validateCalibrationPipeline,executeCalibrationPipeline,getCopilotConfig,listCopilotChatSessions,createCopilotChatSession,getCopilotChatSession,updateCopilotChatSession,deleteCopilotChatSession,branchCopilotChatSession,listCopilotSourceRoots,searchCopilotSource,getCopilotSourceFile,getCopilotPreferences,updateCopilotPreferences,getCopilotSystemPrompt,getSettings,listChips,createChip,listChipConfigSources,updateChip,deleteChip,getChip,getChipDeletionImpact,getChipDates,getChipMux,listChipMuxes,getChipNote,upsertChipNote,deleteChipNote,listChipQubits,getChipQubit,reanalyzeResonatorSpectroscopy,reanalyzeQubitSpectroscopy,listChipCouplings,getChipCoupling,getChipMetricsSummary,getChipMetricHeatmap,listTasks,quickRunTask,getTaskResult,listTaskKnowledge,getTaskKnowledgeMarkdown,downloadTaskKnowledgeArchive,getTaskEvaluationPrompts,getTaskKnowledge,getTaskFileSettings,listTaskFileBackends,getBackendConfig,listTaskInfo,listTaskResults,getLatestQubitTaskResults,getHistoricalQubitTaskResults,getQubitTaskHistory,getLatestCouplingTaskResults,getHistoricalCouplingTaskResults,getCouplingTaskHistory,getTimeseriesTaskResults,reExecuteTaskResult,setTaskResultExcluded,downloadFiguresAsZip,createEvaluationRun,listEvaluationRuns,getEvaluationRun,retryEvaluationRun,cancelEvaluationRun,listEvaluations,setEvaluationVerdict,getEvaluationFigure,createKnowledgeDraft,getKnowledgeDraft,getKnowledgeDraftKnowledge,downloadKnowledgeDraftArchive,listForumCategories,createForumCategory,updateForumCategory,deleteForumCategory,listForumLabels,createForumLabel,updateForumLabel,deleteForumLabel,listForumPosts,createForumPost,getForumPost,updateForumPost,deleteForumPost,getForumPostReplies,uploadForumImage,closeForumPost,reopenForumPost,listTags,getDeviceTopology,getDeviceTopologyPlot,listBackends,saveFlow,listFlows,listFlowTemplates,getFlowTemplate,listFlowHelperFiles,getFlowHelperFile,listAllFlowSchedules,deleteFlowSchedule,updateFlowSchedule,getFlow,deleteFlow,getFlowExecutionPlan,executeFlow,moveFlow,scheduleFlow,listFlowSchedules,getMetricsConfig,getChipMetrics,getQubitMetricHistory,getCouplingMetricHistory,downloadMetricsPdf,upsertQubitNote,deleteQubitNote,createQubitNoteComment,updateQubitNoteComment,deleteQubitNoteComment,upsertQubitMetricNote,deleteQubitMetricNote,upsertCouplingNote,deleteCouplingNote,createCouplingNoteComment,updateCouplingNoteComment,deleteCouplingNoteComment,upsertCouplingMetricNote,deleteCouplingMetricNote,getTaskNote,upsertTaskNote,deleteTaskNote,getChipNotesSummary,listChipNoteEvents,listTargetNoteEvents,searchNoteEvents,listNotifications,getUnreadNotificationCount,markNotificationRead,markAllNotificationsRead,listCryostats,createCryostat,getCryostat,updateCryostat,deleteCryostat,listCooldowns,createCooldown,getCooldown,updateCooldown,deleteCooldown,assignChipToCooldown,unassignChipFromCooldown,createCooldownWiringCheckpoint,listCooldownWiringEvents,listTopologies,getTopologyById,getConfigAll,getProvenanceEntity,getProvenanceLineage,getProvenanceImpact,compareExecutions,getParameterHistory,getProvenanceStats,getRecentExecutions,getRecentChanges,getDegradationTrends,getRecalibrationRecommendations,getCurrentUserAvatar,updateCurrentUserAvatar,listUserAvatars}};
+return {login,registerUser,getCurrentUser,updateCurrentUserProfile,logout,changePassword,resetPassword,reloadConfigCaches,listAllUsers,getUserDetails,updateUserSettings,deleteUser,bulkImportUsers,listAllProjects,adminDeleteProject,listProjectMembersAdmin,addProjectMemberAdmin,removeProjectMemberAdmin,createProjectForUser,listProjects,createProject,getProject,updateProject,deleteProject,listProjectMembers,inviteProjectMember,updateProjectMember,removeProjectMember,transferProjectOwnership,getFigureByPath,downloadArtifactByPath,downloadArtifactsAsArchive,previewArtifactByPath,getExecutionLockStatus,checkExecutionAvailability,listExecutions,getExecutionActivity,getExecution,cancelExecution,downloadFile,downloadZipFile,getFileTree,getFileContent,saveFileContent,getFileImage,validateFileContent,getGitStatus,gitPullConfig,gitPushConfig,createAgentSession,getAgentSession,evaluateAgentCandidateGate,submitAgentAction,listAgentActions,listAgentActionCandidates,commitAgentActionCandidate,commitAgentCandidateSet,getAgentCandidateSetCommit,getAgentCandidateCommit,applyAgentCandidateCommit,getAgentAction,executeAgentAction,retryCalibrationGitHubSync,getCalibrationNote,importSeedParameters,getAvailableSeedParameters,compareSeedValues,updateCalibrationParameters,deleteCalibrationParameter,getManualEdits,getCalibrationPipelineCatalog,validateCalibrationPipeline,executeCalibrationPipeline,getCopilotConfig,listCopilotChatSessions,createCopilotChatSession,getCopilotChatSession,updateCopilotChatSession,deleteCopilotChatSession,branchCopilotChatSession,listCopilotSourceRoots,searchCopilotSource,getCopilotSourceFile,getCopilotPreferences,updateCopilotPreferences,getCopilotSystemPrompt,getSettings,listChips,createChip,listChipConfigSources,updateChip,deleteChip,getChip,getChipDeletionImpact,getChipDates,getChipMux,listChipMuxes,getChipNote,upsertChipNote,deleteChipNote,listChipQubits,getChipQubit,reanalyzeResonatorSpectroscopy,reanalyzeQubitSpectroscopy,listChipCouplings,getChipCoupling,getChipMetricsSummary,getChipMetricHeatmap,listTasks,quickRunTask,getTaskResult,listTaskKnowledge,getTaskKnowledgeMarkdown,downloadTaskKnowledgeArchive,getTaskEvaluationPrompts,getTaskKnowledge,getTaskFileSettings,listTaskFileBackends,getBackendConfig,listTaskInfo,listTaskResults,getLatestQubitTaskResults,getHistoricalQubitTaskResults,getQubitTaskHistory,getLatestCouplingTaskResults,getHistoricalCouplingTaskResults,getCouplingTaskHistory,getTimeseriesTaskResults,reExecuteTaskResult,setTaskResultExcluded,downloadFiguresAsZip,createEvaluationRun,listEvaluationRuns,getEvaluationRun,retryEvaluationRun,cancelEvaluationRun,listEvaluations,setEvaluationVerdict,getEvaluationFigure,createKnowledgeDraft,getKnowledgeDraft,getKnowledgeDraftKnowledge,downloadKnowledgeDraftArchive,listForumCategories,createForumCategory,updateForumCategory,deleteForumCategory,listForumLabels,createForumLabel,updateForumLabel,deleteForumLabel,listForumPosts,createForumPost,getForumPost,updateForumPost,deleteForumPost,getForumPostReplies,uploadForumImage,closeForumPost,reopenForumPost,listTags,getDeviceTopology,getDeviceTopologyPlot,listBackends,saveFlow,listFlows,listFlowTemplates,getFlowTemplate,listFlowHelperFiles,getFlowHelperFile,listAllFlowSchedules,deleteFlowSchedule,updateFlowSchedule,getFlow,deleteFlow,getFlowExecutionPlan,executeFlow,moveFlow,scheduleFlow,listFlowSchedules,getMetricsConfig,getChipMetrics,getQubitMetricHistory,getCouplingMetricHistory,downloadMetricsPdf,upsertQubitNote,deleteQubitNote,createQubitNoteComment,updateQubitNoteComment,deleteQubitNoteComment,upsertQubitMetricNote,deleteQubitMetricNote,upsertCouplingNote,deleteCouplingNote,createCouplingNoteComment,updateCouplingNoteComment,deleteCouplingNoteComment,upsertCouplingMetricNote,deleteCouplingMetricNote,getTaskNote,upsertTaskNote,deleteTaskNote,getChipNotesSummary,listChipNoteEvents,listTargetNoteEvents,searchNoteEvents,listNotifications,getUnreadNotificationCount,markNotificationRead,markAllNotificationsRead,listCryostats,createCryostat,getCryostat,updateCryostat,deleteCryostat,listCooldowns,createCooldown,getCooldown,updateCooldown,deleteCooldown,assignChipToCooldown,unassignChipFromCooldown,createCooldownWiringCheckpoint,listCooldownWiringEvents,listCustomDashboards,createCustomDashboard,listCustomDashboardTemplates,getCustomDashboard,updateCustomDashboard,deleteCustomDashboard,duplicateCustomDashboard,listCollisionChecks,evaluateCollisionCheck,listTopologies,getTopologyById,getConfigAll,getProvenanceEntity,getProvenanceLineage,getProvenanceImpact,compareExecutions,getParameterHistory,getProvenanceStats,getRecentExecutions,getRecentChanges,getDegradationTrends,getRecalibrationRecommendations,getCurrentUserAvatar,updateCurrentUserAvatar,listUserAvatars}};
 export type LoginResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['login']>>>
 export type RegisterUserResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['registerUser']>>>
 export type GetCurrentUserResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getCurrentUser']>>>
@@ -5187,6 +5320,15 @@ export type AssignChipToCooldownResult = NonNullable<Awaited<ReturnType<ReturnTy
 export type UnassignChipFromCooldownResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['unassignChipFromCooldown']>>>
 export type CreateCooldownWiringCheckpointResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['createCooldownWiringCheckpoint']>>>
 export type ListCooldownWiringEventsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listCooldownWiringEvents']>>>
+export type ListCustomDashboardsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listCustomDashboards']>>>
+export type CreateCustomDashboardResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['createCustomDashboard']>>>
+export type ListCustomDashboardTemplatesResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listCustomDashboardTemplates']>>>
+export type GetCustomDashboardResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getCustomDashboard']>>>
+export type UpdateCustomDashboardResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['updateCustomDashboard']>>>
+export type DeleteCustomDashboardResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['deleteCustomDashboard']>>>
+export type DuplicateCustomDashboardResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['duplicateCustomDashboard']>>>
+export type ListCollisionChecksResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listCollisionChecks']>>>
+export type EvaluateCollisionCheckResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['evaluateCollisionCheck']>>>
 export type ListTopologiesResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listTopologies']>>>
 export type GetTopologyByIdResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getTopologyById']>>>
 export type GetConfigAllResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getConfigAll']>>>

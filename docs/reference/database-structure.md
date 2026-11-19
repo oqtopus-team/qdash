@@ -80,6 +80,7 @@ runtime lifecycle, reservations, and terminal state handling.
 | `slack_forum_thread` | `SlackForumThreadDocument` | `slack_forum_thread.py` |
 | `notification` | `NotificationDocument` | `notification.py` |
 | `copilot_chat_session` | `CopilotChatSessionDocument` | `copilot_chat_session.py` |
+| `custom_dashboard` | `CustomDashboardDocument` | `custom_dashboard.py` |
 | `copilot_store_teardown` | None (raw collection, one lease per owner and store) | `api/services/copilot_chat_session_service.py` |
 | `copilot_store_generation` | None (raw collection, the current generation per owner and store) | `api/services/copilot_chat_session_service.py` |
 

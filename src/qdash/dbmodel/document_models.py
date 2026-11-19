@@ -17,6 +17,7 @@ from qdash.dbmodel.copilot_chat_session import CopilotChatSessionDocument
 from qdash.dbmodel.coupling import CouplingDocument
 from qdash.dbmodel.coupling_history import CouplingHistoryDocument
 from qdash.dbmodel.cryostat import CryostatDocument
+from qdash.dbmodel.custom_dashboard import CustomDashboardDocument
 from qdash.dbmodel.evaluation import EvaluationDocument
 from qdash.dbmodel.evaluation_asset import EvaluationAssetDocument
 from qdash.dbmodel.evaluation_run import EvaluationRunDocument
@@ -93,6 +94,7 @@ def document_models() -> list[Any]:
         NoteEventDocument,
         NotificationDocument,
         CryostatDocument,
+        CustomDashboardDocument,
         CooldownDocument,
         CooldownWiringEventDocument,
         CopilotChatSessionDocument,

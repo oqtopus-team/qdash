@@ -67,6 +67,6 @@ ends.
 
 ## Filter Calibration Data
 
-Select a cool-down from the filter on **Dashboard**, **Chip**, or another view that offers the
+Select a cool-down from the filter on **Overview**, **Chip**, or another view that offers the
 control. QDash applies the cool-down period and shows calibration data in that operating context.
 For an active cool-down, the period ends at the current time.
