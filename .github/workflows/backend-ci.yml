@@ -6,6 +6,9 @@ on:
     paths:
       - "src/qdash/**"
       - "scripts/generate_task_catalog.py"
+      - "scripts/generate_python_client_models.py"
+      - "docs/oas/openapi.json"
+      - "clients/python/**"
       - "tests/**"
       - "pyproject.toml"
       - "uv.lock"
@@ -19,6 +22,9 @@ on:
     paths:
       - "src/qdash/**"
       - "scripts/generate_task_catalog.py"
+      - "scripts/generate_python_client_models.py"
+      - "docs/oas/openapi.json"
+      - "clients/python/**"
       - "tests/**"
       - "pyproject.toml"
       - "uv.lock"

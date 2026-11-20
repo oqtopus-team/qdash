@@ -17,7 +17,9 @@ dashboarding, chip/task inspection, workflow editing and execution, metrics, pro
 tracking, file management, and Copilot-assisted analysis.
 
 The UI client and standalone TypeScript client are generated with Orval from the API's OpenAPI
-schema. API contract changes therefore require client regeneration with `task generate`.
+schema, and the Python client's Pydantic models with `datamodel-code-generator`. API contract
+changes therefore require client regeneration with `task generate`; `task ci-lint` fails when the
+Python models no longer match `docs/oas/openapi.json`.
 [UI Architecture](./ui/architecture.md) maps the routes, component boundaries, and state flow.
 
 ![qdash-ui](/images/qdash-ui.png)
@@ -25,7 +27,7 @@ schema. API contract changes therefore require client regeneration with `task ge
 ### QDash API
 
 The API receives user requests, enforces authentication and project access, communicates with
-MongoDB and Prefect, and exposes the OpenAPI schema used to generate the UI and standalone TypeScript clients.
+MongoDB and Prefect, and exposes the OpenAPI schema used to generate the UI, TypeScript, and Python clients.
 [API Code Structure](./api/structure.md) maps routers, schemas, services, and dependencies.
 
 ![server-example](/images/server-example.png)

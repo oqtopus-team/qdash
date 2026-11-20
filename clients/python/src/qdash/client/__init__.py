@@ -12,6 +12,21 @@ from qdash.client.services.agent_runner import (
     AgentStepOutcome,
 )
 from qdash.client.services.client import QDashClient
+from qdash.client.services.client_models import (
+    AgentActionListResponse,
+    AgentActionResponse,
+    AgentCandidateCommitResponse,
+    AgentCandidateListResponse,
+    AgentCandidateResponse,
+    AgentCandidateSetCommitResponse,
+    AgentSessionPolicy,
+    AgentSessionResponse,
+    CandidateGateResponse,
+    IssueKnowledgeResponse,
+    IssueResponse,
+    ListIssueKnowledgeResponse,
+    ListIssuesResponse,
+)
 from qdash.client.services.config import (
     QDashConfig,
     QDashRetryConfig,
@@ -27,16 +42,7 @@ from qdash.client.services.errors import (
 )
 from qdash.client.services.exporter_models import NormalizedMetricRecord
 from qdash.client.services.models import (
-    AgentActionListResponse,
-    AgentActionResponse,
-    AgentCandidateCommitResponse,
-    AgentCandidateListResponse,
-    AgentCandidateResponse,
-    AgentCandidateSetCommitResponse,
-    AgentSessionPolicy,
-    AgentSessionResponse,
     CancelExecutionResponse,
-    CandidateGateResponse,
     ChipMetricsResponse,
     ChipResponse,
     CouplingResponse,
@@ -48,16 +54,12 @@ from qdash.client.services.models import (
     FlowTemplateWithCode,
     GetFlowResponse,
     ImpactResponse,
-    IssueKnowledgeResponse,
-    IssueResponse,
     LatestTaskResultResponse,
     LineageResponse,
     ListChipsResponse,
     ListCouplingsResponse,
     ListExecutionsResponse,
     ListFlowsResponse,
-    ListIssueKnowledgeResponse,
-    ListIssuesResponse,
     ListQubitsResponse,
     ListTaskKnowledgeResponse,
     ListTaskResponse,

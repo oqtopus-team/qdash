@@ -24,11 +24,12 @@ tasks:
         OPENAPI_TMP="$(mktemp)"
         ENV=test uv run python -c 'import json, os; from dotenv import load_dotenv; load_dotenv(".env"); os.environ["ENV"] = "test"; from qdash.api.main import app; print(json.dumps(app.openapi(), ensure_ascii=False, indent=2))' > "$OPENAPI_TMP"
         mv "$OPENAPI_TMP" docs/oas/openapi.json
+      - task: generate-python-schema
       - cd clients/typescript && bun run generate:ui
       - cd clients/typescript && bun run generate
       - cd ui && bun run fmt
       - cd ui && bun run lint:fix
-    desc: Generate the TypeScript clients
+    desc: Generate the OpenAPI document and the Python and TypeScript clients
 
   generate-task-catalog:
     desc: Generate task metadata catalog from workflow classes
@@ -36,33 +37,9 @@ tasks:
       - uv run --all-packages scripts/generate_task_catalog.py
 
   generate-python-schema:
-    desc: Generate Python Pydantic schema models from OpenAPI
-    vars:
-      OPENAPI_INPUT: '{{default "docs/oas/openapi.json" .OPENAPI_INPUT}}'
-      PY_SCHEMA_OUTPUT: '{{default "scripts/generated/openapi_models/models.py" .PY_SCHEMA_OUTPUT}}'
+    desc: Generate the Python client's Pydantic models from the OpenAPI document
     cmds:
-      - mkdir -p "$(dirname {{.PY_SCHEMA_OUTPUT}})"
-      - |
-        uvx --from datamodel-code-generator datamodel-codegen \
-          --use-schema-description \
-          --target-python-version 3.12 \
-          --field-constraints \
-          --use-annotated \
-          --use-field-description \
-          --input {{.OPENAPI_INPUT}} \
-          --input-file-type openapi \
-          --collapse-root-models \
-          --enum-field-as-literal one \
-          --set-default-enum-member \
-          --use-union-operator \
-          --use-subclass-enum \
-          --output-model-type pydantic_v2.BaseModel \
-          --disable-timestamp \
-          --use-standard-collections \
-          --strict-nullable \
-          --use-default \
-          --output {{.PY_SCHEMA_OUTPUT}}
-      - uv run ruff format {{.PY_SCHEMA_OUTPUT}}
+      - uv run python scripts/generate_python_client_models.py
 
   knowledge-pull:
     desc: Pull task-knowledge.json from the knowledge repository (KNOWLEDGE_REPO_URL)
@@ -496,6 +473,7 @@ tasks:
     desc: Check Python linting (no auto-fix)
     cmds:
       - uv run --all-packages scripts/generate_task_catalog.py --check
+      - uv run python scripts/generate_python_client_models.py --check
       - uv run ruff check .
       - uv run ruff format --check .
 

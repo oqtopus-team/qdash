@@ -186,6 +186,7 @@ dev = [
     "types-croniter>=6.0.0.20250809",
     "types-requests>=2.32.0.20250809",
     "setuptools>=80.9.0",
+    "datamodel-code-generator[black,isort]==0.98.0",
 ]
 
 [tool.uv.workspace]
