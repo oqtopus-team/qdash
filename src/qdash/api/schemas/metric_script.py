@@ -14,6 +14,7 @@ from qdash.datamodel.metric_script import (
     MetricScriptStatus,
     MetricScriptVisibility,
     ScriptDiagnostic,
+    StrictRevision,
     default_period,
 )
 
@@ -46,9 +47,8 @@ class MetricScriptUpdateRequest(BaseModel):
     description: str | None = Field(default=None, max_length=MAX_DESCRIPTION_LENGTH)
     visibility: MetricScriptVisibility | None = None
     source: str | None = Field(default=None, max_length=MAX_SOURCE_BYTES)
-    expected_revision: int | None = Field(
+    expected_revision: StrictRevision | None = Field(
         default=None,
-        ge=1,
         description="Reject with 409 unless the script is still at this revision",
     )
 
@@ -84,8 +84,8 @@ class MetricScriptEvaluateRequest(BaseModel):
     chip_id: str = Field(..., min_length=1, max_length=100)
     period: MetricPeriod = Field(default_factory=default_period)
     params: ParamValues = Field(default_factory=dict)
-    revision: int | None = Field(
-        default=None, ge=1, description="Revision to evaluate; defaults to the active one"
+    revision: StrictRevision | None = Field(
+        default=None, description="Revision to evaluate; defaults to the active one"
     )
 
 

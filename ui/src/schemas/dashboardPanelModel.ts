@@ -12,7 +12,7 @@ import type { PanelLayoutModel } from './panelLayoutModel';
 /**
  * One panel of a custom dashboard.
  *
- * ``config`` is stored as given; its shape depends on ``type`` and is validated
+ * ``config`` is normalized when saved; its shape depends on ``type`` and is validated
  * against the matching ``*PanelConfig`` model when the dashboard is saved.
  */
 export interface DashboardPanelModel {

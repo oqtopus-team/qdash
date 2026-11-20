@@ -17,6 +17,10 @@ MAX_PERIOD_DAYS = 400
 DEFAULT_PERIOD_DAYS = 14
 
 
+StrictRevision = Annotated[int, Field(strict=True, ge=1)]
+"""A script revision number in a request: a positive integer, never a bool, string or float."""
+
+
 class RelativePeriod(BaseModel):
     """The last ``days`` days, resolved to ``[now - days, now]`` at evaluation."""
 

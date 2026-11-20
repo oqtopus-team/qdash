@@ -51,7 +51,6 @@ from qdash.datamodel.custom_dashboard import (
     DashboardPanelModel,
     DashboardVisibility,
     MetricScriptPanelConfig,
-    script_reference,
 )
 from qdash.datamodel.project import ProjectRole
 from qdash.dbmodel.custom_dashboard import CustomDashboardDocument
@@ -99,9 +98,9 @@ def script_pins(panels: list[DashboardPanelModel]) -> dict[str, list[int]]:
     for panel in panels:
         if panel.type != "metric_script":
             continue
-        reference = script_reference(panel.config)
-        if reference is not None:
-            pins.setdefault(reference.script_id, set()).add(reference.script_revision)
+        # Panels are validated before they are stored or pinned.
+        config = MetricScriptPanelConfig.model_validate(panel.config)
+        pins.setdefault(config.script_id, set()).add(config.script_revision)
     return {script_id: sorted(revisions) for script_id, revisions in pins.items()}
 
 
@@ -424,7 +423,7 @@ class CustomDashboardService:
             doc.chip_id = body.chip_id
         new_pins = script_pins(doc.panels)
         new_shared = doc.visibility == "project"
-        # Metadata saves also repair legacy pins and narrow surplus claims.
+        # Metadata saves also update the shared flag and narrow surplus pins.
         repin = bool(old_pins or new_pins)
         writer = uuid4().hex
         if repin:
@@ -459,10 +458,6 @@ class CustomDashboardService:
 
     def delete(self, ctx: ProjectContext, dashboard_id: str) -> SuccessResponse:
         doc = self._get_editable(ctx, dashboard_id)
-        # Complete legacy backfills before removing their source dashboard. Otherwise a
-        # migration that already read it could add orphan pins after deletion's cleanup.
-        for script_id in script_pins(doc.panels):
-            self._scripts.ensure_pins_initialized(project_id=ctx.project_id, script_id=script_id)
         self._repo.delete(doc)
         self._scripts.clear_dashboard_pins(project_id=ctx.project_id, dashboard_id=dashboard_id)
         return SuccessResponse(message="Custom dashboard deleted")

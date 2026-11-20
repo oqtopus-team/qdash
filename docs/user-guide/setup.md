@@ -159,9 +159,6 @@ answers the script's data requests itself. Set these in `.env` to change their l
 apply them with `docker compose up -d api metric-runner`.
 
 Deploy `api` and `metric-runner` from the same revision; incompatible versions refuse runs.
-When upgrading an existing installation, stop the old API instances before the upgraded API
-accepts writes. Existing dashboard dependencies are repaired automatically when a script is
-accessed or a dashboard is saved; no manual data rewrite is needed.
 
 | Variable | Meaning | Default |
 | --- | --- | --- |

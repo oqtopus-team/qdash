@@ -467,8 +467,6 @@ class MetricScriptService:
         doc = self._get_editable(ctx, script_id)
         # The stored state this update builds on; the save below is a compare-and-set on it.
         # ``version`` also covers pins, so the pin checks below hold for the state replaced.
-        read_revision = doc.revision
-        read_updated_at = doc.system_info.updated_at
         read_version = doc.version
         if body.expected_revision is not None and body.expected_revision != doc.revision:
             raise HTTPException(
@@ -495,9 +493,7 @@ class MetricScriptService:
             doc.description = body.description
         if body.visibility is not None:
             doc.visibility = body.visibility
-        if not self._repo.save_if_unchanged(
-            doc, revision=read_revision, updated_at=read_updated_at, version=read_version
-        ):
+        if not self._repo.save_if_unchanged(doc, version=read_version):
             raise HTTPException(status_code=409, detail=CONFLICT)
         return self._to_response(doc, ctx)
 

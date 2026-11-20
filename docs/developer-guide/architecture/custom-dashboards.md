@@ -76,10 +76,11 @@ update of that document that increments its `version`. QDash does not use Mongo 
 so one document has to decide alone; the dashboard document never decides whether a revision may
 go.
 
-- A script save is an atomic compare-and-set on the stored `revision`, `system_info.updated_at`,
-  and `version` (`MongoMetricScriptRepository.save_if_unchanged`). When another save, or a
-  dashboard pinning or unpinning a revision, landed after the document was read, the update
-  returns 409 and writes nothing, even without `expected_revision`. A saved revision's source is
+- A script save is an atomic compare-and-set on the stored `version`
+  (`MongoMetricScriptRepository.save_if_unchanged`). Every write to a script document
+  increments `version`: saves, `add_pin`, `narrow_pin`, and `clear_dashboard_pins`. When another
+  save, or a dashboard pinning or unpinning a revision, landed after the document was read, the
+  update returns 409 and writes nothing, even without `expected_revision`. A saved revision's source is
   therefore never rewritten, and a save never evicts a revision pinned after its read.
 - `MetricScriptService._apply_source` keeps at most 50 revisions but never evicts the newest, the
   active one, or any revision in `pins`. When everything left is pinned, the save returns 409
@@ -119,23 +120,13 @@ Deleting a dashboard, or an update that finds its
 dashboard deleted, removes the dashboard's pins from every script (`clear_dashboard_pins`);
 dashboard IDs are never reused.
 
-Legacy scripts are migrated lazily by `MongoMetricScriptRepository.ensure_pins_initialized`
-before an individual script read, pin acquisition, or deletion of a referencing dashboard.
-The persisted `pins_initialized` marker and `pins_schema_version` (currently 2) distinguish a
-complete registry from missing, partial, or previously initialized registries that missed
-coercible revision values. Backfill unions saved
-dashboard references with existing pins and atomically sets the marker while incrementing
-`version`. Concurrent pin changes invalidate its snapshot and trigger a retry; script replacement
-and deletion require both current markers and an existing registry. No startup migration or
-collection rewrite is required. Failed migration requests can be retried without clearing data.
 Panel saves normalize validated settings, including defaults, while retaining accepted extra
-settings on non-script panels. Pin acquisition, release, and migration use the same reference
-model: numeric strings and integral floats resolve to integer revisions; `true` retains its
-previously accepted meaning of revision 1. Fractional, nonpositive, and out-of-BSON-range
-revisions are rejected. Script IDs are exact strings, without whitespace trimming. Migration
-parses only reference fields so unrelated legacy settings cannot hide a dependency.
-All API writers must run the upgraded code; old API processes that bypass this barrier must be
-stopped before serving writes after upgrade.
+settings on non-script panels. A revision number is a positive JSON integer wherever a request
+names one: `script_revision` in a panel, `expected_revision` on a script save, and `revision`
+on an evaluation. Booleans, strings, and floats such as `1.0` are rejected with 422 before any
+pin changes, and `script_revision` must also fit in a BSON 64-bit integer. Script IDs are exact
+strings, without whitespace trimming. Custom dashboards ship without a data migration: every
+script and dashboard document is created by code that maintains `pins` and `version`.
 
 ## Visibility and permissions
 

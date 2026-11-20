@@ -89,8 +89,7 @@ runtime lifecycle, reservations, and terminal state handling.
 their audit events.
 [Custom Dashboards Architecture](../developer-guide/architecture/custom-dashboards.md) explains
 dashboards, metric scripts, and their revisions. A `metric_script` document also stores the
-revisions each dashboard pins (`pins`, keyed by `dashboard_id`) and a `version` write counter. `pins_initialized` and `pins_schema_version` (2) mark a completed legacy-reference backfill
-using canonical revision values;
+revisions each dashboard pins (`pins`, keyed by `dashboard_id`) and a `version` write counter;
 `custom_dashboard` documents have a `version` too.
 
 ## Agent and Provenance

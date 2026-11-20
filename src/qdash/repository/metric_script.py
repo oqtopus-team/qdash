@@ -2,31 +2,11 @@
 
 from __future__ import annotations
 
-from copy import deepcopy
-from datetime import UTC, datetime, timedelta
 from typing import Any
-from uuid import uuid4
 
 from bunnet.exceptions import DocumentNotFound
 
-from qdash.datamodel.custom_dashboard import script_reference
-from qdash.dbmodel.custom_dashboard import CustomDashboardDocument
 from qdash.dbmodel.metric_script import MetricScriptDocument
-
-PINS_SCHEMA_VERSION = 2
-
-
-def _bson_millis(value: datetime) -> datetime:
-    """``value`` as BSON stores it: UTC, truncated to whole milliseconds."""
-    if value.tzinfo is None:
-        value = value.replace(tzinfo=UTC)
-    value = value.astimezone(UTC)
-    return value.replace(microsecond=value.microsecond // 1000 * 1000)
-
-
-def version_filter(version: int) -> Any:
-    """Match ``version``; documents written before the field existed count as version 0."""
-    return version if version else {"$in": [0, None]}
 
 
 def _pin_path(dashboard_id: str) -> str:
@@ -39,60 +19,6 @@ def _pin_path(dashboard_id: str) -> str:
 
 class MongoMetricScriptRepository:
     """CRUD helpers for MetricScriptDocument."""
-
-    def ensure_pins_initialized(self, *, project_id: str, script_id: str) -> None:
-        """Backfill legacy references before any pin or destructive script write.
-
-        Never trust a model's default empty pins. The persisted marker distinguishes a
-        complete registry from an old or partially populated one. Every dashboard writer
-        widens pins before saving; its version increment invalidates our snapshot. Script
-        replacement/deletion require the marker, so cannot cross an unfinished backfill.
-        A crash or ambiguous acknowledgement leaves either the old protected document or
-        the complete registry. Retry from a fresh snapshot after any competing write.
-        """
-        collection = MetricScriptDocument.get_motor_collection()
-        identity = {"project_id": project_id, "script_id": script_id}
-        while True:
-            raw = collection.find_one(identity)
-            if raw is None or (
-                raw.get("pins_initialized") is True
-                and raw.get("pins_schema_version") == PINS_SCHEMA_VERSION
-                and "pins" in raw
-            ):
-                return
-            pins = deepcopy(raw.get("pins", {}))
-            for dashboard in CustomDashboardDocument.get_motor_collection().find(
-                {"project_id": project_id, "panels.config.script_id": script_id}
-            ):
-                revisions = set()
-                for panel in dashboard.get("panels", []):
-                    if panel.get("type") != "metric_script":
-                        continue
-                    reference = script_reference(panel.get("config", {}))
-                    if reference is not None and reference.script_id == script_id:
-                        revisions.add(reference.script_revision)
-                if not revisions:
-                    continue
-                dashboard_id = dashboard["dashboard_id"]
-                _pin_path(dashboard_id)
-                pin = pins.setdefault(
-                    dashboard_id, {"revisions": [], "shared": False, "writer": uuid4().hex}
-                )
-                pin["revisions"] = sorted(set(pin["revisions"]) | revisions)
-                pin["shared"] = pin.get("shared", False) or dashboard.get("visibility") == "project"
-            result = collection.update_one(
-                {"_id": raw["_id"], "version": version_filter(raw.get("version", 0))},
-                {
-                    "$set": {
-                        "pins": pins,
-                        "pins_initialized": True,
-                        "pins_schema_version": PINS_SCHEMA_VERSION,
-                    },
-                    "$inc": {"version": 1},
-                },
-            )
-            if result.matched_count:
-                return
 
     def list_visible(self, *, project_id: str, user_id: str) -> list[MetricScriptDocument]:
         """Project-shared scripts plus the caller's own, newest update first."""
@@ -108,7 +34,6 @@ class MongoMetricScriptRepository:
         return docs
 
     def get(self, *, project_id: str, script_id: str) -> MetricScriptDocument | None:
-        self.ensure_pins_initialized(project_id=project_id, script_id=script_id)
         return MetricScriptDocument.find_one(
             MetricScriptDocument.project_id == project_id,
             MetricScriptDocument.script_id == script_id,
@@ -123,42 +48,23 @@ class MongoMetricScriptRepository:
         return docs
 
     def insert(self, doc: MetricScriptDocument) -> MetricScriptDocument:
-        doc.pins_initialized = True
-        doc.pins_schema_version = PINS_SCHEMA_VERSION
         doc.insert()
         return doc
 
-    def save_if_unchanged(
-        self, doc: MetricScriptDocument, *, revision: int, updated_at: datetime, version: int
-    ) -> bool:
-        """Replace the stored script only if it is still in the state ``doc`` was read in.
+    def save_if_unchanged(self, doc: MetricScriptDocument, *, version: int) -> bool:
+        """Replace the stored script only if it still has ``version``.
 
-        ``revision``, ``updated_at`` and ``version`` are the values read before ``doc`` was
-        modified. ``version`` is incremented by every write to the document, including the
-        pin operations below, so a save also fails when a dashboard pinned or unpinned a
-        revision after the read. The
-        match and the replace are one atomic operation, so of two writes that started from
-        the same stored state exactly one succeeds. Returns False, writing nothing, when
-        another write landed first; ``doc`` then keeps its incremented ``version``.
+        ``version`` is the value read before ``doc`` was modified. Every write to the
+        document increments it, including the pin operations below, so a save also fails
+        when a dashboard pinned or unpinned a revision after the read. The match and the
+        replace are one atomic operation, so of two writes that started from the same
+        stored state exactly one succeeds. Returns False, writing nothing, when another
+        write landed first; ``doc`` then keeps its incremented ``version``.
         """
         doc.system_info.update_time()
-        # BSON keeps milliseconds only: make sure a save within the same millisecond as the
-        # previous one still changes the stored value that later saves compare against.
-        if _bson_millis(doc.system_info.updated_at) <= _bson_millis(updated_at):
-            doc.system_info.updated_at = _bson_millis(updated_at) + timedelta(milliseconds=1)
         doc.version = version + 1
         try:
-            MetricScriptDocument.find_one(
-                {
-                    "_id": doc.id,
-                    "pins_initialized": True,
-                    "pins_schema_version": PINS_SCHEMA_VERSION,
-                    "pins": {"$exists": True},
-                    "revision": revision,
-                    "system_info.updated_at": updated_at,
-                    "version": version_filter(version),
-                }
-            ).replace_one(doc)
+            MetricScriptDocument.find_one({"_id": doc.id, "version": version}).replace_one(doc)
         except DocumentNotFound:
             return False
         return True
@@ -182,7 +88,6 @@ class MongoMetricScriptRepository:
         a revision is never pinned after a script save evicted it. Returns False, writing
         nothing, when the script is gone or the filter does not match.
         """
-        self.ensure_pins_initialized(project_id=project_id, script_id=script_id)
         path = _pin_path(dashboard_id)
         query: dict[str, Any] = {"project_id": project_id, "script_id": script_id}
         conditions: list[dict[str, Any]] = [{"revisions.revision": r} for r in revisions]
@@ -244,12 +149,6 @@ class MongoMetricScriptRepository:
     def delete_if_unchanged(self, doc: MetricScriptDocument, *, version: int) -> bool:
         """Delete the script only if it still has ``version``; False when it changed."""
         result = MetricScriptDocument.get_motor_collection().delete_one(
-            {
-                "_id": doc.id,
-                "version": version_filter(version),
-                "pins_initialized": True,
-                "pins_schema_version": PINS_SCHEMA_VERSION,
-                "pins": {"$exists": True},
-            }
+            {"_id": doc.id, "version": version}
         )
         return bool(result.deleted_count)

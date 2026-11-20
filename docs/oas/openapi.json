@@ -22300,7 +22300,7 @@
           "layout"
         ],
         "title": "DashboardPanelModel",
-        "description": "One panel of a custom dashboard.\n\n``config`` is stored as given; its shape depends on ``type`` and is validated\nagainst the matching ``*PanelConfig`` model when the dashboard is saved."
+        "description": "One panel of a custom dashboard.\n\n``config`` is normalized when saved; its shape depends on ``type`` and is validated\nagainst the matching ``*PanelConfig`` model when the dashboard is saved."
       },
       "DashboardPanelResponse": {
         "properties": {

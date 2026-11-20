@@ -47,7 +47,7 @@ def _raw(script_id: str) -> dict[str, Any] | None:
 
 
 def _save_next(repo: MongoMetricScriptRepository, doc: MetricScriptDocument, source: str) -> bool:
-    revision, updated_at, version = doc.revision, doc.system_info.updated_at, doc.version
+    version = doc.version
     doc.revision += 1
     doc.source = source
     doc.revisions.append(
@@ -55,7 +55,7 @@ def _save_next(repo: MongoMetricScriptRepository, doc: MetricScriptDocument, sou
             revision=doc.revision, source=source, created_at=datetime.now(UTC), status="valid"
         )
     )
-    return repo.save_if_unchanged(doc, revision=revision, updated_at=updated_at, version=version)
+    return repo.save_if_unchanged(doc, version=version)
 
 
 def test_stale_copy_is_rejected_and_writes_nothing(init_db) -> None:
@@ -78,34 +78,32 @@ def test_metadata_save_with_same_revision_is_rejected(init_db) -> None:
     script_id = _insert().script_id
     first, second = _load(script_id), _load(script_id)
 
-    revision, updated_at = first.revision, first.system_info.updated_at
     first.name = "Renamed"
-    assert repo.save_if_unchanged(first, revision=revision, updated_at=updated_at, version=0)
+    assert repo.save_if_unchanged(first, version=first.version)
 
-    # Same revision number, but the update time no longer matches.
-    revision, updated_at = second.revision, second.system_info.updated_at
+    # Same revision number, but the version no longer matches.
     second.description = "lost"
-    assert not repo.save_if_unchanged(second, revision=revision, updated_at=updated_at, version=0)
+    assert not repo.save_if_unchanged(second, version=second.version)
     current = _load(script_id)
     assert current.name == "Renamed"
     assert current.description == ""
+    assert current.version == 1
 
 
-def test_save_within_the_same_millisecond_still_advances_update_time(init_db, monkeypatch) -> None:
+def test_version_rejects_a_save_with_an_identical_update_time(init_db, monkeypatch) -> None:
     repo = MongoMetricScriptRepository()
     script_id = _insert().script_id
-    doc = _load(script_id)
-    frozen = doc.system_info.updated_at
+    first, stale = _load(script_id), _load(script_id)
+    frozen = first.system_info.updated_at
     monkeypatch.setattr(SystemInfoModel, "update_time", lambda self: None)
-    revision = doc.revision
-    doc.name = "Renamed"
 
-    assert repo.save_if_unchanged(doc, revision=revision, updated_at=frozen, version=0) is True
-    # A concurrent writer that read before this save must not match the new state.
-    assert _load(script_id).system_info.updated_at != frozen
-    stale = _load(script_id)
+    first.name = "Renamed"
+    assert repo.save_if_unchanged(first, version=first.version) is True
+    # Revision and update time are unchanged; only the version tells the writes apart.
+    stored = _load(script_id)
+    assert (stored.revision, stored.system_info.updated_at) == (stale.revision, frozen)
     stale.description = "lost"
-    assert repo.save_if_unchanged(stale, revision=revision, updated_at=frozen, version=0) is False
+    assert repo.save_if_unchanged(stale, version=stale.version) is False
     assert _load(script_id).description == ""
 
 
@@ -117,12 +115,7 @@ def test_saved_shape_matches_plain_save(init_db) -> None:
     assert plain is not None
 
     loaded = _load(doc.script_id)
-    assert repo.save_if_unchanged(
-        loaded,
-        revision=loaded.revision,
-        updated_at=loaded.system_info.updated_at,
-        version=loaded.version,
-    )
+    assert repo.save_if_unchanged(loaded, version=loaded.version)
     stored = _raw(doc.script_id)
     assert stored is not None
     assert set(stored) == set(plain)
@@ -162,7 +155,7 @@ def test_pin_changes_fail_a_save_that_read_before_them(init_db) -> None:
     assert pinned.pins["dash_a"].revisions == [1]
     assert pinned.pins["dash_a"].shared is False
     assert pinned.pins["dash_a"].writer == "w1"
-    # Same revision and update time as stored, but the pin moved the version on.
+    # Same revision as stored, but the pin moved the version on.
     assert _save_next(repo, stale, "lost") is False
     assert _load(script_id).revision == 1
 
@@ -226,45 +219,9 @@ def test_clear_dashboard_pins_and_delete_if_unchanged(init_db) -> None:
     assert _raw(doc.script_id) is None
 
 
-def test_documents_without_registry_require_migration_before_save(init_db) -> None:
-    repo = MongoMetricScriptRepository()
-    doc = _insert()
-    collection = MetricScriptDocument.get_motor_collection()
-    collection.update_one({"_id": doc.id}, {"$unset": {"version": "", "pins": ""}})
-
-    legacy = _load(doc.script_id)
-    assert legacy.version == 0
-    assert _save_next(repo, legacy, "v2") is False
-    migrated = repo.get(project_id=doc.project_id, script_id=doc.script_id)
-    assert migrated is not None and migrated.pins_initialized
-    assert migrated.version == 1
-    assert _save_next(repo, migrated, "v2") is True
-    assert _load(doc.script_id).version == 2
-
-
 @pytest.mark.parametrize("dashboard_id", ["", "dash.a", "$where"])
 def test_pin_keys_reject_paths_and_operators(init_db, dashboard_id: str) -> None:
     repo = MongoMetricScriptRepository()
     script_id = _insert().script_id
     with pytest.raises(ValueError, match="dashboard ID"):
         _add_pin(repo, script_id, [1], dashboard_id=dashboard_id)
-
-
-@pytest.mark.parametrize("marker", [None, 1])
-def test_old_initialized_registry_cannot_be_saved_or_deleted(init_db, marker) -> None:
-    repo = MongoMetricScriptRepository()
-    doc = _insert()
-    collection = MetricScriptDocument.get_motor_collection()
-    collection.update_one(
-        {"_id": doc.id},
-        {"$set": {"pins_schema_version": marker}}
-        if marker
-        else {"$unset": {"pins_schema_version": ""}},
-    )
-    stale = _load(doc.script_id)
-    assert not repo.delete_if_unchanged(stale, version=stale.version)
-    assert not _save_next(repo, stale, "lost")
-    current = repo.get(project_id=doc.project_id, script_id=doc.script_id)
-    assert current is not None and current.pins_schema_version == 2
-    assert not repo.delete_if_unchanged(stale, version=stale.version - 1)
-    assert _save_next(repo, current, "next")

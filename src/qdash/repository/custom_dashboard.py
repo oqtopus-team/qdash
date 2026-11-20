@@ -5,7 +5,6 @@ from __future__ import annotations
 from bunnet.exceptions import DocumentNotFound
 
 from qdash.dbmodel.custom_dashboard import CustomDashboardDocument
-from qdash.repository.metric_script import version_filter
 
 
 class MongoCustomDashboardRepository:
@@ -43,9 +42,7 @@ class MongoCustomDashboardRepository:
         doc.system_info.update_time()
         doc.version = version + 1
         try:
-            CustomDashboardDocument.find_one(
-                {"_id": doc.id, "version": version_filter(version)}
-            ).replace_one(doc)
+            CustomDashboardDocument.find_one({"_id": doc.id, "version": version}).replace_one(doc)
         except DocumentNotFound:
             return False
         return True
