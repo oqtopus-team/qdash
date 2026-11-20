@@ -126,6 +126,8 @@ describe("WorkflowPageContent", () => {
       "href",
       "/workflow/zoe_flow?space=zoe",
     );
+    // Workflow links navigate without a native title popup.
+    expect(document.querySelectorAll("a[title]")).toHaveLength(0);
     // The subfolder path becomes nested, open disclosures with their own counts.
     const daily = mine.getByTestId("flow-subfolder-daily");
     expect(daily).toHaveAttribute("open");

@@ -427,55 +427,37 @@ describe("Sidebar", () => {
       expect(container.querySelectorAll("aside [title]")).toHaveLength(0);
     });
 
-    it("names collapsed icon rows and shows a right-side tooltip on keyboard focus", () => {
+    it("names collapsed icon rows without a hover or focus popup", () => {
+      vi.useFakeTimers();
+      projectState.canEdit = true;
       sidebarState.isOpen = false;
       const { container } = render(<Sidebar />);
 
-      const { desktop } = getAsides(container);
-      const home = within(desktop as HTMLElement).getByRole("link", { name: "Home" });
-      focus(home);
+      const desktop = getDesktop(container);
+      for (const name of ["Home", "Metrics", "Docs", "Prefect"]) {
+        const link = desktop.getByRole("link", { name });
+        focus(link);
+        fireEvent.pointerMove(link, { pointerType: "mouse" });
+        act(() => vi.advanceTimersByTime(1000));
 
-      const tooltip = screen.getByRole("tooltip");
-      expect(tooltip.textContent).toBe("Home");
-      expect(home.getAttribute("aria-describedby")).toBe(tooltip.id);
-      // Portalled out of the scrolling nav, so the rail cannot clip it.
-      expect(desktop.contains(tooltip)).toBe(false);
-      expect(tooltip.getAttribute("data-side")).toBe("right");
-      expect(tooltip.className).toContain("bg-neutral");
-      expect(tooltip.className).toContain("text-neutral-content");
+        expect(screen.queryByRole("tooltip")).toBeNull();
+        expect(link.hasAttribute("aria-describedby")).toBe(false);
+      }
     });
 
-    it("opens a collapsed row tooltip on hover after the shared delay", () => {
+    it("labels the collapsed profile button without a popup and still opens the profile", () => {
       vi.useFakeTimers();
       sidebarState.isOpen = false;
       const { container } = render(<Sidebar />);
 
-      const docs = getDesktop(container).getByRole("link", { name: "Docs" });
-      fireEvent.pointerMove(docs, { pointerType: "mouse" });
+      const profile = getDesktop(container).getByRole("button", { name: "Open user profile" });
+      focus(profile);
+      fireEvent.pointerMove(profile, { pointerType: "mouse" });
+      act(() => vi.advanceTimersByTime(1000));
       expect(screen.queryByRole("tooltip")).toBeNull();
-      act(() => vi.advanceTimersByTime(350));
 
-      expect(screen.getByRole("tooltip").textContent).toBe("Docs");
-
-      fireEvent.pointerLeave(docs, { pointerType: "mouse" });
-      expect(screen.queryByRole("tooltip")).toBeNull();
-    });
-
-    it("labels the collapsed profile button and gives it a tooltip", () => {
-      sidebarState.isOpen = false;
-      const { container } = render(<Sidebar />);
-
-      focus(getDesktop(container).getByRole("button", { name: "Open user profile" }));
-
-      expect(screen.getByRole("tooltip").textContent).toBe("tester");
-    });
-
-    it("keeps row tooltips off while labels are visible", () => {
-      const { container } = render(<Sidebar />);
-
-      focus(getDesktop(container).getByRole("link", { name: "Home" }));
-
-      expect(screen.queryByRole("tooltip")).toBeNull();
+      fireEvent.click(profile);
+      expect(screen.getByRole("dialog", { name: "User profile" })).toBeTruthy();
     });
 
     it("never shows rail tooltips inside the mobile drawer", () => {
@@ -548,12 +530,12 @@ describe("Sidebar", () => {
       expect(screen.getByRole("tooltip").textContent).toBe("Expand sidebar");
     });
 
-    it("dismisses a stale row tooltip after navigation", () => {
+    it("dismisses a stale toggle tooltip after navigation", () => {
       sidebarState.isOpen = false;
       const { container, rerender } = render(<Sidebar />);
 
-      focus(getDesktop(container).getByRole("link", { name: "Metrics" }));
-      expect(screen.getByRole("tooltip").textContent).toBe("Metrics");
+      focus(getDesktop(container).getByRole("button", { name: "Expand sidebar" }));
+      expect(screen.getByRole("tooltip").textContent).toBe("Expand sidebar");
 
       mockPathname.mockReturnValue("/metrics");
       rerender(<Sidebar />);

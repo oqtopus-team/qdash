@@ -322,9 +322,9 @@ export function ForumNewPage() {
           type="button"
           className="btn btn-square btn-ghost btn-sm shrink-0"
           onClick={() => router.push(forumReturnHref)}
-          title="Back to Forum"
+          aria-label="Back to Forum"
         >
-          <ArrowLeft className="h-4 w-4" />
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
         </button>
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-start gap-2">
