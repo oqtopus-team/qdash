@@ -38,9 +38,9 @@ Settings (environment variables read per run, with defaults):
     with an error the script sees per cell; the run itself continues. The limit also bounds
     how much database work can outlive runs that have already ended (see below).
 
-Each data request gets the seconds left before the run's time limit (counted from the
-runner's ``accepted`` line in socket mode and from the worker's start in local mode). The
-broker turns them into a pymongo client-side operation timeout. When the limit passes
+Each data request gets the remaining run budget: the runner's adopted timeout less elapsed
+transport and execution time in socket mode, or time left since worker start in local mode.
+The broker turns it into a pymongo client-side operation timeout. When the limit passes
 while a request is being served, its data is not sent: the worker gets a ``Time limit
 exceeded`` error answer and the run fails with the time-limit message.
 
@@ -88,6 +88,7 @@ from __future__ import annotations
 import contextlib
 import json
 import logging
+import math
 import os
 import signal
 import socket
@@ -96,7 +97,7 @@ import sys
 import tempfile
 import threading
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import IO, TYPE_CHECKING, Any, Literal, cast
 
@@ -129,7 +130,7 @@ WORKER_MODULE = "qdash.api.metric_runtime.worker"
 SOURCE_ROOT = str(Path(__file__).resolve().parents[3])
 """Directory containing the ``qdash`` package; prepended to the worker's PYTHONPATH."""
 
-PROTOCOL_VERSION = 1
+PROTOCOL_VERSION = 2
 """Version of the API ⇄ runner protocol (``v`` of the request line)."""
 CONNECT_TIMEOUT_SECONDS = 2.0
 """How long connecting to the runner socket may take."""
@@ -569,7 +570,8 @@ def _converse(
     broker: BrokerHandler | None,
     settings: RuntimeSettings,
 ) -> WorkerOutcome:
-    admission = time.monotonic() + ADMISSION_TIMEOUT_SECONDS
+    sent_at = time.monotonic()
+    admission = sent_at + ADMISSION_TIMEOUT_SECONDS
     unavailable = (
         "The metric script runner did not take the job; try again shortly or ask an "
         "administrator to check the metric-runner service"
@@ -589,14 +591,34 @@ def _converse(
         raise WorkerFailure(f"Metric script runner sent an unexpected '{reply['type']}' message")
     logger.debug("Metric script job %s accepted", reply.get("job_id"))
 
-    # The runner starts the job's clock right after `accepted`; data requests get the time
-    # left until then, while waiting for the final line is allowed a grace period.
-    data_deadline = time.monotonic() + settings.timeout_seconds
+    adopted = reply.get("timeout_seconds")
+    queued = reply.get("queue_seconds")
+    received_at = time.monotonic()
+    if (
+        type(reply.get("v")) is not int
+        or reply["v"] != PROTOCOL_VERSION
+        or not isinstance(adopted, (int, float))
+        or isinstance(adopted, bool)
+        or (isinstance(adopted, float) and not math.isfinite(adopted))
+        or adopted <= 0
+        or not isinstance(queued, (int, float))
+        or isinstance(queued, bool)
+        or not 0 <= queued <= min(received_at - sent_at, ADMISSION_TIMEOUT_SECONDS)
+    ):
+        raise WorkerFailure("Metric script runner sent malformed acceptance limits")
+    # Anchor to our send time, adding only the runner's measured queue duration. This
+    # deducts round-trip transport and delayed handling without comparing process clocks.
+    # A runner must never increase the API's configured budget (including test budgets
+    # below the runner's minimum). Missing/old acceptance fields fail closed.
+    settings = replace(settings, timeout_seconds=min(settings.timeout_seconds, adopted))
+    data_deadline = sent_at + queued + settings.timeout_seconds
     deadline = data_deadline + DEADLINE_GRACE_SECONDS
     limit = max(settings.output_limit_bytes + RESULT_SLACK_BYTES, MESSAGE_LIMIT_BYTES)
     try:
         while True:
             message = connection.read_message(limit, deadline)
+            if time.monotonic() >= deadline:
+                raise _Expired
             if message is None:
                 # The runner ends every job it accepted with `result` or `failed`; a bare
                 # close means it stopped (crash or shutdown), not that the script failed.

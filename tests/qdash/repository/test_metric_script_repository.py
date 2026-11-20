@@ -29,7 +29,7 @@ def _insert() -> MetricScriptDocument:
         ],
         system_info=SystemInfoModel(),
     )
-    doc.insert()
+    MongoMetricScriptRepository().insert(doc)
     return doc
 
 
@@ -226,7 +226,7 @@ def test_clear_dashboard_pins_and_delete_if_unchanged(init_db) -> None:
     assert _raw(doc.script_id) is None
 
 
-def test_documents_without_version_match_version_zero(init_db) -> None:
+def test_documents_without_registry_require_migration_before_save(init_db) -> None:
     repo = MongoMetricScriptRepository()
     doc = _insert()
     collection = MetricScriptDocument.get_motor_collection()
@@ -234,8 +234,12 @@ def test_documents_without_version_match_version_zero(init_db) -> None:
 
     legacy = _load(doc.script_id)
     assert legacy.version == 0
-    assert _save_next(repo, legacy, "v2") is True
-    assert _load(doc.script_id).version == 1
+    assert _save_next(repo, legacy, "v2") is False
+    migrated = repo.get(project_id=doc.project_id, script_id=doc.script_id)
+    assert migrated is not None and migrated.pins_initialized
+    assert migrated.version == 1
+    assert _save_next(repo, migrated, "v2") is True
+    assert _load(doc.script_id).version == 2
 
 
 @pytest.mark.parametrize("dashboard_id", ["", "dash.a", "$where"])

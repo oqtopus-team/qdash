@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 import pytest
+from pymongo.errors import NetworkTimeout, OperationFailure
 
 from qdash.api.metric_runtime import executor
 from qdash.api.metric_runtime.executor import QueueFullError, RunnerUnavailableError
@@ -1018,3 +1019,313 @@ def test_zx90_median_end_to_end_with_real_worker(test_client, users, monkeypatch
     assert reverse["status"] == "missing"
     assert reverse["assessment"]["count"] == 1
     assert reverse["color"] == "#737373"
+
+
+@pytest.mark.parametrize("error", [NetworkTimeout, OperationFailure, RuntimeError])
+@pytest.mark.parametrize("operation", ["insert", "save_if_unchanged", "delete"])
+@pytest.mark.parametrize("committed", [False, True])
+def test_ambiguous_dashboard_write_preserves_pins(
+    test_client, users, runtime, monkeypatch, error, operation, committed
+):
+    owner = users["owner"]
+    script_id = _create(test_client, owner)["script_id"]
+    panel = _pinned_panel(script_id, 1)
+    dashboard_id = None
+    if operation != "insert":
+        dashboard_id = _post_dashboard(test_client, owner, [panel]).json()["dashboard_id"]
+    original = getattr(MongoCustomDashboardRepository, operation)
+
+    def uncertain(self, *args, **kwargs):
+        if committed:
+            original(self, *args, **kwargs)
+        raise error("write outcome unknown")
+
+    monkeypatch.setattr(MongoCustomDashboardRepository, operation, uncertain)
+    with pytest.raises(error):
+        if operation == "insert":
+            _post_dashboard(test_client, owner, [panel])
+        elif operation == "delete":
+            test_client.delete(f"/custom-dashboards/{dashboard_id}", headers=owner)
+        else:
+            test_client.patch(
+                f"/custom-dashboards/{dashboard_id}", json={"panels": []}, headers=owner
+            )
+    # Even a noncommitted write cannot be distinguished from a lost acknowledgement.
+    assert _stored_doc(script_id).pins
+    assert test_client.delete(f"/metric-scripts/{script_id}", headers=owner).status_code == 409
+    for dashboard in CustomDashboardDocument.find({"project_id": PROJECT}).run():
+        for item in dashboard.panels:
+            assert item.config["script_revision"] in _stored_doc(script_id).pinned_revisions()
+
+
+def test_pin_failure_before_insert_releases_new_dashboard_pins(
+    test_client, users, runtime, monkeypatch
+):
+    owner = users["owner"]
+    script_id = _create(test_client, owner)["script_id"]
+    original = MongoMetricScriptRepository.add_pin
+
+    def fail_after_pin(self, **kwargs):
+        original(self, **kwargs)
+        raise NetworkTimeout("pin acknowledgement lost before dashboard insert")
+
+    monkeypatch.setattr(MongoMetricScriptRepository, "add_pin", fail_after_pin)
+    with pytest.raises(NetworkTimeout):
+        _post_dashboard(test_client, owner, [_pinned_panel(script_id, 1)])
+    assert CustomDashboardDocument.find({"project_id": PROJECT}).count() == 0
+    assert _stored_doc(script_id).pins == {}
+    assert test_client.delete(f"/metric-scripts/{script_id}", headers=owner).status_code == 200
+
+
+def _make_legacy(script_id, dashboard_id, *, partial=False):
+    collection = MetricScriptDocument.get_motor_collection()
+    unset = {"pins_initialized": "", "version": ""}
+    if not partial:
+        unset["pins"] = ""
+    collection.update_one({"script_id": script_id}, {"$unset": unset})
+    CustomDashboardDocument.get_motor_collection().update_one(
+        {"dashboard_id": dashboard_id}, {"$unset": {"version": ""}}
+    )
+
+
+@pytest.mark.parametrize("action", ["delete", "unshare", "evict", "metadata"])
+def test_legacy_references_are_backfilled_before_writes(
+    test_client, users, runtime, monkeypatch, action
+):
+    owner = users["owner"]
+    script_id = _create(test_client, owner, visibility="project")["script_id"]
+    dashboard_id = _post_dashboard(
+        test_client, owner, [_pinned_panel(script_id, 1)], visibility="project"
+    ).json()["dashboard_id"]
+    _make_legacy(script_id, dashboard_id)
+    if action == "delete":
+        assert test_client.delete(f"/metric-scripts/{script_id}", headers=owner).status_code == 409
+    elif action == "unshare":
+        assert (
+            test_client.patch(
+                f"/metric-scripts/{script_id}", json={"visibility": "private"}, headers=owner
+            ).status_code
+            == 409
+        )
+    elif action == "evict":
+        monkeypatch.setattr(metric_script_service, "MAX_REVISIONS", 2)
+        for index in range(3):
+            response = test_client.patch(
+                f"/metric-scripts/{script_id}",
+                json={"source": RATIO + f"\n# {index}"},
+                headers=owner,
+            )
+            assert response.status_code == 200, response.text
+    else:
+        response = test_client.patch(
+            f"/custom-dashboards/{dashboard_id}", json={"name": "Renamed legacy"}, headers=owner
+        )
+        assert response.status_code == 200, response.text
+    doc = _stored_doc(script_id)
+    assert doc.pins_initialized
+    assert doc.pins[dashboard_id].revisions == [1]
+    assert doc.pins[dashboard_id].shared
+    assert doc.find_revision(1) is not None
+
+
+def test_legacy_backfill_retries_concurrent_dashboard_pin(test_client, users, runtime, monkeypatch):
+    owner = users["owner"]
+    script_id = _create(test_client, owner, visibility="project")["script_id"]
+    panel = _pinned_panel(script_id, 1)
+    legacy_id = _post_dashboard(test_client, owner, [panel], visibility="project").json()[
+        "dashboard_id"
+    ]
+    _make_legacy(script_id, legacy_id)
+    collection = MetricScriptDocument.get_motor_collection()
+    update = collection.update_one
+    raced: list[Any] = []
+
+    def interleaved(query, change, *args, **kwargs):
+        if change.get("$set", {}).get("pins_initialized") and not raced:
+            raced.append(True)
+            # A second lazy migration and a new dashboard complete before our CAS.
+            response = _post_dashboard(test_client, owner, [panel])
+            assert response.status_code == 201, response.text
+            raced.append(response.json()["dashboard_id"])
+        return update(query, change, *args, **kwargs)
+
+    monkeypatch.setattr(collection, "update_one", interleaved)
+    doc = MongoMetricScriptRepository().get(project_id=PROJECT, script_id=script_id)
+    assert doc is not None
+    assert set(doc.pins) == {legacy_id, raced[1]}
+    assert doc.pins[legacy_id].shared
+
+
+def test_partial_registry_is_merged_and_empty_registry_is_completed(test_client, users, runtime):
+    owner = users["owner"]
+    script_id = _create(test_client, owner, visibility="project")["script_id"]
+    dashboard_id = _post_dashboard(test_client, owner, [_pinned_panel(script_id, 1)]).json()[
+        "dashboard_id"
+    ]
+    _make_legacy(script_id, dashboard_id, partial=True)
+    collection = MetricScriptDocument.get_motor_collection()
+    collection.update_one(
+        {"script_id": script_id},
+        {"$set": {"pins.dash_pending": {"revisions": [1], "shared": True, "writer": "pending"}}},
+    )
+    repo = MongoMetricScriptRepository()
+    doc = repo.get(project_id=PROJECT, script_id=script_id)
+    assert doc is not None
+    assert set(doc.pins) == {dashboard_id, "dash_pending"}
+    assert doc.pins["dash_pending"].writer == "pending"
+    again = repo.get(project_id=PROJECT, script_id=script_id)
+    assert again is not None and again.version == doc.version
+    empty_id = _create(test_client, owner)["script_id"]
+    _make_legacy(empty_id, "dash_absent")
+    empty = repo.get(project_id=PROJECT, script_id=empty_id)
+    assert empty is not None and empty.pins_initialized and empty.pins == {}
+    assert test_client.delete(f"/metric-scripts/{empty_id}", headers=owner).status_code == 200
+
+
+def test_unmigrated_snapshot_cannot_replace_or_delete_script(test_client, users, runtime):
+    owner = users["owner"]
+    script_id = _create(test_client, owner)["script_id"]
+    _make_legacy(script_id, "dash_absent")
+    doc = _stored_doc(script_id)  # Bypass the repository's lazy migration.
+    repo = MongoMetricScriptRepository()
+    assert not repo.delete_if_unchanged(doc, version=doc.version)
+    assert not repo.save_if_unchanged(
+        doc, revision=doc.revision, updated_at=doc.system_info.updated_at, version=doc.version
+    )
+    assert _stored_doc(script_id).source == RATIO
+
+
+@pytest.mark.parametrize("committed", [False, True])
+def test_migration_failure_retries_without_losing_references(
+    test_client, users, runtime, monkeypatch, committed
+):
+    owner = users["owner"]
+    script_id = _create(test_client, owner, visibility="project")["script_id"]
+    dashboard_id = _post_dashboard(
+        test_client, owner, [_pinned_panel(script_id, 1)], visibility="project"
+    ).json()["dashboard_id"]
+    _make_legacy(script_id, dashboard_id)
+    collection = MetricScriptDocument.get_motor_collection()
+    update = collection.update_one
+
+    def interrupted(query, change, *args, **kwargs):
+        if change.get("$set", {}).get("pins_initialized"):
+            if committed:
+                update(query, change, *args, **kwargs)
+            raise NetworkTimeout("migration acknowledgement lost")
+        return update(query, change, *args, **kwargs)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(collection, "update_one", interrupted)
+        with pytest.raises(NetworkTimeout):
+            test_client.delete(f"/metric-scripts/{script_id}", headers=owner)
+    assert test_client.delete(f"/metric-scripts/{script_id}", headers=owner).status_code == 409
+    assert _stored_doc(script_id).pins[dashboard_id].shared
+
+
+@pytest.mark.parametrize("operation", ["narrow_pin", "clear_dashboard_pins"])
+@pytest.mark.parametrize("committed", [False, True])
+def test_pin_release_failures_preserve_live_references(
+    test_client, users, runtime, monkeypatch, operation, committed
+):
+    owner = users["owner"]
+    script_id = _create(test_client, owner)["script_id"]
+    panel = _pinned_panel(script_id, 1)
+    first = _post_dashboard(test_client, owner, [panel]).json()["dashboard_id"]
+    second = _post_dashboard(test_client, owner, [panel]).json()["dashboard_id"]
+    original = getattr(MongoMetricScriptRepository, operation)
+
+    def interrupted(self, **kwargs):
+        if committed:
+            original(self, **kwargs)
+        raise NetworkTimeout("pin release acknowledgement lost")
+
+    monkeypatch.setattr(MongoMetricScriptRepository, operation, interrupted)
+    with pytest.raises(NetworkTimeout):
+        if operation == "narrow_pin":
+            test_client.patch(f"/custom-dashboards/{first}", json={"panels": []}, headers=owner)
+        else:
+            test_client.delete(f"/custom-dashboards/{first}", headers=owner)
+    assert _stored_doc(script_id).pins[second].revisions == [1]
+    assert test_client.delete(f"/metric-scripts/{script_id}", headers=owner).status_code == 409
+
+
+def test_unacknowledged_delete_does_not_release_pins(test_client, users, runtime, monkeypatch):
+    from pymongo.results import DeleteResult
+
+    owner = users["owner"]
+    script_id = _create(test_client, owner)["script_id"]
+    dashboard_id = _post_dashboard(test_client, owner, [_pinned_panel(script_id, 1)]).json()[
+        "dashboard_id"
+    ]
+    monkeypatch.setattr(CustomDashboardDocument, "delete", lambda self: DeleteResult({}, False))
+    with pytest.raises(RuntimeError, match="not acknowledged"):
+        test_client.delete(f"/custom-dashboards/{dashboard_id}", headers=owner)
+    assert _stored_doc(script_id).pins[dashboard_id].revisions == [1]
+
+
+@pytest.mark.parametrize("mode", ["duplicate", "template"])
+def test_lost_insert_acknowledgement_protects_every_creation_path(
+    test_client, users, runtime, monkeypatch, mode
+):
+    owner = users["owner"]
+    script_id = _create(test_client, owner)["script_id"]
+    dashboard_id = _post_dashboard(test_client, owner, [_pinned_panel(script_id, 1)]).json()[
+        "dashboard_id"
+    ]
+    insert = MongoCustomDashboardRepository.insert
+    persisted = []
+
+    def committed(self, doc):
+        insert(self, doc)
+        persisted.append(doc)
+        raise NetworkTimeout("insert acknowledgement lost")
+
+    monkeypatch.setattr(MongoCustomDashboardRepository, "insert", committed)
+    with pytest.raises(NetworkTimeout):
+        if mode == "duplicate":
+            test_client.post(f"/custom-dashboards/{dashboard_id}/duplicate", headers=owner)
+        else:
+            test_client.post(
+                "/custom-dashboards",
+                json={"name": "Template", "template_id": "frequency-collision-map"},
+                headers=owner,
+            )
+    assert len(persisted) == 1
+    for panel in persisted[0].panels:
+        if panel.type == "metric_script":
+            script = _stored_doc(panel.config["script_id"])
+            assert (
+                panel.config["script_revision"] in script.pins[persisted[0].dashboard_id].revisions
+            )
+            assert (
+                test_client.delete(f"/metric-scripts/{script.script_id}", headers=owner).status_code
+                == 409
+            )
+
+
+def test_dashboard_delete_invalidates_a_legacy_migration_snapshot(
+    test_client, users, runtime, monkeypatch
+):
+    owner = users["owner"]
+    script_id = _create(test_client, owner)["script_id"]
+    dashboard_id = _post_dashboard(test_client, owner, [_pinned_panel(script_id, 1)]).json()[
+        "dashboard_id"
+    ]
+    _make_legacy(script_id, dashboard_id)
+    collection = MetricScriptDocument.get_motor_collection()
+    update = collection.update_one
+    raced = False
+
+    def interleaved(query, change, *args, **kwargs):
+        nonlocal raced
+        if change.get("$set", {}).get("pins_initialized") and not raced:
+            raced = True
+            response = test_client.delete(f"/custom-dashboards/{dashboard_id}", headers=owner)
+            assert response.status_code == 200, response.text
+        return update(query, change, *args, **kwargs)
+
+    monkeypatch.setattr(collection, "update_one", interleaved)
+    doc = MongoMetricScriptRepository().get(project_id=PROJECT, script_id=script_id)
+    assert doc is not None and doc.pins_initialized and doc.pins == {}
+    assert test_client.delete(f"/metric-scripts/{script_id}", headers=owner).status_code == 200

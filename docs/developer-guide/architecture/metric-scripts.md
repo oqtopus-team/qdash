@@ -83,7 +83,7 @@ starts, so the same panel moves with time; absolute periods need timezones
 The API opens one connection to `metric.sock` per job and exchanges newline-delimited UTF-8
 JSON, one object per line. `protocol.ts` is the reference; `executor.py` is the client.
 
-1. **Request** (API → runner, first line): `{"v": 1, "mode": "catalog" | "evaluate", "source",
+1. **Request** (API → runner, first line): `{"v": 2, "mode": "catalog" | "evaluate", "source",
    "timeout_seconds", "memory_mb"}`, plus `metric_id`, `chip_id`, `start`, `end` and `params`
    for `evaluate`. The runner refuses unknown fields, a wrong `v`, an unknown mode, wrong types,
    a line over 1 MiB (`REQUEST_MAX_BYTES`) or a source over 256 KiB (`SOURCE_MAX_BYTES`, the
@@ -91,11 +91,13 @@ JSON, one object per line. `protocol.ts` is the reference; `executor.py` is the 
    A connection that sends no request within 10 s is refused the same way. The runner clamps
    `timeout_seconds` to `[1, METRIC_RUNNER_MAX_TIMEOUT_SECONDS]` and `memory_mb` to
    `[128, METRIC_RUNNER_MAX_MEMORY_MB]`.
-2. **Admission** (runner → API): `{"type": "accepted", "job_id": "<16 hex>"}` once a slot is
+2. **Admission** (runner → API): `{"type": "accepted", "v": 2, "job_id": "<16 hex>", "timeout_seconds",
+   "queue_seconds"}` once a slot is
    free, or `{"type": "error", "code": "queue_full"}` and close when
    `METRIC_RUNNER_QUEUE_LIMIT` jobs are already waiting or no slot frees within
    `METRIC_RUNNER_QUEUE_WAIT_SECONDS`. Slots are global: one runner process serves every
-   API worker and caller.
+   API worker and caller. The response reports the adopted timeout and the monotonic
+   duration from admission to acceptance; no absolute process clock crosses the socket.
 3. **Relay**: each `CALL` line of the worker becomes `{"type": "call", "op", "args"}`. The API
    answers each call, in order, with exactly one `{"type": "answer", "ok": true, "data"}` or
    `{"type": "answer", "ok": false, "error"}`; the runner forwards it to the worker's stdin
@@ -110,7 +112,7 @@ JSON, one object per line. `protocol.ts` is the reference; `executor.py` is the 
 | --- | --- | --- |
 | `invalid_request` | `error` | The request line failed validation or did not arrive in 10 s |
 | `queue_full` | `error` | The queue is at its limit, or no slot freed in time |
-| `timeout` | `failed` | `timeout_seconds` passed since the worker was spawned; the job was killed |
+| `timeout` | `failed` | `timeout_seconds` passed since acceptance; the job was killed |
 | `output_limit` | `failed` | Worker stdout exceeded 8 MiB (`OUTPUT_LIMIT_BYTES`) in total |
 | `crash` | `failed` | The worker exited without a `RESULT` line, or printed a malformed one; `stderr_tail` holds the last 4 KiB of stderr |
 | `protocol` | `failed` | The API sent a malformed, oversized or unexpected line |
@@ -121,8 +123,13 @@ the authenticated caller's project, the evaluated chip and the period, before th
 connects, so the runner cannot widen the scope of what the worker reads.
 
 The executor waits at most 30 s (`ADMISSION_TIMEOUT_SECONDS`) for `accepted`; the runner's own
-queue wait is shorter. After acceptance its deadline is `timeout_seconds` + 15 s
-(`DEADLINE_GRACE_SECONDS`). When the deadline passes, a pending call is answered `ok: false`,
+queue wait is shorter. Its data deadline is the API request send time plus `queue_seconds`
+plus the smaller of the requested and adopted timeout. This conservatively deducts transport
+and delayed acceptance handling, while excluding queue wait. Missing, malformed or old-version
+acceptance limits fail closed. Deploy API and runner protocol v2 together.
+The socket completion deadline adds 15 s (`DEADLINE_GRACE_SECONDS`) to the data deadline;
+this grace never extends data access. Timeout messages report the adopted budget. When the
+data deadline passes, a pending call is answered `ok: false`,
 the executor closes the socket, and the runner kills the job: closing the connection is the
 cancel signal. The executor bounds runner lines to 1 MiB, or 8 MiB plus slack for `result`.
 
@@ -188,7 +195,7 @@ worker reaches data only through the relayed broker.
 | Network | `network_mode: none` for the whole container |
 | Container | No `env_file` and no source, workspace or data mounts; `read_only` root with `/tmp` as a `METRIC_RUNNER_TMPFS_SIZE` tmpfs, `cap_drop: ALL` plus the capabilities the supervisor needs, `no-new-privileges`, and limits of `METRIC_RUNNER_PIDS_LIMIT` pids, `METRIC_RUNNER_MEMORY_LIMIT` memory and `METRIC_RUNNER_CPU_LIMIT` CPUs |
 | Worker limits | `RLIMIT_AS` (the baseline address space plus `memory_mb`), `RLIMIT_CPU` (timeout + 1 s), `RLIMIT_FSIZE` (1 MiB), `RLIMIT_NPROC` (0, no child processes), and `oom_score_adj` 1000 |
-| Runner bounds | Wall clock from spawn, 8 MiB of worker stdout, 1 MiB request and 32 MiB answer lines, 256 KiB of source |
+| Runner bounds | Wall clock from acceptance, 8 MiB of worker stdout, 1 MiB request and 32 MiB answer lines, 256 KiB of source |
 
 When a job ends, times out, or loses its client, `killJob` sends `SIGKILL` to the worker's
 process group (it is spawned detached), waits for the worker to exit, scans `/proc/*/status`

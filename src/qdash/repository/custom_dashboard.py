@@ -51,7 +51,9 @@ class MongoCustomDashboardRepository:
         return True
 
     def delete(self, doc: CustomDashboardDocument) -> None:
-        doc.delete()
+        result = doc.delete()
+        if result is None or not result.acknowledged:
+            raise RuntimeError("Dashboard deletion was not acknowledged; retaining script pins")
 
     def find_referencing_script(
         self, *, project_id: str, script_id: str

@@ -22,7 +22,7 @@ import {
 } from "../metric-runner/runner.ts";
 
 const limits = { maxTimeoutSeconds: 300, maxMemoryMb: 2048 };
-const catalog = { v: 1, mode: "catalog", source: "x = 1\n", timeout_seconds: 60, memory_mb: 1024 };
+const catalog = { v: 2, mode: "catalog", source: "x = 1\n", timeout_seconds: 60, memory_mb: 1024 };
 const evaluate = {
   ...catalog,
   mode: "evaluate",
@@ -75,11 +75,11 @@ test("malformed requests are refused with a reason", () => {
     "not json",
     "[]",
     "null",
-    JSON.stringify({ ...catalog, v: 2 }),
+    JSON.stringify({ ...catalog, v: 1 }),
     JSON.stringify({ ...catalog, v: "1" }),
     JSON.stringify({ ...catalog, mode: "exec" }),
     JSON.stringify({ ...catalog, source: 1 }),
-    JSON.stringify({ v: 1, mode: "catalog", timeout_seconds: 60, memory_mb: 1024 }),
+    JSON.stringify({ v: 2, mode: "catalog", timeout_seconds: 60, memory_mb: 1024 }),
     JSON.stringify({ ...catalog, timeout_seconds: "60" }),
     JSON.stringify({ ...catalog, memory_mb: null }),
     JSON.stringify({ ...catalog, owner: "alice" }),

@@ -158,6 +158,11 @@ else and has no network and no credentials; the API sends each validation and pr
 answers the script's data requests itself. Set these in `.env` to change their limits, then
 apply them with `docker compose up -d api metric-runner`.
 
+Deploy `api` and `metric-runner` from the same revision; incompatible versions refuse runs.
+When upgrading an existing installation, stop the old API instances before the upgraded API
+accepts writes. Existing dashboard dependencies are repaired automatically when a script is
+accessed or a dashboard is saved; no manual data rewrite is needed.
+
 | Variable | Meaning | Default |
 | --- | --- | --- |
 | `METRIC_SCRIPT_TIMEOUT_SECONDS` | Wall-clock limit of one run, in seconds | `60` |
@@ -176,7 +181,8 @@ Keep `METRIC_RUNNER_CONCURRENCY` × (`METRIC_RUNNER_MAX_MEMORY_MB` + 128) + 128 
 `METRIC_RUNNER_TMPFS_SIZE` (in MiB) within `METRIC_RUNNER_MEMORY_LIMIT`; the defaults use 2688 MiB
 of 3 GiB. When you raise the concurrency or the memory cap, raise the memory limit with them. The
 container logs this budget when it starts (`docker compose logs metric-runner`) and warns when it
-does not fit; a run that then runs out of memory fails on its own, and the other runs continue.
+does not fit. A memory shortage can stop a worker or the supervisor; a supervisor failure
+interrupts every in-flight run until the container restarts.
 
 A refused run shows that the queue is full; try again shortly. When the `metric-runner`
 container is not running, validation, saving a script and previews fail with a message that the

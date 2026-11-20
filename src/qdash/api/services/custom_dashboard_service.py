@@ -324,13 +324,15 @@ class CustomDashboardService:
                 shared=doc.visibility == "project",
                 writer=uuid4().hex,
             )
-            self._repo.insert(doc)
         except Exception:
-            # The ID is fresh and never reused, so no stored dashboard needs these pins.
+            # Insertion has not been attempted, so this ID cannot be persisted yet.
             self._scripts.clear_dashboard_pins(
                 project_id=ctx.project_id, dashboard_id=doc.dashboard_id
             )
             raise
+        # Any insert exception may mean the write committed but its acknowledgement was
+        # lost. Do not infer absence from a subsequent read or an exception class.
+        self._repo.insert(doc)
 
     # -- read --------------------------------------------------------------
 
@@ -399,7 +401,6 @@ class CustomDashboardService:
         # The stored state this update replaces; the save below is a compare-and-set on it.
         read_version = doc.version
         old_pins = script_pins(doc.panels)
-        old_shared = doc.visibility == "project"
         visibility = body.visibility if body.visibility is not None else doc.visibility
         if body.panels is not None:
             self.validate_panels(ctx, body.panels, visibility)
@@ -417,7 +418,8 @@ class CustomDashboardService:
             doc.chip_id = body.chip_id
         new_pins = script_pins(doc.panels)
         new_shared = doc.visibility == "project"
-        repin = new_pins != old_pins or (new_shared != old_shared and bool(new_pins))
+        # Metadata saves also repair legacy pins and narrow surplus claims.
+        repin = bool(old_pins or new_pins)
         writer = uuid4().hex
         if repin:
             self._add_pins(
@@ -451,6 +453,10 @@ class CustomDashboardService:
 
     def delete(self, ctx: ProjectContext, dashboard_id: str) -> SuccessResponse:
         doc = self._get_editable(ctx, dashboard_id)
+        # Complete legacy backfills before removing their source dashboard. Otherwise a
+        # migration that already read it could add orphan pins after deletion's cleanup.
+        for script_id in script_pins(doc.panels):
+            self._scripts.ensure_pins_initialized(project_id=ctx.project_id, script_id=script_id)
         self._repo.delete(doc)
         self._scripts.clear_dashboard_pins(project_id=ctx.project_id, dashboard_id=dashboard_id)
         return SuccessResponse(message="Custom dashboard deleted")

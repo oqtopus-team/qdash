@@ -32,7 +32,13 @@ from qdash.api.metric_runtime.executor import (
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
 
-ACCEPTED = {"type": "accepted", "job_id": "0123456789abcdef"}
+ACCEPTED = {
+    "type": "accepted",
+    "v": 2,
+    "job_id": "0123456789abcdef",
+    "timeout_seconds": 5,
+    "queue_seconds": 0,
+}
 OK_RESULT = {
     "type": "result",
     "ok": True,
@@ -191,7 +197,7 @@ def test_call_relay_and_result(serve):
         {"type": "answer", "ok": True, "data": {"0": 1.5}},
     ]
     assert runner.request == {
-        "v": 1,
+        "v": 2,
         "mode": "evaluate",
         "source": "SOURCE",
         "metric_id": "m",
@@ -210,7 +216,7 @@ def test_catalog_request_line(serve):
     runner.join()
     assert outcome.result == {"metrics": []}
     assert runner.request == {
-        "v": 1,
+        "v": 2,
         "mode": "catalog",
         "source": "SOURCE",
         "memory_mb": executor.DEFAULT_MEMORY_MB,
@@ -309,8 +315,7 @@ def test_failed_timeout_keeps_the_time_limit_wording(serve):
         evaluate(runner, timeout_seconds=7.5)
     runner.join()
     assert caught.value.message == (
-        "Metric script exceeded the 7.5 s time limit (METRIC_SCRIPT_TIMEOUT_SECONDS) "
-        "and was stopped"
+        "Metric script exceeded the 5 s time limit (METRIC_SCRIPT_TIMEOUT_SECONDS) and was stopped"
     )
 
 
@@ -708,3 +713,72 @@ def test_expired_inflight_broker_keeps_its_slot_until_return(clock, monkeypatch)
     answer = executor._serve_call(broker, {"op": "next"}, clock.now + 5, 1, {})
     assert answer is not None
     assert json.loads(answer) == {"ok": True, "data": 7}
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [
+        {"v": 1},
+        {"v": True},
+        {"timeout_seconds": None},
+        {"timeout_seconds": True},
+        {"timeout_seconds": float("nan")},
+        {"timeout_seconds": float("inf")},
+        {"timeout_seconds": -1},
+        {"timeout_seconds": 0},
+        {"queue_seconds": None},
+        {"queue_seconds": True},
+        {"queue_seconds": -1},
+        {"queue_seconds": float("nan")},
+        {"queue_seconds": 1000},
+    ],
+)
+def test_invalid_acceptance_limits_fail_closed(serve, fields):
+    runner = serve(lambda r: r.send({**ACCEPTED, **fields}, OK_RESULT))
+    with pytest.raises(WorkerFailure, match="malformed acceptance"):
+        evaluate(runner)
+    runner.join()
+
+
+def test_old_acceptance_without_limits_fails_closed(serve):
+    runner = serve(lambda r: r.send({"type": "accepted", "job_id": "old"}, OK_RESULT))
+    with pytest.raises(WorkerFailure, match="malformed acceptance"):
+        evaluate(runner)
+    runner.join()
+
+
+@pytest.mark.parametrize("queue,delay,expected", [(0, 0.4, 0.6), (2, 2.4, 0.6)])
+def test_adopted_budget_deducts_transport_but_not_queue(serve, clock, queue, delay, expected):
+    def play(runner):
+        clock.now += delay
+        runner.send(
+            {**ACCEPTED, "timeout_seconds": 1, "queue_seconds": queue},
+            {"type": "call", "op": "history", "args": {}},
+        )
+        runner.read()
+        runner.send(OK_RESULT)
+
+    runner = serve(play)
+    broker = FakeBroker()
+    evaluate(runner, broker, timeout_seconds=3)
+    runner.join()
+    assert broker.timeouts == pytest.approx([expected])
+
+
+def test_delayed_acceptance_cannot_restart_expired_data_budget(serve, clock):
+    answers = []
+
+    def play(runner):
+        clock.now += 1.1
+        runner.send(
+            {**ACCEPTED, "timeout_seconds": 1}, {"type": "call", "op": "history", "args": {}}
+        )
+        answers.append(runner.read())
+
+    runner = serve(play)
+    broker = FakeBroker()
+    with pytest.raises(WorkerFailure, match="1 s time limit"):
+        evaluate(runner, broker, timeout_seconds=3)
+    runner.join()
+    assert broker.calls == []
+    assert answers == [TIME_LIMIT]

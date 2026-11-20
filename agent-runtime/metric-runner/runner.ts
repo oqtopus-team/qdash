@@ -33,6 +33,7 @@ import {
   DEFAULT_METRIC_SOCKET,
   LineSplitter,
   METRIC_MAX_CONCURRENCY,
+  METRIC_PROTOCOL_VERSION,
   METRIC_UID_BASE,
   METRIC_WORKER_MODULE,
   MIN_METRIC_MEMORY_MB,
@@ -193,6 +194,7 @@ export async function startMetricRunner(options: MetricRunnerOptions): Promise<M
     );
 
     const admit = (request: MetricWorkerRequest): void => {
+      const queuedAt = performance.now();
       const run = (slot: number): void => {
         if (state === "done" || closing) {
           releaseSlot(slot);
@@ -209,7 +211,7 @@ export async function startMetricRunner(options: MetricRunnerOptions): Promise<M
           },
         });
         jobs.add(job);
-        job.start();
+        job.start(queuedAt);
       };
       const slot = takeSlot();
       if (slot !== undefined) {
@@ -306,9 +308,14 @@ class Job {
     this.dir = join(options.jobRoot, this.id);
   }
 
-  start(): void {
+  start(queuedAt: number): void {
     const { log } = this.options;
-    this.send({ type: "accepted", job_id: this.id });
+    const startedAt = performance.now();
+    this.send({
+      type: "accepted", v: METRIC_PROTOCOL_VERSION, job_id: this.id,
+      timeout_seconds: this.request.timeout_seconds,
+      queue_seconds: (startedAt - queuedAt) / 1000,
+    });
     try {
       // Fresh and chowned before the worker exists: the supervisor never
       // follows a path the worker could have replaced.
@@ -387,7 +394,7 @@ class Job {
         null,
         "SIGKILL",
       );
-    }, this.request.timeout_seconds * 1000);
+    }, Math.max(0, this.request.timeout_seconds * 1000 - (performance.now() - startedAt)));
     child.stdin!.write(`${JSON.stringify(this.request)}\n`);
   }
 

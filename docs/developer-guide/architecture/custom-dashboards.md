@@ -108,13 +108,26 @@ go.
 
 A pin is in the script document before any stored dashboard depends on it, so a concurrent script
 save either sees the pin or fails its compare-and-set. A failed request, a lost race, or a crash
-between the steps can leave a surplus pin, never a missing one. A subsequent panel or visibility
-update narrows pins on the scripts involved in that update; surplus pins on other scripts remain
+between the steps can leave a surplus pin, never a missing one. A subsequent update, including
+a metadata save, narrows pins on the scripts involved in that update; surplus pins on other scripts remain
 until the dashboard is deleted. A process crash before inserting a dashboard can leave orphan
 pins that require administrative cleanup after confirming no writer is still running.
+An insert exception does not prove that insertion failed: the acknowledgement may be lost.
+The service releases new-dashboard pins only if insertion was never attempted. Update and
+delete exceptions likewise retain pins; only acknowledged writes allow narrowing or clearing.
 Deleting a dashboard, or an update that finds its
 dashboard deleted, removes the dashboard's pins from every script (`clear_dashboard_pins`);
 dashboard IDs are never reused.
+
+Legacy scripts are migrated lazily by `MongoMetricScriptRepository.ensure_pins_initialized`
+before an individual script read, pin acquisition, or deletion of a referencing dashboard. A persisted `pins_initialized` marker distinguishes a
+complete empty registry from missing or partially populated legacy pins. Backfill unions saved
+dashboard references with existing pins and atomically sets the marker while incrementing
+`version`. Concurrent pin changes invalidate its snapshot and trigger a retry; script replacement
+and deletion require the completed marker and an existing registry. No startup migration or
+collection rewrite is required. Failed migration requests can be retried without clearing data.
+All API writers must run the upgraded code; old API processes that bypass this barrier must be
+stopped before serving writes after upgrade.
 
 ## Visibility and permissions
 

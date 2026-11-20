@@ -80,7 +80,7 @@ function client(socketPath) {
   };
 }
 
-const request = (source, extra = {}) => ({ v: 1, mode: "catalog", source, timeout_seconds: 10, memory_mb: 1024, ...extra });
+const request = (source, extra = {}) => ({ v: 2, mode: "catalog", source, timeout_seconds: 10, memory_mb: 1024, ...extra });
 
 const TINY = `from qdash_metrics import metric
 
@@ -147,9 +147,9 @@ test("malformed requests get invalid_request and the connection closes", async (
   const { socketPath, logs } = await startRunner(t);
   for (const line of [
     "not json",
-    JSON.stringify({ ...request(TINY), v: 2 }),
+    JSON.stringify({ ...request(TINY), v: 1 }),
     JSON.stringify({ ...request(TINY), mode: "shell" }),
-    JSON.stringify({ v: 1, mode: "catalog", timeout_seconds: 10, memory_mb: 1024 }),
+    JSON.stringify({ v: 2, mode: "catalog", timeout_seconds: 10, memory_mb: 1024 }),
   ]) {
     const api = client(socketPath);
     api.send(line);
@@ -360,4 +360,26 @@ test("a worker that cannot start fails the job and frees the slot", async (t) =>
     assert.equal(await api.next(), undefined);
   }
   assert.ok(await eventually(() => readdirSync(jobRoot).length === 0));
+});
+
+
+live("acceptance reports the adopted timeout and measured queue duration", async (t) => {
+  const runner = await startRunner(t, { concurrency: 1, maxTimeoutSeconds: 1 });
+  const first = client(runner.socketPath);
+  first.send(request("while True: pass", { timeout_seconds: 3 }));
+  const accepted = await first.next();
+  assert.equal(accepted.v, 2);
+  assert.equal(accepted.timeout_seconds, 1);
+  assert.ok(accepted.queue_seconds >= 0);
+  const queuedAt = performance.now();
+  const second = client(runner.socketPath);
+  second.send(request("x = 1", { timeout_seconds: 3 }));
+  assert.equal((await first.next()).code, "timeout");
+  const queued = await second.next();
+  assert.equal(queued.type, "accepted");
+  assert.equal(queued.timeout_seconds, 1);
+  assert.ok(queued.queue_seconds > 0.5);
+  assert.ok(queued.queue_seconds <= (performance.now() - queuedAt) / 1000);
+  first.socket.destroy();
+  second.socket.destroy();
 });

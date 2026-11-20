@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from datetime import UTC, datetime, timedelta
 from typing import Any
+from uuid import uuid4
 
 from bunnet.exceptions import DocumentNotFound
 
+from qdash.dbmodel.custom_dashboard import CustomDashboardDocument
 from qdash.dbmodel.metric_script import MetricScriptDocument
 
 
@@ -34,6 +37,49 @@ def _pin_path(dashboard_id: str) -> str:
 class MongoMetricScriptRepository:
     """CRUD helpers for MetricScriptDocument."""
 
+    def ensure_pins_initialized(self, *, project_id: str, script_id: str) -> None:
+        """Backfill legacy references before any pin or destructive script write.
+
+        Never trust a model's default empty pins. The persisted marker distinguishes a
+        complete registry from an old or partially populated one. Every dashboard writer
+        widens pins before saving; its version increment invalidates our snapshot. Script
+        replacement/deletion require the marker, so cannot cross an unfinished backfill.
+        A crash or ambiguous acknowledgement leaves either the old protected document or
+        the complete registry. Retry from a fresh snapshot after any competing write.
+        """
+        collection = MetricScriptDocument.get_motor_collection()
+        identity = {"project_id": project_id, "script_id": script_id}
+        while True:
+            raw = collection.find_one(identity)
+            if raw is None or (raw.get("pins_initialized") is True and "pins" in raw):
+                return
+            pins = deepcopy(raw.get("pins", {}))
+            for dashboard in CustomDashboardDocument.get_motor_collection().find(
+                {"project_id": project_id, "panels.config.script_id": script_id}
+            ):
+                revisions = {
+                    panel["config"]["script_revision"]
+                    for panel in dashboard.get("panels", [])
+                    if panel.get("type") == "metric_script"
+                    and panel.get("config", {}).get("script_id") == script_id
+                    and isinstance(panel["config"].get("script_revision"), int)
+                }
+                if not revisions:
+                    continue
+                dashboard_id = dashboard["dashboard_id"]
+                _pin_path(dashboard_id)
+                pin = pins.setdefault(
+                    dashboard_id, {"revisions": [], "shared": False, "writer": uuid4().hex}
+                )
+                pin["revisions"] = sorted(set(pin["revisions"]) | revisions)
+                pin["shared"] = pin.get("shared", False) or dashboard.get("visibility") == "project"
+            result = collection.update_one(
+                {"_id": raw["_id"], "version": version_filter(raw.get("version", 0))},
+                {"$set": {"pins": pins, "pins_initialized": True}, "$inc": {"version": 1}},
+            )
+            if result.matched_count:
+                return
+
     def list_visible(self, *, project_id: str, user_id: str) -> list[MetricScriptDocument]:
         """Project-shared scripts plus the caller's own, newest update first."""
         docs = list(
@@ -48,6 +94,7 @@ class MongoMetricScriptRepository:
         return docs
 
     def get(self, *, project_id: str, script_id: str) -> MetricScriptDocument | None:
+        self.ensure_pins_initialized(project_id=project_id, script_id=script_id)
         return MetricScriptDocument.find_one(
             MetricScriptDocument.project_id == project_id,
             MetricScriptDocument.script_id == script_id,
@@ -62,6 +109,7 @@ class MongoMetricScriptRepository:
         return docs
 
     def insert(self, doc: MetricScriptDocument) -> MetricScriptDocument:
+        doc.pins_initialized = True
         doc.insert()
         return doc
 
@@ -88,6 +136,8 @@ class MongoMetricScriptRepository:
             MetricScriptDocument.find_one(
                 {
                     "_id": doc.id,
+                    "pins_initialized": True,
+                    "pins": {"$exists": True},
                     "revision": revision,
                     "system_info.updated_at": updated_at,
                     "version": version_filter(version),
@@ -116,6 +166,7 @@ class MongoMetricScriptRepository:
         a revision is never pinned after a script save evicted it. Returns False, writing
         nothing, when the script is gone or the filter does not match.
         """
+        self.ensure_pins_initialized(project_id=project_id, script_id=script_id)
         path = _pin_path(dashboard_id)
         query: dict[str, Any] = {"project_id": project_id, "script_id": script_id}
         conditions: list[dict[str, Any]] = [{"revisions.revision": r} for r in revisions]
@@ -177,6 +228,11 @@ class MongoMetricScriptRepository:
     def delete_if_unchanged(self, doc: MetricScriptDocument, *, version: int) -> bool:
         """Delete the script only if it still has ``version``; False when it changed."""
         result = MetricScriptDocument.get_motor_collection().delete_one(
-            {"_id": doc.id, "version": version_filter(version)}
+            {
+                "_id": doc.id,
+                "version": version_filter(version),
+                "pins_initialized": True,
+                "pins": {"$exists": True},
+            }
         )
         return bool(result.deleted_count)

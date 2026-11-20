@@ -12,7 +12,7 @@
  * the metric-runner image ships it without node_modules.
  */
 
-export const METRIC_PROTOCOL_VERSION = 1;
+export const METRIC_PROTOCOL_VERSION = 2;
 export const DEFAULT_METRIC_SOCKET = "/run/metric-runner/metric.sock";
 export const DEFAULT_METRIC_JOB_ROOT = "/tmp/metric-jobs";
 export const DEFAULT_METRIC_PYTHON = "python3";
@@ -74,7 +74,7 @@ export type MetricFailureCode = "timeout" | "output_limit" | "crash" | "protocol
 
 /** Runner → API. */
 export type RunnerMessage =
-  | { type: "accepted"; job_id: string }
+  | { type: "accepted"; v: number; job_id: string; timeout_seconds: number; queue_seconds: number }
   | { type: "error"; code: MetricErrorCode; message: string }
   | { type: "call"; op: string; args: Record<string, unknown> }
   | ({ type: "result" } & Record<string, unknown>)
