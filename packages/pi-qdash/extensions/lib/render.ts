@@ -101,10 +101,3 @@ export function formatNumber(value: number): string {
   if (abs >= 10) return value.toFixed(3);
   return value.toFixed(5).replace(/0+$/, "").replace(/\.$/, "");
 }
-
-export function compactDate(value: string | undefined): string {
-  if (!value) return "";
-  const date = new Date(value.endsWith("Z") ? value : `${value}Z`);
-  if (Number.isNaN(date.getTime())) return value.slice(0, 10);
-  return `${String(date.getUTCMonth() + 1).padStart(2, "0")}/${String(date.getUTCDate()).padStart(2, "0")} ${String(date.getUTCHours()).padStart(2, "0")}:${String(date.getUTCMinutes()).padStart(2, "0")}`;
-}

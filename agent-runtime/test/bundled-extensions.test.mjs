@@ -58,6 +58,11 @@ test("bundled packages load tools and skills offline, retaining the pi-qdash all
     const names = extensions.flatMap(({ tools }) => [...tools.keys()]);
     assert.ok(names.includes("qdash_build_qcal_evidence"));
     assert.ok(names.includes("qcal_evaluate"));
+    // Timeseries data stays available; the removed TUI plot tool is not registered.
+    assert.ok(names.includes("qdash_get_timeseries"));
+    assert.ok(!names.includes("qdash_plot_timeseries"));
+    // Every allowlisted read tool names a tool the bundled packages register.
+    for (const name of ALLOWED_TOOL_NAMES) assert.ok(names.includes(name), name);
     const skills = loader.getSkills().skills.map(({ name }) => name);
     assert.ok(skills.includes("qdash"));
     assert.ok(skills.includes("qcaleval"));

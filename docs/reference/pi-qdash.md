@@ -16,7 +16,7 @@ pi-qdash tools reuse the session's profile and chip when callers omit those para
 | `qdash_get_chip_metrics`, `qdash_list_chip_qubits`, `qdash_list_chip_couplings` | Chip metrics and targets. |
 | `qdash_list_cryostats`, `qdash_list_cooldowns` | Cryostats and cooldowns. |
 | `qdash_get_cooldown_wiring`, `qdash_wiring_insights`, `qdash_list_cooldown_wiring_events` | Wiring, attenuation insights, and event history. |
-| `qdash_get_timeseries`, `qdash_plot_timeseries`, `qdash_inspect_timeseries_csv`, `qdash_compare_timeseries` | Timeseries retrieval, plotting, local CSV inspection, and comparison. |
+| `qdash_get_timeseries`, `qdash_inspect_timeseries_csv`, `qdash_compare_timeseries` | Timeseries retrieval, local CSV inspection, and comparison. |
 | `qdash_list_task_results`, `qdash_get_task_result`, `qdash_get_task_knowledge` | Task results and full or summarized task knowledge. |
 | `qdash_list_flows`, `qdash_get_flow` | Saved flows. |
 | `qdash_list_executions`, `qdash_get_execution`, `qdash_wait_execution`, `qdash_compare_executions` | Execution history, status, and comparison. |

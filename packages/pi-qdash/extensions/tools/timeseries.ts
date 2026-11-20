@@ -14,7 +14,7 @@ import {
 } from "../lib/timeseries-analysis.js";
 import type { TimeseriesInvestigationContext } from "../lib/investigation-context.js";
 import { toTextToolResult } from "../lib/results.js";
-import { timeseriesPoints } from "../lib/timeseries-plot.js";
+import { timeseriesPoints } from "../lib/timeseries-points.js";
 
 type ComparisonToolParams = {
   profile?: string;
