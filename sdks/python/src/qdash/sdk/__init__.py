@@ -1,7 +1,8 @@
 """QDash SDK: define calibration pipelines in Python and run them through the QDash API.
 
-The SDK is part of the ``qdash-client`` distribution and reuses its configuration,
-authentication, transport and errors. Pipeline definitions live in :mod:`qdash.sdk.pipeline`.
+The SDK is distributed as ``qdash-sdk``, which depends on ``qdash-client`` and reuses its
+configuration, authentication, transport and errors. Pipeline definitions live in
+:mod:`qdash.sdk.pipeline`.
 """
 
 from qdash.client.services.errors import (

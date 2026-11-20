@@ -244,12 +244,12 @@ tasks:
   test:
     desc: Run all Python tests
     cmds:
-      - uv run pytest tests/ clients/python/tests/ -v
+      - uv run pytest tests/ clients/python/tests/ sdks/python/tests/ -v
 
   test-fast:
     desc: Run tests, stop on first failure
     cmds:
-      - uv run pytest tests/ clients/python/tests/ -v -x --tb=short
+      - uv run pytest tests/ clients/python/tests/ sdks/python/tests/ -v -x --tb=short
 
   test-api:
     desc: Run API router tests
@@ -260,6 +260,11 @@ tasks:
     desc: Run Python client tests
     cmds:
       - uv run pytest clients/python/tests/ -v
+
+  test-sdk:
+    desc: Run Python SDK tests
+    cmds:
+      - uv run pytest sdks/python/tests/ -v
 
   build-client-ts:
     desc: Build the local TypeScript client for pi packages and the runtime
@@ -297,12 +302,12 @@ tasks:
   test-coverage:
     desc: Run tests with coverage report
     cmds:
-      - uv run pytest tests/ clients/python/tests/ --cov=src/qdash --cov=clients/python/src/qdash/client --cov=clients/python/src/qdash/sdk --cov-report=term --cov-report=html
+      - uv run pytest tests/ clients/python/tests/ sdks/python/tests/ --cov=src/qdash --cov=clients/python/src/qdash/client --cov=sdks/python/src/qdash/sdk --cov-report=term --cov-report=html
 
   test-parallel:
     desc: Run tests in parallel (requires pytest-xdist)
     cmds:
-      - uv run pytest tests/ clients/python/tests/ -v -n auto
+      - uv run pytest tests/ clients/python/tests/ sdks/python/tests/ -v -n auto
 
   test-watch:
     desc: Run tests in watch mode (requires pytest-watch)
@@ -480,12 +485,12 @@ tasks:
   ci-typecheck:
     desc: Run mypy type checking
     cmds:
-      - uv run mypy src/qdash/common src/qdash/datamodel src/qdash/dbmodel src/qdash/repository src/qdash/api src/qdash/workflow clients/python/src/qdash/client clients/python/src/qdash/sdk clients/python/tests tests
+      - uv run mypy src/qdash/common src/qdash/datamodel src/qdash/dbmodel src/qdash/repository src/qdash/api src/qdash/workflow clients/python/src/qdash/client sdks/python/src/qdash/sdk clients/python/tests sdks/python/tests tests
 
   ci-test:
     desc: Run all tests with coverage
     cmds:
-      - uv run pytest tests/ clients/python/tests/ -v --tb=short --cov=src/qdash --cov=clients/python/src/qdash/client --cov=clients/python/src/qdash/sdk --cov-report=xml --cov-report=term
+      - uv run pytest tests/ clients/python/tests/ sdks/python/tests/ -v --tb=short --cov=src/qdash --cov=clients/python/src/qdash/client --cov=sdks/python/src/qdash/sdk --cov-report=xml --cov-report=term
 
   knip:
     desc: Check for unused exports, dependencies, and files in UI

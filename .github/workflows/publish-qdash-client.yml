@@ -1,16 +1,19 @@
 name: Publish qdash-client
 
-# PyPI Trusted Publishing for qdash-client is registered for this filename, and PyPI does
-# not support reusable workflows, so this stays a top-level workflow. It never computes a
-# publishable version itself: publish-typescript-packages.yml computes one QDash version
-# per run, publishes the npm client, and uploads a qdash-client-release record. When that
-# run completes, workflow_run builds this client from the same commit and publishes the
-# record's PEP 440 version. Pull requests and manual runs only validate.
+# Publishes the Python packages qdash-client and qdash-sdk. PyPI Trusted Publishing for
+# both must be registered for this filename, and PyPI does not support reusable workflows, so
+# this stays a top-level workflow. It never computes a publishable version itself:
+# publish-typescript-packages.yml computes one QDash version per run, publishes the npm
+# client, and uploads a qdash-client-release record. When that run completes,
+# workflow_run builds both packages from the same commit with the record's PEP 440
+# version, publishes qdash-client, and then qdash-sdk, which requires that exact
+# qdash-client. Pull requests and manual runs only validate.
 on:
   pull_request:
     branches: [develop]
     paths:
       - "clients/python/**"
+      - "sdks/python/**"
       - "pyproject.toml"
       - "uv.lock"
       - ".github/scripts/client-release*"
@@ -42,7 +45,7 @@ jobs:
         github.event.workflow_run.event == 'workflow_dispatch'))
     outputs:
       channel: ${{ steps.release.outputs.channel }}
-    name: Build qdash-client
+    name: Build qdash-client and qdash-sdk
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
@@ -110,7 +113,10 @@ jobs:
         working-directory: source
         run: node .github/scripts/client-release.mjs --python
 
-      - name: Build package
+      # Both packages get the record's version; hatch_build.py pins qdash-sdk's
+      # dependency to qdash-client==<version>.
+      - name: Build packages
+        shell: bash
         working-directory: source
         env:
           SETUPTOOLS_SCM_PRETEND_VERSION: ${{ steps.release.outputs.version || steps.check.outputs.version }}
@@ -118,28 +124,40 @@ jobs:
         run: |
           test -n "$CLIENT_VERSION"
           uv build --package qdash-client --out-dir dist
+          uv build --package qdash-sdk --out-dir dist
           test -f "dist/qdash_client-$CLIENT_VERSION-py3-none-any.whl"
+          test -f "dist/qdash_sdk-$CLIENT_VERSION-py3-none-any.whl"
+          unzip -p "dist/qdash_sdk-$CLIENT_VERSION-py3-none-any.whl" "qdash_sdk-$CLIENT_VERSION.dist-info/METADATA" \
+            | grep -Fx "Requires-Dist: qdash-client==$CLIENT_VERSION"
 
       - name: Run tests
         working-directory: source
-        run: uv run --package qdash-client pytest clients/python/tests -v
+        run: uv run --package qdash-sdk pytest clients/python/tests sdks/python/tests -v
 
       - name: Run lint and type checks
         working-directory: source
         run: |
-          uv run --package qdash-client ruff check clients/python
-          uv run --package qdash-client ruff format --check clients/python
-          uv run --package qdash-client mypy clients/python/src/qdash/client clients/python/src/qdash/sdk clients/python/tests
+          uv run --package qdash-sdk ruff check clients/python sdks/python
+          uv run --package qdash-sdk ruff format --check clients/python sdks/python
+          uv run --package qdash-sdk mypy clients/python/src/qdash/client sdks/python/src/qdash/sdk clients/python/tests sdks/python/tests
 
-      - name: Upload package artifact
+      # One artifact per package, so each publish job uploads only its own files.
+      - name: Upload qdash-client artifact
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: qdash-client-dist
           path: source/dist/qdash_client-*
           if-no-files-found: error
 
+      - name: Upload qdash-sdk artifact
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: qdash-sdk-dist
+          path: source/dist/qdash_sdk-*
+          if-no-files-found: error
+
   publish:
-    name: Publish to PyPI
+    name: Publish qdash-client to PyPI
     runs-on: ubuntu-latest
     timeout-minutes: 60
     needs: build
@@ -161,4 +179,31 @@ jobs:
         with:
           packages-dir: dist
           # Rerunning this run reuses the same record, so it finds the version published.
+          skip-existing: true
+
+  # qdash-sdk requires qdash-client==<version>, so it publishes only after that client
+  # has. If this job fails after the client published, rerun the failed jobs: they reuse
+  # this run's artifacts and record, and skip-existing skips a version already on PyPI.
+  publish-sdk:
+    name: Publish qdash-sdk to PyPI
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    needs: [build, publish]
+    if: >-
+      github.event_name == 'workflow_run' &&
+      (needs.build.outputs.channel == 'latest' || needs.build.outputs.channel == 'beta')
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Download package artifact
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
+        with:
+          name: qdash-sdk-dist
+          path: dist
+
+      - name: Publish package
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # release/v1
+        with:
+          packages-dir: dist
           skip-existing: true

@@ -1,8 +1,8 @@
 # Python SDK
 
 `qdash.sdk` lets a Python script define a [calibration pipeline](../workflow/calibration-pipeline.md)
-as objects and validate or run it through the QDash API. It ships in the `qdash-client`
-distribution beside `qdash.client`; the user-facing example is in the
+as objects and validate or run it through the QDash API. It ships in the `qdash-sdk`
+distribution, which depends on `qdash-client`; the user-facing example is in the
 [Python Client reference](../../reference/clients/python.md#define-and-run-a-calibration-pipeline).
 
 ## Responsibility boundary
@@ -87,13 +87,43 @@ raised after `timeout_seconds` without cancelling the run.
 `ExecutePipelineResponse.execution_id` falls back to the Prefect flow run ID when the API could
 not pre-create the execution; `wait()` then polls that ID until the timeout if no execution has it.
 
-## Packaging
+## Packaging and release
 
-`qdash` is an implicit namespace package shared by the root project (`src/qdash/`) and
-`qdash-client` (`clients/python/src/qdash/`); no distribution ships `qdash/__init__.py`. The
-wheel contains `qdash.client` and `qdash.sdk` and depends only on `httpx` and Pydantic, so the
-SDK installs without Prefect, qubex, NumPy or pint. `qdash.sdk` is unrelated to
-`qdash.api.metric_runtime.sdk`, the server-side module metric scripts import as `qdash_metrics`.
+`qdash` is an implicit namespace package shared by three distributions, and none of them ships
+`qdash/__init__.py`:
+
+| Distribution | Source | Wheel contents | Runtime dependencies |
+| --- | --- | --- | --- |
+| `qdash` (server, not published) | `src/qdash/` | Server packages | Server stack |
+| `qdash-client` | `clients/python/` | `qdash/client/` only | `httpx`, Pydantic |
+| `qdash-sdk` | `sdks/python/` | `qdash/sdk/` only | `qdash-client` of the same version |
+
+Neither published wheel installs a file of the other, so uninstalling `qdash-sdk` leaves
+`qdash.client` working, and uninstalling `qdash-client` leaves `qdash.sdk` installed but
+unimportable. The SDK installs without Prefect, qubex, NumPy or pint. `qdash.sdk` is unrelated
+to `qdash.api.metric_runtime.sdk`, the server-side module metric scripts import as
+`qdash_metrics`.
+
+Both packages take their version from hatch-vcs with the same settings and receive the release
+version through `SETUPTOOLS_SCM_PRETEND_VERSION`. The custom metadata hook in
+`sdks/python/hatch_build.py` reads the version being built and writes the SDK's only
+dependency:
+
+| Built version | `Requires-Dist` |
+| --- | --- |
+| `X.Y.Z` (QDash tag) or `X.Y.ZbN` (develop beta) | `qdash-client==<version>` |
+| A hatch-vcs development version such as `1.0.13.post1.dev1282`, or `0.0.0` | `qdash-client` |
+
+Development versions change on every commit and name no published client, so leaving them
+unpinned keeps `uv.lock` stable; the workspace resolves `qdash-client` to `clients/python`
+through `[tool.uv.sources]`. Because the dependency is dynamic, `uv lock` and
+`uv sync --locked` build the SDK's metadata, so every Dockerfile that copies workspace
+member manifests also copies `sdks/python/hatch_build.py`.
+
+`.github/workflows/publish-qdash-client.yml` builds both packages from one release record,
+publishes `qdash-client`, and then publishes `qdash-sdk`; the release pipeline is described in
+[Pi Packages](../copilot/packages.md#distribution). The workflow keeps its filename because
+the existing `qdash-client` PyPI Trusted Publisher names it.
 
 Python flows written against `qdash.workflow` remain the way to express loops, conditions on
 results or steps outside the catalog; the SDK does not convert them.
@@ -102,16 +132,17 @@ results or steps outside the catalog; the SDK does not convert them.
 
 | Test | Covers |
 | --- | --- |
-| `clients/python/tests/test_sdk_pipeline.py` | Serialized spec, call order and IDs, local structural checks, sweep wire format, literal types against the generated enums |
-| `clients/python/tests/test_sdk_session.py` | Requests and headers through `httpx.MockTransport`, explicit execute, whole-pipeline wait and timeout, 403 and 422 propagation, client ownership, project scope |
-| `clients/python/tests/test_sdk_wheel.py` | Builds the wheel, installs it into a fresh environment, and imports both namespaces without server packages |
+| `sdks/python/tests/test_sdk_pipeline.py` | Serialized spec, call order and IDs, local structural checks, sweep wire format, literal types against the generated enums |
+| `sdks/python/tests/test_sdk_session.py` | Requests and headers through `httpx.MockTransport`, explicit execute, whole-pipeline wait and timeout, 403 and 422 propagation, client ownership, project scope |
+| `sdks/python/tests/test_sdk_distributions.py` | Builds both packages at a stable and a beta version, checks the `qdash-client` pin and disjoint wheels, and installs and uninstalls them in fresh environments |
 | `tests/qdash/api/routers/test_calibration_pipeline_sdk.py` | The example against the real routes and server spec model, including preflight problems and sweep parity with `qdash.datamodel.sweep` |
 | `tests/qdash/api/test_app_factory.py` | The published components and the refusal to replace a different model under a taken name |
 
 ## Implementation Files
 
-- `clients/python/src/qdash/sdk/_session.py`: `QDash`.
-- `clients/python/src/qdash/sdk/_pipelines.py`: `Pipelines`, `PipelineRun`.
-- `clients/python/src/qdash/sdk/pipeline.py`, `sweep.py`: definition objects and sweeps.
+- `sdks/python/src/qdash/sdk/_session.py`: `QDash`.
+- `sdks/python/src/qdash/sdk/_pipelines.py`: `Pipelines`, `PipelineRun`.
+- `sdks/python/src/qdash/sdk/pipeline.py`, `sweep.py`: definition objects and sweeps.
+- `sdks/python/hatch_build.py`: the `qdash-client` pin.
 - `clients/python/src/qdash/client/services/client.py`: the pipeline route methods and `with_project`.
 - `src/qdash/api/app/factory.py`: `OPENAPI_COMPONENT_MODELS`.

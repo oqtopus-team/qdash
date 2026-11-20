@@ -9,12 +9,18 @@ agent integrations. It supports Python 3.11 and 3.12.
 pip install qdash-client
 ```
 
-The distribution name is `qdash-client`. It provides two import packages: `qdash.client`, one
-method per API route, and `qdash.sdk`, which defines and runs
-[calibration pipelines](#define-and-run-a-calibration-pipeline) on top of it.
+`qdash-client` provides `qdash.client`, one method per API route. To also define and run
+[calibration pipelines](#define-and-run-a-calibration-pipeline) with `qdash.sdk`, install
+`qdash-sdk`, which installs the `qdash-client` of the same version:
 
-Each QDash release tag `vX.Y.Z` publishes `qdash-client` `X.Y.Z` to PyPI, the same version as the
-[TypeScript client](./typescript.md). Each change on `develop` that publishes a
+```bash
+pip install qdash-sdk
+```
+
+In a uv project, run `uv add qdash-sdk` or `uv add qdash-client`.
+
+Each QDash release tag `vX.Y.Z` publishes `qdash-client` and `qdash-sdk` `X.Y.Z` to PyPI, the
+same version as the [TypeScript client](./typescript.md). Each change on `develop` that publishes a
 [TypeScript client beta](./typescript.md#installation) also publishes a PEP 440 pre-release,
 `<next QDash patch>b<build>`, where `<build>` counts the first-parent commits on `develop` (for
 example `1.10.3b1278`); the TypeScript client spells the same build `1.10.3-beta.1278`. The
@@ -23,8 +29,12 @@ version can reach npm before PyPI.
 pip installs pre-releases only on request:
 
 ```bash
-pip install --pre qdash-client
+pip install --pre qdash-sdk
 ```
+
+Every `qdash-sdk` release requires exactly the `qdash-client` release of its own version, stable
+or pre-release, so the installed pair always matches. With uv, run
+`uv add --prerelease allow qdash-sdk`.
 
 ## Connect to a Deployment
 
@@ -183,7 +193,7 @@ clients after each request. Call `close()` to release the persistent synchronous
 
 ## Define and Run a Calibration Pipeline
 
-`qdash.sdk` builds a [calibration pipeline spec](../../developer-guide/workflow/calibration-pipeline.md)
+`qdash.sdk`, from the `qdash-sdk` package, builds a [calibration pipeline spec](../../developer-guide/workflow/calibration-pipeline.md)
 from Python objects, validates it on the server, and runs it only when asked. This pipeline runs
 `Configure`, `CheckT1` and `CheckT2Echo` on qubits 0 and 1:
 
