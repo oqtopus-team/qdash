@@ -416,11 +416,13 @@ export function WorkflowEditorPageContent() {
 
   // Tell the chat sidebar what is open here: the active pane's flow and its current text, read
   // when a turn is sent; a proposed edit for that flow lands in the same pane, unlocked.
-  const { registerPage } = useChatDock();
+  const { registerPage, refreshPage } = useChatDock();
   const pageState = useRef({ routeName, name, ready, chipId, code, isDirty, setCode });
-  // Written after each commit, never during render; the provider below reads it when a turn is sent.
+  // Written after each commit, never during render; the provider below reads it when a turn is
+  // sent, and the chat refreshes the page it shows (it rerenders only when that summary changes).
   useEffect(() => {
     pageState.current = { routeName, name, ready, chipId, code, isDirty, setCode };
+    refreshPage();
   });
   useEffect(
     () =>

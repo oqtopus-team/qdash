@@ -26,7 +26,7 @@ for the role to assign.
 | **Metrics** | Inspect one metric across qubits or couplings and compare its history. | [Calibration Data and Provenance](./data-and-provenance.md) |
 | **Chip** | Browse calibration tasks and the latest results on the chip topology. | [Calibration Data and Provenance](./data-and-provenance.md) |
 | **Analysis** | Plot and compare chip parameters over a selected time range. | [Calibration Data and Provenance](./data-and-provenance.md) |
-| **AI Chat** | Ask questions using project calibration context. | [AI Chat](./ai-chat.md) |
+| **Agent** | Ask questions using project calibration context. | [Agent](./ai-chat.md) |
 
 **Executions** on Home shows the active project's runs across all chips over the last 30 days,
 grouped by day and status. The chart labels block size on busy days and uses partial blocks for

@@ -316,7 +316,7 @@ describe("Sidebar", () => {
       const drawer = within(getMobileDrawer());
       const nav = within(drawer.getByRole("navigation", { name: "Menu navigation" }));
 
-      for (const label of ["Dashboard", "Workflow", "Execution", "AI Chat"]) {
+      for (const label of ["Dashboard", "Workflow", "Execution", "Agent"]) {
         expect(nav.queryByRole("link", { name: label })).toBeNull();
       }
       for (const label of ["Home", "Metrics", "Task Results", "Tasks", "Config", "Settings"]) {

@@ -2,15 +2,17 @@
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { useGetCopilotPreferences } from "@/client/copilot/copilot";
-import { ArrowDown, FlaskConical, GitBranch } from "lucide-react";
+import { ArrowDown, GitBranch } from "lucide-react";
 import { StickToBottom, useStickToBottomContext } from "use-stick-to-bottom";
 import { useChatSuggestions, type ChatSuggestion } from "@/hooks/useChatSuggestions";
 import { useCopilotChat } from "@/hooks/useCopilotChat";
 import { useChatAttachments } from "@/hooks/useChatAttachments";
 import { useChatGreeting } from "@/hooks/useChatGreeting";
 import { useAuth } from "@/contexts/AuthContext";
+import { useChatPageSummary } from "@/contexts/ChatDockContext";
 import { withViewTransition } from "@/lib/viewTransition";
 import { ChatComposer, type ChatComposerHandle } from "@/components/features/chat/ChatComposer";
+import { ChatContextBar } from "@/components/features/chat/ChatContextBar";
 import { ChatLinkPreviewProvider } from "@/components/features/chat/ChatLinkPreview";
 import { ChatNotice, ChatPendingSteers } from "@/components/features/chat/ChatPendingSteers";
 import { QdashBotAvatar } from "@/components/ui/UserAvatar";
@@ -27,21 +29,6 @@ import type { TaskChatContext } from "@/types/copilotChat";
  * - compact: the floating window above modals
  */
 type ChatThreadVariant = "page" | "panel" | "compact";
-
-/** "CheckT1 · Q00" badge for chats about one result. */
-export function ContextChip({ context }: { context: TaskChatContext }) {
-  return (
-    <span
-      className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary px-2 py-0.5 text-xs font-medium max-w-full"
-      title={`${context.taskName} · ${context.qid} · ${context.chipId}`}
-    >
-      <FlaskConical className="w-3 h-3 shrink-0" />
-      <span className="truncate">
-        {context.taskName} · {context.qid}
-      </span>
-    </span>
-  );
-}
 
 function ScrollToBottomButton() {
   const { isAtBottom, scrollToBottom } = useStickToBottomContext();
@@ -78,11 +65,6 @@ function EmptyState({
     return (
       <div className="w-full text-center px-4">
         <QdashBotAvatar size={64} unframed className="mx-auto mb-5 chat-avatar-hero" />
-        {context && (
-          <div className="mb-3">
-            <ContextChip context={context} />
-          </div>
-        )}
         <h2 className="text-xl font-medium break-words">{title}</h2>
       </div>
     );
@@ -91,11 +73,6 @@ function EmptyState({
   return (
     <div className={`w-full mx-auto px-1 ${variant === "panel" ? "text-center" : ""}`}>
       {variant === "panel" && <QdashBotAvatar size={80} unframed className="mb-4" />}
-      {context && (
-        <div className="mb-2">
-          <ContextChip context={context} />
-        </div>
-      )}
       <h2 className="text-sm font-medium mb-1 break-words">{title}</h2>
       <p className="text-xs text-base-content/50 mb-4 mx-auto max-w-64">
         {context
@@ -221,6 +198,9 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
   useImperativeHandle(ref, () => ({ focus: () => composerRef.current?.focus() }), []);
 
   const context = session?.context ?? null;
+  // Subscribed, so the shown page follows navigation and the editor registering, loading, or
+  // switching panes; a send still reads the dock's current page at that moment.
+  const page = useChatPageSummary();
   const suggestions = useChatSuggestions(Boolean(context));
   const isEmpty = messages.length === 0 && !liveTurn && steers.length === 0;
   const lastIndex = messages.length - 1;
@@ -267,34 +247,37 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
   const focusComposer = useCallback(() => composerRef.current?.focus(), []);
 
   const composer = (
-    <ChatComposer
-      ref={composerRef}
-      value={input}
-      onChange={setInput}
-      onSubmit={() => submit(input)}
-      onStop={stop}
-      isStreaming={isStreaming}
-      disabled={isLoadingMessages}
-      placeholder={context ? "Ask about this result" : "Ask a question"}
-      attachments={attachments}
-      onAttach={attach}
-      onRemoveAttachment={remove}
-      isStaging={isStaging}
-      attachmentNotice={notice}
-      modelOptions={model.options}
-      selectedModelKey={model.selected.key}
-      onModelChange={model.select}
-      modelStatus={model.status}
-      thinkingChoice={thinking.choice}
-      thinkingModelDefault={thinking.modelDefault}
-      onThinkingChange={thinking.select}
-      instructionsActive={Boolean(preferences?.data.instructions)}
-      compact={variant !== "page"}
-      steerable
-    />
+    <>
+      <ChatContextBar context={context} investigation={session?.investigation} page={page} />
+      <ChatComposer
+        ref={composerRef}
+        value={input}
+        onChange={setInput}
+        onSubmit={() => submit(input)}
+        onStop={stop}
+        isStreaming={isStreaming}
+        disabled={isLoadingMessages}
+        placeholder={context ? "Ask about this result" : "Ask a question"}
+        attachments={attachments}
+        onAttach={attach}
+        onRemoveAttachment={remove}
+        isStaging={isStaging}
+        attachmentNotice={notice}
+        modelOptions={model.options}
+        selectedModelKey={model.selected.key}
+        onModelChange={model.select}
+        modelStatus={model.status}
+        thinkingChoice={thinking.choice}
+        thinkingModelDefault={thinking.modelDefault}
+        onThinkingChange={thinking.select}
+        instructionsActive={Boolean(preferences?.data.instructions)}
+        compact={variant !== "page"}
+        steerable
+      />
+    </>
   );
 
-  const pad = variant === "page" ? "px-4" : "px-3";
+  const pad = variant === "page" ? "px-3 sm:px-4" : "px-3";
   const density =
     variant === "page" ? "" : variant === "panel" ? "chat-compact" : "chat-compact chat-compact-xs";
 
@@ -306,7 +289,7 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
         } ${density}`}
       >
         {variant === "page" ? (
-          <div className="w-full max-w-3xl px-4">
+          <div className="w-full max-w-3xl px-3 sm:px-4">
             <EmptyState
               variant={variant}
               context={context}

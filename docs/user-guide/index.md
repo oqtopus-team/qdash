@@ -54,7 +54,7 @@ passwords.
 
 | Goal | Guide |
 | --- | --- |
-| Ask questions about project data, or investigate a failure | [AI Chat](./ai-chat.md) |
+| Ask questions about project data, or investigate a failure | [Agent](./ai-chat.md) |
 | Judge task-result figures and compare evaluation settings | [AI Evaluations](./ai-evaluations.md) |
 | Let an agent you operate run bounded, gated single-qubit steps (experimental) | [Agent Calibration](./agent-calibration.md) |
 
