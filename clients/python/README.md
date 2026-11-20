@@ -33,7 +33,8 @@ details inside the REST layer. Export public classes and response models from
 
 PyPI Trusted Publishing publishes `qdash-client` from this repository. The package version is
 derived from the repository's `v<version>` release tag; do not edit a version in
-`clients/python/pyproject.toml`.
+`clients/python/pyproject.toml`. The same workflow then publishes
+[`qdash-sdk`](../../sdks/python/README.md) with the same version.
 
 Creating the tag also publishes the TypeScript client and creates the GitHub release:
 

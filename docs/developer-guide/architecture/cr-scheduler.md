@@ -84,8 +84,8 @@ intra/inter-MUX split, conflict coloring, and chunking as `generate()`.
 [Workflow Integration](#workflow-integration), and `manual` runs the step's `rounds` of directed
 pairs without `CRScheduler`, without an earlier `cr_schedule`, and without chunking.
 `max_parallel_ops` now defaults to `None`, meaning 10 for automatic steps, so a manual step that
-sets it is rejected instead of silently ignoring or applying it; a spec rejects it only when the
-field is explicitly set. `pair_round_issues()` in `common/manual_rounds.py` applies the
+sets it is rejected instead of silently ignoring or applying it. A spec treats an omitted cap and
+`null` alike and rejects a manual step only when the cap is a number. `pair_round_issues()` in `common/manual_rounds.py` applies the
 `schedule_pairs()` membership checks (exact `control-target` coupling ID, qubits that are wired
 MUX members or standalone qubits of the chip topology, with membership from the same
 `MuxMapping`) and the

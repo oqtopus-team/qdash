@@ -1,0 +1,49 @@
+[project]
+name = "qdash-sdk"
+description = "Python SDK for defining and running QDash calibrations"
+authors = [
+    {name = "OQTOPUS Team", email = "oqtopus-team@googlegroups.com"}
+]
+readme = "README.md"
+requires-python = ">=3.11,<3.13"
+# hatch_build.py sets the dependencies: qdash-client pinned to this package's version.
+dynamic = ["version", "dependencies"]
+
+[dependency-groups]
+dev = [
+    "mypy==2.3.0",
+    "pytest==9.0.3",
+    "pytest-asyncio==1.3.0",
+    "ruff==0.15.14",
+]
+
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+# Keep the version source identical to clients/python so both packages of one build
+# carry the same version.
+[tool.hatch.version]
+source = "vcs"
+tag-pattern = "^v(?P<version>\\d+\\.\\d+\\.\\d+)$"
+fallback-version = "0.0.0"
+
+[tool.hatch.version.raw-options]
+root = "../.."
+version_scheme = "no-guess-dev"
+local_scheme = "no-local-version"
+
+[tool.hatch.version.raw-options.scm.git]
+describe_command = "git describe --dirty --tags --long --match v[0-9]*"
+
+[tool.hatch.metadata.hooks.custom]
+
+[tool.hatch.build]
+exclude = [
+    "**/__pycache__",
+    "**/*.pyc",
+]
+
+[tool.hatch.build.targets.wheel]
+only-include = ["src/qdash/sdk"]
+sources = ["src"]

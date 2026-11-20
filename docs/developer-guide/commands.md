@@ -22,6 +22,7 @@ task test                # all Python tests
 task test-api            # API tests
 task test-workflow       # workflow tests
 task test-client         # Python client tests
+task test-sdk            # Python SDK tests
 task test-client-ts      # TypeScript client checks
 task ci-pi-packages      # pi extension and release-script checks
 task ci-agent-runtime    # runtime tests and typecheck

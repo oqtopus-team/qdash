@@ -64,8 +64,8 @@ pi-qdash keeps its existing name.
 | Trigger | Result |
 | --- | --- |
 | PR to `develop` affecting packages, either client, API schema, runtime, root dependencies, or release workflow | Typecheck and test both packages and runtime; upload npm tarballs without publishing |
-| Push to `develop` affecting packages, either client, API schema, root dependencies, or release workflow | Publish the client beta first, then both pi betas, with the `beta` dist-tag; then publish the same client version to PyPI |
-| QDash `vX.Y.Z` tag | Publish the client, then both pi packages, as `X.Y.Z` under `latest`; then publish the client to PyPI |
+| Push to `develop` affecting packages, either client, API schema, root dependencies, or release workflow | Publish the client beta first, then both pi betas, with the `beta` dist-tag; then publish `qdash-client` and `qdash-sdk` of the same version to PyPI |
+| QDash `vX.Y.Z` tag | Publish the client, then both pi packages, as `X.Y.Z` under `latest`; then publish `qdash-client` and `qdash-sdk` `X.Y.Z` to PyPI |
 | Manual run on a branch | Build and validate without publishing |
 | Manual run on a QDash tag | Retry that stable release; versions already on npm are skipped |
 
@@ -91,8 +91,9 @@ one computation per run:
    `releaseVersion` in `.github/scripts/pi-package-release.mjs`.
 3. When this workflow's run completes, `publish-qdash-client.yml` starts through
    `workflow_run`, verifies the run and its record with `pypiRelease` in
-   `.github/scripts/client-release.mjs`, then checks out the verified commit, builds it,
-   and publishes that exact version to PyPI.
+   `.github/scripts/client-release.mjs`, then checks out the verified commit, builds
+   `qdash-client` and `qdash-sdk` with that exact version, publishes `qdash-client`, and
+   then publishes `qdash-sdk`, which requires `qdash-client==<version>`.
 
 pi betas keep a run-based suffix on the same base:
 `<next QDash patch>-beta.<GitHub run ID>.<attempt>` (for example
@@ -119,7 +120,10 @@ setting; keep both protected, because an accepted tag publishes its commit to Py
 `publish-qdash-client.yml` has no push or tag trigger of its own; on PRs and manual runs
 it only validates. It ignores PR runs of this workflow. Registries and packages publish
 in separate jobs and runs, so a release is not atomic: if the PyPI run fails, rerun that
-run, which reuses the same record; if a pi package fails, rerun the failed jobs. A run
+run, which reuses the same record; if a pi package fails, rerun the failed jobs.
+`qdash-sdk` publishes only after `qdash-client` succeeds, so PyPI never has an SDK whose
+client is missing. If the SDK job fails after the client published, rerun the failed jobs:
+they reuse the run's built files, and PyPI skips the client version already uploaded. A run
 that fails before publishing the npm client uploads no record, and its PyPI run fails
 at the download step. A rerun on a QDash tag skips every `X.Y.Z` that npm already has,
 through `publishTag` for the pi packages, and PyPI skips an existing version. A tag older
@@ -160,7 +164,11 @@ package-owner setting is external to the repository; merging the workflow alone 
 not authorize publishing.
 
 [PyPI Trusted Publishing](https://docs.pypi.org/trusted-publishers/) for `qdash-client`
-stays registered for workflow filename `publish-qdash-client.yml`. PyPI does not support
+stays registered for workflow filename `publish-qdash-client.yml`. `qdash-sdk` needs its own
+PyPI publisher before its first release: owner `oqtopus-team`, repository `qdash`, workflow
+filename `publish-qdash-client.yml`, and no environment, matching the `publish-sdk` job.
+A maintainer adds it on PyPI as a pending publisher, because the project does not exist yet;
+until then that job fails after `qdash-client` publishes. PyPI does not support
 reusable workflows as trusted publishers, so that workflow remains top-level and receives
 the version through `workflow_run` instead of being called by this workflow. PyPI then
 sees `publish-qdash-client.yml` on the default branch, `develop`, for every publication.

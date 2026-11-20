@@ -59,6 +59,10 @@ The spec cannot reference code. Each `type` maps to one Step class, task names m
 | `POST /calibration-pipelines/validate` | viewer | Dry run: every problem with a path into the spec, warnings, and the resolved steps with each call's id, failure policy, and effective settings |
 | `POST /calibration-pipelines/execute` | editor | Validate, then run the spec as one execution through the worker's `system-calibration-pipeline` deployment |
 
+OpenAPI publishes the spec as the `CalibrationPipelineSpec` component, which the generated
+clients use; the request field `spec` stays a plain object so `validate` can report problems. From
+Python, [`qdash.sdk`](../architecture/python-sdk.md) builds a spec and calls these routes.
+
 For a bad spec, `validate` returns `valid: false` and path-specific `problems`, such as
 `targets.qids[1]: qubit '99' is not on chip 64Qv3`, rather than HTTP 422. Warnings identify
 allowed but suspect choices, including deprecated `task_parameters`; they do not invalidate a spec.

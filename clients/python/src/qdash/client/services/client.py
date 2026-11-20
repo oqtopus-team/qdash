@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import random
 import time
 from datetime import UTC, datetime
@@ -16,7 +17,7 @@ from qdash.client.rest.configuration import Configuration as RestConfiguration
 from qdash.client.rest.exceptions import ApiException as RestApiException
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Mapping
     from pathlib import Path
 
     from qdash.client.rest.api_response import ApiResponse as RestApiResponse
@@ -54,6 +55,7 @@ from qdash.client.services.models import (
     ChipResponse,
     CouplingResponse,
     ExecuteFlowResponse,
+    ExecutePipelineResponse,
     ExecutionActivityResponse,
     ExecutionResponseDetail,
     FileTreeNode,
@@ -73,6 +75,7 @@ from qdash.client.services.models import (
     NoteModel,
     ParameterHistoryResponse,
     ParameterVersionResponse,
+    PipelineCatalogResponse,
     ProjectResponse,
     ProvenanceStatsResponse,
     QdashApiSchemasProjectProjectListResponse,
@@ -87,6 +90,7 @@ from qdash.client.services.models import (
     TaskResultListResponse,
     TaskResultResponse,
     TimeSeriesData,
+    ValidatePipelineResponse,
 )
 
 PACKAGE_NAME = "qdash"
@@ -130,6 +134,7 @@ class QDashClient:
             http_client=http_client,
         )
         self._default_headers = default_headers or {}
+        self._owns_rest_client = True
 
         self._token: str | None = self.config.api_token
         if not self.config.user_agent or self.config.user_agent == "qdash-client/dev":
@@ -152,8 +157,28 @@ class QDashClient:
         )
         return cls(config)
 
+    def with_project(self, project_id: str) -> QDashClient:
+        """Return a client that sends ``project_id`` as ``X-Project-Id``.
+
+        The returned client shares this client's connection, credentials and retry settings.
+        This client and its configuration are unchanged. Closing the returned client does not
+        close the shared connection; close this client when both are done.
+        """
+        if not project_id:
+            raise ValueError("project_id must be a non-empty string")
+        scoped = copy.copy(self)
+        scoped.config = self.config.model_copy(update={"project_id": project_id})
+        scoped._default_headers = {
+            name: value
+            for name, value in self._default_headers.items()
+            if name.lower() != "x-project-id"
+        }
+        scoped._owns_rest_client = False
+        return scoped
+
     def close(self) -> None:
-        self._rest_client.close()
+        if self._owns_rest_client:
+            self._rest_client.close()
 
     def _validate_model_payload(
         self,
@@ -674,10 +699,12 @@ class QDashClient:
         *,
         parameters: dict[str, Any] | None = None,
     ) -> ExecuteFlowResponse:
+        """Run a saved flow; ``parameters`` override its saved defaults for this run only."""
+        # The request's parameters are an object; null is rejected, so None sends {}.
         response = self._request(
             "POST",
             f"/flows/{name}/execute",
-            json={"parameters": parameters},
+            json={"parameters": parameters if parameters is not None else {}},
         )
         return self._validate_model_payload(ExecuteFlowResponse, response.data)
 
@@ -703,6 +730,51 @@ class QDashClient:
             ),
         )
         return self._validate_model_payload(ScheduleFlowResponse, response.data)
+
+    def get_calibration_pipeline_catalog(
+        self, *, backend_name: str | None = None
+    ) -> PipelineCatalogResponse:
+        """Step types, task names and the spec schema for writing a calibration pipeline."""
+        params = {"backend_name": backend_name} if backend_name is not None else None
+        response = self._request("GET", "/calibration-pipelines/catalog", params=params)
+        return self._validate_model_payload(PipelineCatalogResponse, response.data)
+
+    def validate_calibration_pipeline(
+        self,
+        *,
+        chip_id: str,
+        spec: Mapping[str, Any],
+        backend_name: str | None = None,
+    ) -> ValidatePipelineResponse:
+        """Check a pipeline spec on the server without running it.
+
+        Problems with the spec come back in the response, not as an exception.
+        """
+        response = self._request(
+            "POST",
+            "/calibration-pipelines/validate",
+            json=self._query_params(chip_id=chip_id, spec=dict(spec), backend_name=backend_name),
+        )
+        return self._validate_model_payload(ValidatePipelineResponse, response.data)
+
+    def execute_calibration_pipeline(
+        self,
+        *,
+        chip_id: str,
+        spec: Mapping[str, Any],
+        backend_name: str | None = None,
+    ) -> ExecutePipelineResponse:
+        """Validate a pipeline spec on the server and dispatch it as one execution.
+
+        A spec with problems raises :class:`QDashValidationError` (422) whose ``payload`` holds
+        the server's problem list; nothing is dispatched.
+        """
+        response = self._request(
+            "POST",
+            "/calibration-pipelines/execute",
+            json=self._query_params(chip_id=chip_id, spec=dict(spec), backend_name=backend_name),
+        )
+        return self._validate_model_payload(ExecutePipelineResponse, response.data)
 
     def get_execution_activity(
         self,
