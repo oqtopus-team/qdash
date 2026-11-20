@@ -18,8 +18,8 @@
  * card only exists for a call the model made.
  *
  * The one other kind of nested call is an internal tool, such as
- * present_results' classifier: it runs only while a tool named as its caller
- * is executing and is that call's parent. A script's parent is the `codemode`
+ * present_results' classifier: it runs only as a nested call whose parent is
+ * a call to a tool named as its caller. A script's parent is the `codemode`
  * call, never such a caller, so a script cannot reach it.
  *
  * Deferred tools (`deferred: true`) are not offered to the model until it
@@ -42,14 +42,14 @@ import {
 import {
   defineExtension,
   hook,
+  LiveDoc,
   ToolTask,
   wrapSection,
-  wrapTool,
   type Agent,
   type Extension,
   type ToolExecutionResult,
+  type HookApi,
   type ToolHookCall,
-  type TaskId,
   type ToolRegistration,
 } from "@earendil-works/pi-durable";
 import { CODEMODE_TOOL_NAME, createCodemodeExtension } from "@earendil-works/pi-durable/codemode";
@@ -193,48 +193,51 @@ export interface ToolPolicy {
 }
 
 /**
+ * The tool that made nested call `call`, read from the conversation's
+ * committed live state: the slot of the parent's tool task, model-issued or
+ * nested. The Harness writes these slots, so a script cannot name its own
+ * parent, and they stay while the parent is live, also while it is parked or
+ * after a restart, so the answer does not depend on the parent's code running
+ * in this process when the nested call starts.
+ */
+async function parentToolName(call: ToolHookCall, api: HookApi, context: Context): Promise<string | undefined> {
+  const parent = call.parent?.taskId;
+  if (parent === undefined) return undefined;
+  const live = await api.snapshot(LiveDoc, api.conversationId, context);
+  return (
+    live?.tools?.find((slot) => slot.taskId === parent)?.name ??
+    live?.nestedTools?.find((slot) => slot.taskId === parent)?.name
+  );
+}
+
+/**
  * The chat's tool policy: hooks that let a nested call run only for a tool in
  * `nestedTools` or an internal tool whose parent is one of its callers, and
  * that load a deferred tool the model called before loading it.
  *
- * A nested call names only its parent's task, so the policy wraps each caller
- * to note its task while it executes. The note lives in this process; a
- * caller resumed after a restart notes itself again before it can make a
- * nested call, and a call it cannot match is blocked.
+ * A nested call names only its parent's task; the policy reads which tool
+ * that task runs from the Harness's live slots (`parentToolName`). That holds
+ * for a caller that parks (pi-durable 1.6 `{ sleep }` or `{ wait }`) and for
+ * a nested call it started with `wait: false`, whose check runs after the
+ * caller's `execute()` returned. A call whose parent it cannot find is blocked.
  */
 export function toolPolicyExtension(options: ToolPolicy): Extension {
   const nested = new Set(options.nestedTools);
   const deferred = new Set(options.deferredTools);
   const internal = new Map(Object.entries(options.internalCalls ?? {}).map(([name, callers]) => [name, new Set(callers)]));
-  const callers = new Set([...internal.values()].flatMap((names) => [...names]));
-  /** Task of each caller call executing now, with the caller's name. */
-  const executing = new Map<TaskId, { tool: string; count: number }>();
-  const track = (tool: ToolRegistration): ToolRegistration => ({
-    ...tool,
-    execute: async (args, api, context) => {
-      const entry = executing.get(api.taskId) ?? { tool: tool.name, count: 0 };
-      entry.count += 1;
-      executing.set(api.taskId, entry);
-      try {
-        return await tool.execute(args as never, api, context);
-      } finally {
-        entry.count -= 1;
-        if (entry.count === 0) executing.delete(api.taskId);
-      }
-    },
-  });
-  const allowed = (call: ToolHookCall): boolean => {
+  const allowed = async (call: ToolHookCall, api: HookApi, context: Context): Promise<boolean> => {
     if (call.parent === undefined || nested.has(call.name)) return true;
-    const parent = executing.get(call.parent.taskId);
-    return parent !== undefined && internal.get(call.name)?.has(parent.tool) === true;
+    const callers = internal.get(call.name);
+    if (callers === undefined) return false;
+    const parent = await parentToolName(call, api, context);
+    return parent !== undefined && callers.has(parent);
   };
   return defineExtension({
     name: "qdash-tool-policy",
-    wraps: [...callers].map((name) => wrapTool({ name } as ToolRegistration, track)),
     hooks: [
       hook(ToolTask, {
-        beforeTool: (call: ToolHookCall) => {
-          if (allowed(call)) return undefined;
+        beforeTool: async (call: ToolHookCall, api: HookApi, context: Context) => {
+          if (await allowed(call, api, context)) return undefined;
           console.warn(`[agent-runtime] blocked nested call to ${call.name} from ${call.parent?.callId}`);
           return { block: nestedBlockMessage(call.name) };
         },

@@ -84,7 +84,8 @@ store; a branch is another conversation in the store of the chat it was branched
 [Branches](./chat-streaming.md#branches)). Pi 1.4 upgrades existing stores to schema version 2 on first open;
 Pi 1.3 cannot reopen an upgraded store. Pi 1.5 keeps that schema but stores the `pi.live`,
 `pi.tool`, and `pi.generation` documents at new versions when a conversation is next written; Pi 1.4
-cannot read such a conversation and leaves its tasks blocked. Back up the stopped volume before
+cannot read such a conversation and leaves its tasks blocked. Pi 1.6 stores `pi.tool` and
+`pi.generation` at newer versions again; Pi 1.5 blocks those tasks as too new. Back up the stopped volume before
 upgrading, and restore that backup before a rollback to the earlier Pi release. See
 [System Updates](../../user-guide/system-updates.md#deploy-the-release).
 
@@ -135,13 +136,58 @@ list here:
 The hook allows one other kind of nested call: an internal tool called by the tool that owns it.
 `present_results` calls its classifier, `qdash.presentation.classify` (`callers: ["tools"]`), as
 a nested call. `PRESENTATION_INTERNAL_CALLS` names `present_results` as the classifier's only
-caller. The policy wraps `present_results` to note its task while it executes, and allows a
-classifier call only when its parent is that task. A script's parent is the `codemode` call, so a
-script cannot reach the classifier even with Code Mode unfiltered. The note lives in the runtime
-process; a nested call whose parent it cannot match is blocked, and `present_results` then falls
-back to `render_ui` or text. Its `sources` must name a tool the model is offered, or a listed read
+caller. The hook reads which tool the parent task runs from the conversation's `pi.live` tool
+slots, which the Harness writes, and allows a classifier call only when that tool is
+`present_results`. A script's parent is the `codemode` call, so a script cannot reach the
+classifier even with Code Mode unfiltered. The slots are committed state, so the check does not
+depend on the caller's code running in this process: it also holds for a caller that parks (see
+below) or that started the call with `executeTool(..., { wait: false })`, and after a restart. A
+nested call whose parent has no slot is blocked, and `present_results` then falls back to
+`render_ui` or text. Its `sources` must name a tool the model is offered, or a listed read
 a script may call (in the agent's `callable` tools), so a script's deferred read counts before
 `tool_search` loads it.
+
+The `qdash` durable extension declares the code mode namespace `QDASH_TOOL_NAMESPACE` from
+pi-qdash's `extensions/lib/tool-policy.ts` (Pi 1.6 `Extension.namespace`). The prompt section
+lists the tools a script may call under `## qdash` with the namespace's one-line description. A
+script reads the longer instructions (the read-only rule, the data bound, deferred reads) with
+`describeNamespace("qdash")`, and `searchTools()` searches both. The namespace groups tools only;
+it does not widen what a script may call, and write tools in the same extension stay out of the
+listing, `describeNamespace()`, and `searchTools()`.
+
+Pi 1.6 also lets a durable tool's `execute()` park, returning `{ sleep }` or `{ wait }` instead of
+a result, and run again once a deadline, a signal, or its child tasks wake it. Other pi-qdash
+tools are pi CLI tools adapted by `adaptCodingAgentTool`, which runs the tool once and returns its
+result. Approval stays the card-and-next-message flow below rather than a parked call. The
+runtime's own layer passes a park through unchanged: `modelOnly` and the Code Mode wrapper keep the
+tool's `execute()` result and `cancel`, and the policy hook works for parked callers as described
+above.
+
+The pinned `qdash_wait_execution` and `qdash_wait_agent_action` park between polls instead of
+running the client's polling loop (`agent-runtime/src/durable-waits.ts`). pi-qdash's
+`extensions/lib/waits.ts` (`WAIT_SPECS`) splits each tool into one poll, `check`, and its result,
+`result`. `check` stops on the same value as the client's loop: the whole pipeline's terminal
+status for an execution, and the requested `operation_id` or `execution_id`, or a failed
+`execution_status`, for an action. The pi CLI keeps the client's loop and builds the same result
+with `result`. In chat, each run of the tool polls once with a client built from the chat's
+connection, then returns the result, throws the client's timeout error once the deadline passed,
+or parks with `{ sleep: { until } }` for one poll interval. The tool's inputs, defaults, results,
+and errors are those of the pi CLI tool. A parked wait differs from the loop in these ways:
+
+- It holds no process or open request. Its `pi.live` slot is `sleeping`, so the chat stream
+  still shows the call as running and the turn as busy, and Stop stays available.
+- Its deadline is fixed from the Harness clock when the call first runs, memoized, and carried in
+  every park's checkpoint. A wait recovered after a runtime restart polls once against that
+  original deadline, so it never outlives its timeout.
+- Stop ends a parked wait at once and drops a poll in flight. The tool has no `cancel`: waiting
+  only reads, so the execution or action keeps running in QDash. The model reads Pi's
+  `aborted` result.
+- A recovered poll uses the credentials of the request that reopened the chat; the checkpoint
+  holds only the deadline.
+
+Polls keep the requested interval, 0.5 seconds by default, so each poll also commits a park to
+the chat store. A trusted checkout that replaces either tool runs its own code. Both tools stay
+model-only, so a script cannot long-poll.
 
 Write tools therefore still run only after the user approves the model's own call on the
 approval card, never from a script. In a script, a listed read resolves to its redacted response
@@ -184,6 +230,14 @@ deferred loading, including recovery of a direct call and persistence across a r
 `agent-runtime/test/chat-registry.test.mjs` runs the production `buildChatRegistry` assembly:
 `present_results` reaches its classifier, scripts reach only the listed reads, the policy hook
 blocks the classifier for any other parent, and a script past the worker limit is refused.
+`agent-runtime/test/tool-park.test.mjs` parks tools through the policy on a real Harness: a
+caller that sleeps on a signal and calls its internal tool after the wake, a caller that parks on
+an internal call it started without waiting, a non-caller that stays blocked after a wake, and an
+abort that runs the parked tool's `cancel`. `agent-runtime/test/durable-waits.test.mjs` runs the real pi-qdash
+waiting tools on a Harness against a QDash fixture: park and wake, the chat stream while parked,
+timeout, a failed request, Stop while parked and during a poll, and recovery after a restart
+against the original deadline, each compared with the pi CLI's result or error.
+`packages/pi-qdash/tests/waits.test.mjs` compares `WAIT_SPECS` with the client's polling loops.
 
 ## Page context and editor edits
 
