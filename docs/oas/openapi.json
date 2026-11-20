@@ -33940,6 +33940,826 @@
         ],
         "title": "ProjectListResponse",
         "description": "Response schema for listing projects."
+      },
+      "BringUpStep": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "BringUp",
+            "title": "Type"
+          },
+          "step_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]{0,63}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step Id",
+            "description": "Identifier of this step, unique within the pipeline; filters reference it. Defaults to the step's name. Set it when a pipeline runs the same step type twice."
+          },
+          "tasks": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/TaskCall"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tasks",
+            "description": "Task calls to run on every target, in order. A task may appear more than once when each occurrence has its own call_id. Defaults to BRINGUP_TASKS."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type"
+        ],
+        "title": "BringUpStep",
+        "description": "Initial characterization: resonator and qubit spectroscopy, chevron."
+      },
+      "CalibrationPipelineSpec": {
+        "properties": {
+          "spec_version": {
+            "type": "integer",
+            "const": 2,
+            "title": "Spec Version",
+            "description": "Spec format version. Convert a version 1 spec with migrate_pipeline_spec."
+          },
+          "name": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$",
+            "title": "Name",
+            "description": "Display name of the execution.",
+            "default": "pipeline"
+          },
+          "targets": {
+            "$ref": "#/components/schemas/PipelineTargets"
+          },
+          "steps": {
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/ConfigureAllStep"
+                },
+                {
+                  "$ref": "#/components/schemas/BringUpStep"
+                },
+                {
+                  "$ref": "#/components/schemas/OneQubitCheckStep"
+                },
+                {
+                  "$ref": "#/components/schemas/OneQubitFineTuneStep"
+                },
+                {
+                  "$ref": "#/components/schemas/CustomOneQubitStep"
+                },
+                {
+                  "$ref": "#/components/schemas/FilterByStatusStep"
+                },
+                {
+                  "$ref": "#/components/schemas/FilterByMetricStep"
+                },
+                {
+                  "$ref": "#/components/schemas/GenerateCRScheduleStep"
+                },
+                {
+                  "$ref": "#/components/schemas/TwoQubitCalibrationStep"
+                },
+                {
+                  "$ref": "#/components/schemas/CustomTwoQubitStep"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "type",
+                "mapping": {
+                  "BringUp": "#/components/schemas/BringUpStep",
+                  "ConfigureAll": "#/components/schemas/ConfigureAllStep",
+                  "CustomOneQubit": "#/components/schemas/CustomOneQubitStep",
+                  "CustomTwoQubit": "#/components/schemas/CustomTwoQubitStep",
+                  "FilterByMetric": "#/components/schemas/FilterByMetricStep",
+                  "FilterByStatus": "#/components/schemas/FilterByStatusStep",
+                  "GenerateCRSchedule": "#/components/schemas/GenerateCRScheduleStep",
+                  "OneQubitCheck": "#/components/schemas/OneQubitCheckStep",
+                  "OneQubitFineTune": "#/components/schemas/OneQubitFineTuneStep",
+                  "TwoQubitCalibration": "#/components/schemas/TwoQubitCalibrationStep"
+                }
+              }
+            },
+            "type": "array",
+            "maxItems": 32,
+            "minItems": 1,
+            "title": "Steps"
+          },
+          "task_parameters": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/TaskSettings"
+            },
+            "type": "object",
+            "title": "Task Parameters",
+            "description": "Deprecated: set run, input and update_calibration_parameters on each task call instead. Common per-task defaults keyed by task name; every call of the task starts from them and a call's own settings take precedence. Still accepted and applied.",
+            "deprecated": true
+          },
+          "default_run_parameters": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Default Run Parameters",
+            "description": "Run parameters applied to every task, e.g. shots or interval."
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 16,
+            "title": "Tags"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "spec_version",
+          "targets",
+          "steps"
+        ],
+        "title": "CalibrationPipelineSpec",
+        "description": "A complete, runnable calibration pipeline."
+      },
+      "ConfigureAllStep": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "ConfigureAll",
+            "title": "Type"
+          },
+          "step_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]{0,63}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step Id"
+          },
+          "mux_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mux Ids",
+            "description": "MUXes to configure; defaults to the targets' MUXes."
+          },
+          "call": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskCall"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Settings of the ConfigureAll call, e.g. {\"name\": \"ConfigureAll\", \"run\": {\"configuration_mode\": \"ge-ef-cr\"}}. Its name must be ConfigureAll. The step's mux_ids, or the targets' MUXes, replace any run.mux_ids. Defaults to a call without settings of its own."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type"
+        ],
+        "title": "ConfigureAllStep",
+        "description": "Configure every box of the targeted MUXes once."
+      },
+      "CustomOneQubitStep": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "CustomOneQubit",
+            "title": "Type"
+          },
+          "step_name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+            "title": "Step Name",
+            "description": "Name and step_id of this step; unique within the pipeline.",
+            "default": "custom_one_qubit"
+          },
+          "tasks": {
+            "items": {
+              "$ref": "#/components/schemas/TaskCall"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Tasks",
+            "description": "Task calls to run on every target, in order. A task may appear more than once when each occurrence has its own call_id."
+          },
+          "execution_mode": {
+            "type": "string",
+            "enum": [
+              "parallel_by_round",
+              "parallel_by_mux",
+              "simultaneous_spectroscopy",
+              "sequential",
+              "manual"
+            ],
+            "title": "Execution Mode",
+            "description": "Where and when the step's targets run; every target runs the step's full task list. parallel_by_round: the scheduler selects rounds of qubits from different MUXes and the next round starts after every qubit of the current round finishes. parallel_by_mux: MUXes run in parallel and the qubits of one MUX run one after another, each MUX advancing independently. sequential: one MUX and one qubit at a time. simultaneous_spectroscopy: experimental batch spectroscopy. manual: run the rounds listed in `rounds` exactly as written.",
+            "default": "parallel_by_round"
+          },
+          "rounds": {
+            "anyOf": [
+              {
+                "items": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rounds",
+            "description": "Required with execution_mode manual and rejected otherwise: the rounds in run order, each a list of qubit IDs, e.g. [[\"0\", \"8\"], [\"1\", \"9\"]]. The qubits of a round run in parallel and the next round starts after all of them finish. A qubit appears in one round only, the qubits of a round use different MUXes, and the rounds must name exactly the step's current qubits; nothing is regrouped, reordered or dropped."
+          },
+          "continue_on_failure": {
+            "type": "boolean",
+            "title": "Continue On Failure",
+            "description": "Run a target's later calls after one of its calls fails. A call's on_failure overrides this for that call.",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "tasks"
+        ],
+        "title": "CustomOneQubitStep",
+        "description": "Any sequence of qubit task calls on the current candidate qubits."
+      },
+      "CustomTwoQubitStep": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "CustomTwoQubit",
+            "title": "Type"
+          },
+          "step_name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+            "title": "Step Name",
+            "description": "Name and step_id of this step; unique within the pipeline.",
+            "default": "custom_two_qubit"
+          },
+          "tasks": {
+            "items": {
+              "$ref": "#/components/schemas/TaskCall"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Tasks",
+            "description": "Task calls to run on every target, in order. A task may appear more than once when each occurrence has its own call_id."
+          },
+          "execution_mode": {
+            "type": "string",
+            "enum": [
+              "automatic",
+              "manual"
+            ],
+            "title": "Execution Mode",
+            "description": "automatic (default): run an earlier GenerateCRSchedule schedule or generate one from the candidate qubits. manual: run the pairs listed in `rounds` exactly as written.",
+            "default": "automatic"
+          },
+          "rounds": {
+            "anyOf": [
+              {
+                "items": {
+                  "items": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array",
+                    "maxItems": 2,
+                    "minItems": 2
+                  },
+                  "type": "array"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rounds",
+            "description": "Required with execution_mode manual and rejected otherwise: the rounds in run order, each a list of directed [control, target] pairs, e.g. [[[\"0\", \"1\"], [\"4\", \"5\"]], [[\"8\", \"9\"]]]. Each pair must be a chip coupling in that direction, the pairs of a round may not share a qubit, a MUX or a modeled readout/control module, and both qubits of every pair must be current candidates. Rounds are never regrouped, reversed or split."
+          },
+          "max_parallel_ops": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Max Parallel Ops",
+            "description": "Pairs per automatically generated CR group. Rejected with execution_mode manual.",
+            "default": 10
+          },
+          "continue_on_failure": {
+            "type": "boolean",
+            "title": "Continue On Failure",
+            "description": "Run a target's later calls after one of its calls fails. A call's on_failure overrides this for that call.",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "tasks"
+        ],
+        "title": "CustomTwoQubitStep",
+        "description": "Any sequence of coupling task calls on the candidate couplings."
+      },
+      "FilterByMetricStep": {
+        "properties": {
+          "step": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]{0,63}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step",
+            "description": "step_id of an earlier one-qubit step to read. Omitted: the latest of OneQubitFineTune and OneQubitCheck, as in version 1."
+          },
+          "call_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,63}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Call Id",
+            "description": "call_id within `step` to read; requires `step`."
+          },
+          "type": {
+            "type": "string",
+            "const": "FilterByMetric",
+            "title": "Type"
+          },
+          "metric": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Metric",
+            "description": "Metric name, e.g. \"x90_fidelity\". With call_id it is an output parameter of that call, e.g. \"t2_star\"."
+          },
+          "threshold": {
+            "type": "number",
+            "title": "Threshold",
+            "description": "Qubits with metric >= threshold are kept."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "metric",
+          "threshold"
+        ],
+        "title": "FilterByMetricStep",
+        "description": "Keep only the qubits whose metric from the referenced step or call meets the threshold."
+      },
+      "FilterByStatusStep": {
+        "properties": {
+          "step": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]{0,63}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step",
+            "description": "step_id of an earlier one-qubit step to read. Omitted: the latest of OneQubitFineTune and OneQubitCheck, as in version 1."
+          },
+          "call_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,63}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Call Id",
+            "description": "call_id within `step` to read; requires `step`."
+          },
+          "type": {
+            "type": "string",
+            "const": "FilterByStatus",
+            "title": "Type"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type"
+        ],
+        "title": "FilterByStatusStep",
+        "description": "Keep only the qubits whose referenced step or call succeeded."
+      },
+      "GenerateCRScheduleStep": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "GenerateCRSchedule",
+            "title": "Type"
+          },
+          "max_parallel_ops": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Max Parallel Ops",
+            "default": 10
+          },
+          "inverse": {
+            "type": "boolean",
+            "title": "Inverse",
+            "description": "Reverse CR direction: control has the higher design frequency.",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type"
+        ],
+        "title": "GenerateCRScheduleStep",
+        "description": "Plan parallel cross-resonance groups for the candidate qubits."
+      },
+      "OneQubitCheckStep": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "OneQubitCheck",
+            "title": "Type"
+          },
+          "step_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]{0,63}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step Id",
+            "description": "Identifier of this step, unique within the pipeline; filters reference it. Defaults to the step's name. Set it when a pipeline runs the same step type twice."
+          },
+          "execution_mode": {
+            "type": "string",
+            "enum": [
+              "parallel_by_round",
+              "parallel_by_mux",
+              "simultaneous_spectroscopy",
+              "sequential",
+              "manual"
+            ],
+            "title": "Execution Mode",
+            "description": "Where and when the step's targets run; every target runs the step's full task list. parallel_by_round: the scheduler selects rounds of qubits from different MUXes and the next round starts after every qubit of the current round finishes. parallel_by_mux: MUXes run in parallel and the qubits of one MUX run one after another, each MUX advancing independently. sequential: one MUX and one qubit at a time. simultaneous_spectroscopy: experimental batch spectroscopy. manual: run the rounds listed in `rounds` exactly as written.",
+            "default": "parallel_by_round"
+          },
+          "rounds": {
+            "anyOf": [
+              {
+                "items": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rounds",
+            "description": "Required with execution_mode manual and rejected otherwise: the rounds in run order, each a list of qubit IDs, e.g. [[\"0\", \"8\"], [\"1\", \"9\"]]. The qubits of a round run in parallel and the next round starts after all of them finish. A qubit appears in one round only, the qubits of a round use different MUXes, and the rounds must name exactly the step's current qubits; nothing is regrouped, reordered or dropped."
+          },
+          "tasks": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/TaskCall"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tasks",
+            "description": "Task calls to run on every target, in order. A task may appear more than once when each occurrence has its own call_id. Defaults to CHECK_1Q_TASKS."
+          },
+          "configure": {
+            "type": "boolean",
+            "title": "Configure",
+            "description": "Run Configure before the first task.",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type"
+        ],
+        "title": "OneQubitCheckStep",
+        "description": "Coarse one-qubit characterization (Rabi, HPI, PI pulses)."
+      },
+      "OneQubitFineTuneStep": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "OneQubitFineTune",
+            "title": "Type"
+          },
+          "step_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]{0,63}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step Id",
+            "description": "Identifier of this step, unique within the pipeline; filters reference it. Defaults to the step's name. Set it when a pipeline runs the same step type twice."
+          },
+          "execution_mode": {
+            "type": "string",
+            "enum": [
+              "parallel_by_round",
+              "parallel_by_mux",
+              "simultaneous_spectroscopy",
+              "sequential",
+              "manual"
+            ],
+            "title": "Execution Mode",
+            "description": "Where and when the step's targets run; every target runs the step's full task list. parallel_by_round: the scheduler selects rounds of qubits from different MUXes and the next round starts after every qubit of the current round finishes. parallel_by_mux: MUXes run in parallel and the qubits of one MUX run one after another, each MUX advancing independently. sequential: one MUX and one qubit at a time. simultaneous_spectroscopy: experimental batch spectroscopy. manual: run the rounds listed in `rounds` exactly as written.",
+            "default": "parallel_by_round"
+          },
+          "rounds": {
+            "anyOf": [
+              {
+                "items": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rounds",
+            "description": "Required with execution_mode manual and rejected otherwise: the rounds in run order, each a list of qubit IDs, e.g. [[\"0\", \"8\"], [\"1\", \"9\"]]. The qubits of a round run in parallel and the next round starts after all of them finish. A qubit appears in one round only, the qubits of a round use different MUXes, and the rounds must name exactly the step's current qubits; nothing is regrouped, reordered or dropped."
+          },
+          "tasks": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/TaskCall"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tasks",
+            "description": "Task calls to run on every target, in order. A task may appear more than once when each occurrence has its own call_id. Defaults to FULL_1Q_TASKS_AFTER_CHECK."
+          },
+          "configure": {
+            "type": "boolean",
+            "title": "Configure",
+            "description": "Run Configure before the first task.",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type"
+        ],
+        "title": "OneQubitFineTuneStep",
+        "description": "Fine one-qubit calibration (DRAG, readout classification, benchmarking)."
+      },
+      "PipelineTargets": {
+        "properties": {
+          "qids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qids",
+            "description": "Qubit ids as QDash lists them, e.g. [\"0\", \"1\"]."
+          },
+          "mux_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mux Ids",
+            "description": "MUX ids; every qubit of each MUX is a target."
+          },
+          "exclude_qids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Exclude Qids",
+            "description": "Qubits to leave out of the MUX targets."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "PipelineTargets",
+        "description": "Which qubits the pipeline starts from: explicit qids or whole MUXes."
+      },
+      "TaskSettings": {
+        "properties": {
+          "run": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run",
+            "description": "Run parameters. A plain value, {\"value\": ..., \"value_type\": ...}, or a sweep declaration {\"value\": [start, stop, step_or_num], \"value_type\": \"np.arange\" | \"np.linspace\" | \"np.logspace\" | \"range\"} or {\"value\": [points...], \"value_type\": \"list\"}."
+          },
+          "input": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input",
+            "description": "Calibration input overrides, as plain values."
+          },
+          "update_calibration_parameters": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Update Calibration Parameters",
+            "description": "False records outputs as measurement history only. None inherits the next layer and finally the workflow's policy."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "TaskSettings",
+        "description": "Common per-task defaults: run parameters, input overrides, persistence policy.\n\nA workflow's ``task_parameters`` maps a task name to one of these; every call\nof that task starts from it. :class:`TaskCall` carries the same fields for one\ncall."
+      },
+      "TwoQubitCalibrationStep": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "TwoQubitCalibration",
+            "title": "Type"
+          },
+          "step_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]{0,63}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step Id",
+            "description": "Identifier of this step, unique within the pipeline; filters reference it. Defaults to the step's name. Set it when a pipeline runs the same step type twice."
+          },
+          "tasks": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/TaskCall"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tasks",
+            "description": "Task calls to run on every target, in order. A task may appear more than once when each occurrence has its own call_id. Defaults to FULL_2Q_TASKS."
+          },
+          "execution_mode": {
+            "type": "string",
+            "enum": [
+              "automatic",
+              "manual"
+            ],
+            "title": "Execution Mode",
+            "description": "automatic (default): run an earlier GenerateCRSchedule schedule or generate one from the candidate qubits. manual: run the pairs listed in `rounds` exactly as written.",
+            "default": "automatic"
+          },
+          "rounds": {
+            "anyOf": [
+              {
+                "items": {
+                  "items": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array",
+                    "maxItems": 2,
+                    "minItems": 2
+                  },
+                  "type": "array"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rounds",
+            "description": "Required with execution_mode manual and rejected otherwise: the rounds in run order, each a list of directed [control, target] pairs, e.g. [[[\"0\", \"1\"], [\"4\", \"5\"]], [[\"8\", \"9\"]]]. Each pair must be a chip coupling in that direction, the pairs of a round may not share a qubit, a MUX or a modeled readout/control module, and both qubits of every pair must be current candidates. Rounds are never regrouped, reversed or split."
+          },
+          "max_parallel_ops": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Max Parallel Ops",
+            "description": "Pairs per automatically generated CR group. Rejected with execution_mode manual.",
+            "default": 10
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type"
+        ],
+        "title": "TwoQubitCalibrationStep",
+        "description": "Full coupling calibration on the scheduled pairs."
       }
     },
     "securitySchemes": {

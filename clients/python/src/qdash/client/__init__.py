@@ -42,11 +42,13 @@ from qdash.client.services.errors import (
 )
 from qdash.client.services.exporter_models import NormalizedMetricRecord
 from qdash.client.services.models import (
+    CalibrationPipelineSpec,
     CancelExecutionResponse,
     ChipMetricsResponse,
     ChipResponse,
     CouplingResponse,
     ExecuteFlowResponse,
+    ExecutePipelineResponse,
     ExecutionActivityResponse,
     ExecutionResponseDetail,
     FileTreeNode,
@@ -65,6 +67,7 @@ from qdash.client.services.models import (
     ListTaskResponse,
     NoteModel,
     ParameterModel,
+    PipelineCatalogResponse,
     ProjectResponse,
     ProvenanceStatsResponse,
     QdashApiSchemasProjectProjectListResponse,
@@ -79,6 +82,7 @@ from qdash.client.services.models import (
     TaskResultListResponse,
     TaskResultResponse,
     TimeSeriesData,
+    ValidatePipelineResponse,
 )
 
 from . import rest
@@ -101,12 +105,14 @@ __all__ = [
     "AgentSessionResponse",
     "AgentSkillTransition",
     "AgentStepOutcome",
+    "CalibrationPipelineSpec",
     "CancelExecutionResponse",
     "CandidateGateResponse",
     "ChipMetricsResponse",
     "ChipResponse",
     "CouplingResponse",
     "ExecuteFlowResponse",
+    "ExecutePipelineResponse",
     "ExecutionActivityResponse",
     "ExecutionResponseDetail",
     "FileTreeNode",
@@ -130,6 +136,7 @@ __all__ = [
     "NormalizedMetricRecord",
     "NoteModel",
     "ParameterModel",
+    "PipelineCatalogResponse",
     "ProjectResponse",
     "ProvenanceStatsResponse",
     "QDashApiError",
@@ -154,5 +161,6 @@ __all__ = [
     "TaskResultListResponse",
     "TaskResultResponse",
     "TimeSeriesData",
+    "ValidatePipelineResponse",
     "rest",
 ]

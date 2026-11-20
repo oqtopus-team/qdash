@@ -13,12 +13,13 @@ uv sync --all-groups
 task test-client
 ```
 
-The package has two layers:
+The package has three layers:
 
 | Layer | Responsibility |
 | --- | --- |
 | `src/qdash/client/services/` | High-level models, configuration, retries, validation, and agent runners |
 | `src/qdash/client/rest/` | Generated low-level HTTP transport |
+| `src/qdash/sdk/` | `qdash.sdk`: the `QDash` session and calibration pipeline definitions built on `QDashClient` |
 
 `src/qdash/client/services/models.py` is generated from `docs/oas/openapi.json`; regenerate it
 with `task generate` (or `task generate-python-schema` for the models alone) and never edit it by

@@ -139,7 +139,7 @@ warn_required_dynamic_aliases = true
 asyncio_default_fixture_loop_scope = "function"
 
 [tool.coverage.run]
-source = ["src/qdash", "clients/python/src/qdash/client"]
+source = ["src/qdash", "clients/python/src/qdash/client", "clients/python/src/qdash/sdk"]
 omit = [
     # Data models - primarily type definitions
     "src/qdash/datamodel/*",

@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 from enum import StrEnum
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, RootModel
 
@@ -4949,6 +4949,408 @@ class QdashApiSchemasAdminProjectListResponse(BaseModel):
     total: Annotated[int, Field(title="Total")]
 
 
+class StepId(RootModel[str]):
+    root: Annotated[str, Field(pattern="^[a-z][a-z0-9_]{0,63}$", title="Step Id")]
+    """
+    Identifier of this step, unique within the pipeline; filters reference it. Defaults to the step's name. Set it when a pipeline runs the same step type twice.
+    """
+
+
+class BringUpStep(BaseModel):
+    """
+    Initial characterization: resonator and qubit spectroscopy, chevron.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    type: Annotated[Literal["BringUp"], Field(title="Type")]
+    step_id: Annotated[StepId | None, Field(title="Step Id")] = None
+    """
+    Identifier of this step, unique within the pipeline; filters reference it. Defaults to the step's name. Set it when a pipeline runs the same step type twice.
+    """
+    tasks: Annotated[list[TaskCall] | None, Field(title="Tasks")] = None
+    """
+    Task calls to run on every target, in order. A task may appear more than once when each occurrence has its own call_id. Defaults to BRINGUP_TASKS.
+    """
+
+
+class StepId1(RootModel[str]):
+    root: Annotated[str, Field(pattern="^[a-z][a-z0-9_]{0,63}$", title="Step Id")]
+
+
+class ConfigureAllStep(BaseModel):
+    """
+    Configure every box of the targeted MUXes once.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    type: Annotated[Literal["ConfigureAll"], Field(title="Type")]
+    step_id: Annotated[StepId1 | None, Field(title="Step Id")] = None
+    mux_ids: Annotated[list[int] | None, Field(title="Mux Ids")] = None
+    """
+    MUXes to configure; defaults to the targets' MUXes.
+    """
+    call: TaskCall | None = None
+    """
+    Settings of the ConfigureAll call, e.g. {"name": "ConfigureAll", "run": {"configuration_mode": "ge-ef-cr"}}. Its name must be ConfigureAll. The step's mux_ids, or the targets' MUXes, replace any run.mux_ids. Defaults to a call without settings of its own.
+    """
+
+
+class ExecutionMode(StrEnum):
+    """
+    Where and when the step's targets run; every target runs the step's full task list. parallel_by_round: the scheduler selects rounds of qubits from different MUXes and the next round starts after every qubit of the current round finishes. parallel_by_mux: MUXes run in parallel and the qubits of one MUX run one after another, each MUX advancing independently. sequential: one MUX and one qubit at a time. simultaneous_spectroscopy: experimental batch spectroscopy. manual: run the rounds listed in `rounds` exactly as written.
+    """
+
+    parallel_by_round = "parallel_by_round"
+    parallel_by_mux = "parallel_by_mux"
+    simultaneous_spectroscopy = "simultaneous_spectroscopy"
+    sequential = "sequential"
+    manual = "manual"
+
+
+class CustomOneQubitStep(BaseModel):
+    """
+    Any sequence of qubit task calls on the current candidate qubits.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    type: Annotated[Literal["CustomOneQubit"], Field(title="Type")]
+    step_name: Annotated[str, Field(pattern="^[a-z][a-z0-9_]{0,63}$", title="Step Name")] = (
+        "custom_one_qubit"
+    )
+    """
+    Name and step_id of this step; unique within the pipeline.
+    """
+    tasks: Annotated[list[TaskCall], Field(min_length=1, title="Tasks")]
+    """
+    Task calls to run on every target, in order. A task may appear more than once when each occurrence has its own call_id.
+    """
+    execution_mode: Annotated[ExecutionMode, Field(title="Execution Mode")] = (
+        ExecutionMode.parallel_by_round
+    )
+    """
+    Where and when the step's targets run; every target runs the step's full task list. parallel_by_round: the scheduler selects rounds of qubits from different MUXes and the next round starts after every qubit of the current round finishes. parallel_by_mux: MUXes run in parallel and the qubits of one MUX run one after another, each MUX advancing independently. sequential: one MUX and one qubit at a time. simultaneous_spectroscopy: experimental batch spectroscopy. manual: run the rounds listed in `rounds` exactly as written.
+    """
+    rounds: Annotated[list[list[str]] | None, Field(title="Rounds")] = None
+    """
+    Required with execution_mode manual and rejected otherwise: the rounds in run order, each a list of qubit IDs, e.g. [["0", "8"], ["1", "9"]]. The qubits of a round run in parallel and the next round starts after all of them finish. A qubit appears in one round only, the qubits of a round use different MUXes, and the rounds must name exactly the step's current qubits; nothing is regrouped, reordered or dropped.
+    """
+    continue_on_failure: Annotated[bool, Field(title="Continue On Failure")] = False
+    """
+    Run a target's later calls after one of its calls fails. A call's on_failure overrides this for that call.
+    """
+
+
+class ExecutionMode1(StrEnum):
+    """
+    automatic (default): run an earlier GenerateCRSchedule schedule or generate one from the candidate qubits. manual: run the pairs listed in `rounds` exactly as written.
+    """
+
+    automatic = "automatic"
+    manual = "manual"
+
+
+class Round(RootModel[list[str]]):
+    root: Annotated[list[str], Field(max_length=2, min_length=2)]
+
+
+class CustomTwoQubitStep(BaseModel):
+    """
+    Any sequence of coupling task calls on the candidate couplings.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    type: Annotated[Literal["CustomTwoQubit"], Field(title="Type")]
+    step_name: Annotated[str, Field(pattern="^[a-z][a-z0-9_]{0,63}$", title="Step Name")] = (
+        "custom_two_qubit"
+    )
+    """
+    Name and step_id of this step; unique within the pipeline.
+    """
+    tasks: Annotated[list[TaskCall], Field(min_length=1, title="Tasks")]
+    """
+    Task calls to run on every target, in order. A task may appear more than once when each occurrence has its own call_id.
+    """
+    execution_mode: Annotated[ExecutionMode1, Field(title="Execution Mode")] = (
+        ExecutionMode1.automatic
+    )
+    """
+    automatic (default): run an earlier GenerateCRSchedule schedule or generate one from the candidate qubits. manual: run the pairs listed in `rounds` exactly as written.
+    """
+    rounds: Annotated[list[list[Round]] | None, Field(title="Rounds")] = None
+    """
+    Required with execution_mode manual and rejected otherwise: the rounds in run order, each a list of directed [control, target] pairs, e.g. [[["0", "1"], ["4", "5"]], [["8", "9"]]]. Each pair must be a chip coupling in that direction, the pairs of a round may not share a qubit, a MUX or a modeled readout/control module, and both qubits of every pair must be current candidates. Rounds are never regrouped, reversed or split.
+    """
+    max_parallel_ops: Annotated[int, Field(ge=1, le=100, title="Max Parallel Ops")] = 10
+    """
+    Pairs per automatically generated CR group. Rejected with execution_mode manual.
+    """
+    continue_on_failure: Annotated[bool, Field(title="Continue On Failure")] = False
+    """
+    Run a target's later calls after one of its calls fails. A call's on_failure overrides this for that call.
+    """
+
+
+class Step(RootModel[str]):
+    root: Annotated[str, Field(pattern="^[a-z][a-z0-9_]{0,63}$", title="Step")]
+    """
+    step_id of an earlier one-qubit step to read. Omitted: the latest of OneQubitFineTune and OneQubitCheck, as in version 1.
+    """
+
+
+class CallId1(RootModel[str]):
+    root: Annotated[str, Field(pattern="^[A-Za-z][A-Za-z0-9_.-]{0,63}$", title="Call Id")]
+    """
+    call_id within `step` to read; requires `step`.
+    """
+
+
+class FilterByMetricStep(BaseModel):
+    """
+    Keep only the qubits whose metric from the referenced step or call meets the threshold.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    step: Annotated[Step | None, Field(title="Step")] = None
+    """
+    step_id of an earlier one-qubit step to read. Omitted: the latest of OneQubitFineTune and OneQubitCheck, as in version 1.
+    """
+    call_id: Annotated[CallId1 | None, Field(title="Call Id")] = None
+    """
+    call_id within `step` to read; requires `step`.
+    """
+    type: Annotated[Literal["FilterByMetric"], Field(title="Type")]
+    metric: Annotated[str, Field(min_length=1, title="Metric")]
+    """
+    Metric name, e.g. "x90_fidelity". With call_id it is an output parameter of that call, e.g. "t2_star".
+    """
+    threshold: Annotated[float, Field(title="Threshold")]
+    """
+    Qubits with metric >= threshold are kept.
+    """
+
+
+class FilterByStatusStep(BaseModel):
+    """
+    Keep only the qubits whose referenced step or call succeeded.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    step: Annotated[Step | None, Field(title="Step")] = None
+    """
+    step_id of an earlier one-qubit step to read. Omitted: the latest of OneQubitFineTune and OneQubitCheck, as in version 1.
+    """
+    call_id: Annotated[CallId1 | None, Field(title="Call Id")] = None
+    """
+    call_id within `step` to read; requires `step`.
+    """
+    type: Annotated[Literal["FilterByStatus"], Field(title="Type")]
+
+
+class GenerateCRScheduleStep(BaseModel):
+    """
+    Plan parallel cross-resonance groups for the candidate qubits.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    type: Annotated[Literal["GenerateCRSchedule"], Field(title="Type")]
+    max_parallel_ops: Annotated[int, Field(ge=1, le=100, title="Max Parallel Ops")] = 10
+    inverse: Annotated[bool, Field(title="Inverse")] = False
+    """
+    Reverse CR direction: control has the higher design frequency.
+    """
+
+
+class StepId2(RootModel[str]):
+    root: Annotated[str, Field(pattern="^[a-z][a-z0-9_]{0,63}$", title="Step Id")]
+    """
+    Identifier of this step, unique within the pipeline; filters reference it. Defaults to the step's name. Set it when a pipeline runs the same step type twice.
+    """
+
+
+class ExecutionMode2(StrEnum):
+    """
+    Where and when the step's targets run; every target runs the step's full task list. parallel_by_round: the scheduler selects rounds of qubits from different MUXes and the next round starts after every qubit of the current round finishes. parallel_by_mux: MUXes run in parallel and the qubits of one MUX run one after another, each MUX advancing independently. sequential: one MUX and one qubit at a time. simultaneous_spectroscopy: experimental batch spectroscopy. manual: run the rounds listed in `rounds` exactly as written.
+    """
+
+    parallel_by_round = "parallel_by_round"
+    parallel_by_mux = "parallel_by_mux"
+    simultaneous_spectroscopy = "simultaneous_spectroscopy"
+    sequential = "sequential"
+    manual = "manual"
+
+
+class OneQubitCheckStep(BaseModel):
+    """
+    Coarse one-qubit characterization (Rabi, HPI, PI pulses).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    type: Annotated[Literal["OneQubitCheck"], Field(title="Type")]
+    step_id: Annotated[StepId2 | None, Field(title="Step Id")] = None
+    """
+    Identifier of this step, unique within the pipeline; filters reference it. Defaults to the step's name. Set it when a pipeline runs the same step type twice.
+    """
+    execution_mode: Annotated[ExecutionMode2, Field(title="Execution Mode")] = (
+        ExecutionMode2.parallel_by_round
+    )
+    """
+    Where and when the step's targets run; every target runs the step's full task list. parallel_by_round: the scheduler selects rounds of qubits from different MUXes and the next round starts after every qubit of the current round finishes. parallel_by_mux: MUXes run in parallel and the qubits of one MUX run one after another, each MUX advancing independently. sequential: one MUX and one qubit at a time. simultaneous_spectroscopy: experimental batch spectroscopy. manual: run the rounds listed in `rounds` exactly as written.
+    """
+    rounds: Annotated[list[list[str]] | None, Field(title="Rounds")] = None
+    """
+    Required with execution_mode manual and rejected otherwise: the rounds in run order, each a list of qubit IDs, e.g. [["0", "8"], ["1", "9"]]. The qubits of a round run in parallel and the next round starts after all of them finish. A qubit appears in one round only, the qubits of a round use different MUXes, and the rounds must name exactly the step's current qubits; nothing is regrouped, reordered or dropped.
+    """
+    tasks: Annotated[list[TaskCall] | None, Field(title="Tasks")] = None
+    """
+    Task calls to run on every target, in order. A task may appear more than once when each occurrence has its own call_id. Defaults to CHECK_1Q_TASKS.
+    """
+    configure: Annotated[bool, Field(title="Configure")] = False
+    """
+    Run Configure before the first task.
+    """
+
+
+class OneQubitFineTuneStep(BaseModel):
+    """
+    Fine one-qubit calibration (DRAG, readout classification, benchmarking).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    type: Annotated[Literal["OneQubitFineTune"], Field(title="Type")]
+    step_id: Annotated[StepId2 | None, Field(title="Step Id")] = None
+    """
+    Identifier of this step, unique within the pipeline; filters reference it. Defaults to the step's name. Set it when a pipeline runs the same step type twice.
+    """
+    execution_mode: Annotated[ExecutionMode2, Field(title="Execution Mode")] = (
+        ExecutionMode2.parallel_by_round
+    )
+    """
+    Where and when the step's targets run; every target runs the step's full task list. parallel_by_round: the scheduler selects rounds of qubits from different MUXes and the next round starts after every qubit of the current round finishes. parallel_by_mux: MUXes run in parallel and the qubits of one MUX run one after another, each MUX advancing independently. sequential: one MUX and one qubit at a time. simultaneous_spectroscopy: experimental batch spectroscopy. manual: run the rounds listed in `rounds` exactly as written.
+    """
+    rounds: Annotated[list[list[str]] | None, Field(title="Rounds")] = None
+    """
+    Required with execution_mode manual and rejected otherwise: the rounds in run order, each a list of qubit IDs, e.g. [["0", "8"], ["1", "9"]]. The qubits of a round run in parallel and the next round starts after all of them finish. A qubit appears in one round only, the qubits of a round use different MUXes, and the rounds must name exactly the step's current qubits; nothing is regrouped, reordered or dropped.
+    """
+    tasks: Annotated[list[TaskCall] | None, Field(title="Tasks")] = None
+    """
+    Task calls to run on every target, in order. A task may appear more than once when each occurrence has its own call_id. Defaults to FULL_1Q_TASKS_AFTER_CHECK.
+    """
+    configure: Annotated[bool, Field(title="Configure")] = False
+    """
+    Run Configure before the first task.
+    """
+
+
+class PipelineTargets(BaseModel):
+    """
+    Which qubits the pipeline starts from: explicit qids or whole MUXes.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    qids: Annotated[list[str] | None, Field(title="Qids")] = None
+    """
+    Qubit ids as QDash lists them, e.g. ["0", "1"].
+    """
+    mux_ids: Annotated[list[int] | None, Field(title="Mux Ids")] = None
+    """
+    MUX ids; every qubit of each MUX is a target.
+    """
+    exclude_qids: Annotated[list[str] | None, Field(title="Exclude Qids")] = None
+    """
+    Qubits to leave out of the MUX targets.
+    """
+
+
+class TaskSettings(BaseModel):
+    """
+    Common per-task defaults: run parameters, input overrides, persistence policy.
+
+    A workflow's ``task_parameters`` maps a task name to one of these; every call
+    of that task starts from it. :class:`TaskCall` carries the same fields for one
+    call.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    run: Annotated[dict[str, Any] | None, Field(title="Run")] = None
+    """
+    Run parameters. A plain value, {"value": ..., "value_type": ...}, or a sweep declaration {"value": [start, stop, step_or_num], "value_type": "np.arange" | "np.linspace" | "np.logspace" | "range"} or {"value": [points...], "value_type": "list"}.
+    """
+    input: Annotated[dict[str, Any] | None, Field(title="Input")] = None
+    """
+    Calibration input overrides, as plain values.
+    """
+    update_calibration_parameters: Annotated[
+        bool | None, Field(title="Update Calibration Parameters")
+    ] = None
+    """
+    False records outputs as measurement history only. None inherits the next layer and finally the workflow's policy.
+    """
+
+
+class ExecutionMode4(StrEnum):
+    """
+    automatic (default): run an earlier GenerateCRSchedule schedule or generate one from the candidate qubits. manual: run the pairs listed in `rounds` exactly as written.
+    """
+
+    automatic = "automatic"
+    manual = "manual"
+
+
+class TwoQubitCalibrationStep(BaseModel):
+    """
+    Full coupling calibration on the scheduled pairs.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    type: Annotated[Literal["TwoQubitCalibration"], Field(title="Type")]
+    step_id: Annotated[StepId2 | None, Field(title="Step Id")] = None
+    """
+    Identifier of this step, unique within the pipeline; filters reference it. Defaults to the step's name. Set it when a pipeline runs the same step type twice.
+    """
+    tasks: Annotated[list[TaskCall] | None, Field(title="Tasks")] = None
+    """
+    Task calls to run on every target, in order. A task may appear more than once when each occurrence has its own call_id. Defaults to FULL_2Q_TASKS.
+    """
+    execution_mode: Annotated[ExecutionMode4, Field(title="Execution Mode")] = (
+        ExecutionMode4.automatic
+    )
+    """
+    automatic (default): run an earlier GenerateCRSchedule schedule or generate one from the candidate qubits. manual: run the pairs listed in `rounds` exactly as written.
+    """
+    rounds: Annotated[list[list[Round]] | None, Field(title="Rounds")] = None
+    """
+    Required with execution_mode manual and rejected otherwise: the rounds in run order, each a list of directed [control, target] pairs, e.g. [[["0", "1"], ["4", "5"]], [["8", "9"]]]. Each pair must be a chip coupling in that direction, the pairs of a round may not share a qubit, a MUX or a modeled readout/control module, and both qubits of every pair must be current candidates. Rounds are never regrouped, reversed or split.
+    """
+    max_parallel_ops: Annotated[int, Field(ge=1, le=100, title="Max Parallel Ops")] = 10
+    """
+    Pairs per automatically generated CR group. Rejected with execution_mode manual.
+    """
+
+
 class AddMemberRequest(BaseModel):
     """
     Request to add a member to a project.
@@ -6586,6 +6988,56 @@ class QdashApiSchemasProjectProjectListResponse(BaseModel):
 
     projects: Annotated[list[ProjectResponse], Field(title="Projects")]
     total: Annotated[int, Field(title="Total")]
+
+
+class CalibrationPipelineSpec(BaseModel):
+    """
+    A complete, runnable calibration pipeline.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    spec_version: Annotated[Literal[2], Field(title="Spec Version")]
+    """
+    Spec format version. Convert a version 1 spec with migrate_pipeline_spec.
+    """
+    name: Annotated[str, Field(pattern="^[A-Za-z][A-Za-z0-9_-]{0,63}$", title="Name")] = "pipeline"
+    """
+    Display name of the execution.
+    """
+    targets: PipelineTargets
+    steps: Annotated[
+        list[
+            Annotated[
+                ConfigureAllStep
+                | BringUpStep
+                | OneQubitCheckStep
+                | OneQubitFineTuneStep
+                | CustomOneQubitStep
+                | FilterByStatusStep
+                | FilterByMetricStep
+                | GenerateCRScheduleStep
+                | TwoQubitCalibrationStep
+                | CustomTwoQubitStep,
+                Field(discriminator="type"),
+            ]
+        ],
+        Field(max_length=32, min_length=1, title="Steps"),
+    ]
+    task_parameters: Annotated[
+        dict[str, TaskSettings] | None, Field(deprecated=True, title="Task Parameters")
+    ] = None
+    """
+    Deprecated: set run, input and update_calibration_parameters on each task call instead. Common per-task defaults keyed by task name; every call of the task starts from them and a call's own settings take precedence. Still accepted and applied.
+    """
+    default_run_parameters: Annotated[
+        dict[str, Any] | None, Field(title="Default Run Parameters")
+    ] = None
+    """
+    Run parameters applied to every task, e.g. shots or interval.
+    """
+    tags: Annotated[list[str] | None, Field(max_length=16, title="Tags")] = None
 
 
 class AllConfigResponse(BaseModel):

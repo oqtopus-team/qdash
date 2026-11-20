@@ -252,6 +252,7 @@ export default withMermaid(
                 { text: "Square Lattice", link: "/developer-guide/architecture/square-lattice-topology" },
                 { text: "Notes", link: "/developer-guide/architecture/notes" },
                 { text: "Provenance", link: "/developer-guide/architecture/provenance" },
+                { text: "Python SDK", link: "/developer-guide/architecture/python-sdk" },
               ],
             },
             {

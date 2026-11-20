@@ -9,7 +9,9 @@ agent integrations. It supports Python 3.11 and 3.12.
 pip install qdash-client
 ```
 
-The distribution name is `qdash-client`; import it as `qdash.client`.
+The distribution name is `qdash-client`. It provides two import packages: `qdash.client`, one
+method per API route, and `qdash.sdk`, which defines and runs
+[calibration pipelines](#define-and-run-a-calibration-pipeline) on top of it.
 
 Each QDash release tag `vX.Y.Z` publishes `qdash-client` `X.Y.Z` to PyPI, the same version as the
 [TypeScript client](./typescript.md). Each change on `develop` that publishes a
@@ -137,6 +139,7 @@ The high-level client groups operations by domain:
 | Projects and files | Project getters, file tree and content, validation, and configuration Git operations |
 | Issues and knowledge | Issue lifecycle, approved knowledge, and task knowledge operations |
 | Flows and executions | Flow templates, save, execute, schedule, wait, and cancel operations |
+| Calibration pipelines | `get_calibration_pipeline_catalog`, `validate_calibration_pipeline`, `execute_calibration_pipeline` |
 | Provenance | Entity, lineage, impact, history, statistics, and recent-change operations |
 | Agent calibration | Sessions, actions, candidate gates, commits, apply operations, and polling helpers |
 
@@ -170,9 +173,71 @@ waits for the whole run and reads `pipeline.status`; pass `whole_pipeline=False`
 step's execution only. A failed or cancelled execution is returned, not raised, and the call raises
 `TimeoutError` after `timeout_seconds`.
 
+`with_project(project_id)` returns a client that sends another `X-Project-Id` and shares this
+client's connection and credentials. The original client is unchanged; close it, not the copy,
+to release the connection.
+
 Only `list_chips_async`, `get_task_results_timeseries_async`, and `get_metrics_config_async` have
 async variants. They use the same `QDashClient` configuration and close their temporary async HTTP
 clients after each request. Call `close()` to release the persistent synchronous transport.
+
+## Define and Run a Calibration Pipeline
+
+`qdash.sdk` builds a [calibration pipeline spec](../../developer-guide/workflow/calibration-pipeline.md)
+from Python objects, validates it on the server, and runs it only when asked. This pipeline runs
+`Configure`, `CheckT1` and `CheckT2Echo` on qubits 0 and 1:
+
+```python
+import math
+
+from qdash.sdk import QDash
+from qdash.sdk.pipeline import CustomOneQubit, Pipeline, Qubits, TaskCall, sweep
+
+time_range = sweep.logspace(math.log10(300), math.log10(500_000), 51)
+pipeline = Pipeline(
+    name="coherence-t1-t2echo",
+    targets=Qubits(["0", "1"]),
+    steps=[
+        CustomOneQubit(
+            step_name="coherence",
+            tasks=[
+                TaskCall(name="Configure"),
+                TaskCall(name="CheckT1", run={"time_range": time_range}),
+                TaskCall(name="CheckT2Echo", run={"time_range": time_range}),
+            ],
+        ),
+    ],
+    default_run_parameters={"readout_duration": 1024, "interval": 262_144},
+)
+
+with QDash.from_env() as qdash:
+    result = qdash.pipelines.validate(pipeline, chip_id="64Qv3")  # no effects
+    if not result.valid:
+        raise SystemExit([f"{p.path}: {p.message}" for p in result.problems or []])
+    run = qdash.pipelines.execute(pipeline, chip_id="64Qv3")  # dispatches and measures
+    detail = run.wait(timeout_seconds=3600)
+    print(detail.pipeline.status if detail.pipeline else detail.status)
+```
+
+| Call | Result |
+| --- | --- |
+| `Pipeline(...)`, `pipeline.to_spec()` | The spec version 2 JSON object; nothing is sent |
+| `qdash.pipelines.catalog(backend_name=None)` | Step types, task names by type, and the spec schema |
+| `qdash.pipelines.validate(pipeline, chip_id=...)` | `ValidatePipelineResponse`; problems are data, not exceptions |
+| `qdash.pipelines.execute(pipeline, chip_id=...)` | `PipelineRun`; raises `QDashValidationError` (422) for a spec with problems and `QDashConfigError` without a project |
+| `run.wait(timeout_seconds=3600, poll_interval_seconds=5)` | The execution detail once the whole pipeline ends; `TimeoutError` otherwise |
+
+Building a pipeline checks only its structure, such as required fields, ID patterns and literal
+values. The server decides whether it can run, including task names, repeated call IDs and the
+calibration data each task needs, so pass a pipeline through `validate` before `execute`. A
+valid result is not a hardware safety check beyond those rules.
+
+`QDash.from_env()` and `QDash.from_profile(...)` read the same settings as `QDashClient` and
+close their client on exit. `QDash(client)` uses an existing client and leaves it open.
+`project_id=...` on any of them scopes the session to another project without changing the
+client's configuration. Other step types are passed as their generated models from
+`qdash.client.services.models` or as dictionaries in the spec's JSON form. How the SDK is built:
+[Python SDK](../../developer-guide/architecture/python-sdk.md).
 
 ## Agent Calibration
 

@@ -129,7 +129,7 @@ jobs:
         run: |
           uv run --package qdash-client ruff check clients/python
           uv run --package qdash-client ruff format --check clients/python
-          uv run --package qdash-client mypy clients/python/src/qdash/client clients/python/tests
+          uv run --package qdash-client mypy clients/python/src/qdash/client clients/python/src/qdash/sdk clients/python/tests
 
       - name: Upload package artifact
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
