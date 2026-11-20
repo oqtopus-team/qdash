@@ -10,7 +10,7 @@ pip install qdash-client
 ```
 
 `qdash-client` provides `qdash.client`, one method per API route. To also define and run
-[calibration pipelines](#define-and-run-a-calibration-pipeline) with `qdash.sdk`, install
+[calibrations](#run-a-calibration) with `qdash.sdk`, install
 `qdash-sdk`, which installs the `qdash-client` of the same version:
 
 ```bash
@@ -191,63 +191,143 @@ Only `list_chips_async`, `get_task_results_timeseries_async`, and `get_metrics_c
 async variants. They use the same `QDashClient` configuration and close their temporary async HTTP
 clients after each request. Call `close()` to release the persistent synchronous transport.
 
-## Define and Run a Calibration Pipeline
+## Run a Calibration
 
-`qdash.sdk`, from the `qdash-sdk` package, builds a [calibration pipeline spec](../../developer-guide/workflow/calibration-pipeline.md)
-from Python objects, validates it on the server, and runs it only when asked. This pipeline runs
-`Configure`, `CheckT1` and `CheckT2Echo` on qubits 0 and 1:
+`qdash.sdk`, from the `qdash-sdk` package, starts a calibration on a chip from Python objects:
+targets, and steps that run in order, as `CalibService.run(targets, steps)` takes them in a
+[workflow](../../developer-guide/workflow/services.md). This calibration runs `Configure`,
+`CheckT1` and `CheckT2Echo` on qubits 0 and 1 with the sweeps of the `coherence_check`
+template:
 
 ```python
 import math
 
 from qdash.sdk import QDash
-from qdash.sdk.pipeline import CustomOneQubit, Pipeline, Qubits, TaskCall, sweep
+from qdash.sdk.calibration import CustomOneQubit, QubitTargets, TaskCall, sweep
+
+qdash = QDash.from_env()
+chip = qdash.chip("64Qv3")
 
 time_range = sweep.logspace(math.log10(300), math.log10(500_000), 51)
-pipeline = Pipeline(
-    name="coherence-t1-t2echo",
-    targets=Qubits(["0", "1"]),
-    steps=[
-        CustomOneQubit(
-            step_name="coherence",
-            tasks=[
-                TaskCall(name="Configure"),
-                TaskCall(name="CheckT1", run={"time_range": time_range}),
-                TaskCall(name="CheckT2Echo", run={"time_range": time_range}),
-            ],
-        ),
-    ],
-    default_run_parameters={"readout_duration": 1024, "interval": 262_144},
-)
+targets = QubitTargets(["0", "1"])
+steps = [
+    CustomOneQubit(
+        step_name="coherence",
+        tasks=[
+            TaskCall(name="Configure"),
+            TaskCall(name="CheckT1", run={"time_range": time_range}),
+            TaskCall(name="CheckT2Echo", run={"time_range": time_range}),
+        ],
+    ),
+]
+run_parameters = {"readout_duration": 1024, "interval": 262_144}
 
-with QDash.from_env() as qdash:
-    result = qdash.pipelines.validate(pipeline, chip_id="64Qv3")  # no effects
-    if not result.valid:
-        raise SystemExit([f"{p.path}: {p.message}" for p in result.problems or []])
-    run = qdash.pipelines.execute(pipeline, chip_id="64Qv3")  # dispatches and measures
-    detail = run.wait(timeout_seconds=3600)
-    print(detail.pipeline.status if detail.pipeline else detail.status)
+check = chip.validate_calibration(targets, steps, default_run_parameters=run_parameters)
+if not check.valid:
+    raise SystemExit([f"{p.path}: {p.message}" for p in check.problems or []])
+
+run = chip.calibrate(targets, steps, default_run_parameters=run_parameters)  # measures
+result = run.wait(timeout_seconds=3600)
+print(result.status)
 ```
 
 | Call | Result |
 | --- | --- |
-| `Pipeline(...)`, `pipeline.to_spec()` | The spec version 2 JSON object; nothing is sent |
+| `QDash.from_env()`, `QDash.from_profile(...)` | A session with its own `QDashClient`; nothing is sent |
+| `qdash.chip(chip_id)` | A `Chip` bound to the session's client, project and `chip_id`; nothing is sent |
+| `QubitTargets(qids)`, `MuxTargets(mux_ids, exclude_qids=...)` | Explicit qubits, or every qubit of the MUXes except the excluded ones |
+| `CustomOneQubit(step_name=..., tasks=[...])`, `TaskCall(name=..., run=...)` | A step that runs its task calls in order on each target qubit |
+| `chip.validate_calibration(targets, steps, ...)` | `ValidatePipelineResponse`; problems are data, nothing is dispatched |
+| `chip.calibrate(targets, steps, ...)` | `CalibrationRun`; dispatches one execution, raises `QDashValidationError` (422) for a calibration with problems and `QDashConfigError` without a project |
+| `run.wait(timeout_seconds=3600, poll_interval_seconds=5)` | `RunResult` once the whole calibration ends; `TimeoutError` otherwise, and the run keeps going |
+| `run.get()` | `RunResult` for the current state, without waiting |
+
+`validate_calibration` and `calibrate` take the same arguments: `targets`, `steps`, and the
+optional `name` (the execution's display name), `default_run_parameters` (the run parameters
+every task call starts from), `tags` and `backend_name`. The server's defaults apply to each one
+left out. `calibrate` does not call `validate_calibration`; the server validates again before
+dispatch.
+
+`result.status` is the whole calibration's status, `completed`, `failed` or `cancelled` once it
+ends, not the status of its first step's execution. A failed or cancelled calibration is returned,
+not raised. `result.detail` is the execution detail as `get_execution` returns it, with every
+step's progress in `result.detail.pipeline`, and `result.execution_id` names the first step's
+execution.
+
+Building the definitions checks only their structure, such as required fields, ID patterns and
+literal values. The server decides whether a calibration can run, including task names, repeated
+call IDs and the calibration data each task needs. A valid check is not a hardware safety check
+beyond those rules. Other step types are passed as their generated models from
+`qdash.client.services.models` or as dictionaries in the spec's JSON form.
+
+A session keeps one connection for all its calls, so a script or notebook creates it once and
+calls `qdash.close()` when done; `with QDash.from_env() as qdash:` calls `close()` on exit.
+`QDash(client)` uses an existing client and `close()` leaves it open. `project_id=...` on any of
+them scopes the session to another project without changing the client's configuration.
+
+### Run a Whole Pipeline Spec
+
+`qdash.pipelines` works with a whole [calibration pipeline spec](../../developer-guide/workflow/calibration-pipeline.md),
+for a spec kept as a file or built with `Pipeline` from `qdash.sdk.pipeline`, which also exports
+the definitions above:
+
+```python
+from qdash.sdk.pipeline import Pipeline
+
+pipeline = Pipeline(
+    name="coherence-t1-t2echo",
+    targets=targets,
+    steps=steps,
+    default_run_parameters=run_parameters,
+)
+spec = pipeline.to_spec()  # the spec version 2 JSON object; nothing is sent
+check = qdash.pipelines.validate(spec, chip_id="64Qv3")
+pipeline_run = qdash.pipelines.execute(spec, chip_id="64Qv3")
+detail = pipeline_run.wait(timeout_seconds=3600)
+print(detail.pipeline.status if detail.pipeline else detail.status)
+```
+
+| Call | Result |
+| --- | --- |
 | `qdash.pipelines.catalog(backend_name=None)` | Step types, task names by type, and the spec schema |
-| `qdash.pipelines.validate(pipeline, chip_id=...)` | `ValidatePipelineResponse`; problems are data, not exceptions |
-| `qdash.pipelines.execute(pipeline, chip_id=...)` | `PipelineRun`; raises `QDashValidationError` (422) for a spec with problems and `QDashConfigError` without a project |
-| `run.wait(timeout_seconds=3600, poll_interval_seconds=5)` | The execution detail once the whole pipeline ends; `TimeoutError` otherwise |
+| `qdash.pipelines.validate(pipeline, chip_id=...)` | `ValidatePipelineResponse`; a `Pipeline` or a spec mapping, sent unchanged |
+| `qdash.pipelines.execute(pipeline, chip_id=...)` | `PipelineRun`; the same errors as `chip.calibrate` |
+| `pipeline_run.wait(...)` | The raw `ExecutionResponseDetail` once the whole pipeline ends |
 
-Building a pipeline checks only its structure, such as required fields, ID patterns and literal
-values. The server decides whether it can run, including task names, repeated call IDs and the
-calibration data each task needs, so pass a pipeline through `validate` before `execute`. A
-valid result is not a hardware safety check beyond those rules.
+## Run a Registered Workflow
 
-`QDash.from_env()` and `QDash.from_profile(...)` read the same settings as `QDashClient` and
-close their client on exit. `QDash(client)` uses an existing client and leaves it open.
-`project_id=...` on any of them scopes the session to another project without changing the
-client's configuration. Other step types are passed as their generated models from
-`qdash.client.services.models` or as dictionaries in the spec's JSON form. How the SDK is built:
-[Python SDK](../../developer-guide/architecture/python-sdk.md).
+`qdash.workflows` lists, inspects and runs the workflows registered in the session's project: flows
+saved from the UI or with `save_flow`, each with a deployment and the chip it was saved for. Unlike
+`chip.calibrate`, which sends the steps it should run, a registered workflow runs code already
+stored in QDash:
+
+```python
+for summary in qdash.workflows.list():
+    print(summary.name, summary.chip_id, summary.description)
+
+workflow = qdash.workflows.get("coherence_check")
+print(workflow.chip_id, workflow.default_parameters)
+
+run = workflow.run(parameters={"qids": ["0", "1"]})  # measures
+result = run.wait(timeout_seconds=3600)
+print(result.status)
+```
+
+| Call | Result |
+| --- | --- |
+| `qdash.workflows.list()` | A list of `FlowSummary` with `name`, `chip_id`, `description`, `tags` and `folder`; nothing is run |
+| `qdash.workflows.get(name)` | A `Workflow` with `name`, `chip_id`, `description`, `default_parameters` and the raw `GetFlowResponse` as `detail`; `QDashNotFoundError` for a name the project does not have |
+| `workflow.run(parameters=...)`, `qdash.workflows.run(name, parameters=...)` | `WorkflowRun` with `execution_id` and the raw `ExecuteFlowResponse` as `response`; `QDashConfigError` without a project |
+| `run.wait(...)`, `run.get()` | `RunResult`, read the same way as a calibration's |
+
+`parameters` override the saved `default_parameters` for this run only; without them the run uses
+the saved defaults. The workflow runs on its saved `chip_id` unless the saved defaults or the
+parameters carry a `chip_id`. `default_parameters` lists the saved values, not every parameter the flow function
+accepts; the source is in `workflow.detail.code`. A name other than letters, digits and
+underscores raises `ValueError` before any request. Nothing is uploaded, registered or run
+locally.
+
+How the SDK is built: [Python SDK](../../developer-guide/architecture/python-sdk.md).
 
 ## Agent Calibration
 

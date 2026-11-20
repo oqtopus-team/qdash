@@ -1,4 +1,4 @@
-"""The qdash.sdk pipeline example against the real calibration pipeline routes.
+"""The qdash.sdk calibration and pipeline examples against the real calibration pipeline routes.
 
 The SDK's QDashClient sends its requests through FastAPI's TestClient, so the spec it builds
 is parsed by the server's CalibrationPipelineSpec and checked by the same preflight as any
@@ -23,6 +23,7 @@ from qdash.dbmodel.project_membership import ProjectMembershipDocument
 from qdash.dbmodel.qubit import QubitDocument
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 from qdash.sdk import QDash, QDashApiError, QDashValidationError
+from qdash.sdk.calibration import MuxTargets, QubitTargets
 from qdash.sdk.pipeline import CustomOneQubit, Pipeline, Qubits, TaskCall, sweep
 from tests.qdash.api.routers.test_calibration_pipeline import (  # noqa: F401 - pytest fixtures
     CHIP,
@@ -52,6 +53,32 @@ COHERENCE_INPUTS = (
 )
 READOUT_DURATION = 1024
 TIME_RANGE = sweep.logspace(math.log10(300), math.log10(500_000), 51)
+RUN_PARAMETERS = {"readout_duration": READOUT_DURATION, "interval": 262_144}
+
+
+def coherence_steps() -> list[CustomOneQubit]:
+    return [
+        CustomOneQubit(
+            step_name="coherence",
+            tasks=[
+                TaskCall(name="Configure"),
+                TaskCall(name="CheckT1", run={"time_range": TIME_RANGE}),
+                TaskCall(name="CheckT2Echo", run={"time_range": TIME_RANGE}),
+            ],
+        ),
+    ]
+
+
+def patched_dispatch() -> tuple[AsyncMock, Any]:
+    """Patch the Prefect calls of execute; returns create_flow_run and the patch context."""
+    create_flow_run = AsyncMock(return_value="flow-run-1")
+    gateway = "qdash.api.services.flow_service.prefect_gateway.PrefectGateway"
+    context = patch.multiple(
+        gateway,
+        read_deployment_id=AsyncMock(return_value="deployment-1"),
+        create_flow_run=create_flow_run,
+    )
+    return create_flow_run, context
 
 
 def coherence_pipeline() -> Pipeline:
@@ -238,5 +265,93 @@ def test_execute_without_editor_role_is_refused(qdash: QDash) -> None:
 
     with pytest.raises(QDashApiError) as raised:
         qdash.pipelines.execute(coherence_pipeline(), chip_id=CHIP)
+
+    assert raised.value.status_code == 403
+
+
+@pytest.mark.parametrize(
+    ("targets", "expected"),
+    [
+        (QubitTargets(["0", "1"]), {"qids": ["0", "1"], "mux_ids": None, "exclude_qids": []}),
+        (
+            MuxTargets([0, 1], exclude_qids=["2"]),
+            {"qids": None, "mux_ids": [0, 1], "exclude_qids": ["2"]},
+        ),
+    ],
+)
+def test_calibration_targets_parse_into_the_server_targets(
+    targets: QubitTargets | MuxTargets, expected: dict[str, Any]
+) -> None:
+    spec = Pipeline(targets=targets, steps=coherence_steps()).to_spec()
+
+    assert ServerSpec.model_validate(spec).targets.model_dump() == expected
+
+
+@pytest.mark.usefixtures("calibrated_chip")
+def test_validate_calibration_checks_the_example_without_dispatching(qdash: QDash) -> None:
+    create_flow_run, dispatch = patched_dispatch()
+    with dispatch:
+        check = qdash.chip(CHIP).validate_calibration(
+            QubitTargets(["0", "1"]), coherence_steps(), default_run_parameters=RUN_PARAMETERS
+        )
+
+    assert check.valid is True, check.problems
+    assert check.steps is not None
+    assert check.steps[0].tasks == ["Configure", "CheckT1", "CheckT2Echo"]
+    create_flow_run.assert_not_called()
+
+
+def test_validate_calibration_reports_missing_calibration_data(qdash: QDash) -> None:
+    check = qdash.chip(CHIP).validate_calibration(
+        QubitTargets(["0", "1"]), coherence_steps(), default_run_parameters=RUN_PARAMETERS
+    )
+
+    assert check.valid is False
+    assert check.problems is not None
+    assert {problem.path for problem in check.problems} == {
+        "steps[0].tasks[1]",
+        "steps[0].tasks[2]",
+    }
+
+
+@pytest.mark.usefixtures("calibrated_chip")
+def test_calibrate_dispatches_the_same_spec_as_the_pipeline(qdash: QDash) -> None:
+    create_flow_run, dispatch = patched_dispatch()
+    with dispatch:
+        run = qdash.chip(CHIP).calibrate(
+            QubitTargets(["0", "1"]),
+            coherence_steps(),
+            name="coherence-t1-t2echo",
+            default_run_parameters=RUN_PARAMETERS,
+            tags=["sdk"],
+        )
+
+    assert run.response.flow_run_id == "flow-run-1"
+    create_flow_run.assert_awaited_once()
+    parameters = create_flow_run.call_args.kwargs["parameters"]
+    assert parameters["project_id"] == "test_project"
+    expected = ServerSpec.model_validate({**coherence_pipeline().to_spec(), "tags": ["sdk"]})
+    assert ServerSpec.model_validate(parameters["spec"]) == expected
+
+
+def test_calibrate_rejects_an_invalid_calibration_before_dispatch(qdash: QDash) -> None:
+    create_flow_run, dispatch = patched_dispatch()
+    with dispatch, pytest.raises(QDashValidationError) as raised:
+        qdash.chip(CHIP).calibrate(QubitTargets(["99"]), coherence_steps())
+
+    assert raised.value.status_code == 422
+    assert isinstance(raised.value.payload, dict)
+    assert raised.value.payload["detail"]["problems"][0]["path"] == "targets.qids[0]"
+    create_flow_run.assert_not_called()
+
+
+def test_calibrate_without_editor_role_is_refused(qdash: QDash) -> None:
+    membership = ProjectMembershipDocument.find_one({"username": "test_user"}).run()
+    assert membership is not None
+    membership.role = ProjectRole.VIEWER
+    membership.save()
+
+    with pytest.raises(QDashApiError) as raised:
+        qdash.chip(CHIP).calibrate(QubitTargets(["0", "1"]), coherence_steps())
 
     assert raised.value.status_code == 403

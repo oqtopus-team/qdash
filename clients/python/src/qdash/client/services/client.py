@@ -699,10 +699,12 @@ class QDashClient:
         *,
         parameters: dict[str, Any] | None = None,
     ) -> ExecuteFlowResponse:
+        """Run a saved flow; ``parameters`` override its saved defaults for this run only."""
+        # The request's parameters are an object; null is rejected, so None sends {}.
         response = self._request(
             "POST",
             f"/flows/{name}/execute",
-            json={"parameters": parameters},
+            json={"parameters": parameters if parameters is not None else {}},
         )
         return self._validate_model_payload(ExecuteFlowResponse, response.data)
 

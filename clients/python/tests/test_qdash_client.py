@@ -1056,6 +1056,32 @@ def test_flow_and_execution_write_helpers_return_models() -> None:
         client.close()
 
 
+def test_execute_flow_without_parameters_sends_an_empty_object() -> None:
+    # ExecuteFlowRequest.parameters is an object; null would be rejected with 422.
+    bodies: list[object] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        bodies.append(json.loads(request.content))
+        return httpx.Response(
+            200,
+            json={
+                "execution_id": "exec-1",
+                "flow_run_id": "run-1",
+                "flow_run_url": "http://prefect/run-1",
+                "qdash_ui_url": "http://qdash/executions/exec-1",
+                "message": "started",
+            },
+        )
+
+    client = _build_client(httpx.MockTransport(handler), api_token="api-token")
+    try:
+        client.execute_flow("demo")
+    finally:
+        client.close()
+
+    assert bodies == [{"parameters": {}}]
+
+
 def test_task_result_and_issue_write_helpers_return_models() -> None:
     issue_payload = {
         "id": "issue-1",

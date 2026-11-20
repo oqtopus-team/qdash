@@ -1,6 +1,6 @@
 [project]
 name = "qdash-sdk"
-description = "Python SDK for defining and running QDash calibration pipelines"
+description = "Python SDK for defining and running QDash calibrations"
 authors = [
     {name = "OQTOPUS Team", email = "oqtopus-team@googlegroups.com"}
 ]

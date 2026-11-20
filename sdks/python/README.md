@@ -1,15 +1,30 @@
 # qdash-sdk
 
-`qdash-sdk` provides `qdash.sdk`: the `QDash` session and calibration pipeline definitions
-built on [`qdash-client`](../../clients/python/README.md). Installing it installs the matching
+`qdash-sdk` provides `qdash.sdk`: the `QDash` session, which validates and starts calibrations
+on a chip and lists and runs the workflows registered in a project, and the calibration
+definitions, built on
+[`qdash-client`](../../clients/python/README.md). Installing it installs the matching
 `qdash-client` release:
 
 ```bash
 pip install qdash-sdk
 ```
 
-The [Python client guide](../../docs/reference/clients/python.md) covers configuration and the
-pipeline API.
+```python
+from qdash.sdk import QDash
+
+with QDash.from_env() as qdash:
+    # A registered workflow runs code saved in QDash on the chip it was saved for.
+    for summary in qdash.workflows.list():
+        print(summary.name, summary.chip_id)
+    workflow = qdash.workflows.get("coherence_check")
+    result = workflow.run(parameters={"qids": ["0", "1"]}).wait()
+    print(result.status)
+```
+
+The [Python client guide](../../docs/reference/clients/python.md) covers configuration,
+`chip.calibrate(targets, steps)`, which runs steps defined in Python on the chip you name,
+registered workflows and the pipeline API.
 
 ## Develop the Package
 

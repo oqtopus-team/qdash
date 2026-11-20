@@ -104,8 +104,8 @@ class Pipelines:
         """
         if not self._client.config.project_id:
             raise QDashConfigError(
-                "execute needs a project: set QDASH_PROJECT_ID, project_id in the profile, "
-                "or QDash(..., project_id=...)"
+                "running a calibration pipeline needs a project: set QDASH_PROJECT_ID, "
+                "project_id in the profile, or QDash(..., project_id=...)"
             )
         response = self._client.execute_calibration_pipeline(
             chip_id=chip_id, spec=to_spec(pipeline), backend_name=backend_name

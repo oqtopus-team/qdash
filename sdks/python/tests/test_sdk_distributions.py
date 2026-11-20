@@ -34,14 +34,23 @@ import math
 
 from qdash.client import QDashClient
 from qdash.sdk import QDash
-from qdash.sdk.pipeline import CustomOneQubit, Pipeline, Qubits, TaskCall, sweep
+from qdash.sdk.calibration import CustomOneQubit, QubitTargets, TaskCall, sweep
+from qdash.sdk.pipeline import Pipeline
 
 time_range = sweep.logspace(math.log10(300), math.log10(500_000), 51)
 spec = Pipeline(
-    targets=Qubits(["0", "1"]),
+    targets=QubitTargets(["0", "1"]),
     steps=[CustomOneQubit(tasks=[TaskCall(name="CheckT1", run={"time_range": time_range})])],
 ).to_spec()
 assert spec["steps"][0]["type"] == "CustomOneQubit", spec
+
+from qdash.client import QDashConfig
+from qdash.sdk import RunResult, Workflow, WorkflowRun
+
+# Opening a session and reaching its operations sends nothing to the unreachable host.
+with QDash(QDashClient(QDashConfig(base_url="http://qdash.invalid", api_token="t"))) as session:
+    session.workflows
+    session.chip("64Qv3")
 
 import qdash
 assert getattr(qdash, "__file__", None) is None, qdash.__file__

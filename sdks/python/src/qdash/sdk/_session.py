@@ -6,7 +6,9 @@ from typing import TYPE_CHECKING
 
 from qdash.client.services.client import QDashClient
 from qdash.client.services.config import QDashConfig
+from qdash.sdk._calibration import Chip
 from qdash.sdk._pipelines import Pipelines
+from qdash.sdk._workflows import Workflows
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -17,15 +19,18 @@ class QDash:
     """Entry point of the QDash SDK.
 
     ``QDash.from_env()`` and ``QDash.from_profile()`` create a ``QDashClient`` that the session
-    owns and closes. ``QDash(client)`` uses a client the caller created; the session never
-    closes it. ``project_id`` scopes every request of the session to that project without
-    changing the given client or its configuration.
+    owns; :meth:`close` closes it. ``QDash(client)`` uses a client the caller created; the
+    session never closes it. A session is reusable: every call shares its one connection
+    until it is closed, so a script or notebook keeps one session and calls :meth:`close` when
+    done, or uses ``with``, which calls it on exit. ``project_id`` scopes every request of the
+    session to that project without changing the given client or its configuration.
     """
 
     def __init__(self, client: QDashClient, *, project_id: str | None = None) -> None:
         self._client = client.with_project(project_id) if project_id is not None else client
         self._owns_client = False
         self.pipelines = Pipelines(self._client)
+        self.workflows = Workflows(self._client)
 
     @classmethod
     def from_env(cls, *, project_id: str | None = None) -> QDash:
@@ -55,6 +60,10 @@ class QDash:
         session = cls(QDashClient(config))
         session._owns_client = True
         return session
+
+    def chip(self, chip_id: str) -> Chip:
+        """Calibration on ``chip_id`` through this session; sends no request."""
+        return Chip(self.pipelines, chip_id)
 
     @property
     def client(self) -> QDashClient:

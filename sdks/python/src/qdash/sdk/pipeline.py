@@ -2,14 +2,16 @@
 
 The classes here are the API's generated pipeline models (``qdash.client`` builds them from the
 OpenAPI document) with a few conveniences: :class:`Pipeline` fixes ``spec_version``,
-:class:`Qubits` selects explicit qubit IDs, and :class:`CustomOneQubit` fills in the step
-``type``. Building them checks only the structure the schema describes, such as required fields,
-ID patterns and literal values. Whether a pipeline can run, including task names, call ID
-uniqueness, step order and calibration data, is decided by the server's validate and execute
-routes.
+:class:`QubitTargets` and :class:`MuxTargets` select qubit IDs or MUXes, and
+:class:`CustomOneQubit` fills in the step ``type``. Building them checks only the structure
+the schema describes, such as required fields, ID patterns and literal values. Whether a
+pipeline can run, including task names, call ID uniqueness, step order and calibration data,
+is decided by the server's validate and execute routes.
 
 Defining a pipeline has no effects: no request is sent and nothing runs until
-``QDash.pipelines.validate`` or ``QDash.pipelines.execute`` is called.
+``Chip.validate_calibration``, ``Chip.calibrate``, ``QDash.pipelines.validate`` or
+``QDash.pipelines.execute`` is called. :mod:`qdash.sdk.calibration` re-exports the definitions
+a calibration needs; this module adds :class:`Pipeline` for building a whole spec.
 
 Any other step type can be passed as its generated model from
 ``qdash.client.services.models`` (for example ``OneQubitCheckStep(type="OneQubitCheck")``) or
@@ -34,10 +36,12 @@ if TYPE_CHECKING:
 
 __all__ = [
     "CustomOneQubit",
+    "MuxTargets",
     "OnFailure",
     "OneQubitExecutionMode",
     "Pipeline",
     "PipelineSpecInput",
+    "QubitTargets",
     "Qubits",
     "TaskCall",
     "sweep",
@@ -70,13 +74,39 @@ class TaskCall(models.TaskCall):
         ) -> None: ...
 
 
-class Qubits(PipelineTargets):
-    """Explicit target qubits, by the qubit IDs QDash lists, e.g. ``Qubits(["0", "1"])``."""
+class QubitTargets(PipelineTargets):
+    """Explicit target qubits by the IDs QDash lists, e.g. ``QubitTargets(["0", "1"])``.
 
-    def __init__(self, qids: Iterable[str], /) -> None:
+    Named after ``qdash.workflow``'s ``QubitTargets``; it serializes to ``{"qids": [...]}``.
+    """
+
+    def __init__(self, qids: Iterable[str]) -> None:
         if isinstance(qids, str):
-            raise TypeError('Qubits takes a list of qubit IDs, e.g. Qubits(["0", "1"])')
+            raise TypeError('QubitTargets takes a list of qubit IDs, e.g. QubitTargets(["0", "1"])')
         super().__init__(qids=list(qids))
+
+
+Qubits = QubitTargets
+"""The earlier name of :class:`QubitTargets`; the same class."""
+
+
+class MuxTargets(PipelineTargets):
+    """Every qubit of the given MUXes, e.g. ``MuxTargets([0, 1], exclude_qids=["5"])``.
+
+    Named after ``qdash.workflow``'s ``MuxTargets``; it serializes to
+    ``{"mux_ids": [...], "exclude_qids": [...]}``. The server resolves the MUXes to qubits
+    from the chip topology.
+    """
+
+    def __init__(self, mux_ids: Iterable[int], *, exclude_qids: Iterable[str] = ()) -> None:
+        for name, value in (("mux_ids", mux_ids), ("exclude_qids", exclude_qids)):
+            if isinstance(value, str):
+                raise TypeError(f"MuxTargets {name} must be a list, got {value!r}")
+        excluded = list(exclude_qids)
+        if excluded:
+            super().__init__(mux_ids=list(mux_ids), exclude_qids=excluded)
+        else:
+            super().__init__(mux_ids=list(mux_ids))
 
 
 class CustomOneQubit(CustomOneQubitStep):
