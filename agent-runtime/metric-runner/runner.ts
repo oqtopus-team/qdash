@@ -722,7 +722,7 @@ export function memoryBudget(input: MemoryBudgetInput): MemoryBudget {
   const message = fits
     ? `memory budget ${formula} of a ${input.limitMb} MiB container limit`
     : `memory budget ${formula} exceeds the ${input.limitMb} MiB container limit: jobs that use their whole ` +
-      "allowance at once can be OOM-killed (the job fails; the runner stays up). Lower " +
+      "allowance at once can trigger OOM kills; supervisor survival is not guaranteed. Lower " +
       "METRIC_RUNNER_CONCURRENCY or METRIC_RUNNER_MAX_MEMORY_MB, or raise METRIC_RUNNER_MEMORY_LIMIT";
   return { requiredMb, limitMb: input.limitMb, fits, message };
 }

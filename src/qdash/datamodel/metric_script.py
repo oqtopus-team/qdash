@@ -107,6 +107,20 @@ class MetricScriptRevision(BaseModel):
     )
 
 
+class ScriptPin(BaseModel):
+    """Revisions of a script that one dashboard depends on.
+
+    Stored on the script document, keyed by dashboard ID, so that the script save sees
+    every pin in the same document it compares and replaces.
+    """
+
+    revisions: list[int] = Field(default_factory=list, description="Pinned revision numbers")
+    shared: bool = Field(default=False, description="The dashboard is shared with the project")
+    writer: str = Field(
+        default="", description="Token of the dashboard write that last widened this pin"
+    )
+
+
 class CellReference(BaseModel):
     """An input value a cell was computed from."""
 

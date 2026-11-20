@@ -32,8 +32,8 @@ and points fds 0 and 1 at ``/dev/null``, so script output (including output from
 extensions) cannot corrupt the protocol. Python-level ``print`` output goes to a
 :class:`BoundedLog` (16 KiB). Resource limits (address space, CPU time, file size,
 process count) are applied where the platform supports them; unsupported limits are
-skipped (macOS rejects ``RLIMIT_AS``, for example). The worker also makes itself the
-kernel's first choice for the OOM killer (:func:`apply_limits`).
+skipped (macOS rejects ``RLIMIT_AS``, for example). The worker also raises its OOM score
+to bias victim selection toward it (:func:`apply_limits`).
 
 Evaluation follows qdash-playground ``worker.execute`` (Apache License 2.0): one metric
 over every target, each cell evaluated in its own ``try`` so one failure never hides the
@@ -130,7 +130,7 @@ def _address_space_in_use() -> int:
 
 
 def raise_oom_score(path: str = OOM_SCORE_ADJ_PATH) -> bool:
-    """Make this process the OOM killer's first choice; return whether that worked.
+    """Raise this process's OOM selection bias; return whether the setting was written.
 
     Raising ``oom_score_adj`` needs no privilege on Linux. Elsewhere, or when ``/proc`` is
     not writable, nothing happens.
@@ -151,8 +151,8 @@ def apply_limits(memory_mb: int, timeout_seconds: float) -> list[str]:
     ``RLIMIT_AS`` bounds virtual memory, not the resident set: it is the first, per-job
     line, which turns most oversized allocations into a ``MemoryError`` inside the script.
     The hard line is the memory cgroup of the runner's container, shared by every job and
-    the supervisor. ``oom_score_adj`` (``1000``) makes the kernel pick a worker rather than
-    the supervisor when that cgroup runs out, so the failure stays inside a job.
+    the supervisor. ``oom_score_adj`` (``1000``) biases victim selection toward workers,
+    but does not guarantee supervisor survival or isolate OOM failures to one job.
     """
     skipped: list[str] = []
     if not raise_oom_score():

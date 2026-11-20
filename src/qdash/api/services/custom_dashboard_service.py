@@ -1,8 +1,31 @@
-"""Service layer for user-composed custom dashboards."""
+"""Service layer for user-composed custom dashboards.
+
+A metric_script panel pins a script revision. The pins are stored on the script document
+(``MetricScriptDocument.pins``, keyed by dashboard ID), because only that document can be
+updated atomically together with the script's revision history: every pin change increments
+the script's ``version``, and a script save is a compare-and-set on that version.
+
+Dashboard writes therefore follow one order:
+
+1. Widen the pins on every script the new panels use (``add_pin``). The filter of that
+   update refuses revisions that are gone and shared pins on unshared scripts, which is how
+   a dashboard save loses to a script save that evicted or unshared first (422).
+2. Store the dashboard (insert, or a compare-and-set on the dashboard's ``version``).
+3. Narrow each pin to exactly the stored panels (``narrow_pin``), only if no other write of
+   the same dashboard claimed the pin after step 1.
+
+A pin is in the script document before any stored dashboard depends on it, so a concurrent
+script save either sees the pin or fails its compare-and-set. A failed request, a lost race
+or a crash between steps can leave a surplus pin, never a missing one; the next successful
+save involving that script narrows it, and deleting the dashboard removes all its pins.
+A crash before inserting a new dashboard may leave orphan pins requiring administrative
+cleanup once no writer can still insert that dashboard.
+"""
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+from uuid import uuid4
 
 from pydantic import BaseModel, ValidationError
 from starlette.exceptions import HTTPException
@@ -67,6 +90,19 @@ def _invalid(panel: DashboardPanelModel, reason: str) -> HTTPException:
         status_code=422,
         detail=f"Invalid config for {panel.type} panel {_panel_name(panel)}: {reason}",
     )
+
+
+def script_pins(panels: list[DashboardPanelModel]) -> dict[str, list[int]]:
+    """Script revisions the metric_script panels of a dashboard pin, by script ID."""
+    pins: dict[str, set[int]] = {}
+    for panel in panels:
+        if panel.type != "metric_script":
+            continue
+        script_id = panel.config.get("script_id")
+        revision = panel.config.get("script_revision")
+        if isinstance(script_id, str) and isinstance(revision, int):
+            pins.setdefault(script_id, set()).add(revision)
+    return {script_id: sorted(revisions) for script_id, revisions in pins.items()}
 
 
 def validate_panel_configs(panels: list[DashboardPanelModel]) -> list[BaseModel]:
@@ -225,6 +261,79 @@ class CustomDashboardService:
             )
         return doc
 
+    # -- pins ----------------------------------------------------------------
+
+    def _pin_conflict(
+        self, ctx: ProjectContext, script_id: str, revisions: list[int], shared: bool
+    ) -> HTTPException:
+        """Explain why ``add_pin`` did not match: a revision is gone or the script unshared."""
+        script = self._scripts.get(project_id=ctx.project_id, script_id=script_id)
+        if script is None:
+            reason = f"metric script '{script_id}' was deleted"
+        else:
+            missing = [r for r in revisions if script.find_revision(r) is None]
+            if missing:
+                numbers = ", ".join(str(r) for r in missing)
+                noun = "revision" if len(missing) == 1 else "revisions"
+                verb = "was" if len(missing) == 1 else "were"
+                reason = f"{noun} {numbers} of metric script '{script.name}' {verb} removed"
+            elif shared and script.visibility != "project":
+                reason = f"metric script '{script.name}' is no longer shared"
+            else:
+                reason = f"metric script '{script.name}' changed"
+        return HTTPException(status_code=422, detail=f"{reason} while saving; reload the dashboard")
+
+    def _add_pins(
+        self,
+        ctx: ProjectContext,
+        dashboard_id: str,
+        pins: dict[str, list[int]],
+        *,
+        shared: bool,
+        writer: str,
+        claim: set[str] | None = None,
+    ) -> None:
+        """Widen the pins of ``dashboard_id`` on every script in ``pins`` (step 1).
+
+        Scripts in ``claim`` that are not in ``pins`` only get their existing pin claimed
+        for ``writer`` so that step 3 may remove it.
+
+        Raises:
+            HTTPException: 422 when a revision is gone or a script is no longer shared.
+        """
+        for script_id in sorted(set(pins) | (claim or set())):
+            revisions = pins.get(script_id, [])
+            added = self._scripts.add_pin(
+                project_id=ctx.project_id,
+                script_id=script_id,
+                dashboard_id=dashboard_id,
+                revisions=revisions,
+                shared=shared and bool(revisions),
+                writer=writer,
+            )
+            if not added and revisions:
+                raise self._pin_conflict(ctx, script_id, revisions, shared)
+
+    def _insert(self, ctx: ProjectContext, doc: CustomDashboardDocument) -> None:
+        """Pin the scripts of a new dashboard, then insert it."""
+        try:
+            self._add_pins(
+                ctx,
+                doc.dashboard_id,
+                script_pins(doc.panels),
+                shared=doc.visibility == "project",
+                writer=uuid4().hex,
+            )
+            self._repo.insert(doc)
+        except Exception:
+            # The ID is fresh and never reused, so no stored dashboard needs these pins.
+            self._scripts.clear_dashboard_pins(
+                project_id=ctx.project_id, dashboard_id=doc.dashboard_id
+            )
+            raise
+
+    # -- read --------------------------------------------------------------
+
     def list_visible(self, ctx: ProjectContext) -> ListCustomDashboardsResponse:
         docs = self._repo.list_visible(project_id=ctx.project_id, user_id=ctx.user.user_id)
         cache: dict[str, MetricScriptDocument | None] = {}
@@ -280,13 +389,17 @@ class CustomDashboardService:
             chip_id=body.chip_id,
             panels=panels,
         )
-        self._repo.insert(doc)
+        self._insert(ctx, doc)
         return self._to_response(doc, ctx)
 
     def update(
         self, ctx: ProjectContext, dashboard_id: str, body: CustomDashboardUpdateRequest
     ) -> CustomDashboardResponse:
         doc = self._get_editable(ctx, dashboard_id)
+        # The stored state this update replaces; the save below is a compare-and-set on it.
+        read_version = doc.version
+        old_pins = script_pins(doc.panels)
+        old_shared = doc.visibility == "project"
         visibility = body.visibility if body.visibility is not None else doc.visibility
         if body.panels is not None:
             self.validate_panels(ctx, body.panels, visibility)
@@ -302,12 +415,44 @@ class CustomDashboardService:
         if "chip_id" in body.model_fields_set:
             # An explicit null clears the default chip.
             doc.chip_id = body.chip_id
-        self._repo.save(doc)
+        new_pins = script_pins(doc.panels)
+        new_shared = doc.visibility == "project"
+        repin = new_pins != old_pins or (new_shared != old_shared and bool(new_pins))
+        writer = uuid4().hex
+        if repin:
+            self._add_pins(
+                ctx,
+                doc.dashboard_id,
+                new_pins,
+                shared=new_shared,
+                writer=writer,
+                claim=set(old_pins),
+            )
+        if not self._repo.save_if_unchanged(doc, version=read_version):
+            if self._repo.get(project_id=ctx.project_id, dashboard_id=doc.dashboard_id) is None:
+                self._scripts.clear_dashboard_pins(
+                    project_id=ctx.project_id, dashboard_id=doc.dashboard_id
+                )
+            raise HTTPException(
+                status_code=409,
+                detail="Dashboard was changed by another save; reload it before saving",
+            )
+        if repin:
+            for script_id in sorted(set(old_pins) | set(new_pins)):
+                self._scripts.narrow_pin(
+                    project_id=ctx.project_id,
+                    script_id=script_id,
+                    dashboard_id=doc.dashboard_id,
+                    revisions=new_pins.get(script_id, []),
+                    shared=new_shared,
+                    writer=writer,
+                )
         return self._to_response(doc, ctx)
 
     def delete(self, ctx: ProjectContext, dashboard_id: str) -> SuccessResponse:
         doc = self._get_editable(ctx, dashboard_id)
         self._repo.delete(doc)
+        self._scripts.clear_dashboard_pins(project_id=ctx.project_id, dashboard_id=dashboard_id)
         return SuccessResponse(message="Custom dashboard deleted")
 
     def duplicate(self, ctx: ProjectContext, dashboard_id: str) -> CustomDashboardResponse:
@@ -322,5 +467,5 @@ class CustomDashboardService:
             chip_id=source.chip_id,
             panels=[panel.model_copy(deep=True) for panel in source.panels],
         )
-        self._repo.insert(copy)
+        self._insert(ctx, copy)
         return self._to_response(copy, ctx)

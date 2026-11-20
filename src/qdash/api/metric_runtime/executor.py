@@ -32,6 +32,17 @@ Settings (environment variables read per run, with defaults):
     within :data:`QUEUE_WAIT_SECONDS` fails with :class:`QueueFullError` (HTTP 429). In
     socket mode the runner enforces one global limit (``METRIC_RUNNER_CONCURRENCY``)
     across every API process and answers ``queue_full`` instead.
+``METRIC_BROKER_CONCURRENCY`` (4)
+    Worker data requests this API process serves at once, in both modes. A request that
+    cannot start within :data:`BROKER_WAIT_SECONDS` (or before the time limit) is answered
+    with an error the script sees per cell; the run itself continues. The limit also bounds
+    how much database work can outlive runs that have already ended (see below).
+
+Each data request gets the seconds left before the run's time limit (counted from the
+runner's ``accepted`` line in socket mode and from the worker's start in local mode). The
+broker turns them into a pymongo client-side operation timeout. When the limit passes
+while a request is being served, its data is not sent: the worker gets a ``Time limit
+exceeded`` error answer and the run fails with the time-limit message.
 
 The worker's stdout is bounded to :data:`OUTPUT_LIMIT_BYTES`; script ``print`` output is
 kept in a 16 KiB log.
@@ -59,8 +70,8 @@ Socket mode (deployments):
 - Resource bounds: the worker's rlimits (address space, CPU time, file size, process
   count), the runner's wall clock and stdout bound, and the container's CPU, memory and
   pids limits, which every job shares (there is no per-job cgroup). Workers raise their
-  ``oom_score_adj``, so the kernel kills a job rather than the runner when the container
-  runs out of memory. The API side also gives up :data:`DEADLINE_GRACE_SECONDS` after the
+  ``oom_score_adj`` to bias OOM victim selection toward workers; this does not guarantee
+  supervisor survival. The API side also gives up :data:`DEADLINE_GRACE_SECONDS` after the
   time limit and closes the connection, which makes the runner kill the job.
 - Guardrails: an import allowlist and disabled builtins (:mod:`.policy`), which catch
   mistakes and make intent explicit. They are not a sandbox; the boundary is the job uid
@@ -102,6 +113,16 @@ QUEUE_WAIT_SECONDS = 5.0
 DEFAULT_TIMEOUT_SECONDS = 60.0
 DEFAULT_MEMORY_MB = 1024
 DEFAULT_CONCURRENCY = 2
+DEFAULT_BROKER_CONCURRENCY = 4
+BROKER_WAIT_SECONDS = 5.0
+"""Longest wait for a free data request slot (shortened to the time left in the run)."""
+EXPIRED_SEND_SECONDS = 1.0
+"""How long sending the ``Time limit exceeded`` answer may take."""
+TIME_LIMIT_ANSWER: dict[str, Any] = {"ok": False, "error": "Time limit exceeded"}
+BUSY_ANSWER: dict[str, Any] = {
+    "ok": False,
+    "error": "Metric data access is busy; try again shortly",
+}
 DEFAULT_RUNNER_MODE: RunnerMode = "socket"
 DEFAULT_SOCKET_PATH = "/run/metric-runner/metric.sock"
 WORKER_MODULE = "qdash.api.metric_runtime.worker"
@@ -162,7 +183,8 @@ class RuntimeSettings:
     """Limits of one worker run and where it runs.
 
     ``concurrency`` and ``queue_wait_seconds`` apply to ``mode="local"`` only; the runner
-    enforces its own global limit in socket mode.
+    enforces its own global limit in socket mode. ``broker_concurrency`` bounds the data
+    requests this process serves at once in either mode.
     """
 
     timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS
@@ -172,6 +194,7 @@ class RuntimeSettings:
     output_limit_bytes: int = OUTPUT_LIMIT_BYTES
     mode: RunnerMode = DEFAULT_RUNNER_MODE
     socket_path: str = DEFAULT_SOCKET_PATH
+    broker_concurrency: int = DEFAULT_BROKER_CONCURRENCY
 
 
 def _env_number(name: str, default: float, minimum: float) -> float:
@@ -204,6 +227,9 @@ def load_settings() -> RuntimeSettings:
         concurrency=int(_env_number("METRIC_SCRIPT_CONCURRENCY", DEFAULT_CONCURRENCY, 1)),
         mode=_env_mode(),
         socket_path=(os.environ.get("METRIC_RUNNER_SOCKET") or "").strip() or DEFAULT_SOCKET_PATH,
+        broker_concurrency=int(
+            _env_number("METRIC_BROKER_CONCURRENCY", DEFAULT_BROKER_CONCURRENCY, 1)
+        ),
     )
 
 
@@ -217,19 +243,88 @@ class WorkerOutcome:
     skipped_limits: list[str] = field(default_factory=list)
 
 
-def _answer(broker: BrokerHandler | None, payload: dict[str, Any]) -> dict[str, Any]:
+_broker_slots_lock = threading.Lock()
+_broker_slots: dict[int, threading.BoundedSemaphore] = {}
+
+
+def _broker_semaphore(concurrency: int) -> threading.BoundedSemaphore:
+    """The process-wide data request slots for ``concurrency``."""
+    with _broker_slots_lock:
+        if concurrency not in _broker_slots:
+            _broker_slots[concurrency] = threading.BoundedSemaphore(concurrency)
+        return _broker_slots[concurrency]
+
+
+def _answer(
+    broker: BrokerHandler | None,
+    payload: dict[str, Any],
+    *,
+    deadline: float,
+    concurrency: int = DEFAULT_BROKER_CONCURRENCY,
+) -> dict[str, Any]:
+    """Serve one data request, giving the broker the time left before ``deadline``.
+
+    ``deadline`` is a :func:`time.monotonic` value. The caller must still check it after
+    this returns: the answer of a request that finished late must not be sent.
+    """
     if broker is None:
         return {"ok": False, "error": "Data access is not available while validating a script"}
     op = str(payload.get("op", ""))
     args = payload.get("args")
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        return dict(TIME_LIMIT_ANSWER)
+    slots = _broker_semaphore(concurrency)
+    if not slots.acquire(timeout=min(remaining, BROKER_WAIT_SECONDS)):
+        logger.info("Metric data request %s found every broker slot busy; refusing it", op)
+        return dict(BUSY_ANSWER)
     try:
-        data = broker.handle(op, args if isinstance(args, dict) else {})
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return dict(TIME_LIMIT_ANSWER)
+        data = broker.handle(op, args if isinstance(args, dict) else {}, timeout=remaining)
     except Exception as exc:
         detail = getattr(exc, "detail", None)
         message = str(detail) if detail is not None else str(exc)
         logger.debug("Broker request %s failed: %s", op, message)
         return {"ok": False, "error": message or type(exc).__name__}
+    finally:
+        slots.release()
     return {"ok": True, "data": data}
+
+
+def _encode_answer(answer: dict[str, Any], envelope: dict[str, Any]) -> bytes:
+    """``answer`` as one JSON line body, replaced by an error when it cannot be sent."""
+    try:
+        encoded = json.dumps({**envelope, **answer}, allow_nan=False).encode()
+    except (TypeError, ValueError):
+        encoded = json.dumps({**envelope, "ok": False, "error": "Non-finite broker data"}).encode()
+    if len(encoded) > ANSWER_LIMIT_BYTES:
+        encoded = json.dumps(
+            {**envelope, "ok": False, "error": "Broker data is too large"}
+        ).encode()
+    return encoded
+
+
+def _serve_call(
+    broker: BrokerHandler | None,
+    payload: dict[str, Any],
+    deadline: float,
+    concurrency: int,
+    envelope: dict[str, Any],
+) -> bytes | None:
+    """The encoded answer to one call, or ``None`` once ``deadline`` has passed.
+
+    ``None`` is returned both when the call arrives after the deadline and when serving or
+    encoding it ran past the deadline, so data finished late is never delivered.
+    """
+    if time.monotonic() >= deadline:
+        return None
+    answer = _answer(broker, payload, deadline=deadline, concurrency=concurrency)
+    encoded = _encode_answer(answer, envelope)
+    if time.monotonic() >= deadline:
+        return None
+    return encoded
 
 
 def _time_limit_message(settings: RuntimeSettings) -> str:
@@ -416,32 +511,30 @@ def _relay_call(
     message: dict[str, Any],
     broker: BrokerHandler | None,
     deadline: float,
+    concurrency: int = DEFAULT_BROKER_CONCURRENCY,
 ) -> None:
-    """Answer one ``call`` from the broker; refuse it once the deadline has passed."""
-    if time.monotonic() >= deadline:
+    """Answer one ``call`` from the broker; refuse it once the deadline has passed.
+
+    A call that arrives after ``deadline``, or whose answer is only ready after it, gets
+    the ``Time limit exceeded`` answer instead of data and raises :class:`_Expired`.
+    """
+    envelope = {"type": "answer"}
+    encoded = _serve_call(
+        broker,
+        {"op": message.get("op"), "args": message.get("args")},
+        deadline,
+        concurrency,
+        envelope,
+    )
+    if encoded is None:
         with contextlib.suppress(OSError, _Expired):
             connection.send_line(
-                json.dumps(
-                    {"type": "answer", "ok": False, "error": "Time limit exceeded"}
-                ).encode(),
-                time.monotonic() + 1,
+                _encode_answer(TIME_LIMIT_ANSWER, envelope),
+                time.monotonic() + EXPIRED_SEND_SECONDS,
             )
         raise _Expired
-    answer = _answer(broker, {"op": message.get("op"), "args": message.get("args")})
     try:
-        encoded = json.dumps({"type": "answer", **answer}, allow_nan=False).encode()
-    except (TypeError, ValueError):
-        encoded = json.dumps(
-            {"type": "answer", "ok": False, "error": "Non-finite broker data"}
-        ).encode()
-    if len(encoded) > ANSWER_LIMIT_BYTES:
-        encoded = json.dumps(
-            {"type": "answer", "ok": False, "error": "Broker data is too large"}
-        ).encode()
-    try:
-        # Deliver a finished answer even if the broker took past the deadline; the next
-        # read or call then stops the job.
-        connection.send_line(encoded, max(deadline, time.monotonic() + 1))
+        connection.send_line(encoded, deadline)
     except OSError as exc:
         # The runner ended the job; its last line (if any) is still readable.
         logger.debug("Metric script runner closed while answering: %s", exc)
@@ -496,7 +589,10 @@ def _converse(
         raise WorkerFailure(f"Metric script runner sent an unexpected '{reply['type']}' message")
     logger.debug("Metric script job %s accepted", reply.get("job_id"))
 
-    deadline = time.monotonic() + settings.timeout_seconds + DEADLINE_GRACE_SECONDS
+    # The runner starts the job's clock right after `accepted`; data requests get the time
+    # left until then, while waiting for the final line is allowed a grace period.
+    data_deadline = time.monotonic() + settings.timeout_seconds
+    deadline = data_deadline + DEADLINE_GRACE_SECONDS
     limit = max(settings.output_limit_bytes + RESULT_SLACK_BYTES, MESSAGE_LIMIT_BYTES)
     try:
         while True:
@@ -513,7 +609,7 @@ def _converse(
                 )
             kind = message["type"]
             if kind == "call":
-                _relay_call(connection, message, broker, deadline)
+                _relay_call(connection, message, broker, data_deadline, settings.broker_concurrency)
             elif kind == "result":
                 return _outcome(message)
             elif kind == "failed":
@@ -522,9 +618,8 @@ def _converse(
                 raise WorkerFailure(f"Metric script runner sent an unexpected '{kind}' message")
     except _Expired as exc:
         logger.warning(
-            "Metric script job %s gave no result within the time limit plus %g s; cancelling",
+            "Metric script job %s gave no result within its time limit; cancelling",
             reply.get("job_id"),
-            DEADLINE_GRACE_SECONDS,
         )
         raise WorkerFailure(_time_limit_message(settings)) from exc
 
@@ -610,6 +705,24 @@ def _run_local_bounded(
         slots.release()
 
 
+def _local_reply(
+    text: str, broker: BrokerHandler | None, deadline: float, concurrency: int
+) -> bytes | None:
+    """The answer line to the local worker's ``CALL`` line ``text``.
+
+    ``None`` once ``deadline`` has passed (before or while serving the call): no data is
+    written to the worker after its time limit.
+    """
+    try:
+        call = json.loads(text[5:])
+    except json.JSONDecodeError:
+        call = {}
+    if not isinstance(call, dict):
+        call = {}
+    encoded = _serve_call(broker, call, deadline, concurrency, {})
+    return None if encoded is None else encoded + b"\n"
+
+
 def _run_local(
     request: dict[str, Any], broker: BrokerHandler | None, settings: RuntimeSettings
 ) -> WorkerOutcome:
@@ -637,6 +750,7 @@ def _run_local(
             timed_out.set()
             _kill_group(process)
 
+        deadline = time.monotonic() + settings.timeout_seconds
         timer = threading.Timer(settings.timeout_seconds, expire)
         timer.daemon = True
         timer.start()
@@ -658,16 +772,12 @@ def _run_local(
                     break
                 text = line.decode("utf-8", errors="replace").rstrip("\n")
                 if text.startswith("CALL "):
-                    try:
-                        call = json.loads(text[5:])
-                    except json.JSONDecodeError:
-                        call = {}
-                    answer = _answer(broker, call)
-                    try:
-                        encoded = json.dumps(answer, allow_nan=False)
-                    except ValueError:
-                        encoded = json.dumps({"ok": False, "error": "Non-finite broker data"})
-                    process.stdin.write(encoded.encode() + b"\n")
+                    reply = _local_reply(text, broker, deadline, settings.broker_concurrency)
+                    if reply is None:
+                        # Past the time limit: stop now rather than answer late.
+                        expire()
+                        break
+                    process.stdin.write(reply)
                     process.stdin.flush()
                 elif text.startswith("RESULT "):
                     final = json.loads(text[7:])

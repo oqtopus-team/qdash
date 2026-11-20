@@ -88,7 +88,9 @@ runtime lifecycle, reservations, and terminal state handling.
 [Notes Architecture](../developer-guide/architecture/notes.md) explains current-state notes and
 their audit events.
 [Custom Dashboards Architecture](../developer-guide/architecture/custom-dashboards.md) explains
-dashboards, metric scripts, and their revisions.
+dashboards, metric scripts, and their revisions. A `metric_script` document also stores the
+revisions each dashboard pins (`pins`, keyed by `dashboard_id`) and a `version` write counter;
+`custom_dashboard` documents have a `version` too.
 
 ## Agent and Provenance
 

@@ -10,6 +10,7 @@ import pytest
 from qdash.api.metric_runtime import executor
 from qdash.api.metric_runtime.executor import QueueFullError, RunnerUnavailableError
 from qdash.api.metric_runtime.template_library import TEMPLATES
+from qdash.api.schemas.metric_script import MAX_REVISIONS
 from qdash.api.services import metric_script_service
 from qdash.common.config.topology import load_topology
 from qdash.common.utils.datetime import now
@@ -17,8 +18,10 @@ from qdash.datamodel.note import NoteModel
 from qdash.datamodel.project import ProjectRole
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.chip import ChipDocument
+from qdash.dbmodel.custom_dashboard import CustomDashboardDocument
 from qdash.dbmodel.metric_script import MetricScriptDocument
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
+from qdash.repository.custom_dashboard import MongoCustomDashboardRepository
 from qdash.repository.metric_script import MongoMetricScriptRepository
 from tests.qdash.api.metric_runtime.fakes import install_inprocess_runtime
 from tests.qdash.api.routers.test_custom_dashboard import (
@@ -340,9 +343,9 @@ def _interleave(monkeypatch: pytest.MonkeyPatch, target: Any, name: str, other_s
     monkeypatch.setattr(target, name, wrapper)
 
 
-def _pinned_panel(script_id: str, revision: int) -> dict[str, Any]:
+def _pinned_panel(script_id: str, revision: int, panel_id: str = "p1") -> dict[str, Any]:
     return {
-        "panel_id": "p1",
+        "panel_id": panel_id,
         "type": "metric_script",
         "title": "Pinned",
         "layout": {"x": 0, "y": 0, "w": 6, "h": 4},
@@ -532,6 +535,228 @@ def test_revision_history_is_capped_but_keeps_pins(test_client, users, runtime):
     assert len(revisions) == 50
     assert revisions[0] == 1  # pinned by the dashboard
     assert revisions[-1] == 56
+    stored = _stored_doc(script_id)
+    assert stored.pins[dashboard.json()["dashboard_id"]].revisions == [1]
+
+
+def _script_with_revisions(client: Any, headers: dict[str, str], count: int) -> str:
+    """A shared script whose history holds revisions 1..``count``, all valid."""
+    script_id: str = _create(client, headers, visibility="project")["script_id"]
+    for index in range(2, count + 1):
+        saved = client.patch(
+            f"/metric-scripts/{script_id}",
+            json={"source": RATIO + f"\n# {index}\n"},
+            headers=headers,
+        )
+        assert saved.status_code == 200, saved.text
+    assert _stored_doc(script_id).revision == count
+    return script_id
+
+
+def _stored_doc(script_id: str) -> MetricScriptDocument:
+    doc = MetricScriptDocument.find_one({"script_id": script_id}).run()
+    assert doc is not None
+    return doc
+
+
+def _post_dashboard(client: Any, headers: dict[str, str], panels: list[Any], **body: Any) -> Any:
+    return client.post(
+        "/custom-dashboards", json={"name": "Pins", "panels": panels, **body}, headers=headers
+    )
+
+
+def _assert_every_dashboard_pin_holds(client: Any, headers: dict[str, str]) -> None:
+    """Every stored panel's revision is pinned on its script and still evaluates."""
+    for dashboard in CustomDashboardDocument.find({"project_id": PROJECT}).run():
+        for panel in dashboard.panels:
+            if panel.type != "metric_script":
+                continue
+            script_id = panel.config["script_id"]
+            revision = panel.config["script_revision"]
+            script = _stored_doc(script_id)
+            assert len(script.revisions) <= MAX_REVISIONS
+            assert revision in script.pins[dashboard.dashboard_id].revisions
+            evaluated = client.post(
+                f"/metric-scripts/{script_id}/evaluate",
+                json={"metric_id": "scaled_frequency", "chip_id": "chip-1", "revision": revision},
+                headers=headers,
+            )
+            assert evaluated.status_code == 200, evaluated.text
+
+
+@pytest.mark.parametrize(
+    ("target", "name"),
+    [
+        (metric_script_service, "validate_source"),
+        (MongoMetricScriptRepository, "save_if_unchanged"),
+    ],
+)
+def test_pin_during_script_save_fails_the_save(
+    test_client, users, runtime, monkeypatch, target, name
+):
+    # The script save read 50 revisions and would evict revision 1; a dashboard pins
+    # revision 1 before the save writes. The pin moved the script's version on.
+    _seed_chip()
+    owner = users["owner"]
+    script_id = _script_with_revisions(test_client, owner, MAX_REVISIONS)
+    stored: dict[str, Any] = {}
+
+    def pin_revision_1() -> None:
+        stored["dashboard"] = _post_dashboard(test_client, owner, [_pinned_panel(script_id, 1)])
+        stored["script"] = _stored(script_id)
+
+    _interleave(monkeypatch, target, name, pin_revision_1)
+    save = test_client.patch(
+        f"/metric-scripts/{script_id}", json={"source": RATIO + "\n# 51\n"}, headers=owner
+    )
+
+    assert stored["dashboard"].status_code == 201, stored["dashboard"].text
+    assert save.status_code == 409
+    assert save.json()["detail"] == CONFLICT
+    assert _stored(script_id) == stored["script"]
+    assert _stored_doc(script_id).find_revision(1) is not None
+    _assert_every_dashboard_pin_holds(test_client, owner)
+
+    # A retry sees the pin and evicts revision 2 instead.
+    retry = test_client.patch(
+        f"/metric-scripts/{script_id}", json={"source": RATIO + "\n# 51\n"}, headers=owner
+    )
+    assert retry.status_code == 200, retry.text
+    revisions = [r.revision for r in _stored_doc(script_id).revisions]
+    assert revisions == [1, *range(3, 52)]
+    _assert_every_dashboard_pin_holds(test_client, owner)
+
+
+def test_script_save_during_pin_fails_the_dashboard_save(test_client, users, runtime, monkeypatch):
+    # The dashboard validated revision 1; the script save evicts it before the pin lands.
+    _seed_chip()
+    owner = users["owner"]
+    script_id = _script_with_revisions(test_client, owner, MAX_REVISIONS)
+    stored: dict[str, Any] = {}
+
+    def save_script() -> None:
+        stored["save"] = test_client.patch(
+            f"/metric-scripts/{script_id}", json={"source": RATIO + "\n# 51\n"}, headers=owner
+        )
+
+    _interleave(monkeypatch, MongoMetricScriptRepository, "add_pin", save_script)
+    dashboard = _post_dashboard(test_client, owner, [_pinned_panel(script_id, 1)])
+
+    assert stored["save"].status_code == 200, stored["save"].text
+    assert dashboard.status_code == 422
+    assert "revision 1 of metric script 'Ratio' was removed" in dashboard.json()["detail"]
+    assert "reload the dashboard" in dashboard.json()["detail"]
+    assert CustomDashboardDocument.find({"project_id": PROJECT}).count() == 0
+    script = _stored_doc(script_id)
+    assert script.find_revision(1) is None
+    assert script.pins == {}
+    assert len(script.revisions) == MAX_REVISIONS
+
+
+def test_script_save_between_pin_and_dashboard_insert_keeps_the_pin(
+    test_client, users, runtime, monkeypatch
+):
+    # The pin is registered before the dashboard document exists; the script save sees it.
+    _seed_chip()
+    owner = users["owner"]
+    script_id = _script_with_revisions(test_client, owner, MAX_REVISIONS)
+    stored: dict[str, Any] = {}
+
+    def save_script() -> None:
+        stored["pins"] = dict(_stored_doc(script_id).pins)
+        stored["save"] = test_client.patch(
+            f"/metric-scripts/{script_id}", json={"source": RATIO + "\n# 51\n"}, headers=owner
+        )
+
+    _interleave(monkeypatch, MongoCustomDashboardRepository, "insert", save_script)
+    dashboard = _post_dashboard(test_client, owner, [_pinned_panel(script_id, 1)])
+
+    assert dashboard.status_code == 201, dashboard.text
+    assert list(stored["pins"]) == [dashboard.json()["dashboard_id"]]
+    assert stored["save"].status_code == 200, stored["save"].text
+    revisions = [r.revision for r in _stored_doc(script_id).revisions]
+    assert revisions == [1, *range(3, 52)]
+    _assert_every_dashboard_pin_holds(test_client, owner)
+
+
+def test_delete_fails_when_a_dashboard_pins_the_script_meanwhile(
+    test_client, users, runtime, monkeypatch
+):
+    owner = users["owner"]
+    script_id = _create(test_client, owner, visibility="project")["script_id"]
+    stored: dict[str, Any] = {}
+
+    def pin() -> None:
+        stored["dashboard"] = _post_dashboard(test_client, owner, [_pinned_panel(script_id, 1)])
+
+    _interleave(monkeypatch, MongoMetricScriptRepository, "delete_if_unchanged", pin)
+    deleted = test_client.delete(f"/metric-scripts/{script_id}", headers=owner)
+
+    assert stored["dashboard"].status_code == 201, stored["dashboard"].text
+    assert deleted.status_code == 409
+    assert deleted.json()["detail"] == CONFLICT
+    script = _stored_doc(script_id)
+    assert list(script.pins) == [stored["dashboard"].json()["dashboard_id"]]
+
+
+def test_unshare_fails_when_a_shared_dashboard_pins_the_script_meanwhile(
+    test_client, users, runtime, monkeypatch
+):
+    owner = users["owner"]
+    script_id = _create(test_client, owner, visibility="project")["script_id"]
+    stored: dict[str, Any] = {}
+
+    def pin_shared() -> None:
+        stored["dashboard"] = _post_dashboard(
+            test_client, owner, [_pinned_panel(script_id, 1)], visibility="project"
+        )
+
+    _interleave(monkeypatch, MongoMetricScriptRepository, "save_if_unchanged", pin_shared)
+    unshare = test_client.patch(
+        f"/metric-scripts/{script_id}", json={"visibility": "private"}, headers=owner
+    )
+
+    assert stored["dashboard"].status_code == 201, stored["dashboard"].text
+    assert unshare.status_code == 409
+    assert unshare.json()["detail"] == CONFLICT
+    script = _stored_doc(script_id)
+    assert script.visibility == "project"
+    assert script.pins[stored["dashboard"].json()["dashboard_id"]].shared is True
+    # Without the race the shared pin blocks unsharing up front, naming the dashboard.
+    again = test_client.patch(
+        f"/metric-scripts/{script_id}", json={"visibility": "private"}, headers=owner
+    )
+    assert again.status_code == 409
+    assert "'Pins'" in again.json()["detail"]
+
+
+def test_save_refused_when_every_revision_is_pinned(test_client, users, runtime):
+    owner = users["owner"]
+    script_id = _script_with_revisions(test_client, owner, MAX_REVISIONS)
+    panels = [
+        {
+            **_pinned_panel(script_id, revision, panel_id=f"p{revision}"),
+            "layout": {"x": 0, "y": revision * 4, "w": 6, "h": 4},
+        }
+        for revision in range(1, MAX_REVISIONS + 1)
+    ]
+    dashboard = _post_dashboard(test_client, owner, panels)
+    assert dashboard.status_code == 201, dashboard.text
+    before = _stored(script_id)
+
+    save = test_client.patch(
+        f"/metric-scripts/{script_id}", json={"source": RATIO + "\n# 51\n"}, headers=owner
+    )
+
+    assert save.status_code == 409
+    assert f"pin {MAX_REVISIONS} revisions" in save.json()["detail"]
+    assert "unpin dashboards" in save.json()["detail"]
+    assert _stored(script_id) == before
+    # Metadata saves still work.
+    renamed = test_client.patch(
+        f"/metric-scripts/{script_id}", json={"name": "Renamed"}, headers=owner
+    )
+    assert renamed.status_code == 200, renamed.text
 
 
 def test_delete_and_unshare_blocked_while_dashboards_reference_script(test_client, users, runtime):

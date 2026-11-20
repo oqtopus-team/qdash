@@ -61,7 +61,6 @@ from qdash.dbmodel.metric_script import MetricScriptDocument
 if TYPE_CHECKING:
     from qdash.api.lib.project import ProjectContext
     from qdash.api.services.metrics_service import MetricsService
-    from qdash.dbmodel.custom_dashboard import CustomDashboardDocument
     from qdash.repository.chip import MongoChipRepository
     from qdash.repository.custom_dashboard import MongoCustomDashboardRepository
     from qdash.repository.metric_script import MongoMetricScriptRepository
@@ -71,6 +70,7 @@ logger = logging.getLogger(__name__)
 
 NOT_FOUND = "Metric script not found"
 COPY_SUFFIX = " (copy)"
+CONFLICT = "Script was changed by another save; reload it before saving"
 
 
 @dataclass
@@ -163,19 +163,6 @@ def check_params(metric: MetricInfo, params: dict[str, Any]) -> dict[str, Any]:
         ValueError: On unknown names or invalid values.
     """
     return resolve_parameters(metric_parameters(metric), params)
-
-
-def pinned_revisions(dashboards: list[CustomDashboardDocument], script_id: str) -> set[int]:
-    """Script revisions pinned by metric_script panels of ``dashboards``."""
-    pins: set[int] = set()
-    for dashboard in dashboards:
-        for panel in dashboard.panels:
-            if panel.type != "metric_script" or panel.config.get("script_id") != script_id:
-                continue
-            revision = panel.config.get("script_revision")
-            if isinstance(revision, int):
-                pins.add(revision)
-    return pins
 
 
 class MetricScriptService:
@@ -310,10 +297,16 @@ class MetricScriptService:
         )
 
     @staticmethod
-    def _apply_source(
-        doc: MetricScriptDocument, source: str, result: ValidationResult, pins: set[int]
-    ) -> None:
-        """Record ``source`` as a new revision; advance ``active_*`` only when it validated."""
+    def _apply_source(doc: MetricScriptDocument, source: str, result: ValidationResult) -> None:
+        """Record ``source`` as a new revision; advance ``active_*`` only when it validated.
+
+        Old revisions beyond ``MAX_REVISIONS`` are evicted, except the new and active ones
+        and every revision in ``doc.pins``. The caller saves ``doc`` with a compare-and-set
+        on its ``version``, so the pins read here are the pins of the state it replaces.
+
+        Raises:
+            HTTPException: 409 when the pinned revisions leave no room for the new one.
+        """
         revision = doc.revision + 1
         doc.revision = revision
         doc.source = source
@@ -332,20 +325,26 @@ class MetricScriptService:
             doc.active_revision = revision
             doc.active_source = source
             doc.metrics = result.metrics
-        keep = {revision, *pins}
+        pinned = doc.pinned_revisions()
+        keep = {revision, *pinned}
         if doc.active_revision is not None:
             keep.add(doc.active_revision)
-        while len(doc.revisions) > MAX_REVISIONS:
-            evictable = next((r for r in doc.revisions if r.revision not in keep), None)
-            if evictable is None:
-                break
-            doc.revisions.remove(evictable)
-
-    def _pins(self, ctx: ProjectContext, script_id: str) -> set[int]:
-        dashboards = self._dashboards.find_referencing_script(
-            project_id=ctx.project_id, script_id=script_id
-        )
-        return pinned_revisions(dashboards, script_id)
+        excess = len(doc.revisions) - MAX_REVISIONS
+        if excess > 0:
+            # Revisions are stored oldest first: evict the oldest unprotected ones.
+            evict = {r.revision for r in doc.revisions if r.revision not in keep}
+            evict = set(sorted(evict)[:excess])
+            doc.revisions = [r for r in doc.revisions if r.revision not in evict]
+        if len(doc.revisions) > MAX_REVISIONS:
+            # Everything left is pinned: refuse rather than grow the document without bound.
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    f"Dashboards pin {len(pinned)} revisions of this script, which leaves no "
+                    f"room in its {MAX_REVISIONS}-revision history; unpin dashboards from old "
+                    "revisions before saving"
+                ),
+            )
 
     # -- write -------------------------------------------------------------
 
@@ -374,7 +373,7 @@ class MetricScriptService:
             status="invalid",
             template_id=template_id,
         )
-        self._apply_source(doc, source, result, set())
+        self._apply_source(doc, source, result)
         self._repo.insert(doc)
         return doc
 
@@ -429,24 +428,48 @@ class MetricScriptService:
             )
         return doc
 
-    def _shared_dashboards(
-        self, ctx: ProjectContext, doc: MetricScriptDocument
-    ) -> list[CustomDashboardDocument]:
-        return [
-            dashboard
-            for dashboard in self._dashboards.find_referencing_script(
+    def _pinning_dashboards(
+        self, ctx: ProjectContext, doc: MetricScriptDocument, *, shared_only: bool
+    ) -> list[str]:
+        """Describe the dashboards that pin ``doc`` for an error message.
+
+        The decision comes from ``doc.pins``; dashboard documents only supply names. Private
+        dashboards of other members are counted, not named.
+        """
+        pinned = {
+            dashboard_id
+            for dashboard_id, pin in doc.pins.items()
+            if pin.revisions and (pin.shared or not shared_only)
+        }
+        dashboards = {
+            d.dashboard_id: d
+            for d in self._dashboards.find_referencing_script(
                 project_id=ctx.project_id, script_id=doc.script_id
             )
-            if dashboard.visibility == "project"
-        ]
+        }
+        names: list[str] = []
+        hidden = 0
+        for dashboard_id in sorted(pinned):
+            dashboard = dashboards.get(dashboard_id)
+            if dashboard is None:
+                names.append(f"({dashboard_id})")
+            elif dashboard.visibility == "project" or dashboard.user_id == ctx.user.user_id:
+                names.append(f"'{dashboard.name}' ({dashboard_id})")
+            else:
+                hidden += 1
+        if hidden:
+            names.append(f"{hidden} private dashboard(s) of other members")
+        return names
 
     def update(
         self, ctx: ProjectContext, script_id: str, body: MetricScriptUpdateRequest
     ) -> MetricScriptResponse:
         doc = self._get_editable(ctx, script_id)
         # The stored state this update builds on; the save below is a compare-and-set on it.
+        # ``version`` also covers pins, so the pin checks below hold for the state replaced.
         read_revision = doc.revision
         read_updated_at = doc.system_info.updated_at
+        read_version = doc.version
         if body.expected_revision is not None and body.expected_revision != doc.revision:
             raise HTTPException(
                 status_code=409,
@@ -456,9 +479,8 @@ class MetricScriptService:
                 ),
             )
         if body.visibility == "private" and doc.visibility == "project":
-            shared = self._shared_dashboards(ctx, doc)
-            if shared:
-                names = ", ".join(f"'{d.name}' ({d.dashboard_id})" for d in shared)
+            if any(pin.shared and pin.revisions for pin in doc.pins.values()):
+                names = ", ".join(self._pinning_dashboards(ctx, doc, shared_only=True))
                 raise HTTPException(
                     status_code=409,
                     detail=f"Project dashboards use this script: {names}; it must stay shared",
@@ -466,9 +488,7 @@ class MetricScriptService:
         if body.source is not None and body.source != doc.source:
             _check_source_size(body.source)
             result = validate_source(body.source)
-            # Pins are read once here; a dashboard that pins an evictable revision while
-            # this save is in flight can still lose that revision to eviction.
-            self._apply_source(doc, body.source, result, self._pins(ctx, doc.script_id))
+            self._apply_source(doc, body.source, result)
         if body.name is not None:
             doc.name = body.name
         if body.description is not None:
@@ -476,32 +496,21 @@ class MetricScriptService:
         if body.visibility is not None:
             doc.visibility = body.visibility
         if not self._repo.save_if_unchanged(
-            doc, revision=read_revision, updated_at=read_updated_at
+            doc, revision=read_revision, updated_at=read_updated_at, version=read_version
         ):
-            raise HTTPException(
-                status_code=409,
-                detail="Script was changed by another save; reload it before saving",
-            )
+            raise HTTPException(status_code=409, detail=CONFLICT)
         return self._to_response(doc, ctx)
 
     def delete(self, ctx: ProjectContext, script_id: str) -> SuccessResponse:
         doc = self._get_editable(ctx, script_id)
-        dashboards = self._dashboards.find_referencing_script(
-            project_id=ctx.project_id, script_id=doc.script_id
-        )
-        if dashboards:
-            visible = [
-                d for d in dashboards if d.visibility == "project" or d.user_id == ctx.user.user_id
-            ]
-            names = [f"'{d.name}' ({d.dashboard_id})" for d in visible]
-            hidden = len(dashboards) - len(visible)
-            if hidden:
-                names.append(f"{hidden} private dashboard(s) of other members")
+        if any(pin.revisions for pin in doc.pins.values()):
+            names = ", ".join(self._pinning_dashboards(ctx, doc, shared_only=False))
             raise HTTPException(
-                status_code=409,
-                detail=f"Dashboards still use this script: {', '.join(names)}",
+                status_code=409, detail=f"Dashboards still use this script: {names}"
             )
-        self._repo.delete(doc)
+        # A dashboard that pinned the script after the read above changed its version.
+        if not self._repo.delete_if_unchanged(doc, version=doc.version):
+            raise HTTPException(status_code=409, detail=CONFLICT)
         return SuccessResponse(message="Metric script deleted")
 
     def copy(self, ctx: ProjectContext, script_id: str) -> MetricScriptResponse:
@@ -523,7 +532,6 @@ class MetricScriptService:
             doc,
             source.active_source,
             ValidationResult(ok=True, metrics=list(source.metrics)),
-            set(),
         )
         self._repo.insert(doc)
         return self._to_response(doc, ctx)

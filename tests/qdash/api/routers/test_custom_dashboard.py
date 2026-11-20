@@ -8,9 +8,11 @@ import pytest
 
 from qdash.datamodel.project import ProjectRole
 from qdash.datamodel.system_info import SystemInfoModel
+from qdash.dbmodel.metric_script import MetricScriptDocument
 from qdash.dbmodel.project import ProjectDocument
 from qdash.dbmodel.project_membership import ProjectMembershipDocument
 from qdash.dbmodel.user import UserDocument
+from qdash.repository.custom_dashboard import MongoCustomDashboardRepository
 
 PROJECT = "dash_project"
 
@@ -551,3 +553,162 @@ def test_templates_listed_and_copied_on_create(test_client, init_db, runtime):
         headers=owner,
     )
     assert bad.status_code == 422
+
+
+def _pins(script_id: str) -> dict[str, Any]:
+    """The pins stored on a script, as plain data."""
+    doc = MetricScriptDocument.find_one({"script_id": script_id}).run()
+    assert doc is not None
+    return {
+        dashboard_id: {"revisions": pin.revisions, "shared": pin.shared}
+        for dashboard_id, pin in doc.pins.items()
+    }
+
+
+def _new_revision(client: Any, headers: dict[str, str], script: dict[str, Any], tag: str) -> None:
+    saved = client.patch(
+        f"/metric-scripts/{script['script_id']}",
+        json={"source": script["source"] + f"\n# {tag}\n"},
+        headers=headers,
+    )
+    assert saved.status_code == 200, saved.text
+
+
+def test_dashboard_writes_keep_script_pins_in_step(test_client, init_db, runtime):
+    owner = _create_project_owner()
+    script = _script(test_client, owner)
+    script_id = script["script_id"]
+    _new_revision(test_client, owner, script, "v2")
+    second = {**_script_panel(script_id, script_revision=2), "panel_id": "s2"}
+    second["layout"] = {"x": 6, "y": 0, "w": 6, "h": 4}
+
+    created = _create(test_client, owner, panels=[_script_panel(script_id), second])
+    dashboard_id = created["dashboard_id"]
+    assert _pins(script_id) == {dashboard_id: {"revisions": [1, 2], "shared": False}}
+
+    # Sharing the dashboard marks its pins shared; metadata edits leave them alone.
+    shared = test_client.patch(
+        f"/custom-dashboards/{dashboard_id}", json={"visibility": "project"}, headers=owner
+    )
+    assert shared.status_code == 200, shared.text
+    assert _pins(script_id) == {dashboard_id: {"revisions": [1, 2], "shared": True}}
+    renamed = test_client.patch(
+        f"/custom-dashboards/{dashboard_id}", json={"name": "Renamed"}, headers=owner
+    )
+    assert renamed.status_code == 200, renamed.text
+    assert _pins(script_id) == {dashboard_id: {"revisions": [1, 2], "shared": True}}
+
+    # Removing a panel narrows the pin; making the dashboard private clears the flag.
+    narrowed = test_client.patch(
+        f"/custom-dashboards/{dashboard_id}",
+        json={"panels": [second], "visibility": "private"},
+        headers=owner,
+    )
+    assert narrowed.status_code == 200, narrowed.text
+    assert _pins(script_id) == {dashboard_id: {"revisions": [2], "shared": False}}
+
+    # A duplicate pins on its own; deleting a dashboard removes only its pin.
+    copy = test_client.post(f"/custom-dashboards/{dashboard_id}/duplicate", headers=owner)
+    assert copy.status_code == 201, copy.text
+    copy_id = copy.json()["dashboard_id"]
+    assert _pins(script_id)[copy_id] == {"revisions": [2], "shared": False}
+    assert (
+        test_client.delete(f"/custom-dashboards/{dashboard_id}", headers=owner).status_code == 200
+    )
+    assert _pins(script_id) == {copy_id: {"revisions": [2], "shared": False}}
+
+    # Dropping every script panel clears the pin and frees the script for deletion.
+    cleared = test_client.patch(
+        f"/custom-dashboards/{copy_id}", json={"panels": _panels()}, headers=owner
+    )
+    assert cleared.status_code == 200, cleared.text
+    assert _pins(script_id) == {}
+    assert test_client.delete(f"/metric-scripts/{script_id}", headers=owner).status_code == 200
+
+
+def test_template_dashboard_pins_its_script(test_client, init_db, runtime):
+    owner = _create_project_owner()
+    created = _create(
+        test_client, owner, name="Collisions", panels=[], template_id="frequency-collision-map"
+    )
+    script_ids = {
+        p["config"]["script_id"] for p in created["panels"] if p["type"] == "metric_script"
+    }
+    assert [_pins(script_id) for script_id in script_ids] == [
+        {created["dashboard_id"]: {"revisions": [1], "shared": False}}
+    ]
+
+
+def _interleave(monkeypatch: pytest.MonkeyPatch, target: Any, name: str, other: Any) -> None:
+    """Run ``other`` inside the first call of ``target.name``, then continue that call."""
+    original = getattr(target, name)
+    calls: list[int] = []
+
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        if not calls:
+            calls.append(1)
+            other()
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(target, name, wrapper)
+
+
+def test_concurrent_updates_of_one_dashboard_keep_the_winners_pins(
+    test_client, init_db, runtime, monkeypatch
+):
+    owner = _create_project_owner()
+    script = _script(test_client, owner)
+    script_id = script["script_id"]
+    _new_revision(test_client, owner, script, "v2")
+    _new_revision(test_client, owner, script, "v3")
+    dashboard_id = _create(test_client, owner, panels=[_script_panel(script_id)])["dashboard_id"]
+    winner: dict[str, Any] = {}
+
+    def update_b() -> None:
+        winner["response"] = test_client.patch(
+            f"/custom-dashboards/{dashboard_id}",
+            json={"panels": [_script_panel(script_id, script_revision=3)]},
+            headers=owner,
+        )
+
+    # A pinned revision 2 and is about to store its panels when B's update lands.
+    _interleave(monkeypatch, MongoCustomDashboardRepository, "save_if_unchanged", update_b)
+    a = test_client.patch(
+        f"/custom-dashboards/{dashboard_id}",
+        json={"panels": [_script_panel(script_id, script_revision=2)]},
+        headers=owner,
+    )
+
+    assert winner["response"].status_code == 200, winner["response"].text
+    assert a.status_code == 409
+    assert "reload it before saving" in a.json()["detail"]
+    stored = test_client.get(f"/custom-dashboards/{dashboard_id}", headers=owner).json()
+    assert stored["panels"][0]["config"]["script_revision"] == 3
+    # B narrowed after A widened, so A's revision 2 is not left behind as a surplus pin.
+    assert _pins(script_id) == {dashboard_id: {"revisions": [3], "shared": False}}
+
+
+def test_update_racing_a_delete_leaves_no_pins(test_client, init_db, runtime, monkeypatch):
+    owner = _create_project_owner()
+    script = _script(test_client, owner)
+    script_id = script["script_id"]
+    _new_revision(test_client, owner, script, "v2")
+    dashboard_id = _create(test_client, owner, panels=[_script_panel(script_id)])["dashboard_id"]
+    deleted: dict[str, Any] = {}
+
+    def delete() -> None:
+        deleted["response"] = test_client.delete(
+            f"/custom-dashboards/{dashboard_id}", headers=owner
+        )
+
+    _interleave(monkeypatch, MongoCustomDashboardRepository, "save_if_unchanged", delete)
+    update = test_client.patch(
+        f"/custom-dashboards/{dashboard_id}",
+        json={"panels": [_script_panel(script_id, script_revision=2)]},
+        headers=owner,
+    )
+
+    assert deleted["response"].status_code == 200
+    assert update.status_code == 409
+    assert test_client.get(f"/custom-dashboards/{dashboard_id}", headers=owner).status_code == 404
+    assert _pins(script_id) == {}

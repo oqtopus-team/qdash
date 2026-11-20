@@ -26,15 +26,26 @@ naming the cap): :data:`MAX_HISTORY_RECORDS` per history call and
 :data:`MAX_BROKER_CALLS` per evaluation. A history span longer than
 :data:`MAX_HISTORY_DAYS` is clamped to the most recent ``MAX_HISTORY_DAYS`` days of the
 requested span; the answer reports ``clamped``.
+
+Time limit: the executor passes each call the seconds left before the run's time limit.
+``latest`` and ``history`` run their queries inside ``pymongo.timeout(timeout)`` (client-side
+operation timeout: the server gets a matching ``maxTimeMS`` and the driver bounds its socket
+waits), and ``history`` also passes ``max_time_ms`` to its ``find``. A call with less than
+:data:`MIN_DATA_TIMEOUT_SECONDS` left, or a query that hits the limit, raises
+:class:`BrokerTimeoutError`. Python-side processing of rows already fetched is not
+interrupted.
 """
 
 from __future__ import annotations
 
+import contextlib
 import logging
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any, Literal, Protocol
 
+import pymongo
 from bunnet import SortDirection
+from pymongo.errors import PyMongoError
 
 from qdash.api.metric_runtime.sdk import coupling_id, qid, timestamp
 from qdash.api.services.metrics_service import (
@@ -44,6 +55,8 @@ from qdash.api.services.metrics_service import (
 from qdash.common.config.metrics import load_metrics_config
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from qdash.api.services.metrics_service import MetricsService
     from qdash.repository.task_result_history import MongoTaskResultHistoryRepository
 
@@ -52,6 +65,9 @@ logger = logging.getLogger(__name__)
 MAX_HISTORY_RECORDS = 5000
 MAX_BROKER_CALLS = 2000
 MAX_HISTORY_DAYS = 400
+MIN_DATA_TIMEOUT_SECONDS = 0.05
+"""Least time left for which a data request still issues a query."""
+DATA_TIMEOUT_MESSAGE = "The data request exceeded the metric script time limit"
 
 
 class BrokerLimitError(RuntimeError):
@@ -62,12 +78,45 @@ class BrokerRequestError(ValueError):
     """The worker sent an invalid request."""
 
 
+class BrokerTimeoutError(RuntimeError):
+    """A data request ran out of the run's remaining time."""
+
+    def __init__(self) -> None:
+        super().__init__(DATA_TIMEOUT_MESSAGE)
+
+
 class BrokerHandler(Protocol):
     """Anything that can answer worker data requests (the real broker or a test fake)."""
 
-    def handle(self, op: str, args: dict[str, Any]) -> Any:
-        """Return the answer data for ``op`` or raise to send an error to the worker."""
+    def handle(self, op: str, args: dict[str, Any], *, timeout: float) -> Any:
+        """Return the answer data for ``op`` or raise to send an error to the worker.
+
+        ``timeout`` is the number of seconds left before the run's time limit; database
+        waits must be bounded by it; Python processing cannot be preempted.
+        """
         ...
+
+
+@contextlib.contextmanager
+def data_timeout(timeout: float) -> Iterator[None]:
+    """Bound every pymongo operation in the block by ``timeout`` seconds.
+
+    Raises :class:`BrokerTimeoutError` before any query when less than
+    :data:`MIN_DATA_TIMEOUT_SECONDS` is left, and in place of pymongo's timeout errors
+    (``ExecutionTimeout``, ``NetworkTimeout``, server selection timeouts).
+    """
+    if timeout < MIN_DATA_TIMEOUT_SECONDS:
+        raise BrokerTimeoutError
+    try:
+        with pymongo.timeout(timeout):
+            yield
+    except Exception as exc:
+        # MetricsService wraps aggregation failures in HTTPException with the driver
+        # error as its explicit cause. Preserve timeout semantics through that wrapper.
+        cause = exc.__cause__ if exc.__cause__ is not None else exc
+        if isinstance(cause, PyMongoError) and cause.timeout:
+            raise BrokerTimeoutError from exc
+        raise
 
 
 def metrics_catalog() -> dict[str, dict[str, dict[str, Any]]]:
@@ -146,7 +195,7 @@ class MetricDataBroker:
         self._catalog: dict[str, dict[str, dict[str, Any]]] | None = None
         self.calls = 0
 
-    def handle(self, op: str, args: dict[str, Any]) -> Any:
+    def handle(self, op: str, args: dict[str, Any], *, timeout: float) -> Any:
         self.calls += 1
         if self.calls > MAX_BROKER_CALLS:
             raise BrokerLimitError(
@@ -158,15 +207,22 @@ class MetricDataBroker:
         if op == "topology":
             return self._topology
         if op == "latest":
-            return self.latest(self._kind(args), self._metric(args))
+            kind, metric = self._kind(args), self._metric(args)
+            if self._latest is not None:
+                return self.latest(kind, metric)
+            with data_timeout(timeout):
+                return self.latest(kind, metric)
         if op == "history":
-            return self.history(
-                self._kind(args),
-                self._metric(args),
-                str(args.get("target", "")),
-                str(args.get("start", "")),
-                str(args.get("end", "")),
-            )
+            kind, metric = self._kind(args), self._metric(args)
+            with data_timeout(timeout):
+                return self.history(
+                    kind,
+                    metric,
+                    str(args.get("target", "")),
+                    str(args.get("start", "")),
+                    str(args.get("end", "")),
+                    timeout=timeout,
+                )
         raise BrokerRequestError(f"Unknown data request '{op}'")
 
     def catalog(self) -> dict[str, dict[str, dict[str, Any]]]:
@@ -239,7 +295,10 @@ class MetricDataBroker:
         target: str,
         start: str,
         end: str,
+        *,
+        timeout: float | None = None,
     ) -> dict[str, Any]:
+        """Records of one target; ``timeout`` (seconds) also bounds the query's ``maxTimeMS``."""
         try:
             lower, upper = timestamp(start), timestamp(end)
             normalized = qid(target) if kind == "qubit" else coupling_id(target)
@@ -263,6 +322,7 @@ class MetricDataBroker:
             query,
             sort=[("start_at", SortDirection.ASCENDING)],
             limit=MAX_HISTORY_RECORDS + 1,
+            max_time_ms=max(1, int(timeout * 1000)) if timeout is not None else None,
         )
         if len(docs) > MAX_HISTORY_RECORDS:
             raise BrokerLimitError(

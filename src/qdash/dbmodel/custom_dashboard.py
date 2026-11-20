@@ -32,6 +32,7 @@ class CustomDashboardDocument(Document):
     )
     chip_id: str | None = Field(default=None, description="Default chip the panels read")
     panels: list[DashboardPanelModel] = Field(default_factory=list, description="Panels")
+    version: int = Field(default=0, description="Write counter; incremented by every save")
     system_info: SystemInfoModel = Field(
         default_factory=SystemInfoModel, description="Created/updated timestamps"
     )

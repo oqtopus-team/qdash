@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 import json
+import time
 from typing import Any
 
 from qdash.api.metric_runtime.broker import metrics_catalog
@@ -47,9 +48,11 @@ class FakeBroker:
         self.history = history or {}
         self.errors = errors or {}
         self.calls: list[tuple[str, dict[str, Any]]] = []
+        self.timeouts: list[float] = []
 
-    def handle(self, op: str, args: dict[str, Any]) -> Any:
+    def handle(self, op: str, args: dict[str, Any], *, timeout: float = 60.0) -> Any:
         self.calls.append((op, dict(args)))
+        self.timeouts.append(timeout)
         if op in self.errors:
             raise RuntimeError(self.errors[op])
         if op == "metrics_config":
@@ -74,7 +77,7 @@ class FakeBroker:
     def __call__(self, op: str, args: dict[str, Any]) -> Any:
         """Broker function for in-process ``AnalysisContext`` tests."""
         try:
-            return self.handle(op, args)
+            return self.handle(op, args, timeout=60.0)
         except RuntimeError as exc:
             raise BrokerError(str(exc)) from exc
 
@@ -91,7 +94,13 @@ class _InProcessChannel:
     def call(self, op: str, args: dict[str, Any]) -> Any:
         from qdash.api.metric_runtime import executor
 
-        answer = json.loads(json.dumps(executor._answer(self.broker, {"op": op, "args": args})))
+        answer = json.loads(
+            json.dumps(
+                executor._answer(
+                    self.broker, {"op": op, "args": args}, deadline=time.monotonic() + 60
+                )
+            )
+        )
         if not answer["ok"]:
             raise BrokerError(answer["error"])
         return answer["data"]

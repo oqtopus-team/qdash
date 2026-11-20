@@ -14,6 +14,7 @@ import tempfile
 import threading
 import time
 from pathlib import Path
+from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
 
 import pytest
@@ -40,6 +41,8 @@ OK_RESULT = {
     "log_truncated": False,
     "skipped_limits": ["RLIMIT_AS"],
 }
+TIME_LIMIT = {"type": "answer", "ok": False, "error": "Time limit exceeded"}
+BUSY = {"type": "answer", "ok": False, "error": "Metric data access is busy; try again shortly"}
 
 
 class Runner:
@@ -106,9 +109,11 @@ class FakeBroker:
     def __init__(self, answers: dict[str, Any] | None = None) -> None:
         self.answers = answers or {}
         self.calls: list[tuple[str, dict[str, Any]]] = []
+        self.timeouts: list[float] = []
 
-    def handle(self, op: str, args: dict[str, Any]) -> Any:
+    def handle(self, op: str, args: dict[str, Any], *, timeout: float) -> Any:
         self.calls.append((op, args))
+        self.timeouts.append(timeout)
         answer = self.answers.get(op)
         if isinstance(answer, BaseException):
             raise answer
@@ -465,9 +470,10 @@ def test_call_after_the_deadline_is_refused(serve, monkeypatch):
         evaluate(runner, broker, timeout_seconds=0.2)
     runner.join()
     assert [op for op, _ in broker.calls] == ["slow"]
-    assert answers[0] == {"type": "answer", "ok": True, "data": "done"}
-    assert answers[1] == {"type": "answer", "ok": False, "error": "Time limit exceeded"}
-    assert answers[2] is None  # then the API closed the connection
+    # The slow answer finished past the time limit: its data is never sent.
+    assert answers[0] == TIME_LIMIT
+    assert answers[1] is None  # then the API closed the connection
+    assert answers[2] is None
 
 
 def test_socket_mode_does_not_use_local_slots(serve, monkeypatch):
@@ -478,3 +484,227 @@ def test_socket_mode_does_not_use_local_slots(serve, monkeypatch):
     runner = serve(lambda r: r.send(ACCEPTED, OK_RESULT))
     evaluate(runner)
     runner.join()
+
+
+# -- time limit of data requests (controlled clock) ------------------------------------
+
+
+class FakeClock:
+    """``time.monotonic`` for the executor module; only moves when a test moves it."""
+
+    def __init__(self, now: float = 1000.0) -> None:
+        self.now = now
+
+    def monotonic(self) -> float:
+        return self.now
+
+
+@pytest.fixture
+def clock(monkeypatch: pytest.MonkeyPatch) -> FakeClock:
+    fake = FakeClock()
+    monkeypatch.setattr(executor, "time", SimpleNamespace(monotonic=fake.monotonic))
+    return fake
+
+
+def test_data_requests_get_the_time_left(serve, clock):
+    """Each call's timeout is the time left until the job's limit, counted from `accepted`."""
+    answers: list[dict[str, Any] | None] = []
+
+    def play(runner: Runner) -> None:
+        runner.send(ACCEPTED, {"type": "call", "op": "first", "args": {}})
+        answers.append(runner.read())
+        runner.send({"type": "call", "op": "second", "args": {}})
+        answers.append(runner.read())
+        runner.send(OK_RESULT)
+
+    def first() -> int:
+        clock.now += 1.5
+        return 1
+
+    runner = serve(play)
+    broker = FakeBroker({"first": first, "second": 2})
+    evaluate(runner, broker, timeout_seconds=5)
+    runner.join()
+    assert broker.timeouts == pytest.approx([5.0, 3.5])
+    assert answers == [
+        {"type": "answer", "ok": True, "data": 1},
+        {"type": "answer", "ok": True, "data": 2},
+    ]
+
+
+def test_data_ready_after_the_time_limit_is_not_sent(serve, clock):
+    answers: list[dict[str, Any] | None] = []
+
+    def play(runner: Runner) -> None:
+        runner.send(
+            ACCEPTED,
+            {"type": "call", "op": "slow", "args": {}},
+            {"type": "call", "op": "late", "args": {}},
+        )
+        answers.append(runner.read())
+        answers.append(runner.read())
+
+    def slow() -> str:
+        clock.now += 5.01  # the broker finishes just past the 5 s limit
+        return "secret"
+
+    runner = serve(play)
+    broker = FakeBroker({"slow": slow, "late": "never"})
+    with pytest.raises(WorkerFailure) as caught:
+        evaluate(runner, broker, timeout_seconds=5)
+    runner.join()
+    assert caught.value.message == (
+        "Metric script exceeded the 5 s time limit (METRIC_SCRIPT_TIMEOUT_SECONDS) and was stopped"
+    )
+    assert [op for op, _ in broker.calls] == ["slow"]
+    assert answers == [TIME_LIMIT, None]
+
+
+def test_answer_encoded_after_the_time_limit_is_not_sent(serve, clock, monkeypatch):
+    answers: list[dict[str, Any] | None] = []
+    encode = executor._encode_answer
+
+    def slow_encode(answer: dict[str, Any], envelope: dict[str, Any]) -> bytes:
+        if answer.get("ok"):
+            clock.now += 10  # a huge answer takes past the limit to encode
+        return encode(answer, envelope)
+
+    def play(runner: Runner) -> None:
+        runner.send(ACCEPTED, {"type": "call", "op": "big", "args": {}})
+        answers.append(runner.read())
+        answers.append(runner.read())
+
+    monkeypatch.setattr(executor, "_encode_answer", slow_encode)
+    runner = serve(play)
+    with pytest.raises(WorkerFailure, match="time limit"):
+        evaluate(runner, FakeBroker({"big": "secret"}), timeout_seconds=5)
+    runner.join()
+    assert answers == [TIME_LIMIT, None]
+
+
+# -- data request slots ----------------------------------------------------------------
+
+
+def test_busy_broker_slots_refuse_the_call_and_the_run_goes_on(serve, monkeypatch):
+    monkeypatch.setattr(executor, "BROKER_WAIT_SECONDS", 0.05)
+    answers: list[dict[str, Any] | None] = []
+
+    def play(runner: Runner) -> None:
+        runner.send(ACCEPTED, {"type": "call", "op": "latest", "args": {}})
+        answers.append(runner.read())
+        runner.send(OK_RESULT)
+
+    slots = executor._broker_semaphore(1)
+    assert slots.acquire(blocking=False)
+    try:
+        runner = serve(play)
+        broker = FakeBroker({"latest": {"0": 1.0}})
+        started = time.monotonic()
+        outcome = evaluate(runner, broker, broker_concurrency=1)
+        elapsed = time.monotonic() - started
+        runner.join()
+    finally:
+        slots.release()
+    assert answers == [BUSY]
+    assert broker.calls == []
+    assert outcome.result == OK_RESULT["result"]
+    assert elapsed < 2
+
+    # Once the slot is free again the same call is served.
+    answers.clear()
+    runner = serve(play)
+    evaluate(runner, broker, broker_concurrency=1)
+    runner.join()
+    assert answers == [{"type": "answer", "ok": True, "data": {"0": 1.0}}]
+
+
+def test_broker_slot_is_released_after_a_failure():
+    slots = executor._broker_semaphore(1)
+    broker = FakeBroker({"boom": RuntimeError("database down"), "ok": 7})
+    deadline = time.monotonic() + 5
+    failed = executor._answer(broker, {"op": "boom", "args": {}}, deadline=deadline, concurrency=1)
+    assert failed == {"ok": False, "error": "database down"}
+    assert slots.acquire(blocking=False)
+    slots.release()
+    served = executor._answer(broker, {"op": "ok", "args": {}}, deadline=deadline, concurrency=1)
+    assert served == {"ok": True, "data": 7}
+
+
+def test_broker_concurrency_from_environment(monkeypatch):
+    monkeypatch.delenv("METRIC_BROKER_CONCURRENCY", raising=False)
+    assert executor.load_settings().broker_concurrency == executor.DEFAULT_BROKER_CONCURRENCY == 4
+    monkeypatch.setenv("METRIC_BROKER_CONCURRENCY", "8")
+    assert executor.load_settings().broker_concurrency == 8
+    monkeypatch.setenv("METRIC_BROKER_CONCURRENCY", "0")
+    assert executor.load_settings().broker_concurrency == 1
+    monkeypatch.setenv("METRIC_BROKER_CONCURRENCY", "bogus")
+    assert executor.load_settings().broker_concurrency == 4
+
+
+# -- local mode relay (no subprocess) --------------------------------------------------
+
+
+def test_local_reply_passes_the_time_left(clock):
+    broker = FakeBroker({"latest": {"0": 1.5}})
+    reply = executor._local_reply(
+        'CALL {"op": "latest", "args": {"kind": "qubit"}}', broker, clock.now + 4, 4
+    )
+    assert reply is not None and reply.endswith(b"\n")
+    assert json.loads(reply) == {"ok": True, "data": {"0": 1.5}}
+    assert broker.calls == [("latest", {"kind": "qubit"})]
+    assert broker.timeouts == pytest.approx([4.0])
+
+
+def test_local_reply_after_the_time_limit_serves_nothing(clock):
+    broker = FakeBroker({"latest": {"0": 1.5}})
+    assert executor._local_reply('CALL {"op": "latest", "args": {}}', broker, clock.now, 4) is None
+    assert broker.calls == []
+
+
+def test_local_reply_finished_past_the_time_limit_is_dropped(clock):
+    def slow() -> str:
+        clock.now += 3
+        return "secret"
+
+    broker = FakeBroker({"slow": slow})
+    assert (
+        executor._local_reply('CALL {"op": "slow", "args": {}}', broker, clock.now + 2, 4) is None
+    )
+    assert [op for op, _ in broker.calls] == ["slow"]
+
+
+def test_expired_inflight_broker_keeps_its_slot_until_return(clock, monkeypatch):
+    """A driver that returns late cannot accumulate overlapping background DB calls."""
+    monkeypatch.setattr(executor, "BROKER_WAIT_SECONDS", 0.01)
+    entered = threading.Event()
+    release = threading.Event()
+    results: list[bytes | None] = []
+
+    def stalled() -> str:
+        entered.set()
+        assert release.wait(5)
+        return "late data"
+
+    broker = FakeBroker({"stalled": stalled, "next": 7})
+    deadline = clock.now + 1
+    worker = threading.Thread(
+        target=lambda: results.append(
+            executor._serve_call(broker, {"op": "stalled"}, deadline, 1, {})
+        )
+    )
+    worker.start()
+    try:
+        assert entered.wait(5)
+        clock.now += 2
+        answer = executor._serve_call(broker, {"op": "next"}, clock.now + 5, 1, {})
+        assert answer is not None
+        assert json.loads(answer) == executor.BUSY_ANSWER
+        assert [op for op, _ in broker.calls] == ["stalled"]
+    finally:
+        release.set()
+        worker.join(5)
+    assert not worker.is_alive()
+    assert results == [None]
+    answer = executor._serve_call(broker, {"op": "next"}, clock.now + 5, 1, {})
+    assert answer is not None
+    assert json.loads(answer) == {"ok": True, "data": 7}

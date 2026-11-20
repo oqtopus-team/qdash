@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from bunnet.exceptions import DocumentNotFound
 
@@ -15,6 +16,19 @@ def _bson_millis(value: datetime) -> datetime:
         value = value.replace(tzinfo=UTC)
     value = value.astimezone(UTC)
     return value.replace(microsecond=value.microsecond // 1000 * 1000)
+
+
+def version_filter(version: int) -> Any:
+    """Match ``version``; documents written before the field existed count as version 0."""
+    return version if version else {"$in": [0, None]}
+
+
+def _pin_path(dashboard_id: str) -> str:
+    # Dashboard IDs are server-generated ("dash_<hex>"); refuse anything that would be
+    # read as a nested path or an operator.
+    if not dashboard_id or "." in dashboard_id or dashboard_id.startswith("$"):
+        raise ValueError(f"Invalid dashboard ID for a pin key: {dashboard_id!r}")
+    return f"pins.{dashboard_id}"
 
 
 class MongoMetricScriptRepository:
@@ -52,27 +66,117 @@ class MongoMetricScriptRepository:
         return doc
 
     def save_if_unchanged(
-        self, doc: MetricScriptDocument, *, revision: int, updated_at: datetime
+        self, doc: MetricScriptDocument, *, revision: int, updated_at: datetime, version: int
     ) -> bool:
-        """Replace the stored script only if it still has ``revision`` and ``updated_at``.
+        """Replace the stored script only if it is still in the state ``doc`` was read in.
 
-        ``revision`` and ``updated_at`` are the values read before ``doc`` was modified. The
-        match and the replace are one atomic operation, so of two saves that started from
+        ``revision``, ``updated_at`` and ``version`` are the values read before ``doc`` was
+        modified. ``version`` is incremented by every write to the document, including the
+        pin operations below, so a save also fails when a dashboard pinned or unpinned a
+        revision after the read. The
+        match and the replace are one atomic operation, so of two writes that started from
         the same stored state exactly one succeeds. Returns False, writing nothing, when
-        another save landed first.
+        another write landed first; ``doc`` then keeps its incremented ``version``.
         """
         doc.system_info.update_time()
         # BSON keeps milliseconds only: make sure a save within the same millisecond as the
         # previous one still changes the stored value that later saves compare against.
         if _bson_millis(doc.system_info.updated_at) <= _bson_millis(updated_at):
             doc.system_info.updated_at = _bson_millis(updated_at) + timedelta(milliseconds=1)
+        doc.version = version + 1
         try:
             MetricScriptDocument.find_one(
-                {"_id": doc.id, "revision": revision, "system_info.updated_at": updated_at}
+                {
+                    "_id": doc.id,
+                    "revision": revision,
+                    "system_info.updated_at": updated_at,
+                    "version": version_filter(version),
+                }
             ).replace_one(doc)
         except DocumentNotFound:
             return False
         return True
 
-    def delete(self, doc: MetricScriptDocument) -> None:
-        doc.delete()
+    def add_pin(
+        self,
+        *,
+        project_id: str,
+        script_id: str,
+        dashboard_id: str,
+        revisions: list[int],
+        shared: bool,
+        writer: str,
+    ) -> bool:
+        """Atomically widen the pin of ``dashboard_id`` and claim it for ``writer``.
+
+        Adds ``revisions`` to the pin (never removes any), sets ``shared`` when it is True
+        and records ``writer`` as the last writer. With no ``revisions`` it only claims an
+        existing pin. The filter requires every revision in
+        ``revisions`` to still be stored and, for a shared pin, the script to be shared, so
+        a revision is never pinned after a script save evicted it. Returns False, writing
+        nothing, when the script is gone or the filter does not match.
+        """
+        path = _pin_path(dashboard_id)
+        query: dict[str, Any] = {"project_id": project_id, "script_id": script_id}
+        conditions: list[dict[str, Any]] = [{"revisions.revision": r} for r in revisions]
+        if conditions:
+            query["$and"] = conditions
+        else:
+            # Claiming an existing pin only; do not create an empty one.
+            query[path] = {"$exists": True}
+        if shared:
+            query["visibility"] = "project"
+        fields: dict[str, Any] = {f"{path}.writer": writer}
+        if shared:
+            fields[f"{path}.shared"] = True
+        update: dict[str, Any] = {
+            "$set": fields,
+            "$addToSet": {f"{path}.revisions": {"$each": sorted(set(revisions))}},
+            "$inc": {"version": 1},
+        }
+        result = MetricScriptDocument.get_motor_collection().update_one(query, update)
+        return bool(result.matched_count)
+
+    def narrow_pin(
+        self,
+        *,
+        project_id: str,
+        script_id: str,
+        dashboard_id: str,
+        revisions: list[int],
+        shared: bool,
+        writer: str,
+    ) -> bool:
+        """Set the pin of ``dashboard_id`` to exactly ``revisions`` if ``writer`` still owns it.
+
+        An empty ``revisions`` removes the pin. Nothing is written when another dashboard
+        write claimed the pin after ``writer`` did; that write narrows the pin itself.
+        """
+        path = _pin_path(dashboard_id)
+        query = {"project_id": project_id, "script_id": script_id, f"{path}.writer": writer}
+        update: dict[str, Any] = {"$inc": {"version": 1}}
+        if revisions:
+            pin = {"revisions": sorted(set(revisions)), "shared": shared, "writer": writer}
+            update["$set"] = {path: pin}
+        else:
+            update["$unset"] = {path: ""}
+        result = MetricScriptDocument.get_motor_collection().update_one(query, update)
+        return bool(result.matched_count)
+
+    def clear_dashboard_pins(self, *, project_id: str, dashboard_id: str) -> None:
+        """Remove the pins of ``dashboard_id`` from every script of the project.
+
+        Only for a dashboard that no longer exists and never will (IDs are not reused).
+        """
+        path = _pin_path(dashboard_id)
+        MetricScriptDocument.get_motor_collection().update_many(
+            {"project_id": project_id, path: {"$exists": True}},
+            {"$unset": {path: ""}, "$inc": {"version": 1}},
+        )
+
+    def delete_if_unchanged(self, doc: MetricScriptDocument, *, version: int) -> bool:
+        """Delete the script only if it still has ``version``; False when it changed."""
+        result = MetricScriptDocument.get_motor_collection().delete_one(
+            {"_id": doc.id, "version": version_filter(version)}
+        )
+        return bool(result.deleted_count)

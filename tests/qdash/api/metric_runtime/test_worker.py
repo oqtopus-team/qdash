@@ -269,6 +269,31 @@ def test_timeout_kills_the_worker():
     assert time.monotonic() - started < 10
 
 
+class SlowBroker(FakeBroker):
+    """Serves ``latest`` only after the run's time limit has passed."""
+
+    def handle(self, op: str, args: dict[str, Any], *, timeout: float = 60.0) -> Any:
+        if op == "latest":
+            time.sleep(timeout + 0.2)
+        return super().handle(op, args, timeout=timeout)
+
+
+def test_local_data_request_past_the_time_limit_fails_the_run():
+    broker = SlowBroker(
+        topology=line_topology(),
+        latest={"qubit": {"t1": {"0": 50.0}, "t2_echo": {"0": 25.0}}},
+    )
+    settings = RuntimeSettings(mode="local", timeout_seconds=1.5)
+    with pytest.raises(WorkerFailure, match="time limit"):
+        run(TEMPLATES["getting_started"].source, "coherence_ratio", broker, settings=settings)
+    latest_timeouts = [
+        t for (op, _), t in zip(broker.calls, broker.timeouts, strict=True) if op == "latest"
+    ]
+    # On a slow host the worker may not reach the call before the limit.
+    assert len(latest_timeouts) <= 1
+    assert all(0 < t <= 1.5 for t in latest_timeouts)
+
+
 PRINTER = """\
 from qdash_metrics import metric
 

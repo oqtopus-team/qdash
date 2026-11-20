@@ -13,6 +13,7 @@ from qdash.datamodel.metric_script import (
     MetricScriptStatus,
     MetricScriptVisibility,
     ScriptDiagnostic,
+    ScriptPin,
 )
 from qdash.datamodel.system_info import SystemInfoModel
 
@@ -26,6 +27,11 @@ class MetricScriptDocument(Document):
 
     ``source`` is the latest saved text. ``active_*`` describe the last revision that
     validated ("last good"); a failed save leaves them unchanged.
+
+    ``pins`` is the authority on which revisions dashboards depend on: revision eviction,
+    unsharing and deletion decide from it. ``version`` counts every write to the document,
+    including pin changes, so a compare-and-set save on it fails when a dashboard pinned or
+    unpinned a revision after the save read the script.
     """
 
     project_id: str = Field(..., description="Owning project identifier")
@@ -54,6 +60,10 @@ class MetricScriptDocument(Document):
     revisions: list[MetricScriptRevision] = Field(
         default_factory=list, description="Saved revisions, oldest first"
     )
+    pins: dict[str, ScriptPin] = Field(
+        default_factory=dict, description="Revisions pinned by dashboards, keyed by dashboard ID"
+    )
+    version: int = Field(default=0, description="Write counter; incremented by every write")
     template_id: str | None = Field(
         default=None, description="Template the script was created from, if any"
     )
@@ -81,3 +91,7 @@ class MetricScriptDocument(Document):
     def find_revision(self, revision: int) -> MetricScriptRevision | None:
         """Return a stored revision by number."""
         return next((item for item in self.revisions if item.revision == revision), None)
+
+    def pinned_revisions(self) -> set[int]:
+        """Every revision pinned by any dashboard."""
+        return {revision for pin in self.pins.values() for revision in pin.revisions}

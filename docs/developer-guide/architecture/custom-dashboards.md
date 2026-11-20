@@ -19,8 +19,9 @@ The UI owns layout editing, the script editor, and rendering of evaluation resul
 
 `CustomDashboardDocument` (`src/qdash/dbmodel/custom_dashboard.py`, collection
 `custom_dashboard`) holds `project_id`, `dashboard_id` (`dash_<12 hex>`), the owner's `user_id`
-and `username` snapshot, `name`, `description`, `visibility`, an optional default `chip_id`, and
-`panels`. The unique index is `(project_id, dashboard_id)`.
+and `username` snapshot, `name`, `description`, `visibility`, an optional default `chip_id`,
+`panels`, and `version`, a write counter that every update compares and increments. The unique
+index is `(project_id, dashboard_id)`.
 
 `MetricScriptDocument` (`src/qdash/dbmodel/metric_script.py`, collection `metric_script`) holds
 `project_id`, `script_id` (`ms_<12 hex>`), owner `user_id` and `username`, `name` (at most 120
@@ -31,6 +32,8 @@ characters), `description`, `visibility`, and the revision state:
 | `source`, `revision`, `status`, `diagnostics` | The latest saved text, its number (incremented on every save), and its validation result (`valid` or `invalid`) |
 | `active_revision`, `active_source`, `metrics` | The last revision that validated, its text, and its catalog (`MetricInfo`: id, title, unit, target, hops, parameters, has_legend); `None` until a revision validates |
 | `revisions` | `MetricScriptRevision` entries `{revision, source, created_at, status, metrics}` |
+| `pins` | `ScriptPin` entries `{revisions, shared, writer}` keyed by `dashboard_id`: the revisions each dashboard pins, whether that dashboard is project-visible, and the token of the dashboard write that last widened the pin |
+| `version` | Write counter; every save, pin change, and deletion compares it and every write increments it |
 | `template_id` | The template the script was created from, if any |
 
 The unique index is `(project_id, script_id)`; `(project_id, template_id)` serves the template
@@ -67,20 +70,51 @@ dashboard shows, so a viewer never sees a dashboard change because someone else 
 revision rN available" and, in edit mode, an update action that moves the pin and is persisted
 with the next save.
 
-The pin is protected on the script side:
+The script document is the only authority on which revisions are pinned. Eviction, unsharing,
+and deletion read `pins` from the script they change, and every change to `pins` is an atomic
+update of that document that increments its `version`. QDash does not use Mongo transactions,
+so one document has to decide alone; the dashboard document never decides whether a revision may
+go.
 
+- A script save is an atomic compare-and-set on the stored `revision`, `system_info.updated_at`,
+  and `version` (`MongoMetricScriptRepository.save_if_unchanged`). When another save, or a
+  dashboard pinning or unpinning a revision, landed after the document was read, the update
+  returns 409 and writes nothing, even without `expected_revision`. A saved revision's source is
+  therefore never rewritten, and a save never evicts a revision pinned after its read.
 - `MetricScriptService._apply_source` keeps at most 50 revisions but never evicts the newest, the
-  active one, or any revision a dashboard in the project pins (`pinned_revisions`). The pins are
-  read once per save, so a dashboard that pins an old revision while a save is in flight can
-  still lose it to eviction.
-- A save is an atomic compare-and-set on the stored `revision` and `system_info.updated_at`
-  (`MongoMetricScriptRepository.save_if_unchanged`): when another save landed after the document
-  was read, the update returns 409 and writes nothing, even without `expected_revision`. A saved
-  revision's source is therefore never rewritten.
-- Deleting a script returns 409 listing the dashboards that reference it.
-- Making a script private returns 409 while a project-visible dashboard uses it.
+  active one, or any revision in `pins`. When everything left is pinned, the save returns 409
+  naming the number of pinned revisions instead of growing the document; unpinning dashboards
+  from old revisions makes room again. Metadata saves are not affected.
+- Deleting a script returns 409 listing the dashboards in `pins`, and the delete itself matches
+  `version` (`delete_if_unchanged`), so a dashboard that pins the script after the check makes
+  the delete fail with 409.
+- Making a script private returns 409 while a pin has `shared` set, decided from the same
+  document the save then compares.
 - Duplicating a dashboard copies its pins; copying a script (`POST /metric-scripts/{id}/copy`)
   creates a private script from the active source and retargets nothing.
+
+`CustomDashboardService` writes a dashboard in this order:
+
+1. `add_pin` adds the panels' revisions to the pin of every script they use, sets `shared` for a
+   project-visible dashboard, and records a fresh `writer` token. Its filter requires every
+   revision to be stored and, for `shared`, the script to be project-visible, so a dashboard save
+   that lost to an eviction or an unshare returns 422 asking to reload the dashboard. An update
+   also claims the pins of scripts that its new panels no longer use.
+2. The dashboard is inserted, or replaced through a compare-and-set on its `version`
+   (`MongoCustomDashboardRepository.save_if_unchanged`); a lost race returns 409.
+3. After an update, `narrow_pin` sets each pin to exactly the stored panels, or removes it, but
+   only if its `writer` is still this write's token. A later write of the same dashboard claimed
+   the pin otherwise and narrows it itself.
+
+A pin is in the script document before any stored dashboard depends on it, so a concurrent script
+save either sees the pin or fails its compare-and-set. A failed request, a lost race, or a crash
+between the steps can leave a surplus pin, never a missing one. A subsequent panel or visibility
+update narrows pins on the scripts involved in that update; surplus pins on other scripts remain
+until the dashboard is deleted. A process crash before inserting a dashboard can leave orphan
+pins that require administrative cleanup after confirming no writer is still running.
+Deleting a dashboard, or an update that finds its
+dashboard deleted, removes the dashboard's pins from every script (`clear_dashboard_pins`);
+dashboard IDs are never reused.
 
 ## Visibility and permissions
 
@@ -151,9 +185,13 @@ its page with the Agent dock so the Agent can propose edits; see
 ## Tests
 
 - `tests/qdash/api/routers/test_custom_dashboard.py`: visibility, ownership, project isolation,
-  panel validation, pins, and the template.
+  panel validation, the template, and pins kept in step with dashboard writes, including
+  concurrent updates and deletes of one dashboard.
 - `tests/qdash/api/routers/test_metric_script.py`: script CRUD, last-good revisions, conflicts,
-  references from dashboards, and evaluation through the worker.
+  references from dashboards, pins racing script saves, unsharing and deletion, and evaluation
+  through the worker.
+- `tests/qdash/repository/test_metric_script_repository.py`: the compare-and-set save and the
+  pin operations.
 - `tests/qdash/api/metric_runtime/`: the SDK, the import policy, the worker, and the collision
   template against the numbers of the original collision tests.
 - `ui/src/components/features/custom-dashboards/__tests__/` and

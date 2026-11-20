@@ -75,7 +75,8 @@ nobody's edit to a script changes what your dashboard shows without your knowled
 When the script has a newer valid revision, the panel shows **Newer revision rN available**. In
 edit mode, select **Update to rN** on the panel, check the result, and **Save** the dashboard to
 move the pin. A saved revision that a dashboard pins is kept even when the script has many later
-revisions.
+revisions. A script keeps at most 50 revisions, so when dashboards pin 50 of them, saving new
+code is refused until some panels are updated to a newer revision or removed.
 
 ## Read a Metric Script Panel
 

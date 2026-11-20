@@ -208,9 +208,8 @@ What is not enforced:
   container; there is no per-job cgroup, so concurrent jobs slow each other. Chat workspaces
   are not affected: they run in `agent-exec` under their own limits. Container limits do not
   reserve capacity, so contention with other services on the host remains. Within the
-  container, the failure domain is the job: when the memory cgroup runs out, `oom_score_adj`
-  makes the kernel kill a worker rather than the supervisor, and the job fails with
-  `crash`/`SIGKILL` while the runner keeps serving. A supervisor crash fails every in-flight
+  container, `oom_score_adj=1000` biases OOM victim selection toward workers; it does not
+  guarantee that the supervisor survives or that only one job fails. A supervisor crash fails every in-flight
   job, and the API answers 503 until Compose restarts the container.
 - **Readable files.** A job uid can read whatever is world-readable in the container: the
   image, the worker's own source, and files another uid left world-readable in `/tmp` or
@@ -265,7 +264,19 @@ Operators set them as described in
 | `METRIC_RUNNER_SOCKET` | `/run/metric-runner/metric.sock` | The runner's socket; Compose sets it on `api` with the `metric-runner-socket` volume mounted read-only |
 | `METRIC_SCRIPT_TIMEOUT_SECONDS` | `60` | Wall-clock limit of one run (minimum 1); the runner caps it |
 | `METRIC_SCRIPT_MEMORY_MB` | `1024` | Address space the script may add to the interpreter and preloaded numpy/scipy (minimum 128); the runner caps it |
+| `METRIC_BROKER_CONCURRENCY` | `4` | Data requests served at once per API process in either mode; admission waits at most 5 s and never beyond the remaining run time |
 | `METRIC_SCRIPT_CONCURRENCY` | `2` | Local mode only: runs at once per API process; a run that waits `QUEUE_WAIT_SECONDS = 5` for a slot fails with 429 |
+
+Broker calls receive the remaining monotonic run deadline. Both latest-metrics queries and
+history queries use PyMongo client-side operation timeouts; history also sets `maxTimeMS`.
+Calls with less than 50 ms left issue no database query. Answers completed or encoded after
+the deadline are discarded. A busy broker returns a per-cell data-access error.
+
+The API serves calls synchronously and holds the broker slot until the call returns. It does
+not spawn background query workers. Driver timeouts bound database waits, but cannot
+preempt Python row processing, and server cancellation is not instantaneous. A delayed call
+can therefore outlive the runner job; it continues to occupy one of the bounded API broker
+slots. Multiple API processes each have their own limit.
 
 The runner reads its settings from the `metric-runner` environment at startup
 (`metricRunnerOptionsFromEnv`); an invalid value stops the container.
@@ -324,7 +335,8 @@ Because the resident set never exceeds the virtual size, a worker's resident set
 about 107 MiB + `memory_mb`, which the 128 MiB term covers; imports the script makes after the
 limit count against `memory_mb`. `RLIMIT_AS` is a per-job line, which turns most oversized
 allocations into a `MemoryError` inside the script; it does not protect the cgroup. The cgroup
-is the hard line, and `oom_score_adj` keeps its failures inside a job. The queue, output,
+is the hard line; `oom_score_adj` biases victim selection without guaranteeing supervisor
+survival. The queue, output,
 request and answer bounds keep the supervisor's own memory small.
 
 At startup the runner reads the cgroup limit (`/sys/fs/cgroup/memory.max`, or
@@ -334,8 +346,8 @@ allowance at the same time can then be OOM-killed.
 
 ## Differences from qdash-playground
 
-The SDK, policy, worker loop and templates are adapted from qdash-playground by msk-ono
-(Apache License 2.0); the repository `NOTICE` file records the attribution. These differences are intentional:
+The SDK, policy, worker loop and templates follow qdash-playground with these intentional
+differences:
 
 - The module is `qdash_metrics`, not `qdash_playground`.
 - `@metric` takes `hops`, the pair distances a pair metric is evaluated for, and pair metrics
@@ -410,4 +422,3 @@ and `task ci-agent-runtime` for the runner.
 - `agent-runtime/metric-runner/Dockerfile`, `agent-runtime/metric-runner/requirements.txt`: the
   runner image, the worker copy and its Python packages
 - `compose.yaml`: the `api` and `metric-runner` services and the `metric-runner-socket` volume
-- `NOTICE`

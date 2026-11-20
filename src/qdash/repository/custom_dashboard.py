@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from bunnet.exceptions import DocumentNotFound
+
 from qdash.dbmodel.custom_dashboard import CustomDashboardDocument
+from qdash.repository.metric_script import version_filter
 
 
 class MongoCustomDashboardRepository:
@@ -31,10 +34,21 @@ class MongoCustomDashboardRepository:
         doc.insert()
         return doc
 
-    def save(self, doc: CustomDashboardDocument) -> CustomDashboardDocument:
+    def save_if_unchanged(self, doc: CustomDashboardDocument, *, version: int) -> bool:
+        """Replace the stored dashboard only if it still has ``version``.
+
+        ``version`` is the value read before ``doc`` was modified. Returns False, writing
+        nothing, when another save landed first or the dashboard was deleted.
+        """
         doc.system_info.update_time()
-        doc.save()
-        return doc
+        doc.version = version + 1
+        try:
+            CustomDashboardDocument.find_one(
+                {"_id": doc.id, "version": version_filter(version)}
+            ).replace_one(doc)
+        except DocumentNotFound:
+            return False
+        return True
 
     def delete(self, doc: CustomDashboardDocument) -> None:
         doc.delete()
