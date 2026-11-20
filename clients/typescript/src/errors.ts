@@ -29,3 +29,14 @@ export class QDashValidationError extends QDashApiError {}
 export class QDashTransportError extends QDashApiError {}
 
 export const QDashClientError = QDashApiError;
+
+/**
+ * A polling helper gave up waiting. Waiting is client-side only: the execution or
+ * operation it waited for is not cancelled and keeps running in QDash.
+ */
+export class QDashTimeoutError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "QDashTimeoutError";
+  }
+}

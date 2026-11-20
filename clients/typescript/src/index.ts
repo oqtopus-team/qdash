@@ -23,6 +23,7 @@ export {
   QDashClientError,
   QDashConfigError,
   QDashNotFoundError,
+  QDashTimeoutError,
   QDashTransportError,
   QDashValidationError,
 } from "./errors.js";

@@ -4,6 +4,8 @@
 chip through the QDash API; each one runs as a [calibration pipeline](../workflow/calibration-pipeline.md).
 It ships in the `qdash-sdk` distribution, which depends on `qdash-client`; the user-facing
 example is in the [Python Client reference](../../reference/clients/python.md#run-a-calibration).
+TypeScript applications use the separate `@oqtopus-team/qdash-sdk` package, described in
+[TypeScript SDK](./typescript-sdk.md).
 
 ## Responsibility boundary
 

@@ -1,0 +1,88 @@
+# TypeScript SDK
+
+`@oqtopus-team/qdash-sdk` lets a TypeScript application validate or start a calibration on a chip
+and run the workflows registered in a project, through the QDash API. It is a separate npm
+package in `sdks/typescript/`, built on `@oqtopus-team/qdash-client`; the user-facing example is
+in the [TypeScript Client reference](../../reference/clients/typescript.md#run-a-calibration).
+Its calls are modelled on the [Python SDK](./python-sdk.md), with one difference in how a
+missing project is handled, described below.
+
+## Responsibility boundary
+
+| Layer | Owns | Leaves to others |
+| --- | --- | --- |
+| `@oqtopus-team/qdash-client` (`QDashClient`) | Configuration and profiles, authentication, `X-Project-Id`, HTTP transport, retries, error classes, one method per route, generated types, `withProject`, `waitForExecution` | Building request bodies from domain calls |
+| `@oqtopus-team/qdash-sdk` | The `QDash` session, `Chip`, `Workflows`, `Pipelines`, the target, step and sweep helpers, the run handles | Transport, auth, retries, any check that needs server data |
+| API | Authentication, project authorization, the step and task catalog, preflight, dispatch | Anything on the caller's machine |
+
+The client does not depend on the SDK and exports no SDK entry point. The SDK depends on the
+client only, imports it as an external package and does not bundle it, so an application has
+one client and the SDK's re-exported errors (`QDashApiError`, `QDashConfigError`,
+`QDashNotFoundError`, `QDashTimeoutError` and the others) are the client's own classes.
+`instanceof` works with either import.
+
+## Calls and the client calls behind them
+
+The SDK adds no transport, retries or caches; each call delegates to the client:
+
+| SDK call | Client call |
+| --- | --- |
+| `qdash.pipelines.catalog`, `validate`, `execute` | `client.api.getCalibrationPipelineCatalog`, `validateCalibrationPipeline`, `executeCalibrationPipeline` |
+| `chip.validateCalibration`, `chip.calibrate` | `qdash.pipelines.validate`, `qdash.pipelines.execute` with the spec `calibrationSpec` builds |
+| `qdash.workflows.list`, `get`, `run` | `client.listFlows`, `getFlow`, `executeFlow` |
+| `run.wait()` | `client.waitForExecution` with `wholePipeline: true` and `notFoundAsPending: true` |
+| `run.get()` | `client.getExecution` |
+| `new QDash(client, { projectId })` | `client.withProject`, a new client with the same transport options |
+
+Targets, steps and task calls are the generated types from `ui/src/schemas/`, written in the
+spec's snake_case JSON form, so the SDK has no second model of the spec. The helpers
+`qubitTargets`, `muxTargets`, `customOneQubit` and `sweep` only fill in the target shape, the step
+`type` and sweep declarations. Method options outside the spec, such as `defaultRunParameters`
+and `backendName`, are camelCase. A session holds nothing to close, and creating it, a chip or a
+workflow handle sends no request. A timeout throws `QDashTimeoutError` and leaves the run going.
+`client.waitForExecution` keeps throwing `QDashNotFoundError` on a 404 unless it is called with
+`notFoundAsPending: true`, so existing client callers see no change.
+
+## Project scope
+
+`projectId` scopes a session through `client.withProject`; the given client and its
+configuration are not changed. Without `projectId`, the session uses the client as it is. When
+the client has no project either, requests carry no `X-Project-Id` and QDash applies the user's
+default project, as it does for every other client call; the server still authenticates the
+user and authorizes the project. `chip.calibrate`, `qdash.pipelines.execute` and
+`qdash.workflows.run` therefore dispatch without a configured project.
+
+This keeps existing pi-qdash profiles that rely on the server's default project working. The
+Python SDK is stricter: its run calls raise `QDashConfigError` without a project. The two SDKs
+do not match on this point.
+
+A workflow name other than letters, digits and underscores throws `TypeError` before any
+request, as in the Python SDK.
+
+## Packaging and release
+
+The package is ESM only, ships `dist/index.js` and `dist/index.d.ts`, and requires Node.js 20 or
+later. `tsup` builds it with `@oqtopus-team/qdash-client` marked external. In the workspace the
+dependency is `workspace:*`; the release pipeline packs the SDK at the client version of the
+same run and pins the client to exactly that version, then publishes it after the client and
+before pi-qdash. [Pi Packages](../copilot/packages.md#distribution) describes the pipeline.
+
+## Tests
+
+| Test | Covers |
+| --- | --- |
+| `sdks/typescript/tests/sdk.test.ts` | Request bodies and `X-Project-Id` through a recording `fetch`, dispatch without a project, no wait on dispatch, whole-run status, pending 404 and timeout, 422 propagation, name checks before any request, keys against `docs/oas/openapi.json`, error identity with the built client |
+| `clients/typescript/tests/client.test.ts` | `waitForExecution` with and without `notFoundAsPending`, `withProject` |
+| `packages/pi-qdash/tests/qdash-sdk-package.test.mjs` | pi-qdash, the SDK and the built client resolve to one client copy; the client has no SDK subpath |
+| `.github/scripts/sdk-package-release.test.mjs` | Stable and beta manifests, the client pin, publish tags and the job order in the release pipeline |
+| `.github/scripts/sdk-package-smoke.mjs` | Run in CI against an npm install of the SDK and client tarballs: dependencies, one client copy, no bundled client, error identity, and a `nodenext` typecheck of the declarations |
+
+## Implementation Files
+
+- `sdks/typescript/src/session.ts`: `QDash`.
+- `sdks/typescript/src/pipelines.ts`: `Pipelines`, `PipelineRun`, `Chip`, `CalibrationRun`.
+- `sdks/typescript/src/workflows.ts`: `Workflows`, `Workflow`, `WorkflowRun`.
+- `sdks/typescript/src/runs.ts`: `RunResult`, `runStatus`, the wait options.
+- `sdks/typescript/src/definitions.ts`: target, step and sweep helpers, `calibrationSpec`.
+- `clients/typescript/src/client.ts`: `withProject` and `waitForExecution`.
+- `.github/scripts/sdk-package-release.mjs`: release version, client pin and publish tag.

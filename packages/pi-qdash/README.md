@@ -10,7 +10,7 @@
 
 `@oqtopus-team/pi-qdash` is a [pi](https://github.com/badlogic/pi-mono) extension for querying [QDash](https://github.com/oqtopus-team/qdash), the large-scale QPU calibration platform in the OQTOPUS ecosystem.
 
-It uses [`@oqtopus-team/qdash-client`](https://www.npmjs.com/package/@oqtopus-team/qdash-client) and reuses existing `QDASH_*` environment variables or profiles from `~/.config/qdash/config.ini` / `$XDG_CONFIG_HOME/qdash/config.ini`.
+It uses [`@oqtopus-team/qdash-client`](https://www.npmjs.com/package/@oqtopus-team/qdash-client), and [`@oqtopus-team/qdash-sdk`](https://www.npmjs.com/package/@oqtopus-team/qdash-sdk) for the pipeline and flow-run tools, and reuses existing `QDASH_*` environment variables or profiles from `~/.config/qdash/config.ini` / `$XDG_CONFIG_HOME/qdash/config.ini`.
 
 ## Features
 
@@ -45,7 +45,7 @@ pi -e npm:@oqtopus-team/pi-qdash
 ```
 
 The package declares Node.js 20 or later and is tested with Node.js 24 and pi 1.5.2.
-Published releases pin the matching `@oqtopus-team/qdash-client` version.
+Published releases pin the matching `@oqtopus-team/qdash-client` and `@oqtopus-team/qdash-sdk` versions.
 Use the `beta` dist-tag to try changes merged into QDash's `develop` branch:
 
 ```bash

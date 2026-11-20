@@ -13,6 +13,7 @@ COPY agent-runtime/package.json ./agent-runtime/package.json
 COPY packages/pi-qdash/package.json ./packages/pi-qdash/package.json
 COPY packages/pi-qcaleval/package.json ./packages/pi-qcaleval/package.json
 COPY clients/typescript/package.json ./clients/typescript/package.json
+COPY sdks/typescript/package.json ./sdks/typescript/package.json
 RUN --mount=type=cache,target=/root/.bun/install/cache \
     bun install --frozen-lockfile
 RUN set -eu; arch="$(uname -m)"; \

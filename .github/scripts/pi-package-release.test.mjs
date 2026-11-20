@@ -104,14 +104,14 @@ test("retrying a beta publish skips the exact version in the existing tarball", 
   }
 });
 
-test("the CLI packs the manifest at the QDash tag version with the pinned client", () => {
+test("the CLI packs the manifest at the QDash tag version with the pinned client and SDK", () => {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "pi-release-")));
   for (const dir of ["packages/pi-qdash", ".github/scripts"]) mkdirSync(join(root, dir), { recursive: true });
   for (const file of ["pi-package-release.mjs", "client-release.mjs"]) {
     writeFileSync(join(root, ".github/scripts", file), readFileSync(new URL(`./${file}`, import.meta.url)));
   }
   const path = join(root, "packages/pi-qdash/package.json");
-  writeFileSync(path, JSON.stringify({ name: "@oqtopus-team/pi-qdash", version: "0.1.10", dependencies: { "@oqtopus-team/qdash-client": "workspace:*" } }));
+  writeFileSync(path, JSON.stringify({ name: "@oqtopus-team/pi-qdash", version: "0.1.10", dependencies: { "@oqtopus-team/qdash-client": "workspace:*", "@oqtopus-team/qdash-sdk": "workspace:*" } }));
   execFileSync("node", [join(root, ".github/scripts/pi-package-release.mjs"), "pi-qdash"], {
     cwd: root,
     env: { ...process.env, GITHUB_REF: "refs/tags/v1.10.3", GITHUB_EVENT_NAME: "push", QDASH_CLIENT_VERSION: "1.10.3", GITHUB_RUN_ID: "1", GITHUB_RUN_ATTEMPT: "1" },
@@ -119,6 +119,7 @@ test("the CLI packs the manifest at the QDash tag version with the pinned client
   const packed = JSON.parse(readFileSync(path, "utf8"));
   assert.equal(packed.version, "1.10.3");
   assert.equal(packed.dependencies["@oqtopus-team/qdash-client"], "1.10.3");
+  assert.equal(packed.dependencies["@oqtopus-team/qdash-sdk"], "1.10.3");
 });
 
 test("the pipeline has no independent pi stable tags", () => {

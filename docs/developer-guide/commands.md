@@ -24,6 +24,7 @@ task test-workflow       # workflow tests
 task test-client         # Python client tests
 task test-sdk            # Python SDK tests
 task test-client-ts      # TypeScript client checks
+task test-sdk-ts         # TypeScript SDK checks against the built client
 task ci-pi-packages      # pi extension and release-script checks
 task ci-agent-runtime    # runtime tests and typecheck
 task test-ui             # UI tests

@@ -253,6 +253,7 @@ export default withMermaid(
                 { text: "Notes", link: "/developer-guide/architecture/notes" },
                 { text: "Provenance", link: "/developer-guide/architecture/provenance" },
                 { text: "Python SDK", link: "/developer-guide/architecture/python-sdk" },
+                { text: "TypeScript SDK", link: "/developer-guide/architecture/typescript-sdk" },
               ],
             },
             {
