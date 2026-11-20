@@ -119,6 +119,23 @@ describe("Sidebar", () => {
     expect(mobile.className).toContain("lg:hidden");
   });
 
+  it.each([false, true])("marks Dashboards as Beta (mobile: %s)", (mobileOpen) => {
+    sidebarState.isMobileOpen = mobileOpen;
+    const { container } = render(<Sidebar />);
+    const surface = mobileOpen ? getMobileDrawer() : getAsides(container).desktop;
+    const link = surface.querySelector('a[href="/custom-dashboards"]');
+
+    expect(link).not.toBeNull();
+    expect(within(link as HTMLElement).getByText("Beta")).toBeTruthy();
+  });
+
+  it("omits the Beta badge from the collapsed rail", () => {
+    sidebarState.isOpen = false;
+    render(<Sidebar />);
+
+    expect(screen.queryByText("Beta")).toBeNull();
+  });
+
   it("mounts the mobile drawer only while it is open", () => {
     render(<Sidebar />);
 

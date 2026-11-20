@@ -25,6 +25,7 @@ export type NavItem = {
   href: string;
   label: string;
   title?: string;
+  badge?: "Beta";
   icon: LucideIcon;
   match?: "exact" | "prefix";
   visible?: boolean;
@@ -50,6 +51,7 @@ export function getNavigationSections({ canEdit, isAdmin }: NavigationOptions): 
         {
           href: "/custom-dashboards",
           label: "Dashboards",
+          badge: "Beta",
           icon: LayoutGrid,
           match: "prefix",
         },
