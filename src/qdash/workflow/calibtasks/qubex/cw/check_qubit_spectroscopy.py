@@ -28,6 +28,28 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 DEFAULT_QUBIT_SPECTROSCOPY_INTERVAL = 1024.0
+COARSE_CONTROL_AMPLITUDE_HEADROOM_DB = 10.0
+MAX_COARSE_CONTROL_AMPLITUDE = 1.0
+MIN_VALID_QUBIT_FREQUENCY = 2.5
+LOW_QUALITY_LEVEL_MAX = 2
+
+
+def compute_coarse_control_amplitude(
+    repr_db: float,
+    *,
+    headroom_db: float = COARSE_CONTROL_AMPLITUDE_HEADROOM_DB,
+    max_amplitude: float = MAX_COARSE_CONTROL_AMPLITUDE,
+) -> tuple[float, float]:
+    """Return the coarse control amplitude and its marker power for an f01 peak.
+
+    The amplitude is ``10**(repr_db/20)`` raised by ``headroom_db`` and capped at
+    ``max_amplitude``. The marker power is the same amplitude expressed in dB.
+    """
+    raw_amplitude = float(10 ** (repr_db / 20))
+    uplifted_amplitude = raw_amplitude * (10 ** (headroom_db / 20))
+    coarse_control_amplitude = min(uplifted_amplitude, max_amplitude)
+    marker_db = float(20 * math.log10(coarse_control_amplitude))
+    return coarse_control_amplitude, marker_db
 
 
 class CheckQubitSpectroscopy(QubexTask):
@@ -91,8 +113,8 @@ class CheckQubitSpectroscopy(QubexTask):
     }
     _analysis_config: ClassVar[EstimateQubitFrequencyConfig] = EstimateQubitFrequencyConfig()
     _retry_with_trim: ClassVar[bool] = True
-    _seed_amplitude_headroom_db: ClassVar[float] = 10.0
-    _max_coarse_control_amplitude: ClassVar[float] = 1.0
+    _seed_amplitude_headroom_db: ClassVar[float] = COARSE_CONTROL_AMPLITUDE_HEADROOM_DB
+    _max_coarse_control_amplitude: ClassVar[float] = MAX_COARSE_CONTROL_AMPLITUDE
     output_spec: ClassVar[dict[str, OutputParameterSpec]] = {
         "coarse_qubit_frequency": OutputParameterSpec(
             unit="GHz",
@@ -134,13 +156,11 @@ class CheckQubitSpectroscopy(QubexTask):
     }
 
     def _compute_coarse_control_amplitude(self, repr_db: float) -> tuple[float, float]:
-        raw_amplitude = float(10 ** (repr_db / 20))
-        headroom_db = self._seed_amplitude_headroom_db
-        max_amplitude = self._max_coarse_control_amplitude
-        uplifted_amplitude = raw_amplitude * (10 ** (headroom_db / 20))
-        coarse_control_amplitude = min(uplifted_amplitude, max_amplitude)
-        marker_db = float(20 * math.log10(coarse_control_amplitude))
-        return coarse_control_amplitude, marker_db
+        return compute_coarse_control_amplitude(
+            repr_db,
+            headroom_db=self._seed_amplitude_headroom_db,
+            max_amplitude=self._max_coarse_control_amplitude,
+        )
 
     def postprocess(
         self, backend: QubexBackend, execution_id: str, run_result: RunResult, qid: str
@@ -173,7 +193,7 @@ class CheckQubitSpectroscopy(QubexTask):
                 quality_level = freq_result.f01.quality_level
 
                 # Use print for Prefect UI visibility (log_prints=True captures these)
-                if quality_level <= 2:
+                if quality_level <= LOW_QUALITY_LEVEL_MAX:
                     print(
                         f"[WARNING] Low quality qubit frequency for qid={qid}: "
                         f"f01={estimated_frequency:.6f} GHz (quality_level={quality_level}/5)"
@@ -249,9 +269,10 @@ class CheckQubitSpectroscopy(QubexTask):
         # Validate qubit frequency range.
         # We still return figures so they are saved before the task is marked failed.
         # Invalid outputs are excluded so they are not persisted to the DB.
-        if estimated_frequency < 2.5:
+        if estimated_frequency < MIN_VALID_QUBIT_FREQUENCY:
             error_msg = (
-                f"Qubit frequency too low for qid={qid}: {estimated_frequency:.6f} GHz < 2.5 GHz"
+                f"Qubit frequency too low for qid={qid}: {estimated_frequency:.6f} GHz "
+                f"< {MIN_VALID_QUBIT_FREQUENCY} GHz"
             )
             print(f"[ERROR] {error_msg}")
             return PostProcessResult(

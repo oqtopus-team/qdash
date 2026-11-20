@@ -275,8 +275,9 @@ export function evidenceSummary(details: unknown): {
 
 /**
  * The context the evaluation model is given, from the evidence tool's
- * `details.evidence`: the task, its target and status, and the task's own
- * message when it left one. Undefined when the evidence carries no details
+ * `details.evidence`: the task, its target and status, the task's own
+ * message when it left one, and the candidate comparison line when the
+ * evidence tool found one in the figure metadata. Undefined when the evidence carries no details
  * (an older evidence tool), so the caller falls back to its text.
  */
 export function evidenceContext(details: unknown): string | undefined {
@@ -301,9 +302,13 @@ export function evidenceContext(details: unknown): string | undefined {
   const settings = runSettings(evidence, new Set(sweeps.map((sweep) => sweep.name)));
   if (settings.length > 0) lines.push(`Settings: ${settings.join("; ")}.`);
   const notes = (evidence as { notes?: unknown }).notes;
-  const message =
-    typeof notes === "string" ? notes.split("\n").find((text) => text.startsWith("Task message: ")) : undefined;
+  const noteLines = typeof notes === "string" ? notes.split("\n") : [];
+  const message = noteLines.find((text) => text.startsWith("Task message: "));
   if (message) lines.push(message);
+  // A task that compared candidates (CheckQubitFrequencyMapping) shows the chosen
+  // candidate's figure; this line keeps every candidate's scores in view.
+  const comparison = noteLines.find((text) => text.startsWith("Candidate comparison: "));
+  if (comparison) lines.push(comparison);
   return lines.join("\n");
 }
 

@@ -28,7 +28,7 @@ import { installQDashGuidance } from "./lib/guidance-hook.js";
 import { qdashContextPath } from "./lib/context-path.js";
 import { errorStatus, fileContentSourceGuidance, filesTreeSourceGuidance, looksLikeSourcePath } from "./lib/source-guidance.js";
 import { withAbort } from "./lib/abort.js";
-import { qcalContextText, recordedParameters, sweepsOf, type RecordedParameter, type Sweep } from "./lib/qcal-evidence.js";
+import { candidateComparison, qcalContextText, recordedParameters, sweepsOf, type RecordedParameter, type Sweep } from "./lib/qcal-evidence.js";
 import { registerCalibrationPipelineTools } from "./tools/calibration-pipeline.js";
 import { registerFlowAuthoringTools } from "./tools/flow-authoring.js";
 import { registerSourceCodeTools } from "./tools/source-code.js";
@@ -473,7 +473,7 @@ function firstStringField(object: Record<string, unknown>, keys: string[]): stri
  * inputs are left out unless asked for, since the evaluation model is meant
  * to read them off the plot.
  */
-function qcalEvidenceText(evidence: CalibrationEvidence, include: { inputs?: boolean; metrics?: boolean } = {}): string {
+function qcalEvidenceText(evidence: CalibrationEvidence, include: { inputs?: boolean; metrics?: boolean; comparison?: string } = {}): string {
   return qcalContextText({
     taskName: typeof evidence.task?.name === "string" ? evidence.task.name : undefined,
     status: typeof evidence.task?.status === "string" ? evidence.task.status : undefined,
@@ -484,6 +484,7 @@ function qcalEvidenceText(evidence: CalibrationEvidence, include: { inputs?: boo
     ...(include.inputs ? { inputParameters: recordedParameters(evidence.inputParameters) } : {}),
     ...(include.metrics ? { metrics: recordedParameters(evidence.metricRecords) } : {}),
     message: typeof evidence.task?.message === "string" ? evidence.task.message : undefined,
+    comparison: include.comparison,
   });
 }
 
@@ -2713,6 +2714,7 @@ export default function qdashExtension(host: ExtensionAPI) {
       const figures: Array<Record<string, unknown>> = [];
       const images: Array<{ type: "image"; data: string; mimeType: string }> = [];
       const notes: string[] = [];
+      let comparison: string | undefined;
       const figurePaths = Array.isArray(task.figure_path) ? task.figure_path.filter((item): item is string => typeof item === "string") : [];
       const jsonFigurePaths = Array.isArray(task.json_figure_path) ? task.json_figure_path.filter((item): item is string => typeof item === "string") : [];
 
@@ -2723,6 +2725,7 @@ export default function qdashExtension(host: ExtensionAPI) {
             const file: TaskResultFigureFile = await client.getTaskResultFigure(params.taskId, { index, preferJson: true });
             const figure = JSON.parse(Buffer.from(file.data).toString("utf8")) as unknown;
             const analysis = analyzePlotlyFigure(file.path ?? jsonFigurePaths[index] ?? "", figure, params.taskId);
+            comparison ??= candidateComparison(figure);
             notes.push(`Figure JSON analysis #${index + 1}:`, ...analysis.summaries.map((line) => `- ${line}`));
             if (analysis.warnings.length) notes.push("Warnings:", ...analysis.warnings.map((line) => `- ${line}`));
             figures.push({ path: file.path ?? jsonFigurePaths[index], role: "plotly", data: figure });
@@ -2781,6 +2784,7 @@ export default function qdashExtension(host: ExtensionAPI) {
         figures: figures.length ? figures : undefined,
         notes: [
           typeof task.message === "string" ? `Task message: ${task.message}` : undefined,
+          comparison,
           notes.length ? notes.join("\n") : undefined,
         ].filter(Boolean).join("\n\n") || undefined,
         resultJson: params.includeRawTaskResult ? task : {
@@ -2794,7 +2798,7 @@ export default function qdashExtension(host: ExtensionAPI) {
       };
 
       const result = toTextToolResult(
-        qcalEvidenceText(evidence, { inputs: params.includeInputs === true, metrics: params.includeMetrics === true }),
+        qcalEvidenceText(evidence, { inputs: params.includeInputs === true, metrics: params.includeMetrics === true, comparison }),
         { evidence },
         { tool: "qdash_build_qcal_evidence", taskId: params.taskId, ...(evidence.task?.name ? { taskName: evidence.task.name } : {}), evidence },
       );

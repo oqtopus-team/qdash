@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  candidateComparison,
   formatNumber,
   formatSettings,
   formatSweep,
@@ -109,4 +110,66 @@ test("the context names the task and target, the sweep and the settings, and not
     withExtras,
     ["Task CheckRabi on all.", "Calibration inputs: control_amplitude 0.01698.", "Fitted results: rabi_frequency 12.49 MHz."].join("\n"),
   );
+});
+
+const MAPPING_EVIDENCE = {
+  schema: "qdash.qubit_frequency_mapping.v1",
+  qid: "1",
+  outcome: "selected",
+  reason: "Unique qubit response",
+  runner_up_status: "f01_detected",
+  score_ratio: 6,
+  candidates: [
+    { candidate_index: 0, readout_label: "RQ00", readout_frequency: 10.21, status: "f01_detected", error: null, f01_frequency: 4.2, moment: 2000, quality_level: 2, rank: 2, selected: false },
+    { candidate_index: 1, readout_label: "RQ01", readout_frequency: 10.29, status: "no_f01_peak", error: null, f01_frequency: null, moment: null, quality_level: null, rank: null, selected: false },
+    { candidate_index: 2, readout_label: "RQ02", readout_frequency: 10.36, status: "f01_detected", error: null, f01_frequency: 4.205, moment: 12000, quality_level: 4, rank: 1, selected: true },
+    { candidate_index: 3, readout_label: "RQ03", readout_frequency: 10.43, status: "error", error: "RQ03: analysis failed", f01_frequency: null, moment: null, quality_level: null, rank: null, selected: false },
+  ],
+};
+
+test("the selected mapping figure keeps every candidate's scores in one comparison line", () => {
+  const selected = {
+    data: [],
+    layout: { meta: { qdash_figure_role: "marked", qubit_frequency_mapping_figure: "selected", qubit_frequency_mapping: MAPPING_EVIDENCE } },
+  };
+  assert.equal(
+    candidateComparison(selected),
+    "Candidate comparison: outcome selected (Unique qubit response); runner-up f01_detected, ratio 6; " +
+      "candidate 0 (RQ00, readout 10.21 GHz) f01 4.2 GHz, moment 2000, quality 2, rank 2; " +
+      "candidate 1 (RQ01, readout 10.29 GHz) no f01 peak; " +
+      "candidate 2 (RQ02, readout 10.36 GHz) f01 4.205 GHz, moment 12000, quality 4, rank 1, SELECTED; " +
+      "candidate 3 (RQ03, readout 10.43 GHz) error: RQ03: analysis failed. " +
+      "The figure shows the selected candidate; the all-candidate summary figure follows it.",
+  );
+  const summary = { layout: { meta: { qubit_frequency_mapping_figure: "summary", qubit_frequency_mapping: { ...MAPPING_EVIDENCE, outcome: "rejected", score_ratio: null } } } };
+  const line = candidateComparison(summary);
+  assert.ok(line?.startsWith("Candidate comparison: outcome rejected (Unique qubit response); runner-up f01_detected; candidate 0"));
+  assert.ok(!line?.includes("summary figure follows"));
+  const context = qcalContextText({ taskName: "CheckQubitFrequencyMapping", targetKind: "qubit", targetId: "1", runParameters: {}, comparison: candidateComparison(selected) });
+  assert.equal(context.split("\n")[1], candidateComparison(selected));
+});
+
+test("figures without mapping evidence give no comparison", () => {
+  assert.equal(candidateComparison(undefined), undefined);
+  assert.equal(candidateComparison({ layout: { meta: { qdash_figure_role: "raw" } } }), undefined);
+  assert.equal(candidateComparison({ layout: { meta: { qubit_frequency_mapping: { ...MAPPING_EVIDENCE, schema: "other" } } } }), undefined);
+});
+
+test("mapping comparison bounds candidate rows and text without coercing objects", () => {
+  const malformed = JSON.parse('{"toString":null,"valueOf":null}');
+  const evidence = {
+    ...MAPPING_EVIDENCE,
+    outcome: malformed,
+    reason: "x".repeat(100000),
+    runner_up_status: malformed,
+    candidates: Array.from({ length: 1000 }, () => ({
+      candidate_index: malformed, readout_label: malformed, status: "error", error: malformed,
+    })),
+  };
+  const line = candidateComparison({ layout: { meta: { qubit_frequency_mapping: evidence } } });
+  assert.ok(line?.startsWith("Candidate comparison:"));
+  assert.ok(line.length < 5000);
+  assert.equal((line.match(/candidate - /g) ?? []).length, 4);
+  assert.ok(line.includes("Additional candidates omitted"));
+  assert.ok(!line.includes("[object Object]"));
 });

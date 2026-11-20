@@ -320,6 +320,21 @@ test("the context names the task, target and status, and the task's message, nev
   assert.equal(evidenceContext({ evidence: { task: { name: "CheckRabi" } } }), "Task CheckRabi.");
   assert.equal(evidenceContext({ evidence: { task: { name: "Configure", status: "completed" }, target: { kind: "system", id: "all" } } }), "Task Configure on all, status completed.");
   assert.equal(evidenceContext({ evidence: { task: { name: "CheckBellState" }, target: { kind: "coupling", id: "Q00-Q01", chipId: "c1" }, notes: "Figure JSON analysis #1:\n- x" } }), "Task CheckBellState on coupling Q00-Q01 (chip c1).");
+  // A candidate comparison found in the figure metadata stays in the context; other notes do not.
+  assert.equal(
+    evidenceContext({
+      evidence: {
+        task: { name: "CheckQubitFrequencyMapping", status: "completed" },
+        target: { kind: "qubit", id: "1" },
+        notes: "Task message: done\n\nCandidate comparison: outcome selected (x); candidate 2 (RQ02), SELECTED.\n\nFigure JSON analysis #1:\n- y",
+      },
+    }),
+    [
+      "Task CheckQubitFrequencyMapping on qubit 1, status completed.",
+      "Task message: done",
+      "Candidate comparison: outcome selected (x); candidate 2 (RQ02), SELECTED.",
+    ].join("\n"),
+  );
   // No details, or no task name: the caller falls back to the evidence text.
   assert.equal(evidenceContext(undefined), undefined);
   assert.equal(evidenceContext({ evidence: { target: { id: "Q05" } } }), undefined);

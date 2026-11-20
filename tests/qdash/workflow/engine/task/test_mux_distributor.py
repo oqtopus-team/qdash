@@ -6,9 +6,11 @@ from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import MagicMock, patch
 
+import plotly.graph_objects as go
 import pytest
 
 from qdash.common.mux_mapping import MuxMapping, MuxMappingError
+from qdash.datamodel.task import OutputParameterModel
 from qdash.workflow.calibtasks.base import PostProcessResult, RunResult
 from qdash.workflow.engine.task.executor import TaskExecutor
 from qdash.workflow.engine.task.mux_distributor import MuxDistributor
@@ -358,3 +360,60 @@ def test_pinned_mux_batch_runs_once_and_postprocesses_each_qid() -> None:
     ]
     cast("MagicMock", executor.state_manager).update_task_status_to_failed.assert_not_called()
     resolve.assert_not_called()
+
+
+# ------------------------------------------------------------------ sibling failure status
+
+
+def _distribute_one(postprocess_result: PostProcessResult) -> MuxDistributor:
+    distributor = _distributor(MuxMapping.from_groups({0: ["0", "1"]}))
+    cast("MagicMock", distributor._data_saver).save_figures.return_value = (["a.png"], ["a.json"])
+    task = MagicMock()
+    task.get_name.return_value = "CheckResonatorSpectroscopy"
+    task.get_task_type.return_value = "qubit"
+    task.postprocess.return_value = postprocess_result
+    distributor._distribute_to_qid(task, MagicMock(), MagicMock(), MagicMock(), "1")
+    return distributor
+
+
+def test_sibling_validation_error_marks_the_sibling_failed_without_outputs() -> None:
+    """A sibling whose postprocess rejects the shared result fails instead of completing."""
+    figure = go.Figure()
+    distributor = _distribute_one(
+        PostProcessResult(
+            output_parameters={"resonator_frequency": OutputParameterModel(value=10.2, unit="GHz")},
+            figures=[figure],
+            validation_error="no usable candidate set",
+        )
+    )
+    state_manager = cast("MagicMock", distributor._state_manager)
+
+    state_manager.update_task_status_to_completed.assert_not_called()
+    state_manager.update_task_status_to_failed.assert_called_once()
+    assert state_manager.update_task_status_to_failed.call_args.args[:4] == (
+        "CheckResonatorSpectroscopy",
+        "no usable candidate set",
+        "qubit",
+        "1",
+    )
+    state_manager.put_output_parameters.assert_not_called()
+    cast("MagicMock", distributor._backend_saver).save_mux_qid.assert_not_called()
+    cast("MagicMock", distributor._data_saver).save_figures.assert_called_once()
+    assert cast("MagicMock", distributor._data_saver).save_figures.call_args.args[0] == [figure]
+    cast("MagicMock", distributor._history_recorder).record_task_result.assert_called_once()
+
+
+def test_valid_sibling_result_still_completes() -> None:
+    """A sibling without a validation error is stored and completed as before."""
+    distributor = _distribute_one(
+        PostProcessResult(
+            output_parameters={"resonator_frequency": OutputParameterModel(value=10.2, unit="GHz")},
+            figures=[],
+        )
+    )
+    state_manager = cast("MagicMock", distributor._state_manager)
+
+    state_manager.update_task_status_to_completed.assert_called_once()
+    state_manager.update_task_status_to_failed.assert_not_called()
+    state_manager.put_output_parameters.assert_called_once()
+    cast("MagicMock", distributor._backend_saver).save_mux_qid.assert_called_once()
