@@ -167,170 +167,175 @@ function DashboardForm({
   );
 
   return (
-    <form className="mt-3 flex flex-col gap-3" onSubmit={handleSubmit} noValidate>
-      {isCreate && (
-        <fieldset className="fieldset">
-          <legend className="fieldset-legend">Start from</legend>
-          {templatesLoading ? (
-            <div
-              className="grid grid-cols-1 gap-2 sm:grid-cols-2"
-              aria-busy="true"
-              aria-label="Loading templates"
-            >
-              <div className="skeleton h-16" />
-              <div className="skeleton h-16" />
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {templates.map((entry) => (
-                <TemplateChoice
-                  key={entry.template_id}
-                  name={`${id}-template`}
-                  value={entry.template_id}
-                  checked={templateChoice === entry.template_id}
-                  title={entry.name}
-                  detail={`${entry.description}. ${entry.panel_count} panels, ready to use on your chip.`}
-                  onChange={() => applyTemplateChoice(entry.template_id)}
-                />
-              ))}
-              <TemplateChoice
-                name={`${id}-template`}
-                value={BLANK}
-                checked={templateChoice === BLANK}
-                title="Blank dashboard"
-                detail="Add panels yourself"
-                onChange={() => applyTemplateChoice(BLANK)}
-              />
-            </div>
-          )}
-          {templatesFailed ? (
-            <div role="alert" className="alert alert-warning alert-soft mt-2 text-sm">
-              <span>
-                {getApiErrorMessage(templatesQuery.error, "Templates could not be loaded")}. You can
-                start blank, or{" "}
-                <button
-                  type="button"
-                  className="link"
-                  disabled={templatesQuery.isFetching}
-                  onClick={() => void templatesQuery.refetch()}
-                >
-                  try again
-                </button>
-                .
-              </span>
-            </div>
-          ) : !templatesLoading && templates.length === 0 ? (
-            <p className="label whitespace-normal">No templates are available in this project</p>
-          ) : null}
-        </fieldset>
-      )}
-
-      <fieldset className="fieldset">
-        <legend className="fieldset-legend">
-          <label htmlFor={`${id}-name`}>Name</label>
-        </legend>
-        <input
-          id={`${id}-name`}
-          className="input w-full"
-          value={name}
-          maxLength={200}
-          placeholder="Dashboard name"
-          autoFocus={!isCreate}
-          onChange={(event) => {
-            nameEdited.current = event.target.value !== "";
-            setName(event.target.value);
-          }}
-        />
-        {isCreate && template && !nameEdited.current && (
-          <p className="label whitespace-normal">Named after the template; change it if you like</p>
-        )}
-      </fieldset>
-
-      <fieldset className="fieldset">
-        <legend className="fieldset-legend">
-          <label htmlFor={`${id}-chip`}>{isCreate ? "Chip" : "Default chip"}</label>
-        </legend>
-        <select
-          id={`${id}-chip`}
-          className="select w-full"
-          value={chipId}
-          onChange={(event) => {
-            chipDefaulted.current = true;
-            setChipId(event.target.value);
-          }}
-        >
-          <option value="">Newest chip when opened</option>
-          {chips.map((chip) => (
-            <option key={chip.chip_id} value={chip.chip_id}>
-              {chip.chip_id}
-              {chip.activity_status === "inactive" ? " (inactive)" : ""}
-            </option>
-          ))}
-        </select>
-        <p className="label whitespace-normal">
-          {chips.length === 0
-            ? "No chip is registered yet; the dashboard opens on the newest chip once one exists"
-            : "The chip the panels show by default; viewers can switch chips without changing it"}
-        </p>
-      </fieldset>
-
-      <fieldset className="fieldset">
-        <legend className="fieldset-legend">Sharing</legend>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          <label className="choice-field gap-3 rounded-[var(--radius-field)] border border-base-300 p-3">
-            <input
-              type="radio"
-              name={`${id}-visibility`}
-              className="radio radio-sm"
-              checked={visibility === "private"}
-              onChange={() => setVisibility("private")}
-            />
-            <span>
-              <span className="block font-medium">Private</span>
-              <span className="block text-xs text-base-content/60">Only you can open it</span>
-            </span>
-          </label>
-          <label className="choice-field gap-3 rounded-[var(--radius-field)] border border-base-300 p-3">
-            <input
-              type="radio"
-              name={`${id}-visibility`}
-              className="radio radio-sm"
-              checked={visibility === "project"}
-              onChange={() => setVisibility("project")}
-            />
-            <span>
-              <span className="block font-medium">Shared with project</span>
-              <span className="block text-xs text-base-content/60">
-                Every project member can open it
-              </span>
-            </span>
-          </label>
-        </div>
+    <form className="mt-3 flex min-h-0 flex-1 flex-col" onSubmit={handleSubmit} noValidate>
+      {/* Fields scroll; the actions below stay in view on short screens. */}
+      <div className="-mx-1 flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-1 pb-1">
         {isCreate && (
-          <p className="label whitespace-normal">
-            {visibility === "project"
-              ? "A shared dashboard can only show scripts that are shared with the project"
-              : "You can share it with the project later from the dashboard's actions menu"}
-          </p>
+          <fieldset className="fieldset">
+            <legend className="fieldset-legend">Start from</legend>
+            {templatesLoading ? (
+              <div
+                className="grid grid-cols-1 gap-2 sm:grid-cols-2"
+                aria-busy="true"
+                aria-label="Loading templates"
+              >
+                <div className="skeleton h-16" />
+                <div className="skeleton h-16" />
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {templates.map((entry) => (
+                  <TemplateChoice
+                    key={entry.template_id}
+                    name={`${id}-template`}
+                    value={entry.template_id}
+                    checked={templateChoice === entry.template_id}
+                    title={entry.name}
+                    detail={`${entry.description}. ${entry.panel_count} panels, ready to use on your chip.`}
+                    onChange={() => applyTemplateChoice(entry.template_id)}
+                  />
+                ))}
+                <TemplateChoice
+                  name={`${id}-template`}
+                  value={BLANK}
+                  checked={templateChoice === BLANK}
+                  title="Blank dashboard"
+                  detail="Add panels yourself"
+                  onChange={() => applyTemplateChoice(BLANK)}
+                />
+              </div>
+            )}
+            {templatesFailed ? (
+              <div role="alert" className="alert alert-warning alert-soft mt-2 text-sm">
+                <span>
+                  {getApiErrorMessage(templatesQuery.error, "Templates could not be loaded")}. You
+                  can start blank, or{" "}
+                  <button
+                    type="button"
+                    className="link"
+                    disabled={templatesQuery.isFetching}
+                    onClick={() => void templatesQuery.refetch()}
+                  >
+                    try again
+                  </button>
+                  .
+                </span>
+              </div>
+            ) : !templatesLoading && templates.length === 0 ? (
+              <p className="label whitespace-normal">No templates are available in this project</p>
+            ) : null}
+          </fieldset>
         )}
-      </fieldset>
 
-      {isCreate ? (
-        <details className="collapse collapse-arrow rounded-[var(--radius-field)] border border-base-300">
-          <summary className="collapse-title min-h-0 py-2 text-sm">Add a description</summary>
-          <div className="collapse-content pb-2">{descriptionField}</div>
-        </details>
-      ) : (
-        descriptionField
-      )}
+        <fieldset className="fieldset">
+          <legend className="fieldset-legend">
+            <label htmlFor={`${id}-name`}>Name</label>
+          </legend>
+          <input
+            id={`${id}-name`}
+            className="input w-full"
+            value={name}
+            maxLength={200}
+            placeholder="Dashboard name"
+            autoFocus={!isCreate}
+            onChange={(event) => {
+              nameEdited.current = event.target.value !== "";
+              setName(event.target.value);
+            }}
+          />
+          {isCreate && template && !nameEdited.current && (
+            <p className="label whitespace-normal">
+              Named after the template; change it if you like
+            </p>
+          )}
+        </fieldset>
 
-      {error && (
-        <div role="alert" className="alert alert-error alert-soft text-sm">
-          {error}
-        </div>
-      )}
+        <fieldset className="fieldset">
+          <legend className="fieldset-legend">
+            <label htmlFor={`${id}-chip`}>{isCreate ? "Chip" : "Default chip"}</label>
+          </legend>
+          <select
+            id={`${id}-chip`}
+            className="select w-full"
+            value={chipId}
+            onChange={(event) => {
+              chipDefaulted.current = true;
+              setChipId(event.target.value);
+            }}
+          >
+            <option value="">Newest chip when opened</option>
+            {chips.map((chip) => (
+              <option key={chip.chip_id} value={chip.chip_id}>
+                {chip.chip_id}
+                {chip.activity_status === "inactive" ? " (inactive)" : ""}
+              </option>
+            ))}
+          </select>
+          <p className="label whitespace-normal">
+            {chips.length === 0
+              ? "No chip is registered yet; the dashboard opens on the newest chip once one exists"
+              : "The chip the panels show by default; viewers can switch chips without changing it"}
+          </p>
+        </fieldset>
 
-      <div className="modal-action mt-2">
+        <fieldset className="fieldset">
+          <legend className="fieldset-legend">Sharing</legend>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <label className="choice-field gap-3 rounded-[var(--radius-field)] border border-base-300 p-3">
+              <input
+                type="radio"
+                name={`${id}-visibility`}
+                className="radio radio-sm"
+                checked={visibility === "private"}
+                onChange={() => setVisibility("private")}
+              />
+              <span>
+                <span className="block font-medium">Private</span>
+                <span className="block text-xs text-base-content/60">Only you can open it</span>
+              </span>
+            </label>
+            <label className="choice-field gap-3 rounded-[var(--radius-field)] border border-base-300 p-3">
+              <input
+                type="radio"
+                name={`${id}-visibility`}
+                className="radio radio-sm"
+                checked={visibility === "project"}
+                onChange={() => setVisibility("project")}
+              />
+              <span>
+                <span className="block font-medium">Shared with project</span>
+                <span className="block text-xs text-base-content/60">
+                  Every project member can open it
+                </span>
+              </span>
+            </label>
+          </div>
+          {isCreate && (
+            <p className="label whitespace-normal">
+              {visibility === "project"
+                ? "A shared dashboard can only show scripts that are shared with the project"
+                : "You can share it with the project later from the dashboard's actions menu"}
+            </p>
+          )}
+        </fieldset>
+
+        {isCreate ? (
+          <details className="collapse collapse-arrow rounded-[var(--radius-field)] border border-base-300">
+            <summary className="collapse-title min-h-0 py-2 text-sm">Add a description</summary>
+            <div className="collapse-content pb-2">{descriptionField}</div>
+          </details>
+        ) : (
+          descriptionField
+        )}
+
+        {error && (
+          <div role="alert" className="alert alert-error alert-soft text-sm">
+            {error}
+          </div>
+        )}
+      </div>
+
+      <div className="modal-action mt-3 shrink-0 border-t border-base-300 pt-3">
         <button type="button" className="btn btn-ghost" onClick={onCancel} disabled={pending}>
           Cancel
         </button>
@@ -371,7 +376,7 @@ export function DashboardFormDialog({
 }: DashboardFormDialogProps) {
   return (
     <Dialog open={open} onOpenChange={(next) => !pending && onOpenChange(next)}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="flex max-w-lg flex-col overflow-hidden p-4 sm:p-6">
         <DialogTitle>{mode === "create" ? "New dashboard" : "Dashboard settings"}</DialogTitle>
         <DialogDescription className="mt-1 text-xs text-base-content/60">
           {mode === "create"

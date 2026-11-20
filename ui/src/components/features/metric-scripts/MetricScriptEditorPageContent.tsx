@@ -34,6 +34,7 @@ import { PageContainer } from "@/components/ui/PageContainer";
 import { useToast } from "@/components/ui/Toast";
 import { useChatDock } from "@/contexts/ChatDockContext";
 import { useProject } from "@/contexts/ProjectContext";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { monoFontFamily, remeasureMonacoFontsWhenLoaded } from "@/lib/fonts";
 import type { MetricScriptEditorContext } from "@/types/copilotChat";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
@@ -71,6 +72,19 @@ const EDITOR_OPTIONS = {
 
 const MARKER_OWNER = "metric-script";
 
+/** Below Tailwind's `md` breakpoint the editor and the side pane become tabs. */
+const NARROW_QUERY = "(max-width: 767px)";
+
+/** Heading id of the Settings section; other pages link to it with a URL fragment. */
+const SETTINGS_ANCHOR = "metric-script-settings";
+
+type EditorPane = "code" | "details";
+
+const EDITOR_PANES: Array<{ value: EditorPane; label: string }> = [
+  { value: "code", label: "Code" },
+  { value: "details", label: "Settings & preview" },
+];
+
 /** The last check of the script's text: a validation, a save, or what the server stored. */
 interface ScriptReport {
   kind: "loaded" | "validated" | "saved";
@@ -87,6 +101,10 @@ interface MonacoEditorLike {
   setPosition: (position: { lineNumber: number; column: number }) => void;
   focus: () => void;
   getModel: () => unknown;
+}
+
+interface DisposableModel {
+  dispose?: () => void;
 }
 
 interface MonacoLike {
@@ -175,19 +193,64 @@ export function MetricScriptEditorPageContent({ scriptId }: { scriptId: string }
   // Editor handles for jumping to diagnostics and marking them in the text.
   const editorRef = useRef<MonacoEditorLike | null>(null);
   const monacoRef = useRef<MonacoLike | null>(null);
+  const [editorMounts, setEditorMounts] = useState(0);
   const handleMount = useCallback<OnMount>((editor, monaco) => {
     editorRef.current = editor as unknown as MonacoEditorLike;
     monacoRef.current = monaco as unknown as MonacoLike;
     remeasureMonacoFontsWhenLoaded(monaco);
+    setEditorMounts((count) => count + 1);
   }, []);
 
-  const jumpToLine = useCallback((line: number, column?: number | null) => {
-    const editor = editorRef.current;
-    if (!editor) return;
-    editor.revealLineInCenter(line);
-    editor.setPosition({ lineNumber: line, column: column ?? 1 });
-    editor.focus();
-  }, []);
+  // On narrow screens only one pane shows at a time; both stay mounted so switching keeps the
+  // editor, its undo history, and the preview result.
+  const isNarrow = useMediaQuery(NARROW_QUERY);
+  const [pane, setPane] = useState<EditorPane>("code");
+
+  const jumpToLine = useCallback(
+    (line: number, column?: number | null) => {
+      const reveal = () => {
+        const editor = editorRef.current;
+        if (!editor) return;
+        editor.revealLineInCenter(line);
+        editor.setPosition({ lineNumber: line, column: column ?? 1 });
+        editor.focus();
+      };
+      if (isNarrow && pane !== "code") {
+        // Let the editor lay out at its visible size before it scrolls to the line.
+        setPane("code");
+        requestAnimationFrame(reveal);
+        return;
+      }
+      reveal();
+    },
+    [isNarrow, pane],
+  );
+
+  // The editor keeps its model across remounts (crossing the narrow breakpoint swaps the
+  // layout); drop the model once the page itself goes away.
+  useEffect(
+    () => () => {
+      (editorRef.current?.getModel() as DisposableModel | null | undefined)?.dispose?.();
+    },
+    [],
+  );
+
+  // A link to #metric-script-settings shows the Settings section, on narrow screens by
+  // switching to its pane first.
+  const hasScript = Boolean(doc.script);
+  useEffect(() => {
+    if (!hasScript) return;
+    const revealSettings = () => {
+      if (window.location.hash !== `#${SETTINGS_ANCHOR}`) return;
+      setPane("details");
+      requestAnimationFrame(() =>
+        document.getElementById(SETTINGS_ANCHOR)?.scrollIntoView({ block: "start" }),
+      );
+    };
+    revealSettings();
+    window.addEventListener("hashchange", revealSettings);
+    return () => window.removeEventListener("hashchange", revealSettings);
+  }, [hasScript]);
 
   const diagnostics = useMemo(() => reportSource?.diagnostics ?? [], [reportSource]);
   useEffect(() => {
@@ -210,7 +273,7 @@ export function MetricScriptEditorPageContent({ scriptId }: { scriptId: string }
             }))
         : [],
     );
-  }, [code, diagnostics, reportSource?.code]);
+  }, [code, diagnostics, reportSource?.code, editorMounts]);
 
   const handleValidate = () => {
     const source = code;
@@ -248,6 +311,7 @@ export function MetricScriptEditorPageContent({ scriptId }: { scriptId: string }
   const handlePreview = () => {
     if (previewBlocked || !metric) return;
     const base = { metric_id: metric.id, chip_id: chipId, period: preview.period, params };
+    setPane("details");
     if (canEdit) {
       draftMutation.mutate({ data: { ...base, source: code } });
     } else {
@@ -380,6 +444,138 @@ export function MetricScriptEditorPageContent({ scriptId }: { scriptId: string }
   const status = script.status;
   const active = script.active_revision;
 
+  const editorPane = isReady ? (
+    <Editor
+      height="100%"
+      language="python"
+      theme="vs-dark"
+      path={`metric-script/${scriptId}.py`}
+      keepCurrentModel
+      value={code}
+      onChange={(value) => setCode(value ?? "")}
+      onMount={handleMount}
+      options={{ ...EDITOR_OPTIONS, readOnly, domReadOnly: readOnly }}
+    />
+  ) : (
+    <div className="skeleton h-full w-full" />
+  );
+
+  const detailsPane = (
+    <>
+      <Section title="Settings">
+        <div className="grid grid-cols-1 gap-x-3 sm:grid-cols-2">
+          <fieldset className="fieldset min-w-0">
+            <legend className="fieldset-legend">
+              <label htmlFor={`${id}-name`}>Name</label>
+            </legend>
+            <input
+              id={`${id}-name`}
+              className={`input input-sm w-full ${settings.name.trim() ? "" : "input-error"}`}
+              value={settings.name}
+              maxLength={120}
+              disabled={readOnly}
+              onChange={(event) => setSettings({ name: event.target.value })}
+            />
+          </fieldset>
+          <fieldset className="fieldset min-w-0">
+            <legend className="fieldset-legend">
+              <label htmlFor={`${id}-visibility`}>Visibility</label>
+            </legend>
+            <select
+              id={`${id}-visibility`}
+              className="select select-sm w-full"
+              value={settings.visibility}
+              disabled={readOnly}
+              onChange={(event) =>
+                setSettings({
+                  visibility: event.target.value as MetricScriptResponseVisibility,
+                })
+              }
+            >
+              <option value="private">Private</option>
+              <option value="project">Shared with project</option>
+            </select>
+          </fieldset>
+        </div>
+        <fieldset className="fieldset">
+          <legend className="fieldset-legend">
+            <label htmlFor={`${id}-description`}>Description</label>
+          </legend>
+          <textarea
+            id={`${id}-description`}
+            className="textarea textarea-sm w-full"
+            rows={2}
+            maxLength={2000}
+            value={settings.description}
+            disabled={readOnly}
+            onChange={(event) => setSettings({ description: event.target.value })}
+          />
+        </fieldset>
+      </Section>
+
+      <Section
+        title="Diagnostics"
+        actions={
+          reportSource && reportSource.code !== code ? (
+            <span className="text-xs text-base-content/60">For an earlier version</span>
+          ) : undefined
+        }
+      >
+        {diagnostics.length > 0 ? (
+          <ul className="flex flex-col gap-1.5 text-sm" data-testid="diagnostics">
+            {diagnostics.map((diagnostic, index) => (
+              <li key={`${diagnostic.line ?? "x"}-${index}`} className="flex gap-2 py-0.5">
+                <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-error" aria-hidden="true" />
+                <DiagnosticLocation diagnostic={diagnostic} onJumpToLine={jumpToLine} />
+              </li>
+            ))}
+          </ul>
+        ) : reportSource?.ok ? (
+          <p className="flex items-center gap-1.5 text-sm text-base-content/70">
+            <CircleCheck className="h-4 w-4 text-success" aria-hidden="true" />
+            {reportSource.kind === "validated" ? "Validation found no problems" : "No problems"}
+          </p>
+        ) : (
+          <p className="text-sm text-base-content/60">Validate the script to check it</p>
+        )}
+      </Section>
+
+      <Section title="Preview">
+        <PreviewControls
+          id={`${id}-preview`}
+          metrics={metrics}
+          value={{
+            ...preview,
+            chipId,
+            metricId,
+            hops: metric?.target === "pair" ? preview.hops : declaredHops(metric),
+          }}
+          onChange={updatePreview}
+        />
+        {!canEdit && (
+          <p className="text-xs text-base-content/60">
+            Viewers preview the active revision; only editors can run unsaved text.
+          </p>
+        )}
+        <div className="h-[28rem] min-h-0">
+          <MetricResultView
+            result={previewMutation.data?.data}
+            error={previewMutation.error}
+            isLoading={previewMutation.isPending && !previewMutation.data}
+            isFetching={previewMutation.isPending}
+            topologyId={topologyId}
+            view={preview.view}
+            direction={preview.direction}
+            hops={effectiveHops}
+            onRetry={handlePreview}
+            onJumpToLine={jumpToLine}
+            emptyMessage="Choose a chip and metric, then press Preview"
+          />
+        </div>
+      </Section>
+    </>
+  );
+
   return (
     <div className="flex h-full min-h-0 flex-col bg-base-100">
       <header className="flex flex-col gap-3 border-b border-base-300 bg-base-100 px-4 py-3 sm:flex-row sm:items-start sm:justify-between">
@@ -491,140 +687,58 @@ export function MetricScriptEditorPageContent({ scriptId }: { scriptId: string }
         </div>
       )}
 
-      <PanelGroup orientation="horizontal" style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
-        <Panel defaultSize="55%" minSize="25%" style={{ overflow: "hidden", minWidth: 0 }}>
-          {isReady ? (
-            <Editor
-              height="100%"
-              language="python"
-              theme="vs-dark"
-              value={code}
-              onChange={(value) => setCode(value ?? "")}
-              onMount={handleMount}
-              options={{ ...EDITOR_OPTIONS, readOnly, domReadOnly: readOnly }}
-            />
-          ) : (
-            <div className="skeleton h-full w-full" />
-          )}
-        </Panel>
-        <PanelResizeHandle className="w-1 cursor-col-resize bg-base-300 transition-colors hover:bg-primary/50" />
-        <Panel defaultSize="45%" minSize="25%" style={{ overflow: "auto", minWidth: 0 }}>
-          <Section title="Settings">
-            <div className="grid grid-cols-1 gap-x-3 sm:grid-cols-2">
-              <fieldset className="fieldset min-w-0">
-                <legend className="fieldset-legend">
-                  <label htmlFor={`${id}-name`}>Name</label>
-                </legend>
-                <input
-                  id={`${id}-name`}
-                  className={`input input-sm w-full ${settings.name.trim() ? "" : "input-error"}`}
-                  value={settings.name}
-                  maxLength={120}
-                  disabled={readOnly}
-                  onChange={(event) => setSettings({ name: event.target.value })}
-                />
-              </fieldset>
-              <fieldset className="fieldset min-w-0">
-                <legend className="fieldset-legend">
-                  <label htmlFor={`${id}-visibility`}>Visibility</label>
-                </legend>
-                <select
-                  id={`${id}-visibility`}
-                  className="select select-sm w-full"
-                  value={settings.visibility}
-                  disabled={readOnly}
-                  onChange={(event) =>
-                    setSettings({
-                      visibility: event.target.value as MetricScriptResponseVisibility,
-                    })
-                  }
-                >
-                  <option value="private">Private</option>
-                  <option value="project">Shared with project</option>
-                </select>
-              </fieldset>
-            </div>
-            <fieldset className="fieldset">
-              <legend className="fieldset-legend">
-                <label htmlFor={`${id}-description`}>Description</label>
-              </legend>
-              <textarea
-                id={`${id}-description`}
-                className="textarea textarea-sm w-full"
-                rows={2}
-                maxLength={2000}
-                value={settings.description}
-                disabled={readOnly}
-                onChange={(event) => setSettings({ description: event.target.value })}
-              />
-            </fieldset>
-          </Section>
-
-          <Section
-            title="Diagnostics"
-            actions={
-              reportSource && reportSource.code !== code ? (
-                <span className="text-xs text-base-content/60">For an earlier version</span>
-              ) : undefined
-            }
+      {isNarrow ? (
+        <>
+          <div
+            role="tablist"
+            aria-label="Editor panes"
+            className="tabs tabs-border shrink-0 border-b border-base-300"
           >
-            {diagnostics.length > 0 ? (
-              <ul className="flex flex-col gap-1.5 text-sm" data-testid="diagnostics">
-                {diagnostics.map((diagnostic, index) => (
-                  <li key={`${diagnostic.line ?? "x"}-${index}`} className="flex gap-2 py-0.5">
-                    <TriangleAlert
-                      className="mt-0.5 h-4 w-4 shrink-0 text-error"
-                      aria-hidden="true"
-                    />
-                    <DiagnosticLocation diagnostic={diagnostic} onJumpToLine={jumpToLine} />
-                  </li>
-                ))}
-              </ul>
-            ) : reportSource?.ok ? (
-              <p className="flex items-center gap-1.5 text-sm text-base-content/70">
-                <CircleCheck className="h-4 w-4 text-success" aria-hidden="true" />
-                {reportSource.kind === "validated" ? "Validation found no problems" : "No problems"}
-              </p>
-            ) : (
-              <p className="text-sm text-base-content/60">Validate the script to check it</p>
-            )}
-          </Section>
-
-          <Section title="Preview">
-            <PreviewControls
-              id={`${id}-preview`}
-              metrics={metrics}
-              value={{
-                ...preview,
-                chipId,
-                metricId,
-                hops: metric?.target === "pair" ? preview.hops : declaredHops(metric),
-              }}
-              onChange={updatePreview}
-            />
-            {!canEdit && (
-              <p className="text-xs text-base-content/60">
-                Viewers preview the active revision; only editors can run unsaved text.
-              </p>
-            )}
-            <div className="h-[28rem] min-h-0">
-              <MetricResultView
-                result={previewMutation.data?.data}
-                error={previewMutation.error}
-                isLoading={previewMutation.isPending && !previewMutation.data}
-                isFetching={previewMutation.isPending}
-                topologyId={topologyId}
-                view={preview.view}
-                direction={preview.direction}
-                hops={effectiveHops}
-                onRetry={handlePreview}
-                onJumpToLine={jumpToLine}
-                emptyMessage="Choose a chip and metric, then press Preview"
-              />
-            </div>
-          </Section>
-        </Panel>
-      </PanelGroup>
+            {EDITOR_PANES.map(({ value, label }) => (
+              <button
+                key={value}
+                type="button"
+                role="tab"
+                id={`${id}-pane-tab-${value}`}
+                aria-selected={pane === value}
+                aria-controls={`${id}-pane-${value}`}
+                className={`tab flex-1 ${pane === value ? "tab-active" : ""}`}
+                onClick={() => setPane(value)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <div
+            role="tabpanel"
+            id={`${id}-pane-code`}
+            aria-labelledby={`${id}-pane-tab-code`}
+            hidden={pane !== "code"}
+            className="min-h-0 flex-1 overflow-hidden"
+          >
+            {editorPane}
+          </div>
+          <div
+            role="tabpanel"
+            id={`${id}-pane-details`}
+            aria-labelledby={`${id}-pane-tab-details`}
+            hidden={pane !== "details"}
+            className="min-h-0 flex-1 overflow-auto"
+          >
+            {detailsPane}
+          </div>
+        </>
+      ) : (
+        <PanelGroup orientation="horizontal" style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
+          <Panel defaultSize="55%" minSize="25%" style={{ overflow: "hidden", minWidth: 0 }}>
+            {editorPane}
+          </Panel>
+          <PanelResizeHandle className="w-1 cursor-col-resize bg-base-300 transition-colors hover:bg-primary/50" />
+          <Panel defaultSize="45%" minSize="25%" style={{ overflow: "auto", minWidth: 0 }}>
+            {detailsPane}
+          </Panel>
+        </PanelGroup>
+      )}
     </div>
   );
 }

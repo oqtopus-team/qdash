@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
     getModel: () => ({ id: "model" }),
   },
   setModelMarkers: vi.fn(),
+  editorMounted: vi.fn(),
   validate: vi.fn(),
   validateResult: null as unknown,
   draftEvaluate: vi.fn(),
@@ -45,6 +46,9 @@ vi.mock("next/dynamic", () => ({
       onMount?: (editor: unknown, monaco: unknown) => void;
       options?: { readOnly?: boolean };
     }) {
+      useEffect(() => {
+        mocks.editorMounted();
+      }, []);
       useEffect(() => {
         onMount?.(mocks.editor, {
           editor: { remeasureFonts: () => undefined, setModelMarkers: mocks.setModelMarkers },
@@ -163,6 +167,8 @@ describe("MetricScriptEditorPageContent", () => {
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
+    vi.restoreAllMocks();
+    window.history.replaceState(null, "", "/");
   });
 
   it("loads the script with its saved and active revisions", async () => {
@@ -271,5 +277,82 @@ describe("MetricScriptEditorPageContent", () => {
         data: expect.objectContaining({ source: `${SOURCE}# more\n`, expected_revision: 3 }),
       }),
     );
+  });
+
+  describe("on a narrow screen", () => {
+    const originalMatchMedia = window.matchMedia;
+    // The code tab panel is also labelled "Code"; the editor stand-in is the text box.
+    const codeBox = () => screen.getByRole("textbox", { name: "Code", hidden: true });
+
+    beforeEach(() => {
+      window.matchMedia = (query: string) =>
+        ({
+          ...originalMatchMedia(query),
+          matches: query === "(max-width: 767px)",
+        }) as MediaQueryList;
+    });
+
+    afterEach(() => {
+      window.matchMedia = originalMatchMedia;
+    });
+
+    it("switches between the code and the settings without losing the draft", async () => {
+      renderPage();
+      await waitFor(() => expect(codeBox()).toHaveValue(SOURCE));
+
+      const codeTab = screen.getByRole("tab", { name: "Code" });
+      const detailsTab = screen.getByRole("tab", { name: "Settings & preview" });
+      expect(codeTab).toHaveAttribute("aria-selected", "true");
+      expect(codeBox()).toBeVisible();
+      expect(screen.getByLabelText("Name")).not.toBeVisible();
+
+      fireEvent.change(codeBox(), { target: { value: `${SOURCE}# more\n` } });
+      fireEvent.click(detailsTab);
+      expect(detailsTab).toHaveAttribute("aria-selected", "true");
+      expect(screen.getByLabelText("Name")).toBeVisible();
+      fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Coherence v2" } });
+
+      fireEvent.click(codeTab);
+      expect(codeBox()).toBeVisible();
+      expect(codeBox()).toHaveValue(`${SOURCE}# more\n`);
+      expect(screen.getByLabelText("Name")).toHaveValue("Coherence v2");
+      // One editor instance for the whole session: switching panes does not remount it.
+      expect(mocks.editorMounted).toHaveBeenCalledTimes(1);
+    });
+
+    it("opens the settings pane for a link to #metric-script-settings", async () => {
+      const scrollIntoView = vi.spyOn(HTMLElement.prototype, "scrollIntoView");
+      window.history.replaceState(null, "", "/#metric-script-settings");
+      renderPage();
+
+      await waitFor(() =>
+        expect(screen.getByRole("tab", { name: "Settings & preview" })).toHaveAttribute(
+          "aria-selected",
+          "true",
+        ),
+      );
+      expect(screen.getByLabelText("Name")).toBeVisible();
+      expect(codeBox()).not.toBeVisible();
+      await waitFor(() => expect(scrollIntoView).toHaveBeenCalled());
+      expect(scrollIntoView.mock.contexts[0]).toHaveAttribute("id", "metric-script-settings");
+    });
+
+    it("shows the code when a diagnostic's line is chosen", async () => {
+      mocks.script = scriptResponse({
+        status: "invalid",
+        revision: 4,
+        active_revision: 3,
+        diagnostics: [{ message: "NameError: name 'x' is not defined", line: 6 }],
+      });
+      renderPage();
+      await waitFor(() => expect(codeBox()).toHaveValue(SOURCE));
+
+      fireEvent.click(screen.getByRole("tab", { name: "Settings & preview" }));
+      fireEvent.click(screen.getByRole("button", { name: /Line 6/ }));
+
+      expect(screen.getByRole("tab", { name: "Code" })).toHaveAttribute("aria-selected", "true");
+      expect(codeBox()).toBeVisible();
+      await waitFor(() => expect(mocks.editor.revealLineInCenter).toHaveBeenCalledWith(6));
+    });
   });
 });

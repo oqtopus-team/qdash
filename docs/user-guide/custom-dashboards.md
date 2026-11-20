@@ -20,9 +20,9 @@ them.
 
 1. Open **Dashboards** and select **New dashboard**.
 2. Under **Start from**, keep the **Frequency Collision Map** template, which is preselected, or
-   choose **Blank dashboard**. The template adds a how-to note, a qubit frequency map, and the
-   Type0A, Type0B, Type1A, Type3A, Type1C, and Type2C collision checks, ready to read on your
-   chip. Its collision panels use the project's shared **Frequency collision checks** script;
+   choose **Blank dashboard**. The template adds a qubit frequency map, the Type0A, Type0B,
+   Type1A, Type3A, Type1C, and Type2C collision checks, ready to read on your chip, and a short
+   note on reading their colours. Its collision panels use the project's shared **Frequency collision checks** script;
    when the project has none yet, QDash creates it and shares it with the project. The dashboard
    is yours: later changes to the template do not alter it. When the templates cannot be
    loaded, the dialog says so, offers **try again**, and selects **Blank dashboard**.
@@ -48,6 +48,7 @@ applies. A metric panel shows one metric on the chip topology or in a table:
    which read the latest calibration like **Overview**, and then each metric a saved script
    computes, under the script's name, with its unit and whether it is per qubit or per pair.
    Scripts without a valid revision are not listed; a private script is marked **(private)**.
+   The full name of the chosen metric and its source appear below the list.
 2. The **Title** follows the metric until you type your own.
 3. For a qubit or coupling metric, choose the **Value selection**: **Latest**, **Best**, or
    **Average**.

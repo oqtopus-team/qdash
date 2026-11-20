@@ -20,7 +20,9 @@ with the project and preview its saved version.
 
 The editor shows the code on the left. On the right, **Settings** holds the name,
 description and visibility, **Diagnostics** lists problems with their line numbers (select one
-to jump to the line), and **Preview** shows the result on a chip.
+to jump to the line), and **Preview** shows the result on a chip. On a narrow screen, the
+**Code** and **Settings & preview** tabs switch between the two sides without losing unsaved
+changes.
 
 - **Validate** checks the code without saving it.
 - **Preview** runs one metric of the code in the editor, saved or not, on the chip and period

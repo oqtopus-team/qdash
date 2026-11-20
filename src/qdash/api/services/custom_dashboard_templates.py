@@ -47,20 +47,12 @@ class DashboardTemplate:
 
 
 FREQUENCY_COLLISION_INTRO = """\
-## Frequency collision map
+- Blue: within the limit. Orange: on the boundary. Red: the limit is exceeded.
+- Grey: not evaluated, usually because an input is missing from the last 30 days.
+- Type2C is a signed two-photon detuning in MHz, not a ratio.
 
-Each map runs one qubex collision check of the shared *Frequency collision checks* metric
-script on the latest qubit frequencies, anharmonicities, resonator frequencies, coherence
-times and coupling strengths of the last 30 days.
-
-- Blue: below the limit. Orange: on the boundary. Red: the limit is exceeded.
-- Grey: not evaluated, usually because an input is missing.
-- Type2C shows a signed two-photon detuning in MHz instead of a ratio.
-
-Select a qubit or an edge for the terms behind the verdict. Adjust the limits, the CNOT time and
-the fallback values under **Advanced** in each panel's settings; they are saved with this
-dashboard. Edit the script itself from the Scripts tab; panels keep the revision they were saved
-with until you choose **Use updated definition**.
+Select a qubit or an edge to see the terms behind its verdict. Limits, the CNOT time and
+fallback values are under **Advanced** in each panel's settings.
 """
 
 
@@ -99,24 +91,26 @@ FREQUENCY_COLLISION_MAP = DashboardTemplate(
         "on the chip topology, with a qubit frequency map for context"
     ),
     panels=(
-        TemplatePanel(
-            type="markdown",
-            title="How to read this dashboard",
-            layout=(0, 0, 12, 2),
-            config={"content": FREQUENCY_COLLISION_INTRO},
-        ),
+        # Maps first; the reading guide fills the slot beside Type2C, which it explains,
+        # and comes last on narrow screens where panels stack.
         TemplatePanel(
             type="qubit_metric",
             title="Qubit frequency",
-            layout=(0, 2, 6, 4),
+            layout=(0, 0, 6, 4),
             config={"metric": "qubit_frequency"},
         ),
-        _collision("Type0A", 6, 2),
-        _collision("Type0B", 0, 6),
-        _collision("Type1A", 6, 6),
-        _collision("Type3A", 0, 10),
-        _collision("Type1C", 6, 10),
-        _collision("Type2C", 0, 14),
+        _collision("Type0A", 6, 0),
+        _collision("Type0B", 0, 4),
+        _collision("Type1A", 6, 4),
+        _collision("Type3A", 0, 8),
+        _collision("Type1C", 6, 8),
+        _collision("Type2C", 0, 12),
+        TemplatePanel(
+            type="markdown",
+            title="Reading the collision maps",
+            layout=(6, 12, 6, 4),
+            config={"content": FREQUENCY_COLLISION_INTRO},
+        ),
     ),
 )
 

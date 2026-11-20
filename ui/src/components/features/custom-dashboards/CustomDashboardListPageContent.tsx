@@ -333,7 +333,7 @@ export function CustomDashboardListPageContent() {
             title="No dashboards yet"
             description={
               canEdit
-                ? "Create a dashboard and add metric, metric script and note panels"
+                ? "Create a dashboard and add metric and note panels"
                 : "Dashboards that project members share will appear here"
             }
             action={newButton}

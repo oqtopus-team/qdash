@@ -510,6 +510,14 @@ def test_templates_listed_and_copied_on_create(test_client, init_db, runtime):
     assert all(p["config"]["script_revision"] == 1 for p in script_panels)
     assert all(p["script_name"] == "Frequency collision checks" for p in script_panels)
     assert script_panels[0]["config"]["period"] == {"kind": "relative", "days": 30}
+    # Maps come first; the short reading guide sits last, beside the Type2C map it explains.
+    in_order = sorted(first["panels"], key=lambda p: (p["layout"]["y"], p["layout"]["x"]))
+    assert in_order[0]["type"] == "qubit_metric"
+    assert in_order[-1]["type"] == "markdown"
+    guide = in_order[-1]["config"]["content"]
+    assert not guide.lstrip().startswith("#")
+    assert "MHz" in guide
+    assert "missing" in guide
 
     script = test_client.get(f"/metric-scripts/{script_id}", headers=editor).json()
     assert script["template_id"] == "collision"

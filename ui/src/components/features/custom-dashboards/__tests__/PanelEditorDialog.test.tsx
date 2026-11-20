@@ -198,6 +198,23 @@ describe("PanelEditorDialog", () => {
     });
   });
 
+  it("spells out the chosen metric and keeps the actions outside the scrolling fields", () => {
+    renderEditor();
+
+    const show = screen.getByLabelText("Show");
+    fireEvent.change(show, { target: { value: ZX90_CHOICE } });
+
+    // The closed select can clip a long name; the full choice and its source stay readable.
+    const described = document.getElementById(show.getAttribute("aria-describedby") ?? "");
+    expect(described).toHaveTextContent("Median ZX90 gate fidelity (%) · per pair · ZX90 median");
+    expect(show).toHaveAttribute("title", "Median ZX90 gate fidelity (%) · per pair");
+
+    const body = screen.getByTestId("panel-editor-body");
+    expect(body).toContainElement(show);
+    expect(body).not.toContainElement(screen.getByRole("button", { name: "Add panel" }));
+    expect(body).not.toContainElement(screen.getByRole("button", { name: "Cancel" }));
+  });
+
   it("keeps a typed title when the metric changes", () => {
     renderEditor();
 
