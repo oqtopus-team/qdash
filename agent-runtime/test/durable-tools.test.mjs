@@ -375,10 +375,12 @@ test("a tool's text reaches the model without inline images and within the budge
 });
 
 test("a cancelled turn does not wait for a tool that ignores the signal", async () => {
-  const tool = registered("qdash_wait_execution");
+  // A pi-qdash tool that still runs the client's polling loop (the execution and
+  // agent action waits park instead; see durable-waits.test.mjs).
+  const tool = registered("qdash_wait_agent_candidate_apply");
   tool.definition.execute = () => new Promise(() => {}); // polls forever, never looks at the signal
   const { extension } = buildQDashExtension(
-    [{ tools: new Map([["qdash_wait_execution", tool]]) }],
+    [{ tools: new Map([["qdash_wait_agent_candidate_apply", tool]]) }],
     {},
     "/tmp/work",
     connection,

@@ -44,7 +44,7 @@ Or try it without installing:
 pi -e npm:@oqtopus-team/pi-qdash
 ```
 
-The package declares Node.js 20 or later and is tested with Node.js 24 and pi 1.5.2.
+The package declares Node.js 20 or later and is tested with Node.js 24 and pi 1.6.0.
 Published releases pin the matching `@oqtopus-team/qdash-client` and `@oqtopus-team/qdash-sdk` versions.
 Use the `beta` dist-tag to try changes merged into QDash's `develop` branch:
 

@@ -50,7 +50,10 @@ Closing the browser stream does not cancel work in the Agent Runtime. The Stop a
 separate cancellation path for the active turn. A stop reaches the turn as soon as it holds the
 store, also while its own message is still being admitted: `ActiveChat.stop` records it, and the
 turn aborts again once its submission is in, before it admits any steer. Request IDs let a retry
-recover an answer that the runtime already committed.
+recover an answer that the runtime already committed. A parked `qdash_wait_execution` or
+`qdash_wait_agent_action` call stays a running tool in the stream until it ends, and a stop ends it
+without stopping the execution in QDash (see
+[Copilot Architecture](./architecture.md#code-mode-and-deferred-tools)).
 
 One turn runs per user and store, so per conversation and across a chat's [branches](#branches); a second `/chat` request gets `409`. A message sent
 while the turn runs goes to `POST /copilot/chat/steer` instead, which the runtime's `/chat/steer`
@@ -194,7 +197,7 @@ preserve the connection without creating transcript entries.
 ## Branches
 
 A branch is a chat session that continues another one from one of its answers. It is a Pi fork
-(`Conversation.fork(at)`) in the source chat's SQLite store, not a copy of the store: Pi 1.5 has no
+(`Conversation.fork(at)`) in the source chat's SQLite store, not a copy of the store: Pi 1.6 has no
 per-conversation export, import, or delete, so the runtime never copies SQLite files or rebuilds a
 transcript. The fork starts with what Pi copies at `at`: the transcript, `pi.agent` as of that
 entry (model tools loaded through `tool_search` included), and the Code Mode store as of that

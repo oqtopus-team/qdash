@@ -28,8 +28,11 @@ import { acceptsImages, newestMessages } from "./figure-context.ts";
 import { hostRecord } from "./evaluate.ts";
 import { acceptsKnowledge, fetchTaskKnowledgeResponse, referenceOf } from "./knowledge-context.ts";
 import { hydrateEvaluationArgs } from "@oqtopus-team/pi-qdash/extensions/lib/qcal-hydration.ts";
+import { QDASH_TOOL_NAMESPACE } from "@oqtopus-team/pi-qdash/extensions/lib/tool-policy.ts";
+import { isWaitToolName, WAIT_SPECS, type WaitSpec } from "@oqtopus-team/pi-qdash/extensions/lib/waits.ts";
 import { isTrustedExtension } from "./local-extensions.ts";
 import { withParameterOverrides } from "./tool-schemas.ts";
+import { parkingWait } from "./durable-waits.ts";
 
 /** Newest transcript entries searched for a figure when a tool asks for one. */
 const FIGURE_SCAN_LIMIT = 50;
@@ -227,10 +230,20 @@ export function adaptCodingAgentTool(
     nested?: boolean;
     /** Offer the tool to the model only once `tool_search` (or a call by name) loaded it. */
     deferred?: boolean;
+    /**
+     * Run a pi-qdash waiting tool (`WAIT_SPECS`) one poll per durable wake,
+     * parked in between, instead of running its polling loop (see
+     * durable-waits.ts). Only for the pinned pi-qdash implementation.
+     */
+    parkingWait?: boolean;
   } = {},
 ): ToolRegistration {
   const writesQDash = isReviewedWriteTool(tool.name);
   const parameters = withParameterOverrides(tool.name, tool.parameters);
+  const wait: WaitSpec<object, unknown> | undefined =
+    options.parkingWait && !writesQDash && isWaitToolName(tool.name)
+      ? (WAIT_SPECS[tool.name] as WaitSpec<never, unknown> as WaitSpec<object, unknown>)
+      : undefined;
   return defineTool({
     name: tool.name,
     description: writesQDash
@@ -266,6 +279,17 @@ export function adaptCodingAgentTool(
           details: asJson({ approval }),
           control: { terminate: true as const },
         };
+      }
+      if (wait) {
+        // Connection settings come only from the runtime's connection, as for every pi-qdash call.
+        // A poll in flight when the turn is stopped is dropped, not awaited.
+        const spec: WaitSpec<object, unknown> = {
+          ...wait,
+          check: (client, params) => untilAborted(wait.check(client, params), context.abortSignal, tool.name),
+        };
+        const step = await parkingWait(spec, approvalArgs(args), api, context, connection);
+        if (!("content" in step)) return step;
+        return { output: boundOutput(step.content, tool.name), details: asJson(step.details) };
       }
       let callArgs: unknown = args;
       let hydrated: Awaited<ReturnType<typeof hydrateEvaluationArgs<object>>> | undefined;
@@ -436,6 +460,13 @@ export class QDashWriteTools {
  * and a tool is replayed on recovery only when its
  * annotations say it is read-only. A trusted tool that reuses a pinned name
  * replaces the pinned implementation.
+ *
+ * The extension declares the shared `qdash` code mode namespace
+ * (`QDASH_TOOL_NAMESPACE`, pi-durable 1.6 `Extension.namespace`), so the
+ * `codemode` section lists the tools scripts may call under it and a script
+ * can read its instructions with `describeNamespace("qdash")`. The namespace
+ * groups tools only; Code Mode still shows and gives scripts only the audited
+ * reads (see codemode.ts).
  */
 export function buildQDashExtension(
   extensions: ReadonlyArray<{
@@ -483,6 +514,8 @@ export function buildQDashExtension(
       // script; a trusted checkout's replacement is model-only.
       const nestedRead = !local && !writeName && isNestedReadTool(name);
       const deferredTool = isDeferredTool(name);
+      // The pinned waiting tools park between polls; a trusted replacement runs its own code.
+      const parkingWaitTool = !local && isWaitToolName(name);
       tools.set(
         name,
         adaptCodingAgentTool(registered.definition, modelRuntime, cwd, connection, {
@@ -491,6 +524,7 @@ export function buildQDashExtension(
           fillKnowledge,
           nested: nestedRead,
           deferred: deferredTool,
+          parkingWait: parkingWaitTool,
         }),
       );
       if (nestedRead) nested.add(name);
@@ -500,7 +534,7 @@ export function buildQDashExtension(
     }
   }
   return {
-    extension: defineExtension({ name: "qdash", tools: [...tools.values()] }),
+    extension: defineExtension({ name: "qdash", namespace: QDASH_TOOL_NAMESPACE, tools: [...tools.values()] }),
     writeTools: new QDashWriteTools(writes, modelRuntime, cwd, connection),
     nestedTools: [...nested],
     deferredTools: [...deferred],
