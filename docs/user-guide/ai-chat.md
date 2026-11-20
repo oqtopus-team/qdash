@@ -35,7 +35,7 @@ shows only what QDash knows and sends; a general chat on the **Agent** page show
 | --- | --- | --- |
 | **Result** | The chat is about one task result | The task, qubit, and chip saved with this chat; every message names them |
 | **Investigating** | The chat investigates a failure | The failed execution, with the task, qubit, and chip when known, saved with this chat |
-| **Page** | You chat from the **Ask AI** sidebar or the floating window | The page you have open now; it follows you as you navigate, and adds **with editor code** on the **Workflow** editor |
+| **Page** | You chat from the **Ask AI** sidebar or the floating window | The page you have open now; it follows you as you navigate, and adds **with editor code** on the **Workflow** editor and the metric script editor |
 
 Hover over an item for its full details. The link icon on **Result** or **Investigating** opens
 the execution. The saved result or investigation cannot be removed from a chat; start a general
@@ -124,6 +124,11 @@ T1". The answer shows a diff against the editor; **Apply to editor** puts the ne
 editor and unlocks it, **Discard** leaves it as it was. Nothing is saved until you select
 **Save**, which checks the flow the same way as a hand-written one.
 Apply is available only while the proposal's flow is open on the same chip.
+
+The metric script editor works the same way: the assistant sees the script as it is in the
+editor, checks its changes by validating and previewing the draft, and proposes them as a diff
+that **Apply to editor** puts into the editor of that script. See
+[Write a Script with the Agent](./metric-scripts.md#write-a-script-with-the-agent).
 
 ### Calculations and Scripts
 

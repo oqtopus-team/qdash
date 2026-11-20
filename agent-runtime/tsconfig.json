@@ -10,5 +10,5 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["src/**/*.ts", "exec/**/*.ts"]
+  "include": ["src/**/*.ts", "exec/**/*.ts", "metric-runner/**/*.ts"]
 }

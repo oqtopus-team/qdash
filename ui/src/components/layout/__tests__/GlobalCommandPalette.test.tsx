@@ -187,7 +187,7 @@ describe("GlobalCommandPalette", () => {
     expect(screen.getByRole("dialog")).toBeTruthy();
     expect(screen.getByRole("combobox", { name: "QDash navigation" })).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("option", { name: "Dashboard" }));
+    fireEvent.click(screen.getByRole("option", { name: "Overview" }));
 
     expect(push).toHaveBeenCalledWith("/dashboard");
     expect(screen.queryByRole("dialog")).toBeNull();

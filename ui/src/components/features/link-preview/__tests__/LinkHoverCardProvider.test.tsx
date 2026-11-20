@@ -138,13 +138,13 @@ describe("app-wide link hover cards", () => {
     render(
       <LinkHoverCardProvider>
         <a href="/dashboard" onClick={onClick}>
-          Dashboard
+          Overview
         </a>
       </LinkHoverCardProvider>,
     );
-    hoverOpen(link("Dashboard"));
-    expect(card()).toHaveTextContent("Dashboard");
-    expect(fireEvent.click(link("Dashboard"))).toBe(true);
+    hoverOpen(link("Overview"));
+    expect(card()).toHaveTextContent("Overview");
+    expect(fireEvent.click(link("Overview"))).toBe(true);
     expect(onClick).toHaveReturnedWith(false);
     expect(card()).toBeNull();
   });
@@ -305,16 +305,16 @@ describe("app-wide link hover cards", () => {
   it("does not open on focus that a pointer press or hover caused", () => {
     render(
       <LinkHoverCardProvider>
-        <a href="/dashboard">Dashboard</a>
+        <a href="/dashboard">Overview</a>
         <a href="/metrics">Metrics</a>
       </LinkHoverCardProvider>,
     );
-    fireEvent.pointerDown(link("Dashboard"), { pointerType: "mouse" });
-    act(() => link("Dashboard").focus());
+    fireEvent.pointerDown(link("Overview"), { pointerType: "mouse" });
+    act(() => link("Overview").focus());
     expect(card()).toBeNull();
 
     // Back on the keyboard, focus opens at once again.
-    fireEvent.keyDown(link("Dashboard"), { key: "Tab" });
+    fireEvent.keyDown(link("Overview"), { key: "Tab" });
     act(() => link("Metrics").focus());
     expect(card()).toHaveTextContent("Metrics");
     act(() => link("Metrics").blur());
@@ -322,12 +322,12 @@ describe("app-wide link hover cards", () => {
     expect(card()).toBeNull();
 
     // A menu-style hover that moves focus waits for the hover delay.
-    hover(link("Dashboard"));
-    act(() => link("Dashboard").focus());
+    hover(link("Overview"));
+    act(() => link("Overview").focus());
     expect(card()).toBeNull();
     advance(CARD_OPEN_DELAY_MS);
-    expect(card()).toHaveTextContent("Dashboard");
-    unhover(link("Dashboard"));
+    expect(card()).toHaveTextContent("Overview");
+    unhover(link("Overview"));
     advance(CARD_CLOSE_DELAY_MS);
     expect(card()).toBeNull();
   });

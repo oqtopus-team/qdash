@@ -50,7 +50,13 @@ export interface PageContextSummary {
 }
 
 function summarizePage(page: PageContext | null): PageContextSummary | null {
-  return page ? { path: page.path, title: page.title, withEditorCode: Boolean(page.flow) } : null;
+  return page
+    ? {
+        path: page.path,
+        title: page.title,
+        withEditorCode: Boolean(page.flow || page.metricScript),
+      }
+    : null;
 }
 
 function sameSummary(a: PageContextSummary | null, b: PageContextSummary | null): boolean {

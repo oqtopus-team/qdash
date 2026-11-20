@@ -164,6 +164,7 @@ class MongoTaskResultHistoryRepository:
         query: dict[str, Any],
         sort: list[tuple[str, SortDirection]] | None = None,
         limit: int | None = None,
+        max_time_ms: int | None = None,
     ) -> list[TaskResultHistoryDocument]:
         """Find task results by query.
 
@@ -175,6 +176,8 @@ class MongoTaskResultHistoryRepository:
             Optional sort specification
         limit : int | None
             Optional limit
+        max_time_ms : int | None
+            Optional server-side time limit of the query (``maxTimeMS``)
 
         Returns
         -------
@@ -182,7 +185,10 @@ class MongoTaskResultHistoryRepository:
             List of matching documents
 
         """
-        finder = TaskResultHistoryDocument.find(query)
+        if max_time_ms is not None:
+            finder = TaskResultHistoryDocument.find(query, max_time_ms=max_time_ms)
+        else:
+            finder = TaskResultHistoryDocument.find(query)
         if sort:
             finder = finder.sort(sort)
         if limit:

@@ -11,6 +11,7 @@ from qdash.repository.chip_history import MongoChipHistoryRepository
 from qdash.repository.cooldown import MongoCooldownRepository
 from qdash.repository.coupling import MongoCouplingCalibrationRepository
 from qdash.repository.cryostat import MongoCryostatRepository
+from qdash.repository.custom_dashboard import MongoCustomDashboardRepository
 from qdash.repository.execution import MongoExecutionRepository
 from qdash.repository.execution_counter import MongoExecutionCounterRepository
 from qdash.repository.execution_finalizer import finalize_executions_by_flow_run_id
@@ -21,6 +22,7 @@ from qdash.repository.execution_lock import MongoExecutionLockRepository
 # Filesystem implementations
 from qdash.repository.filesystem import FilesystemCalibDataSaver
 from qdash.repository.flow import MongoFlowRepository
+from qdash.repository.metric_script import MongoMetricScriptRepository
 from qdash.repository.note_event import MongoNoteEventRepository
 from qdash.repository.project import MongoProjectRepository
 from qdash.repository.project_membership import MongoProjectMembershipRepository
@@ -74,11 +76,13 @@ __all__ = [
     "MongoCooldownRepository",
     "MongoCouplingCalibrationRepository",
     "MongoCryostatRepository",
+    "MongoCustomDashboardRepository",
     "MongoExecutionCounterRepository",
     "MongoExecutionHistoryRepository",
     "MongoExecutionLockRepository",
     "MongoExecutionRepository",
     "MongoFlowRepository",
+    "MongoMetricScriptRepository",
     "MongoNoteEventRepository",
     "MongoParameterVersionRepository",
     "MongoProjectMembershipRepository",

@@ -316,7 +316,7 @@ describe("Sidebar", () => {
       const drawer = within(getMobileDrawer());
       const nav = within(drawer.getByRole("navigation", { name: "Menu navigation" }));
 
-      for (const label of ["Dashboard", "Workflow", "Execution", "Agent"]) {
+      for (const label of ["Overview", "Workflow", "Execution", "Agent"]) {
         expect(nav.queryByRole("link", { name: label })).toBeNull();
       }
       for (const label of ["Home", "Metrics", "Task Results", "Tasks", "Config", "Settings"]) {
@@ -618,11 +618,11 @@ describe("Sidebar", () => {
     it("names each section list by its heading in both rail states", () => {
       const { container, rerender } = render(<Sidebar />);
       const desktop = getDesktopAside(container);
-      const overview = within(desktop).getByRole("list", { name: "Overview" });
+      const overview = within(desktop).getByRole("list", { name: "Explore" });
 
       toggleRail(rerender);
 
-      expect(within(desktop).getByRole("list", { name: "Overview" })).toBe(overview);
+      expect(within(desktop).getByRole("list", { name: "Explore" })).toBe(overview);
       for (const heading of desktop.querySelectorAll('[data-testid="sidebar-section-header"]')) {
         expect(heading.getAttribute("aria-hidden")).toBe("true");
       }
@@ -720,7 +720,7 @@ describe("Sidebar", () => {
       Object.defineProperty(settled, "propertyName", { value: "grid-template-rows" });
       nav.querySelector('[data-testid="sidebar-section-header"]')?.dispatchEvent(settled);
       expect(scroll).toHaveBeenCalledTimes(1);
-      expect(scroll.mock.contexts[0]).toBe(within(nav).getByRole("link", { name: "Dashboard" }));
+      expect(scroll.mock.contexts[0]).toBe(within(nav).getByRole("link", { name: "Overview" }));
     });
 
     it("still reveals the active row on navigation", () => {

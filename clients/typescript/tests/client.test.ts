@@ -169,6 +169,61 @@ describe("QDashClient", () => {
     });
   });
 
+  it("wraps the metric script and custom dashboard endpoints", async () => {
+    const requests: Request[] = [];
+    const fetch = vi.fn(async (input: RequestInfo | URL) => {
+      requests.push(new Request(input));
+      return jsonResponse({});
+    });
+    const client = new QDashClient(
+      new QDashConfig({ baseUrl: "https://qdash.example/api", apiToken: "token" }),
+      { fetch },
+    );
+
+    await client.listMetricScripts();
+    await client.getMetricScript("ms_0123456789ab");
+    await client.listMetricScriptTemplates();
+    await client.getMetricScriptCatalog();
+    await client.validateMetricScript("x = 1");
+    await client.evaluateMetricScriptDraft({
+      source: "x = 1",
+      metric_id: "m",
+      chip_id: "chip-1",
+      period: { kind: "relative", days: 14 },
+    });
+    await client.evaluateMetricScript("ms_1", { metric_id: "m", chip_id: "chip-1", revision: 2 });
+    await client.createMetricScript({ name: "Median", source: "x = 1" });
+    await client.updateMetricScript("ms_1", { source: "x = 2", expected_revision: 3 });
+    await client.copyMetricScript("ms_1");
+    await client.deleteMetricScript("ms_1");
+    await client.listCustomDashboards();
+    await client.getCustomDashboard("cd/1");
+    await client.listCustomDashboardTemplates();
+    await client.createCustomDashboard({ name: "Board" });
+    await client.updateCustomDashboard("cd_1", { panels: [] });
+
+    expect(requests.map((request) => `${request.method} ${new URL(request.url).pathname}`)).toEqual([
+      "GET /api/metric-scripts",
+      "GET /api/metric-scripts/ms_0123456789ab",
+      "GET /api/metric-scripts/templates",
+      "GET /api/metric-scripts/catalog",
+      "POST /api/metric-scripts/validate",
+      "POST /api/metric-scripts/evaluate",
+      "POST /api/metric-scripts/ms_1/evaluate",
+      "POST /api/metric-scripts",
+      "PATCH /api/metric-scripts/ms_1",
+      "POST /api/metric-scripts/ms_1/copy",
+      "DELETE /api/metric-scripts/ms_1",
+      "GET /api/custom-dashboards",
+      "GET /api/custom-dashboards/cd%2F1",
+      "GET /api/custom-dashboards/templates",
+      "POST /api/custom-dashboards",
+      "PATCH /api/custom-dashboards/cd_1",
+    ]);
+    expect(await requests[8]?.json()).toEqual({ source: "x = 2", expected_revision: 3 });
+    expect(await requests[6]?.json()).toEqual({ metric_id: "m", chip_id: "chip-1", revision: 2 });
+  });
+
   it("sends an agent action's source execution only as provenance", async () => {
     const bodies: unknown[] = [];
     const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {

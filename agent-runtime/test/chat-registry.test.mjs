@@ -253,6 +253,33 @@ test("the production chat registry: present_results reaches its classifier; scri
   }
 });
 
+test("the edit tool comes with either editor and is model-only; other pages have none", () => {
+  const parts = {
+    extensions: [piExtension([piTool("qdash_list_chips", () => [])])],
+    modelRuntime,
+    workDir: "/tmp/work",
+    extensionPaths: [LOCAL],
+    trustedPackages: [],
+    copilot: buildCopilotExtension("QDash test prompt", []),
+    internalCalls: PRESENTATION_INTERNAL_CALLS,
+  };
+  const editTool = (page) => {
+    const chat = buildChatRegistry(parts, connection, undefined, page);
+    const found = chat.registry.snapshot().tools().find(({ tool }) => tool.name === "propose_code_edit");
+    void chat.close();
+    return found?.tool;
+  };
+  const script = editTool({
+    path: "/custom-dashboards/scripts/ms_1",
+    metricScript: { scriptId: "ms_1", name: "ZX90", code: "x = 1\n" },
+  });
+  assert.ok(script);
+  assert.match(script.description, /metric script `ZX90`/);
+  assert.deepEqual(script.callers, ["model"]);
+  assert.match(editTool({ path: "/workflow/t1", flow: { name: "t1", code: "x = 1\n" } }).description, /flow `t1`/);
+  assert.equal(editTool({ path: "/chip" }), undefined);
+});
+
 test("the policy hook blocks the classifier for any parent but a running present_results", async () => {
   const [present, classify] = buildPresentationTools(presentationConfig);
   // A model tool that is not the classifier's caller tries the same nested call.

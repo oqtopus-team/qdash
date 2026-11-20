@@ -112,7 +112,7 @@ lint.ignore = [
 [tool.mypy]
 strict = true
 ignore_missing_imports = true
-exclude = ["tools", "scripts", "user_flows"]
+exclude = ["tools", "scripts", "user_flows", "src/qdash/api/metric_runtime/templates/"]
 # Disable error codes for known issues:
 # - misc: FastAPI untyped decorator warnings
 # - override: Liskov substitution violations in calibtasks (design issue)

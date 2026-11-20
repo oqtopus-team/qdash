@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { matchesEditTarget } from "../copilotEditTarget";
+import { editTargetCode, matchesEditTarget } from "../copilotEditTarget";
 import type { EditProposal, PageContext } from "@/types/copilotChat";
 
 const edit: EditProposal = {
@@ -41,5 +41,37 @@ describe("matchesEditTarget", () => {
     expect(matchesEditTarget(edit, draft)).toBe(false);
     const legacy = { summary: "Update", code: "new", flowName: "t1" } as EditProposal;
     expect(matchesEditTarget(legacy, draft)).toBe(false);
+  });
+
+  it("identifies a metric script editor by its route and script ID", () => {
+    const scriptPage: PageContext = {
+      title: "Metric script: ZX90",
+      path: "/custom-dashboards/scripts/ms_1",
+      metricScript: { scriptId: "ms_1", name: "ZX90", code: "old script", dirty: false },
+    };
+    const scriptEdit: EditProposal = {
+      summary: "Count observations",
+      code: "new script",
+      target: "metric_script",
+      flowName: "ZX90",
+      chipId: null,
+      scriptId: "ms_1",
+      scriptName: "ZX90",
+      pagePath: "/custom-dashboards/scripts/ms_1",
+    };
+    expect(matchesEditTarget(scriptEdit, scriptPage)).toBe(true);
+    expect(editTargetCode(scriptEdit, scriptPage)).toBe("old script");
+    // The script was renamed in the editor; the ID still matches.
+    const renamed = { ...scriptPage, metricScript: { ...scriptPage.metricScript!, name: "New" } };
+    expect(matchesEditTarget(scriptEdit, renamed)).toBe(true);
+    expect(matchesEditTarget({ ...scriptEdit, scriptId: "ms_2" }, scriptPage)).toBe(false);
+    expect(
+      matchesEditTarget({ ...scriptEdit, pagePath: "/custom-dashboards/scripts/ms_2" }, scriptPage),
+    ).toBe(false);
+    // A flow proposal never lands in a script editor, nor a script proposal in a flow editor.
+    expect(matchesEditTarget({ ...edit, pagePath: scriptPage.path }, scriptPage)).toBe(false);
+    expect(matchesEditTarget({ ...scriptEdit, pagePath: page.path }, page)).toBe(false);
+    expect(editTargetCode(edit, page)).toBe("old");
+    expect(editTargetCode(scriptEdit, page)).toBeNull();
   });
 });

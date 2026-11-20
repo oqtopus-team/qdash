@@ -1,0 +1,220 @@
+# Custom Dashboards Architecture
+
+Custom dashboards store a layout of typed panels per project and owner; metric panels read live
+chip data through the metrics endpoints, and `metric_script` panels evaluate a pinned revision
+of a user-authored [metric script](./metric-scripts.md). The user procedures are
+[Dashboards](../../user-guide/custom-dashboards.md) and
+[Metric Scripts](../../user-guide/metric-scripts.md).
+
+## Responsibility boundary
+
+The API owns persistence, visibility, and validation of dashboards and metric scripts. It stores
+no measured values and no computed results: a dashboard describes what to show, a script defines
+how to compute it, and every panel evaluates when it renders. The metric script runtime owns
+code execution: the API's executor and data broker (`src/qdash/api/metric_runtime/`) and the
+`metric-runner` container, described in [Metric Scripts](./metric-scripts.md).
+The UI owns layout editing, the script editor, and rendering of evaluation results.
+
+## Documents
+
+`CustomDashboardDocument` (`src/qdash/dbmodel/custom_dashboard.py`, collection
+`custom_dashboard`) holds `project_id`, `dashboard_id` (`dash_<12 hex>`), the owner's `user_id`
+and `username` snapshot, `name`, `description`, `visibility`, an optional default `chip_id`,
+`panels`, and `version`, a write counter that every update compares and increments. The unique
+index is `(project_id, dashboard_id)`.
+
+`MetricScriptDocument` (`src/qdash/dbmodel/metric_script.py`, collection `metric_script`) holds
+`project_id`, `script_id` (`ms_<12 hex>`), owner `user_id` and `username`, `name` (at most 120
+characters), `description`, `visibility`, and the revision state:
+
+| Field | Meaning |
+| --- | --- |
+| `source`, `revision`, `status`, `diagnostics` | The latest saved text, its number (incremented on every save), and its validation result (`valid` or `invalid`) |
+| `active_revision`, `active_source`, `metrics` | The last revision that validated, its text, and its catalog (`MetricInfo`: id, title, unit, target, hops, parameters, has_legend); `None` until a revision validates |
+| `revisions` | `MetricScriptRevision` entries `{revision, source, created_at, status, metrics}` |
+| `pins` | `ScriptPin` entries `{revisions, shared, writer}` keyed by `dashboard_id`: the revisions each dashboard pins, whether that dashboard is project-visible, and the token of the dashboard write that last widened the pin |
+| `version` | Write counter; every save, pin change, and deletion compares it and every write increments it |
+| `template_id` | The template the script was created from, if any |
+
+The unique index is `(project_id, script_id)`; `(project_id, template_id)` serves the template
+lookup below.
+
+## Panels
+
+The shared panel models live in `src/qdash/datamodel/custom_dashboard.py`:
+
+| Model | Meaning |
+| --- | --- |
+| `PanelLayoutModel` | `x`, `y`, `w`, `h` on a 12-column grid; `x + w <= 12`, `1 <= h <= 12` |
+| `DashboardPanelModel` | `panel_id` (unique within the dashboard), `type`, `title`, `layout`, `config` |
+| `QubitMetricPanelConfig`, `CouplingMetricPanelConfig` | `metric` key from the metrics configuration |
+| `MetricScriptPanelConfig` | `script_id`, `metric_id`, `script_revision` (required), `period`, `params`, `view` (`map` or `table`), `direction` (`both`, `forward`, `reverse`), `hops` (subset of `[1, 2]`); extra keys are rejected |
+| `MarkdownPanelConfig` | `content`, at most 20000 characters |
+
+`config` is stored as a dictionary so the UI can keep display-only settings on the metric
+panels, and `CustomDashboardService.validate_panels`
+(`src/qdash/api/services/custom_dashboard_service.py`) validates it against the model for the
+panel's `type` on every create and update, and when the visibility of a dashboard changes. For a
+`metric_script` panel it also checks that the script is visible to the saver, that a
+project-visible dashboard uses only project-visible scripts, that the pinned revision exists and
+validated, that `metric_id` is in that revision's catalog, that `params` pass `check_params`
+(the metric's `Parameter` declarations), and that `hops` stay within the metric's declared hops.
+Violations return 422 naming the panel.
+
+## Revision policy
+
+Panels pin `script_revision`, deliberately: saving a script never changes what an existing
+dashboard shows, so a viewer never sees a dashboard change because someone else edited a script.
+`_to_response` annotates every `metric_script` panel whose script the caller can view with
+`script_name` and `latest_revision` (the script's `active_revision`); the UI shows "Newer
+revision rN available" and, in edit mode, an update action that moves the pin and is persisted
+with the next save.
+
+The script document is the only authority on which revisions are pinned. Eviction, unsharing,
+and deletion read `pins` from the script they change, and every change to `pins` is an atomic
+update of that document that increments its `version`. QDash does not use Mongo transactions,
+so one document has to decide alone; the dashboard document never decides whether a revision may
+go.
+
+- A script save is an atomic compare-and-set on the stored `revision`, `system_info.updated_at`,
+  and `version` (`MongoMetricScriptRepository.save_if_unchanged`). When another save, or a
+  dashboard pinning or unpinning a revision, landed after the document was read, the update
+  returns 409 and writes nothing, even without `expected_revision`. A saved revision's source is
+  therefore never rewritten, and a save never evicts a revision pinned after its read.
+- `MetricScriptService._apply_source` keeps at most 50 revisions but never evicts the newest, the
+  active one, or any revision in `pins`. When everything left is pinned, the save returns 409
+  naming the number of pinned revisions instead of growing the document; unpinning dashboards
+  from old revisions makes room again. Metadata saves are not affected.
+- Deleting a script returns 409 listing the dashboards in `pins`, and the delete itself matches
+  `version` (`delete_if_unchanged`), so a dashboard that pins the script after the check makes
+  the delete fail with 409.
+- Making a script private returns 409 while a pin has `shared` set, decided from the same
+  document the save then compares.
+- Duplicating a dashboard copies its pins; copying a script (`POST /metric-scripts/{id}/copy`)
+  creates a private script from the active source and retargets nothing.
+
+`CustomDashboardService` writes a dashboard in this order:
+
+1. `add_pin` adds the panels' revisions to the pin of every script they use, sets `shared` for a
+   project-visible dashboard, and records a fresh `writer` token. Its filter requires every
+   revision to be stored and, for `shared`, the script to be project-visible, so a dashboard save
+   that lost to an eviction or an unshare returns 422 asking to reload the dashboard. An update
+   also claims the pins of scripts that its new panels no longer use.
+2. The dashboard is inserted, or replaced through a compare-and-set on its `version`
+   (`MongoCustomDashboardRepository.save_if_unchanged`); a lost race returns 409.
+3. After an update, `narrow_pin` sets each pin to exactly the stored panels, or removes it, but
+   only if its `writer` is still this write's token. A later write of the same dashboard claimed
+   the pin otherwise and narrows it itself.
+
+A pin is in the script document before any stored dashboard depends on it, so a concurrent script
+save either sees the pin or fails its compare-and-set. A failed request, a lost race, or a crash
+between the steps can leave a surplus pin, never a missing one. A subsequent update, including
+a metadata save, narrows pins on the scripts involved in that update; surplus pins on other scripts remain
+until the dashboard is deleted. A process crash before inserting a dashboard can leave orphan
+pins that require administrative cleanup after confirming no writer is still running.
+An insert exception does not prove that insertion failed: the acknowledgement may be lost.
+The service releases new-dashboard pins only if insertion was never attempted. Update and
+delete exceptions likewise retain pins; only acknowledged writes allow narrowing or clearing.
+Deleting a dashboard, or an update that finds its
+dashboard deleted, removes the dashboard's pins from every script (`clear_dashboard_pins`);
+dashboard IDs are never reused.
+
+Legacy scripts are migrated lazily by `MongoMetricScriptRepository.ensure_pins_initialized`
+before an individual script read, pin acquisition, or deletion of a referencing dashboard.
+The persisted `pins_initialized` marker and `pins_schema_version` (currently 2) distinguish a
+complete registry from missing, partial, or previously initialized registries that missed
+coercible revision values. Backfill unions saved
+dashboard references with existing pins and atomically sets the marker while incrementing
+`version`. Concurrent pin changes invalidate its snapshot and trigger a retry; script replacement
+and deletion require both current markers and an existing registry. No startup migration or
+collection rewrite is required. Failed migration requests can be retried without clearing data.
+Panel saves normalize validated settings, including defaults, while retaining accepted extra
+settings on non-script panels. Pin acquisition, release, and migration use the same reference
+model: numeric strings and integral floats resolve to integer revisions; `true` retains its
+previously accepted meaning of revision 1. Fractional, nonpositive, and out-of-BSON-range
+revisions are rejected. Script IDs are exact strings, without whitespace trimming. Migration
+parses only reference fields so unrelated legacy settings cannot hide a dependency.
+All API writers must run the upgraded code; old API processes that bypass this barrier must be
+stopped before serving writes after upgrade.
+
+## Visibility and permissions
+
+`CustomDashboardService` and `MetricScriptService` apply the sharing rules; the routers
+(`src/qdash/api/routers/custom_dashboard.py` with prefix `/custom-dashboards`,
+`src/qdash/api/routers/metric_script.py` with prefix `/metric-scripts`) only choose the project
+dependency.
+
+| Operation | Project dependency | Service rule |
+| --- | --- | --- |
+| List, get (dashboards and scripts), script catalog and templates | `get_project_context` (any member) | `visibility == "project"` or `user_id` equals the caller's |
+| Evaluate a saved script revision | `get_project_context` | The script is visible; the revision validated |
+| Create, duplicate, copy | `get_project_context_editor` | The source is visible; the copy is private and owned by the caller |
+| Validate and evaluate draft source | `get_project_context_editor` | Runs unsaved code, so editors only |
+| Update, delete | `get_project_context_editor` | Owner of the document or project role `OWNER`; otherwise 403 |
+
+A document that is not visible to the caller returns 404, not 403, so private documents do not
+reveal their existence. Every query filters by `project_id`, so dashboards and scripts never
+cross projects. Ownership compares `user_id`, which survives a username change. Responses carry
+`can_edit` so the UI can hide controls without re-deriving the rule.
+
+## Templates
+
+Dashboard templates are `DashboardTemplate` values in
+`src/qdash/api/services/custom_dashboard_templates.py`, keyed by `template_id`; the only one is
+`frequency-collision-map`. A create request with `template_id` and no `panels` copies the
+template through `instantiate_panels`, which mints a fresh `panel_id` per panel. Its
+`metric_script` panels name a script template (`script_template="collision"`) instead of a
+script: `MetricScriptService.ensure_template_script` reuses a project-visible script created from
+that template whose active revision still defines every metric the panels need, or creates one
+owned by the caller and shared with the project, and the panels are pinned to its active
+revision. Explicit `panels` take precedence over the template, and an unknown `template_id`
+returns 422.
+
+Script templates are Python files in `src/qdash/api/metric_runtime/templates/`, listed in
+`TEMPLATES` of `src/qdash/api/metric_runtime/template_library.py` (`getting_started`,
+`collision`, `zx90_median`). Creating a script with `template_id` copies the source; the script
+owns it from then on. Templates are code, not documents, and there are no user-defined
+templates.
+
+## UI
+
+Routes: `/custom-dashboards` (list, with a `tab` query parameter for **Dashboards** and
+**Scripts**), `/custom-dashboards/[dashboardId]`, and `/custom-dashboards/scripts/[scriptId]`.
+Dashboard code lives in `ui/src/components/features/custom-dashboards/`; panels are laid out with
+CSS grid from each panel's `layout`, and edit mode keeps the panel list in local state and
+persists it with one `PATCH` of `panels`. `panelConfig.ts` reads and writes panel configs.
+
+Script code lives in `ui/src/components/features/metric-scripts/`:
+`MetricScriptEditorPageContent` (Monaco editor, settings, diagnostics, preview) with
+`useMetricScriptDocument` (draft, dirty state, save with `expected_revision`, 409 handling), and
+the shared renderers under `render/` (`QubitMap`, `PairMap`, `ResultTable`, `CellDetailsDialog`,
+`MetricResultView`). `panels/MetricScriptPanel.tsx` evaluates a panel's pinned revision with
+`POST /metric-scripts/{id}/evaluate` and renders it with `MetricResultView`. The editor registers
+its page with the Agent dock so the Agent can propose edits; see
+[Page context and editor edits](../copilot/architecture.md#page-context-and-editor-edits).
+
+## Extending
+
+- A new dashboard template is one `DashboardTemplate` in `TEMPLATES`, with an assertion on its
+  panels in `tests/qdash/api/routers/test_custom_dashboard.py`.
+- A new script template is one file under `templates/` and one `MetricScriptTemplate` entry;
+  every template must pass validation in `tests/qdash/api/metric_runtime/`.
+- A new panel type needs a config model in `PANEL_CONFIG_MODELS`, a `PanelType` literal, a
+  renderer and editor section in the UI, and a row on the user page.
+- Changing either router's schemas requires `task generate`.
+
+## Tests
+
+- `tests/qdash/api/routers/test_custom_dashboard.py`: visibility, ownership, project isolation,
+  panel validation, the template, and pins kept in step with dashboard writes, including
+  concurrent updates and deletes of one dashboard.
+- `tests/qdash/api/routers/test_metric_script.py`: script CRUD, last-good revisions, conflicts,
+  references from dashboards, pins racing script saves, unsharing and deletion, and evaluation
+  through the worker.
+- `tests/qdash/repository/test_metric_script_repository.py`: the compare-and-set save and the
+  pin operations.
+- `tests/qdash/api/metric_runtime/`: the SDK, the import policy, the worker, and the collision
+  template against the numbers of the original collision tests.
+- `ui/src/components/features/custom-dashboards/__tests__/` and
+  `ui/src/components/features/metric-scripts/__tests__/`: list tabs, panel editor, renderers,
+  the editor page, and the document hook.

@@ -160,8 +160,8 @@ until that call returns. Scripts cannot start model calls (`models: false`). Eac
 has its own sandbox, which `openSession` closes after the harness.
 
 Pi offers a tool with `deferred: true` to the model only after it is loaded. The pi-qdash tools in
-`DEFERRED_TOOL_NAMES` (cryostat and wiring context, forum, pipelines, agent workflow state, source
-code, and similar narrower workflows) are deferred. The tool guide in the system prompt marks
+`DEFERRED_TOOL_NAMES` (cryostat and wiring context, forum, pipelines, agent workflow state, metric
+scripts and custom dashboards, source code, and similar narrower workflows) are deferred. The tool guide in the system prompt marks
 them with `*`, and the prompt lists the deferred tools the guide does not name. The
 model loads one with `tool_search`, which records it in the conversation's `modelTools`. The tool
 stays offered on that conversation branch, also after compaction or a runtime restart. A model
@@ -188,8 +188,10 @@ blocks the classifier for any other parent, and a script past the worker limit i
 ## Page context and editor edits
 
 A chat from the sidebar or the floating window tells the assistant what the user has open.
-Every turn carries `ChatRequest.page` (`PageContext`: route, title, and on the Workflow editor
-the flow's name, chip, and the editor's current text, unsaved changes included); the runtime
+Every turn carries `ChatRequest.page` (`PageContext`: route, title, and on an editor the
+editor's current text, unsaved changes included: `flow` with the flow's name and chip on the
+Workflow editor, `metric_script` with the script's ID and name on the metric script editor at
+`/custom-dashboards/scripts/<id>`); the runtime
 rebuilds a system prompt section from it each turn (`agent-runtime/src/page-context.ts`,
 `buildPageContextSection`). The chat page itself sends none. Above the message box, every chat
 surface lists the page with the session's saved task result or investigation
@@ -204,12 +206,20 @@ when a page registers or unregisters, and a registered page calls `refreshPage` 
 commits, so the list follows navigation, the editor finishing loading, and a pane switch. The
 summary holds no code, so a keystroke in the editor does not rerender the chat.
 
-On the Workflow editor the runtime also offers `propose_code_edit`: the model passes the
-complete new file and a one-line summary, the call ends the turn, and the chat renders an
-`edit` block (`EditProposalCard`) with a diff against what the editor holds now. **Apply to
-editor** replaces the buffer and unlocks the editor; saving stays with the user and goes through
-the editor's Save, so `POST /flows` validation and deployment registration are unchanged. The
-runtime never writes the flow; `qdash_save_flow` stays for flows written from the chat alone.
+On either editor the runtime also offers `propose_code_edit` (`buildProposeCodeEditTool`, for
+the editor `editorOf` finds on the page): the model passes the complete new file and a one-line
+summary, the call ends the turn, and the chat renders an `edit` block (`EditProposalCard`) with a
+diff against what the editor holds now. The proposal carries `target` (`flow` or
+`metric_script`), `pagePath`, and the editor's identity: `flowName` and `chipId` for a flow,
+`scriptId` and `scriptName` for a script (`flowName` repeats the script name). **Apply to
+editor** replaces the buffer only when the open editor matches (`ui/src/lib/copilotEditTarget.ts`)
+and unlocks the editor; saving stays with the user and goes through the editor's Save, so
+`POST /flows` validation and deployment registration, and metric script revisions, are
+unchanged. The runtime never writes the flow or the script. For a metric script, the page
+section also tells the model the file is a `qdash_metrics` module, points it to the
+`qdash-metric-scripts` skill, and has it check the draft with `qdash_validate_metric_script` and
+`qdash_preview_metric_script`; `qdash_save_flow` and `qdash_save_metric_script` stay for code
+written from the chat alone or saved at the user's request.
 
 ## Failure investigations and source access
 

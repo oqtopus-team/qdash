@@ -93,7 +93,7 @@ function QuickActions({ canEdit }: QuickActionsProps) {
       : []),
     {
       href: "/dashboard",
-      label: "View dashboard",
+      label: "View overview",
       description: "Check overall chip health",
       icon: Gauge,
     },

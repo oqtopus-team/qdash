@@ -151,7 +151,7 @@ describe("AppLayout navigation chrome", () => {
     ]) {
       expect(nav.getByRole("link", { name: label })).toBeTruthy();
     }
-    for (const label of ["Dashboard", "Workflow", "Execution", "Agent"]) {
+    for (const label of ["Overview", "Workflow", "Execution", "Agent"]) {
       expect(nav.queryByRole("link", { name: label })).toBeNull();
     }
 

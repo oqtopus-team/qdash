@@ -1,0 +1,154 @@
+# ruff: noqa: RUF001
+"""Starter templates for custom dashboards.
+
+A template is copied into a new dashboard at creation time. Later changes to a
+template never touch dashboards that were created from it. ``metric_script`` panels of a
+template name the metric script template they read; the dashboard service resolves it to a
+project script and pins the panels to that script's active revision.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Any
+from uuid import uuid4
+
+from qdash.datamodel.custom_dashboard import DashboardPanelModel, PanelLayoutModel, PanelType
+
+
+@dataclass(frozen=True)
+class TemplatePanel:
+    """Panel blueprint without an ID; IDs are minted per created dashboard."""
+
+    type: PanelType
+    title: str
+    layout: tuple[int, int, int, int]
+    config: dict[str, Any] = field(default_factory=dict)
+    script_template: str | None = None
+    """Metric script template a ``metric_script`` panel reads."""
+
+
+@dataclass(frozen=True)
+class DashboardTemplate:
+    """A named set of panels a dashboard can start from."""
+
+    template_id: str
+    name: str
+    description: str
+    panels: tuple[TemplatePanel, ...]
+
+    def script_requirements(self) -> dict[str, set[str]]:
+        """Metric IDs each referenced script template must define."""
+        required: dict[str, set[str]] = {}
+        for panel in self.panels:
+            if panel.script_template is not None:
+                required.setdefault(panel.script_template, set()).add(panel.config["metric_id"])
+        return required
+
+
+FREQUENCY_COLLISION_INTRO = """\
+## Frequency collision map
+
+Each map runs one qubex collision check of the shared *Frequency collision checks* metric
+script on the latest qubit frequencies, anharmonicities, resonator frequencies, coherence
+times and coupling strengths of the last 30 days.
+
+- Blue: below the limit. Orange: on the boundary. Red: the limit is exceeded.
+- Grey: not evaluated, usually because an input is missing.
+- Type2C shows a signed two-photon detuning in MHz instead of a ratio.
+
+Select a qubit or an edge for the terms behind the verdict. Adjust the limits, the CNOT time and
+the fallback values from each panel's settings; they are saved with this dashboard. Edit the
+script itself from the Scripts tab; panels keep their pinned revision until you update them.
+"""
+
+
+COLLISION_TITLES = {
+    "Type0A": "Type0A — Qubit quality",
+    "Type0B": "Type0B — Excessive detuning",
+    "Type1A": "Type1A — GE–GE proximity",
+    "Type3A": "Type3A — EF–GE proximity",
+    "Type1C": "Type1C — CR causes GE",
+    "Type2C": "Type2C — Two-photon e0–f1 detuning (screening)",
+}
+
+
+def _collision(kind: str, x: int, y: int) -> TemplatePanel:
+    return TemplatePanel(
+        type="metric_script",
+        title=COLLISION_TITLES[kind],
+        layout=(x, y, 6, 4),
+        config={
+            "metric_id": kind,
+            "period": {"kind": "relative", "days": 30},
+            "params": {},
+            "view": "map",
+            "direction": "both",
+            "hops": [1, 2],
+        },
+        script_template="collision",
+    )
+
+
+FREQUENCY_COLLISION_MAP = DashboardTemplate(
+    template_id="frequency-collision-map",
+    name="Frequency Collision Map",
+    description=(
+        "Qubit quality, detuning and the main cross-resonance collision checks "
+        "on the chip topology, with a qubit frequency map for context"
+    ),
+    panels=(
+        TemplatePanel(
+            type="markdown",
+            title="How to read this dashboard",
+            layout=(0, 0, 12, 2),
+            config={"content": FREQUENCY_COLLISION_INTRO},
+        ),
+        TemplatePanel(
+            type="qubit_metric",
+            title="Qubit frequency",
+            layout=(0, 2, 6, 4),
+            config={"metric": "qubit_frequency"},
+        ),
+        _collision("Type0A", 6, 2),
+        _collision("Type0B", 0, 6),
+        _collision("Type1A", 6, 6),
+        _collision("Type3A", 0, 10),
+        _collision("Type1C", 6, 10),
+        _collision("Type2C", 0, 14),
+    ),
+)
+
+TEMPLATES: dict[str, DashboardTemplate] = {
+    FREQUENCY_COLLISION_MAP.template_id: FREQUENCY_COLLISION_MAP,
+}
+
+
+def instantiate_panels(
+    template: DashboardTemplate, scripts: dict[str, tuple[str, int]] | None = None
+) -> list[DashboardPanelModel]:
+    """Copy a template's panels with fresh panel IDs.
+
+    Args:
+        template: Template to copy.
+        scripts: Script template ID → ``(script_id, revision)`` the metric_script panels
+            are pinned to.
+    """
+    panels = []
+    for panel in template.panels:
+        config = dict(panel.config)
+        if panel.script_template is not None:
+            script_id, revision = (scripts or {})[panel.script_template]
+            config = {"script_id": script_id, "script_revision": revision, **config}
+        panels.append(
+            DashboardPanelModel(
+                panel_id=uuid4().hex,
+                type=panel.type,
+                title=panel.title,
+                layout=PanelLayoutModel(
+                    x=panel.layout[0], y=panel.layout[1], w=panel.layout[2], h=panel.layout[3]
+                ),
+                config=config,
+            )
+        )
+    return panels

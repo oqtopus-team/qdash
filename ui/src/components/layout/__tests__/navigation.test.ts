@@ -29,12 +29,30 @@ describe("isPathWithin", () => {
   });
 });
 
+describe("getNavigationSections", () => {
+  it("lists Dashboards right after Overview for every role", () => {
+    for (const sections of [editor, viewer]) {
+      const explore = sections.find((section) => section.label === "Explore");
+      const hrefs = explore?.items.map((item) => item.href) ?? [];
+      const item = explore?.items.find((entry) => entry.href === "/custom-dashboards");
+
+      expect(hrefs.indexOf("/custom-dashboards")).toBe(hrefs.indexOf("/dashboard") + 1);
+      expect(item).toMatchObject({ label: "Dashboards", match: "prefix" });
+      expect(item?.visible).not.toBe(false);
+    }
+  });
+
+  it("keeps Dashboards out of the Overview mobile tab", () => {
+    expect(isMobileTabActive(tabFor("/dashboard"), "/custom-dashboards/abc")).toBe(false);
+  });
+});
+
 describe("getMobileTabs", () => {
-  it("returns Dashboard, Workflow, Execution, and Agent in order for project editors", () => {
+  it("returns Overview, Workflow, Execution, and Agent in order for project editors", () => {
     const tabs = getMobileTabs(editor);
 
     expect(tabs.map((tab) => tab.item.label)).toEqual([
-      "Dashboard",
+      "Overview",
       "Workflow",
       "Execution",
       "Agent",
@@ -49,7 +67,7 @@ describe("getMobileTabs", () => {
 
   it("drops Workflow when the sidebar hides it from viewers", () => {
     expect(getMobileTabs(viewer).map((tab) => tab.item.label)).toEqual([
-      "Dashboard",
+      "Overview",
       "Execution",
       "Agent",
     ]);

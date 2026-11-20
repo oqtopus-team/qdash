@@ -125,6 +125,43 @@ function FlowSavePreview({ args }: { args: Record<string, unknown> }) {
   );
 }
 
+const METRIC_SCRIPT_PREVIEW_KEYS = new Set(["name", "source", "description", "visibility"]);
+
+/** A metric script about to be saved: its name, sharing, and the whole source to review. */
+function MetricScriptSavePreview({ args }: { args: Record<string, unknown> }) {
+  const name = stringArg(args, "name");
+  const scriptId = stringArg(args, "scriptId");
+  const visibility = stringArg(args, "visibility");
+  const description = stringArg(args, "description");
+  const source = stringArg(args, "source") ?? "";
+  return (
+    <div
+      className="rounded-lg border border-base-300/70 bg-base-100/60 p-3"
+      data-testid="metric-script-save-preview"
+    >
+      <div className="text-xs">
+        {scriptId ? "Update" : "New"} metric script{" "}
+        <span className="font-mono font-medium">{name ?? "?"}</span>
+        {visibility && (
+          <span className="badge badge-ghost badge-xs ml-1 align-middle">
+            {visibility === "project" ? "shared with project" : visibility}
+          </span>
+        )}
+      </div>
+      {description && <p className="mt-0.5 text-xs text-base-content/60">{description}</p>}
+      <div className="max-h-96 overflow-auto">
+        <CodeBlock compact language="python" title={`${name ?? "script"}.py`}>
+          {source}
+        </CodeBlock>
+      </div>
+      <p className="text-xs text-base-content/50">
+        QDash validates the script before saving it. Text that fails validation is saved as a new
+        revision, but dashboards keep using the last revision that validated.
+      </p>
+    </div>
+  );
+}
+
 function ArgValue({ value }: { value: unknown }) {
   if (value !== null && typeof value === "object") {
     return (
@@ -154,8 +191,14 @@ export function ApprovalCard({
   const chipId = stringArg(approval.args, "chipId") ?? stringArg(approval.args, "chip_id");
   // A flow save shows its code as code; the remaining arguments stay in the list.
   const flowSave = approval.tool === "qdash_save_flow" && typeof approval.args.code === "string";
+  // A metric script save shows its source the same way.
+  const scriptSave =
+    approval.tool === "qdash_save_metric_script" && typeof approval.args.source === "string";
   const entries = Object.entries(approval.args).filter(
-    ([key]) => !(pipelineSpec && key === "spec") && !(flowSave && FLOW_PREVIEW_KEYS.has(key)),
+    ([key]) =>
+      !(pipelineSpec && key === "spec") &&
+      !(flowSave && FLOW_PREVIEW_KEYS.has(key)) &&
+      !(scriptSave && METRIC_SCRIPT_PREVIEW_KEYS.has(key)),
   );
 
   return (
@@ -182,6 +225,11 @@ export function ApprovalCard({
       {flowSave && (
         <div className="mt-3">
           <FlowSavePreview args={approval.args} />
+        </div>
+      )}
+      {scriptSave && (
+        <div className="mt-3">
+          <MetricScriptSavePreview args={approval.args} />
         </div>
       )}
 
@@ -240,11 +288,14 @@ export function ApprovalCard({
 }
 
 /**
- * A change the assistant proposes to the flow open in the Workflow editor: the
- * diff against what the editor holds now, applied there with one click. The
- * card never saves; the editor's Save does, through QDash's validation.
+ * A change the assistant proposes to the flow open in the Workflow editor, or to
+ * the metric script open in its editor: the diff against what the editor holds
+ * now, applied there with one click. The card never saves; the editor's Save
+ * does, through QDash's validation.
  */
 export function EditProposalCard({ edit, state }: { edit: EditProposal; state: InteractionState }) {
+  const isScript = edit.target === "metric_script";
+  const name = (isScript ? edit.scriptName || edit.flowName : edit.flowName) || "script";
   const [outcome, setOutcome] = useState<"applied" | "discarded" | null>(null);
   // The editor text the diff was made against. The chat does not rerender as
   // the user types in the editor, so Apply reads the text again first and, when
@@ -267,27 +318,24 @@ export function EditProposalCard({ edit, state }: { edit: EditProposal; state: I
     <div
       className="chat-interaction-card not-prose"
       role="group"
-      aria-label={`Proposed change to ${edit.flowName}`}
+      aria-label={`Proposed change to ${name}`}
       data-testid="edit-proposal"
     >
       <div className="flex items-start gap-2">
         <FileDiff className="w-4 h-4 mt-0.5 text-primary shrink-0" />
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium leading-snug">
-            Proposed change to <span className="font-mono">{edit.flowName}</span>
+            Proposed change to {isScript ? "metric script " : ""}
+            <span className="font-mono">{name}</span>
           </p>
           <p className="text-xs text-base-content/70 mt-0.5">{edit.summary}</p>
         </div>
       </div>
       <div className="mt-3 max-h-[28rem] overflow-auto rounded-lg border border-base-300/70">
         {current !== null && !unchanged ? (
-          <PierreDiffViewer
-            filename={`${edit.flowName}.py`}
-            oldContent={current}
-            newContent={edit.code}
-          />
+          <PierreDiffViewer filename={`${name}.py`} oldContent={current} newContent={edit.code} />
         ) : (
-          <CodeBlock compact language="python" title={`${edit.flowName}.py`}>
+          <CodeBlock compact language="python" title={`${name}.py`}>
             {edit.code}
           </CodeBlock>
         )}
@@ -302,7 +350,9 @@ export function EditProposalCard({ edit, state }: { edit: EditProposal; state: I
       )}
       {(!state.applyCode || current === null) && (
         <p className="mt-2 text-xs text-base-content/50">
-          Open this flow in the Workflow editor on the same chip to apply the change there.
+          {isScript
+            ? "Open this metric script in its editor to apply the change there."
+            : "Open this flow in the Workflow editor on the same chip to apply the change there."}
         </p>
       )}
       <div className="mt-3 flex flex-wrap items-center gap-2">

@@ -7,7 +7,7 @@ produced.
 
 | Question | Open |
 | --- | --- |
-| Is the chip broadly healthy? | **Dashboard** |
+| Is the chip broadly healthy? | **Overview** |
 | How does one metric compare across targets? | **Metrics** |
 | What is the latest result for a task on each target? | **Chip** |
 | How did parameters change over time? | **Analysis** |
@@ -19,7 +19,7 @@ what these pages show. Include that scope when sharing an observation.
 
 ## Scan Current State
 
-Follow [Dashboard](./dashboard.md#select-the-data-scope) to choose a chip, time range, and value
+Follow [Overview](./dashboard.md#select-the-data-scope) to choose a chip, time range, and value
 selection, then review coverage and distributions. Use **Metrics** to compare one parameter
 across targets, checking direction for couplings. The
 [Color range](./dashboard.md#scan-chip-health) control is shared by both pages.

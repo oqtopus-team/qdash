@@ -19,7 +19,7 @@ import { createCodingTools } from "@earendil-works/pi-durable/tools";
 import type { QDashConnection } from "./auth.ts";
 import { buildCodemodeExtensions, createCodemodeSandbox, modelOnlyTools, type InternalCalls } from "./codemode.ts";
 import { buildQDashExtension, type QDashWriteTools } from "./durable-tools.ts";
-import { buildPageContextSection, buildProposeCodeEditTool, PAGE_SECTION, type PageContext } from "./page-context.ts";
+import { buildPageContextSection, buildProposeCodeEditTool, editorOf, PAGE_SECTION, type PageContext } from "./page-context.ts";
 import { buildUserInstructionsSection } from "./prompt.ts";
 
 /** Section key of the user's preferences in the system prompt. */
@@ -92,16 +92,17 @@ export function buildChatRegistry(
       }),
     );
   }
-  // The page the user has open, after their preferences; on the Workflow
-  // editor it brings the edit tool, which proposes and never saves.
+  // The page the user has open, after their preferences; on the Workflow or
+  // metric script editor it brings the edit tool, which proposes and never saves.
   const pageSection = buildPageContextSection(pageContext);
+  const editor = editorOf(pageContext);
   if (pageSection) {
     registry.install(
       modelOnlyTools(
         defineExtension({
           name: PAGE_SECTION,
           sections: [section(PAGE_SECTION, () => pageSection)],
-          tools: pageContext?.flow ? [buildProposeCodeEditTool(pageContext.flow, pageContext.path)] : [],
+          tools: editor && pageContext ? [buildProposeCodeEditTool(editor, pageContext.path)] : [],
         }),
       ),
     );
