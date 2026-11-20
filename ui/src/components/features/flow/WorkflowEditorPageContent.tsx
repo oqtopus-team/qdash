@@ -1086,7 +1086,6 @@ export function WorkflowEditorPageContent() {
               onClick={leaveEditor}
               className="btn btn-sm btn-ghost"
               disabled={active.isSaving || deleteMutation.isPending}
-              title="Back to workflows"
               aria-label="Back to workflows"
             >
               <ArrowLeft size={16} />

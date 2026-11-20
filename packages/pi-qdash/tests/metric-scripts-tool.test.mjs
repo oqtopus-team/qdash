@@ -295,6 +295,9 @@ test("dashboard saves send the API's shape: create with a template, update with 
 
   await save.execute("t", { name: "Starter", templateId: "frequency-collision-map", confirmWrite: true }, undefined, undefined, { hasUI: false });
   assert.deepEqual(calls[2], ["createDashboard", { name: "Starter", template_id: "frequency-collision-map" }]);
+
+  await save.execute("t", { dashboardId: "cd_1", name: "Renamed", expectedVersion: 3, confirmWrite: true }, undefined, undefined, { hasUI: false });
+  assert.deepEqual(calls[3], ["updateDashboard", "cd_1", { name: "Renamed", expected_version: 3 }]);
 });
 
 test("dashboard problems are reported before confirmation, and the save is gated", async () => {
@@ -311,6 +314,7 @@ test("dashboard problems are reported before confirmation, and the save is gated
     "panels[0].config.script_revision must pin a saved revision (an integer)",
   ]);
   assert.deepEqual(dashboardSaveProblems({ dashboardId: "cd_1", templateId: "t" }), ["templateId applies only when creating a dashboard"]);
+  assert.deepEqual(dashboardSaveProblems({ name: "x", expectedVersion: 1 }), ["expectedVersion applies only when updating a dashboard"]);
   await assert.rejects(save.execute("t", { name: "x" }, undefined, undefined, uiContext(false)), /requires explicit confirmation/);
   assert.equal(calls.length, 0);
 });

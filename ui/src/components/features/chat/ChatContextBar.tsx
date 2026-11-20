@@ -49,7 +49,6 @@ function ExecutionLink({ executionId, chipId }: { executionId: string; chipId?: 
       href={executionHref(executionId, chipId)}
       className="shrink-0 text-base-content/50 hover:text-base-content"
       aria-label={`Open execution ${executionId}`}
-      title={`Open execution ${executionId}`}
     >
       <ExternalLink className="w-3 h-3" aria-hidden="true" />
     </Link>

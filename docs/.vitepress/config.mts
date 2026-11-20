@@ -18,6 +18,13 @@ export default withMermaid(
         target: "es2022",
       },
       optimizeDeps: {
+        // mermaid imports the CommonJS package fastdom, which
+        // vitepress-plugin-mermaid does not pre-bundle. Without these entries
+        // the dev server serves it as ESM and the page renders blank.
+        include: [
+          "mermaid > fastdom",
+          "mermaid > fastdom/extensions/fastdom-promised.js",
+        ],
         esbuildOptions: {
           // Keep dev pre-bundling aligned with the production target.
           target: "es2022",
@@ -256,6 +263,8 @@ export default withMermaid(
                 { text: "Custom Dashboards", link: "/developer-guide/architecture/custom-dashboards" },
                 { text: "Metric Scripts", link: "/developer-guide/architecture/metric-scripts" },
                 { text: "Provenance", link: "/developer-guide/architecture/provenance" },
+                { text: "Python SDK", link: "/developer-guide/architecture/python-sdk" },
+                { text: "TypeScript SDK", link: "/developer-guide/architecture/typescript-sdk" },
               ],
             },
             {

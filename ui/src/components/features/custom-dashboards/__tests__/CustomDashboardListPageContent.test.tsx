@@ -127,6 +127,7 @@ function dashboard(overrides: Partial<CustomDashboardResponse>): CustomDashboard
     owner_username: "me",
     owner_user_id: "user-me",
     can_edit: true,
+    version: 0,
     created_at: "2026-11-01T00:00:00Z",
     updated_at: "2026-11-02T00:00:00Z",
     ...overrides,

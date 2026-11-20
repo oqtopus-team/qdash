@@ -1,5 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { QDashClient } from "@oqtopus-team/qdash-client";
+import { QDash } from "@oqtopus-team/qdash-sdk";
 import { Type } from "typebox";
 
 import { toTextToolResult } from "../lib/results.js";
@@ -13,6 +14,12 @@ import { toTextToolResult } from "../lib/results.js";
  * Step classes and task names QDash exposes, so QDash owns the validation and
  * these tools only relay it. The spec schema is deliberately not restated
  * here: `qdash_get_pipeline_catalog` returns QDash's own JSON schema.
+ *
+ * The routes are reached through the SDK's `qdash.pipelines`, which owns the
+ * request shape; the project is the profile's, or the server's default when
+ * none is set. Confirmation, the structured result and the 422/503 handling
+ * stay here. A run returns its execution ID at once; following it is
+ * qdash_wait_execution's job.
  */
 
 type ConnectionParams = { profile?: string; configPath?: string; useEnv?: boolean };
@@ -84,16 +91,8 @@ export type PipelineCatalog = {
   example?: Record<string, unknown>;
 };
 
-type PipelineRequest = { chip_id: string; spec: Record<string, unknown>; backend_name?: string };
-
-/** The slice of QDashClient these tools use; tests pass a stub. */
-export type PipelineClient = {
-  api: {
-    getCalibrationPipelineCatalog(params?: { backend_name?: string }): Promise<unknown>;
-    validateCalibrationPipeline(request: PipelineRequest): Promise<unknown>;
-    executeCalibrationPipeline(request: PipelineRequest): Promise<unknown>;
-  };
-};
+/** The client these tools use; tests pass a stub with the same `api` methods and `config`. */
+export type PipelineClient = QDashClient;
 
 export type CalibrationPipelineDependencies = {
   makeClient(params: ConnectionParams): Promise<PipelineClient>;
@@ -258,10 +257,8 @@ export function registerCalibrationPipelineTools(pi: Pick<ExtensionAPI, "registe
       backendName: Type.Optional(Type.String({ description: "Backend to list tasks for. Defaults to the configured backend." })),
     }),
     async execute(_toolCallId, params: ConnectionParams & { backendName?: string }) {
-      const client = await deps.makeClient(params);
-      const catalog = (await client.api.getCalibrationPipelineCatalog(
-        params.backendName ? { backend_name: params.backendName } : undefined,
-      )) as PipelineCatalog;
+      const qdash = new QDash(await deps.makeClient(params));
+      const catalog = (await qdash.pipelines.catalog({ backendName: params.backendName })) as PipelineCatalog;
       return toTextToolResult(formatPipelineCatalog(catalog), catalog, { tool: "qdash_get_pipeline_catalog", backendName: catalog.backend_name });
     },
   });
@@ -285,10 +282,9 @@ export function registerCalibrationPipelineTools(pi: Pick<ExtensionAPI, "registe
     async execute(_toolCallId, params: ConnectionParams & { chipId?: string; spec: Record<string, unknown>; backendName?: string }) {
       const client = await deps.makeClient(params);
       const chipId = await deps.resolveChipId(client, params.chipId);
-      const result = (await client.api.validateCalibrationPipeline({
-        chip_id: chipId,
-        spec: params.spec,
-        ...(params.backendName ? { backend_name: params.backendName } : {}),
+      const result = (await new QDash(client).pipelines.validate(params.spec, {
+        chipId,
+        backendName: params.backendName,
       })) as PipelineValidation;
       return toTextToolResult(formatPipelinePlan(result, chipId), result, {
         tool: "qdash_plan_pipeline",
@@ -323,13 +319,11 @@ export function registerCalibrationPipelineTools(pi: Pick<ExtensionAPI, "registe
           throw new Error("qdash_run_pipeline requires explicit confirmation");
         }
       }
-      const client = await deps.makeClient(params);
+      const qdash = new QDash(await deps.makeClient(params));
       try {
-        const result = (await client.api.executeCalibrationPipeline({
-          chip_id: params.chipId,
-          spec: params.spec,
-          ...(params.backendName ? { backend_name: params.backendName } : {}),
-        })) as PipelineExecution;
+        // Dispatch only: the run handle's wait() is deliberately not called here.
+        const run = await qdash.pipelines.execute(params.spec, { chipId: params.chipId, backendName: params.backendName });
+        const result = run.response as PipelineExecution;
         return toTextToolResult(formatPipelineExecution(result, params.chipId), result, {
           tool: "qdash_run_pipeline",
           chipId: params.chipId,

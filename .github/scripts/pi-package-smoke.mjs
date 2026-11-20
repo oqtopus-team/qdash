@@ -19,9 +19,15 @@ for (const version of Object.values(manifest.dependencies ?? {})) {
   assert.ok(!/^(workspace:|file:|link:)/.test(version), "Published dependencies must resolve outside the workspace");
 }
 if (name === "pi-qdash") {
-  const client = JSON.parse(readFileSync(join(consumer, "node_modules/@oqtopus-team/qdash-client/package.json"), "utf8"));
-  assert.equal(manifest.dependencies["@oqtopus-team/qdash-client"], client.version);
-  assert.notEqual(client.version, "0.0.0");
+  // pi-qdash uses the SDK and, for other routes, the client; both come from one release.
+  for (const library of ["qdash-client", "qdash-sdk"]) {
+    const installed = JSON.parse(readFileSync(join(consumer, `node_modules/@oqtopus-team/${library}/package.json`), "utf8"));
+    assert.equal(manifest.dependencies[`@oqtopus-team/${library}`], installed.version);
+    assert.notEqual(installed.version, "0.0.0");
+  }
+  // One client copy, so the SDK's errors are the classes pi-qdash checks against.
+  assert.ok(!existsSync(join(consumer, "node_modules/@oqtopus-team/qdash-sdk/node_modules/@oqtopus-team/qdash-client")));
+  assert.ok(!existsSync(join(root, "node_modules/@oqtopus-team/qdash-client")));
 }
 assert.ok(existsSync(join(root, "LICENSE")));
 assert.ok(existsSync(join(root, "skills", skill, "SKILL.md")));

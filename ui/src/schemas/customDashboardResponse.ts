@@ -25,6 +25,8 @@ export interface CustomDashboardResponse {
   owner_user_id: CustomDashboardResponseOwnerUserId;
   /** Whether the caller may update or delete it */
   can_edit: boolean;
+  /** Write counter; send it as expected_version to guard an update */
+  version: number;
   created_at: string;
   updated_at: string;
 }

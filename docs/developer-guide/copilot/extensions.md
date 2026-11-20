@@ -101,6 +101,15 @@ Pipeline execution is separate from agent candidate approval. A valid
 the latter persists completed task parameters directly. Do not use it to retry
 a failed agent action because that would bypass the candidate gate.
 
+The pipeline tools and `qdash_execute_flow` reach QDash through the
+[TypeScript SDK](../architecture/typescript-sdk.md) package `@oqtopus-team/qdash-sdk`
+(`qdash.pipelines` and `qdash.workflows.run`), which builds the requests; other
+tools use `@oqtopus-team/qdash-client` directly. A profile without a project keeps
+running on the server's default project. Confirmation, input checks, the 422 and
+503 handling and the structured results stay in the tools. A run tool returns the execution ID as soon as QDash
+accepts the run and never calls the SDK's `wait()`; `qdash_wait_execution` follows
+the run when asked.
+
 When adding a tool or command, update the [pi-qdash reference](../../reference/pi-qdash.md)
 and add focused tests under `packages/pi-qdash/tests/`. Keep pure extraction helpers
 separate from API calls so tests can exercise them without a live QDash deployment.

@@ -1,5 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { QDashClient } from "@oqtopus-team/qdash-client";
+import { QDash, Script } from "@oqtopus-team/qdash-sdk";
 import { Type } from "typebox";
 
 import { customDashboardPagePath, metricScriptPagePath } from "../lib/links.js";
@@ -12,7 +13,9 @@ import { toTextToolResult } from "../lib/results.js";
  * it in a bounded worker process and turns it into one value per qubit or
  * directed pair. Validation and previews execute the code on the server but
  * persist nothing, so they are direct tools rather than script-callable reads;
- * saving a script or a dashboard is a confirmation-gated write. These tools
+ * saving a script or a dashboard is a confirmation-gated write. Scripts are
+ * saved through the SDK's `qdash.scripts`; dashboards keep the client's partial
+ * update, which the SDK's whole-definition save does not express. These tools
  * only reach the API and format its answers; how to write a script and read
  * its results lives in the qdash-metric-scripts skill.
  */
@@ -378,11 +381,13 @@ export function dashboardSaveProblems(params: {
   dashboardId?: string;
   name?: string;
   templateId?: string;
+  expectedVersion?: number;
   panels?: Array<Record<string, unknown>>;
 }): string[] {
   const problems: string[] = [];
   if (!params.dashboardId && !params.name?.trim()) problems.push("a new dashboard needs a name");
   if (params.dashboardId && params.templateId) problems.push("templateId applies only when creating a dashboard");
+  if (!params.dashboardId && params.expectedVersion !== undefined) problems.push("expectedVersion applies only when updating a dashboard");
   for (const [index, panel] of (params.panels ?? []).entries()) {
     const label = `panels[${index}]`;
     if (typeof panel.panel_id !== "string" || !panel.panel_id) problems.push(`${label}.panel_id is required`);
@@ -638,20 +643,19 @@ export function registerMetricScriptTools(pi: Pick<ExtensionAPI, "registerTool">
       }
       try {
         const created = !params.scriptId;
-        const result = (created
-          ? await client.createMetricScript({
-              name: params.name,
-              source: params.source,
-              ...(params.description !== undefined ? { description: params.description } : {}),
-              ...(params.visibility ? { visibility: params.visibility } : {}),
-            })
-          : await client.updateMetricScript(params.scriptId as string, {
-              name: params.name,
-              source: params.source,
-              ...(params.description !== undefined ? { description: params.description } : {}),
-              ...(params.visibility ? { visibility: params.visibility } : {}),
-              ...(params.expectedRevision !== undefined ? { expected_revision: params.expectedRevision } : {}),
-            })) as unknown as ScriptResponse;
+        const qdash = new QDash(client as QDashClient);
+        const script = new Script({
+          name: params.name,
+          source: params.source,
+          ...(params.description !== undefined ? { description: params.description } : {}),
+          ...(params.visibility ? { visibility: params.visibility } : {}),
+        });
+        const saved = created
+          ? await qdash.scripts.create(script)
+          : await qdash.scripts.update(params.scriptId as string, script, {
+              ...(params.expectedRevision !== undefined ? { expectedRevision: params.expectedRevision } : {}),
+            });
+        const result = saved.response as unknown as ScriptResponse;
         const page = url(client, metricScriptPagePath(result.script_id));
         return toTextToolResult(formatSavedScript(result, created, page), { ...result, url: page }, {
           tool,
@@ -683,6 +687,7 @@ export function registerMetricScriptTools(pi: Pick<ExtensionAPI, "registerTool">
     promptGuidelines: [
       "Pin metric_script panels to the script's active_revision from qdash_query metric_script, and say which revision a panel shows.",
       "On update, send the complete panels list; omitted panels are removed.",
+      "Pass expectedVersion (the version you read) when updating so a concurrent save is not overwritten.",
     ],
     parameters: Type.Object({
       ...connectionParams,
@@ -693,6 +698,7 @@ export function registerMetricScriptTools(pi: Pick<ExtensionAPI, "registerTool">
       chipId: Type.Optional(Type.String({ description: "Chip the dashboard shows." })),
       panels: Type.Optional(Type.Array(Type.Object({}, { additionalProperties: true }), { description: "The complete panel list (see the description for the shape)." })),
       templateId: Type.Optional(Type.String({ description: "Creation only: a starter template to copy panels from (qdash_query custom_dashboard_templates)." })),
+      expectedVersion: Type.Optional(Type.Number({ description: "Update only if the dashboard is still at this version (its `version` from qdash_query custom_dashboard; 409 otherwise)." })),
       confirmWrite: Type.Optional(Type.Boolean({ description: "Required for non-interactive execution. Set true only after explicit user confirmation." })),
     }),
     async execute(
@@ -705,6 +711,7 @@ export function registerMetricScriptTools(pi: Pick<ExtensionAPI, "registerTool">
         chipId?: string;
         panels?: Array<Record<string, unknown>>;
         templateId?: string;
+        expectedVersion?: number;
         confirmWrite?: boolean;
       },
       _signal,
@@ -739,6 +746,7 @@ export function registerMetricScriptTools(pi: Pick<ExtensionAPI, "registerTool">
           : await client.updateCustomDashboard(params.dashboardId as string, {
               ...(params.name !== undefined ? { name: params.name } : {}),
               ...fields,
+              ...(params.expectedVersion !== undefined ? { expected_version: params.expectedVersion } : {}),
             } as Parameters<MetricScriptClient["updateCustomDashboard"]>[1])) as unknown as DashboardResponse;
         const page = url(client, customDashboardPagePath(result.dashboard_id));
         return toTextToolResult(formatSavedDashboard(result, created, page), { ...result, url: page }, {

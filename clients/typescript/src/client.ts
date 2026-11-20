@@ -3,7 +3,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { getQDashAPI } from "./generated/api.js";
 
 import { QDashConfig } from "./config.js";
-import { QDashNotFoundError } from "./errors.js";
+import { QDashNotFoundError, QDashTimeoutError } from "./errors.js";
 import type {
   AgentActionResponse,
   AgentCandidateSetCommitResponse,
@@ -151,6 +151,12 @@ export interface PollOptions {
    * `pipeline.status` then carries the run's outcome.
    */
   wholePipeline?: boolean;
+  /**
+   * Poll again when the execution is not listed yet (404) instead of throwing
+   * `QDashNotFoundError` (default false). A dispatched run can briefly be unknown
+   * to `GET /executions/{id}`; the timeout still applies.
+   */
+  notFoundAsPending?: boolean;
 }
 
 export interface DownloadedFile {
@@ -209,9 +215,11 @@ export class QDashClient {
   readonly config: QDashConfig;
 
   private readonly transport: QDashTransport;
+  private readonly options: QDashClientOptions;
 
   constructor(config: QDashConfig, options: QDashClientOptions = {}) {
     this.config = config;
+    this.options = options;
     this.transport = new QDashTransport(config, options);
     this.api = this.bindGeneratedApi(getQDashAPI());
   }
@@ -232,6 +240,16 @@ export class QDashClient {
       ? await QDashConfig.fromFile(profile, path)
       : await QDashConfig.fromFile(profile);
     return new QDashClient(config, options);
+  }
+
+  /**
+   * A new client that sends `projectId` as `X-Project-Id`. It keeps this client's
+   * configuration and transport options (`fetch`, headers, environment); this
+   * client and its configuration are unchanged. A username/password login is not
+   * shared, so the new client logs in on its first request.
+   */
+  withProject(projectId: string): QDashClient {
+    return new QDashClient(new QDashConfig({ ...this.config, projectId }), this.options);
   }
 
   async listChips(): Promise<ListChipsResponse> {
@@ -604,13 +622,20 @@ export class QDashClient {
     const terminal = new Set(["completed", "failed", "cancelled", "canceled", "crashed"]);
     const wholePipeline = options.wholePipeline ?? true;
     while (true) {
-      const execution = await this.getExecution(executionId);
-      // A pipeline step's own execution completes long before the run does.
-      const status =
-        wholePipeline && execution.pipeline ? execution.pipeline.status : execution.status;
-      if (terminal.has(status.toLowerCase())) return execution;
+      let execution: ExecutionResponseDetail | undefined;
+      try {
+        execution = await this.getExecution(executionId);
+      } catch (error) {
+        if (!(options.notFoundAsPending && error instanceof QDashNotFoundError)) throw error;
+      }
+      if (execution) {
+        // A pipeline step's own execution completes long before the run does.
+        const status =
+          wholePipeline && execution.pipeline ? execution.pipeline.status : execution.status;
+        if (terminal.has(status.toLowerCase())) return execution;
+      }
       if (Date.now() >= deadline) {
-        throw new Error(
+        throw new QDashTimeoutError(
           `Execution '${executionId}' did not reach a terminal state within ${timeoutSeconds} seconds`,
         );
       }

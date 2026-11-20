@@ -28,6 +28,7 @@ import { installQDashGuidance } from "./lib/guidance-hook.js";
 import { qdashContextPath } from "./lib/context-path.js";
 import { errorStatus, fileContentSourceGuidance, filesTreeSourceGuidance, looksLikeSourcePath } from "./lib/source-guidance.js";
 import { withAbort } from "./lib/abort.js";
+import { WAIT_AGENT_ACTION, WAIT_EXECUTION } from "./lib/waits.js";
 import { qcalContextText, recordedParameters, sweepsOf, type RecordedParameter, type Sweep } from "./lib/qcal-evidence.js";
 import { registerCalibrationPipelineTools } from "./tools/calibration-pipeline.js";
 import { registerFlowAuthoringTools } from "./tools/flow-authoring.js";
@@ -1940,7 +1941,7 @@ export default function qdashExtension(host: ExtensionAPI) {
         signal,
         `Waiting for execution ${params.executionId}`,
       );
-      return toToolResult(withQDashLinks(client, data), { tool: "qdash_wait_execution", executionId: params.executionId, webBaseUrl: qdashWebBaseUrl(client) });
+      return WAIT_EXECUTION.result(client, params, data);
     },
   });
 
@@ -2156,7 +2157,7 @@ export default function qdashExtension(host: ExtensionAPI) {
         signal,
         `Waiting for agent action ${params.actionId}`,
       );
-      return toToolResult(data, { tool: "qdash_wait_agent_action" });
+      return WAIT_AGENT_ACTION.result(client, params, data);
     },
   });
 

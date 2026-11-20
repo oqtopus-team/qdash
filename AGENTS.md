@@ -14,7 +14,7 @@ QDash is a web platform for managing and monitoring qubit calibration workflows.
 
 - Frontend: `ui/` uses Next.js, React, TypeScript, DaisyUI, TanStack Query, and Bun.
 - Backend API: `src/qdash/api/` uses FastAPI with MongoDB/PostgreSQL-related services.
-- Pi extensions: `packages/pi-qdash/` and `packages/pi-qcaleval/` share a root Bun workspace with `agent-runtime/` and `clients/typescript/`; install dependencies from the repository root. They remain independently published npm packages.
+- Pi extensions: `packages/pi-qdash/` and `packages/pi-qcaleval/` share a root Bun workspace with `agent-runtime/`, `clients/typescript/`, and `sdks/typescript/`; install dependencies from the repository root. They remain independently published npm packages.
 - Workflow engine: `src/qdash/workflow/` uses Prefect 3 and qubex.
 - Shared data/model code lives under `src/qdash/common`, `src/qdash/datamodel`, `src/qdash/dbmodel`, and repository/service modules.
 

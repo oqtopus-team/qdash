@@ -75,6 +75,66 @@ def test_targets_need_exactly_one_kind() -> None:
         parse(targets={"qids": ["0"], "exclude_qids": ["1"]})
     parsed = parse(targets={"mux_ids": [0, 1], "exclude_qids": ["5"]})
     assert parsed.targets.mux_ids == [0, 1]
+    # The empty selector is rejected too, as the published descriptions state.
+    with pytest.raises(ValidationError, match="exactly one of qids or mux_ids"):
+        parse(targets={"qids": []})
+    targets = CalibrationPipelineSpec.model_json_schema()["$defs"]["PipelineTargets"]
+    assert "exactly one of qids and mux_ids" in targets["properties"]["qids"]["description"]
+    assert "Must be empty with qids" in targets["properties"]["exclude_qids"]["description"]
+
+
+@pytest.mark.parametrize(
+    "field",
+    ["tags", "default_run_parameters", "task_parameters", "targets.exclude_qids"],
+)
+def test_optional_collections_reject_null_and_publish_their_default(field: str) -> None:
+    # Omission is allowed and null is not, so the schema gives a default and no null type;
+    # generated clients then reject None instead of sending it.
+    *parents, name = field.split(".")
+    payload = spec(targets={"mux_ids": [0]})
+    container: Any = payload
+    for parent in parents:
+        container = container[parent]
+    container[name] = None
+    with pytest.raises(ValidationError, match=name):
+        CalibrationPipelineSpec.model_validate(payload)
+
+    schema = CalibrationPipelineSpec.model_json_schema()
+    model = schema["$defs"]["PipelineTargets"] if parents else schema
+    published = model["properties"][name]
+    assert published["default"] in ([], {})
+    assert "anyOf" not in published
+
+
+@pytest.mark.parametrize(
+    "step",
+    [
+        {"type": "TwoQubitCalibration"},
+        {"type": "CustomTwoQubit", "tasks": [{"name": "CheckCrossResonance"}]},
+    ],
+)
+def test_two_qubit_cap_is_unset_until_given(step: dict[str, Any]) -> None:
+    def two_qubit(**fields: object) -> dict[str, Any]:
+        parsed = parse(steps=[{"type": "OneQubitCheck"}, {**step, **fields}])
+        dumped: dict[str, Any] = parsed.model_dump(mode="json")["steps"][1]
+        # Every dump validates again.
+        CalibrationPipelineSpec.model_validate(parsed.model_dump(mode="json"))
+        return dumped
+
+    manual = {"execution_mode": "manual", "rounds": [[["0", "1"]]]}
+    # A manual step may leave the cap out or send null, as a client dumping every field does.
+    assert "max_parallel_ops" not in two_qubit(**manual)
+    assert "max_parallel_ops" not in two_qubit(**manual, max_parallel_ops=None)
+    with pytest.raises(ValidationError, match="max_parallel_ops only caps automatic"):
+        two_qubit(**manual, max_parallel_ops=10)
+    # An automatic step dumps the cap it runs with, as before, so its plan digest is unchanged.
+    assert two_qubit()["max_parallel_ops"] == 10
+    assert two_qubit(max_parallel_ops=None)["max_parallel_ops"] == 10
+    assert two_qubit(max_parallel_ops=4)["max_parallel_ops"] == 4
+    with_default = parse(steps=[{"type": "OneQubitCheck"}, {**step, "max_parallel_ops": 10}])
+    assert parse(steps=[{"type": "OneQubitCheck"}, step]).plan_digest() == (
+        with_default.plan_digest()
+    )
 
 
 def test_filters_need_a_one_qubit_step_before_them() -> None:

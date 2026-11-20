@@ -139,6 +139,9 @@ export function CustomDashboardPageContent({ dashboardId }: { dashboardId: strin
   const [editing, setEditing] = useState(false);
   // Panels keep the response's script annotations so a draft can show "newer revision" badges.
   const [draft, setDraft] = useState<DashboardPanelResponse[]>([]);
+  // The stored version the draft is based on; a panel save is refused (409) once it is stale,
+  // and the draft stays so the user can keep or copy their edits.
+  const [draftVersion, setDraftVersion] = useState<number | null>(null);
   const [editorPanelId, setEditorPanelId] = useState<string | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -196,6 +199,7 @@ export function CustomDashboardPageContent({ dashboardId }: { dashboardId: strin
 
   const startEditing = () => {
     setDraft(savedPanels);
+    setDraftVersion(dashboard?.version ?? null);
     setEditing(true);
   };
 
@@ -210,14 +214,19 @@ export function CustomDashboardPageContent({ dashboardId }: { dashboardId: strin
   const savePanels = () => {
     const submitted = draft;
     update(
-      { panels: submitted.map(toPanelModel) },
+      {
+        panels: submitted.map(toPanelModel),
+        ...(draftVersion !== null ? { expected_version: draftVersion } : {}),
+      },
       {
         success: "Dashboard saved",
         failure: "Failed to save the dashboard",
         // Adopt the server's copy so the draft matches what was stored, unless
         // the user kept editing while the request was in flight.
-        onDone: (response) =>
-          setDraft((current) => (current === submitted ? response.panels : current)),
+        onDone: (response) => {
+          setDraftVersion(response.version);
+          setDraft((current) => (current === submitted ? response.panels : current));
+        },
       },
     );
   };
@@ -271,6 +280,10 @@ export function CustomDashboardPageContent({ dashboardId }: { dashboardId: strin
       {
         onSuccess: (response) => {
           storeResponse(response.data);
+          // A settings save directly on top of the draft's base leaves its panels current.
+          setDraftVersion((base) =>
+            base !== null && response.data.version === base + 1 ? response.data.version : base,
+          );
           setSettingsOpen(false);
           toast.success("Settings saved");
         },

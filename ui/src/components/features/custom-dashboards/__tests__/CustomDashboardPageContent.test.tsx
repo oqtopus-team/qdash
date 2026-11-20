@@ -99,6 +99,7 @@ function dashboard(overrides: Partial<CustomDashboardResponse> = {}): CustomDash
     owner_username: "alice",
     owner_user_id: "user-alice",
     can_edit: true,
+    version: 7,
     created_at: "2026-11-01T00:00:00Z",
     updated_at: "2026-11-02T00:00:00Z",
     ...overrides,
@@ -174,6 +175,33 @@ describe("CustomDashboardPageContent", () => {
     // Panel a moved into b's columns, so b is pushed below it.
     expect(screen.getByText("6×2 at 1,0")).toBeInTheDocument();
     expect(screen.getByText("6×2 at 6,2")).toBeInTheDocument();
+  });
+
+  it("saves panels against the version the edit started from and keeps the draft on 409", async () => {
+    mocks.update.mockImplementation((_variables, options) =>
+      options.onError({ response: { status: 409, data: { detail: "Dashboard was changed" } } }),
+    );
+    renderPage();
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.keyDown(screen.getByRole("button", { name: "Panel actions for Panel a" }), {
+      key: "Enter",
+    });
+    const moveRight = await screen.findByRole("menuitem", { name: "Move right" });
+    fireEvent.click(moveRight);
+    fireEvent.keyDown(moveRight, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("menu")).not.toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(mocks.update).toHaveBeenCalledTimes(1);
+    const [{ dashboardId, data }] = mocks.update.mock.calls[0];
+    expect(dashboardId).toBe("dash-1");
+    expect(data.expected_version).toBe(7);
+    expect(data.panels).toHaveLength(3);
+    // The rejected edit is still on screen, unsaved, for the user to keep or redo.
+    expect(screen.getByRole("toolbar", { name: "Edit dashboard" })).toBeInTheDocument();
+    expect(screen.getByText("Unsaved changes")).toBeInTheDocument();
+    expect(screen.getByText("6×2 at 1,0")).toBeInTheDocument();
   });
 
   it("shows Duplicate but not Edit or Delete to an editor who does not own it", () => {

@@ -7,6 +7,7 @@
  */
 import type { CustomDashboardUpdateRequestChipId } from './customDashboardUpdateRequestChipId';
 import type { CustomDashboardUpdateRequestDescription } from './customDashboardUpdateRequestDescription';
+import type { CustomDashboardUpdateRequestExpectedVersion } from './customDashboardUpdateRequestExpectedVersion';
 import type { CustomDashboardUpdateRequestName } from './customDashboardUpdateRequestName';
 import type { CustomDashboardUpdateRequestPanels } from './customDashboardUpdateRequestPanels';
 import type { CustomDashboardUpdateRequestVisibility } from './customDashboardUpdateRequestVisibility';
@@ -20,4 +21,6 @@ export interface CustomDashboardUpdateRequest {
   visibility?: CustomDashboardUpdateRequestVisibility;
   chip_id?: CustomDashboardUpdateRequestChipId;
   panels?: CustomDashboardUpdateRequestPanels;
+  /** Reject with 409 unless the dashboard is still at this version; omit to update whatever is stored */
+  expected_version?: CustomDashboardUpdateRequestExpectedVersion;
 }

@@ -199,6 +199,26 @@ export function nestedBlockMessage(name: string): string {
   return `${name} cannot be called from a code mode script: scripts may only call QDash's read-only tools. Call ${name} directly instead; write tools then ask the user for approval.`;
 }
 
+/**
+ * The code mode namespace of the pi-qdash tools, the same in both hosts: the
+ * QDash Agent Runtime declares it on its `qdash` durable extension, and the pi
+ * CLI on each tool pi-qdash registers. Code mode lists `description` once
+ * above the tools scripts may call; a script reads `instructions` with
+ * `describeNamespace("qdash")`, and `searchTools()` searches both. It names
+ * no tools: which tools a script may call stays the policy above.
+ */
+export const QDASH_TOOL_NAMESPACE = {
+  name: "qdash",
+  description:
+    "QDash calibration data read as the signed-in user: chips, qubits, couplings, executions, task results, metrics, time series, flows, forum posts, and source. Each tool resolves to its redacted response data as JSON.",
+  instructions: [
+    "Scripts can call only QDash's audited read-only tools. Write tools, figures, charts, and evaluation tools are called directly, outside a script; write tools then ask the user for approval.",
+    "A tool resolves to the response data its text answer summarizes, as JSON and not truncated; print a small sample first when you do not know its shape.",
+    `One call may hand a script at most ${MAX_NESTED_DATA_BYTES} bytes of JSON; a larger response fails the call. Narrow it with a chip, qubit, task, time range, or limit, or split it into several calls.`,
+    "Deferred read tools can be called from a script without loading them with tool_search first.",
+  ].join("\n"),
+} as const;
+
 /** What a script reads when a nested call returned more data than it may receive. */
 export function nestedDataTooLargeMessage(name: string, bytes: number): string {
   return `${name} returned ${bytes} bytes of data, more than the ${MAX_NESTED_DATA_BYTES} bytes a script may receive from one call. Narrow the request (a chip, qubit, task, time range, or limit) or split it into several calls.`;

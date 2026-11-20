@@ -1,6 +1,7 @@
 """Schemas for custom dashboard endpoints."""
 
 from datetime import datetime
+from typing import Annotated
 
 from pydantic import BaseModel, Field
 
@@ -32,6 +33,13 @@ class CustomDashboardUpdateRequest(BaseModel):
     visibility: DashboardVisibility | None = None
     chip_id: str | None = Field(default=None, max_length=100)
     panels: list[DashboardPanelModel] | None = Field(default=None, max_length=MAX_PANELS)
+    expected_version: Annotated[int, Field(strict=True, ge=0)] | None = Field(
+        default=None,
+        description=(
+            "Reject with 409 unless the dashboard is still at this version; "
+            "omit to update whatever is stored"
+        ),
+    )
 
 
 class DashboardPanelResponse(DashboardPanelModel):
@@ -59,6 +67,9 @@ class CustomDashboardResponse(BaseModel):
     owner_username: str
     owner_user_id: str | None
     can_edit: bool = Field(..., description="Whether the caller may update or delete it")
+    version: int = Field(
+        ..., description="Write counter; send it as expected_version to guard an update"
+    )
     created_at: datetime
     updated_at: datetime
 

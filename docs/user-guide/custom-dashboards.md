@@ -63,7 +63,8 @@ Each panel sits on a 12-column grid. Use the panel menu to move it, make it wide
 taller or shorter, duplicate it, or remove it. On a narrow screen every panel spans the full width.
 
 Changes stay local until you select **Save**; **Discard** returns to the saved layout and **Done**
-leaves edit mode. The dashboard stores the layout, the chip, and the panel settings, not measured
+leaves edit mode. If someone else saved the dashboard after you selected **Edit**, **Save** fails
+with a message to reload, and your changes stay on screen so you can note them before reloading. The dashboard stores the layout, the chip, and the panel settings, not measured
 values: every time someone opens it, the panels read the current data of the selected chip.
 
 ## Keep Panels on a Known Script Revision

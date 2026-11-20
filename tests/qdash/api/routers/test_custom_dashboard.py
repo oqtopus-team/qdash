@@ -714,6 +714,71 @@ def test_update_racing_a_delete_leaves_no_pins(test_client, init_db, runtime, mo
     assert _pins(script_id) == {}
 
 
+def test_expected_version_guards_a_read_edit_save(test_client, init_db, runtime):
+    owner = _create_project_owner()
+    script = _script(test_client, owner)
+    script_id = script["script_id"]
+    _new_revision(test_client, owner, script, "v2")
+    created = _create(test_client, owner, panels=[_script_panel(script_id)])
+    dashboard_id = created["dashboard_id"]
+    assert created["version"] == 0
+    url = f"/custom-dashboards/{dashboard_id}"
+
+    saved = test_client.patch(url, json={"name": "Ops v2", "expected_version": 0}, headers=owner)
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["version"] == 1
+    assert test_client.get(url, headers=owner).json()["version"] == 1
+
+    # An editor still holding version 0 loses, before any pin is widened.
+    stale = test_client.patch(
+        url,
+        json={"panels": [_script_panel(script_id, script_revision=2)], "expected_version": 0},
+        headers=owner,
+    )
+    assert stale.status_code == 409
+    assert "reload it before saving" in stale.json()["detail"]
+    stored = test_client.get(url, headers=owner).json()
+    assert stored["name"] == "Ops v2"
+    assert stored["version"] == 1
+    assert stored["panels"][0]["config"]["script_revision"] == 1
+    assert _pins(script_id) == {dashboard_id: {"revisions": [1], "shared": False}}
+
+    # Omitting expected_version keeps the unguarded update of existing callers.
+    legacy = test_client.patch(url, json={"description": "desk"}, headers=owner)
+    assert legacy.status_code == 200
+    assert legacy.json()["version"] == 2
+
+
+@pytest.mark.parametrize("value", [-1, "1", 1.0, True])
+def test_expected_version_must_be_a_non_negative_integer(test_client, init_db, value):
+    owner = _create_project_owner()
+    dashboard_id = _create(test_client, owner)["dashboard_id"]
+    response = test_client.patch(
+        f"/custom-dashboards/{dashboard_id}", json={"expected_version": value}, headers=owner
+    )
+    assert response.status_code == 422
+
+
+def test_expected_version_is_checked_at_the_compare_and_set(
+    test_client, init_db, runtime, monkeypatch
+):
+    owner = _create_project_owner()
+    dashboard_id = _create(test_client, owner)["dashboard_id"]
+    url = f"/custom-dashboards/{dashboard_id}"
+    other: dict[str, Any] = {}
+
+    def concurrent() -> None:
+        other["response"] = test_client.patch(url, json={"name": "B"}, headers=owner)
+
+    # The guarded save read version 0 and passed the early check when B lands.
+    _interleave(monkeypatch, MongoCustomDashboardRepository, "save_if_unchanged", concurrent)
+    guarded = test_client.patch(url, json={"name": "A", "expected_version": 0}, headers=owner)
+
+    assert other["response"].status_code == 200
+    assert guarded.status_code == 409
+    assert test_client.get(url, headers=owner).json()["name"] == "B"
+
+
 def test_config_normalization_preserves_accepted_extra_settings():
     from qdash.api.services.custom_dashboard_service import validate_panel_configs
     from qdash.datamodel.custom_dashboard import DashboardPanelModel, PanelLayoutModel

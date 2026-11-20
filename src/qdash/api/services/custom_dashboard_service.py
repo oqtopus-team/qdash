@@ -63,6 +63,7 @@ if TYPE_CHECKING:
     from qdash.repository.metric_script import MongoMetricScriptRepository
 
 NOT_FOUND = "Custom dashboard not found"
+STALE = "Dashboard was changed by another save; reload it before saving"
 MAX_NAME_LENGTH = 200
 COPY_SUFFIX = " (copy)"
 
@@ -245,6 +246,7 @@ class CustomDashboardService:
             owner_username=doc.username,
             owner_user_id=doc.user_id,
             can_edit=self._can_edit(doc, ctx),
+            version=doc.version,
             created_at=doc.system_info.created_at,
             updated_at=doc.system_info.updated_at,
         )
@@ -402,7 +404,11 @@ class CustomDashboardService:
     ) -> CustomDashboardResponse:
         doc = self._get_editable(ctx, dashboard_id)
         # The stored state this update replaces; the save below is a compare-and-set on it.
+        # A caller's expected_version names the state it edited; reject before any pin write
+        # when that state is gone, and the compare-and-set below covers the rest of the race.
         read_version = doc.version
+        if body.expected_version is not None and body.expected_version != read_version:
+            raise HTTPException(status_code=409, detail=STALE)
         old_pins = script_pins(doc.panels)
         visibility = body.visibility if body.visibility is not None else doc.visibility
         if body.panels is not None:
@@ -440,10 +446,7 @@ class CustomDashboardService:
                 self._scripts.clear_dashboard_pins(
                     project_id=ctx.project_id, dashboard_id=doc.dashboard_id
                 )
-            raise HTTPException(
-                status_code=409,
-                detail="Dashboard was changed by another save; reload it before saving",
-            )
+            raise HTTPException(status_code=409, detail=STALE)
         if repin:
             for script_id in sorted(set(old_pins) | set(new_pins)):
                 self._scripts.narrow_pin(

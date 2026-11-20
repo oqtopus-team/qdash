@@ -9,6 +9,7 @@ import {
   isNestedReadTool,
   isReviewedWriteTool,
   nestedBlockMessage,
+  QDASH_TOOL_NAMESPACE,
   scriptDataOf,
   withScriptDeadline,
 } from "./tool-policy.js";
@@ -70,6 +71,8 @@ export interface PolicyToolDefinition {
   parameters?: unknown;
   exposure?: Exposure;
   outputSchema?: unknown;
+  /** pi's `ToolNamespace`: the group code mode lists the tool under. */
+  namespace?: { name: string; description?: string; instructions?: string; aliases?: readonly string[] };
   annotations?: { readOnlyHint?: boolean; destructiveHint?: boolean; idempotentHint?: boolean; openWorldHint?: boolean };
 }
 
@@ -87,7 +90,9 @@ interface ToolInfoLike {
  * A pi-qdash tool definition with the shared policy applied: deferred tools
  * become `deferred`; audited reads declare the script data schema and a
  * read-only hint; every other QDash tool becomes `model-only` so scripts
- * cannot reach it. An exposure the tool already states is kept.
+ * cannot reach it. Every QDash tool joins the shared `qdash` namespace
+ * (`QDASH_TOOL_NAMESPACE`), as in QDash chat. An exposure or namespace the
+ * tool already states is kept.
  */
 export function applyToolPolicy<T extends PolicyToolDefinition>(definition: T): T {
   const name = definition.name;
@@ -97,6 +102,7 @@ export function applyToolPolicy<T extends PolicyToolDefinition>(definition: T): 
     definition.exposure ?? (isDeferredTool(name) ? "deferred" : read ? undefined : "model-only");
   return {
     ...definition,
+    namespace: definition.namespace ?? QDASH_TOOL_NAMESPACE,
     ...(exposure ? { exposure } : {}),
     ...(read
       ? {

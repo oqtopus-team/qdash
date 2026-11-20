@@ -262,7 +262,9 @@ def test_run_plan_parses_plan_and_prints_audit_outcome(
 
 
 def _auto_session(autonomy: str):
-    from qdash.client.services.models import AgentSessionResponse
+    from qdash.client.services.client_models import (
+        AgentSessionResponse,
+    )
 
     return AgentSessionResponse.model_validate(
         {

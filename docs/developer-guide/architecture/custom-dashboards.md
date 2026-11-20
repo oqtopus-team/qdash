@@ -102,7 +102,11 @@ go.
    that lost to an eviction or an unshare returns 422 asking to reload the dashboard. An update
    also claims the pins of scripts that its new panels no longer use.
 2. The dashboard is inserted, or replaced through a compare-and-set on its `version`
-   (`MongoCustomDashboardRepository.save_if_unchanged`); a lost race returns 409.
+   (`MongoCustomDashboardRepository.save_if_unchanged`); a lost race returns 409. An update that
+   carries `expected_version` is compared against that version: a mismatch returns 409 before
+   step 1, and the compare-and-set covers a save that lands later. Without it, the update is
+   compared against the version the request read. Responses include `version`, so a client that
+   read a dashboard can send it back.
 3. After an update, `narrow_pin` sets each pin to exactly the stored panels, or removes it, but
    only if its `writer` is still this write's token. A later write of the same dashboard claimed
    the pin otherwise and narrows it itself.
@@ -173,7 +177,8 @@ Routes: `/custom-dashboards` (list, with a `tab` query parameter for **Dashboard
 **Scripts**), `/custom-dashboards/[dashboardId]`, and `/custom-dashboards/scripts/[scriptId]`.
 Dashboard code lives in `ui/src/components/features/custom-dashboards/`; panels are laid out with
 CSS grid from each panel's `layout`, and edit mode keeps the panel list in local state and
-persists it with one `PATCH` of `panels`. `panelConfig.ts` reads and writes panel configs.
+persists it with one `PATCH` of `panels` and the `expected_version` read when editing started; a
+409 leaves the draft in place. `panelConfig.ts` reads and writes panel configs.
 
 Script code lives in `ui/src/components/features/metric-scripts/`:
 `MetricScriptEditorPageContent` (Monaco editor, settings, diagnostics, preview) with
@@ -198,7 +203,7 @@ its page with the Agent dock so the Agent can propose edits; see
 
 - `tests/qdash/api/routers/test_custom_dashboard.py`: visibility, ownership, project isolation,
   panel validation, the template, and pins kept in step with dashboard writes, including
-  concurrent updates and deletes of one dashboard.
+  concurrent updates and deletes of one dashboard and stale `expected_version` saves.
 - `tests/qdash/api/routers/test_metric_script.py`: script CRUD, last-good revisions, conflicts,
   references from dashboards, pins racing script saves, unsharing and deletion, and evaluation
   through the worker.

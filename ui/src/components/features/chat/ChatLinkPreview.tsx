@@ -33,7 +33,7 @@ export function ChatLinkPreviewProvider({ children }: { children: ReactNode }) {
   const value = useMemo(() => ({ preview }), [preview]);
 
   return (
-    <LinkHoverCardProvider>
+    <LinkHoverCardProvider scope="chat">
       <ChatLinkPreviewContext.Provider value={value}>
         {children}
         {link?.kind === "figure" ? (

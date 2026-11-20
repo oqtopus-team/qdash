@@ -1,24 +1,45 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import random
 import time
 from datetime import UTC, datetime
 from importlib.metadata import PackageNotFoundError, version
 from typing import TYPE_CHECKING, Any, TypeVar, cast
+from urllib.parse import quote
 
 import httpx
 from pydantic import BaseModel, ValidationError
 
 from qdash.client.rest.api_client import ApiClient as RestApiClient
+from qdash.client.rest.api_client import request_may_have_been_sent
 from qdash.client.rest.configuration import Configuration as RestConfiguration
 from qdash.client.rest.exceptions import ApiException as RestApiException
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Mapping
     from pathlib import Path
 
     from qdash.client.rest.api_response import ApiResponse as RestApiResponse
+from qdash.client.services.client_models import (
+    AgentActionListResponse,
+    AgentActionResponse,
+    AgentCandidateCommitResponse,
+    AgentCandidateListResponse,
+    AgentCandidateResponse,
+    AgentCandidateSetCommitResponse,
+    AgentSessionResponse,
+    CandidateGateResponse,
+    CreateEvaluationRunResponse,
+    EvaluationItem,
+    EvaluationRunDetailResponse,
+    IssueKnowledgeResponse,
+    IssueResponse,
+    ListIssueKnowledgeResponse,
+    ListIssuesResponse,
+    TaskNextAction,
+)
 from qdash.client.services.config import QDashConfig
 from qdash.client.services.errors import (
     QDashApiError,
@@ -29,23 +50,16 @@ from qdash.client.services.errors import (
 )
 from qdash.client.services.exporter_models import NormalizedMetricRecord
 from qdash.client.services.models import (
-    AgentActionListResponse,
-    AgentActionResponse,
-    AgentCandidateCommitResponse,
-    AgentCandidateListResponse,
-    AgentCandidateResponse,
-    AgentCandidateSetCommitResponse,
-    AgentSessionResponse,
     BodyReExecuteTaskResult,
     CancelExecutionResponse,
-    CandidateGateResponse,
     ChipMetricsResponse,
     ChipResponse,
     CouplingResponse,
-    CreateEvaluationRunResponse,
-    EvaluationItem,
-    EvaluationRunDetailResponse,
+    CustomDashboardCreateRequest,
+    CustomDashboardResponse,
+    CustomDashboardUpdateRequest,
     ExecuteFlowResponse,
+    ExecutePipelineResponse,
     ExecutionActivityResponse,
     ExecutionResponseDetail,
     FileTreeNode,
@@ -53,22 +67,29 @@ from qdash.client.services.models import (
     FlowTemplateWithCode,
     GetFlowResponse,
     ImpactResponse,
-    IssueKnowledgeResponse,
-    IssueResponse,
     LatestTaskResultResponse,
     LineageResponse,
     ListChipsResponse,
     ListCouplingsResponse,
+    ListCustomDashboardsResponse,
     ListExecutionsResponse,
     ListFlowsResponse,
-    ListIssueKnowledgeResponse,
-    ListIssuesResponse,
+    ListMetricScriptsResponse,
+    ListMetricScriptTemplatesResponse,
     ListQubitsResponse,
     ListTaskKnowledgeResponse,
     ListTaskResponse,
+    MetricScriptCatalogResponse,
+    MetricScriptCreateRequest,
+    MetricScriptEvaluateRequest,
+    MetricScriptEvaluateResponse,
+    MetricScriptResponse,
+    MetricScriptUpdateRequest,
+    MetricScriptValidateResponse,
     NoteModel,
     ParameterHistoryResponse,
     ParameterVersionResponse,
+    PipelineCatalogResponse,
     ProjectResponse,
     ProvenanceStatsResponse,
     QdashApiSchemasProjectProjectListResponse,
@@ -79,14 +100,20 @@ from qdash.client.services.models import (
     SuccessResponse,
     TaskHistoryResponse,
     TaskKnowledgeResponse,
-    TaskNextAction,
     TaskResultExcludeResponse,
     TaskResultListResponse,
     TaskResultResponse,
     TimeSeriesData,
+    ValidatePipelineResponse,
 )
 
 PACKAGE_NAME = "qdash"
+# Execution and pipeline statuses after which nothing more runs.
+_EXECUTION_TERMINAL_STATUSES = frozenset(
+    {"completed", "failed", "cancelled", "canceled", "crashed"}
+)
+# Methods without side effects; a transport failure on them is always safe to retry.
+_SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 TModel = TypeVar("TModel", bound=BaseModel)
 
 
@@ -96,6 +123,16 @@ def _resolve_user_agent() -> str:
     except PackageNotFoundError:
         package_version = "unknown"
     return f"qdash-client/{package_version}"
+
+
+def _path_part(value: str) -> str:
+    """``value`` as one URL path segment, so an ID cannot reach another route."""
+    return quote(value, safe="")
+
+
+def _request_body(request: BaseModel) -> dict[str, Any]:
+    """A request model as JSON, keeping only the fields the caller set (explicit nulls too)."""
+    return cast("dict[str, Any]", request.model_dump(mode="json", exclude_unset=True))
 
 
 class QDashClient:
@@ -121,6 +158,7 @@ class QDashClient:
             http_client=http_client,
         )
         self._default_headers = default_headers or {}
+        self._owns_rest_client = True
 
         self._token: str | None = self.config.api_token
         if not self.config.user_agent or self.config.user_agent == "qdash-client/dev":
@@ -143,8 +181,28 @@ class QDashClient:
         )
         return cls(config)
 
+    def with_project(self, project_id: str) -> QDashClient:
+        """Return a client that sends ``project_id`` as ``X-Project-Id``.
+
+        The returned client shares this client's connection, credentials and retry settings.
+        This client and its configuration are unchanged. Closing the returned client does not
+        close the shared connection; close this client when both are done.
+        """
+        if not project_id:
+            raise ValueError("project_id must be a non-empty string")
+        scoped = copy.copy(self)
+        scoped.config = self.config.model_copy(update={"project_id": project_id})
+        scoped._default_headers = {
+            name: value
+            for name, value in self._default_headers.items()
+            if name.lower() != "x-project-id"
+        }
+        scoped._owns_rest_client = False
+        return scoped
+
     def close(self) -> None:
-        self._rest_client.close()
+        if self._owns_rest_client:
+            self._rest_client.close()
 
     def _validate_model_payload(
         self,
@@ -665,10 +723,12 @@ class QDashClient:
         *,
         parameters: dict[str, Any] | None = None,
     ) -> ExecuteFlowResponse:
+        """Run a saved flow; ``parameters`` override its saved defaults for this run only."""
+        # The request's parameters are an object; null is rejected, so None sends {}.
         response = self._request(
             "POST",
             f"/flows/{name}/execute",
-            json={"parameters": parameters},
+            json={"parameters": parameters if parameters is not None else {}},
         )
         return self._validate_model_payload(ExecuteFlowResponse, response.data)
 
@@ -694,6 +754,127 @@ class QDashClient:
             ),
         )
         return self._validate_model_payload(ScheduleFlowResponse, response.data)
+
+    def list_metric_scripts(self) -> ListMetricScriptsResponse:
+        """Metric scripts visible to the caller (project-shared and their own), without source."""
+        response = self._request("GET", "/metric-scripts")
+        return self._validate_model_payload(ListMetricScriptsResponse, response.data)
+
+    def get_metric_script(self, script_id: str) -> MetricScriptResponse:
+        """A metric script with its latest source, active (last-good) source and revisions."""
+        response = self._request("GET", f"/metric-scripts/{_path_part(script_id)}")
+        return self._validate_model_payload(MetricScriptResponse, response.data)
+
+    def list_metric_script_templates(self) -> ListMetricScriptTemplatesResponse:
+        """Starter metric scripts, with their source."""
+        response = self._request("GET", "/metric-scripts/templates")
+        return self._validate_model_payload(ListMetricScriptTemplatesResponse, response.data)
+
+    def get_metric_script_catalog(self) -> MetricScriptCatalogResponse:
+        """The qubit and coupling metrics a script can read through ``ctx.data``."""
+        response = self._request("GET", "/metric-scripts/catalog")
+        return self._validate_model_payload(MetricScriptCatalogResponse, response.data)
+
+    def validate_metric_script(self, source: str) -> MetricScriptValidateResponse:
+        """Compile metric script source in a worker; nothing is saved."""
+        response = self._request("POST", "/metric-scripts/validate", json={"source": source})
+        return self._validate_model_payload(MetricScriptValidateResponse, response.data)
+
+    def evaluate_metric_script(
+        self, script_id: str, request: MetricScriptEvaluateRequest
+    ) -> MetricScriptEvaluateResponse:
+        """Evaluate one metric of a saved script's validated revision (the active by default)."""
+        response = self._request(
+            "POST",
+            f"/metric-scripts/{_path_part(script_id)}/evaluate",
+            json=_request_body(request),
+        )
+        return self._validate_model_payload(MetricScriptEvaluateResponse, response.data)
+
+    def create_metric_script(self, request: MetricScriptCreateRequest) -> MetricScriptResponse:
+        """Create a metric script; the server validates the source and records revision 1."""
+        response = self._request("POST", "/metric-scripts", json=_request_body(request))
+        return self._validate_model_payload(MetricScriptResponse, response.data)
+
+    def update_metric_script(
+        self, script_id: str, request: MetricScriptUpdateRequest
+    ) -> MetricScriptResponse:
+        """Update a script; new source is validated and saved as a revision."""
+        response = self._request(
+            "PATCH", f"/metric-scripts/{_path_part(script_id)}", json=_request_body(request)
+        )
+        return self._validate_model_payload(MetricScriptResponse, response.data)
+
+    def list_custom_dashboards(self) -> ListCustomDashboardsResponse:
+        """Custom dashboards visible to the caller (project-shared and their own)."""
+        response = self._request("GET", "/custom-dashboards")
+        return self._validate_model_payload(ListCustomDashboardsResponse, response.data)
+
+    def get_custom_dashboard(self, dashboard_id: str) -> CustomDashboardResponse:
+        response = self._request("GET", f"/custom-dashboards/{_path_part(dashboard_id)}")
+        return self._validate_model_payload(CustomDashboardResponse, response.data)
+
+    def create_custom_dashboard(
+        self, request: CustomDashboardCreateRequest
+    ) -> CustomDashboardResponse:
+        response = self._request("POST", "/custom-dashboards", json=_request_body(request))
+        return self._validate_model_payload(CustomDashboardResponse, response.data)
+
+    def update_custom_dashboard(
+        self, dashboard_id: str, request: CustomDashboardUpdateRequest
+    ) -> CustomDashboardResponse:
+        """Update a dashboard; a provided ``panels`` list replaces the previous one."""
+        response = self._request(
+            "PATCH",
+            f"/custom-dashboards/{_path_part(dashboard_id)}",
+            json=_request_body(request),
+        )
+        return self._validate_model_payload(CustomDashboardResponse, response.data)
+
+    def get_calibration_pipeline_catalog(
+        self, *, backend_name: str | None = None
+    ) -> PipelineCatalogResponse:
+        """Step types, task names and the spec schema for writing a calibration pipeline."""
+        params = {"backend_name": backend_name} if backend_name is not None else None
+        response = self._request("GET", "/calibration-pipelines/catalog", params=params)
+        return self._validate_model_payload(PipelineCatalogResponse, response.data)
+
+    def validate_calibration_pipeline(
+        self,
+        *,
+        chip_id: str,
+        spec: Mapping[str, Any],
+        backend_name: str | None = None,
+    ) -> ValidatePipelineResponse:
+        """Check a pipeline spec on the server without running it.
+
+        Problems with the spec come back in the response, not as an exception.
+        """
+        response = self._request(
+            "POST",
+            "/calibration-pipelines/validate",
+            json=self._query_params(chip_id=chip_id, spec=dict(spec), backend_name=backend_name),
+        )
+        return self._validate_model_payload(ValidatePipelineResponse, response.data)
+
+    def execute_calibration_pipeline(
+        self,
+        *,
+        chip_id: str,
+        spec: Mapping[str, Any],
+        backend_name: str | None = None,
+    ) -> ExecutePipelineResponse:
+        """Validate a pipeline spec on the server and dispatch it as one execution.
+
+        A spec with problems raises :class:`QDashValidationError` (422) whose ``payload`` holds
+        the server's problem list; nothing is dispatched.
+        """
+        response = self._request(
+            "POST",
+            "/calibration-pipelines/execute",
+            json=self._query_params(chip_id=chip_id, spec=dict(spec), backend_name=backend_name),
+        )
+        return self._validate_model_payload(ExecutePipelineResponse, response.data)
 
     def get_execution_activity(
         self,
@@ -738,11 +919,21 @@ class QDashClient:
         timeout_seconds: float = 600.0,
         poll_interval_seconds: float = 1.0,
         terminal_statuses: set[str] | None = None,
+        whole_pipeline: bool = True,
     ) -> ExecutionResponseDetail:
-        """Poll an execution until it reaches a terminal state or times out."""
+        """Poll an execution until it reaches a terminal state or times out.
+
+        When the execution is one step of a pipeline run and ``whole_pipeline`` is true, wait
+        for the whole run instead: a step's own execution finishes long before the run does.
+        The returned detail's ``pipeline.status`` then carries the run's outcome. An execution
+        without pipeline metadata, including one from a server that does not report it, is
+        judged by its own ``status``. A failed or cancelled run is returned, not raised.
+        """
         if timeout_seconds < 0 or poll_interval_seconds < 0:
             raise ValueError("Polling timeout and interval must be non-negative")
-        terminal = terminal_statuses or {"completed", "failed", "cancelled"}
+        terminal = {
+            status.lower() for status in (terminal_statuses or _EXECUTION_TERMINAL_STATUSES)
+        }
         deadline = time.monotonic() + timeout_seconds
 
         while True:
@@ -750,8 +941,14 @@ class QDashClient:
                 execution = self.get_execution(execution_id)
             except QDashNotFoundError:
                 execution = None
-            if execution is not None and execution.status.lower() in terminal:
-                return execution
+            if execution is not None:
+                status = (
+                    execution.pipeline.status
+                    if whole_pipeline and execution.pipeline is not None
+                    else execution.status
+                )
+                if status.lower() in terminal:
+                    return execution
             if time.monotonic() >= deadline:
                 raise TimeoutError(
                     f"Execution '{execution_id}' did not reach a terminal state "
@@ -1348,7 +1545,9 @@ class QDashClient:
                     raise_on_status=False,
                 )
             except RestApiException as exc:
-                if attempt < attempts:
+                if attempt < attempts and self._may_resend_after_transport_error(
+                    method, request_sent=exc.request_sent
+                ):
                     self._sleep(self._retry_delay_for_attempt(attempt))
                     continue
                 raise QDashTransportError(str(exc), payload=exc.body) from exc
@@ -1358,6 +1557,8 @@ class QDashClient:
                 and self.config.api_token is None
                 and self.config.username
             ):
+                # A 401 is a definite rejection, so the server did not act on the request and
+                # resending it with a fresh login token is safe for every method.
                 self._token = None
                 if attempt < attempts:
                     self._sleep(self._retry_delay_for_attempt(attempt, response))
@@ -1396,7 +1597,9 @@ class QDashClient:
                 ) as client:
                     response = await client.get(path, params=params, headers=headers)
             except httpx.HTTPError as exc:
-                if attempt < attempts:
+                if attempt < attempts and self._may_resend_after_transport_error(
+                    "GET", request_sent=request_may_have_been_sent(exc)
+                ):
                     await asyncio.sleep(self._retry_delay_for_attempt(attempt))
                     continue
                 raise QDashTransportError(str(exc)) from exc
@@ -1480,6 +1683,15 @@ class QDashClient:
             raise QDashAuthError("Login response did not include access_token", status_code=401)
         self._token = str(token)
         return self._token
+
+    def _may_resend_after_transport_error(self, method: str, *, request_sent: bool) -> bool:
+        """Return whether a request that failed in transport may be sent again.
+
+        Safe methods are always resent. Any other method is resent only when the connection
+        failed before the request went out: after a timeout or a dropped connection the server
+        may already have acted on it, and sending it again could repeat the write.
+        """
+        return method.upper() in _SAFE_METHODS or not request_sent
 
     def _is_retryable_status(self, status_code: int) -> bool:
         # Follow OpenAPI-declared responses for the currently supported GET endpoints.
