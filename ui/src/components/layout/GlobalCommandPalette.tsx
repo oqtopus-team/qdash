@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Bot,
   Braces,
   Check,
   FolderKanban,
@@ -27,6 +28,7 @@ import {
   CommandList,
 } from "@/components/ui/Command";
 import { useAuth } from "@/contexts/AuthContext";
+import { useChatDock } from "@/contexts/ChatDockContext";
 import { useProject } from "@/contexts/ProjectContext";
 import { useMetricsConfig } from "@/hooks/useMetricsConfig";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -56,11 +58,14 @@ export function GlobalCommandPalette() {
   const { canEdit, projects, projectId, switchProject } = useProject();
   const { theme, setTheme } = useTheme();
   const toast = useToast();
+  const { openGeneralChat } = useChatDock();
   const [shortcut, setShortcut] = useState("Ctrl K");
   const [open, setOpen] = useState(false);
   const isDashboard = pathname === "/dashboard";
   const isMetrics = pathname === "/metrics";
   const isTasks = pathname === "/tasks";
+  // The /chat page is the chat itself and hides the chat sidebar, so opening it there shows nothing.
+  const isChatPage = pathname === "/chat";
   const hasMetricCommands = isDashboard || isMetrics;
   const { qubitMetrics, couplingMetrics } = useMetricsConfig(hasMetricCommands);
   const { data: taskFileSettings } = useGetTaskFileSettings({
@@ -101,6 +106,12 @@ export function GlobalCommandPalette() {
   const navigate = (href: string) => {
     setOpen(false);
     router.push(href);
+  };
+
+  // Resumes the current general chat in the sidebar, or starts one, as the Ask AI tab does.
+  const openAgentChat = () => {
+    setOpen(false);
+    openGeneralChat();
   };
 
   const copyPageLink = async () => {
@@ -204,6 +215,25 @@ export function GlobalCommandPalette() {
               </CommandItem>
             </CommandGroup>
             <CommandGroup heading="Actions">
+              {!isChatPage && (
+                <CommandItem
+                  value="Open agent chat"
+                  keywords={[
+                    "agent",
+                    "chat",
+                    "copilot",
+                    "ai",
+                    "ask",
+                    "assistant",
+                    "チャット",
+                    "エージェント",
+                  ]}
+                  onSelect={openAgentChat}
+                >
+                  <Bot size={15} className="shrink-0 opacity-60" aria-hidden="true" />
+                  <span>Open agent chat</span>
+                </CommandItem>
+              )}
               <CommandItem
                 value="Open inbox"
                 keywords={["notifications", "inbox", "mentions", "通知", "受信箱"]}
