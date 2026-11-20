@@ -89,7 +89,7 @@ export function SweepParameterField({
           aria-invalid={Boolean(error)}
           aria-describedby={error ? errorId : undefined}
           aria-label={`${name} values`}
-          className="input input-sm input-bordered mt-2 w-full font-mono"
+          className={`input input-sm input-bordered mt-2 w-full font-mono ${error ? "input-error" : ""}`}
           value={listValue}
           placeholder="[0, 4, 16, 64]"
           onChange={(event) => onListChange(event.target.value)}
@@ -103,7 +103,7 @@ export function SweepParameterField({
                 aria-invalid={Boolean(error)}
                 aria-describedby={error ? errorId : undefined}
                 aria-label={`${name} ${argument}`}
-                className="input input-sm input-bordered w-full min-w-0 px-2 font-mono"
+                className={`input input-sm input-bordered w-full min-w-0 px-2 font-mono ${error ? "input-error" : ""}`}
                 value={parts[index] ?? ""}
                 onChange={(event) => onPartChange(index, event.target.value)}
               />
@@ -112,15 +112,17 @@ export function SweepParameterField({
         </div>
       )}
       {error && (
-        <span id={errorId} className="text-error text-xs">
+        <span id={errorId} className="mt-1 block break-words text-xs text-error">
           {error}
         </span>
       )}
-      <span className="mt-1 break-words text-xs text-base-content/45">
+      <span className="mt-1 block break-words text-xs text-base-content/45">
         {isBlank ? (
           "Blank runs the task default."
         ) : summary === null ? (
-          <span className="text-error">Enter numbers that produce a sweep.</span>
+          error ? null : (
+            <span className="text-error">Enter numbers that produce a sweep.</span>
+          )
         ) : (
           summary
         )}

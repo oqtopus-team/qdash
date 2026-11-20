@@ -305,6 +305,8 @@ describe("TaskWorkbench run availability", () => {
     expect(document.getElementById(field.getAttribute("aria-describedby")!)).toHaveTextContent(
       "Enter numbers that produce a range sweep for time_range",
     );
+    expect(field).toHaveClass("input-error");
+    expect(screen.queryByText("Enter numbers that produce a sweep.")).toBeNull();
     expect(mocks.toast.error).not.toHaveBeenCalled();
     expect(mocks.post).not.toHaveBeenCalled();
 

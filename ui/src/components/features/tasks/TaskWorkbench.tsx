@@ -385,7 +385,7 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
           </span>
         </span>
         <input
-          className="input input-sm input-bordered font-mono"
+          className={`input input-sm input-bordered font-mono ${error ? "input-error" : ""}`}
           {...register(`inputs.${index}.value`)}
           aria-invalid={Boolean(error)}
           aria-describedby={error ? errorId : undefined}
@@ -393,7 +393,7 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
           placeholder="Use current value"
         />
         {error && (
-          <span id={errorId} className="text-error text-xs">
+          <span id={errorId} className="mt-1 break-words text-xs text-error">
             {error}
           </span>
         )}
@@ -577,7 +577,7 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
                             </span>
                           </span>
                           <input
-                            className="input input-sm input-bordered font-mono"
+                            className={`input input-sm input-bordered font-mono ${errors.runs?.[index]?.value ? "input-error" : ""}`}
                             {...register(`runs.${index}.value`)}
                             aria-invalid={Boolean(errors.runs?.[index]?.value)}
                             aria-describedby={
@@ -589,7 +589,7 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
                           {errors.runs?.[index]?.value?.message && (
                             <span
                               id={`${runDisabledReasonId}-run-${index}-error`}
-                              className="text-error text-xs"
+                              className="mt-1 break-words text-xs text-error"
                             >
                               {errors.runs[index]?.value?.message}
                             </span>
