@@ -10,7 +10,7 @@ question such as "what is the median ZX90 fidelity of each coupling over the las
 
 **Dashboards** has two tabs. **Dashboards** lists the dashboards you own and those shared with
 the project. **Scripts** lists metric scripts: Python files that compute one value per qubit or
-per coupling for a **Metric script** panel. Writing a script is covered in
+per coupling that a metric panel can show. Writing a script is covered in
 [Metric Scripts](./metric-scripts.md); this page covers dashboards and their panels.
 
 ## Create a Dashboard
@@ -19,46 +19,47 @@ Project editors and owners can create dashboards; viewers can open the dashboard
 them.
 
 1. Open **Dashboards** and select **New dashboard**.
-2. Enter a name and an optional description.
-3. Under **Start from**, choose **Blank dashboard** or the **Frequency Collision Map** template.
-   The template adds a how-to note, a qubit frequency map, and the Type0A, Type0B, Type1A,
-   Type3A, Type1C, and Type2C collision checks. Its collision panels use the project's shared
-   **Frequency collision checks** script; when the project has none yet, QDash creates it and
-   shares it with the project. The dashboard is yours: later changes to the template do not
-   alter it.
-4. Choose **Private** to keep the dashboard to yourself or **Shared with project** to show it to
-   every project member. You can change this later.
-5. Choose the **Default chip**. Viewers can switch to another chip while they look at the
-   dashboard without changing the saved default.
-6. Select **Create dashboard**. The new dashboard opens; select **Edit** to add, remove, or
-   reconfigure panels.
+2. Under **Start from**, keep the **Frequency Collision Map** template, which is preselected, or
+   choose **Blank dashboard**. The template adds a how-to note, a qubit frequency map, and the
+   Type0A, Type0B, Type1A, Type3A, Type1C, and Type2C collision checks, ready to read on your
+   chip. Its collision panels use the project's shared **Frequency collision checks** script;
+   when the project has none yet, QDash creates it and shares it with the project. The dashboard
+   is yours: later changes to the template do not alter it. When the templates cannot be
+   loaded, the dialog says so, offers **try again**, and selects **Blank dashboard**.
+3. The **Name** follows the chosen template until you type your own.
+4. Choose the **Chip**. The newest active chip is preselected. Viewers can switch to another
+   chip while they look at the dashboard without changing the saved default.
+5. Under **Sharing**, keep **Private** or choose **Shared with project** to show it to every
+   project member. You can change this later.
+6. Select **Add a description** to add an optional description.
+7. Select **Create dashboard**. The new dashboard opens with its panels on the chosen chip;
+   select **Edit** to add, remove, or reconfigure panels.
 
-Change the name, description, visibility, or default chip later under **Dashboard settings**
+Change the name, description, sharing, or default chip later under **Dashboard settings**
 in the dashboard's actions menu, next to **Edit**.
 
 ## Add Panels
 
-In edit mode, select **Add panel**, choose the **Panel type**, and give the panel a title.
+In edit mode, select **Add panel** and choose **Metric** or **Note** under **Panel**. A note
+holds Markdown text, for example the purpose of the dashboard or the decision rule the team
+applies. A metric panel shows one metric on the chip topology or in a table:
 
-| Panel type | Shows | Settings |
-| --- | --- | --- |
-| **Qubit metric** | One qubit metric on the chip topology, with the same colour scale as **Overview** | Metric, **Value selection** (Latest, Best, or Average) |
-| **Coupling metric** | One coupling metric on the chip topology | Metric, **Value selection** |
-| **Metric script** | One metric of a saved metric script as a map or a table | **Script**, **Metric**, **Period**, **Parameters**, **View**, **Direction**, **Pair distance** |
-| **Markdown note** | Free text, for example the purpose of the dashboard or the decision rule the team applies | Content |
-
-For a **Metric script** panel:
-
-1. Choose the **Script**. The list shows the scripts you can see that have a valid revision.
-2. Choose the **Metric**: each metric the script defines.
-3. Set the **Period**. **Last days** always shows the most recent number of days, measured when
-   the panel loads; **Fixed range** shows the same start and end every time.
-4. Adjust **Parameters** if the metric has any. Only values that differ from the default are
-   kept.
-5. Choose **Map** or **Table** under **View**. For a metric computed per coupling, choose the
-   **Direction** to draw and the **Pair distance**: **1** for neighbouring qubits, **2** for
-   qubits two steps apart, among the distances the metric supports.
-6. Select **Apply**.
+1. Under **Show**, choose the metric. The list groups **Qubit metrics** and **Coupling metrics**,
+   which read the latest calibration like **Overview**, and then each metric a saved script
+   computes, under the script's name, with its unit and whether it is per qubit or per pair.
+   Scripts without a valid revision are not listed; a private script is marked **(private)**.
+2. The **Title** follows the metric until you type your own.
+3. For a qubit or coupling metric, choose the **Value selection**: **Latest**, **Best**, or
+   **Average**.
+4. For a script metric, set the **Period** and the **View**. **Last days** always shows the
+   most recent number of days, measured when the panel loads; **Fixed range** shows the same
+   start and end every time. For a metric computed per pair, choose the **Direction** to draw
+   and the **Pair distance**: **1 hop** for neighbouring qubits, **2 hops** for qubits two
+   steps apart, among the distances the metric supports.
+5. Open **Advanced** to adjust the metric's **Parameters**, if it has any, and to see which
+   script and revision the panel uses. Only parameter values that differ from the default are
+   kept. The section opens by itself when the panel already has parameter values.
+6. Select **Apply** (or **Add panel**).
 
 Each panel sits on a 12-column grid. Use the panel menu to move it, make it wider or narrower,
 taller or shorter, duplicate it, or remove it. On a narrow screen every panel spans the full width.
@@ -71,14 +72,16 @@ values: every time someone opens it, the panels read the current data of the sel
 ## Keep Panels on a Known Script Revision
 
 Every save of a metric script creates a numbered revision, shown as **r1**, **r2**, and so on.
-A **Metric script** panel is pinned to the revision that was current when you added it, so
-nobody's edit to a script changes what your dashboard shows without your knowledge.
+A panel that shows a script metric is pinned to the revision that was current when you added
+it, so nobody's edit to a script changes what your dashboard shows without your knowledge.
 
-When the script has a newer valid revision, the panel shows **Newer revision rN available**. In
-edit mode, select **Update to rN** on the panel, check the result, and **Save** the dashboard to
-move the pin. A saved revision that a dashboard pins is kept even when the script has many later
-revisions. A script keeps at most 50 revisions, so when dashboards pin 50 of them, saving new
-code is refused until some panels are updated to a newer revision or removed.
+When the script has a newer valid revision, the panel shows **Update available**. In edit
+mode, select **Use updated definition** on the panel, or in the panel's **Advanced** section,
+which shows the pinned and the active revision numbers; check the result, then **Save** the
+dashboard to move the pin. Nothing moves until you do. A saved revision that a dashboard pins
+is kept even when the script has many later revisions. A script keeps at most 50 revisions, so
+when dashboards pin 50 of them, saving new code is refused until some panels are updated to a
+newer revision or removed.
 
 ## Read a Metric Script Panel
 
@@ -109,9 +112,12 @@ A dashboard set to **Shared with project** appears under **Shared with project**
 themselves, and use **Copy link** to send the page to a colleague, who needs access to the same
 project to open it.
 
-A shared dashboard can only use scripts that are also shared with the project; QDash refuses to
-save one that uses a private script. Share the script first from its **Settings** in the script
-editor.
+A shared dashboard can only use scripts that are also shared with the project. When you select
+**Share with project** and a panel uses a private script, QDash lists those scripts instead of
+sharing: select **Open script settings** for a script you own and share it from its
+**Settings** in the script editor, or ask the owner named in the list, or replace the panel.
+QDash never shares a script on your behalf. The panel editor warns in the same way when you add
+a private script's metric to a shared dashboard.
 
 Only the owner and project owners can edit, re-share, or delete a dashboard; **Share with
 project**, **Make private**, and **Delete dashboard** are in the dashboard's actions menu. Any

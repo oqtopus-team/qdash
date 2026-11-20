@@ -1,8 +1,9 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { DashboardPanelResponse, MetricInfo, MetricScriptSummary } from "@/schemas";
 
+import { choiceValue } from "../metricChoices";
 import { PanelEditorDialog } from "../PanelEditorDialog";
 
 const ZX90: MetricInfo = {
@@ -92,6 +93,12 @@ vi.mock("@/hooks/useMetricsConfig", () => ({
   }),
 }));
 
+const ZX90_CHOICE = choiceValue({
+  kind: "metric_script",
+  script_id: "ms_zx90",
+  metric_id: "zx90_median",
+});
+
 function renderEditor(panel: DashboardPanelResponse | null = null, dashboardShared = false) {
   const onSave = vi.fn();
   render(
@@ -106,24 +113,67 @@ function renderEditor(panel: DashboardPanelResponse | null = null, dashboardShar
   return onSave;
 }
 
+function collisionPanel(): DashboardPanelResponse {
+  return {
+    panel_id: "p1",
+    type: "metric_script",
+    title: "Collisions",
+    layout: { x: 0, y: 0, w: 6, h: 4 },
+    config: {
+      script_id: "ms_collision",
+      metric_id: "type1a",
+      script_revision: 4,
+      period: { kind: "relative", days: 7 },
+      params: { window: 0.8 },
+      view: "map",
+      direction: "both",
+      hops: [1, 2],
+    },
+    script_name: "Collisions",
+    latest_revision: 5,
+  };
+}
+
 describe("PanelEditorDialog", () => {
   afterEach(() => {
     cleanup();
   });
 
-  it("pins a new metric script panel to the script's active revision", () => {
+  it("lists chip metrics and script metrics by source, without scripts lacking a valid revision", () => {
+    renderEditor();
+
+    const show = screen.getByLabelText("Show");
+    const groups = within(show)
+      .getAllByRole("group")
+      .map((group) => group.getAttribute("label"));
+    expect(groups).toEqual([
+      "Qubit metrics",
+      "Coupling metrics",
+      "ZX90 median",
+      "Collisions (private)",
+    ]);
+    expect(screen.queryByRole("group", { name: "Broken" })).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("option", { name: "Median ZX90 gate fidelity (%) · per pair" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add panel" })).toBeDisabled();
+    expect(screen.getByText("Choose a metric")).toBeInTheDocument();
+  });
+
+  it("adds a script metric with a period and view, pinned to the active revision", () => {
     const onSave = renderEditor();
 
-    fireEvent.change(screen.getByLabelText("Panel type"), { target: { value: "metric_script" } });
-    expect(screen.getByRole("button", { name: "Add panel" })).toBeDisabled();
-    // Scripts without a valid revision cannot be chosen.
-    expect(screen.queryByRole("option", { name: "Broken" })).not.toBeInTheDocument();
-
-    fireEvent.change(screen.getByLabelText("Script"), { target: { value: "ms_zx90" } });
-    expect(screen.getByText("Pinned to r2")).toBeInTheDocument();
-    // The only metric is chosen; its declared single hop hides the distance choice.
-    expect(screen.getByLabelText("Metric")).toHaveValue("zx90_median");
+    fireEvent.change(screen.getByLabelText("Show"), { target: { value: ZX90_CHOICE } });
+    // The title follows the metric; period and view are in the main form.
+    expect(screen.getByLabelText("Title")).toHaveValue("Median ZX90 gate fidelity");
+    expect(screen.getByLabelText("Days back from now")).toHaveValue(14);
+    expect(screen.getByLabelText("View")).toHaveValue("map");
+    // A single declared hop hides the distance choice; the pin is in the advanced section.
     expect(screen.queryByLabelText("2 hops (next-nearest)")).not.toBeInTheDocument();
+    expect(screen.getByTestId("panel-revision")).toHaveTextContent("pinned to r2");
+    expect(
+      screen.queryByRole("button", { name: "Use updated definition" }),
+    ).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText("Minimum observations"), { target: { value: "5" } });
     fireEvent.change(screen.getByLabelText("Direction"), { target: { value: "forward" } });
@@ -132,7 +182,7 @@ describe("PanelEditorDialog", () => {
 
     expect(onSave).toHaveBeenCalledWith({
       type: "metric_script",
-      title: "",
+      title: "Median ZX90 gate fidelity",
       config: {
         script_id: "ms_zx90",
         metric_id: "zx90_median",
@@ -148,34 +198,31 @@ describe("PanelEditorDialog", () => {
     });
   });
 
-  it("keeps the pinned revision of an existing panel and drops parameters set to default", () => {
-    const onSave = renderEditor(
-      {
-        panel_id: "p1",
-        type: "metric_script",
-        title: "Collisions",
-        layout: { x: 0, y: 0, w: 6, h: 4 },
-        config: {
-          script_id: "ms_collision",
-          metric_id: "type1a",
-          script_revision: 4,
-          period: { kind: "relative", days: 7 },
-          params: { window: 0.8 },
-          view: "map",
-          direction: "both",
-          hops: [1, 2],
-        },
-        script_name: "Collisions",
-        latest_revision: 5,
-      },
-      true,
-    );
+  it("keeps a typed title when the metric changes", () => {
+    renderEditor();
 
-    expect(screen.getByText("Pinned to r4")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Use active r5" })).toBeInTheDocument();
-    // A private script cannot be used on a dashboard shared with the project.
-    expect(screen.getByRole("status")).toHaveTextContent("This script is private");
+    fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Fidelity watch" } });
+    fireEvent.change(screen.getByLabelText("Show"), { target: { value: ZX90_CHOICE } });
+
+    expect(screen.getByLabelText("Title")).toHaveValue("Fidelity watch");
+  });
+
+  it("keeps the pinned revision of an existing panel until the update is requested", () => {
+    const onSave = renderEditor(collisionPanel(), true);
+
+    // The pinned catalog is listed, with stored parameters visible in the open advanced section.
+    expect(screen.getByLabelText("Show")).toHaveValue(
+      choiceValue({ kind: "metric_script", script_id: "ms_collision", metric_id: "type1a" }),
+    );
+    expect(screen.getByTestId("panel-revision")).toHaveTextContent("pinned to r4 · active r5");
+    expect(screen.getByRole("button", { name: "Use updated definition" })).toBeInTheDocument();
     expect(screen.getByLabelText("window (GHz)")).toHaveValue(0.8);
+    // A private script cannot be used on a dashboard shared with the project.
+    const alerts = screen.getAllByRole("status");
+    expect(alerts[0]).toHaveTextContent("This metric comes from a private script");
+    expect(
+      within(alerts[0]).getByRole("link", { name: "Open the script's settings" }),
+    ).toHaveAttribute("href", "/custom-dashboards/scripts/ms_collision#metric-script-settings");
 
     fireEvent.change(screen.getByLabelText("window (GHz)"), { target: { value: "0.5" } });
     fireEvent.click(screen.getByLabelText("Strict"));
@@ -200,10 +247,27 @@ describe("PanelEditorDialog", () => {
     });
   });
 
+  it("moves the pin only on Use updated definition", () => {
+    const onSave = renderEditor(collisionPanel());
+
+    fireEvent.click(screen.getByRole("button", { name: "Use updated definition" }));
+    expect(screen.getByTestId("panel-revision")).toHaveTextContent("pinned to r5");
+    expect(
+      screen.queryByRole("button", { name: "Use updated definition" }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Apply" }));
+    expect(onSave.mock.calls[0][0].config).toMatchObject({
+      script_id: "ms_collision",
+      metric_id: "type1a",
+      script_revision: 5,
+      params: { window: 0.8 },
+    });
+  });
+
   it("blocks invalid parameters and periods", () => {
     renderEditor();
-    fireEvent.change(screen.getByLabelText("Panel type"), { target: { value: "metric_script" } });
-    fireEvent.change(screen.getByLabelText("Script"), { target: { value: "ms_zx90" } });
+    fireEvent.change(screen.getByLabelText("Show"), { target: { value: ZX90_CHOICE } });
 
     fireEvent.change(screen.getByLabelText("Minimum observations"), { target: { value: "0" } });
     expect(screen.getByText("Must be at least 1")).toBeInTheDocument();
@@ -219,17 +283,56 @@ describe("PanelEditorDialog", () => {
     expect(screen.getByRole("button", { name: "Add panel" })).toBeDisabled();
   });
 
-  it("requires a metric for metric panels", () => {
+  it("saves a chip metric with its value selection and no period", () => {
     const onSave = renderEditor();
 
-    expect(screen.getByRole("button", { name: "Add panel" })).toBeDisabled();
-    fireEvent.change(screen.getByLabelText("Metric"), { target: { value: "t1" } });
+    fireEvent.change(screen.getByLabelText("Show"), {
+      target: { value: choiceValue({ kind: "qubit_metric", metric: "t1" }) },
+    });
+    expect(screen.queryByLabelText("Days back from now")).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Value selection"), { target: { value: "best" } });
     fireEvent.click(screen.getByRole("button", { name: "Add panel" }));
 
     expect(onSave).toHaveBeenCalledWith({
       type: "qubit_metric",
+      title: "T1",
+      config: { metric: "t1", selection_mode: "best" },
+      script_name: null,
+      latest_revision: null,
+    });
+  });
+
+  it("opens an existing coupling metric panel on its metric", () => {
+    renderEditor({
+      panel_id: "p2",
+      type: "coupling_metric",
       title: "",
-      config: { metric: "t1", selection_mode: "latest" },
+      layout: { x: 0, y: 0, w: 6, h: 4 },
+      config: { metric: "zx90_gate_fidelity", selection_mode: "average" },
+    });
+
+    expect(screen.getByLabelText("Show")).toHaveValue(
+      choiceValue({ kind: "coupling_metric", metric: "zx90_gate_fidelity" }),
+    );
+    expect(screen.getByLabelText("Value selection")).toHaveValue("average");
+  });
+
+  it("switches to a note with the keyboard-reachable panel kind radios", () => {
+    const onSave = renderEditor();
+
+    fireEvent.click(screen.getByRole("radio", { name: "Note" }));
+    expect(screen.queryByLabelText("Show")).not.toBeInTheDocument();
+    expect(screen.getByText("Write the note content")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByPlaceholderText("Write Markdown"), {
+      target: { value: "Review rule" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add panel" }));
+
+    expect(onSave).toHaveBeenCalledWith({
+      type: "markdown",
+      title: "",
+      config: { content: "Review rule" },
       script_name: null,
       latest_revision: null,
     });

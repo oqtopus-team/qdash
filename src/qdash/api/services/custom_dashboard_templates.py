@@ -58,8 +58,9 @@ times and coupling strengths of the last 30 days.
 - Type2C shows a signed two-photon detuning in MHz instead of a ratio.
 
 Select a qubit or an edge for the terms behind the verdict. Adjust the limits, the CNOT time and
-the fallback values from each panel's settings; they are saved with this dashboard. Edit the
-script itself from the Scripts tab; panels keep their pinned revision until you update them.
+the fallback values under **Advanced** in each panel's settings; they are saved with this
+dashboard. Edit the script itself from the Scripts tab; panels keep the revision they were saved
+with until you choose **Use updated definition**.
 """
 
 

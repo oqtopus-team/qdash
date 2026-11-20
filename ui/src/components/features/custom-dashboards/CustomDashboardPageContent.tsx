@@ -32,6 +32,7 @@ import {
   useGetCustomDashboard,
   useUpdateCustomDashboard,
 } from "@/client/custom-dashboard/custom-dashboard";
+import { useListMetricScripts } from "@/client/metric-script/metric-script";
 import type {
   CustomDashboardResponse,
   CustomDashboardUpdateRequest,
@@ -40,6 +41,7 @@ import type {
 } from "@/schemas";
 import { ChipSelector } from "@/components/selectors/ChipSelector";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -64,6 +66,7 @@ import { DashboardFormDialog, type DashboardFormValues } from "./DashboardFormDi
 import { DashboardPanelCard, type PanelCommand } from "./DashboardPanelCard";
 import { applyLayoutAction, nextPanelLayout, resolveCollisions, sortPanels } from "./layout";
 import { type PanelDraft, PanelEditorDialog } from "./PanelEditorDialog";
+import { readMetricScriptConfig } from "./panelConfig";
 import { VisibilityLabel } from "./VisibilityLabel";
 
 /** Backend limit on panels per dashboard. */
@@ -154,6 +157,13 @@ export function CustomDashboardPageContent({ dashboardId }: { dashboardId: strin
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsError, setSettingsError] = useState<string | null>(null);
   const [pendingConfirm, setPendingConfirm] = useState<PendingConfirm>(null);
+  // Why the dashboard cannot be shared yet: the server's reason, or null when the private
+  // scripts below explain it on their own.
+  const [sharingBlocked, setSharingBlocked] = useState<{ message: string | null } | null>(null);
+
+  // Scripts the caller can see, to explain sharing limits before the server refuses a save.
+  const scriptsQuery = useListMetricScripts({ query: { enabled: canEdit } });
+  const scripts = useMemo(() => scriptsQuery.data?.data.scripts ?? [], [scriptsQuery.data]);
 
   const savedPanels = useMemo(() => dashboard?.panels ?? [], [dashboard?.panels]);
   const panels = editing ? draft : savedPanels;
@@ -382,14 +392,40 @@ export function CustomDashboardPageContent({ dashboardId }: { dashboardId: strin
     : null;
   const busy = updateMutation.isPending;
 
-  const toggleSharing = () =>
-    update(
-      { visibility: shared ? "private" : "project" },
+  // Private scripts the saved panels use; a shared dashboard may only show shared scripts.
+  // Sharing is never granted here: the owner shares the script from its own settings.
+  const privateScripts = scripts.filter(
+    (script) =>
+      script.visibility === "private" &&
+      savedPanels.some(
+        (panel) =>
+          panel.type === "metric_script" &&
+          readMetricScriptConfig(panel).script_id === script.script_id,
+      ),
+  );
+
+  const toggleSharing = () => {
+    if (!shared && privateScripts.length > 0) {
+      setSharingBlocked({ message: null });
+      return;
+    }
+    updateMutation.mutate(
+      { dashboardId, data: { visibility: shared ? "private" : "project" } },
       {
-        success: shared ? "Dashboard is now private" : "Dashboard shared with the project",
-        failure: "Failed to change sharing",
+        onSuccess: (response) => {
+          storeResponse(response.data);
+          toast.success(shared ? "Dashboard is now private" : "Dashboard shared with the project");
+        },
+        onError: (error) => {
+          if (!shared && isAxiosError(error) && error.response?.status === 422) {
+            setSharingBlocked({ message: getApiErrorMessage(error, "Failed to change sharing") });
+            return;
+          }
+          toast.error(getApiErrorMessage(error, "Failed to change sharing"));
+        },
       },
     );
+  };
 
   // Copy link and Duplicate stay visible for everyone they apply to; the owner-only
   // sharing, settings and delete actions sit behind one overflow menu next to Edit.
@@ -654,6 +690,64 @@ export function CustomDashboardPageContent({ dashboardId }: { dashboardId: strin
           setEditing(false);
         }}
       />
+      <Dialog
+        open={sharingBlocked !== null}
+        onOpenChange={(open) => !open && setSharingBlocked(null)}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogTitle>Share with project</DialogTitle>
+          <DialogDescription className="mt-1 text-xs text-base-content/60">
+            A shared dashboard can only show scripts that are shared with the project
+          </DialogDescription>
+          <div className="mt-3 flex flex-col gap-3 text-sm">
+            {sharingBlocked?.message && (
+              <div role="alert" className="alert alert-warning alert-soft text-sm">
+                {sharingBlocked.message}
+              </div>
+            )}
+            {privateScripts.length > 0 && (
+              <>
+                <p>
+                  These scripts are private. Share each one first, or replace its panels, then share
+                  the dashboard. Nothing is shared on your behalf.
+                </p>
+                <ul className="divide-y divide-base-content/10 rounded-[var(--radius-box)] border border-base-content/10">
+                  {privateScripts.map((script) => (
+                    <li
+                      key={script.script_id}
+                      className="flex flex-wrap items-center justify-between gap-2 px-3 py-2"
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate font-medium">{script.name}</span>
+                        <span className="block text-xs text-base-content/60">
+                          by {script.owner_username}
+                        </span>
+                      </span>
+                      {script.can_edit ? (
+                        <Link
+                          href={`/custom-dashboards/scripts/${script.script_id}#metric-script-settings`}
+                          className="btn btn-sm"
+                        >
+                          Open script settings
+                        </Link>
+                      ) : (
+                        <span className="text-xs text-base-content/60">
+                          Ask {script.owner_username} to share it
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </div>
+          <div className="modal-action mt-2">
+            <button type="button" className="btn" onClick={() => setSharingBlocked(null)}>
+              Close
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
       <ConfirmDialog
         open={pendingConfirm === "delete"}
         title="Delete dashboard"

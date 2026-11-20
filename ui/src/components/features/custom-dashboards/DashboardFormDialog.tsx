@@ -4,8 +4,9 @@ import { type FormEvent, useEffect, useId, useMemo, useRef, useState } from "rea
 
 import { useListChips } from "@/client/chip/chip";
 import { useListCustomDashboardTemplates } from "@/client/custom-dashboard/custom-dashboard";
-import type { CustomDashboardResponseVisibility } from "@/schemas";
+import type { CustomDashboardResponseVisibility, CustomDashboardTemplateResponse } from "@/schemas";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
+import { getApiErrorMessage } from "@/lib/utils/apiError";
 import { sortChipsByDefaultPriority } from "@/lib/utils/chips";
 
 export interface DashboardFormValues {
@@ -17,6 +18,9 @@ export interface DashboardFormValues {
   template_id?: string | null;
 }
 
+/** Radio value of the explicit "no template" choice. */
+const BLANK = "blank";
+
 interface DashboardFormProps {
   initial: DashboardFormValues | null;
   submitLabel: string;
@@ -24,6 +28,43 @@ interface DashboardFormProps {
   error: string | null;
   onCancel: () => void;
   onSubmit: (values: DashboardFormValues) => void;
+}
+
+function TemplateChoice({
+  name,
+  value,
+  checked,
+  title,
+  detail,
+  onChange,
+}: {
+  name: string;
+  value: string;
+  checked: boolean;
+  title: string;
+  detail: string;
+  onChange: () => void;
+}) {
+  return (
+    <label
+      className={`choice-field gap-3 rounded-[var(--radius-field)] border p-3 ${
+        checked ? "border-primary/40 bg-primary/5" : "border-base-300"
+      }`}
+    >
+      <input
+        type="radio"
+        name={name}
+        value={value}
+        className="radio radio-sm"
+        checked={checked}
+        onChange={onChange}
+      />
+      <span>
+        <span className="block font-medium">{title}</span>
+        <span className="block text-xs text-base-content/60">{detail}</span>
+      </span>
+    </label>
+  );
 }
 
 function DashboardForm({
@@ -40,6 +81,7 @@ function DashboardForm({
     () => sortChipsByDefaultPriority(chipsResponse?.data?.chips ?? []),
     [chipsResponse],
   );
+  const isCreate = initial === null;
 
   const [name, setName] = useState(initial?.name ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
@@ -47,12 +89,40 @@ function DashboardForm({
     initial?.visibility ?? "private",
   );
   const [chipId, setChipId] = useState<string>(initial?.chip_id ?? "");
-  const isCreate = initial === null;
-  const { data: templatesResponse } = useListCustomDashboardTemplates({
+
+  const templatesQuery = useListCustomDashboardTemplates({
     query: { enabled: isCreate, staleTime: Infinity },
   });
-  const templates = templatesResponse?.data?.templates ?? [];
-  const [templateId, setTemplateId] = useState<string>("");
+  const templates = useMemo<CustomDashboardTemplateResponse[]>(
+    () => templatesQuery.data?.data?.templates ?? [],
+    [templatesQuery.data],
+  );
+  const templatesLoading = isCreate && !!templatesQuery.isLoading;
+  const templatesFailed = isCreate && !!templatesQuery.isError;
+  // "" until a default is chosen; the first template once they load, else the blank start.
+  const [templateChoice, setTemplateChoice] = useState<string>("");
+  const templateId = templateChoice === BLANK ? "" : templateChoice;
+  const template = templates.find((entry) => entry.template_id === templateId);
+
+  // The name follows the chosen template until the user types one of their own.
+  const nameEdited = useRef(!isCreate);
+  const applyTemplateChoice = (choice: string) => {
+    setTemplateChoice(choice);
+    if (nameEdited.current) return;
+    const next = templates.find((entry) => entry.template_id === choice);
+    setName(next?.name ?? "");
+  };
+
+  // Default to the first template once the list arrives; a failed or empty list starts blank.
+  const templateDefaulted = useRef(!isCreate);
+  useEffect(() => {
+    if (templateDefaulted.current || templatesLoading) return;
+    if (!templatesFailed && templates.length === 0 && templatesQuery.data === undefined) return;
+    templateDefaulted.current = true;
+    const first = templates[0]?.template_id ?? BLANK;
+    setTemplateChoice(first);
+    if (!nameEdited.current) setName(templates[0]?.name ?? "");
+  }, [templates, templatesFailed, templatesLoading, templatesQuery.data]);
 
   // A new dashboard defaults to the most recently installed active chip, once.
   const chipDefaulted = useRef(initial !== null);
@@ -64,10 +134,12 @@ function DashboardForm({
 
   const trimmedName = name.trim();
   const nameError = trimmedName ? null : "Enter a name";
+  // Never submit a blank dashboard on the user's behalf while the templates are still unknown.
+  const startUndecided = isCreate && templateChoice === "";
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
-    if (nameError) return;
+    if (nameError || startUndecided) return;
     onSubmit({
       name: trimmedName,
       description: description.trim(),
@@ -77,8 +149,82 @@ function DashboardForm({
     });
   };
 
+  const descriptionField = (
+    <fieldset className="fieldset">
+      <legend className="fieldset-legend">
+        <label htmlFor={`${id}-description`}>Description</label>
+      </legend>
+      <textarea
+        id={`${id}-description`}
+        className="textarea w-full"
+        rows={2}
+        value={description}
+        maxLength={2000}
+        placeholder="What this dashboard is for"
+        onChange={(event) => setDescription(event.target.value)}
+      />
+    </fieldset>
+  );
+
   return (
     <form className="mt-3 flex flex-col gap-3" onSubmit={handleSubmit} noValidate>
+      {isCreate && (
+        <fieldset className="fieldset">
+          <legend className="fieldset-legend">Start from</legend>
+          {templatesLoading ? (
+            <div
+              className="grid grid-cols-1 gap-2 sm:grid-cols-2"
+              aria-busy="true"
+              aria-label="Loading templates"
+            >
+              <div className="skeleton h-16" />
+              <div className="skeleton h-16" />
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {templates.map((entry) => (
+                <TemplateChoice
+                  key={entry.template_id}
+                  name={`${id}-template`}
+                  value={entry.template_id}
+                  checked={templateChoice === entry.template_id}
+                  title={entry.name}
+                  detail={`${entry.description}. ${entry.panel_count} panels, ready to use on your chip.`}
+                  onChange={() => applyTemplateChoice(entry.template_id)}
+                />
+              ))}
+              <TemplateChoice
+                name={`${id}-template`}
+                value={BLANK}
+                checked={templateChoice === BLANK}
+                title="Blank dashboard"
+                detail="Add panels yourself"
+                onChange={() => applyTemplateChoice(BLANK)}
+              />
+            </div>
+          )}
+          {templatesFailed ? (
+            <div role="alert" className="alert alert-warning alert-soft mt-2 text-sm">
+              <span>
+                {getApiErrorMessage(templatesQuery.error, "Templates could not be loaded")}. You can
+                start blank, or{" "}
+                <button
+                  type="button"
+                  className="link"
+                  disabled={templatesQuery.isFetching}
+                  onClick={() => void templatesQuery.refetch()}
+                >
+                  try again
+                </button>
+                .
+              </span>
+            </div>
+          ) : !templatesLoading && templates.length === 0 ? (
+            <p className="label whitespace-normal">No templates are available in this project</p>
+          ) : null}
+        </fieldset>
+      )}
+
       <fieldset className="fieldset">
         <legend className="fieldset-legend">
           <label htmlFor={`${id}-name`}>Name</label>
@@ -89,70 +235,47 @@ function DashboardForm({
           value={name}
           maxLength={200}
           placeholder="Dashboard name"
-          autoFocus
-          onChange={(event) => setName(event.target.value)}
+          autoFocus={!isCreate}
+          onChange={(event) => {
+            nameEdited.current = event.target.value !== "";
+            setName(event.target.value);
+          }}
         />
+        {isCreate && template && !nameEdited.current && (
+          <p className="label whitespace-normal">Named after the template; change it if you like</p>
+        )}
       </fieldset>
 
       <fieldset className="fieldset">
         <legend className="fieldset-legend">
-          <label htmlFor={`${id}-description`}>Description</label>
+          <label htmlFor={`${id}-chip`}>{isCreate ? "Chip" : "Default chip"}</label>
         </legend>
-        <textarea
-          id={`${id}-description`}
-          className="textarea w-full"
-          rows={2}
-          value={description}
-          maxLength={2000}
-          placeholder="What this dashboard is for"
-          onChange={(event) => setDescription(event.target.value)}
-        />
+        <select
+          id={`${id}-chip`}
+          className="select w-full"
+          value={chipId}
+          onChange={(event) => {
+            chipDefaulted.current = true;
+            setChipId(event.target.value);
+          }}
+        >
+          <option value="">Newest chip when opened</option>
+          {chips.map((chip) => (
+            <option key={chip.chip_id} value={chip.chip_id}>
+              {chip.chip_id}
+              {chip.activity_status === "inactive" ? " (inactive)" : ""}
+            </option>
+          ))}
+        </select>
+        <p className="label whitespace-normal">
+          {chips.length === 0
+            ? "No chip is registered yet; the dashboard opens on the newest chip once one exists"
+            : "The chip the panels show by default; viewers can switch chips without changing it"}
+        </p>
       </fieldset>
 
-      {isCreate && (
-        <fieldset className="fieldset">
-          <legend className="fieldset-legend">Start from</legend>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <label className="choice-field gap-3 rounded-[var(--radius-field)] border border-base-300 p-3">
-              <input
-                type="radio"
-                name={`${id}-template`}
-                className="radio radio-sm"
-                checked={templateId === ""}
-                onChange={() => setTemplateId("")}
-              />
-              <span>
-                <span className="block font-medium">Blank dashboard</span>
-                <span className="block text-xs text-base-content/60">Add panels yourself</span>
-              </span>
-            </label>
-            {templates.map((template) => (
-              <label
-                key={template.template_id}
-                className="choice-field gap-3 rounded-[var(--radius-field)] border border-base-300 p-3"
-              >
-                <input
-                  type="radio"
-                  name={`${id}-template`}
-                  className="radio radio-sm"
-                  checked={templateId === template.template_id}
-                  onChange={() => setTemplateId(template.template_id)}
-                />
-                <span>
-                  <span className="block font-medium">{template.name}</span>
-                  <span className="block text-xs text-base-content/60">
-                    {template.description}. {template.panel_count} panels, copied into your
-                    dashboard.
-                  </span>
-                </span>
-              </label>
-            ))}
-          </div>
-        </fieldset>
-      )}
-
       <fieldset className="fieldset">
-        <legend className="fieldset-legend">Visibility</legend>
+        <legend className="fieldset-legend">Sharing</legend>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           <label className="choice-field gap-3 rounded-[var(--radius-field)] border border-base-300 p-3">
             <input
@@ -183,31 +306,23 @@ function DashboardForm({
             </span>
           </label>
         </div>
+        {isCreate && (
+          <p className="label whitespace-normal">
+            {visibility === "project"
+              ? "A shared dashboard can only show scripts that are shared with the project"
+              : "You can share it with the project later from the dashboard's actions menu"}
+          </p>
+        )}
       </fieldset>
 
-      <fieldset className="fieldset">
-        <legend className="fieldset-legend">
-          <label htmlFor={`${id}-chip`}>Default chip</label>
-        </legend>
-        <select
-          id={`${id}-chip`}
-          className="select w-full"
-          value={chipId}
-          onChange={(event) => {
-            chipDefaulted.current = true;
-            setChipId(event.target.value);
-          }}
-        >
-          <option value="">Newest chip when opened</option>
-          {chips.map((chip) => (
-            <option key={chip.chip_id} value={chip.chip_id}>
-              {chip.chip_id}
-              {chip.activity_status === "inactive" ? " (inactive)" : ""}
-            </option>
-          ))}
-        </select>
-        <p className="label whitespace-normal">Viewers can switch chips without changing this</p>
-      </fieldset>
+      {isCreate ? (
+        <details className="collapse collapse-arrow rounded-[var(--radius-field)] border border-base-300">
+          <summary className="collapse-title min-h-0 py-2 text-sm">Add a description</summary>
+          <div className="collapse-content pb-2">{descriptionField}</div>
+        </details>
+      ) : (
+        descriptionField
+      )}
 
       {error && (
         <div role="alert" className="alert alert-error alert-soft text-sm">
@@ -219,7 +334,11 @@ function DashboardForm({
         <button type="button" className="btn btn-ghost" onClick={onCancel} disabled={pending}>
           Cancel
         </button>
-        <button type="submit" className="btn btn-primary" disabled={pending || !!nameError}>
+        <button
+          type="submit"
+          className="btn btn-primary"
+          disabled={pending || !!nameError || startUndecided}
+        >
           {pending && (
             <span data-icon="inline-start" className="loading loading-spinner loading-xs" />
           )}
@@ -256,7 +375,7 @@ export function DashboardFormDialog({
         <DialogTitle>{mode === "create" ? "New dashboard" : "Dashboard settings"}</DialogTitle>
         <DialogDescription className="mt-1 text-xs text-base-content/60">
           {mode === "create"
-            ? "Start blank or copy a template, then adjust the panels at any time"
+            ? "Pick a template and a chip; you can adjust every panel afterwards"
             : "These settings are saved immediately"}
         </DialogDescription>
         <DashboardForm

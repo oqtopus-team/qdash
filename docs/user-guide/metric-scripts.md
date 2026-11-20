@@ -2,8 +2,8 @@
 
 A metric script is a short Python file that computes one value per qubit or per directed qubit
 pair from your calibration data, such as the median ZX90 fidelity of each coupling over the
-last two weeks. QDash runs it on the server and shows the result in a **Metric script** panel
-on a [dashboard](./custom-dashboards.md), as a chip map or a table.
+last two weeks. QDash runs it on the server and shows the result in a metric panel on a
+[dashboard](./custom-dashboards.md), as a chip map or a table.
 
 ## Create a Script
 
@@ -66,7 +66,8 @@ unit cannot be converted to the declared one, or an exception marks that one tar
 error with the line it occurred on; the other targets are still evaluated.
 
 A script can define several metrics: decorate each function you want to show, and keep helper
-functions without the decorator. Each metric appears separately in the **Metric** pickers.
+functions without the decorator. Each metric appears separately under the script's name in the
+panel editor's **Show** list and in the preview's metric picker.
 
 ## Read Data
 
@@ -237,8 +238,9 @@ aid rather than a calibrated tolerance.
    of samples, the minimum, the maximum, and the time of the latest measurement. Grey edges have
    fewer measurements than **Minimum observations**; lower it under **Parameters** to include
    them.
-4. Select **Save**, then add a **Metric script** panel for it to a dashboard, with **Pair
-   distance** 1.
+4. Select **Save**, then on a dashboard select **Add panel** and choose **Median ZX90 gate
+   fidelity** under the script's name in **Show**. Set **Last days** to 14, choose **Map** or
+   **Table**, and **Apply**.
 
 ## Write a Script with the Agent
 

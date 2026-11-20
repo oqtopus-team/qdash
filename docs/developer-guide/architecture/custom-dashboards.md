@@ -178,7 +178,9 @@ Routes: `/custom-dashboards` (list, with a `tab` query parameter for **Dashboard
 Dashboard code lives in `ui/src/components/features/custom-dashboards/`; panels are laid out with
 CSS grid from each panel's `layout`, and edit mode keeps the panel list in local state and
 persists it with one `PATCH` of `panels` and the `expected_version` read when editing started; a
-409 leaves the draft in place. `panelConfig.ts` reads and writes panel configs.
+409 leaves the draft in place. `panelConfig.ts` reads and writes panel configs;
+`metricChoices.ts` flattens the configured chip metrics and the catalogs of the visible scripts
+into the grouped **Show** list of `PanelEditorDialog`, from which the panel type follows.
 
 Script code lives in `ui/src/components/features/metric-scripts/`:
 `MetricScriptEditorPageContent` (Monaco editor, settings, diagnostics, preview) with

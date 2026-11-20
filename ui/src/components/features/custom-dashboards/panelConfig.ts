@@ -45,7 +45,7 @@ export interface MetricScriptPanelConfig {
 
 const KNOWN_HOPS = [1, 2];
 
-export const PANEL_TYPES: ReadonlyArray<{
+const PANEL_TYPES: ReadonlyArray<{
   value: DashboardPanelModelType;
   label: string;
   icon: LucideIcon;

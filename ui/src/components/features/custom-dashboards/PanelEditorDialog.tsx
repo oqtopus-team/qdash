@@ -1,6 +1,8 @@
 "use client";
 
-import { type FormEvent, type ReactNode, useId, useMemo, useState } from "react";
+import { type FormEvent, type ReactNode, useId, useMemo, useRef, useState } from "react";
+
+import Link from "next/link";
 
 import { useGetMetricScript, useListMetricScripts } from "@/client/metric-script/metric-script";
 import type {
@@ -9,12 +11,12 @@ import type {
   DashboardPanelResponse,
   MetricInfo,
 } from "@/schemas";
-import { displayUnit } from "@/components/features/metric-scripts/format";
 import { declaredHops } from "@/components/features/metric-scripts/hops";
 import { ParameterFields, PeriodFields } from "@/components/features/metric-scripts/MetricInputs";
 import {
   type ParamInputs,
   paramInputsFrom,
+  parameterEntries,
   paramsFromInputs,
 } from "@/components/features/metric-scripts/parameters";
 import { periodError, type MetricPeriod } from "@/components/features/metric-scripts/periods";
@@ -28,8 +30,13 @@ import { MarkdownEditor } from "@/components/ui/MarkdownEditor";
 import { useMetricsConfig } from "@/hooks/useMetricsConfig";
 
 import {
+  findChoiceOption,
+  type MetricChoice,
+  metricChoiceGroups,
+  parseChoiceValue,
+} from "./metricChoices";
+import {
   type MetricSelectionMode,
-  PANEL_TYPES,
   readMarkdownContent,
   readMetricConfig,
   readMetricScriptConfig,
@@ -48,6 +55,9 @@ export interface PanelDraft {
   script_name: string | null;
   latest_revision: number | null;
 }
+
+/** The two things a panel can be from the user's point of view; metric panels pick a source. */
+type PanelKind = "metric" | "note";
 
 function Field({
   id,
@@ -86,37 +96,47 @@ interface PanelEditorFormProps {
   onSave: (draft: PanelDraft) => void;
 }
 
-function metricOptionLabel(metric: MetricInfo): string {
-  const unit = displayUnit(metric.unit);
-  return `${metric.title}${unit ? ` (${unit})` : ""} · ${metric.target}`;
+function initialChoice(panel: DashboardPanelResponse | null): MetricChoice | null {
+  if (!panel) return null;
+  switch (panel.type) {
+    case "qubit_metric":
+    case "coupling_metric": {
+      const metric = readMetricConfig(panel).metric;
+      return metric ? { kind: panel.type, metric } : null;
+    }
+    case "metric_script": {
+      const config = readMetricScriptConfig(panel);
+      return config.script_id
+        ? { kind: "metric_script", script_id: config.script_id, metric_id: config.metric_id }
+        : null;
+    }
+    case "markdown":
+      return null;
+  }
 }
 
 function PanelEditorForm({ panel, dashboardShared, onCancel, onSave }: PanelEditorFormProps) {
   const id = useId();
   const { qubitMetrics, couplingMetrics } = useMetricsConfig();
 
-  const initialType = panel?.type ?? "qubit_metric";
-  const initialMetric = panel ? readMetricConfig(panel) : null;
   const initialScript = panel?.type === "metric_script" ? readMetricScriptConfig(panel) : null;
 
-  const [type, setType] = useState<DashboardPanelModelType>(initialType);
+  const [kind, setKind] = useState<PanelKind>(panel?.type === "markdown" ? "note" : "metric");
   const [title, setTitle] = useState(panel?.title ?? "");
-  const [metric, setMetric] = useState(
-    initialType === "qubit_metric" || initialType === "coupling_metric"
-      ? (initialMetric?.metric ?? "")
-      : "",
-  );
+  // The title follows the chosen metric until the user types one; saved titles are kept.
+  const titleEdited = useRef(!!panel?.title);
+  const [choice, setChoice] = useState<MetricChoice | null>(() => initialChoice(panel));
   const [selectionMode, setSelectionMode] = useState<MetricSelectionMode>(
-    initialMetric?.selection_mode ?? "latest",
+    panel && (panel.type === "qubit_metric" || panel.type === "coupling_metric")
+      ? readMetricConfig(panel).selection_mode
+      : "latest",
   );
   const [content, setContent] = useState(
-    initialType === "markdown" && panel ? readMarkdownContent(panel) : "",
+    panel?.type === "markdown" ? readMarkdownContent(panel) : "",
   );
 
-  // metric_script settings
-  const [scriptId, setScriptId] = useState(initialScript?.script_id ?? "");
+  // Settings of a script metric. The revision is the pin; it only moves on explicit request.
   const [revision, setRevision] = useState<number | null>(initialScript?.script_revision ?? null);
-  const [scriptMetricId, setScriptMetricId] = useState(initialScript?.metric_id ?? "");
   const [period, setPeriod] = useState<MetricPeriod>(
     initialScript?.period ?? { kind: "relative", days: 14 },
   );
@@ -128,90 +148,140 @@ function PanelEditorForm({ panel, dashboardShared, onCancel, onSave }: PanelEdit
   const [view, setView] = useState<ResultViewMode>(initialScript?.view ?? "map");
   const [direction, setDirection] = useState<PairDirection>(initialScript?.direction ?? "both");
   const [hops, setHops] = useState<number[]>(initialScript?.hops ?? [1, 2]);
+  // Parameters and the revision sit behind a disclosure; it opens when a panel already
+  // deviates from the defaults so nothing stored is out of sight.
+  const [advancedOpen, setAdvancedOpen] = useState(
+    Object.keys(initialScript?.params ?? {}).length > 0,
+  );
 
-  const isScriptType = type === "metric_script";
-  const scriptsQuery = useListMetricScripts({ query: { enabled: isScriptType } });
+  const isMetric = kind === "metric";
+  const scriptChoice = choice?.kind === "metric_script" ? choice : null;
+  const scriptId = scriptChoice?.script_id ?? "";
+
+  const scriptsQuery = useListMetricScripts({ query: { enabled: isMetric } });
   const scripts = useMemo(() => scriptsQuery.data?.data.scripts ?? [], [scriptsQuery.data]);
-  const detailQuery = useGetMetricScript(scriptId, {
-    query: { enabled: isScriptType && !!scriptId },
-  });
+  const detailQuery = useGetMetricScript(scriptId, { query: { enabled: isMetric && !!scriptId } });
   const detail = detailQuery.data?.data;
   const summary = scripts.find((entry) => entry.script_id === scriptId);
-  const selectable = scripts.filter((entry) => entry.active_revision !== null);
   const activeRevision = summary?.active_revision ?? detail?.active_revision ?? null;
+  const scriptName = summary?.name ?? detail?.name ?? panel?.script_name ?? null;
+  const updateAvailable = revision !== null && activeRevision !== null && activeRevision > revision;
 
   // The catalog of the pinned revision: from the script's revision list when loaded, else the
   // active catalog when the pin is the active revision.
   const catalog = useMemo<MetricInfo[]>(() => {
-    if (revision === null) return [];
+    if (!scriptId || revision === null) return [];
     const pinned = detail?.revisions.find((entry) => entry.revision === revision)?.metrics;
     if (pinned && pinned.length > 0) return pinned;
     if (summary && revision === summary.active_revision) return summary.metrics;
     if (detail && revision === detail.active_revision) return detail.metrics;
     return pinned ?? [];
-  }, [detail, revision, summary]);
-  const scriptMetric = catalog.find((entry) => entry.id === scriptMetricId);
+  }, [detail, revision, scriptId, summary]);
+
+  const groups = useMemo(
+    () =>
+      metricChoiceGroups({
+        qubitMetrics,
+        couplingMetrics,
+        scripts,
+        // A pin behind the active revision lists what that revision defines; a script that is
+        // no longer offered (deleted, unshared) still shows the panel's own metric.
+        pinnedCatalog:
+          scriptId && (revision !== activeRevision || !summary)
+            ? {
+                script_id: scriptId,
+                metrics: catalog,
+                label: summary ? undefined : `${scriptName ?? scriptId} (unavailable)`,
+              }
+            : null,
+      }),
+    [
+      activeRevision,
+      catalog,
+      couplingMetrics,
+      qubitMetrics,
+      revision,
+      scriptId,
+      scriptName,
+      scripts,
+      summary,
+    ],
+  );
+  const selectedOption = findChoiceOption(groups, choice);
+
+  const scriptMetric = scriptChoice
+    ? catalog.find((entry) => entry.id === scriptChoice.metric_id)
+    : undefined;
   const isPairMetric = scriptMetric?.target === "pair";
   const hopOptions = declaredHops(scriptMetric);
   const shownHops = hops.filter((hop) => hopOptions.includes(hop));
+  const hasParameters = parameterEntries(scriptMetric).length > 0;
 
   const paramInputs = useMemo(
     () => ({ ...paramInputsFrom(scriptMetric, storedParams), ...typedParams }),
     [scriptMetric, storedParams, typedParams],
   );
   const { params, errors: paramErrors } = paramsFromInputs(scriptMetric, paramInputs);
+  const paramsInvalid = Object.keys(paramErrors).length > 0;
 
-  const metricOptions = type === "coupling_metric" ? couplingMetrics : qubitMetrics;
   const catalogLoading = scriptsQuery.isLoading || (!!scriptId && detailQuery.isLoading);
+  const scriptGone = !!scriptId && !summary && !scriptsQuery.isLoading && !!detailQuery.isError;
 
   const missing: string | null = (() => {
-    switch (type) {
-      case "qubit_metric":
-      case "coupling_metric":
-        return metricOptions.some((entry) => entry.key === metric) ? null : "Choose a metric";
-      case "metric_script":
-        if (!scriptId) return "Choose a script";
-        if (revision === null) return "The script has no valid revision to pin";
-        if (!scriptMetric)
-          return catalogLoading ? "Loading the script's metrics" : "Choose a metric";
-        if (Object.keys(paramErrors).length > 0) return "Fix the highlighted parameters";
-        if (isPairMetric && shownHops.length === 0) return "Choose at least one pair distance";
-        return periodError(period);
-      case "markdown":
-        return content.trim() ? null : "Write the note content";
-    }
+    if (kind === "note") return content.trim() ? null : "Write the note content";
+    if (!choice) return catalogLoading ? "Loading metrics" : "Choose a metric";
+    if (choice.kind !== "metric_script") return selectedOption ? null : "Choose a metric";
+    if (scriptGone) return "This script is no longer available; choose another metric";
+    if (revision === null) return "The script has no valid revision to pin";
+    if (!scriptMetric) return catalogLoading ? "Loading the script's metrics" : "Choose a metric";
+    if (paramsInvalid) return "Fix the highlighted parameters";
+    if (isPairMetric && shownHops.length === 0) return "Choose at least one pair distance";
+    return periodError(period);
   })();
 
-  const handleTypeChange = (next: DashboardPanelModelType) => {
-    setType(next);
-    if (next === "qubit_metric" || next === "coupling_metric") {
-      const options = next === "coupling_metric" ? couplingMetrics : qubitMetrics;
-      if (!options.some((entry) => entry.key === metric)) setMetric("");
-    }
-  };
-
-  const resetMetric = (next: MetricInfo | undefined) => {
-    setScriptMetricId(next?.id ?? "");
+  const resetScriptMetric = (next: MetricInfo | undefined) => {
     setStoredParams({});
     setTypedParams({});
     setHops(declaredHops(next));
   };
 
-  const handleScriptChange = (nextId: string) => {
-    const next = scripts.find((entry) => entry.script_id === nextId);
-    setScriptId(nextId);
-    setRevision(next?.active_revision ?? null);
-    resetMetric(next?.metrics.length === 1 ? next.metrics[0] : undefined);
+  const handleChoiceChange = (value: string) => {
+    const next = parseChoiceValue(value);
+    if (!next) return;
+    let metricTitle: string | undefined;
+    if (next.kind === "metric_script") {
+      const script = scripts.find((entry) => entry.script_id === next.script_id);
+      const sameScript = next.script_id === scriptId;
+      const source = sameScript ? catalog : (script?.metrics ?? []);
+      const metric = source.find((entry) => entry.id === next.metric_id);
+      metricTitle = metric?.title;
+      if (!sameScript) {
+        setRevision(script?.active_revision ?? null);
+        resetScriptMetric(metric);
+      } else if (next.metric_id !== scriptChoice?.metric_id) {
+        resetScriptMetric(metric);
+      }
+    } else {
+      const options = next.kind === "coupling_metric" ? couplingMetrics : qubitMetrics;
+      metricTitle = options.find((entry) => entry.key === next.metric)?.title;
+    }
+    if (!titleEdited.current && metricTitle) setTitle(metricTitle);
+    setChoice(next);
   };
 
-  const pinActiveRevision = () => {
-    if (activeRevision === null) return;
+  const useUpdatedDefinition = () => {
+    if (activeRevision === null || !scriptChoice) return;
     setRevision(activeRevision);
     const metrics =
       detail?.revisions.find((entry) => entry.revision === activeRevision)?.metrics ??
       summary?.metrics ??
       [];
-    if (!metrics.some((entry) => entry.id === scriptMetricId)) resetMetric(undefined);
+    const kept = metrics.find((entry) => entry.id === scriptChoice.metric_id);
+    if (!kept) {
+      // The metric no longer exists in the updated definition; ask for a new choice.
+      resetScriptMetric(undefined);
+      setChoice({ kind: "metric_script", script_id: scriptChoice.script_id, metric_id: "" });
+    }
   };
 
   const toggleHop = (hop: number, checked: boolean) => {
@@ -221,6 +291,8 @@ function PanelEditorForm({ panel, dashboardShared, onCancel, onSave }: PanelEdit
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
     if (missing) return;
+    if (kind === "metric" && !choice) return;
+    const type: DashboardPanelModelType = kind === "note" || !choice ? "markdown" : choice.kind;
     // Keep keys this editor does not manage, e.g. ones added by a newer client. Metric script
     // configs are strict on the API side, so they are written field by field.
     const previous = panel && panel.type === type ? (panel.config ?? {}) : {};
@@ -229,253 +301,296 @@ function PanelEditorForm({ panel, dashboardShared, onCancel, onSave }: PanelEdit
       script_name: null,
       latest_revision: null,
     };
-    switch (type) {
-      case "qubit_metric":
-      case "coupling_metric":
-        config = { ...previous, metric, selection_mode: selectionMode };
-        break;
-      case "metric_script":
-        config = writeMetricScriptConfig({
-          script_id: scriptId,
-          metric_id: scriptMetricId,
-          script_revision: revision,
-          period,
-          params,
-          view,
-          direction,
-          hops: isPairMetric ? shownHops : hopOptions,
-        });
-        annotations = {
-          script_name: summary?.name ?? detail?.name ?? panel?.script_name ?? null,
-          latest_revision: activeRevision ?? panel?.latest_revision ?? null,
-        };
-        break;
-      case "markdown":
-        config = { ...previous, content };
-        break;
+    if (type === "markdown" || !choice) {
+      config = { ...previous, content };
+    } else if (choice.kind === "metric_script") {
+      config = writeMetricScriptConfig({
+        script_id: choice.script_id,
+        metric_id: choice.metric_id,
+        script_revision: revision,
+        period,
+        params,
+        view,
+        direction,
+        hops: isPairMetric ? shownHops : hopOptions,
+      });
+      annotations = {
+        script_name: scriptName,
+        latest_revision: activeRevision ?? panel?.latest_revision ?? null,
+      };
+    } else {
+      config = { ...previous, metric: choice.metric, selection_mode: selectionMode };
     }
     onSave({ type, title: title.trim(), config, ...annotations });
   };
 
   const privateOnShared = dashboardShared && summary?.visibility === "private";
+  const scriptHref = scriptId ? `/custom-dashboards/scripts/${scriptId}` : null;
 
   return (
     <form className="flex flex-col gap-2" onSubmit={handleSubmit} noValidate>
-      <div className="grid grid-cols-1 gap-x-3 sm:grid-cols-2">
-        <Field id={`${id}-type`} label="Panel type">
-          <select
-            id={`${id}-type`}
-            className="select select-sm w-full"
-            value={type}
-            onChange={(event) => handleTypeChange(event.target.value as DashboardPanelModelType)}
-          >
-            {PANEL_TYPES.map((entry) => (
-              <option key={entry.value} value={entry.value}>
-                {entry.label}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field id={`${id}-title`} label="Title" hint="Leave empty to use the panel type">
+      <fieldset className="fieldset min-w-0">
+        <legend className="fieldset-legend">Panel</legend>
+        <div className="join" role="radiogroup" aria-label="Panel kind">
           <input
-            id={`${id}-title`}
-            className="input input-sm w-full"
-            value={title}
-            maxLength={200}
-            placeholder="Panel title"
-            onChange={(event) => setTitle(event.target.value)}
+            type="radio"
+            name={`${id}-kind`}
+            className="join-item btn btn-sm"
+            aria-label="Metric"
+            checked={kind === "metric"}
+            onChange={() => setKind("metric")}
           />
-        </Field>
-      </div>
+          <input
+            type="radio"
+            name={`${id}-kind`}
+            className="join-item btn btn-sm"
+            aria-label="Note"
+            checked={kind === "note"}
+            onChange={() => setKind("note")}
+          />
+        </div>
+      </fieldset>
 
-      {(type === "qubit_metric" || type === "coupling_metric") && (
-        <div className="grid grid-cols-1 gap-x-3 sm:grid-cols-2">
-          <Field id={`${id}-metric`} label="Metric">
+      {isMetric && (
+        <>
+          <Field
+            id={`${id}-show`}
+            label="Show"
+            hint={
+              scriptsQuery.isLoading
+                ? "Loading metrics"
+                : groups.some((group) => group.key.startsWith("script:"))
+                  ? "Chip metrics come from the latest calibration; script metrics are computed from the period you choose"
+                  : "Chip metrics come from the latest calibration; computed metrics appear here once a script is saved"
+            }
+          >
             <select
-              id={`${id}-metric`}
+              id={`${id}-show`}
               className="select select-sm w-full"
-              value={metric}
-              onChange={(event) => setMetric(event.target.value)}
+              value={selectedOption?.value ?? ""}
+              disabled={groups.length === 0}
+              onChange={(event) => handleChoiceChange(event.target.value)}
             >
               <option value="" disabled>
                 Select a metric
               </option>
-              {metricOptions.map((entry) => (
-                <option key={entry.key} value={entry.key}>
-                  {entry.title}
-                  {entry.unit ? ` (${entry.unit})` : ""}
-                </option>
+              {groups.map((group) => (
+                <optgroup key={group.key} label={group.label}>
+                  {group.options.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </optgroup>
               ))}
             </select>
           </Field>
-          <Field id={`${id}-mode`} label="Value selection">
-            <select
-              id={`${id}-mode`}
-              className="select select-sm w-full"
-              value={selectionMode}
-              onChange={(event) => setSelectionMode(event.target.value as MetricSelectionMode)}
-            >
-              {SELECTION_MODES.map((entry) => (
-                <option key={entry.value} value={entry.value}>
-                  {entry.label}
-                </option>
-              ))}
-            </select>
-          </Field>
-        </div>
-      )}
-
-      {type === "metric_script" && (
-        <>
-          <div className="grid grid-cols-1 gap-x-3 sm:grid-cols-2">
-            <Field
-              id={`${id}-script`}
-              label="Script"
-              hint={
-                revision !== null ? (
-                  <span className="flex flex-wrap items-center gap-2">
-                    Pinned to r{revision}
-                    {activeRevision !== null && activeRevision > revision && (
-                      <button
-                        type="button"
-                        className="link link-primary"
-                        onClick={pinActiveRevision}
-                      >
-                        Use active r{activeRevision}
-                      </button>
-                    )}
-                  </span>
-                ) : scriptsQuery.isLoading ? (
-                  "Loading scripts"
-                ) : selectable.length === 0 ? (
-                  "No script has a valid revision yet"
-                ) : undefined
-              }
-            >
-              <select
-                id={`${id}-script`}
-                className="select select-sm w-full"
-                value={scriptId}
-                disabled={scriptsQuery.isLoading}
-                onChange={(event) => handleScriptChange(event.target.value)}
-              >
-                <option value="" disabled>
-                  Select a script
-                </option>
-                {scriptId && !selectable.some((entry) => entry.script_id === scriptId) && (
-                  <option value={scriptId}>
-                    {panel?.script_name ?? detail?.name ?? scriptId} (unavailable)
-                  </option>
-                )}
-                {selectable.map((entry) => (
-                  <option key={entry.script_id} value={entry.script_id}>
-                    {entry.name}
-                    {entry.visibility === "private" ? " (private)" : ""}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field id={`${id}-script-metric`} label="Metric">
-              <select
-                id={`${id}-script-metric`}
-                className="select select-sm w-full"
-                value={scriptMetric ? scriptMetricId : ""}
-                disabled={catalog.length === 0}
-                onChange={(event) =>
-                  resetMetric(catalog.find((entry) => entry.id === event.target.value))
-                }
-              >
-                <option value="" disabled>
-                  Select a metric
-                </option>
-                {catalog.map((entry) => (
-                  <option key={entry.id} value={entry.id}>
-                    {metricOptionLabel(entry)}
-                  </option>
-                ))}
-              </select>
-            </Field>
-          </div>
-
-          {privateOnShared && (
-            <div role="status" className="alert alert-warning alert-soft text-sm">
-              This script is private. A dashboard shared with the project can only use shared
-              scripts; share the script before saving the dashboard.
-            </div>
-          )}
-
-          <PeriodFields id={`${id}-period`} value={period} onChange={setPeriod} />
-
-          <ParameterFields
-            id={id}
-            metric={scriptMetric}
-            inputs={paramInputs}
-            onChange={(inputs) => {
-              setStoredParams({});
-              setTypedParams(inputs);
-            }}
-          />
 
           <div className="grid grid-cols-1 gap-x-3 sm:grid-cols-2">
-            <Field id={`${id}-view`} label="View">
-              <select
-                id={`${id}-view`}
-                className="select select-sm w-full"
-                value={view}
-                onChange={(event) => setView(event.target.value as ResultViewMode)}
-              >
-                <option value="map">Map</option>
-                <option value="table">Table</option>
-              </select>
+            <Field id={`${id}-title`} label="Title" hint="Shown above the panel">
+              <input
+                id={`${id}-title`}
+                className="input input-sm w-full"
+                value={title}
+                maxLength={200}
+                placeholder="Panel title"
+                onChange={(event) => {
+                  titleEdited.current = event.target.value !== "";
+                  setTitle(event.target.value);
+                }}
+              />
             </Field>
-            {isPairMetric && (
-              <Field id={`${id}-direction`} label="Direction">
+            {choice && choice.kind !== "metric_script" && (
+              <Field
+                id={`${id}-mode`}
+                label="Value selection"
+                hint="Which measurement of each target to show"
+              >
                 <select
-                  id={`${id}-direction`}
+                  id={`${id}-mode`}
                   className="select select-sm w-full"
-                  value={direction}
-                  onChange={(event) => setDirection(event.target.value as PairDirection)}
+                  value={selectionMode}
+                  onChange={(event) => setSelectionMode(event.target.value as MetricSelectionMode)}
                 >
-                  {PAIR_DIRECTIONS.map((entry) => (
-                    <option key={entry.value} value={entry.value} title={entry.title}>
+                  {SELECTION_MODES.map((entry) => (
+                    <option key={entry.value} value={entry.value}>
                       {entry.label}
                     </option>
                   ))}
                 </select>
               </Field>
             )}
-            {isPairMetric && hopOptions.length > 1 && (
-              <fieldset className="fieldset min-w-0">
-                <legend className="fieldset-legend">Pair distance</legend>
-                <div className="flex flex-wrap gap-x-4 gap-y-1">
-                  {hopOptions.map((hop) => (
-                    <label key={hop} className="choice-field gap-2">
-                      <input
-                        type="checkbox"
-                        className="checkbox checkbox-sm"
-                        checked={shownHops.includes(hop)}
-                        onChange={(event) => toggleHop(hop, event.target.checked)}
-                      />
-                      <span>{hop === 1 ? "1 hop (coupled pairs)" : "2 hops (next-nearest)"}</span>
-                    </label>
-                  ))}
-                </div>
-              </fieldset>
+            {scriptChoice && (
+              <Field id={`${id}-view`} label="View">
+                <select
+                  id={`${id}-view`}
+                  className="select select-sm w-full"
+                  value={view}
+                  onChange={(event) => setView(event.target.value as ResultViewMode)}
+                >
+                  <option value="map">Map</option>
+                  <option value="table">Table</option>
+                </select>
+              </Field>
             )}
           </div>
+
+          {scriptChoice && (
+            <>
+              <PeriodFields id={`${id}-period`} value={period} onChange={setPeriod} />
+
+              {isPairMetric && (
+                <div className="grid grid-cols-1 gap-x-3 sm:grid-cols-2">
+                  <Field id={`${id}-direction`} label="Direction">
+                    <select
+                      id={`${id}-direction`}
+                      className="select select-sm w-full"
+                      value={direction}
+                      onChange={(event) => setDirection(event.target.value as PairDirection)}
+                    >
+                      {PAIR_DIRECTIONS.map((entry) => (
+                        <option key={entry.value} value={entry.value} title={entry.title}>
+                          {entry.label}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  {hopOptions.length > 1 && (
+                    <fieldset className="fieldset min-w-0">
+                      <legend className="fieldset-legend">Pair distance</legend>
+                      <div className="flex flex-wrap gap-x-4 gap-y-1">
+                        {hopOptions.map((hop) => (
+                          <label key={hop} className="choice-field gap-2">
+                            <input
+                              type="checkbox"
+                              className="checkbox checkbox-sm"
+                              checked={shownHops.includes(hop)}
+                              onChange={(event) => toggleHop(hop, event.target.checked)}
+                            />
+                            <span>
+                              {hop === 1 ? "1 hop (coupled pairs)" : "2 hops (next-nearest)"}
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    </fieldset>
+                  )}
+                </div>
+              )}
+
+              {privateOnShared && (
+                <div role="status" className="alert alert-warning alert-soft text-sm">
+                  <span>
+                    This metric comes from a private script. A dashboard shared with the project can
+                    only show shared scripts; this panel cannot be saved until the script is shared.{" "}
+                    {summary?.can_edit && scriptHref ? (
+                      <Link href={`${scriptHref}#metric-script-settings`} className="link">
+                        Open the script&apos;s settings
+                      </Link>
+                    ) : (
+                      <>
+                        Ask {summary?.owner_username ?? "its owner"} to share it, or choose another
+                        metric.
+                      </>
+                    )}
+                  </span>
+                </div>
+              )}
+
+              {updateAvailable && (
+                <div role="status" className="alert alert-info alert-soft text-sm">
+                  <span>
+                    The script has an updated definition. This panel keeps using the one it was
+                    saved with until you switch.
+                  </span>
+                  <button type="button" className="btn btn-sm" onClick={useUpdatedDefinition}>
+                    Use updated definition
+                  </button>
+                </div>
+              )}
+
+              <details
+                className="collapse collapse-arrow rounded-[var(--radius-field)] border border-base-300"
+                open={advancedOpen || paramsInvalid}
+                onToggle={(event) => setAdvancedOpen(event.currentTarget.open)}
+              >
+                <summary className="collapse-title min-h-0 py-2 text-sm">
+                  Advanced
+                  <span className="ml-2 text-xs text-base-content/60">
+                    {hasParameters ? "Parameters and script revision" : "Script revision"}
+                  </span>
+                </summary>
+                <div className="collapse-content flex flex-col gap-2 pb-2">
+                  <ParameterFields
+                    id={id}
+                    metric={scriptMetric}
+                    inputs={paramInputs}
+                    onChange={(inputs) => {
+                      setStoredParams({});
+                      setTypedParams(inputs);
+                    }}
+                  />
+                  <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+                    <dt className="text-base-content/60">Script</dt>
+                    <dd className="min-w-0">
+                      {scriptHref ? (
+                        <Link href={scriptHref} className="link link-hover">
+                          {scriptName ?? scriptId}
+                        </Link>
+                      ) : (
+                        (scriptName ?? scriptId)
+                      )}
+                      {summary?.visibility === "private" && " (private)"}
+                    </dd>
+                    <dt className="text-base-content/60">Revision</dt>
+                    <dd className="min-w-0" data-testid="panel-revision">
+                      {revision === null ? "none valid" : `pinned to r${revision}`}
+                      {activeRevision !== null && activeRevision !== revision
+                        ? ` · active r${activeRevision}`
+                        : ""}
+                    </dd>
+                  </dl>
+                  <p className="text-xs text-base-content/60">
+                    Panels keep the revision they were saved with, so edits to the script never
+                    change a saved dashboard unnoticed. Edit the Python source or write a custom
+                    calculation under{" "}
+                    <Link href="/custom-dashboards?tab=scripts" className="link link-hover">
+                      Scripts
+                    </Link>
+                    .
+                  </p>
+                </div>
+              </details>
+            </>
+          )}
         </>
       )}
 
-      {type === "markdown" && (
-        <fieldset className="fieldset">
-          <legend className="fieldset-legend">Content</legend>
-          <MarkdownEditor
-            value={content}
-            onChange={setContent}
-            rows={8}
-            placeholder="Write Markdown"
-          />
-        </fieldset>
+      {kind === "note" && (
+        <>
+          <Field id={`${id}-title`} label="Title" hint="Shown above the note">
+            <input
+              id={`${id}-title`}
+              className="input input-sm w-full"
+              value={title}
+              maxLength={200}
+              placeholder="Panel title"
+              onChange={(event) => {
+                titleEdited.current = event.target.value !== "";
+                setTitle(event.target.value);
+              }}
+            />
+          </Field>
+          <fieldset className="fieldset">
+            <legend className="fieldset-legend">Content</legend>
+            <MarkdownEditor
+              value={content}
+              onChange={setContent}
+              rows={8}
+              placeholder="Write Markdown"
+            />
+          </fieldset>
+        </>
       )}
 
       <div className="modal-action mt-2 items-center">
@@ -514,7 +629,7 @@ export function PanelEditorDialog({
       <DialogContent className="max-w-2xl">
         <DialogTitle>{panel ? "Edit panel" : "Add panel"}</DialogTitle>
         <DialogDescription className="mt-1 text-xs text-base-content/60">
-          Changes apply to the draft; save the dashboard to share them
+          Choose what to show and over which period; save the dashboard to keep the change
         </DialogDescription>
         <div className="mt-3">
           <PanelEditorForm

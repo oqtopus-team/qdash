@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   canEdit: true,
   dashboard: null as unknown,
   error: null as unknown,
+  scripts: [] as unknown[],
   update: vi.fn(),
   evaluate: vi.fn(),
 }));
@@ -52,7 +53,10 @@ vi.mock("@/client/chip/chip", () => ({
 
 vi.mock("@/client/metric-script/metric-script", () => ({
   evaluateMetricScript: mocks.evaluate,
-  useListMetricScripts: () => ({ data: undefined, isLoading: false }),
+  useListMetricScripts: () => ({
+    data: { data: { scripts: mocks.scripts, total: mocks.scripts.length } },
+    isLoading: false,
+  }),
   useGetMetricScript: () => ({ data: undefined, isLoading: false }),
 }));
 
@@ -126,6 +130,7 @@ describe("CustomDashboardPageContent", () => {
     mocks.canEdit = true;
     mocks.dashboard = dashboard();
     mocks.error = null;
+    mocks.scripts = [];
   });
 
   afterEach(() => {
@@ -291,8 +296,10 @@ describe("CustomDashboardPageContent", () => {
       undefined,
       expect.anything(),
     );
-    expect(screen.getByText("Newer revision r3 available")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Update to r3" })).not.toBeInTheDocument();
+    expect(screen.getByText("Update available")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Use updated definition" }),
+    ).not.toBeInTheDocument();
     expect(screen.getByTestId("metric-script-footer")).toHaveTextContent(
       "ZX90 median r2 · Median ZX90 gate fidelity · Last 14 days · min samples 3",
     );
@@ -300,9 +307,9 @@ describe("CustomDashboardPageContent", () => {
     expect(screen.getByTestId("metric-edge-1>0")).toHaveAttribute("data-status", "error");
 
     fireEvent.click(screen.getByRole("button", { name: "Edit" }));
-    fireEvent.click(screen.getByRole("button", { name: "Update to r3" }));
+    fireEvent.click(screen.getByRole("button", { name: "Use updated definition" }));
     expect(screen.getByText("Unsaved changes")).toBeInTheDocument();
-    expect(screen.queryByText("Newer revision r3 available")).not.toBeInTheDocument();
+    expect(screen.queryByText("Update available")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     const saved = mocks.update.mock.calls[0][0].data.panels[0];
@@ -310,5 +317,106 @@ describe("CustomDashboardPageContent", () => {
     // Response annotations are not sent back.
     expect(saved).not.toHaveProperty("script_name");
     expect(saved).not.toHaveProperty("latest_revision");
+  });
+
+  function scriptPanel(scriptId: string): DashboardPanelResponse {
+    return {
+      panel_id: `panel-${scriptId}`,
+      type: "metric_script",
+      title: "Script panel",
+      layout: { x: 0, y: 0, w: 6, h: 4 },
+      config: {
+        script_id: scriptId,
+        metric_id: "m",
+        script_revision: 1,
+        period: { kind: "relative", days: 14 },
+        params: {},
+        view: "map",
+        direction: "both",
+        hops: [1],
+      },
+      script_name: scriptId,
+      latest_revision: 1,
+    };
+  }
+
+  function scriptSummary(overrides: Record<string, unknown>) {
+    return {
+      script_id: "ms_private",
+      project_id: "project-1",
+      name: "My private script",
+      description: "",
+      visibility: "private",
+      status: "valid",
+      revision: 1,
+      active_revision: 1,
+      metrics: [],
+      template_id: null,
+      owner_username: "alice",
+      owner_user_id: "user-alice",
+      can_edit: true,
+      created_at: "",
+      updated_at: "",
+      ...overrides,
+    };
+  }
+
+  it("explains which private scripts block sharing instead of sharing anything", async () => {
+    mocks.evaluate.mockResolvedValue(new Promise(() => {}));
+    mocks.scripts = [
+      scriptSummary({}),
+      scriptSummary({
+        script_id: "ms_theirs",
+        name: "Bob's script",
+        owner_username: "bob",
+        can_edit: false,
+      }),
+      scriptSummary({ script_id: "ms_shared", name: "Shared", visibility: "project" }),
+    ];
+    mocks.dashboard = dashboard({
+      visibility: "private",
+      panels: [scriptPanel("ms_private"), scriptPanel("ms_theirs"), scriptPanel("ms_shared")],
+    });
+    renderPage();
+
+    fireEvent.keyDown(screen.getByRole("button", { name: "Dashboard actions" }), { key: "Enter" });
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Share with project" }));
+
+    const dialog = await screen.findByRole("dialog", { name: "Share with project" });
+    expect(mocks.update).not.toHaveBeenCalled();
+    expect(dialog).toHaveTextContent("My private script");
+    expect(dialog).toHaveTextContent("Bob's script");
+    expect(dialog).not.toHaveTextContent("Shared");
+    expect(screen.getByRole("link", { name: "Open script settings" })).toHaveAttribute(
+      "href",
+      "/custom-dashboards/scripts/ms_private#metric-script-settings",
+    );
+    expect(dialog).toHaveTextContent("Ask bob to share it");
+  });
+
+  it("shows the server's reason when sharing is refused", async () => {
+    mocks.update.mockImplementation((_variables, options) =>
+      options.onError(
+        Object.assign(new Error("Unprocessable"), {
+          isAxiosError: true,
+          response: {
+            status: 422,
+            data: {
+              detail:
+                "Invalid config for metric_script panel 'x': metric script 'Hidden' is private; share it with the project before using it on a shared dashboard",
+            },
+          },
+        }),
+      ),
+    );
+    mocks.dashboard = dashboard({ visibility: "private" });
+    renderPage();
+
+    fireEvent.keyDown(screen.getByRole("button", { name: "Dashboard actions" }), { key: "Enter" });
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Share with project" }));
+
+    expect(mocks.update.mock.calls[0][0].data).toEqual({ visibility: "project" });
+    const dialog = await screen.findByRole("dialog", { name: "Share with project" });
+    expect(dialog).toHaveTextContent("metric script 'Hidden' is private");
   });
 });

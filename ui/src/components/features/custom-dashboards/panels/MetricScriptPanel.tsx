@@ -27,7 +27,8 @@ interface MetricScriptPanelProps {
 
 /**
  * A metric of a saved script, evaluated at the panel's pinned revision with its period and
- * parameters. A newer active revision is announced but only an editor can move the pin.
+ * parameters. An updated definition (newer active revision) is announced; only an editor's
+ * explicit action moves the pin, and the revision numbers stay in the footer and tooltips.
  */
 export function MetricScriptPanel({
   panel,
@@ -94,14 +95,22 @@ export function MetricScriptPanel({
     <div className="flex h-full min-h-0 flex-col gap-2">
       {newer && (
         <div className="flex flex-wrap items-center gap-2 text-xs">
-          <span className="inline-flex items-center gap-1 text-info">
+          <span
+            className="inline-flex items-center gap-1 text-info"
+            title={`Showing revision r${pinned}; the script's active revision is r${latest}`}
+          >
             <Info className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-            Newer revision r{latest} available
+            Update available
           </span>
           {editing && (
-            <button type="button" className="btn btn-ghost btn-xs" onClick={onUpdateRevision}>
+            <button
+              type="button"
+              className="btn btn-ghost btn-xs"
+              title={`Switch this panel from r${pinned} to r${latest}`}
+              onClick={onUpdateRevision}
+            >
               <ArrowUpCircle data-icon="inline-start" aria-hidden="true" />
-              Update to r{latest}
+              Use updated definition
             </button>
           )}
         </div>

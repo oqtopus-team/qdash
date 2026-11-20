@@ -214,13 +214,14 @@ describe("CustomDashboardListPageContent", () => {
     vi.clearAllMocks();
   });
 
-  it("creates a dashboard from the Frequency Collision Map template", () => {
+  it("creates a dashboard from the Frequency Collision Map template by default", () => {
     renderPage();
     fireEvent.click(screen.getByRole("button", { name: "New dashboard" }));
 
+    // The template is first and preselected; the name follows it until edited.
+    expect(screen.getByRole("radio", { name: /Frequency Collision Map/ })).toBeChecked();
+    expect(screen.getByLabelText("Name")).toHaveValue("Frequency Collision Map");
     fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Collisions" } });
-    expect(screen.getByRole("radio", { name: /Blank dashboard/ })).toBeChecked();
-    fireEvent.click(screen.getByRole("radio", { name: /Frequency Collision Map/ }));
     fireEvent.click(screen.getByRole("button", { name: "Create dashboard" }));
 
     expect(mocks.create).toHaveBeenCalledTimes(1);
@@ -236,9 +237,10 @@ describe("CustomDashboardListPageContent", () => {
     });
   });
 
-  it("creates a blank dashboard without a template", () => {
+  it("creates a blank dashboard only when Blank dashboard is chosen", () => {
     renderPage();
     fireEvent.click(screen.getByRole("button", { name: "New dashboard" }));
+    fireEvent.click(screen.getByRole("radio", { name: /Blank dashboard/ }));
     fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Empty" } });
     fireEvent.click(screen.getByRole("button", { name: "Create dashboard" }));
 
