@@ -101,15 +101,37 @@ function hoverOpen(element: Element) {
   advance(CARD_OPEN_DELAY_MS);
 }
 
-describe("app-wide link hover cards", () => {
-  it("are mounted by the root providers for Next.js links outside the chat", () => {
+describe("link hover cards", () => {
+  it("are kept off page navigation links by the root providers", () => {
     render(
       <Providers>
+        <nav aria-label="Primary navigation">
+          <Link href="/">Home</Link>
+        </nav>
+        <Link href="/chip/64Qv3?tab=qubits">Chip 64Qv3</Link>
+        <Link href="/workflow/my-flow">my-flow</Link>
+        <Link href="/task-results/t1">Latest Rabi</Link>
+      </Providers>,
+    );
+
+    for (const name of ["Home", "Chip 64Qv3", "my-flow", "Latest Rabi"]) {
+      act(() => link(name).focus());
+      hoverOpen(link(name));
+      expect(card()).toBeNull();
+      expect(link(name)).not.toHaveAttribute("aria-describedby");
+      unhover(link(name));
+    }
+    expect(useGetTaskResult).not.toHaveBeenCalled();
+  });
+
+  it("describe a page link and load its record when every link is in scope", () => {
+    render(
+      <LinkHoverCardProvider>
         <nav>
           <Link href="/chip/64Qv3?tab=qubits">Chip 64Qv3</Link>
         </nav>
         <Link href="/task-results/t1">Latest Rabi</Link>
-      </Providers>,
+      </LinkHoverCardProvider>,
     );
     expect(useGetTaskResult).not.toHaveBeenCalled();
 

@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { GlobalExecutionIndicator } from "@/components/layout/GlobalExecutionIndicator";
@@ -62,6 +62,25 @@ describe("GlobalExecutionIndicator", () => {
 
     expect(screen.getByText("Cancelling")).toBeTruthy();
     expect(screen.queryByText("Running")).toBeNull();
+  });
+
+  it("names the indicator without a native title popup and opens the execution", () => {
+    lockStatus = {
+      lock: true,
+      execution_id: "exec-1",
+      chip_id: "chip-1",
+      name: "Calibration run",
+      status: "running",
+    };
+    render(<GlobalExecutionIndicator />);
+
+    const indicator = screen.getByRole("button", {
+      name: "Open Calibration run execution (Running)",
+    });
+    expect(indicator.hasAttribute("title")).toBe(false);
+
+    fireEvent.click(indicator);
+    expect(push).toHaveBeenCalledTimes(1);
   });
 
   it("renders nothing when no execution lock is held", () => {
