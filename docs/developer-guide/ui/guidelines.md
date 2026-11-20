@@ -73,13 +73,29 @@ menus, tooltips, page framing, tables, loading and empty states, errors, confirm
 feedback.
 
 Use DaisyUI for buttons, cards, inputs, badges, tables, alerts, and other visual components. Reuse
-the shared Radix-based `Dialog`, `DropdownMenu`, and `Tooltip` wrappers when focus management,
-keyboard navigation, portals, dismissal, or collision handling requires them. Feature code does
-not import another headless primitive to replace an established wrapper. The app root mounts one
-`TooltipProvider`, so moving between neighbouring tooltips skips the open delay; feature code
-does not add its own provider. An inline autocomplete, such as the mention list in
+the shared Radix-based `Dialog`, `DropdownMenu`, `Popover`, and `Tooltip` wrappers when focus
+management, keyboard navigation, portals, dismissal, or collision handling requires them. Feature
+code does not import another headless primitive to replace an established wrapper. The app root
+mounts one `TooltipProvider`, so moving between neighbouring tooltips skips the open delay; feature
+code does not add its own provider. An inline autocomplete, such as the mention list in
 `MarkdownEditor`, keeps focus in its text field, which `DropdownMenu` would move into the menu; it
 renders a `listbox` and marks the field as a `combobox` with `aria-activedescendant` instead.
+
+Every explicit link in the app gets a hover card from the root `LinkHoverCardProvider` in
+`ui/src/components/features/link-preview/`. The provider finds `<a href>` elements, including those
+rendered by Next.js `Link` and inside dialog or menu portals, through event delegation on the
+document, so a page adds no wrapper and a click keeps its normal navigation. A pointer opens the
+card after 400 ms and keyboard focus opens it at once; touch and focus that follows a pointer press
+open nothing. `describeLink` in `ui/src/lib/linkPreview.ts` names the destination from the URL
+alone. A task result, execution, forum post, or figure route on the current origin loads a short
+summary when the card opens. Other links show their page, host, file, or address and are never
+requested; the same record path on another host is an external link. An empty `href`, a bare `#`, a
+`javascript:` URL, and `aria-disabled="true"` get no card, and buttons are never treated as links.
+
+Mark a subtree with `data-link-preview="off"` when its links must not show a card. Chat answers
+set `data-link-preview="chat"`: there, a record route on any host is still read as a QDash
+record, matching the click preview in `ChatLinkPreviewProvider`, because older answers may name a
+misconfigured host. Keep this exception to chat answers.
 
 How these boundaries connect: [UI Architecture](./architecture.md).
 

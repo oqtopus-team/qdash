@@ -43,6 +43,7 @@ export function ChatLink({ href, children, ...props }: AnchorHTMLAttributes<HTML
       target="_blank"
       rel="noopener noreferrer"
       {...props}
+      data-link-preview="chat"
       onClick={(event) => {
         props.onClick?.(event);
         handlePreviewClick(event, href, preview);

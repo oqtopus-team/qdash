@@ -69,6 +69,7 @@ interface ChatMarkdownProps {
  * @pierre/words owns the rendered DOM and patches only what changed as text
  * streams in, so the interactive parts (link previews, copy buttons, diagram
  * controls) are handled here by delegation instead of as React components.
+ * Hover cards for its links come from the app-wide `LinkHoverCardProvider`.
  */
 export const ChatMarkdown = memo(function ChatMarkdown({
   children,
@@ -191,6 +192,7 @@ export const ChatMarkdown = memo(function ChatMarkdown({
         onClickCapture={onClickCapture}
         onClick={onClick}
         onPointerDown={onPointerDown}
+        data-link-preview="chat"
       >
         {source}
       </Markdown>
