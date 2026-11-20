@@ -5059,6 +5059,13 @@ class Round(RootModel[list[str]]):
     root: Annotated[list[str], Field(max_length=2, min_length=2)]
 
 
+class MaxParallelOps(RootModel[int]):
+    root: Annotated[int, Field(ge=1, le=100, title="Max Parallel Ops")]
+    """
+    Pairs per automatically generated CR group; omitted or null uses 10. Rejected with execution_mode manual unless omitted or null.
+    """
+
+
 class CustomTwoQubitStep(BaseModel):
     """
     Any sequence of coupling task calls on the candidate couplings.
@@ -5088,9 +5095,9 @@ class CustomTwoQubitStep(BaseModel):
     """
     Required with execution_mode manual and rejected otherwise: the rounds in run order, each a list of directed [control, target] pairs, e.g. [[["0", "1"], ["4", "5"]], [["8", "9"]]]. Each pair must be a chip coupling in that direction, the pairs of a round may not share a qubit, a MUX or a modeled readout/control module, and both qubits of every pair must be current candidates. Rounds are never regrouped, reversed or split.
     """
-    max_parallel_ops: Annotated[int, Field(ge=1, le=100, title="Max Parallel Ops")] = 10
+    max_parallel_ops: Annotated[MaxParallelOps | None, Field(title="Max Parallel Ops")] = None
     """
-    Pairs per automatically generated CR group. Rejected with execution_mode manual.
+    Pairs per automatically generated CR group; omitted or null uses 10. Rejected with execution_mode manual unless omitted or null.
     """
     continue_on_failure: Annotated[bool, Field(title="Continue On Failure")] = False
     """
@@ -5262,6 +5269,9 @@ class OneQubitFineTuneStep(BaseModel):
 class PipelineTargets(BaseModel):
     """
     Which qubits the pipeline starts from: explicit qids or whole MUXes.
+
+    Set exactly one of qids and mux_ids to a nonempty list without duplicates.
+    exclude_qids may be nonempty only with mux_ids.
     """
 
     model_config = ConfigDict(
@@ -5269,15 +5279,15 @@ class PipelineTargets(BaseModel):
     )
     qids: Annotated[list[str] | None, Field(title="Qids")] = None
     """
-    Qubit ids as QDash lists them, e.g. ["0", "1"].
+    Qubit ids as QDash lists them, e.g. ["0", "1"]. Set exactly one of qids and mux_ids, as a nonempty list without duplicates.
     """
     mux_ids: Annotated[list[int] | None, Field(title="Mux Ids")] = None
     """
-    MUX ids; every qubit of each MUX is a target.
+    MUX ids; every qubit of each MUX is a target. Set exactly one of qids and mux_ids, as a nonempty list without duplicates.
     """
-    exclude_qids: Annotated[list[str] | None, Field(title="Exclude Qids")] = None
+    exclude_qids: Annotated[list[str], Field(title="Exclude Qids")] = []
     """
-    Qubits to leave out of the MUX targets.
+    Qubits to leave out of the MUX targets. Must be empty with qids.
     """
 
 
@@ -5345,9 +5355,9 @@ class TwoQubitCalibrationStep(BaseModel):
     """
     Required with execution_mode manual and rejected otherwise: the rounds in run order, each a list of directed [control, target] pairs, e.g. [[["0", "1"], ["4", "5"]], [["8", "9"]]]. Each pair must be a chip coupling in that direction, the pairs of a round may not share a qubit, a MUX or a modeled readout/control module, and both qubits of every pair must be current candidates. Rounds are never regrouped, reversed or split.
     """
-    max_parallel_ops: Annotated[int, Field(ge=1, le=100, title="Max Parallel Ops")] = 10
+    max_parallel_ops: Annotated[MaxParallelOps | None, Field(title="Max Parallel Ops")] = None
     """
-    Pairs per automatically generated CR group. Rejected with execution_mode manual.
+    Pairs per automatically generated CR group; omitted or null uses 10. Rejected with execution_mode manual unless omitted or null.
     """
 
 
@@ -7026,18 +7036,17 @@ class CalibrationPipelineSpec(BaseModel):
         Field(max_length=32, min_length=1, title="Steps"),
     ]
     task_parameters: Annotated[
-        dict[str, TaskSettings] | None, Field(deprecated=True, title="Task Parameters")
-    ] = None
+        dict[str, TaskSettings],
+        Field(deprecated=True, title="Task Parameters", validate_default=True),
+    ] = {}
     """
     Deprecated: set run, input and update_calibration_parameters on each task call instead. Common per-task defaults keyed by task name; every call of the task starts from them and a call's own settings take precedence. Still accepted and applied.
     """
-    default_run_parameters: Annotated[
-        dict[str, Any] | None, Field(title="Default Run Parameters")
-    ] = None
+    default_run_parameters: Annotated[dict[str, Any], Field(title="Default Run Parameters")] = {}
     """
     Run parameters applied to every task, e.g. shots or interval.
     """
-    tags: Annotated[list[str] | None, Field(max_length=16, title="Tags")] = None
+    tags: Annotated[list[str], Field(max_length=16, title="Tags")] = []
 
 
 class AllConfigResponse(BaseModel):

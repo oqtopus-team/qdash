@@ -8,7 +8,11 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
-from qdash.client.services.models import CalibrationPipelineSpec, OneQubitCheckStep
+from qdash.client.services.models import (
+    CalibrationPipelineSpec,
+    OneQubitCheckStep,
+    PipelineTargets,
+)
 from qdash.sdk.pipeline import CustomOneQubit, Pipeline, Qubits, TaskCall, sweep, to_spec
 
 TIME_RANGE = sweep.logspace(math.log10(300), math.log10(500_000), 51)
@@ -139,6 +143,16 @@ def test_local_checks_cover_the_schema_structure() -> None:
         CustomOneQubit(step_name="Coherence", tasks=[TaskCall(name="CheckT1")])
     with pytest.raises(ValidationError):
         Pipeline(targets=Qubits(["0"]), steps=[{"type": "NoSuchStep"}])
+
+
+@pytest.mark.parametrize("field", ["tags", "default_run_parameters", "task_parameters"])
+def test_optional_spec_fields_reject_none(field: str) -> None:
+    # The server allows leaving these out but not null, so None fails before any request.
+    options: dict[str, Any] = {field: None}  # the signatures already refuse None statically
+    with pytest.raises(ValidationError, match=field):
+        Pipeline(targets=Qubits(["0"]), steps=[{"type": "OneQubitCheck"}], **options)
+    with pytest.raises(ValidationError, match="exclude_qids"):
+        PipelineTargets(mux_ids=[0], exclude_qids=None)  # type: ignore[arg-type]
 
 
 def test_server_only_rules_are_not_checked_locally() -> None:

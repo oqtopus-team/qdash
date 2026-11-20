@@ -5,7 +5,7 @@ from typing import Any, cast
 import pytest
 from fastapi.middleware.cors import CORSMiddleware
 
-from qdash.api.app import OPENAPI_EXTRA, create_app
+from qdash.api.app import OPENAPI_EXTRA, create_app, factory
 from qdash.api.app.factory import _add_component_models
 from qdash.config import Settings
 from qdash.datamodel.calibration_pipeline import CalibrationPipelineSpec
@@ -99,3 +99,22 @@ def test_component_models_refuse_to_replace_another_model() -> None:
 
     with pytest.raises(RuntimeError, match="TaskCall"):
         _add_component_models(schema, (CalibrationPipelineSpec,))
+
+
+def test_a_failed_schema_transformation_is_not_cached(monkeypatch: pytest.MonkeyPatch) -> None:
+    # TaskCall is a component of the pipeline spec; publishing another TaskCall conflicts.
+    conflict = {"components": {"schemas": {"TaskCall": {"type": "string"}}}}
+    monkeypatch.setattr(factory, "OPENAPI_EXTRA", conflict)
+    app = create_app(settings=_settings())
+
+    with pytest.raises(RuntimeError, match="TaskCall"):
+        app.openapi()
+    assert app.openapi_schema is None
+    with pytest.raises(RuntimeError, match="TaskCall"):
+        app.openapi()
+
+    # Without the conflict the transformed schema is cached as usual.
+    monkeypatch.setattr(factory, "OPENAPI_EXTRA", OPENAPI_EXTRA)
+    schema = app.openapi()
+    assert "PipelineTargets" in schema["components"]["schemas"]
+    assert app.openapi() is schema

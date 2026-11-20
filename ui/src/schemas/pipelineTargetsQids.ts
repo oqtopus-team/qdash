@@ -7,6 +7,6 @@
  */
 
 /**
- * Qubit ids as QDash lists them, e.g. ["0", "1"].
+ * Qubit ids as QDash lists them, e.g. ["0", "1"]. Set exactly one of qids and mux_ids, as a nonempty list without duplicates.
  */
 export type PipelineTargetsQids = string[] | null;

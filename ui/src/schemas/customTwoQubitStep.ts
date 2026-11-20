@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { CustomTwoQubitStepExecutionMode } from './customTwoQubitStepExecutionMode';
+import type { CustomTwoQubitStepMaxParallelOps } from './customTwoQubitStepMaxParallelOps';
 import type { CustomTwoQubitStepRounds } from './customTwoQubitStepRounds';
 import type { TaskCall } from './taskCall';
 
@@ -28,12 +29,8 @@ export interface CustomTwoQubitStep {
   execution_mode?: CustomTwoQubitStepExecutionMode;
   /** Required with execution_mode manual and rejected otherwise: the rounds in run order, each a list of directed [control, target] pairs, e.g. [[["0", "1"], ["4", "5"]], [["8", "9"]]]. Each pair must be a chip coupling in that direction, the pairs of a round may not share a qubit, a MUX or a modeled readout/control module, and both qubits of every pair must be current candidates. Rounds are never regrouped, reversed or split. */
   rounds?: CustomTwoQubitStepRounds;
-  /**
-     * Pairs per automatically generated CR group. Rejected with execution_mode manual.
-     * @minimum 1
-     * @maximum 100
-     */
-  max_parallel_ops?: number;
+  /** Pairs per automatically generated CR group; omitted or null uses 10. Rejected with execution_mode manual unless omitted or null. */
+  max_parallel_ops?: CustomTwoQubitStepMaxParallelOps;
   /** Run a target's later calls after one of its calls fails. A call's on_failure overrides this for that call. */
   continue_on_failure?: boolean;
 }

@@ -82,11 +82,37 @@ Other step types are passed as their generated models or as dictionaries in the 
 so server defaults apply to everything else. A mapping passed to `validate` or `execute` is sent
 unchanged.
 
+The generated models follow the published schema, so a server field's schema decides how a
+client that dumps every field behaves. An optional field that rejects `null` needs a plain
+`default` (`Field(default=[])`), not `default_factory`, which Pydantic leaves out of the JSON
+schema; without a published default the generator types the field as nullable and the client
+accepts `None` that the server rejects. A field whose server default depends on other fields,
+such as `max_parallel_ops` on two-qubit steps, is published as nullable with `null` meaning
+unset, and the server model's serializer keeps its own dumps unchanged.
+
 Local validation is structural: required fields, ID patterns, literal values, list lengths and
 `extra="forbid"` from the generated schema. Rules that live in Pydantic validators, such as
 unique call IDs, step order and target exclusivity, and everything that reads calibration data,
 are checked only by the server. A pipeline that builds locally can still be invalid; for example,
 `CheckT1` on a qubit without Rabi parameters is a validate problem.
+
+## Extending the SDK
+
+Change the contract on the server first, so the SDK, the generated clients and the published
+schema cannot disagree:
+
+1. Add or change the field or step model in `src/qdash/datamodel/calibration_pipeline.py`,
+   with a `description` that states the rules its validators enforce.
+2. Run `task generate` to rewrite `docs/oas/openapi.json`,
+   `clients/python/src/qdash/client/services/models.py` and the TypeScript clients; never edit
+   them by hand.
+3. Add a convenience in `qdash.sdk.pipeline` only when the generated model is awkward to write,
+   such as a positional argument or a fixed `type`, and keep it a subclass of the generated
+   model.
+4. Test that the generated model, `to_spec()` and a plain `model_dump(mode="json")` are
+   accepted or rejected by the server model as intended, in
+   `tests/qdash/api/routers/test_calibration_pipeline_sdk.py`, and add SDK-only behavior to
+   `sdks/python/tests/`.
 
 ## Session and client ownership
 
@@ -169,9 +195,9 @@ results or steps outside the catalog; the SDK does not convert them.
 | `sdks/python/tests/test_sdk_workflows.py` | `list` and `get` mapping and project scope, 404, name checks before any request, no dispatch until `run`, parameter forwarding including `{}`, whole-run `status`, pending 404 and timeout, shared client lifecycle |
 | `sdks/python/tests/test_sdk_session.py` | Requests and headers through `httpx.MockTransport`, explicit execute, whole-pipeline wait and timeout, 403 and 422 propagation, client ownership, project scope |
 | `sdks/python/tests/test_sdk_distributions.py` | Builds both packages at a stable and a beta version, checks the `qdash-client` pin and disjoint wheels, and installs and uninstalls them in fresh environments |
-| `tests/qdash/api/routers/test_calibration_pipeline_sdk.py` | The calibration and pipeline examples against the real routes and server spec model, including both target kinds, preflight problems, 403 and 422, and sweep parity with `qdash.datamodel.sweep` |
+| `tests/qdash/api/routers/test_calibration_pipeline_sdk.py` | The calibration and pipeline examples against the real routes and server spec model, including both target kinds, preflight problems, 403 and 422, sweep parity with `qdash.datamodel.sweep`, and generated two-qubit steps serialized by `to_spec()` and by a plain dump |
 | `tests/qdash/api/routers/test_workflows_sdk.py` | `QDash.workflows` against the real `/flows` routes: project scoping, saved defaults merged with run parameters, no dispatch from `list` or `get` |
-| `tests/qdash/api/test_app_factory.py` | The published components and the refusal to replace a different model under a taken name |
+| `tests/qdash/api/test_app_factory.py` | The published components, the refusal to replace a different model under a taken name, and no cached schema after a failed transformation |
 
 ## Implementation Files
 

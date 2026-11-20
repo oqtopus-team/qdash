@@ -75,9 +75,15 @@ def _configure_openapi_schema(app: FastAPI) -> None:
         if app.openapi_schema is not None:
             return app.openapi_schema
         schema = generate_openapi()
-        deep_dict_update(schema, deepcopy(OPENAPI_EXTRA))
-        _add_component_models(schema, OPENAPI_COMPONENT_MODELS)
-        _add_binary_formats(schema)
+        # FastAPI has already cached ``schema``; drop a partly transformed copy on failure
+        # so the next call regenerates it and fails the same way.
+        try:
+            deep_dict_update(schema, deepcopy(OPENAPI_EXTRA))
+            _add_component_models(schema, OPENAPI_COMPONENT_MODELS)
+            _add_binary_formats(schema)
+        except Exception:
+            app.openapi_schema = None
+            raise
         return schema
 
     app.openapi = openapi  # type: ignore[method-assign]

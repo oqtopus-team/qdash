@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { TwoQubitCalibrationStepExecutionMode } from './twoQubitCalibrationStepExecutionMode';
+import type { TwoQubitCalibrationStepMaxParallelOps } from './twoQubitCalibrationStepMaxParallelOps';
 import type { TwoQubitCalibrationStepRounds } from './twoQubitCalibrationStepRounds';
 import type { TwoQubitCalibrationStepStepId } from './twoQubitCalibrationStepStepId';
 import type { TwoQubitCalibrationStepTasks } from './twoQubitCalibrationStepTasks';
@@ -23,10 +24,6 @@ export interface TwoQubitCalibrationStep {
   execution_mode?: TwoQubitCalibrationStepExecutionMode;
   /** Required with execution_mode manual and rejected otherwise: the rounds in run order, each a list of directed [control, target] pairs, e.g. [[["0", "1"], ["4", "5"]], [["8", "9"]]]. Each pair must be a chip coupling in that direction, the pairs of a round may not share a qubit, a MUX or a modeled readout/control module, and both qubits of every pair must be current candidates. Rounds are never regrouped, reversed or split. */
   rounds?: TwoQubitCalibrationStepRounds;
-  /**
-     * Pairs per automatically generated CR group. Rejected with execution_mode manual.
-     * @minimum 1
-     * @maximum 100
-     */
-  max_parallel_ops?: number;
+  /** Pairs per automatically generated CR group; omitted or null uses 10. Rejected with execution_mode manual unless omitted or null. */
+  max_parallel_ops?: TwoQubitCalibrationStepMaxParallelOps;
 }

@@ -140,8 +140,8 @@ class Pipeline(CalibrationPipelineSpec):
             targets: PipelineTargets | Mapping[str, Any],
             steps: Sequence[BaseModel | Mapping[str, Any]],
             name: str = ...,
-            default_run_parameters: Mapping[str, Any] | None = None,
-            tags: Sequence[str] | None = None,
+            default_run_parameters: Mapping[str, Any] = ...,
+            tags: Sequence[str] = ...,
             spec_version: Literal[2] = 2,
         ) -> None: ...
 

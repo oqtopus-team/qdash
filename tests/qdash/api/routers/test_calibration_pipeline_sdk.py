@@ -15,6 +15,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from qdash.client import QDashClient, QDashConfig
+from qdash.client.services.models import CustomTwoQubitStep, TwoQubitCalibrationStep
 from qdash.datamodel import sweep as server_sweep
 from qdash.datamodel.calibration_pipeline import CalibrationPipelineSpec as ServerSpec
 from qdash.datamodel.project import ProjectRole
@@ -24,7 +25,7 @@ from qdash.dbmodel.qubit import QubitDocument
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 from qdash.sdk import QDash, QDashApiError, QDashValidationError
 from qdash.sdk.calibration import MuxTargets, QubitTargets
-from qdash.sdk.pipeline import CustomOneQubit, Pipeline, Qubits, TaskCall, sweep
+from qdash.sdk.pipeline import CustomOneQubit, Pipeline, Qubits, TaskCall, sweep, to_spec
 from tests.qdash.api.routers.test_calibration_pipeline import (  # noqa: F401 - pytest fixtures
     CHIP,
     chip,
@@ -159,6 +160,50 @@ def test_sdk_spec_is_accepted_by_the_server_model() -> None:
         "CheckT2Echo",
     ]
     assert parsed.targets.qids == ["0", "1"]
+
+
+MANUAL = {"execution_mode": "manual", "rounds": [[["0", "1"]]]}
+TWO_QUBIT_STEPS = {
+    "CustomTwoQubit": lambda **fields: CustomTwoQubitStep(
+        type="CustomTwoQubit", tasks=[TaskCall(name="CheckCrossResonance")], **fields
+    ),
+    "TwoQubitCalibration": lambda **fields: TwoQubitCalibrationStep(
+        type="TwoQubitCalibration", **fields
+    ),
+}
+
+
+def after_check(step: Any) -> Pipeline:
+    return Pipeline(targets=Qubits(["0", "1"]), steps=[{"type": "OneQubitCheck"}, step])
+
+
+@pytest.mark.parametrize("step_type", TWO_QUBIT_STEPS)
+def test_generated_manual_two_qubit_steps_are_accepted_however_serialized(step_type: str) -> None:
+    step = TWO_QUBIT_STEPS[step_type](**MANUAL)
+
+    # to_spec writes only the set fields. A plain dump writes every field: the unset cap as
+    # null and the empty collections at their defaults. A mapping is sent unchanged.
+    for spec in (
+        after_check(step).to_spec(),
+        after_check(step).model_dump(mode="json"),
+        after_check(step.model_dump(mode="json")).to_spec(),
+        to_spec(after_check(step).model_dump(mode="json")),
+    ):
+        parsed = ServerSpec.model_validate(spec)
+        assert parsed.steps[1].execution_mode == "manual"  # type: ignore[union-attr]
+
+
+@pytest.mark.parametrize("step_type", TWO_QUBIT_STEPS)
+def test_generated_two_qubit_caps_keep_the_server_rules(step_type: str) -> None:
+    manual = after_check(TWO_QUBIT_STEPS[step_type](**MANUAL, max_parallel_ops=4))
+    automatic = after_check(TWO_QUBIT_STEPS[step_type](max_parallel_ops=4))
+
+    for spec in (manual.to_spec(), manual.model_dump(mode="json")):
+        with pytest.raises(ValueError, match="max_parallel_ops only caps automatic"):
+            ServerSpec.model_validate(spec)
+    for spec in (automatic.to_spec(), automatic.model_dump(mode="json")):
+        parsed = ServerSpec.model_validate(spec)
+        assert parsed.steps[1].max_parallel_ops == 4  # type: ignore[union-attr]
 
 
 def test_sdk_sweeps_match_the_server_sweeps() -> None:

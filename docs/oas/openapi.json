@@ -34065,13 +34065,15 @@
             "type": "object",
             "title": "Task Parameters",
             "description": "Deprecated: set run, input and update_calibration_parameters on each task call instead. Common per-task defaults keyed by task name; every call of the task starts from them and a call's own settings take precedence. Still accepted and applied.",
+            "default": {},
             "deprecated": true
           },
           "default_run_parameters": {
             "additionalProperties": true,
             "type": "object",
             "title": "Default Run Parameters",
-            "description": "Run parameters applied to every task, e.g. shots or interval."
+            "description": "Run parameters applied to every task, e.g. shots or interval.",
+            "default": {}
           },
           "tags": {
             "items": {
@@ -34079,7 +34081,8 @@
             },
             "type": "array",
             "maxItems": 16,
-            "title": "Tags"
+            "title": "Tags",
+            "default": []
           }
         },
         "additionalProperties": false,
@@ -34273,12 +34276,18 @@
             "description": "Required with execution_mode manual and rejected otherwise: the rounds in run order, each a list of directed [control, target] pairs, e.g. [[[\"0\", \"1\"], [\"4\", \"5\"]], [[\"8\", \"9\"]]]. Each pair must be a chip coupling in that direction, the pairs of a round may not share a qubit, a MUX or a modeled readout/control module, and both qubits of every pair must be current candidates. Rounds are never regrouped, reversed or split."
           },
           "max_parallel_ops": {
-            "type": "integer",
-            "maximum": 100.0,
-            "minimum": 1.0,
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 100.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Max Parallel Ops",
-            "description": "Pairs per automatically generated CR group. Rejected with execution_mode manual.",
-            "default": 10
+            "description": "Pairs per automatically generated CR group; omitted or null uses 10. Rejected with execution_mode manual unless omitted or null."
           },
           "continue_on_failure": {
             "type": "boolean",
@@ -34599,7 +34608,7 @@
               }
             ],
             "title": "Qids",
-            "description": "Qubit ids as QDash lists them, e.g. [\"0\", \"1\"]."
+            "description": "Qubit ids as QDash lists them, e.g. [\"0\", \"1\"]. Set exactly one of qids and mux_ids, as a nonempty list without duplicates."
           },
           "mux_ids": {
             "anyOf": [
@@ -34614,7 +34623,7 @@
               }
             ],
             "title": "Mux Ids",
-            "description": "MUX ids; every qubit of each MUX is a target."
+            "description": "MUX ids; every qubit of each MUX is a target. Set exactly one of qids and mux_ids, as a nonempty list without duplicates."
           },
           "exclude_qids": {
             "items": {
@@ -34622,13 +34631,14 @@
             },
             "type": "array",
             "title": "Exclude Qids",
-            "description": "Qubits to leave out of the MUX targets."
+            "description": "Qubits to leave out of the MUX targets. Must be empty with qids.",
+            "default": []
           }
         },
         "additionalProperties": false,
         "type": "object",
         "title": "PipelineTargets",
-        "description": "Which qubits the pipeline starts from: explicit qids or whole MUXes."
+        "description": "Which qubits the pipeline starts from: explicit qids or whole MUXes.\n\nSet exactly one of qids and mux_ids to a nonempty list without duplicates.\nexclude_qids may be nonempty only with mux_ids."
       },
       "TaskSettings": {
         "properties": {
@@ -34745,12 +34755,18 @@
             "description": "Required with execution_mode manual and rejected otherwise: the rounds in run order, each a list of directed [control, target] pairs, e.g. [[[\"0\", \"1\"], [\"4\", \"5\"]], [[\"8\", \"9\"]]]. Each pair must be a chip coupling in that direction, the pairs of a round may not share a qubit, a MUX or a modeled readout/control module, and both qubits of every pair must be current candidates. Rounds are never regrouped, reversed or split."
           },
           "max_parallel_ops": {
-            "type": "integer",
-            "maximum": 100.0,
-            "minimum": 1.0,
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 100.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Max Parallel Ops",
-            "description": "Pairs per automatically generated CR group. Rejected with execution_mode manual.",
-            "default": 10
+            "description": "Pairs per automatically generated CR group; omitted or null uses 10. Rejected with execution_mode manual unless omitted or null."
           }
         },
         "additionalProperties": false,
