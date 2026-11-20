@@ -31,6 +31,19 @@ test("pi-qdash resolves the client built from this checkout", () => {
   );
 });
 
+test("pi-qdash resolves the SDK built from this checkout, on the same client", () => {
+  const pi = fileURLToPath(new URL("../../packages/pi-qdash/package.json", import.meta.url));
+  const sdk = fileURLToPath(import.meta.resolve("@oqtopus-team/qdash-sdk", pi));
+  assert.equal(
+    realpathSync(sdk),
+    realpathSync(fileURLToPath(new URL("../../sdks/typescript/dist/index.js", import.meta.url))),
+  );
+  assert.equal(
+    realpathSync(fileURLToPath(import.meta.resolve("@oqtopus-team/qdash-client", sdk))),
+    realpathSync(fileURLToPath(import.meta.resolve("@oqtopus-team/qdash-client", pi))),
+  );
+});
+
 test("bundled packages load tools and skills offline, retaining the pi-qdash allowlist", async () => {
   const dir = mkdtempSync(join(tmpdir(), "qdash-bundled-"));
   try {

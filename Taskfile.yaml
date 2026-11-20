@@ -267,9 +267,10 @@ tasks:
       - uv run pytest sdks/python/tests/ -v
 
   build-client-ts:
-    desc: Build the local TypeScript client for pi packages and the runtime
+    desc: Build the local TypeScript client and SDK for pi packages and the runtime
     cmds:
       - bun run build:client
+      - bun run build:sdk
 
   pi-local:
     desc: Run the pi CLI with pi-qdash and the Copilot chat models from .env (args after --)
@@ -280,6 +281,13 @@ tasks:
   test-client-ts:
     desc: Run TypeScript client checks
     dir: clients/typescript
+    cmds:
+      - bun run check
+
+  test-sdk-ts:
+    desc: Run TypeScript SDK checks against the built client
+    deps: [build-client-ts]
+    dir: sdks/typescript
     cmds:
       - bun run check
 
@@ -454,6 +462,7 @@ tasks:
       - task: ci-test
       - task: ci-ui
       - task: test-client-ts
+      - task: test-sdk-ts
       - task: ci-pi-packages
       - task: ci-agent-runtime
       - task: scan-leaks-local
@@ -527,7 +536,7 @@ tasks:
       - bun run --filter '@oqtopus-team/pi-qdash' test
       - bun run --filter '@oqtopus-team/pi-qcaleval' check
       - bun run --filter '@oqtopus-team/pi-qcaleval' test
-      - node --test .github/scripts/pi-package-release.test.mjs .github/scripts/client-release.test.mjs
+      - node --test .github/scripts/pi-package-release.test.mjs .github/scripts/client-release.test.mjs .github/scripts/sdk-package-release.test.mjs
 
   ci-agent-runtime:
     desc: Run all agent-runtime CI checks

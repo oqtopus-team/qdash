@@ -51,7 +51,7 @@ export function publishTag({ name, ref, version, published = [], latest }) {
   return "latest";
 }
 
-async function registryState(spec) {
+export async function registryState(spec) {
   const response = await fetch(`https://registry.npmjs.org/${spec.replace("/", "%2f")}`);
   if (response.status === 404) return { published: [], latest: undefined };
   if (!response.ok) throw new Error(`npm registry returned ${response.status}`);
