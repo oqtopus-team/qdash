@@ -64,6 +64,7 @@ class MetricScriptDocument(Document):
         default_factory=dict, description="Revisions pinned by dashboards, keyed by dashboard ID"
     )
     pins_initialized: bool = Field(default=False, description="Legacy pin backfill completed")
+    pins_schema_version: int = Field(default=0, description="Completed pin interpretation version")
     version: int = Field(default=0, description="Write counter; incremented by every write")
     template_id: str | None = Field(
         default=None, description="Template the script was created from, if any"

@@ -120,12 +120,20 @@ dashboard deleted, removes the dashboard's pins from every script (`clear_dashbo
 dashboard IDs are never reused.
 
 Legacy scripts are migrated lazily by `MongoMetricScriptRepository.ensure_pins_initialized`
-before an individual script read, pin acquisition, or deletion of a referencing dashboard. A persisted `pins_initialized` marker distinguishes a
-complete empty registry from missing or partially populated legacy pins. Backfill unions saved
+before an individual script read, pin acquisition, or deletion of a referencing dashboard.
+The persisted `pins_initialized` marker and `pins_schema_version` (currently 2) distinguish a
+complete registry from missing, partial, or previously initialized registries that missed
+coercible revision values. Backfill unions saved
 dashboard references with existing pins and atomically sets the marker while incrementing
 `version`. Concurrent pin changes invalidate its snapshot and trigger a retry; script replacement
-and deletion require the completed marker and an existing registry. No startup migration or
+and deletion require both current markers and an existing registry. No startup migration or
 collection rewrite is required. Failed migration requests can be retried without clearing data.
+Panel saves normalize validated settings, including defaults, while retaining accepted extra
+settings on non-script panels. Pin acquisition, release, and migration use the same reference
+model: numeric strings and integral floats resolve to integer revisions; `true` retains its
+previously accepted meaning of revision 1. Fractional, nonpositive, and out-of-BSON-range
+revisions are rejected. Script IDs are exact strings, without whitespace trimming. Migration
+parses only reference fields so unrelated legacy settings cannot hide a dependency.
 All API writers must run the upgraded code; old API processes that bypass this barrier must be
 stopped before serving writes after upgrade.
 

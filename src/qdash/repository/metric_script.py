@@ -9,8 +9,11 @@ from uuid import uuid4
 
 from bunnet.exceptions import DocumentNotFound
 
+from qdash.datamodel.custom_dashboard import script_reference
 from qdash.dbmodel.custom_dashboard import CustomDashboardDocument
 from qdash.dbmodel.metric_script import MetricScriptDocument
+
+PINS_SCHEMA_VERSION = 2
 
 
 def _bson_millis(value: datetime) -> datetime:
@@ -51,19 +54,23 @@ class MongoMetricScriptRepository:
         identity = {"project_id": project_id, "script_id": script_id}
         while True:
             raw = collection.find_one(identity)
-            if raw is None or (raw.get("pins_initialized") is True and "pins" in raw):
+            if raw is None or (
+                raw.get("pins_initialized") is True
+                and raw.get("pins_schema_version") == PINS_SCHEMA_VERSION
+                and "pins" in raw
+            ):
                 return
             pins = deepcopy(raw.get("pins", {}))
             for dashboard in CustomDashboardDocument.get_motor_collection().find(
                 {"project_id": project_id, "panels.config.script_id": script_id}
             ):
-                revisions = {
-                    panel["config"]["script_revision"]
-                    for panel in dashboard.get("panels", [])
-                    if panel.get("type") == "metric_script"
-                    and panel.get("config", {}).get("script_id") == script_id
-                    and isinstance(panel["config"].get("script_revision"), int)
-                }
+                revisions = set()
+                for panel in dashboard.get("panels", []):
+                    if panel.get("type") != "metric_script":
+                        continue
+                    reference = script_reference(panel.get("config", {}))
+                    if reference is not None and reference.script_id == script_id:
+                        revisions.add(reference.script_revision)
                 if not revisions:
                     continue
                 dashboard_id = dashboard["dashboard_id"]
@@ -75,7 +82,14 @@ class MongoMetricScriptRepository:
                 pin["shared"] = pin.get("shared", False) or dashboard.get("visibility") == "project"
             result = collection.update_one(
                 {"_id": raw["_id"], "version": version_filter(raw.get("version", 0))},
-                {"$set": {"pins": pins, "pins_initialized": True}, "$inc": {"version": 1}},
+                {
+                    "$set": {
+                        "pins": pins,
+                        "pins_initialized": True,
+                        "pins_schema_version": PINS_SCHEMA_VERSION,
+                    },
+                    "$inc": {"version": 1},
+                },
             )
             if result.matched_count:
                 return
@@ -110,6 +124,7 @@ class MongoMetricScriptRepository:
 
     def insert(self, doc: MetricScriptDocument) -> MetricScriptDocument:
         doc.pins_initialized = True
+        doc.pins_schema_version = PINS_SCHEMA_VERSION
         doc.insert()
         return doc
 
@@ -137,6 +152,7 @@ class MongoMetricScriptRepository:
                 {
                     "_id": doc.id,
                     "pins_initialized": True,
+                    "pins_schema_version": PINS_SCHEMA_VERSION,
                     "pins": {"$exists": True},
                     "revision": revision,
                     "system_info.updated_at": updated_at,
@@ -232,6 +248,7 @@ class MongoMetricScriptRepository:
                 "_id": doc.id,
                 "version": version_filter(version),
                 "pins_initialized": True,
+                "pins_schema_version": PINS_SCHEMA_VERSION,
                 "pins": {"$exists": True},
             }
         )

@@ -248,3 +248,23 @@ def test_pin_keys_reject_paths_and_operators(init_db, dashboard_id: str) -> None
     script_id = _insert().script_id
     with pytest.raises(ValueError, match="dashboard ID"):
         _add_pin(repo, script_id, [1], dashboard_id=dashboard_id)
+
+
+@pytest.mark.parametrize("marker", [None, 1])
+def test_old_initialized_registry_cannot_be_saved_or_deleted(init_db, marker) -> None:
+    repo = MongoMetricScriptRepository()
+    doc = _insert()
+    collection = MetricScriptDocument.get_motor_collection()
+    collection.update_one(
+        {"_id": doc.id},
+        {"$set": {"pins_schema_version": marker}}
+        if marker
+        else {"$unset": {"pins_schema_version": ""}},
+    )
+    stale = _load(doc.script_id)
+    assert not repo.delete_if_unchanged(stale, version=stale.version)
+    assert not _save_next(repo, stale, "lost")
+    current = repo.get(project_id=doc.project_id, script_id=doc.script_id)
+    assert current is not None and current.pins_schema_version == 2
+    assert not repo.delete_if_unchanged(stale, version=stale.version - 1)
+    assert _save_next(repo, current, "next")

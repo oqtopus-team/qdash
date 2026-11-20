@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
 from qdash.datamodel.metric_script import MetricPeriod, default_period
 
@@ -33,7 +33,7 @@ class PanelLayoutModel(BaseModel):
 class DashboardPanelModel(BaseModel):
     """One panel of a custom dashboard.
 
-    ``config`` is stored as given; its shape depends on ``type`` and is validated
+    ``config`` is normalized when saved; its shape depends on ``type`` and is validated
     against the matching ``*PanelConfig`` model when the dashboard is saved.
     """
 
@@ -56,7 +56,34 @@ class CouplingMetricPanelConfig(BaseModel):
     metric: str = Field(..., min_length=1, max_length=100)
 
 
-class MetricScriptPanelConfig(BaseModel):
+class MetricScriptReference(BaseModel):
+    """Canonical pin identity, also used for formerly accepted stored configurations."""
+
+    script_id: str = Field(..., min_length=1, max_length=64)
+    script_revision: int = Field(..., ge=1, description="Pinned script revision")
+
+    @field_validator("script_revision")
+    @classmethod
+    def _bson_revision(cls, value: int) -> int:
+        if value > 2**63 - 1:
+            raise ValueError("script_revision exceeds the BSON integer range")
+        return value
+
+
+def script_reference(config: dict[str, Any]) -> MetricScriptReference | None:
+    """Parse only the reference so unrelated legacy settings cannot hide a pin.
+
+    Use Pydantic's integer semantics (including integral floats, numeric strings and
+    True), exactly as panel validation does; never truncate a fractional revision.
+    Script IDs remain exact strings: whitespace is significant and numbers are invalid.
+    """
+    try:
+        return MetricScriptReference.model_validate(config)
+    except ValidationError:
+        return None
+
+
+class MetricScriptPanelConfig(MetricScriptReference):
     """Config of a ``metric_script`` panel.
 
     The panel pins ``script_revision``: saving a newer revision of the script never
@@ -66,9 +93,7 @@ class MetricScriptPanelConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    script_id: str = Field(..., min_length=1, max_length=64)
     metric_id: str = Field(..., min_length=1, max_length=200)
-    script_revision: int = Field(..., ge=1, description="Pinned script revision")
     period: MetricPeriod = Field(default_factory=default_period)
     params: dict[str, bool | int | float | str] = Field(default_factory=dict)
     view: Literal["map", "table"] = "map"

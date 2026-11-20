@@ -1088,9 +1088,11 @@ def _make_legacy(script_id, dashboard_id, *, partial=False):
     )
 
 
+@pytest.mark.parametrize("value", ["1", 1.0, True])
+@pytest.mark.parametrize("initialized", [False, True])
 @pytest.mark.parametrize("action", ["delete", "unshare", "evict", "metadata"])
 def test_legacy_references_are_backfilled_before_writes(
-    test_client, users, runtime, monkeypatch, action
+    test_client, users, runtime, monkeypatch, action, value, initialized
 ):
     owner = users["owner"]
     script_id = _create(test_client, owner, visibility="project")["script_id"]
@@ -1098,6 +1100,17 @@ def test_legacy_references_are_backfilled_before_writes(
         test_client, owner, [_pinned_panel(script_id, 1)], visibility="project"
     ).json()["dashboard_id"]
     _make_legacy(script_id, dashboard_id)
+    CustomDashboardDocument.get_motor_collection().update_one(
+        {"dashboard_id": dashboard_id},
+        {"$set": {"panels.0.config.script_revision": value}},
+    )
+    MetricScriptDocument.get_motor_collection().update_one(
+        {"script_id": script_id},
+        {
+            "$set": {"pins_initialized": initialized, "pins": {}},
+            "$unset": {"pins_schema_version": ""},
+        },
+    )
     if action == "delete":
         assert test_client.delete(f"/metric-scripts/{script_id}", headers=owner).status_code == 409
     elif action == "unshare":
@@ -1128,7 +1141,10 @@ def test_legacy_references_are_backfilled_before_writes(
     assert doc.find_revision(1) is not None
 
 
-def test_legacy_backfill_retries_concurrent_dashboard_pin(test_client, users, runtime, monkeypatch):
+@pytest.mark.parametrize("initialized", [False, True])
+def test_legacy_backfill_retries_concurrent_dashboard_pin(
+    test_client, users, runtime, monkeypatch, initialized
+):
     owner = users["owner"]
     script_id = _create(test_client, owner, visibility="project")["script_id"]
     panel = _pinned_panel(script_id, 1)
@@ -1136,6 +1152,16 @@ def test_legacy_backfill_retries_concurrent_dashboard_pin(test_client, users, ru
         "dashboard_id"
     ]
     _make_legacy(script_id, legacy_id)
+    CustomDashboardDocument.get_motor_collection().update_one(
+        {"dashboard_id": legacy_id}, {"$set": {"panels.0.config.script_revision": "1"}}
+    )
+    MetricScriptDocument.get_motor_collection().update_one(
+        {"script_id": script_id},
+        {
+            "$set": {"pins_initialized": initialized, "pins": {}},
+            "$unset": {"pins_schema_version": ""},
+        },
+    )
     collection = MetricScriptDocument.get_motor_collection()
     update = collection.update_one
     raced: list[Any] = []
@@ -1329,3 +1355,80 @@ def test_dashboard_delete_invalidates_a_legacy_migration_snapshot(
     doc = MongoMetricScriptRepository().get(project_id=PROJECT, script_id=script_id)
     assert doc is not None and doc.pins_initialized and doc.pins == {}
     assert test_client.delete(f"/metric-scripts/{script_id}", headers=owner).status_code == 200
+
+
+@pytest.mark.parametrize("value", ["1", "1.0", " 1 ", 1.0, True])
+def test_coerced_references_are_normalized_and_stay_pinned(test_client, users, runtime, value):
+    owner = users["owner"]
+    script_id = _create(test_client, owner, visibility="project")["script_id"]
+    panel = _pinned_panel(script_id, 1)
+    panel["config"].update(script_revision=value, hops=[2, "1", 2])
+    created = _post_dashboard(test_client, owner, [panel], visibility="project")
+    assert created.status_code == 201, created.text
+    dashboard_id = created.json()["dashboard_id"]
+    for response in [
+        created,
+        test_client.patch(
+            f"/custom-dashboards/{dashboard_id}", json={"panels": [panel]}, headers=owner
+        ),
+    ]:
+        assert response.status_code in (200, 201), response.text
+        config = response.json()["panels"][0]["config"]
+        assert type(config["script_revision"]) is int
+        assert config["script_revision"] == 1
+        assert config["hops"] == [1, 2]
+        assert config["period"] == {"kind": "relative", "days": 14}
+        assert _stored_doc(script_id).pins[dashboard_id].revisions == [1]
+    raw = CustomDashboardDocument.get_motor_collection().find_one({"dashboard_id": dashboard_id})
+    assert raw is not None
+    assert type(raw["panels"][0]["config"]["script_revision"]) is int
+    assert test_client.delete(f"/metric-scripts/{script_id}", headers=owner).status_code == 409
+    assert (
+        test_client.patch(
+            f"/metric-scripts/{script_id}", json={"visibility": "private"}, headers=owner
+        ).status_code
+        == 409
+    )
+    # Copy and metadata-save legacy raw values through the same canonicalizer.
+    CustomDashboardDocument.get_motor_collection().update_one(
+        {"dashboard_id": dashboard_id}, {"$set": {"panels.0.config.script_revision": value}}
+    )
+    copied = test_client.post(f"/custom-dashboards/{dashboard_id}/duplicate", headers=owner)
+    assert copied.status_code == 201, copied.text
+    copy_id = copied.json()["dashboard_id"]
+    assert type(copied.json()["panels"][0]["config"]["script_revision"]) is int
+    assert _stored_doc(script_id).pins[copy_id].revisions == [1]
+    assert (
+        test_client.delete(f"/custom-dashboards/{dashboard_id}", headers=owner).status_code == 200
+    )
+    assert test_client.delete(f"/metric-scripts/{script_id}", headers=owner).status_code == 409
+    assert test_client.delete(f"/custom-dashboards/{copy_id}", headers=owner).status_code == 200
+    assert test_client.delete(f"/metric-scripts/{script_id}", headers=owner).status_code == 200
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("script_revision", False),
+        ("script_revision", 1.5),
+        ("script_revision", "1.5"),
+        ("script_revision", "invalid"),
+        ("script_revision", None),
+        ("script_revision", 2**63),
+        ("script_revision", str(2**63)),
+        ("script_revision", 1e100),
+        ("script_id", 1),
+        ("script_id", True),
+        ("script_id", " "),
+        ("script_id", " padded "),
+    ],
+)
+def test_invalid_reference_never_creates_dashboard(test_client, users, runtime, field, value):
+    owner = users["owner"]
+    script_id = _create(test_client, owner)["script_id"]
+    panel = _pinned_panel(script_id, 1)
+    panel["config"][field] = value
+    response = _post_dashboard(test_client, owner, [panel])
+    assert response.status_code == 422, response.text
+    assert CustomDashboardDocument.find({"project_id": PROJECT}).count() == 0
+    assert _stored_doc(script_id).pins == {}

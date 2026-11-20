@@ -712,3 +712,17 @@ def test_update_racing_a_delete_leaves_no_pins(test_client, init_db, runtime, mo
     assert update.status_code == 409
     assert test_client.get(f"/custom-dashboards/{dashboard_id}", headers=owner).status_code == 404
     assert _pins(script_id) == {}
+
+
+def test_config_normalization_preserves_accepted_extra_settings():
+    from qdash.api.services.custom_dashboard_service import validate_panel_configs
+    from qdash.datamodel.custom_dashboard import DashboardPanelModel, PanelLayoutModel
+
+    panel = DashboardPanelModel(
+        panel_id="notes",
+        type="markdown",
+        layout=PanelLayoutModel(x=0, y=0, w=6, h=4),
+        config={"custom_setting": {"keep": True}},
+    )
+    validate_panel_configs([panel])
+    assert panel.config == {"content": "", "custom_setting": {"keep": True}}

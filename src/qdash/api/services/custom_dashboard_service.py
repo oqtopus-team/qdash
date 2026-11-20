@@ -51,6 +51,7 @@ from qdash.datamodel.custom_dashboard import (
     DashboardPanelModel,
     DashboardVisibility,
     MetricScriptPanelConfig,
+    script_reference,
 )
 from qdash.datamodel.project import ProjectRole
 from qdash.dbmodel.custom_dashboard import CustomDashboardDocument
@@ -98,10 +99,9 @@ def script_pins(panels: list[DashboardPanelModel]) -> dict[str, list[int]]:
     for panel in panels:
         if panel.type != "metric_script":
             continue
-        script_id = panel.config.get("script_id")
-        revision = panel.config.get("script_revision")
-        if isinstance(script_id, str) and isinstance(revision, int):
-            pins.setdefault(script_id, set()).add(revision)
+        reference = script_reference(panel.config)
+        if reference is not None:
+            pins.setdefault(reference.script_id, set()).add(reference.script_revision)
     return {script_id: sorted(revisions) for script_id, revisions in pins.items()}
 
 
@@ -121,7 +121,11 @@ def validate_panel_configs(panels: list[DashboardPanelModel]) -> list[BaseModel]
         seen.add(panel.panel_id)
         model = PANEL_CONFIG_MODELS[panel.type]
         try:
-            configs.append(model.model_validate(panel.config))
+            config = model.model_validate(panel.config)
+            # Keep unknown settings accepted by non-script panels, while normalizing
+            # validated fields and materializing their defaults.
+            panel.config = {**panel.config, **config.model_dump(mode="json")}
+            configs.append(config)
         except ValidationError as exc:
             raise _invalid(panel, _format_validation_error(exc)) from exc
     return configs
@@ -407,6 +411,8 @@ class CustomDashboardService:
             doc.panels = body.panels
         elif visibility != doc.visibility:
             self.validate_panels(ctx, doc.panels, visibility)
+        else:
+            validate_panel_configs(doc.panels)
         if body.name is not None:
             doc.name = body.name
         if body.description is not None:
@@ -473,5 +479,6 @@ class CustomDashboardService:
             chip_id=source.chip_id,
             panels=[panel.model_copy(deep=True) for panel in source.panels],
         )
+        validate_panel_configs(copy.panels)
         self._insert(ctx, copy)
         return self._to_response(copy, ctx)
