@@ -102,7 +102,7 @@ export QDASH_PROJECT_ID="your-project-id"
 | `QDASH_CF_ACCESS_CLIENT_SECRET` | None | Cloudflare Access client secret |
 | `QDASH_TIMEOUT_SECONDS` | `30` | Request timeout |
 | `QDASH_MAX_WORKERS` | `4` | Concurrent worker limit |
-| `QDASH_RETRY_MAX_ATTEMPTS` | `3` | Maximum attempts for retryable GET requests |
+| `QDASH_RETRY_MAX_ATTEMPTS` | `3` | Maximum attempts for a request the client may send again |
 | `QDASH_RETRY_BACKOFF_SECONDS` | `0.2` | Initial retry delay |
 | `QDASH_RETRY_MAX_BACKOFF_SECONDS` | `5.0` | Maximum retry delay |
 | `QDASH_VERIFY_TLS` | `true` | TLS certificate verification |
@@ -150,6 +150,25 @@ Methods return Pydantic models exported from `qdash.client`. Configuration failu
 | `QDashNotFoundError` | HTTP 404 |
 | `QDashValidationError` | Invalid request arguments or an unexpected response shape |
 | `QDashTransportError` | Network failure, timeout, or another unexpected HTTP status |
+
+`QDASH_RETRY_MAX_ATTEMPTS` bounds three kinds of resend:
+
+| Failure | Resent |
+| --- | --- |
+| Network failure or timeout on a `GET` | Yes |
+| Connection never made (`POST`, `PUT`, `PATCH`, or `DELETE`) | Yes, because the server never received the request |
+| Timeout or dropped connection after a write was sent | No; it raises `QDashTransportError`, because the server may already have acted on it |
+| HTTP 401 with username and password authentication | Yes, after a fresh login, because the server rejected the request without acting on it |
+
+The client does not resend on any other HTTP status. Before repeating a failed write, check its
+effect, for example with `list_executions` after `execute_flow`.
+
+`wait_for_execution` polls until the execution reaches `completed`, `failed`, `cancelled`,
+`canceled`, or `crashed`. For one step of a
+[calibration pipeline](../../developer-guide/workflow/calibration-pipeline.md#following-a-run) it
+waits for the whole run and reads `pipeline.status`; pass `whole_pipeline=False` to wait for that
+step's execution only. A failed or cancelled execution is returned, not raised, and the call raises
+`TimeoutError` after `timeout_seconds`.
 
 Only `list_chips_async`, `get_task_results_timeseries_async`, and `get_metrics_config_async` have
 async variants. They use the same `QDashClient` configuration and close their temporary async HTTP

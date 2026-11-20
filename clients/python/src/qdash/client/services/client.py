@@ -11,6 +11,7 @@ import httpx
 from pydantic import BaseModel, ValidationError
 
 from qdash.client.rest.api_client import ApiClient as RestApiClient
+from qdash.client.rest.api_client import request_may_have_been_sent
 from qdash.client.rest.configuration import Configuration as RestConfiguration
 from qdash.client.rest.exceptions import ApiException as RestApiException
 
@@ -19,6 +20,24 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from qdash.client.rest.api_response import ApiResponse as RestApiResponse
+from qdash.client.services.client_models import (
+    AgentActionListResponse,
+    AgentActionResponse,
+    AgentCandidateCommitResponse,
+    AgentCandidateListResponse,
+    AgentCandidateResponse,
+    AgentCandidateSetCommitResponse,
+    AgentSessionResponse,
+    CandidateGateResponse,
+    CreateEvaluationRunResponse,
+    EvaluationItem,
+    EvaluationRunDetailResponse,
+    IssueKnowledgeResponse,
+    IssueResponse,
+    ListIssueKnowledgeResponse,
+    ListIssuesResponse,
+    TaskNextAction,
+)
 from qdash.client.services.config import QDashConfig
 from qdash.client.services.errors import (
     QDashApiError,
@@ -29,22 +48,11 @@ from qdash.client.services.errors import (
 )
 from qdash.client.services.exporter_models import NormalizedMetricRecord
 from qdash.client.services.models import (
-    AgentActionListResponse,
-    AgentActionResponse,
-    AgentCandidateCommitResponse,
-    AgentCandidateListResponse,
-    AgentCandidateResponse,
-    AgentCandidateSetCommitResponse,
-    AgentSessionResponse,
     BodyReExecuteTaskResult,
     CancelExecutionResponse,
-    CandidateGateResponse,
     ChipMetricsResponse,
     ChipResponse,
     CouplingResponse,
-    CreateEvaluationRunResponse,
-    EvaluationItem,
-    EvaluationRunDetailResponse,
     ExecuteFlowResponse,
     ExecutionActivityResponse,
     ExecutionResponseDetail,
@@ -53,16 +61,12 @@ from qdash.client.services.models import (
     FlowTemplateWithCode,
     GetFlowResponse,
     ImpactResponse,
-    IssueKnowledgeResponse,
-    IssueResponse,
     LatestTaskResultResponse,
     LineageResponse,
     ListChipsResponse,
     ListCouplingsResponse,
     ListExecutionsResponse,
     ListFlowsResponse,
-    ListIssueKnowledgeResponse,
-    ListIssuesResponse,
     ListQubitsResponse,
     ListTaskKnowledgeResponse,
     ListTaskResponse,
@@ -79,7 +83,6 @@ from qdash.client.services.models import (
     SuccessResponse,
     TaskHistoryResponse,
     TaskKnowledgeResponse,
-    TaskNextAction,
     TaskResultExcludeResponse,
     TaskResultListResponse,
     TaskResultResponse,
@@ -87,6 +90,12 @@ from qdash.client.services.models import (
 )
 
 PACKAGE_NAME = "qdash"
+# Execution and pipeline statuses after which nothing more runs.
+_EXECUTION_TERMINAL_STATUSES = frozenset(
+    {"completed", "failed", "cancelled", "canceled", "crashed"}
+)
+# Methods without side effects; a transport failure on them is always safe to retry.
+_SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 TModel = TypeVar("TModel", bound=BaseModel)
 
 
@@ -738,11 +747,21 @@ class QDashClient:
         timeout_seconds: float = 600.0,
         poll_interval_seconds: float = 1.0,
         terminal_statuses: set[str] | None = None,
+        whole_pipeline: bool = True,
     ) -> ExecutionResponseDetail:
-        """Poll an execution until it reaches a terminal state or times out."""
+        """Poll an execution until it reaches a terminal state or times out.
+
+        When the execution is one step of a pipeline run and ``whole_pipeline`` is true, wait
+        for the whole run instead: a step's own execution finishes long before the run does.
+        The returned detail's ``pipeline.status`` then carries the run's outcome. An execution
+        without pipeline metadata, including one from a server that does not report it, is
+        judged by its own ``status``. A failed or cancelled run is returned, not raised.
+        """
         if timeout_seconds < 0 or poll_interval_seconds < 0:
             raise ValueError("Polling timeout and interval must be non-negative")
-        terminal = terminal_statuses or {"completed", "failed", "cancelled"}
+        terminal = {
+            status.lower() for status in (terminal_statuses or _EXECUTION_TERMINAL_STATUSES)
+        }
         deadline = time.monotonic() + timeout_seconds
 
         while True:
@@ -750,8 +769,14 @@ class QDashClient:
                 execution = self.get_execution(execution_id)
             except QDashNotFoundError:
                 execution = None
-            if execution is not None and execution.status.lower() in terminal:
-                return execution
+            if execution is not None:
+                status = (
+                    execution.pipeline.status
+                    if whole_pipeline and execution.pipeline is not None
+                    else execution.status
+                )
+                if status.lower() in terminal:
+                    return execution
             if time.monotonic() >= deadline:
                 raise TimeoutError(
                     f"Execution '{execution_id}' did not reach a terminal state "
@@ -1348,7 +1373,9 @@ class QDashClient:
                     raise_on_status=False,
                 )
             except RestApiException as exc:
-                if attempt < attempts:
+                if attempt < attempts and self._may_resend_after_transport_error(
+                    method, request_sent=exc.request_sent
+                ):
                     self._sleep(self._retry_delay_for_attempt(attempt))
                     continue
                 raise QDashTransportError(str(exc), payload=exc.body) from exc
@@ -1358,6 +1385,8 @@ class QDashClient:
                 and self.config.api_token is None
                 and self.config.username
             ):
+                # A 401 is a definite rejection, so the server did not act on the request and
+                # resending it with a fresh login token is safe for every method.
                 self._token = None
                 if attempt < attempts:
                     self._sleep(self._retry_delay_for_attempt(attempt, response))
@@ -1396,7 +1425,9 @@ class QDashClient:
                 ) as client:
                     response = await client.get(path, params=params, headers=headers)
             except httpx.HTTPError as exc:
-                if attempt < attempts:
+                if attempt < attempts and self._may_resend_after_transport_error(
+                    "GET", request_sent=request_may_have_been_sent(exc)
+                ):
                     await asyncio.sleep(self._retry_delay_for_attempt(attempt))
                     continue
                 raise QDashTransportError(str(exc)) from exc
@@ -1480,6 +1511,15 @@ class QDashClient:
             raise QDashAuthError("Login response did not include access_token", status_code=401)
         self._token = str(token)
         return self._token
+
+    def _may_resend_after_transport_error(self, method: str, *, request_sent: bool) -> bool:
+        """Return whether a request that failed in transport may be sent again.
+
+        Safe methods are always resent. Any other method is resent only when the connection
+        failed before the request went out: after a timeout or a dropped connection the server
+        may already have acted on it, and sending it again could repeat the write.
+        """
+        return method.upper() in _SAFE_METHODS or not request_sent
 
     def _is_retryable_status(self, status_code: int) -> bool:
         # Follow OpenAPI-declared responses for the currently supported GET endpoints.

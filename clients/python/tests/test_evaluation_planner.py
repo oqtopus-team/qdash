@@ -14,12 +14,7 @@ from qdash.client.services.agent_runner import (
     AgentSkillTransition,
     AgentStepOutcome,
 )
-from qdash.client.services.evaluation_planner import (
-    EvaluationPlanner,
-    parse_suggested_range,
-    verdict_from_diagnosis,
-)
-from qdash.client.services.models import (
+from qdash.client.services.client_models import (
     AgentCandidateResponse,
     CreateEvaluationRunResponse,
     EvaluationItem,
@@ -27,6 +22,11 @@ from qdash.client.services.models import (
     EvaluationRunDetailResponse,
     EvaluationRunSummary,
     TaskNextAction,
+)
+from qdash.client.services.evaluation_planner import (
+    EvaluationPlanner,
+    parse_suggested_range,
+    verdict_from_diagnosis,
 )
 
 BOUNDS = {"control_amplitude": {"minimum": 0.01, "maximum": 0.05}}

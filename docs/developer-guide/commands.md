@@ -34,7 +34,7 @@ task check               # required before every push; Python, UI, workspace pac
 ## Build and Generation
 
 ```bash
-task generate            # OpenAPI + generated UI client
+task generate            # OpenAPI + generated UI, TypeScript, and Python clients
 task generate-task-catalog # workflow task metadata catalog
 task build               # UI production build
 task build-client-ts     # build the local TypeScript client for pi CLI development

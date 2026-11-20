@@ -803,6 +803,7 @@ def test_task_file_and_flow_read_helpers_return_models() -> None:
         "execution_id": "exec-1",
         "figure_path": [],
         "json_figure_path": [],
+        "raw_data_path": [],
         "input_parameters": {},
         "output_parameters": {"t1": 12.5},
     }
@@ -844,11 +845,24 @@ def test_task_file_and_flow_read_helpers_return_models() -> None:
                         "chip_id": "chip-1",
                         "days": 2,
                         "timezone": "Asia/Tokyo",
+                        "granularity": "day",
                         "since": "2026-11-01",
                         "until": "2026-11-02",
                         "buckets": [
-                            {"date": "2026-11-01", "completed": 2, "failed": 1, "total": 3},
-                            {"date": "2026-11-02", "total": 0},
+                            {
+                                "date": "2026-11-01",
+                                "start": "2026-11-01T00:00:00+09:00",
+                                "end": "2026-11-02T00:00:00+09:00",
+                                "completed": 2,
+                                "failed": 1,
+                                "total": 3,
+                            },
+                            {
+                                "date": "2026-11-02",
+                                "start": "2026-11-02T00:00:00+09:00",
+                                "end": "2026-11-03T00:00:00+09:00",
+                                "total": 0,
+                            },
                         ],
                     },
                 )
@@ -967,6 +981,7 @@ def test_file_and_git_write_helpers_send_json_bodies() -> None:
 def test_flow_and_execution_write_helpers_return_models() -> None:
     execute_payload = {
         "execution_id": "exec-1",
+        "flow_run_id": "run-1",
         "flow_run_url": "https://prefect.local/runs/exec-1",
         "qdash_ui_url": "https://qdash.local/executions/exec-1",
         "message": "started",
@@ -1063,6 +1078,7 @@ def test_task_result_and_issue_write_helpers_return_models() -> None:
     }
     execute_payload = {
         "execution_id": "exec-1",
+        "flow_run_id": "run-1",
         "flow_run_url": "https://prefect.local/runs/exec-1",
         "qdash_ui_url": "https://qdash.local/executions/exec-1",
         "message": "started",

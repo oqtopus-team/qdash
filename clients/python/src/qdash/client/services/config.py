@@ -37,7 +37,7 @@ def _resolve_config_path(path: str | Path | object = _DEFAULT_CONFIG_PATH) -> Pa
 
 
 class QDashRetryConfig(BaseModel):
-    """Retry tuning parameters for idempotent GET requests."""
+    """Retry tuning for requests the client may send again; see `QDashClient._request`."""
 
     model_config = ConfigDict(extra="forbid")
 
