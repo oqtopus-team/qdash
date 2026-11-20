@@ -274,7 +274,7 @@ describe("CustomDashboardListPageContent", () => {
     expect(screen.queryByRole("button", { name: "New dashboard" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^Duplicate/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^Delete/ })).not.toBeInTheDocument();
-    expect(screen.getAllByRole("link", { name: "Open" })).toHaveLength(3);
+    expect(screen.getAllByRole("link", { name: /board$/ })).toHaveLength(3);
   });
 
   it("shows an empty state when no dashboard is visible", () => {

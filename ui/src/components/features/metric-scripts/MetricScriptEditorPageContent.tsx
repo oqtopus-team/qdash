@@ -8,7 +8,16 @@ import { type ReactNode, useCallback, useEffect, useId, useMemo, useRef, useStat
 
 import { useQueryClient } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
-import { ArrowLeft, CircleCheck, Copy, Play, Save, ShieldCheck, TriangleAlert } from "lucide-react";
+import {
+  ArrowLeft,
+  CircleAlert,
+  CircleCheck,
+  Copy,
+  Play,
+  Save,
+  ShieldCheck,
+  TriangleAlert,
+} from "lucide-react";
 import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from "react-resizable-panels";
 
 import {
@@ -19,7 +28,7 @@ import {
   useValidateMetricScript,
 } from "@/client/metric-script/metric-script";
 import type { MetricInfo, MetricScriptResponseVisibility, ScriptDiagnostic } from "@/schemas";
-import { VisibilityBadge } from "@/components/features/custom-dashboards/VisibilityBadge";
+import { VisibilityLabel } from "@/components/features/custom-dashboards/VisibilityLabel";
 import { ErrorCard } from "@/components/ui/ErrorCard";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { useToast } from "@/components/ui/Toast";
@@ -373,31 +382,36 @@ export function MetricScriptEditorPageContent({ scriptId }: { scriptId: string }
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-base-100">
-      <header className="flex flex-col gap-2 border-b border-base-300 bg-base-200 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex min-w-0 items-center gap-2">
+      <header className="flex flex-col gap-3 border-b border-base-300 bg-base-100 px-4 py-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 items-start gap-2">
           <Link
             href="/custom-dashboards?tab=scripts"
-            className="btn btn-ghost btn-sm btn-square"
+            className="btn btn-ghost btn-sm btn-square shrink-0"
             aria-label="All scripts"
-            title="All scripts"
           >
             <ArrowLeft className="h-4 w-4" aria-hidden="true" />
           </Link>
           <div className="min-w-0">
-            <h1 className="truncate text-base font-semibold">{settings.name || script.name}</h1>
+            <h1 className="truncate text-xl font-medium">{settings.name || script.name}</h1>
             <div
-              className="flex flex-wrap items-center gap-1.5 text-xs text-base-content/60"
+              className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-base-content/60"
               data-testid="script-status"
             >
-              <VisibilityBadge visibility={script.visibility} />
-              <span className="badge badge-ghost badge-sm">Saved r{script.revision}</span>
+              <VisibilityLabel visibility={script.visibility} />
+              <span>Saved r{script.revision}</span>
               {active ? (
-                <span className="badge badge-success badge-soft badge-sm">Active r{active}</span>
+                <span>Active r{active}</span>
               ) : (
-                <span className="badge badge-warning badge-soft badge-sm">No valid revision</span>
+                <span className="inline-flex items-center gap-1 text-warning">
+                  <TriangleAlert className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                  No valid revision
+                </span>
               )}
               {isDirty && (
-                <span className="badge badge-warning badge-soft badge-sm">Unsaved changes</span>
+                <span className="inline-flex items-center gap-1 text-warning">
+                  <CircleAlert className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                  Unsaved changes
+                </span>
               )}
               <span>by {script.owner_username}</span>
             </div>
@@ -557,10 +571,7 @@ export function MetricScriptEditorPageContent({ scriptId }: { scriptId: string }
             {diagnostics.length > 0 ? (
               <ul className="flex flex-col gap-1.5 text-sm" data-testid="diagnostics">
                 {diagnostics.map((diagnostic, index) => (
-                  <li
-                    key={`${diagnostic.line ?? "x"}-${index}`}
-                    className="flex gap-2 rounded-[var(--radius-field)] bg-error/5 px-2 py-1"
-                  >
+                  <li key={`${diagnostic.line ?? "x"}-${index}`} className="flex gap-2 py-0.5">
                     <TriangleAlert
                       className="mt-0.5 h-4 w-4 shrink-0 text-error"
                       aria-hidden="true"

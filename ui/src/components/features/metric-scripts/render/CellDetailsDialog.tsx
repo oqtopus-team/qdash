@@ -130,7 +130,7 @@ export function CellDetailsDialog({ cell, metric, color, onOpenChange }: CellDet
                 )}
                 <span>{metric.title}</span>
                 {cell.hops ? (
-                  <span className="badge badge-ghost badge-sm">
+                  <span className="text-xs text-base-content/60">
                     {cell.hops} {cell.hops === 1 ? "hop" : "hops"}
                   </span>
                 ) : null}
@@ -146,7 +146,7 @@ export function CellDetailsDialog({ cell, metric, color, onOpenChange }: CellDet
                 <span className="font-mono tabular-nums">{valueText(cell, unit)}</span>
                 {cell.label && <span className="text-base-content/70">{cell.label}</span>}
                 {typeof count === "number" && (
-                  <span className="badge badge-ghost badge-sm">n = {count}</span>
+                  <span className="font-mono text-xs text-base-content/60">n = {count}</span>
                 )}
               </DialogDescription>
             </div>

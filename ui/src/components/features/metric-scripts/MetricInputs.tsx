@@ -27,86 +27,109 @@ interface PeriodFieldsProps {
   disabled?: boolean;
 }
 
-/** Period editor: the last N days, or a fixed start and end in the UI time zone. */
+/**
+ * Period editor: the last N days, or a fixed start and end in the UI time zone. The kind
+ * and its values share one row at the small control size.
+ */
 export function PeriodFields({ id, value, onChange, disabled = false }: PeriodFieldsProps) {
   const error = periodError(value);
   const isAbsolute = value.kind === "absolute";
+  const errorId = `${id}-error`;
+
+  const handleKindChange = (kind: string) => {
+    if (kind === "absolute" && !isAbsolute) {
+      onChange(
+        absoluteFromDays(
+          value.kind === "relative" && Number.isFinite(value.days)
+            ? value.days
+            : DEFAULT_PERIOD_DAYS,
+        ),
+      );
+    } else if (kind === "relative" && isAbsolute) {
+      onChange({ kind: "relative", days: DEFAULT_PERIOD_DAYS });
+    }
+  };
+
   return (
-    <fieldset className="fieldset min-w-0" disabled={disabled}>
-      <legend className="fieldset-legend">Period</legend>
-      <div className="join w-fit" role="group" aria-label="Period kind">
-        <button
-          type="button"
-          aria-pressed={!isAbsolute}
-          className={`btn btn-xs join-item ${!isAbsolute ? "btn-active" : ""}`}
-          onClick={() =>
-            !isAbsolute ? undefined : onChange({ kind: "relative", days: DEFAULT_PERIOD_DAYS })
-          }
-        >
-          Last days
-        </button>
-        <button
-          type="button"
-          aria-pressed={isAbsolute}
-          className={`btn btn-xs join-item ${isAbsolute ? "btn-active" : ""}`}
-          onClick={() =>
-            isAbsolute
-              ? undefined
-              : onChange(
-                  absoluteFromDays(
-                    value.kind === "relative" && Number.isFinite(value.days)
-                      ? value.days
-                      : DEFAULT_PERIOD_DAYS,
-                  ),
-                )
-          }
-        >
-          Fixed range
-        </button>
-      </div>
-      {value.kind === "absolute" ? (
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          <label className="flex flex-col gap-1">
-            <span className="label">Start</span>
-            <input
-              id={`${id}-start`}
-              type="datetime-local"
-              className="input input-sm w-full"
-              value={isoToLocalInput(value.start)}
-              onChange={(event) =>
-                onChange({ ...value, start: localInputToIso(event.target.value) })
-              }
-            />
+    <fieldset className="min-w-0" disabled={disabled}>
+      <div
+        className={`grid grid-cols-1 gap-x-3 ${isAbsolute ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}
+      >
+        <div className="fieldset min-w-0">
+          <label htmlFor={`${id}-kind`} className="fieldset-legend">
+            Period
           </label>
-          <label className="flex flex-col gap-1">
-            <span className="label">End</span>
-            <input
-              id={`${id}-end`}
-              type="datetime-local"
-              className="input input-sm w-full"
-              value={isoToLocalInput(value.end)}
-              onChange={(event) => onChange({ ...value, end: localInputToIso(event.target.value) })}
-            />
-          </label>
+          <select
+            id={`${id}-kind`}
+            className="select select-sm w-full"
+            value={value.kind}
+            onChange={(event) => handleKindChange(event.target.value)}
+          >
+            <option value="relative">Last days</option>
+            <option value="absolute">Fixed range</option>
+          </select>
         </div>
-      ) : (
-        <label className="flex flex-col gap-1">
-          <span className="label">Days back from now</span>
-          <input
-            id={`${id}-days`}
-            type="number"
-            inputMode="numeric"
-            min={1}
-            max={MAX_PERIOD_DAYS}
-            step={1}
-            className={`input input-sm w-32 ${error ? "input-error" : ""}`}
-            value={Number.isFinite(value.days) ? value.days : ""}
-            aria-invalid={Boolean(error)}
-            onChange={(event) => onChange({ kind: "relative", days: event.target.valueAsNumber })}
-          />
-        </label>
+        {value.kind === "absolute" ? (
+          <>
+            <div className="fieldset min-w-0">
+              <label htmlFor={`${id}-start`} className="fieldset-legend">
+                Start
+              </label>
+              <input
+                id={`${id}-start`}
+                type="datetime-local"
+                className="input input-sm w-full"
+                value={isoToLocalInput(value.start)}
+                aria-invalid={Boolean(error)}
+                aria-describedby={error ? errorId : undefined}
+                onChange={(event) =>
+                  onChange({ ...value, start: localInputToIso(event.target.value) })
+                }
+              />
+            </div>
+            <div className="fieldset min-w-0">
+              <label htmlFor={`${id}-end`} className="fieldset-legend">
+                End
+              </label>
+              <input
+                id={`${id}-end`}
+                type="datetime-local"
+                className="input input-sm w-full"
+                value={isoToLocalInput(value.end)}
+                aria-invalid={Boolean(error)}
+                aria-describedby={error ? errorId : undefined}
+                onChange={(event) =>
+                  onChange({ ...value, end: localInputToIso(event.target.value) })
+                }
+              />
+            </div>
+          </>
+        ) : (
+          <div className="fieldset min-w-0">
+            <label htmlFor={`${id}-days`} className="fieldset-legend">
+              Days back from now
+            </label>
+            <input
+              id={`${id}-days`}
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={MAX_PERIOD_DAYS}
+              step={1}
+              className={`input input-sm w-full ${error ? "input-error" : ""}`}
+              value={Number.isFinite(value.days) ? value.days : ""}
+              aria-invalid={Boolean(error)}
+              aria-describedby={error ? errorId : undefined}
+              onChange={(event) => onChange({ kind: "relative", days: event.target.valueAsNumber })}
+            />
+          </div>
+        )}
+      </div>
+      {error && (
+        <p id={errorId} className="text-xs text-error">
+          {error}
+        </p>
       )}
-      {error && <p className="text-xs text-error">{error}</p>}
     </fieldset>
   );
 }
@@ -131,12 +154,8 @@ export function ParameterFields({
   if (entries.length === 0) return null;
   const set = (name: string, value: string | boolean) => onChange({ ...inputs, [name]: value });
   return (
-    <fieldset
-      className="fieldset min-w-0 rounded-[var(--radius-box)] border border-base-content/10 p-3"
-      disabled={disabled}
-    >
-      <legend className="fieldset-legend px-1">Parameters</legend>
-      <p className="label whitespace-normal">Only values that differ from the default are kept</p>
+    <fieldset className="fieldset min-w-0" disabled={disabled}>
+      <legend className="fieldset-legend">Parameters</legend>
       <div className="grid grid-cols-1 gap-x-3 gap-y-2 sm:grid-cols-2">
         {entries.map(([name, info]) => {
           const inputId = `${id}-param-${name}`;
@@ -207,6 +226,7 @@ export function ParameterFields({
           );
         })}
       </div>
+      <p className="label whitespace-normal">Only values that differ from the default are kept</p>
     </fieldset>
   );
 }

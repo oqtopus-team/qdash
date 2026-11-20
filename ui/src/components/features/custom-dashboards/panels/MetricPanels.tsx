@@ -10,7 +10,7 @@ import { useTopologyConfig } from "@/hooks/useTopologyConfig";
 import { getStoredColorRanges, resolveMetricColorRange } from "@/lib/metricColorRanges";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
 
-import type { MetricSelectionMode } from "../panelConfig";
+import { type MetricSelectionMode, SELECTION_MODES } from "../panelConfig";
 import { PanelMessage, PanelSkeleton } from "./PanelStates";
 import { fitCellSize, topologyGridDimensions, useElementSize } from "./useElementSize";
 
@@ -124,7 +124,7 @@ function MetricPanel({
         <span className="truncate">{metric.title}</span>
         <span className="shrink-0">
           {metric.unit ? `${metric.unit} · ` : ""}
-          {selectionMode}
+          {SELECTION_MODES.find((entry) => entry.value === selectionMode)?.label ?? selectionMode}
         </span>
       </div>
       <div ref={ref} className="min-h-0 flex-1 overflow-hidden">

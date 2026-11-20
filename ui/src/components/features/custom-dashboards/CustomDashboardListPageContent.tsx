@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { Copy, LayoutGrid, Plus, Trash2 } from "lucide-react";
+import { Copy, Plus, Trash2 } from "lucide-react";
 import { parseAsStringLiteral, useQueryState } from "nuqs";
 
 import {
@@ -17,6 +17,7 @@ import {
   useListCustomDashboards,
 } from "@/client/custom-dashboard/custom-dashboard";
 import type { CustomDashboardResponse } from "@/schemas";
+import { countLabel } from "@/components/features/metric-scripts/format";
 import { MetricScriptList } from "@/components/features/metric-scripts/MetricScriptList";
 import { NewMetricScriptDialog } from "@/components/features/metric-scripts/NewMetricScriptDialog";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -31,7 +32,7 @@ import { getApiErrorMessage } from "@/lib/utils/apiError";
 import { formatDateTime, formatRelativeTime } from "@/lib/utils/datetime";
 
 import { DashboardFormDialog, type DashboardFormValues } from "./DashboardFormDialog";
-import { VisibilityBadge } from "./VisibilityBadge";
+import { VisibilityLabel } from "./VisibilityLabel";
 
 interface DashboardRowProps {
   dashboard: CustomDashboardResponse;
@@ -51,71 +52,61 @@ function DashboardRow({
   onDelete,
 }: DashboardRowProps) {
   const href = `/custom-dashboards/${dashboard.dashboard_id}`;
-  const panelCount = dashboard.panels.length;
   return (
-    <li className="list-row items-center" data-dashboard-id={dashboard.dashboard_id}>
-      <div className="flex h-9 w-9 items-center justify-center rounded-[var(--radius-field)] bg-base-200 text-base-content/60">
-        <LayoutGrid className="h-4 w-4" aria-hidden="true" />
-      </div>
-      <div className="min-w-0">
-        <div className="flex flex-wrap items-center gap-2">
-          <Link href={href} className="link link-hover truncate font-medium">
-            {dashboard.name}
-          </Link>
-          <VisibilityBadge visibility={dashboard.visibility} />
-        </div>
+    <li
+      className="flex items-start gap-3 px-4 py-3 sm:items-center"
+      data-dashboard-id={dashboard.dashboard_id}
+    >
+      <div className="min-w-0 flex-1">
+        <Link href={href} className="link link-hover block truncate font-medium">
+          {dashboard.name}
+        </Link>
         {dashboard.description && (
-          <p className="mt-0.5 line-clamp-2 text-sm text-base-content/70">
+          <p className="mt-0.5 line-clamp-2 text-xs text-base-content/70">
             {dashboard.description}
           </p>
         )}
-        <p className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-base-content/60">
+        <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-base-content/60">
+          <VisibilityLabel visibility={dashboard.visibility} />
           <span>by {dashboard.owner_username}</span>
-          <span>
-            {panelCount} {panelCount === 1 ? "panel" : "panels"}
-          </span>
-          {dashboard.chip_id && (
-            <span>
-              Chip <span className="font-mono">{dashboard.chip_id}</span>
-            </span>
-          )}
+          <span>{countLabel(dashboard.panels.length, "panel")}</span>
+          {dashboard.chip_id && <span className="font-mono">{dashboard.chip_id}</span>}
           <span title={formatDateTime(dashboard.updated_at)}>
             Updated {formatRelativeTime(dashboard.updated_at)}
           </span>
         </p>
       </div>
-      <div className="flex shrink-0 items-center gap-1">
-        <Link href={href} className="btn btn-sm">
-          Open
-        </Link>
-        {canDuplicate && (
-          <button
-            type="button"
-            className="btn btn-ghost btn-sm btn-square"
-            onClick={onDuplicate}
-            disabled={duplicating}
-            aria-label={`Duplicate ${dashboard.name}`}
-            title="Duplicate"
-          >
-            {duplicating ? (
-              <span className="loading loading-spinner loading-xs" />
-            ) : (
-              <Copy className="h-4 w-4" aria-hidden="true" />
-            )}
-          </button>
-        )}
-        {canDelete && (
-          <button
-            type="button"
-            className="btn btn-ghost btn-sm btn-square text-error"
-            onClick={onDelete}
-            aria-label={`Delete ${dashboard.name}`}
-            title="Delete"
-          >
-            <Trash2 className="h-4 w-4" aria-hidden="true" />
-          </button>
-        )}
-      </div>
+      {(canDuplicate || canDelete) && (
+        <div className="flex shrink-0 items-center gap-1">
+          {canDuplicate && (
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm btn-square"
+              onClick={onDuplicate}
+              disabled={duplicating}
+              aria-label={`Duplicate ${dashboard.name}`}
+              title="Duplicate"
+            >
+              {duplicating ? (
+                <span className="loading loading-spinner loading-xs" />
+              ) : (
+                <Copy className="h-4 w-4" aria-hidden="true" />
+              )}
+            </button>
+          )}
+          {canDelete && (
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm btn-square"
+              onClick={onDelete}
+              aria-label={`Delete ${dashboard.name}`}
+              title="Delete"
+            >
+              <Trash2 className="h-4 w-4" aria-hidden="true" />
+            </button>
+          )}
+        </div>
+      )}
     </li>
   );
 }
@@ -134,18 +125,16 @@ function DashboardGroup({
   const headingId = `custom-dashboards-${title.toLowerCase().replace(/\W+/g, "-")}`;
   return (
     <section aria-labelledby={headingId} className="flex flex-col gap-2">
-      <h2 id={headingId} className="flex items-center gap-2 text-sm font-medium">
+      <h2 id={headingId} className="text-sm font-medium">
         {title}
-        <span className="badge badge-ghost badge-sm">{dashboards.length}</span>
+        <span className="ml-2 text-xs font-normal text-base-content/60">{dashboards.length}</span>
       </h2>
       {dashboards.length > 0 ? (
-        <ul className="list rounded-[var(--radius-box)] border border-base-content/10 bg-base-100">
+        <ul className="divide-y divide-base-content/10 rounded-[var(--radius-box)] border border-base-content/10 bg-base-100">
           {dashboards.map(renderRow)}
         </ul>
       ) : (
-        <p className="rounded-[var(--radius-box)] border border-dashed border-base-300 px-4 py-3 text-sm text-base-content/60">
-          {emptyText}
-        </p>
+        <p className="text-xs text-base-content/60">{emptyText}</p>
       )}
     </section>
   );

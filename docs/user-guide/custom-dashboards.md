@@ -33,7 +33,8 @@ them.
 6. Select **Create dashboard**. The new dashboard opens; select **Edit** to add, remove, or
    reconfigure panels.
 
-Change the name, description, visibility, or default chip later under **Dashboard settings**.
+Change the name, description, visibility, or default chip later under **Dashboard settings**
+in the dashboard's actions menu, next to **Edit**.
 
 ## Add Panels
 
@@ -112,9 +113,10 @@ A shared dashboard can only use scripts that are also shared with the project; Q
 save one that uses a private script. Share the script first from its **Settings** in the script
 editor.
 
-Only the owner and project owners can edit, re-share, or delete a dashboard. Any editor can
-select **Duplicate** to get a private copy to change independently; the copy keeps the pinned
-script revisions. Dashboards and scripts belong to the project in which they were created and are
+Only the owner and project owners can edit, re-share, or delete a dashboard; **Share with
+project**, **Make private**, and **Delete dashboard** are in the dashboard's actions menu. Any
+editor can select **Duplicate** to get a private copy to change independently; the copy keeps the
+pinned script revisions. Dashboards and scripts belong to the project in which they were created and are
 not visible from other projects; see [Projects and Data Sharing](./projects-and-data-sharing.md).
 
 How this works: [Custom Dashboards architecture](../developer-guide/architecture/custom-dashboards.md).

@@ -28,7 +28,10 @@ interface PreviewControlsProps {
   onChange: (patch: Partial<PreviewSettings>) => void;
 }
 
-/** What a preview evaluates and how it is shown: chip, metric, period, parameters and view. */
+/**
+ * What a preview evaluates and how it is shown: chip, metric, period, parameters and view.
+ * The same controls as the panel editor, so a script previews the way its panel will look.
+ */
 export function PreviewControls({ id, metrics, value, onChange }: PreviewControlsProps) {
   const metric = metrics.find((entry) => entry.id === value.metricId);
   const isPair = metric?.target === "pair";
@@ -36,7 +39,7 @@ export function PreviewControls({ id, metrics, value, onChange }: PreviewControl
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-x-3 sm:grid-cols-2">
         <fieldset className="fieldset min-w-0">
           <legend className="fieldset-legend">
             <label htmlFor={`${id}-chip`}>Chip</label>
@@ -90,67 +93,63 @@ export function PreviewControls({ id, metrics, value, onChange }: PreviewControl
         onChange={(paramInputs) => onChange({ paramInputs })}
       />
 
-      <div className="flex flex-wrap items-end gap-x-4 gap-y-2">
-        <fieldset className="fieldset">
-          <legend className="fieldset-legend">View</legend>
-          <div className="join" role="group" aria-label="View">
-            {(["map", "table"] as const).map((view) => (
-              <button
-                key={view}
-                type="button"
-                aria-pressed={value.view === view}
-                className={`btn btn-xs join-item ${value.view === view ? "btn-active" : ""}`}
-                onClick={() => onChange({ view })}
-              >
-                {view === "map" ? "Map" : "Table"}
-              </button>
-            ))}
-          </div>
+      <div className="grid grid-cols-1 gap-x-3 sm:grid-cols-2">
+        <fieldset className="fieldset min-w-0">
+          <legend className="fieldset-legend">
+            <label htmlFor={`${id}-view`}>View</label>
+          </legend>
+          <select
+            id={`${id}-view`}
+            className="select select-sm w-full"
+            value={value.view}
+            onChange={(event) => onChange({ view: event.target.value as ResultViewMode })}
+          >
+            <option value="map">Map</option>
+            <option value="table">Table</option>
+          </select>
         </fieldset>
         {isPair && (
-          <>
-            <fieldset className="fieldset">
-              <legend className="fieldset-legend">Direction</legend>
-              <div className="join" role="group" aria-label="Direction">
-                {PAIR_DIRECTIONS.map((entry) => (
-                  <button
-                    key={entry.value}
-                    type="button"
-                    title={entry.title}
-                    aria-pressed={value.direction === entry.value}
-                    className={`btn btn-xs join-item ${value.direction === entry.value ? "btn-active" : ""}`}
-                    onClick={() => onChange({ direction: entry.value })}
-                  >
-                    {entry.label}
-                  </button>
-                ))}
-              </div>
-            </fieldset>
-            {hopOptions.length > 1 && (
-              <fieldset className="fieldset">
-                <legend className="fieldset-legend">Pair distance</legend>
-                <div className="flex flex-wrap gap-3">
-                  {hopOptions.map((hop) => (
-                    <label key={hop} className="choice-field gap-1.5 text-sm">
-                      <input
-                        type="checkbox"
-                        className="checkbox checkbox-xs"
-                        checked={value.hops.includes(hop)}
-                        onChange={(event) =>
-                          onChange({
-                            hops: hopOptions.filter((entry) =>
-                              entry === hop ? event.target.checked : value.hops.includes(entry),
-                            ),
-                          })
-                        }
-                      />
-                      {hop === 1 ? "1 hop" : "2 hops"}
-                    </label>
-                  ))}
-                </div>
-              </fieldset>
-            )}
-          </>
+          <fieldset className="fieldset min-w-0">
+            <legend className="fieldset-legend">
+              <label htmlFor={`${id}-direction`}>Direction</label>
+            </legend>
+            <select
+              id={`${id}-direction`}
+              className="select select-sm w-full"
+              value={value.direction}
+              onChange={(event) => onChange({ direction: event.target.value as PairDirection })}
+            >
+              {PAIR_DIRECTIONS.map((entry) => (
+                <option key={entry.value} value={entry.value} title={entry.title}>
+                  {entry.label}
+                </option>
+              ))}
+            </select>
+          </fieldset>
+        )}
+        {isPair && hopOptions.length > 1 && (
+          <fieldset className="fieldset min-w-0">
+            <legend className="fieldset-legend">Pair distance</legend>
+            <div className="flex flex-wrap gap-x-4 gap-y-1">
+              {hopOptions.map((hop) => (
+                <label key={hop} className="choice-field gap-2">
+                  <input
+                    type="checkbox"
+                    className="checkbox checkbox-sm"
+                    checked={value.hops.includes(hop)}
+                    onChange={(event) =>
+                      onChange({
+                        hops: hopOptions.filter((entry) =>
+                          entry === hop ? event.target.checked : value.hops.includes(entry),
+                        ),
+                      })
+                    }
+                  />
+                  <span>{hop === 1 ? "1 hop (coupled pairs)" : "2 hops (next-nearest)"}</span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
         )}
       </div>
     </div>

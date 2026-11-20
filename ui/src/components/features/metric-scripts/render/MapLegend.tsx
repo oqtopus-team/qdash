@@ -99,7 +99,7 @@ export function MapLegend({
       {NON_OK.filter((status) => statusCounts[status] > 0).map((status) => (
         <li key={status} className="flex items-center gap-1" data-status={status}>
           <span
-            className={`font-mono font-semibold ${status === "error" ? "text-error" : "text-base-content/60"}`}
+            className={`font-mono font-medium ${status === "error" ? "text-error" : "text-base-content/60"}`}
             aria-hidden="true"
           >
             {STATUS_GLYPHS[status]}

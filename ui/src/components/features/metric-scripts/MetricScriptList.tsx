@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { Copy, FileCode, Trash2 } from "lucide-react";
+import { Copy, Trash2 } from "lucide-react";
 
 import {
   getListMetricScriptsQueryKey,
@@ -15,7 +15,7 @@ import {
   useListMetricScripts,
 } from "@/client/metric-script/metric-script";
 import type { MetricScriptSummary } from "@/schemas";
-import { VisibilityBadge } from "@/components/features/custom-dashboards/VisibilityBadge";
+import { VisibilityLabel } from "@/components/features/custom-dashboards/VisibilityLabel";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorCard } from "@/components/ui/ErrorCard";
@@ -27,15 +27,14 @@ import { formatDateTime, formatRelativeTime } from "@/lib/utils/datetime";
 
 import { countLabel } from "./format";
 
-function StatusBadge({ script }: { script: MetricScriptSummary }) {
+/** Revision state: valid scripts read as plain meta, broken ones carry a warning. */
+function RevisionStatus({ script }: { script: MetricScriptSummary }) {
   if (script.status === "valid") {
-    return (
-      <span className="badge badge-success badge-soft badge-sm">Valid r{script.revision}</span>
-    );
+    return <span>Valid r{script.revision}</span>;
   }
   return (
     <span
-      className="badge badge-warning badge-soft badge-sm"
+      className="badge badge-warning badge-sm"
       title={
         script.active_revision
           ? `r${script.revision} has errors; dashboards use r${script.active_revision}`
@@ -66,22 +65,20 @@ interface ScriptRowProps {
 function ScriptRow({ script, canCopy, canDelete, copying, onCopy, onDelete }: ScriptRowProps) {
   const href = `/custom-dashboards/scripts/${script.script_id}`;
   return (
-    <li className="list-row items-center" data-script-id={script.script_id}>
-      <div className="flex h-9 w-9 items-center justify-center rounded-[var(--radius-field)] bg-base-200 text-base-content/60">
-        <FileCode className="h-4 w-4" aria-hidden="true" />
-      </div>
-      <div className="min-w-0">
-        <div className="flex flex-wrap items-center gap-2">
-          <Link href={href} className="link link-hover truncate font-medium">
-            {script.name}
-          </Link>
-          <VisibilityBadge visibility={script.visibility} />
-          <StatusBadge script={script} />
-        </div>
+    <li
+      className="flex items-start gap-3 px-4 py-3 sm:items-center"
+      data-script-id={script.script_id}
+    >
+      <div className="min-w-0 flex-1">
+        <Link href={href} className="link link-hover block truncate font-medium">
+          {script.name}
+        </Link>
         {script.description && (
-          <p className="mt-0.5 line-clamp-2 text-sm text-base-content/70">{script.description}</p>
+          <p className="mt-0.5 line-clamp-2 text-xs text-base-content/70">{script.description}</p>
         )}
-        <p className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-base-content/60">
+        <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-base-content/60">
+          <VisibilityLabel visibility={script.visibility} />
+          <RevisionStatus script={script} />
           <span>by {script.owner_username}</span>
           <span>{metricsSummary(script)}</span>
           <span title={formatDateTime(script.updated_at)}>
@@ -89,38 +86,37 @@ function ScriptRow({ script, canCopy, canDelete, copying, onCopy, onDelete }: Sc
           </span>
         </p>
       </div>
-      <div className="flex shrink-0 items-center gap-1">
-        <Link href={href} className="btn btn-sm">
-          Open
-        </Link>
-        {canCopy && (
-          <button
-            type="button"
-            className="btn btn-ghost btn-sm btn-square"
-            onClick={onCopy}
-            disabled={copying}
-            aria-label={`Copy ${script.name}`}
-            title="Copy to my scripts"
-          >
-            {copying ? (
-              <span className="loading loading-spinner loading-xs" />
-            ) : (
-              <Copy className="h-4 w-4" aria-hidden="true" />
-            )}
-          </button>
-        )}
-        {canDelete && (
-          <button
-            type="button"
-            className="btn btn-ghost btn-sm btn-square text-error"
-            onClick={onDelete}
-            aria-label={`Delete ${script.name}`}
-            title="Delete"
-          >
-            <Trash2 className="h-4 w-4" aria-hidden="true" />
-          </button>
-        )}
-      </div>
+      {(canCopy || canDelete) && (
+        <div className="flex shrink-0 items-center gap-1">
+          {canCopy && (
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm btn-square"
+              onClick={onCopy}
+              disabled={copying}
+              aria-label={`Copy ${script.name}`}
+              title="Copy to my scripts"
+            >
+              {copying ? (
+                <span className="loading loading-spinner loading-xs" />
+              ) : (
+                <Copy className="h-4 w-4" aria-hidden="true" />
+              )}
+            </button>
+          )}
+          {canDelete && (
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm btn-square"
+              onClick={onDelete}
+              aria-label={`Delete ${script.name}`}
+              title="Delete"
+            >
+              <Trash2 className="h-4 w-4" aria-hidden="true" />
+            </button>
+          )}
+        </div>
+      )}
     </li>
   );
 }
@@ -139,18 +135,16 @@ function ScriptGroup({
   const headingId = `metric-scripts-${title.toLowerCase().replace(/\W+/g, "-")}`;
   return (
     <section aria-labelledby={headingId} className="flex flex-col gap-2">
-      <h2 id={headingId} className="flex items-center gap-2 text-sm font-medium">
+      <h2 id={headingId} className="text-sm font-medium">
         {title}
-        <span className="badge badge-ghost badge-sm">{scripts.length}</span>
+        <span className="ml-2 text-xs font-normal text-base-content/60">{scripts.length}</span>
       </h2>
       {scripts.length > 0 ? (
-        <ul className="list rounded-[var(--radius-box)] border border-base-content/10 bg-base-100">
+        <ul className="divide-y divide-base-content/10 rounded-[var(--radius-box)] border border-base-content/10 bg-base-100">
           {scripts.map(renderRow)}
         </ul>
       ) : (
-        <p className="rounded-[var(--radius-box)] border border-dashed border-base-300 px-4 py-3 text-sm text-base-content/60">
-          {emptyText}
-        </p>
+        <p className="text-xs text-base-content/60">{emptyText}</p>
       )}
     </section>
   );

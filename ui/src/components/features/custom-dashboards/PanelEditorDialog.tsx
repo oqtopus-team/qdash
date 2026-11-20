@@ -260,12 +260,12 @@ function PanelEditorForm({ panel, dashboardShared, onCancel, onSave }: PanelEdit
   const privateOnShared = dashboardShared && summary?.visibility === "private";
 
   return (
-    <form className="flex flex-col gap-3" onSubmit={handleSubmit} noValidate>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+    <form className="flex flex-col gap-2" onSubmit={handleSubmit} noValidate>
+      <div className="grid grid-cols-1 gap-x-3 sm:grid-cols-2">
         <Field id={`${id}-type`} label="Panel type">
           <select
             id={`${id}-type`}
-            className="select w-full"
+            className="select select-sm w-full"
             value={type}
             onChange={(event) => handleTypeChange(event.target.value as DashboardPanelModelType)}
           >
@@ -279,7 +279,7 @@ function PanelEditorForm({ panel, dashboardShared, onCancel, onSave }: PanelEdit
         <Field id={`${id}-title`} label="Title" hint="Leave empty to use the panel type">
           <input
             id={`${id}-title`}
-            className="input w-full"
+            className="input input-sm w-full"
             value={title}
             maxLength={200}
             placeholder="Panel title"
@@ -289,11 +289,11 @@ function PanelEditorForm({ panel, dashboardShared, onCancel, onSave }: PanelEdit
       </div>
 
       {(type === "qubit_metric" || type === "coupling_metric") && (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-x-3 sm:grid-cols-2">
           <Field id={`${id}-metric`} label="Metric">
             <select
               id={`${id}-metric`}
-              className="select w-full"
+              className="select select-sm w-full"
               value={metric}
               onChange={(event) => setMetric(event.target.value)}
             >
@@ -311,7 +311,7 @@ function PanelEditorForm({ panel, dashboardShared, onCancel, onSave }: PanelEdit
           <Field id={`${id}-mode`} label="Value selection">
             <select
               id={`${id}-mode`}
-              className="select w-full"
+              className="select select-sm w-full"
               value={selectionMode}
               onChange={(event) => setSelectionMode(event.target.value as MetricSelectionMode)}
             >
@@ -327,7 +327,7 @@ function PanelEditorForm({ panel, dashboardShared, onCancel, onSave }: PanelEdit
 
       {type === "metric_script" && (
         <>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-x-3 sm:grid-cols-2">
             <Field
               id={`${id}-script`}
               label="Script"
@@ -354,7 +354,7 @@ function PanelEditorForm({ panel, dashboardShared, onCancel, onSave }: PanelEdit
             >
               <select
                 id={`${id}-script`}
-                className="select w-full"
+                className="select select-sm w-full"
                 value={scriptId}
                 disabled={scriptsQuery.isLoading}
                 onChange={(event) => handleScriptChange(event.target.value)}
@@ -378,7 +378,7 @@ function PanelEditorForm({ panel, dashboardShared, onCancel, onSave }: PanelEdit
             <Field id={`${id}-script-metric`} label="Metric">
               <select
                 id={`${id}-script-metric`}
-                className="select w-full"
+                className="select select-sm w-full"
                 value={scriptMetric ? scriptMetricId : ""}
                 disabled={catalog.length === 0}
                 onChange={(event) =>
@@ -416,11 +416,11 @@ function PanelEditorForm({ panel, dashboardShared, onCancel, onSave }: PanelEdit
             }}
           />
 
-          <div className="flex flex-wrap gap-x-6 gap-y-2">
+          <div className="grid grid-cols-1 gap-x-3 sm:grid-cols-2">
             <Field id={`${id}-view`} label="View">
               <select
                 id={`${id}-view`}
-                className="select select-sm w-40"
+                className="select select-sm w-full"
                 value={view}
                 onChange={(event) => setView(event.target.value as ResultViewMode)}
               >
@@ -432,12 +432,12 @@ function PanelEditorForm({ panel, dashboardShared, onCancel, onSave }: PanelEdit
               <Field id={`${id}-direction`} label="Direction">
                 <select
                   id={`${id}-direction`}
-                  className="select select-sm w-40"
+                  className="select select-sm w-full"
                   value={direction}
                   onChange={(event) => setDirection(event.target.value as PairDirection)}
                 >
                   {PAIR_DIRECTIONS.map((entry) => (
-                    <option key={entry.value} value={entry.value}>
+                    <option key={entry.value} value={entry.value} title={entry.title}>
                       {entry.label}
                     </option>
                   ))}
@@ -445,9 +445,9 @@ function PanelEditorForm({ panel, dashboardShared, onCancel, onSave }: PanelEdit
               </Field>
             )}
             {isPairMetric && hopOptions.length > 1 && (
-              <fieldset className="fieldset">
+              <fieldset className="fieldset min-w-0">
                 <legend className="fieldset-legend">Pair distance</legend>
-                <div className="flex flex-wrap gap-4">
+                <div className="flex flex-wrap gap-x-4 gap-y-1">
                   {hopOptions.map((hop) => (
                     <label key={hop} className="choice-field gap-2">
                       <input

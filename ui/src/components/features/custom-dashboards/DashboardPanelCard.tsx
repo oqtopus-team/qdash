@@ -138,7 +138,7 @@ export function DashboardPanelCard({
       data-panel-id={panel.panel_id}
       style={style}
       className={`card card-border card-sm h-[var(--panel-height)] min-w-0 bg-base-100 md:h-auto md:[grid-column:var(--panel-col)] md:[grid-row:var(--panel-row)] ${
-        editing ? "border-dashed border-primary/40" : ""
+        editing ? "border-primary/30" : ""
       }`}
     >
       <div className="card-body min-h-0 gap-2 p-3">

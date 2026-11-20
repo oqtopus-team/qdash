@@ -142,13 +142,17 @@ describe("CustomDashboardPageContent", () => {
     expect(screen.getByTestId("chip-selector")).toHaveTextContent("chip-1");
   });
 
-  it("offers Edit, sharing and Delete when the caller may edit", () => {
+  it("offers Edit, sharing and Delete when the caller may edit", async () => {
     renderPage();
 
     expect(screen.getByRole("button", { name: "Edit" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Make private" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Delete dashboard" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Duplicate" })).toBeInTheDocument();
+
+    // Sharing, settings and delete sit in the overflow menu next to Edit.
+    fireEvent.keyDown(screen.getByRole("button", { name: "Dashboard actions" }), { key: "Enter" });
+    expect(await screen.findByRole("menuitem", { name: "Make private" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Dashboard settings" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Delete dashboard" })).toBeInTheDocument();
   });
 
   it("enters edit mode with panel menus and an unsaved badge after a layout change", async () => {
@@ -210,8 +214,7 @@ describe("CustomDashboardPageContent", () => {
 
     expect(screen.getByRole("button", { name: "Duplicate" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Delete dashboard" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Make private" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Dashboard actions" })).not.toBeInTheDocument();
   });
 
   it("is read-only for viewers even when the response allows editing", () => {

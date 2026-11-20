@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { CircleAlert, Hourglass, Map as MapIcon, RotateCcw, Table2 } from "lucide-react";
 
 import type { MetricCell, MetricScriptEvaluateResponse, ScriptDiagnostic } from "@/schemas";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { useMetricsConfig } from "@/hooks/useMetricsConfig";
 import { formatDateTime } from "@/lib/utils/datetime";
 
@@ -224,9 +225,9 @@ export function MetricResultView({
   }
   if (!result) {
     return (
-      <p className="flex h-full min-h-16 items-center justify-center text-sm text-base-content/60">
-        {emptyMessage}
-      </p>
+      <div className="flex h-full min-h-16 items-center justify-center">
+        <EmptyState size="sm" emoji="chart" title={emptyMessage} />
+      </div>
     );
   }
 
