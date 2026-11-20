@@ -9,11 +9,6 @@ vi.mock("@/client/chip/chip", () => ({
   useListChips: (...args: unknown[]) => listChips(...args),
   useListChipQubits: (...args: unknown[]) => listChipQubits(...args),
 }));
-const systemPrompt = vi.fn();
-vi.mock("@/client/copilot/copilot", () => ({
-  useGetCopilotSystemPrompt: (...args: unknown[]) => systemPrompt(...args),
-}));
-const ALL_TOOLS = new Set(["bash", "qdash_save_flow"]);
 
 describe("pickChip", () => {
   it("prefers the active chip, then the newest", () => {
@@ -30,77 +25,72 @@ describe("pickChip", () => {
 });
 
 describe("buildGeneralSuggestions", () => {
-  it("names the chip's first qubits and leads with a pipeline plan", () => {
-    const texts = buildGeneralSuggestions("64Qv3", ["0", "1"], ALL_TOOLS).map((s) => s.text);
-    expect(texts[0]).toBe(
-      "Plan a calibration on 64Qv3: coarse one-qubit check on qubits 0 and 1, then T1 and T2 on the ones that pass",
-    );
-    expect(texts[1]).toBe(
-      "Fetch Q00's recent T1 values, write a Python script in the workspace that fits their drift, and run it",
-    );
-    expect(texts[2]).toBe(
-      'Write a flow from the "simple" template that runs CheckT1 on qubit 0 and save it as t1_check_0',
-    );
-    expect(texts).toContain("Show T1 trend for Q00");
-    expect(texts).toContain("Compare T1 and T2 for Q01");
+  it("offers exactly three short prompts aimed at the chip's first qubit", () => {
+    expect(buildGeneralSuggestions("64Qv3", ["0", "1"]).map((s) => s.text)).toEqual([
+      "Show T1 trend for Q00",
+      "What are Q00's current parameters?",
+      "Plan a calibration for Q00 on 64Qv3",
+    ]);
   });
 
-  it("keeps non-numeric qubit ids as they are and copes with one qubit", () => {
-    const texts = buildGeneralSuggestions("chip", ["Q32"]).map((s) => s.text);
-    expect(texts[0]).toBe(
-      "Plan a calibration on chip: coarse one-qubit check on qubit Q32, then T1 and T2 on the ones that pass",
-    );
-    expect(texts).toContain("Compare T1 and T2 for Q32");
+  it("keeps non-numeric qubit ids as they are", () => {
+    expect(buildGeneralSuggestions("chip", ["Q32"]).map((s) => s.text)).toEqual([
+      "Show T1 trend for Q32",
+      "What are Q32's current parameters?",
+      "Plan a calibration for Q32 on chip",
+    ]);
   });
 
-  it("offers the workspace and flow prompts only when the runtime has their tools", () => {
-    const none = buildGeneralSuggestions("chip", ["0"]).map((s) => s.text);
-    expect(none.some((t) => /workspace/.test(t))).toBe(false);
-    expect(none.some((t) => /save it as/.test(t))).toBe(false);
-    expect(none[1]).toBe("Show T1 trend for Q00");
-    const bashOnly = buildGeneralSuggestions("chip", ["0"], new Set(["bash"])).map((s) => s.text);
-    expect(bashOnly[1]).toMatch(/write a Python script in the workspace/);
-    expect(bashOnly.some((t) => /save it as/.test(t))).toBe(false);
+  it("stays generic instead of naming a qubit that may not exist", () => {
+    expect(buildGeneralSuggestions("chip", []).map((s) => s.text)).toEqual([
+      "Show T1 trend",
+      "What are the current parameters?",
+      "Plan a calibration on chip",
+    ]);
+    expect(buildGeneralSuggestions(null, []).map((s) => s.text)).toEqual([
+      "Show T1 trend",
+      "What are the current parameters?",
+      "Plan a calibration",
+    ]);
   });
 
-  it("falls back to MUX 0 and generic ids when nothing is known", () => {
-    const texts = buildGeneralSuggestions(null, [], ALL_TOOLS).map((s) => s.text);
-    expect(texts[0]).toBe(
-      "Plan a calibration: coarse one-qubit check on MUX 0, then T1 and T2 on the ones that pass",
-    );
-    expect(texts).toContain("Show T1 trend for Q00");
-    expect(texts[2]).toMatch(/runs CheckT1 on qubit 0 and save it as t1_check_0$/);
+  it("never offers workspace scripts or flow creation", () => {
+    const texts = buildGeneralSuggestions("chip", ["0"]).map((s) => s.text);
+    expect(texts.some((t) => /workspace|script|flow|save it as/i.test(t))).toBe(false);
   });
 });
 
 describe("useChatSuggestions", () => {
-  it("asks for the active chip's first two qubits and builds from them", () => {
+  it("asks for the active chip's first qubit and builds from it", () => {
     listChips.mockReturnValue({
       data: { data: { chips: [{ chip_id: "64Qv3", activity_status: "active" }] } },
     });
     listChipQubits.mockReturnValue({
-      data: { data: { qubits: [{ qid: "4" }, { qid: "5" }] } },
+      data: { data: { qubits: [{ qid: "4" }] } },
     });
-    systemPrompt.mockReturnValue({ data: { data: { tools: ["bash", "qdash_list_chips"] } } });
     const { result } = renderHook(() => useChatSuggestions(false));
 
     expect(listChipQubits).toHaveBeenCalledWith(
       "64Qv3",
-      { limit: 2 },
+      { limit: 1 },
       expect.objectContaining({ query: expect.objectContaining({ enabled: true }) }),
     );
-    expect(result.current[0].text).toMatch(/on 64Qv3: coarse one-qubit check on qubits 4 and 5/);
-    // The runtime has bash but no flow saving: the workspace prompt, not the flow one.
-    expect(result.current[1].text).toMatch(/write a Python script in the workspace/);
-    expect(result.current.some((s) => /save it as/.test(s.text))).toBe(false);
+    expect(result.current.map((s) => s.text)).toEqual([
+      "Show T1 trend for Q04",
+      "What are Q04's current parameters?",
+      "Plan a calibration for Q04 on 64Qv3",
+    ]);
   });
 
-  it("hides the tool-bound prompts while the runtime's tools are unknown", () => {
+  it("falls back to generic prompts while chips and qubits are unknown", () => {
     listChips.mockReturnValue({ data: undefined });
     listChipQubits.mockReturnValue({ data: undefined });
-    systemPrompt.mockReturnValue({ data: undefined, error: new Error("503") });
     const { result } = renderHook(() => useChatSuggestions(false));
-    expect(result.current.some((s) => /workspace|save it as/.test(s.text))).toBe(false);
+    expect(result.current.map((s) => s.text)).toEqual([
+      "Show T1 trend",
+      "What are the current parameters?",
+      "Plan a calibration",
+    ]);
   });
 
   it("does not fetch for analysis chats and returns the analysis prompts", () => {
@@ -108,19 +98,14 @@ describe("useChatSuggestions", () => {
     listChipQubits.mockClear();
     listChips.mockReturnValue({ data: undefined });
     listChipQubits.mockReturnValue({ data: undefined });
-    systemPrompt.mockClear();
-    systemPrompt.mockReturnValue({ data: undefined });
     const { result } = renderHook(() => useChatSuggestions(true));
-    expect(systemPrompt).toHaveBeenCalledWith(
-      expect.objectContaining({ query: expect.objectContaining({ enabled: false }) }),
-    );
 
     expect(listChips).toHaveBeenCalledWith(
       expect.objectContaining({ query: expect.objectContaining({ enabled: false }) }),
     );
     expect(listChipQubits).toHaveBeenCalledWith(
       "",
-      { limit: 2 },
+      { limit: 1 },
       expect.objectContaining({ query: expect.objectContaining({ enabled: false }) }),
     );
     expect(result.current.map((s) => s.text)).toContain("How should I interpret this result?");
