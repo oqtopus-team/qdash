@@ -39,7 +39,12 @@ vi.mock("@/contexts/CopilotChatSessionContext", () => ({
 vi.mock("@/contexts/ChatDockContext", () => ({
   ChatDockProvider: ({ children }: { children: ReactNode }) => children,
 }));
-vi.mock("@/components/layout/ChatSidebar", () => ({ ChatSidebar: () => null }));
+const mockAgentTabShown = vi.hoisted(() => vi.fn(() => true));
+vi.mock("@/components/layout/ChatSidebar", () => ({
+  AGENT_TAB_WIDTH: "2rem",
+  ChatSidebar: () => null,
+  useAgentTabShown: () => mockAgentTabShown(),
+}));
 vi.mock("@/components/layout/MiniChatWindow", () => ({ MiniChatWindow: () => null }));
 vi.mock("@/components/layout/GlobalCommandPalette", () => ({ GlobalCommandPalette: () => null }));
 vi.mock("@/components/layout/GlobalExecutionIndicator", () => ({
@@ -189,5 +194,25 @@ describe("AppLayout navigation chrome", () => {
     );
 
     expect(screen.queryByRole("dialog", { name: "Navigation menu" })).toBeNull();
+  });
+});
+
+describe("AppLayout room for the Ask Agent tab", () => {
+  afterEach(() => {
+    cleanup();
+    mockAgentTabShown.mockReturnValue(true);
+  });
+
+  it("reserves the tab's width at the page edge while the tab floats over it", () => {
+    renderLayout();
+    const main = document.querySelector("main")!;
+    expect(main.style.getPropertyValue("--agent-tab-inset")).toBe("calc(2rem + 0.25rem)");
+  });
+
+  it("reserves nothing while the sidebar is open or on the chat page", () => {
+    mockAgentTabShown.mockReturnValue(false);
+    renderLayout();
+    const main = document.querySelector("main")!;
+    expect(main.style.getPropertyValue("--agent-tab-inset")).toBe("");
   });
 });

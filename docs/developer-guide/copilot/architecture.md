@@ -288,7 +288,10 @@ its shape with `parseDashboardDraft` (`agent-runtime/src/page-context.ts`), fail
 the problems so the model can correct it, and otherwise sends the draft in the page's key order
 with `target: "dashboard"` and `dashboardId` (null for a new dashboard). **Apply to draft** calls
 the page's `applyCode`, which parses the draft again and returns false, with a toast, for one it
-refuses; the card then stays unapplied. Applying replaces the page's local draft (entering edit
+refuses; the card then stays unapplied. When `applyCode` succeeds while the sidebar covers the
+page (below the `lg` breakpoint, `SIDEBAR_COVERS_PAGE_QUERY` in `ChatDockContext.tsx`), the dock
+closes the sidebar and calls the registration's optional `revealAppliedCode`; the dashboard page
+uses it to move focus to its edit toolbar. The chat session and the card are unchanged. Applying replaces the page's local draft (entering edit
 mode for a stored dashboard) and never writes: the page's **Save** sends `PATCH` with
 `expected_version`, or for a new dashboard `POST /dashboards` as private, so a 409 or 422
 keeps the draft. A registration may also offer `suggestions`, which the empty chat shows in

@@ -116,7 +116,10 @@ here** again: QDash finishes the same branch rather than making a second one.
 ### Ask Agent Beside Any Page {#ask-ai-beside-any-page}
 
 **Ask Agent** opens a sidebar with the current page as context. Drag its left edge to resize it, or
-double-click to restore the default width. Your browser remembers the width.
+double-click to restore the default width. Your browser remembers the width. On a narrow screen
+the sidebar covers the page instead; when you apply a proposed change, it closes so you can
+review the change on the page, and **Ask Agent** on the right edge opens the chat again. A
+proposal the page refuses leaves the sidebar open.
 
 On the **Workflow** editor the assistant also sees the flow's code as it is in the editor,
 unsaved changes included. Ask for a change in plain terms, for example "add a T2 echo check after

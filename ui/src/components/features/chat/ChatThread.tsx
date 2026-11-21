@@ -13,7 +13,7 @@ import { useGetCopilotPreferences } from "@/client/copilot/copilot";
 import { ArrowDown, GitBranch, LayoutDashboard } from "lucide-react";
 import { StickToBottom, useStickToBottomContext } from "use-stick-to-bottom";
 import { useChatSuggestions, type ChatSuggestion } from "@/hooks/useChatSuggestions";
-import { useCopilotChat } from "@/hooks/useCopilotChat";
+import { replyAfter, useCopilotChat } from "@/hooks/useCopilotChat";
 import { useChatAttachments } from "@/hooks/useChatAttachments";
 import { useChatGreeting } from "@/hooks/useChatGreeting";
 import { useAuth } from "@/contexts/AuthContext";
@@ -365,9 +365,7 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
                   isLast={idx === lastIndex && !liveTurn}
                   canRetry={canRetryLast}
                   onRetry={retryLast}
-                  answer={
-                    messages[idx + 1]?.role === "user" ? messages[idx + 1].content : undefined
-                  }
+                  answer={replyAfter(messages, idx)}
                   onAnswer={submit}
                   onDecide={decide}
                   onOther={focusComposer}

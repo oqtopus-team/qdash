@@ -628,6 +628,21 @@ describe("DashboardPageContent with the Agent", () => {
     expect(data).not.toHaveProperty("visibility");
   });
 
+  it("reveals an applied draft at its edit toolbar when the Agent steps aside", () => {
+    renderPage();
+
+    // The dock applies first, then asks the page to reveal what it applied.
+    expect(applyDraft({ panels: [...dashboard().panels, proposedPanel] })).toBe(true);
+    act(() => mocks.provider?.revealAppliedCode?.());
+
+    const toolbar = screen.getByRole("toolbar", { name: "Edit dashboard" });
+    expect(toolbar).toHaveFocus();
+    expect(toolbar).toHaveTextContent("Unsaved changes");
+    // Revealing is not saving or sharing.
+    expect(mocks.update).not.toHaveBeenCalled();
+    expect(mocks.create).not.toHaveBeenCalled();
+  });
+
   it("applies a draft on top of manual edits and keeps it when the save is stale", async () => {
     mocks.update.mockImplementation((_variables, options) =>
       options.onError({ response: { status: 409, data: { detail: "Dashboard was changed" } } }),

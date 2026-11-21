@@ -39,6 +39,11 @@ export interface PageContextProvider {
    * the page refused it (e.g. a dashboard draft that does not parse); the page says why.
    */
   applyCode?(code: string): void | boolean;
+  /**
+   * Bring the code just applied into view and move focus to it, after the chat stepped aside
+   * so the page could be seen. Without it, the page is shown as it is.
+   */
+  revealAppliedCode?(): void;
   /** Requests the empty chat offers on this page instead of the general ones. */
   suggestions?(): string[];
 }
@@ -143,6 +148,18 @@ interface ChatDockValue {
 
 const ChatDockCtx = createContext<ChatDockValue | null>(null);
 
+/**
+ * Where the docked sidebar covers the whole page instead of sitting beside it: below the `lg`
+ * breakpoint, the exact complement of the `lg:` and `max-lg:` variants ChatSidebar uses.
+ */
+export const SIDEBAR_COVERS_PAGE_QUERY = "not all and (min-width: 64rem)";
+
+function sidebarCoversPage(): boolean {
+  return (
+    typeof window !== "undefined" && Boolean(window.matchMedia?.(SIDEBAR_COVERS_PAGE_QUERY).matches)
+  );
+}
+
 export function ChatDockProvider({ children }: { children: React.ReactNode }) {
   const {
     activeSession,
@@ -154,6 +171,11 @@ export function ChatDockProvider({ children }: { children: React.ReactNode }) {
     sendMessage,
   } = useCopilotChatSessionContext();
   const [isOpen, setIsOpen] = useState(false);
+  // Read by applyCode, which keeps one identity across renders.
+  const isOpenRef = useRef(isOpen);
+  useEffect(() => {
+    isOpenRef.current = isOpen;
+  }, [isOpen]);
   const [miniOpen, setMiniOpen] = useState(false);
   const pathname = usePathname();
   const pageProvider = useRef<PageContextProvider | null>(null);
@@ -213,7 +235,16 @@ export function ChatDockProvider({ children }: { children: React.ReactNode }) {
   const applyCode = useCallback((edit: EditProposal): boolean => {
     const provider = pageProvider.current;
     if (!provider?.applyCode || !matchesEditTarget(edit, provider.current())) return false;
-    return provider.applyCode(edit.code) !== false;
+    if (provider.applyCode(edit.code) === false) return false;
+    // Where the sidebar covers the page, the change applied behind it: step aside so the user
+    // sees it. The chat, its session, and the card stay as they are; the tab reopens them. A
+    // refused or stale proposal never gets here, so its card stays on screen.
+    if (isOpenRef.current && sidebarCoversPage()) {
+      isOpenRef.current = false;
+      setIsOpen(false);
+      provider.revealAppliedCode?.();
+    }
+    return true;
   }, []);
 
   /** Resume the chat about this result, or start one. */

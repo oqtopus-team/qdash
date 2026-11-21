@@ -316,6 +316,19 @@ export function DashboardPageContent({ dashboardId }: { dashboardId: string | nu
     return true;
   };
 
+  // After the Agent sheet stepped aside for an applied draft (narrow screens), show the edit
+  // toolbar: its status says the draft is unsaved and its Save is the next step. The toolbar
+  // renders with the draft, so focus waits for that commit.
+  const editToolbarRef = useRef<HTMLDivElement>(null);
+  const [revealRequest, setRevealRequest] = useState(0);
+  useEffect(() => {
+    if (revealRequest === 0) return;
+    const toolbar = editToolbarRef.current;
+    if (!toolbar) return;
+    toolbar.scrollIntoView?.({ block: "nearest" });
+    toolbar.focus({ preventScroll: true });
+  }, [revealRequest]);
+
   // What the Agent panel reads when a turn is sent: the draft as JSON, for a dashboard the
   // user may save. Read-only viewers share only the route and title.
   const pageState = useRef({
@@ -377,6 +390,7 @@ export function DashboardPageContent({ dashboardId }: { dashboardId: string | nu
         };
       },
       applyCode: (code) => pageState.current.applyDraft(code),
+      revealAppliedCode: () => setRevealRequest((count) => count + 1),
       suggestions: () => {
         const state = pageState.current;
         if (!state.mayEdit) return [];
@@ -791,8 +805,10 @@ export function DashboardPageContent({ dashboardId }: { dashboardId: string | nu
 
       {editing && (
         <div
+          ref={editToolbarRef}
           role="toolbar"
           aria-label="Edit dashboard"
+          tabIndex={-1}
           className="sticky top-0 z-20 mb-4 flex flex-wrap items-center gap-2 rounded-[var(--radius-box)] border border-base-content/10 bg-base-100 p-2"
         >
           <span className="px-1 text-sm font-medium">{isNew ? "New dashboard" : "Editing"}</span>

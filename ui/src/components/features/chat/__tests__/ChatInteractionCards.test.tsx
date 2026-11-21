@@ -78,6 +78,47 @@ describe("ApprovalCard", () => {
     );
   });
 
+  it("names the action and tool before the arguments and asks before running", () => {
+    render(<ApprovalCard approval={APPROVAL} state={state()} />);
+
+    const card = screen.getByRole("group", { name: "Approve QDash Execute Agent Action" });
+    expect(card.getAttribute("data-decision")).toBe("pending");
+    const text = card.textContent ?? "";
+    expect(text.indexOf("QDash Execute Agent Action")).toBeLessThan(
+      text.indexOf("qdash_execute_agent_action"),
+    );
+    expect(text.indexOf("qdash_execute_agent_action")).toBeLessThan(text.indexOf("sessionId"));
+    expect(screen.getByText("Runs only if you approve")).toBeTruthy();
+    // The card is neutral: no decorative status icon competes with the title.
+    expect(card.querySelector(".text-warning")).toBeNull();
+  });
+
+  it("keeps nested and long argument values inspectable", () => {
+    const longValue = "x".repeat(300);
+    render(
+      <ApprovalCard
+        approval={{
+          ...APPROVAL,
+          args: { qubits: ["Q00", "Q01"], options: { retries: 2 }, note: longValue },
+        }}
+        state={state()}
+      />,
+    );
+    expect(screen.getAllByRole("term").map((dt) => dt.textContent)).toEqual([
+      "qubits",
+      "options",
+      "note",
+    ]);
+    expect(screen.getByText(/"Q01"/).textContent).toContain('"Q00"');
+    expect(screen.getByText(/"retries": 2/)).toBeTruthy();
+    expect(screen.getByText(longValue)).toBeTruthy();
+  });
+
+  it("says so when the call has no arguments", () => {
+    render(<ApprovalCard approval={{ ...APPROVAL, args: {} }} state={state()} />);
+    expect(screen.getByText("No arguments")).toBeTruthy();
+  });
+
   it("shows the recorded decision instead of buttons", () => {
     render(
       <ApprovalCard
@@ -86,7 +127,28 @@ describe("ApprovalCard", () => {
       />,
     );
     expect(screen.queryByRole("button")).toBeNull();
-    expect(screen.getByText("Approved")).toBeTruthy();
+    expect(screen.getByRole("status").textContent).toBe("Approved");
+    expect(screen.getByRole("group").getAttribute("data-decision")).toBe("approved");
+  });
+
+  it("shows a decline as recorded", () => {
+    render(
+      <ApprovalCard
+        approval={APPROVAL}
+        state={state({ active: false, answer: "Declined: QDash Execute Agent Action" })}
+      />,
+    );
+    expect(screen.queryByRole("button")).toBeNull();
+    expect(screen.getByRole("status").textContent).toBe("Declined");
+    expect(screen.getByRole("group").getAttribute("data-decision")).toBe("declined");
+  });
+
+  it("offers no decision once the card is no longer the latest answer", () => {
+    render(<ApprovalCard approval={APPROVAL} state={state({ active: false })} />);
+    expect(screen.queryByRole("button")).toBeNull();
+    expect(screen.getByText("No decision was made")).toBeTruthy();
+    expect(screen.queryByText("Runs only if you approve")).toBeNull();
+    expect(screen.getByText("20261005-005")).toBeTruthy();
   });
 
   it("shows a flow about to be saved as code, not as a JSON string", () => {
@@ -115,6 +177,25 @@ describe("ApprovalCard", () => {
     expect(preview.textContent).toContain("def t1_sweep():");
     expect(screen.queryByText(/"code"/)).toBeNull();
     expect(screen.queryByText("code", { selector: "dt" })).toBeNull();
+    expect(preview.textContent).toContain("replaces a flow of the same name");
+    expect(preview.textContent).toContain("does not run it");
+  });
+
+  it("keeps flow-save arguments that have no preview in the argument list", () => {
+    render(
+      <ApprovalCard
+        approval={{
+          id: "call-3",
+          tool: "qdash_save_flow",
+          label: "QDash Save Flow",
+          args: { name: "t1_sweep", code: "pass\n", overwrite: true },
+        }}
+        state={state()}
+      />,
+    );
+    expect(screen.getByText("overwrite", { selector: "dt" })).toBeTruthy();
+    expect(screen.getByText("true")).toBeTruthy();
+    expect(screen.getByTestId("flow-save-preview").textContent).toContain("on the session's chip");
   });
 });
 
