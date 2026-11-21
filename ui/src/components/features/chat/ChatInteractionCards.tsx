@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, CircleHelp, FileDiff, PenLine, ShieldCheck, X } from "lucide-react";
+import { Check, CircleHelp, FileDiff, PenLine, X } from "lucide-react";
 import { CodeBlock } from "@/components/features/chat/CodeBlock";
 import { PipelinePreview, isPipelineSpec } from "@/components/features/chat/PipelinePreview";
 import { PierreDiffViewer } from "@/components/ui/PierreDiffViewer";
@@ -91,35 +91,38 @@ function FlowSavePreview({ args }: { args: Record<string, unknown> }) {
     : [];
   const code = stringArg(args, "code") ?? "";
   return (
-    <div
-      className="rounded-lg border border-base-300/70 bg-base-100/60 p-3"
-      data-testid="flow-save-preview"
-    >
-      <div className="text-xs">
-        Flow <span className="font-mono font-medium">{name ?? "?"}</span>
-        {chipId ? (
-          <>
-            {" "}
-            on chip <span className="font-mono">{chipId}</span>
-          </>
-        ) : (
-          " on the session's chip"
+    <div className="flex flex-col gap-2" data-testid="flow-save-preview">
+      <div className="min-w-0">
+        <p className="text-xs text-base-content/60 wrap-anywhere">
+          Flow <span className="font-mono text-base-content">{name ?? "?"}</span>
+          {chipId ? (
+            <>
+              {" "}
+              on chip <span className="font-mono text-base-content">{chipId}</span>
+            </>
+          ) : (
+            " on the session's chip"
+          )}
+        </p>
+        {description && <p className="mt-0.5 text-xs text-base-content/60">{description}</p>}
+        {tags.length > 0 && (
+          <div className="mt-1 flex flex-wrap gap-1">
+            {tags.map((tag) => (
+              <span key={tag} className="badge badge-ghost badge-xs">
+                {tag}
+              </span>
+            ))}
+          </div>
         )}
-        {tags.map((tag) => (
-          <span key={tag} className="badge badge-ghost badge-xs ml-1 align-middle">
-            {tag}
-          </span>
-        ))}
       </div>
-      {description && <p className="mt-0.5 text-xs text-base-content/60">{description}</p>}
       <div className="max-h-96 overflow-auto">
         <CodeBlock compact language="python">
           {code}
         </CodeBlock>
       </div>
-      <p className="text-xs text-base-content/50">
-        QDash checks the @flow function, formats the file, and registers the deployment. A flow of
-        the same name is replaced. Saving does not run it.
+      <p className="text-xs text-base-content/60">
+        Saving checks the @flow function, formats the file, and registers the deployment. It
+        replaces a flow of the same name and does not run it.
       </p>
     </div>
   );
@@ -128,14 +131,19 @@ function FlowSavePreview({ args }: { args: Record<string, unknown> }) {
 function ArgValue({ value }: { value: unknown }) {
   if (value !== null && typeof value === "object") {
     return (
-      <pre className="text-xs leading-relaxed font-mono whitespace-pre-wrap break-all bg-base-200/70 rounded-md px-2 py-1 m-0">
+      <pre className="m-0 max-h-60 overflow-auto rounded-md bg-base-200 px-2 py-1 font-mono text-xs leading-relaxed whitespace-pre-wrap wrap-anywhere">
         {JSON.stringify(value, null, 2)}
       </pre>
     );
   }
-  return <span className="font-mono text-xs break-all">{String(value)}</span>;
+  return <span className="font-mono text-xs wrap-anywhere">{String(value)}</span>;
 }
 
+/**
+ * A tool call that changes QDash and waits for the user: what will run, the
+ * exact arguments to review, then the decision. The reply text is the
+ * contract with the agent, so Approve and Decline send it unchanged.
+ */
 export function ApprovalCard({
   approval,
   state,
@@ -157,72 +165,62 @@ export function ApprovalCard({
   const entries = Object.entries(approval.args).filter(
     ([key]) => !(pipelineSpec && key === "spec") && !(flowSave && FLOW_PREVIEW_KEYS.has(key)),
   );
+  const hasPreview = Boolean(pipelineSpec) || flowSave;
 
   return (
     <div
       className="chat-interaction-card chat-approval-card not-prose"
       role="group"
       aria-label={`Approve ${approval.label}`}
+      data-decision={decided ?? (state.active ? "pending" : "expired")}
     >
-      <div className="flex items-start gap-2">
-        <ShieldCheck className="w-4 h-4 mt-0.5 text-warning shrink-0" />
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium leading-snug">{approval.label}</p>
-          <p className="text-xs text-base-content/55 mt-0.5">
-            This changes QDash. It runs only if you approve, with exactly these arguments.
-          </p>
-        </div>
+      <div className="px-3.5 pt-3">
+        <p className="text-sm font-medium leading-snug wrap-anywhere">{approval.label}</p>
+        <p className="mt-0.5 font-mono text-xs text-base-content/60 wrap-anywhere">
+          {approval.tool}
+        </p>
       </div>
 
-      {pipelineSpec && (
-        <div className="mt-3">
-          <PipelinePreview chipId={chipId} spec={pipelineSpec} />
-        </div>
-      )}
-      {flowSave && (
-        <div className="mt-3">
-          <FlowSavePreview args={approval.args} />
-        </div>
-      )}
+      <div className="flex flex-col gap-3 px-3.5 pt-3 pb-3.5">
+        {pipelineSpec && <PipelinePreview chipId={chipId} spec={pipelineSpec} />}
+        {flowSave && <FlowSavePreview args={approval.args} />}
+        {entries.length > 0 ? (
+          <dl
+            className="m-0 grid grid-cols-[fit-content(40%)_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-xs"
+            aria-label="Arguments"
+          >
+            {entries.map(([key, value]) => (
+              <div key={key} className="contents">
+                <dt className="font-mono text-base-content/60 wrap-anywhere">{key}</dt>
+                <dd className="m-0 min-w-0">
+                  <ArgValue value={value} />
+                </dd>
+              </div>
+            ))}
+          </dl>
+        ) : (
+          !hasPreview && <p className="text-xs text-base-content/60">No arguments</p>
+        )}
+      </div>
 
-      {entries.length > 0 && (
-        <dl className="mt-3 grid grid-cols-[minmax(0,auto)_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-xs">
-          {entries.map(([key, value]) => (
-            <div key={key} className="contents">
-              <dt className="text-base-content/50 font-mono">{key}</dt>
-              <dd className="m-0 min-w-0">
-                <ArgValue value={value} />
-              </dd>
-            </div>
-          ))}
-        </dl>
-      )}
-      <p className="mt-2 text-xs font-mono text-base-content/35">{approval.tool}</p>
-
-      <div className="mt-3 flex items-center gap-2">
+      <div className="flex flex-wrap items-center justify-end gap-2 border-t border-base-content/10 px-3.5 py-2">
         {decided ? (
           <span
-            className={`inline-flex items-center gap-1.5 text-xs font-medium ${
-              decided === "approved" ? "text-success" : "text-base-content/55"
+            role="status"
+            className={`mr-auto inline-flex items-center gap-1.5 text-xs font-medium ${
+              decided === "approved" ? "text-success" : "text-base-content/60"
             }`}
           >
             {decided === "approved" ? (
-              <Check className="w-3.5 h-3.5" />
+              <Check className="h-3.5 w-3.5" aria-hidden="true" />
             ) : (
-              <X className="w-3.5 h-3.5" />
+              <X className="h-3.5 w-3.5" aria-hidden="true" />
             )}
             {decided === "approved" ? "Approved" : "Declined"}
           </span>
         ) : state.active ? (
           <>
-            <button
-              type="button"
-              className="btn btn-primary btn-sm"
-              onClick={() => state.onDecide(approval.id, true, approvedText(approval))}
-            >
-              <Check data-icon="inline-start" />
-              Approve
-            </button>
+            <span className="mr-auto text-xs text-base-content/60">Runs only if you approve</span>
             <button
               type="button"
               className="btn btn-ghost btn-sm"
@@ -230,9 +228,17 @@ export function ApprovalCard({
             >
               Decline
             </button>
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              onClick={() => state.onDecide(approval.id, true, approvedText(approval))}
+            >
+              <Check data-icon="inline-start" aria-hidden="true" />
+              Approve
+            </button>
           </>
         ) : (
-          <span className="text-xs text-base-content/45">No decision was made</span>
+          <span className="mr-auto text-xs text-base-content/60">No decision was made</span>
         )}
       </div>
     </div>

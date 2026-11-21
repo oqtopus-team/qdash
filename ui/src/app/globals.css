@@ -1761,9 +1761,10 @@ html[data-theme="dark"],
   box-shadow: 0 1px 2px rgb(0 0 0 / 0.04);
 }
 
+/* Approval cards stay neutral; their sections set their own padding so the
+   decision footer's rule runs edge to edge. */
 .chat-approval-card {
-  border-color: color-mix(in oklch, var(--color-warning) 40%, transparent);
-  background: color-mix(in oklch, var(--color-warning) 4%, var(--color-base-100));
+  padding: 0;
 }
 
 .chat-option {
