@@ -30,7 +30,6 @@ import {
 import { useOptionalChatDock } from "@/contexts/ChatDockContext";
 import { editTargetCode } from "@/lib/copilotEditTarget";
 import { ImagePreviewDialog } from "@/components/ui/ImagePreviewDialog";
-import { QdashBotAvatar } from "@/components/ui/UserAvatar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import { useToast } from "@/components/ui/Toast";
 import { copyText } from "@/lib/utils/clipboard";
@@ -595,14 +594,13 @@ export function LiveAssistantMessage({
       (s.kind === "thinking" && s.endedAt === undefined),
   );
   const idle = !answer && !busy;
+  const figures = answer ? figuresInSteps(work) : [];
 
   return (
     // The activity footer is the live region; the streaming text itself is not announced.
     <AssistantRow className="animate-fade-in-up" aria-busy="true">
-      <LiveTrace steps={work} />
-      {answer && figuresInSteps(work).length > 0 && (
-        <FigureStrip paths={figuresInSteps(work)} className="mb-3" />
-      )}
+      <LiveTrace steps={work} figuresOutside={figures.length > 0} />
+      {figures.length > 0 && <FigureStrip paths={figures} className="mb-3" />}
       {turn.blocks?.map((block, i) =>
         block.type === "ui" ? (
           <ChatUiBlock key={i} ui={block.ui} />
@@ -617,9 +615,6 @@ export function LiveAssistantMessage({
         startedAt={turn.startedAt}
         statusMessage={statusMessage}
         className={`h-7 gap-2.5 ${idle ? "text-sm" : "mt-1"}`}
-        leading={
-          idle ? <QdashBotAvatar size={20} className="chat-avatar-active chat-bot-mark" /> : null
-        }
       />
     </AssistantRow>
   );

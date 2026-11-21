@@ -567,16 +567,6 @@ export function CouplingMetricsGrid({
         <div className="tabs tabs-boxed bg-base-200/50 p-1">
           <button
             type="button"
-            className={`tab gap-2 ${viewMode === "region" ? "tab-active" : ""}`}
-            onClick={() => setViewMode("region")}
-            title="Lock"
-            aria-label="Lock"
-          >
-            <Lock className="h-4 w-4" />
-            <span className="hidden sm:inline">Lock</span>
-          </button>
-          <button
-            type="button"
             className={`tab gap-2 ${viewMode === "pan-zoom" ? "tab-active" : ""}`}
             onClick={() => {
               setViewMode("pan-zoom");
@@ -589,6 +579,16 @@ export function CouplingMetricsGrid({
           >
             <ZoomIn className="h-4 w-4" />
             <span className="hidden sm:inline">Zoom</span>
+          </button>
+          <button
+            type="button"
+            className={`tab gap-2 ${viewMode === "region" ? "tab-active" : ""}`}
+            onClick={() => setViewMode("region")}
+            title="Lock"
+            aria-label="Lock"
+          >
+            <Lock className="h-4 w-4" />
+            <span className="hidden sm:inline">Lock</span>
           </button>
         </div>
 

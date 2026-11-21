@@ -281,7 +281,7 @@ def _auto_session(autonomy: str):
                 "autonomy": autonomy,
                 "max_rounds_per_target": 2,
             },
-            "skill_name": "qdash-calibration-agent",
+            "skill_name": "pi-qdash",
             "skill_version": "1",
             "skill_hash": "sha256:test",
             "model_name": "local-model",

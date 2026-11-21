@@ -10,6 +10,7 @@ from qdash.datamodel.task import (
     InputParameterSpec,
     OutputParameterSpec,
     RunParameterSpec,
+    TaskDocumentation,
 )
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -28,6 +29,27 @@ class ReadoutClassification(QubexTask):
 
     name: str = "ReadoutClassification"
     task_type: str = "qubit"
+    documentation: ClassVar[TaskDocumentation] = TaskDocumentation(
+        description=(
+            "Prepares 0 and 1 states, trains the Qubex state classifier (k-means or GMM, as the"
+            " session configures), saves it for later measurements, and writes "
+            "average_readout_fidelity, readout_fidelity_0, and readout_fidelity_1."
+        ),
+        when_to_use=(
+            "Run it after readout and pulse calibration to quantify two-state assignment "
+            "fidelity and refresh the classifier that subsequent Qubex measurements use."
+        ),
+        prerequisites=(
+            (
+                "drag_hpi_amplitude, drag_hpi_duration, and drag_hpi_beta stored by "
+                "CreateDRAGHPIPulse."
+            ),
+            (
+                "control_frequency (or qubit_frequency), readout_frequency (or "
+                "resonator_frequency), and readout_amplitude are stored for the qubit."
+            ),
+        ),
+    )
 
     # High resolution for accurate threshold detection
     GRID_RESOLUTION: int = 2001

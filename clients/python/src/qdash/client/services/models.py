@@ -4631,6 +4631,37 @@ class TaskCall(BaseModel):
     """
 
 
+class TaskDocumentation(BaseModel):
+    """
+    Human-readable guidance a task class declares about itself.
+
+    A task class sets ``documentation: ClassVar[TaskDocumentation]`` to a literal
+    ``TaskDocumentation(...)`` call. The task catalog reads that call statically,
+    so every field must be a string literal, or a list or tuple of string
+    literals for ``prerequisites``.
+
+    ``prerequisites`` explains to readers what the task expects; it is not
+    enforced. The task's ``input_spec`` remains the only declaration that decides
+    which calibration values must exist before the task runs.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    description: Annotated[str, Field(min_length=1, title="Description")]
+    """
+    What the task measures or produces, in one or two sentences.
+    """
+    when_to_use: Annotated[str, Field(title="When To Use")] = ""
+    """
+    The situation in which an operator or agent should run the task.
+    """
+    prerequisites: Annotated[list[str], Field(title="Prerequisites")] = []
+    """
+    Calibration state the task expects, explained for readers. Not enforced; input parameter metadata carries the enforced requirements.
+    """
+
+
 class TaskFileBackend(BaseModel):
     """
     Task file backend model.
@@ -4659,6 +4690,13 @@ class TaskInfo(BaseModel):
     class_name: Annotated[str, Field(title="Class Name")]
     task_type: Annotated[str | None, Field(title="Task Type")] = None
     description: Annotated[str | None, Field(title="Description")] = None
+    """
+    Short task description: documentation.description when the task declares documentation, otherwise the class docstring.
+    """
+    documentation: TaskDocumentation | None = None
+    """
+    Structured guidance the task class declares, when it declares any.
+    """
     file_path: Annotated[str, Field(title="File Path")]
     category: Annotated[str | None, Field(title="Category")] = None
     enabled: Annotated[bool, Field(title="Enabled")] = True
@@ -8170,6 +8208,12 @@ class PipelineCatalogResponse(BaseModel):
     tasks: Annotated[dict[str, list[str]], Field(title="Tasks")]
     """
     Available task names by task_type ("qubit", "coupling", ...).
+    """
+    task_documentation: Annotated[
+        dict[str, TaskDocumentation] | None, Field(title="Task Documentation")
+    ] = None
+    """
+    Guidance declared by available tasks, keyed by task name. Tasks that declare no documentation are omitted.
     """
     spec_version: Annotated[int, Field(title="Spec Version")]
     """

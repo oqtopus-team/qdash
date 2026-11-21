@@ -10,6 +10,7 @@ from qdash.datamodel.task import (
     InputParameterSpec,
     OutputParameterSpec,
     RunParameterSpec,
+    TaskDocumentation,
 )
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -72,6 +73,26 @@ class CheckCoarseReadoutParams(QubexTask):
 
     name: str = "CheckCoarseReadoutParams"
     task_type: str = "qubit"
+    documentation: ClassVar[TaskDocumentation] = TaskDocumentation(
+        description=(
+            "Runs a short Rabi sweep at each point of a readout frequency and amplitude grid "
+            "around the stored values and writes the readout_frequency and readout_amplitude "
+            "with the largest Rabi response range. This is a Qubex contrast heuristic, not a "
+            "single-shot fidelity optimization."
+        ),
+        when_to_use=(
+            "Run it after bring-up and before CheckRabi when the spectroscopy readout point "
+            "gives weak Rabi contrast; coarse_one starts with it. Use "
+            "CheckOptimalReadoutFrequency and CheckOptimalReadoutAmplitude for fidelity-based "
+            "tuning once pi pulses exist."
+        ),
+        prerequisites=(
+            (
+                "control_frequency (or qubit_frequency), control_amplitude, readout_frequency "
+                "(or resonator_frequency), and readout_amplitude are stored."
+            ),
+        ),
+    )
     r2_threshold: float = DEFAULT_RABI_R2_THRESHOLD
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
         "control_frequency": InputParameterSpec.required_database(

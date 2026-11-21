@@ -1099,22 +1099,17 @@ html[data-theme="dark"],
    ======================================== */
 
 /*
- * First-message transition on the chat page (lib/viewTransition.ts): the mark
- * and the composer keep their names across the layout change, so the browser
- * morphs them from the centered greeting into the thread while the rest
- * cross-fades. Names are scoped to the page so the docked panel and floating
- * window, which can be open at the same time, never carry duplicates.
+ * First-message transition on the chat page (lib/viewTransition.ts): the
+ * composer keeps its name across the layout change, so the browser morphs it
+ * from the centered greeting into the thread while the rest, including the
+ * greeting's mark, cross-fades. The name is scoped to the page so the docked
+ * panel and floating window, which can be open at the same time, never carry
+ * duplicates.
  */
-.chat-page-thread .chat-avatar-hero,
-.chat-page-thread .chat-bot-mark {
-  view-transition-name: qdash-bot-mark;
-}
-
 .chat-page-thread .chat-composer {
   view-transition-name: chat-composer;
 }
 
-::view-transition-group(qdash-bot-mark),
 ::view-transition-group(chat-composer) {
   animation-duration: 420ms;
   animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -1317,22 +1312,6 @@ html[data-theme="dark"],
 /* Assistant answers sit flush left, full width, with no avatar (ChatGPT and Claude style). */
 .chat-assistant-row {
   min-width: 0;
-}
-
-/* Breathing ring on the bot mark while the answer is still being worked out. */
-.chat-avatar-active {
-  border-radius: 9999px;
-  animation: chatAvatarPulse 1.8s ease-in-out infinite;
-}
-
-@keyframes chatAvatarPulse {
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 color-mix(in oklch, var(--color-primary) 35%, transparent);
-  }
-  50% {
-    box-shadow: 0 0 0 5px color-mix(in oklch, var(--color-primary) 0%, transparent);
-  }
 }
 
 /* Inline editor for a sent user message. */

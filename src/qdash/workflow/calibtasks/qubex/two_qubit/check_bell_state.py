@@ -7,6 +7,7 @@ from qdash.datamodel.task import (
     InputParameterSpec,
     OutputParameterSpec,
     RunParameterSpec,
+    TaskDocumentation,
 )
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -24,6 +25,31 @@ class CheckBellState(QubexTask):
 
     name: str = "CheckBellState"
     task_type: str = "coupling"
+    documentation: ClassVar[TaskDocumentation] = TaskDocumentation(
+        description=(
+            "Prepares a Bell state with a control Y90 and the stored ZX90 gate and plots the "
+            "Z-basis outcome probabilities, raw and readout-mitigated. It writes no calibration"
+            " values."
+        ),
+        when_to_use=(
+            "Run it as a quick entangling check after CreateZX90; use CheckBellStateTomography "
+            "for a fidelity value."
+        ),
+        prerequisites=(
+            (
+                "The coupling qid is control-target; control-qubit and target-qubit inputs are "
+                "read from each qubit's stored calibration."
+            ),
+            (
+                "DRAG half-pi pulses (CreateDRAGHPIPulse) on both qubits and a DRAG pi pulse "
+                "(CreateDRAGPIPulse) on the control qubit."
+            ),
+            (
+                "CR and ZX90 parameters (cr_*, cancel_*, rotary_amplitude, zx_rotation_rate, "
+                "zx90_gate_time) stored by CreateZX90 for the pair."
+            ),
+        ),
+    )
     run_spec: ClassVar[dict[str, RunParameterSpec]] = {
         "readout_duration": readout_duration_run_parameter(),
         "shots": RunParameterSpec(

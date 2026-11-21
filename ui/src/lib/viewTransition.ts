@@ -13,8 +13,7 @@ export function canViewTransition(doc: Document = document, win: Window = window
 /**
  * Apply a state update as a view transition: elements that carry the same
  * `view-transition-name` before and after morph between their two places
- * (the QDash mark and the composer when the first message is sent), and the
- * rest cross-fades. Without browser support, or with reduced motion, the
+ * (the composer when the first message is sent), and the rest cross-fades. Without browser support, or with reduced motion, the
  * update is applied directly.
  *
  * The update runs inside `flushSync` so the new DOM is in place when the

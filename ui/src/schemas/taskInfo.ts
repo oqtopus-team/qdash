@@ -7,6 +7,7 @@
  */
 import type { TaskInfoCategory } from './taskInfoCategory';
 import type { TaskInfoDescription } from './taskInfoDescription';
+import type { TaskInfoDocumentation } from './taskInfoDocumentation';
 import type { TaskInfoInputParameters } from './taskInfoInputParameters';
 import type { TaskInfoRunParameters } from './taskInfoRunParameters';
 import type { TaskInfoTaskType } from './taskInfoTaskType';
@@ -18,7 +19,10 @@ export interface TaskInfo {
   name: string;
   class_name: string;
   task_type?: TaskInfoTaskType;
+  /** Short task description: documentation.description when the task declares documentation, otherwise the class docstring. */
   description?: TaskInfoDescription;
+  /** Structured guidance the task class declares, when it declares any. */
+  documentation?: TaskInfoDocumentation;
   file_path: string;
   category?: TaskInfoCategory;
   enabled?: boolean;

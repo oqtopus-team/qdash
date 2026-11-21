@@ -6,6 +6,7 @@ from qdash.datamodel.task import (
     InputParameterSpec,
     OutputParameterSpec,
     RunParameterSpec,
+    TaskDocumentation,
 )
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -21,6 +22,25 @@ class ConfigureAll(QubexTask):
 
     name: str = "ConfigureAll"
     task_type: str = "system"
+    documentation: ClassVar[TaskDocumentation] = TaskDocumentation(
+        description=(
+            "System task that builds a Qubex experiment for the selected MUXes, reloads the "
+            "system model, and pushes the settings of every target in those MUXes to the QuEL "
+            "boxes. It measures nothing and writes no calibration values."
+        ),
+        when_to_use=(
+            "Run it once at the start of a pipeline instead of per-qubit Configure; the "
+            "ConfigureAll step type wraps this task and fills mux_ids from the step targets. "
+            "Set configuration_mode to ge-ef-cr or ge-ef-fh when later steps need EF or FH "
+            "targets."
+        ),
+        prerequisites=(
+            (
+                "mux_ids name MUXes defined by the chip topology; standalone qubits without a "
+                "MUX cannot be targeted."
+            ),
+        ),
+    )
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {}
     run_spec: ClassVar[dict[str, RunParameterSpec]] = {
         "mux_ids": RunParameterSpec(

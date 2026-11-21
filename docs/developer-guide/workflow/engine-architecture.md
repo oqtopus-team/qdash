@@ -186,6 +186,54 @@ configuration, and test preprocessing, effective parameter resolution, result va
 failure behavior. Keep backend calls inside the task's run phase and persistence policy inside the
 engine.
 
+### Document a calibration task
+
+A task class declares what it does for operators and agents in `documentation`, a
+`TaskDocumentation` from `qdash.datamodel.task`:
+
+```python
+class CheckT1(QubexTask):
+    name: str = "CheckT1"
+    documentation: ClassVar[TaskDocumentation] = TaskDocumentation(
+        description="Measures the energy relaxation time T1 ...",
+        when_to_use="Run it to characterize or track the T1 coherence ...",
+        prerequisites=(
+            "Rabi parameters from a CheckRabi run under the current readout_duration ...",
+        ),
+    )
+```
+
+`description` is required; `when_to_use` and `prerequisites` are optional.
+`prerequisites` explains the calibration state the task expects and is never enforced:
+`input_spec` alone decides which inputs must resolve, and pipeline validation reports what is
+actually missing. Describe only what the task's code and the Qubex functions it calls do, and do
+not use these fields to plan the next task.
+
+The declaration carries no literature citations. Write the fields from the task source and the
+Qubex functions it calls, so sweep ranges, fit models, and stored outputs describe the deployed
+implementation rather than a paper's original protocol. Background reading on the general methods
+lives in [Task method sources](../../reference/task-method-sources.md), which is documentation
+only and is not published with the task metadata.
+
+`TaskFileService` reads the declaration from the source with `ast` and never imports the module,
+so the call must take keyword arguments whose values are string literals, or a tuple or list of
+string literals for `prerequisites`. When it is present, `documentation.description` replaces the
+class docstring as the task's `description`; a class without `documentation` keeps the docstring.
+A declaration that cannot be read statically is ignored with a warning in the API, and
+`scripts/generate_task_catalog.py` fails with the file and class names. After editing a
+declaration, run `task generate-task-catalog` to refresh
+`src/qdash/workflow/calibtasks/task_catalog.json`.
+
+The catalog publishes the declaration as `documentation` on each task in `GET /task-files/tasks`
+and, for the backend's enabled tasks, as `task_documentation` in
+[`GET /calibration-pipelines/catalog`](./calibration-pipeline.md#endpoints). The Copilot reads it
+through `qdash_get_pipeline_catalog` ([pi-qdash tools](../../reference/pi-qdash.md#pipeline-and-flow-operations)).
+`tests/qdash/api/services/test_task_file_service.py` covers static parsing.
+`tests/scripts/test_generate_task_catalog.py` checks that the catalog matches each class's runtime
+declaration and that every task named by a workflow template, a step's default task list, or a
+pi-qdash skill is documented in the packaged catalog, so a task added to any of them needs a
+declaration.
+
 ### Add a backend
 
 Implement `BaseBackend`, add construction logic to `engine/backend/factory.py`, and provide tests

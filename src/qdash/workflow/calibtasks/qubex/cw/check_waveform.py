@@ -7,6 +7,7 @@ from qdash.datamodel.task import (
     InputParameterSpec,
     OutputParameterSpec,
     RunParameterSpec,
+    TaskDocumentation,
 )
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -21,6 +22,18 @@ class CheckWaveform(QubexTask):
 
     name: str = "CheckWaveform"
     task_type: str = "qubit"
+    documentation: ClassVar[TaskDocumentation] = TaskDocumentation(
+        description=(
+            "Captures and plots the averaged readout waveform for each target qubit with Qubex "
+            "check_waveform. It writes no calibration values."
+        ),
+        when_to_use=(
+            "Run it to inspect readout timing and signal level, for example after capture delay"
+            " correction or when readout looks wrong. Readout amplitude, duration, and margins "
+            "default to the Qubex session values."
+        ),
+        prerequisites=("None from calibration storage.",),
+    )
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {}
     run_spec: ClassVar[dict[str, RunParameterSpec]] = {
         "shots": RunParameterSpec(

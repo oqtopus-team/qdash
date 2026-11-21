@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, mkdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -99,6 +99,51 @@ test("bundled packages load tools and skills offline, retaining the pi-qdash all
     assert.equal(info.source, "package");
     assert.equal(info.name, "@oqtopus-team/pi-qcaleval");
     assert.match(info.version, /^\d+\.\d+\.\d+\+source\.[0-9a-f]{16}$/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("experiment-flow skills load in both hosts and name only tools the runtime offers", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "qdash-flow-skills-"));
+  try {
+    const bundled = bundledExtensionCheckouts(packagesDir);
+    const loader = new DefaultResourceLoader({
+      cwd: dir, agentDir: join(dir, "agent"), additionalExtensionPaths: bundled.map(({ path }) => path),
+    });
+    await loader.reload();
+    const tools = new Set(loader.getExtensions().extensions.flatMap(({ tools }) => [...tools.keys()]));
+    const offered = new Set([...ALLOWED_TOOL_NAMES, ...REVIEWED_WRITE_TOOL_NAMES]);
+    const skills = loader.getSkills().skills;
+    const names = new Set(skills.map(({ name }) => name));
+    // The flow skills replace the retired calibration-agent and two-qubit diagnosis skills.
+    for (const retired of ["qdash-calibration-agent", "qdash-two-qubit-calibration-diagnosis"]) {
+      assert.ok(!names.has(retired), retired);
+    }
+    const flowSkills = [
+      "qdash-chip-bringup",
+      "qdash-one-qubit-calibration",
+      "qdash-two-qubit-calibration",
+      "qdash-characterization",
+    ];
+    for (const name of [...flowSkills, "qdash"]) {
+      const skill = skills.find((entry) => entry.name === name);
+      assert.ok(skill, `${name} loads`);
+      assert.ok(!skill.disableModelInvocation, name);
+      const text = readFileSync(skill.filePath, "utf8");
+      // The general skill also covers pi-only tools and APIs; a flow skill must work in the web
+      // Agent too, where read_skill returns only SKILL.md.
+      if (name !== "qdash") {
+        for (const [, tool] of text.matchAll(/`(qdash_[a-z0-9_]+)`/g)) {
+          assert.ok(tools.has(tool), `${name} names unregistered tool ${tool}`);
+          assert.ok(offered.has(tool), `${name} names ${tool}, which the runtime does not offer`);
+        }
+        assert.deepEqual(readdirSync(dirname(skill.filePath)), ["SKILL.md"], name);
+      }
+      for (const [, ref] of text.matchAll(/`(qdash-[a-z0-9-]+)`/g)) {
+        assert.ok(names.has(ref), `${name} refers to missing skill ${ref}`);
+      }
+    }
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

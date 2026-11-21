@@ -31606,6 +31606,14 @@
             "title": "Tasks",
             "description": "Available task names by task_type (\"qubit\", \"coupling\", ...)."
           },
+          "task_documentation": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/TaskDocumentation"
+            },
+            "type": "object",
+            "title": "Task Documentation",
+            "description": "Guidance declared by available tasks, keyed by task name. Tasks that declare no documentation are omitted."
+          },
           "spec_version": {
             "type": "integer",
             "title": "Spec Version",
@@ -34644,6 +34652,38 @@
         "title": "TaskCall",
         "description": "One call of a task in a step, with its own settings and identity."
       },
+      "TaskDocumentation": {
+        "properties": {
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Description",
+            "description": "What the task measures or produces, in one or two sentences."
+          },
+          "when_to_use": {
+            "type": "string",
+            "title": "When To Use",
+            "description": "The situation in which an operator or agent should run the task.",
+            "default": ""
+          },
+          "prerequisites": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Prerequisites",
+            "description": "Calibration state the task expects, explained for readers. Not enforced; input parameter metadata carries the enforced requirements.",
+            "default": []
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "description"
+        ],
+        "title": "TaskDocumentation",
+        "description": "Human-readable guidance a task class declares about itself.\n\nA task class sets ``documentation: ClassVar[TaskDocumentation]`` to a literal\n``TaskDocumentation(...)`` call. The task catalog reads that call statically,\nso every field must be a string literal, or a list or tuple of string\nliterals for ``prerequisites``.\n\n``prerequisites`` explains to readers what the task expects; it is not\nenforced. The task's ``input_spec`` remains the only declaration that decides\nwhich calibration values must exist before the task runs."
+      },
       "TaskFileBackend": {
         "properties": {
           "name": {
@@ -34755,7 +34795,19 @@
                 "type": "null"
               }
             ],
-            "title": "Description"
+            "title": "Description",
+            "description": "Short task description: documentation.description when the task declares documentation, otherwise the class docstring."
+          },
+          "documentation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskDocumentation"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Structured guidance the task class declares, when it declares any."
           },
           "file_path": {
             "type": "string",

@@ -10,6 +10,7 @@ from qdash.datamodel.task import (
     InputParameterSpec,
     OutputParameterSpec,
     RunParameterSpec,
+    TaskDocumentation,
 )
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -36,6 +37,28 @@ class CheckAdaptiveEFChevron(QubexTask):
 
     name: str = "CheckAdaptiveEFChevron"
     task_type: str = "qubit"
+    documentation: ClassVar[TaskDocumentation] = TaskDocumentation(
+        description=(
+            "Prepares the first excited state with the session's GE pulse and runs an adaptive "
+            "chevron on the e-to-f transition. It writes ef_frequency (also published as "
+            "control_frequency_ef) and qubit_anharmonicity = ef_frequency - control_frequency."
+        ),
+        when_to_use=(
+            "Run it to start EF calibration. The search starts from the configured EF frequency"
+            " or, without one, from 18/19 of the GE frequency, with the GE amplitude divided by"
+            " sqrt(2)."
+        ),
+        prerequisites=(
+            (
+                "GE and EF drive targets configured in the current session: run ConfigureEF, or"
+                " start with ConfigureAll, using configuration_mode ge-ef-cr or ge-ef-fh."
+            ),
+            (
+                "control_frequency, control_amplitude, readout_frequency, and readout_amplitude"
+                " are stored; hpi_amplitude and hpi_duration stored by CreateHPIPulse."
+            ),
+        ),
+    )
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
         "control_frequency": InputParameterSpec.required_database(
             fallback_parameter_names=("qubit_frequency",), unit="GHz"

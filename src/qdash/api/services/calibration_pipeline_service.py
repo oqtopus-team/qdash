@@ -70,9 +70,10 @@ from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.qubit import QubitDocument
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Mapping
+    from collections.abc import Callable, Iterable, Mapping
 
     from qdash.api.schemas.task_file import TaskInfo
+    from qdash.datamodel.task import TaskDocumentation
     from qdash.repository.task_definition import MongoTaskDefinitionRepository
 
 logger = logging.getLogger(__name__)
@@ -189,8 +190,9 @@ class CalibrationPipelineService:
     def catalog(self, project_id: str, backend_name: str | None) -> PipelineCatalogResponse:
         """Step types, task names, and the spec schema for writing a spec."""
         backend, _ = self.resolve_backend(backend_name)
+        task_types = self.task_types(project_id, backend)
         by_type: dict[str, list[str]] = {}
-        for name, task_type in sorted(self.task_types(project_id, backend).items()):
+        for name, task_type in sorted(task_types.items()):
             by_type.setdefault(task_type, []).append(name)
         return PipelineCatalogResponse(
             backend_name=backend,
@@ -211,9 +213,32 @@ class CalibrationPipelineService:
             one_qubit_execution_modes=list(ONE_QUBIT_STEP_EXECUTION_MODES),
             two_qubit_execution_modes=list(TWO_QUBIT_EXECUTION_MODES),
             tasks=by_type,
+            task_documentation=self._task_documentation(backend, task_types),
             spec_version=SPEC_VERSION,
             spec_schema=pipeline_spec_json_schema(),
         )
+
+    def _task_documentation(
+        self, backend: str, task_names: Iterable[str]
+    ) -> dict[str, TaskDocumentation]:
+        """Declared documentation of the listed tasks, from the task catalog.
+
+        Documentation is guidance only, so an unavailable catalog leaves it empty
+        rather than failing the pipeline catalog.
+        """
+        if self._task_catalog is None:
+            return {}
+        try:
+            catalog = self._task_catalog(backend)
+        except LookupError as exc:
+            logger.warning("Task documentation unavailable for backend %s: %s", backend, exc)
+            return {}
+        documentation: dict[str, TaskDocumentation] = {}
+        for name in sorted(task_names):
+            info = catalog.get(name)
+            if info is not None and info.documentation is not None:
+                documentation[name] = info.documentation
+        return documentation
 
     # --------------------------------------------------------------- validation
 
