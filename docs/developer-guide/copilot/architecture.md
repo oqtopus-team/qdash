@@ -38,6 +38,7 @@ only in what they open with:
 | `agent-runtime/src/branch.ts` | Branching a chat at an answer: the Pi fork, its checks, and the `qdash.branches` receipts ([Branches](./chat-streaming.md#branches)) |
 | `src/qdash/api/services/copilot_chat_session_service.py` | Chat sessions, the store each one uses, branch creation, and store cleanup with the last session |
 | `agent-runtime/src/chat-registry.ts` | Per-session chat registry: QDash tools, copilot tools, preferences, page context, workspace tools, and Code Mode |
+| `agent-runtime/src/compaction.ts` | Compaction summaries sized to the chat's model, and the compaction failure message |
 | `agent-runtime/src/allowed-tools.ts` | Which pi-qdash tools the chat offers, which need approval, which scripts may call, and which are deferred |
 | `agent-runtime/src/exec-env.ts` | The workspace: one `agent-exec` connection per conversation behind `bash`, `read`, `write`, `edit` |
 | `src/qdash/copilot/contracts/models.py` | Pydantic models: `TaskContext`, `TaskContextBundle`, `ChatRequest` (with `task`); request schemas |
@@ -95,6 +96,29 @@ and `agent-runtime/src/budget.ts` calculates their thresholds. The runtime gives
 `modelOverrides` entry for each resolved model, so a resumed task uses the budget of the model it
 started with even if the next request selects another model. The selected request model also gets
 an entry when it is absent from the startup list.
+
+`buildCompactionExtension` in `agent-runtime/src/compaction.ts` writes the compaction summary through
+Pi's `beforeCompact` hook. Pi's built-in summarizer sends the chat's thinking level, so reasoning and
+the summary share the model's output limit; on the local qwen model with a 64k window and 8k output,
+the reasoning can use all of it, and the turn fails with `Compaction failed: Summarization hit the
+token limit`. The hook sends the request with thinking off and an output cap that never exceeds the
+model's stated `maxTokens`. It serializes the whole summarized range: user and assistant text,
+including an earlier summary, is never cut or left out, and only tool arguments and tool results
+are shortened per call. When the summary is cut off, the hook retries once with shorter tool
+output, which makes a second cut-off less likely but does not rule it out. Pi still chooses the
+range and places the summary whole; raw entries stay in the store, and the task's durable memo
+keeps a written summary across restarts.
+
+The hook sends no request when the model states no context window, when its output limit is
+below 512 tokens, or when the whole serialized range, with the system prompt and instructions,
+does not fit the window with room for the output. It logs the reason and sizes, never
+conversation text, and hands the compaction to the built-in summarizer instead of summarizing a
+partial transcript. A provider error or a second cut-off also hands it over once. When the
+built-in summarizer fails too, the runtime sends the error code `compaction_failed` with a message
+that points to **Continue**. Continue resumes the turn without sending the message again or
+rerunning tool calls that finished. The message also says that the stored chat is intact, and that
+after a summary the model sees the earlier part only in summarized form. The provider's error text
+goes to the runtime log only.
 
 Pi reports storage failures, faulted or interrupted tasks, migrations, and extension errors through
 `onReport`. `agent-runtime/src/durable-report.ts` logs the report kind as `type`, the task and

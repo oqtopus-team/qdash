@@ -54,6 +54,8 @@ export interface ChatRegistryParts {
   internalCalls: InternalCalls;
   /** The workspace's read/write/edit/bash, when there is a workspace. */
   codingTools: boolean;
+  /** From `buildCompactionExtension`: the summarizer chats compact with. */
+  compaction?: Extension;
 }
 
 export interface ChatRegistry {
@@ -81,6 +83,7 @@ export function buildChatRegistry(
   );
   registry.install(qdash.extension);
   registry.install(parts.copilot);
+  if (parts.compaction) registry.install(parts.compaction);
   // After QDash's own rules, so they come first and the user's preferences
   // read as adjustments to them.
   const preferences = buildUserInstructionsSection(userInstructions);
