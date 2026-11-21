@@ -2,6 +2,8 @@
 
 from pydantic import BaseModel, Field
 
+from qdash.datamodel.task import TaskDocumentation
+
 
 class TaskFileBackend(BaseModel):
     """Task file backend model."""
@@ -30,7 +32,17 @@ class TaskInfo(BaseModel):
     name: str
     class_name: str
     task_type: str | None = None
-    description: str | None = None
+    description: str | None = Field(
+        default=None,
+        description=(
+            "Short task description: documentation.description when the task declares "
+            "documentation, otherwise the class docstring."
+        ),
+    )
+    documentation: TaskDocumentation | None = Field(
+        default=None,
+        description="Structured guidance the task class declares, when it declares any.",
+    )
     file_path: str
     category: str | None = None  # From backend.yaml categories
     enabled: bool = True  # Whether task is in enabled_tasks list

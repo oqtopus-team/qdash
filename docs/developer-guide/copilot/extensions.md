@@ -63,7 +63,13 @@ Keep API access through `@oqtopus-team/qdash-client`, redaction, rendering, and
 mechanical evidence extraction in extensions. Keep calibration interpretation,
 diagnosis recipes, thresholds, and runbooks in `packages/pi-qdash/skills/`.
 For example, `extensions/lib/figure-analysis.ts` summarizes Plotly JSON;
-`skills/qdash-two-qubit-calibration-diagnosis/` interprets calibration evidence.
+`skills/qdash-two-qubit-calibration/` decides from that evidence which two-qubit step to rerun.
+The experiment-flow skills (`qdash-chip-bringup`, `qdash-one-qubit-calibration`,
+`qdash-two-qubit-calibration`, and `qdash-characterization`) compose the flow templates toward a
+goal and leave task physics to task knowledge. The runtime's `read_skill` returns only a skill's
+`SKILL.md`, so these skills keep their instructions in that file and retrieve templates and task
+documentation through tools; `agent-runtime/test/bundled-extensions.test.mjs` checks that they
+load and name only tools the runtime offers.
 
 New tools are read-only by default. Writes and operational calls must use the
 existing approval gates, including explicit `confirmWrite: true` in non-interactive

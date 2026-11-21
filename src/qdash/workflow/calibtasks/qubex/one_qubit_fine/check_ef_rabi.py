@@ -8,7 +8,12 @@ from typing import TYPE_CHECKING, ClassVar
 from qubex.experiment.experiment_constants import CALIBRATION_SHOTS
 from qubex.measurement.measurement_defaults import DEFAULT_INTERVAL
 
-from qdash.datamodel.task import InputParameterSpec, OutputParameterSpec, RunParameterSpec
+from qdash.datamodel.task import (
+    InputParameterSpec,
+    OutputParameterSpec,
+    RunParameterSpec,
+    TaskDocumentation,
+)
 from qdash.workflow.calibtasks.base import PostProcessResult, RunResult
 from qdash.workflow.calibtasks.qubex.base import (
     QubexTask,
@@ -31,6 +36,34 @@ class CheckEFRabi(QubexTask):
 
     name: str = "CheckEFRabi"
     task_type: str = "qubit"
+    documentation: ClassVar[TaskDocumentation] = TaskDocumentation(
+        description=(
+            "Prepares the excited state and measures a Rabi oscillation on the e-to-f "
+            "transition, storing EF Rabi parameters (ef_rabi_*) that EF pulse calibration uses "
+            "for normalization."
+        ),
+        when_to_use=(
+            "Run it after CheckAdaptiveEFChevron. Qubex prepares the excited state with its "
+            "x180, which prefers a stored DRAG pi, then pi, then DRAG half-pi pulse over the "
+            "recorded half-pi pulse."
+        ),
+        prerequisites=(
+            (
+                "GE and EF drive targets configured in the current session: run ConfigureEF, or"
+                " start with ConfigureAll, using configuration_mode ge-ef-cr or ge-ef-fh."
+            ),
+            (
+                "Rabi parameters from a CheckRabi run under the current readout_duration, with "
+                "rabi_r2 at or above the R² threshold; they normalize the IQ data."
+            ),
+            "control_frequency_ef (or ef_frequency) stored by CheckAdaptiveEFChevron.",
+            "hpi_amplitude and hpi_duration stored by CreateHPIPulse.",
+            (
+                "control_frequency (or qubit_frequency), readout_frequency (or "
+                "resonator_frequency), and readout_amplitude are stored for the qubit."
+            ),
+        ),
+    )
     r2_threshold: float = DEFAULT_RABI_R2_THRESHOLD
 
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {

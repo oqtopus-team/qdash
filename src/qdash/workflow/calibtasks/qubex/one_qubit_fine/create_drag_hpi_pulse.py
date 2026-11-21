@@ -9,6 +9,7 @@ from qdash.datamodel.task import (
     InputParameterSpec,
     OutputParameterSpec,
     RunParameterSpec,
+    TaskDocumentation,
 )
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -28,6 +29,29 @@ class CreateDRAGHPIPulse(QubexTask):
 
     name: str = "CreateDRAGHPIPulse"
     task_type: str = "qubit"
+    documentation: ClassVar[TaskDocumentation] = TaskDocumentation(
+        description=(
+            "Calibrates a 16 ns DRAG half-pi pulse: two iterations of amplitude calibration and"
+            " a DRAG beta sweep whose zero crossing cancels the phase error amplified by "
+            "repeated X90 and -X90 pairs. It writes drag_hpi_amplitude, drag_hpi_beta, and "
+            "drag_hpi_duration."
+        ),
+        when_to_use=(
+            "Run it after CheckRabi when gates must be short or high fidelity. "
+            "RandomizedBenchmarking, ReadoutClassification, and the two-qubit tasks use the "
+            "DRAG half-pi pulse."
+        ),
+        prerequisites=(
+            (
+                "Rabi parameters from a CheckRabi run under the current readout_duration, with "
+                "rabi_r2 at or above the R² threshold; they normalize the IQ data."
+            ),
+            (
+                "control_frequency (or qubit_frequency), readout_frequency (or "
+                "resonator_frequency), and readout_amplitude are stored for the qubit."
+            ),
+        ),
+    )
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
         # RabiParam calibrates the pulse and normalizes IQ; validate its readout context.
         **required_rabi_normalization_inputs(),

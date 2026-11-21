@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  firstSentence,
   formatPipelineCatalog,
   formatPipelinePlan,
   problemsFromError,
@@ -266,6 +267,40 @@ test("catalog lists step types and tasks by type and keeps the schema in details
   assert.match(text, /"manual" requires rounds and runs them exactly as written/);
   assert.doesNotMatch(text, /CalibrationPipelineSpec/);
   assert.equal(result.details.data.spec_schema.title, "CalibrationPipelineSpec");
+});
+
+test("catalog shows declared task documentation and expands the requested tasks", async () => {
+  const catalog = {
+    backend_name: "qubex",
+    step_types: [],
+    one_qubit_execution_modes: [],
+    tasks: { qubit: ["CheckRabi", "CheckT1", "CheckT2Echo"] },
+    task_documentation: {
+      CheckT1: {
+        description: "Measures the energy relaxation time T1. It writes t1 in microseconds.",
+        when_to_use: "Run it to track T1 once a half-pi pulse is calibrated.",
+        prerequisites: ["Rabi parameters stored by CheckRabi."],
+      },
+      CheckRabi: { description: "Measures a Rabi oscillation.", when_to_use: "Run it first.", prerequisites: [] },
+    },
+    spec_schema: {},
+  };
+  const tools = registeredTools({ async getCalibrationPipelineCatalog() { return catalog; } });
+
+  const brief = (await tools.get("qdash_get_pipeline_catalog").execute("t", {})).content[0].text;
+  assert.match(brief, /Task documentation \(2 documented; pass taskNames/);
+  assert.match(brief, /- CheckRabi: Measures a Rabi oscillation\.\n- CheckT1: Measures the energy relaxation time T1\./);
+  assert.doesNotMatch(brief, /When to use:|Prerequisites|It writes t1/);
+
+  const expanded = (await tools.get("qdash_get_pipeline_catalog").execute("t", { taskNames: ["CheckT1", "CheckT2Echo"] })).content[0].text;
+  assert.match(expanded, /- CheckT1: Measures the energy relaxation time T1\. It writes t1 in microseconds\.\n  When to use: Run it to track T1 once a half-pi pulse is calibrated\.\n  Prerequisites \(explanatory; validation reports what is actually missing\):\n  - Rabi parameters stored by CheckRabi\./);
+  assert.doesNotMatch(expanded, /References|https:/);
+  assert.doesNotMatch(expanded, /When to use: Run it first\./);
+  assert.match(expanded, /No declared documentation for: CheckT2Echo/);
+
+  assert.doesNotMatch(formatPipelineCatalog({ ...catalog, task_documentation: undefined }), /Task documentation/);
+  assert.equal(firstSentence("Sweeps 0.25 GHz. Then (maybe) more."), "Sweeps 0.25 GHz.");
+  assert.equal(firstSentence("No terminal period"), "No terminal period");
 });
 
 test("formatting helpers cover the edge cases", () => {

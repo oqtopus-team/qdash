@@ -85,7 +85,7 @@ Set `QDASH_WEB_URL` when the web UI is not at the API base URL minus `/api`.
 
 | Tool | Operation |
 | --- | --- |
-| `qdash_get_pipeline_catalog` | List supported pipeline steps, dependencies, default task calls, step metrics, backend tasks, and the accepted spec version. |
+| `qdash_get_pipeline_catalog` | List supported pipeline steps, dependencies, default task calls, step metrics, backend tasks, the accepted spec version, and the first sentence of each documented task's description. `taskNames` adds the full description, when to use, and prerequisites for the named tasks and lists named tasks without declared documentation. |
 | `qdash_plan_pipeline` | Validate a version 2 pipeline spec and return problems with paths, warnings, and the calls each step will run with their call ids and effective settings; for a version 1 spec it points to the converted spec. Does not execute. |
 | `qdash_run_pipeline` (confirmation-gated) | Start a validated spec as one QDash execution and return its execution ID without waiting. A 422 with problems is returned as text. Completed tasks persist parameters directly, without an agent candidate gate. |
 | `qdash_save_flow` (confirmation-gated) | Validate, format, save, and register a Prefect `@flow` workflow. |
@@ -177,7 +177,9 @@ The reference and examples come from one knowledge request as the configured QDa
 | Skill | Purpose |
 | --- | --- |
 | `/skill:qdash` | Choose QDash tools and avoid exposing secrets. |
-| `/skill:qdash-calibration-agent` | Confirmation-gated calibration workflows. |
-| `/skill:qdash-two-qubit-calibration-diagnosis` | Diagnose two-qubit calibration from read-only evidence. |
+| `/skill:qdash-chip-bringup` | Run first-time bring-up from capture delay correction through resonator and qubit spectroscopy with the `box_setup`, `bringup`, and `check_waveform` flow templates. |
+| `/skill:qdash-one-qubit-calibration` | Choose, run, and recover single-qubit calibration with the `coarse_one`, `fine_one`, `one_qubit`, full calibration, and `simple` flow templates. |
+| `/skill:qdash-two-qubit-calibration` | Choose a two-qubit template by pair selection, run the CR and ZX90 chain, and diagnose poor two-qubit quality. |
+| `/skill:qdash-characterization` | Measure coherence, EF transitions, noise, coupling, and gate coherence limits with the `coherence_check`, `characterization`, `ef_calibration`, and `coherence_limit` flow templates. |
 | `/skill:qdash-timeseries-diagnosis` | Investigate multi-metric drift and local sensor series. |
 | `/skill:qdash-metric-scripts` | Write, validate, preview, and save metric scripts and put them on dashboards; `references/api.md` documents the `qdash_metrics` API. |

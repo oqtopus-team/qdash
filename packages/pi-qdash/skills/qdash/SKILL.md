@@ -50,6 +50,36 @@ Prefer the dedicated tool that matches the question. Use `qdash_query` only as a
 5. `qdash_query` — fallback for read-only operations without a dedicated tool.
 6. `qdash_raw_get` — last-resort read-only GET for an uncovered endpoint.
 
+## Calibration flows and execution paths
+
+Task definitions describe single measurements; the experiment-flow skills compose them, starting
+from QDash's flow templates, toward a goal. Follow the matching skill when the user wants to
+calibrate or characterize hardware:
+
+- `qdash-chip-bringup` — capture delay, resonator and qubit spectroscopy for a new chip, cooldown, or MUX
+- `qdash-one-qubit-calibration` — coarse and fine single-qubit calibration and its recovery
+- `qdash-two-qubit-calibration` — CR and ZX90 calibration of couplings, and diagnosis of poor two-qubit quality
+- `qdash-characterization` — coherence checks, EF calibration, noise and coupling characterization, gate coherence limits
+
+Calibration runs take one of two paths, and they differ in how results reach QDash:
+
+- A saved flow (`qdash_execute_flow`) or a pipeline (`qdash_run_pipeline`) writes the calibrated
+  parameters of every completed task to QDash directly.
+- An agent calibration session (`qdash_create_agent_session`, then its actions) runs bounded
+  tasks on the qubits its policy names, within the allowed tasks, actions, override bounds, and
+  action budget. Task outputs are staged as candidates; they reach the calibration state only
+  through `qdash_commit_agent_candidate` or `qdash_commit_agent_candidate_set`, and the backend
+  only through `qdash_apply_agent_candidate_commit`. Commit candidates only from a successful task,
+  preferably after a downstream check confirms them. A session with `autonomy` `auto` carries out
+  the plan the user approved, choosing each next step from the evaluation of the last result;
+  when it stops for the user, report its recorded evaluations and execution links.
+
+Stay within the scope the user approved; an approved plan or sequence is not re-litigated step
+by step, but new targets, templates, wider ranges, or commits are new decisions for the user.
+When an agent session refuses, rejects, or stops on a task, report the reason and the result
+links. Do not run the same task through a flow or pipeline instead, because that path writes
+parameters without the session's candidate gate.
+
 ## Composing a calibration pipeline
 
 A calibration pipeline spec is a JSON description of one calibration run: `spec_version: 2`, targets, an ordered list of steps, and the settings of each task call. QDash validates it against the chip, backend, and task catalog and runs it as one execution. The spec can only name the step types and tasks QDash exposes; it cannot contain code.
@@ -58,7 +88,7 @@ A step's `tasks` are calls, not names: `{"name": "CheckRamsey", "call_id": "rams
 
 Workflow:
 
-1. `qdash_get_pipeline_catalog` — read the step types (with what each needs from an earlier step and its default task list), the one-qubit modes, and the task names by type. Use only names from this catalog.
+1. `qdash_get_pipeline_catalog` — read the step types (with what each needs from an earlier step and its default task list), the one-qubit modes, the task names by type, and a one-line description of each documented task. Use only names from this catalog. Before choosing a task for a custom step, call it again with `taskNames` to read when to use the task and its prerequisites; the prerequisites explain, and `qdash_plan_pipeline` reports what is actually missing.
 2. Turn the request into steps. Start from the catalog defaults and the flow templates (`qdash_query` with `flow_templates`, then `flow_template` for one template's task list): `OneQubitCheck` and `OneQubitFineTune` carry the standard one-qubit sequences, `TwoQubitCalibration` the two-qubit chain. Use `CustomOneQubit` / `CustomTwoQubit` only where the user wants a different task list, and keep the task order the templates use.
 3. `qdash_plan_pipeline` — validate. A result with problems is not an error: each problem carries a path into the spec (`steps[2].tasks[0]`, `targets.qids[1]`); fix it and plan again until it is valid. Warnings do not make a spec invalid but usually mean a filter reads a different step than intended. A result with `migrated_spec` means the spec used the version 1 shape; plan the migrated spec.
 4. Show the user the resolved steps, each call's `call_id` and effective settings from the plan, then `qdash_run_pipeline` with the same `chipId` and `spec`. The execution is confirmation-gated. Say that completed tasks write their calibrated parameters to QDash directly; there is no candidate gate, so inside an agent calibration session use the session's actions instead.

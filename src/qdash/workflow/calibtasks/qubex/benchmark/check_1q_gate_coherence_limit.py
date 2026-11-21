@@ -8,6 +8,7 @@ from qdash.datamodel.task import (
     InputParameterSpec,
     OutputParameterSpec,
     RunParameterSpec,
+    TaskDocumentation,
 )
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -22,6 +23,20 @@ class Check1QGateCoherenceLimit(QubexTask):
 
     name: str = "Check1QGateCoherenceLimit"
     task_type: str = "qubit"
+    documentation: ClassVar[TaskDocumentation] = TaskDocumentation(
+        description=(
+            "Computes the coherence-limited single-qubit gate fidelity from stored t1_average "
+            "and t2_echo_average and a gate time (drag_hpi_duration run parameter, 16 ns by "
+            "default). It measures nothing."
+        ),
+        when_to_use=(
+            "Run it after CheckT1Average and CheckT2EchoAverage to compare benchmarked fidelity"
+            " with the decoherence limit."
+        ),
+        prerequisites=(
+            "t1_average and t2_echo_average stored by CheckT1Average and CheckT2EchoAverage.",
+        ),
+    )
 
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
         "t1_average": InputParameterSpec.required_database(),

@@ -6,4 +6,7 @@
  * OpenAPI spec version: 0.0.1
  */
 
+/**
+ * Short task description: documentation.description when the task declares documentation, otherwise the class docstring.
+ */
 export type TaskInfoDescription = string | null;
