@@ -25,6 +25,7 @@ import type {
   ListFlowsResponse,
   DashboardCreateRequest,
   DashboardResponse,
+  DashboardTemplatePreviewResponse,
   DashboardUpdateRequest,
   ListDashboardTemplatesResponse,
   ListDashboardsResponse,
@@ -511,6 +512,11 @@ export class QDashClient {
 
   async listDashboardTemplates(): Promise<ListDashboardTemplatesResponse> {
     return this.get("/dashboards/templates");
+  }
+
+  /** What a dashboard created from a template now would hold, including the shared scripts it adds. Writes nothing. */
+  async previewDashboardTemplate(templateId: string): Promise<DashboardTemplatePreviewResponse> {
+    return this.get(`/dashboards/templates/${pathPart(templateId)}/preview`);
   }
 
   async createDashboard(

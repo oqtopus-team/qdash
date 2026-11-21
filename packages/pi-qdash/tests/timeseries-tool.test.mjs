@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { registerTimeseriesComparisonTool } from "../.test-dist/tools/timeseries.js";
+import { timeseriesPoints } from "../.test-dist/lib/timeseries-points.js";
 
 test("comparison tool fills only omitted inputs from investigation context", async () => {
   const tools = new Map();
@@ -74,4 +75,21 @@ test("explicit comparison arguments can bypass investigation context", async () 
     undefined,
     { cwd: process.cwd() },
   ), /At least two timeseries/);
+});
+
+test("timeseries points flatten keyed series and sort them by calibration time", () => {
+  const points = timeseriesPoints({
+    data: {
+      "1": [
+        { value: 2, calibrated_at: "2026-08-05T00:02:00Z", unit: "us", task_id: "t2" },
+        { value: "skip", calibrated_at: "2026-08-05T00:03:00Z" },
+      ],
+      "2": [{ value: 1, calibrated_at: "2026-08-05T00:01:00Z", execution_id: "e1" }],
+    },
+  });
+
+  assert.deepEqual(points, [
+    { series: "2", value: 1, at: "2026-08-05T00:01:00Z", unit: undefined, taskId: undefined, executionId: "e1" },
+    { series: "1", value: 2, at: "2026-08-05T00:02:00Z", unit: "us", taskId: "t2", executionId: undefined },
+  ]);
 });

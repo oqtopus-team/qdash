@@ -1,11 +1,20 @@
 "use client";
 
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useId, useRef, useState, type KeyboardEvent } from "react";
+import { useForm, useWatch } from "react-hook-form";
 
 import type { FlowExecutionPlanState } from "@/hooks/useFlowExecutionPlan";
 import type { FlowTargetOverride, GetFlowResponseTargetModesItem } from "@/schemas";
 
 import { FlowExecutionPreview } from "@/components/features/flow/FlowExecutionPreview";
+import { flowTagsSchema } from "@/components/features/flow/flowMetadataSchema";
+import {
+  flowTargetsSchema,
+  type FlowTargetsFormData,
+  type FlowTargetsFormInput,
+  type TargetMode,
+} from "@/components/features/flow/flowTargetsSchema";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 
 type ConfirmTab = "settings" | "preview";
@@ -14,8 +23,6 @@ const TABS: ReadonlyArray<{ id: ConfirmTab; label: string }> = [
   { id: "settings", label: "Settings" },
   { id: "preview", label: "Execution preview" },
 ];
-
-type TargetMode = "mux" | "qubit" | "pairs";
 
 const MODE_FROM_API: Record<GetFlowResponseTargetModesItem, TargetMode> = {
   mux_ids: "mux",
@@ -54,19 +61,7 @@ interface FlowExecuteConfirmModalProps {
 
 const formatPairs = (pairs: string[][]) => pairs.map((pair) => pair.join("-")).join(", ");
 
-/** Parse `control-target` pairs such as `63-85`; returns null when any entry is malformed. */
-function parsePairs(value: string): string[][] | null {
-  const trimmed = value.trim();
-  if (!trimmed) return [];
-  const pairs: string[][] = [];
-  for (const token of trimmed.split(/[\s,]+/)) {
-    const match = /^(\d+)-(\d+)$/.exec(token);
-    if (!match) return null;
-    pairs.push([match[1], match[2]]);
-  }
-  return pairs;
-}
-
+/** Confirms a flow run, showing its settings, optional target override, and execution preview. */
 export function FlowExecuteConfirmModal({
   flowName,
   username,
@@ -115,51 +110,27 @@ export function FlowExecuteConfirmModal({
     ? formatPairs(defaults.coupling_pairs)
     : (defaults?.mux_ids ?? defaults?.qids ?? []).join(", ");
   const defaultExcluded = (defaults?.exclude_qids ?? []).join(", ");
-  const [mode, setMode] = useState<TargetMode>(defaultMode);
-  const [ids, setIds] = useState(defaultIds);
-  const [excluded, setExcluded] = useState(defaultExcluded);
+  const defaultValues: FlowTargetsFormInput = {
+    mode: defaultMode,
+    ids: defaultIds,
+    excluded: defaultExcluded,
+  };
+  const { control, register, reset, setValue, handleSubmit } = useForm<
+    FlowTargetsFormInput,
+    unknown,
+    FlowTargetsFormData
+  >({ resolver: zodResolver(flowTargetsSchema), defaultValues });
+  const [mode, ids, excluded] = useWatch({ control, name: ["mode", "ids", "excluded"] });
   const [changed, setChanged] = useState(false);
-  const tagList = tags
-    .split(",")
-    .map((tag) => tag.trim())
-    .filter(Boolean);
-  const parseIds = (value: string) => (value.trim() ? value.trim().split(/[\s,]+/) : []);
-  const pairs = mode === "pairs" ? parsePairs(ids) : [];
-  const selected = mode === "pairs" ? [] : parseIds(ids);
-  const exclusions = mode === "mux" ? parseIds(excluded) : [];
-  const invalid =
-    [...selected, ...exclusions].some((id) => !/^\d+$/.test(id)) ||
-    (mode === "mux" && selected.some((id) => !Number.isSafeInteger(Number(id))));
-  const duplicate =
-    new Set<string | number>(mode === "mux" ? selected.map(Number) : selected).size !==
-      selected.length || new Set(exclusions).size !== exclusions.length;
-  const pairKeys = (pairs ?? []).map((pair) => pair.join("-"));
-  const pairError =
-    pairs === null
-      ? "Use control-target pairs such as 63-85, separated by commas, spaces or new lines."
-      : !pairs.length
-        ? "Enter at least one coupling pair."
-        : pairs.some(([control, target]) => control === target)
-          ? "Each pair needs two different qubits."
-          : new Set(pairKeys).size !== pairKeys.length
-            ? "Remove duplicate coupling pairs."
-            : null;
-  const error = !changed
-    ? null
-    : mode === "pairs"
-      ? pairError
-      : !selected.length
-        ? "Enter at least one target ID."
-        : invalid
-          ? "Use non-negative integer IDs separated by commas or spaces."
-          : duplicate
-            ? "Remove duplicate target IDs."
-            : null;
+  const tagList = flowTagsSchema.parse(tags);
+  const parsed = flowTargetsSchema.safeParse({ mode, ids, excluded });
+  const error = changed && !parsed.success ? (parsed.error.issues[0]?.message ?? null) : null;
+  /** Records that the user edited the targets, which shows errors and submits the override. */
+  const markChanged = () => setChanged(true);
 
+  /** Restores the code defaults so the run leaves its targets to the code. */
   function resetTargets() {
-    setMode(defaultMode);
-    setIds(defaultIds);
-    setExcluded(defaultExcluded);
+    reset(defaultValues);
     setChanged(false);
   }
 
@@ -185,10 +156,14 @@ export function FlowExecuteConfirmModal({
   const blockedReason = disabledReason ?? planBlock;
   const blockedId = disabledReason ? disabledReasonId : planBlock ? planBlockId : undefined;
 
-  function buildOverride(): FlowTargetOverride {
-    if (mode === "pairs") return { coupling_pairs: pairs ?? [] };
-    if (mode === "qubit") return { qids: selected };
-    return { mux_ids: selected.map(Number), exclude_qids: exclusions };
+  /** Runs the flow, submitting the validated target override only after the targets change. */
+  function handleExecute() {
+    if (blockedReason || error) return;
+    if (!changed || !overridesAccepted) {
+      onConfirm(undefined);
+      return;
+    }
+    void handleSubmit((override) => onConfirm(override))();
   }
 
   return (
@@ -282,12 +257,12 @@ export function FlowExecuteConfirmModal({
                     <span className="text-sm">Target type</span>
                     <select
                       className="select w-full"
-                      value={mode}
-                      onChange={(event) => {
-                        setMode(event.target.value as TargetMode);
-                        setIds("");
-                        setChanged(true);
-                      }}
+                      {...register("mode", {
+                        onChange: () => {
+                          setValue("ids", "");
+                          markChanged();
+                        },
+                      })}
                     >
                       {modes.map((option) => (
                         <option key={option} value={option}>
@@ -304,14 +279,10 @@ export function FlowExecuteConfirmModal({
                       <textarea
                         className="textarea w-full font-mono"
                         rows={3}
-                        value={ids}
                         placeholder="63-85, 64-42, 39-61"
                         aria-invalid={Boolean(error)}
                         aria-describedby={error ? `${pairsHelpId} ${errorId}` : pairsHelpId}
-                        onChange={(event) => {
-                          setIds(event.target.value);
-                          setChanged(true);
-                        }}
+                        {...register("ids", { onChange: markChanged })}
                       />
                     </label>
                     <p id={pairsHelpId} className="label whitespace-normal">
@@ -323,14 +294,10 @@ export function FlowExecuteConfirmModal({
                     <span className="text-sm">{MODE_LABEL[mode]}</span>
                     <input
                       className="input w-full font-mono"
-                      value={ids}
                       placeholder="0, 1, 2"
                       aria-invalid={Boolean(error)}
                       aria-describedby={error ? errorId : undefined}
-                      onChange={(event) => {
-                        setIds(event.target.value);
-                        setChanged(true);
-                      }}
+                      {...register("ids", { onChange: markChanged })}
                     />
                   </label>
                 )}
@@ -339,14 +306,10 @@ export function FlowExecuteConfirmModal({
                     <span className="text-sm">Excluded qubit IDs</span>
                     <input
                       className="input w-full font-mono"
-                      value={excluded}
                       placeholder="Optional"
                       aria-invalid={Boolean(error)}
                       aria-describedby={error ? errorId : undefined}
-                      onChange={(event) => {
-                        setExcluded(event.target.value);
-                        setChanged(true);
-                      }}
+                      {...register("excluded", { onChange: markChanged })}
                     />
                   </label>
                 )}
@@ -402,10 +365,7 @@ export function FlowExecuteConfirmModal({
             data-coachmark="flow-execute-confirm"
             disabled={Boolean(blockedReason || error)}
             aria-describedby={blockedReason ? blockedId : error ? errorId : undefined}
-            onClick={() => {
-              if (blockedReason || error) return;
-              onConfirm(changed && overridesAccepted ? buildOverride() : undefined);
-            }}
+            onClick={handleExecute}
           >
             Execute
           </button>

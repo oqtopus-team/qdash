@@ -201,6 +201,7 @@ describe("QDashClient", () => {
     await client.listDashboards();
     await client.getDashboard("cd/1");
     await client.listDashboardTemplates();
+    await client.previewDashboardTemplate("frequency-collision-map");
     await client.createDashboard({ name: "Board" });
     await client.updateDashboard("cd_1", { panels: [] });
 
@@ -219,6 +220,7 @@ describe("QDashClient", () => {
       "GET /api/dashboards",
       "GET /api/dashboards/cd%2F1",
       "GET /api/dashboards/templates",
+      "GET /api/dashboards/templates/frequency-collision-map/preview",
       "POST /api/dashboards",
       "PATCH /api/dashboards/cd_1",
     ]);

@@ -22,7 +22,6 @@ import { executionPagePath, forumPostPagePath, qdashObjectLinks, qdashWebBaseUrl
 import { arrayFromPayload, compactItems, firstNumber, firstString, formatItem, payloadTotal, statusIcon } from "./lib/payload.js";
 import { toFigureToolResult, toTextToolResult, toToolResult } from "./lib/results.js";
 import { ansi, boxLinesToWidth, boxed, formatNumber, textComponent } from "./lib/render.js";
-import { plotSeriesLines, timeseriesPlotComponent, timeseriesPoints } from "./lib/timeseries-plot.js";
 import { installQDashWriteGate } from "./lib/write-gate.js";
 import { installQDashGuidance } from "./lib/guidance-hook.js";
 import { qdashContextPath } from "./lib/context-path.js";
@@ -331,6 +330,7 @@ const QueryAction = Type.Union([
   Type.Literal("dashboards"),
   Type.Literal("dashboard"),
   Type.Literal("dashboard_templates"),
+  Type.Literal("dashboard_template"),
   Type.Literal("executions"),
   Type.Literal("execution"),
   Type.Literal("forum_posts"),
@@ -371,7 +371,7 @@ const querySchema = Type.Object({
   projectId: Type.Optional(Type.String()),
   path: Type.Optional(Type.String({ description: "file_content only: a file path relative to the calibration config directory. Not source code; read QDash or qubex source with qdash_read_source. files_tree takes no path." })),
   flowName: Type.Optional(Type.String()),
-  templateId: Type.Optional(Type.String({ description: "flow_template or metric_script_template: the template ID." })),
+  templateId: Type.Optional(Type.String({ description: "flow_template, metric_script_template or dashboard_template: the template ID." })),
   scriptId: Type.Optional(Type.String({ description: "metric_script: the script ID (ms_…)." })),
   dashboardId: Type.Optional(Type.String({ description: "dashboard: the dashboard ID." })),
   filename: Type.Optional(Type.String()),
@@ -1816,42 +1816,6 @@ export default function qdashExtension(host: ExtensionAPI) {
     }),
   });
 
-  pi.registerTool({
-    name: "qdash_plot_timeseries",
-    label: "QDash Plot Timeseries",
-    description: "Render a compact TUI sparkline/plot for a task-result parameter timeseries.",
-    promptSnippet: "Plot QDash task-result timeseries in the TUI",
-    promptGuidelines: ["Use qdash_plot_timeseries when the user wants to visualize history, drift, trends, or analysis timeseries in the TUI."],
-    parameters: Type.Object({
-      ...connectionParams,
-      ...chipScopedParams,
-      parameter: Type.String(),
-      startAt: Type.Optional(Type.String({ description: "Start timestamp, preferably UTC ISO with Z. Defaults to withinHours ago." })),
-      endAt: Type.Optional(Type.String({ description: "End timestamp, preferably UTC ISO with Z. Defaults to now." })),
-      withinHours: Type.Optional(Type.Number({ description: "Lookback window when startAt is omitted. Defaults to 168 hours." })),
-      qid: Type.Optional(Type.String()),
-      tag: Type.Optional(Type.String()),
-      height: Type.Optional(Type.Number()),
-      width: Type.Optional(Type.Number()),
-      color: Type.Optional(Type.Boolean({ description: "Emit ANSI colors in text output for terminal display." })),
-    }),
-    async execute(_toolCallId, params: { profile?: string; configPath?: string; useEnv?: boolean; chipId?: string; parameter: string; startAt?: string; endAt?: string; withinHours?: number; qid?: string; tag?: string; height?: number; width?: number; color?: boolean }) {
-      const client = await makeClient(params);
-      const endAt = params.endAt ?? new Date().toISOString();
-      const startAt = params.startAt ?? new Date(Date.parse(endAt) - (params.withinHours ?? 168) * 3600_000).toISOString();
-      const chipId = await defaultChipId(client, params.chipId);
-      const data = await client.getTaskResultsTimeseries({ chipId, parameter: params.parameter, tag: params.tag, qid: params.qid, startAt, endAt });
-      const title = `QDash Timeseries: ${params.parameter}${params.qid ? ` q${params.qid}` : ""}`;
-      const text = plotSeriesLines(timeseriesPoints(data), { title, height: params.height, width: params.width, color: params.color }).join("\n");
-      return toTextToolResult(text, data, { tool: "qdash_plot_timeseries", parameter: params.parameter, qid: params.qid, chipId, startAt, endAt });
-    },
-    renderResult(result, _options, theme) {
-      const details = result.details as { data?: unknown; parameter?: string; qid?: string } | undefined;
-      const title = `QDash Timeseries: ${details?.parameter ?? "parameter"}${details?.qid ? ` q${details.qid}` : ""}`;
-      return timeseriesPlotComponent(details?.data, title, theme);
-    },
-  });
-
   registerTimeseriesComparisonTool(pi, {
     makeClient,
     defaultChipId,
@@ -2945,10 +2909,10 @@ export default function qdashExtension(host: ExtensionAPI) {
   pi.registerTool({
     name: "qdash_dashboard",
     label: "QDash Dashboard",
-    description: "Build a compact read-only QDash dashboard for the current profile/chip context.",
+    description: "Build a compact read-only QDash status summary (chips, open Forum threads, recent executions, failed task results) for the current profile/chip context. It does not read or change custom dashboards; those are qdash_query dashboards/dashboard and qdash_save_dashboard.",
     promptSnippet: "Show QDash harness dashboard: chips, open Forum threads, recent executions, failed task results, and provenance stats",
     promptGuidelines: [
-      "Use qdash_dashboard when the user asks for QDash status, overview, triage, or a dashboard.",
+      "Use qdash_dashboard when the user asks for a QDash status overview or triage summary. It is not a custom dashboard: to build, change or save a dashboard of panels, follow the qdash-metric-scripts skill.",
       "Summarize dashboard data instead of dumping large raw payloads.",
     ],
     parameters: Type.Object({ ...connectionParams, ...chipScopedParams, limit: Type.Optional(Type.Number()), color: Type.Optional(Type.Boolean({ description: "Emit ANSI colors in text output for terminal display." })) }),

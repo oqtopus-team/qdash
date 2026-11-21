@@ -23,7 +23,8 @@ plausible-looking scripts go wrong.
 - `qdash_query` actions (read-only): `metric_script_catalog` (the metrics a script can read,
   with unit and scale), `metric_script_templates` / `metric_script_template` (`templateId`),
   `metric_scripts` / `metric_script` (`scriptId`), `dashboards` / `dashboard`
-  (`dashboardId`), `dashboard_templates`.
+  (`dashboardId`), `dashboard_templates` / `dashboard_template` (`templateId`: the panels a
+  starter template would create and the shared scripts creating it would add; writes nothing).
 - `qdash_validate_metric_script` `{source}`: compiles the script in the worker and returns its
   metrics or diagnostics with line numbers. Nothing is saved and no data is read.
 - `qdash_preview_metric_script` `{source | scriptId, metricId, chipId?, period?, params?}`:
@@ -31,7 +32,8 @@ plausible-looking scripts go wrong.
   within the time and memory limits but persists nothing; `details.data` has every cell.
 - `qdash_save_metric_script` and `qdash_save_dashboard`: confirmation-gated writes
   (the harness asks the user). The script save validates first and refuses source that would
-  not validate.
+  not validate. `qdash_save_dashboard` is for pi CLI and other sessions without a dashboard
+  page; `qdash_dashboard` is an unrelated status summary, not a custom dashboard.
 
 These are deferred tools in the web Agent: load them with `tool_search` when they are not
 offered.
@@ -59,9 +61,13 @@ offered.
 6. **Show the code** and the preview summary to the user, then save with
    `qdash_save_metric_script` when they want it kept. New scripts are private unless the user
    asks to share them with the project.
-7. **Optionally add it to a dashboard** with `qdash_save_dashboard`: a `metric_script`
-   panel pinned to the saved script's `active_revision` (see below). On update, read the
-   dashboard first and send the complete panel list; omitted panels are removed.
+7. **Optionally add it to a dashboard**: a `metric_script` panel pinned to the saved script's
+   `active_revision` (see below). When the page context has a dashboard open or a new one
+   being composed, propose the panel in its draft as described under
+   [When a dashboard is open](#when-a-dashboard-is-open); that takes precedence and the user
+   saves. Otherwise save with `qdash_save_dashboard`: on update, read the dashboard first and
+   send the complete panel list (omitted panels are removed); with a starter `templateId`,
+   read `dashboard_template` first and tell the user about any `scripts_to_create`.
 
 When the user asks a one-off question ("what is the median ZX90 fidelity per coupling this
 week?"), a draft preview answers it without saving anything. Offer to save only if they want

@@ -74,6 +74,7 @@ function setup(overrides = {}) {
     createDashboard: record("createDashboard", overrides.createDashboard),
     updateDashboard: record("updateDashboard", overrides.updateDashboard),
     listMetricScriptTemplates: record("templates", overrides.templates),
+    previewDashboardTemplate: record("previewTemplate", overrides.previewTemplate),
   };
   registerMetricScriptTools({ registerTool(tool) { tools.set(tool.name, tool); } }, {
     async makeClient() { return client; },
@@ -268,7 +269,11 @@ test("dashboard saves send the API's shape: create with a template, update with 
     panels: [{ ...PANEL, script_name: "ZX90", latest_revision: 3 }],
     ...overrides,
   });
-  const { tools, calls } = setup({ createDashboard: response(), updateDashboard: response({ panels: [{ ...PANEL, script_name: "ZX90", latest_revision: 2 }] }) });
+  const { tools, calls } = setup({
+    createDashboard: response(),
+    updateDashboard: response({ panels: [{ ...PANEL, script_name: "ZX90", latest_revision: 2 }] }),
+    previewTemplate: { template_id: "frequency-collision-map", name: "Frequency Collision Map", panels: [], scripts_to_create: [] },
+  });
   const save = tools.get("qdash_save_dashboard");
 
   const created = await save.execute(
@@ -294,10 +299,41 @@ test("dashboard saves send the API's shape: create with a template, update with 
   assert.deepEqual(calls[1], ["updateDashboard", "cd_1", { panels: [PANEL] }]);
 
   await save.execute("t", { name: "Starter", templateId: "frequency-collision-map", confirmWrite: true }, undefined, undefined, { hasUI: false });
-  assert.deepEqual(calls[2], ["createDashboard", { name: "Starter", template_id: "frequency-collision-map" }]);
+  assert.deepEqual(calls[2], ["previewTemplate", "frequency-collision-map"]);
+  assert.deepEqual(calls[3], ["createDashboard", { name: "Starter", template_id: "frequency-collision-map" }]);
 
   await save.execute("t", { dashboardId: "cd_1", name: "Renamed", expectedVersion: 3, confirmWrite: true }, undefined, undefined, { hasUI: false });
-  assert.deepEqual(calls[3], ["updateDashboard", "cd_1", { name: "Renamed", expected_version: 3 }]);
+  assert.deepEqual(calls[4], ["updateDashboard", "cd_1", { name: "Renamed", expected_version: 3 }]);
+});
+
+test("a template-based dashboard save names the shared scripts it adds before asking", async () => {
+  const messages = [];
+  const ask = (answer) => ({ hasUI: true, ui: { async confirm(_title, message) { messages.push(message); return answer; } } });
+  const preview = {
+    template_id: "frequency-collision-map",
+    name: "Frequency Collision Map",
+    panels: [],
+    scripts_to_create: [{ template_id: "collision", name: "Frequency collision checks", source: "x = 1" }],
+  };
+  const { tools, calls } = setup({
+    previewTemplate: preview,
+    createDashboard: { dashboard_id: "cd_2", name: "Collisions", visibility: "private", chip_id: null, panels: [] },
+  });
+  const save = tools.get("qdash_save_dashboard");
+
+  await assert.rejects(save.execute("t", { name: "Collisions", templateId: "frequency-collision-map" }, undefined, undefined, ask(false)), /requires explicit confirmation/);
+  assert.match(messages[0], /a new dashboard 'Collisions'.*It also adds a project-visible metric script from the starter template: 'Frequency collision checks' \(collision\)\./);
+  assert.deepEqual(calls.map(([name]) => name), ["previewTemplate"]);
+
+  const saved = await save.execute("t", { name: "Collisions", templateId: "frequency-collision-map" }, undefined, undefined, ask(true));
+  assert.deepEqual(calls.map(([name]) => name), ["previewTemplate", "previewTemplate", "createDashboard"]);
+  assert.match(saved.content[0].text, /Creation also added a project-visible metric script from the starter template: 'Frequency collision checks'/);
+  assert.deepEqual(saved.details.data.scripts_created, preview.scripts_to_create);
+
+  // Explicit panels never copy the template, so nothing is previewed or disclosed.
+  calls.length = 0;
+  await save.execute("t", { name: "Own", panels: [PANEL], confirmWrite: true }, undefined, undefined, { hasUI: false });
+  assert.deepEqual(calls.map(([name]) => name), ["createDashboard"]);
 });
 
 test("dashboard problems are reported before confirmation, and the save is gated", async () => {
@@ -326,4 +362,12 @@ test("query actions list templates without source and return one template with i
   assert.equal((await metricScriptQuery(client, "metric_script_template", { templateId: "zx90_median" })).source, "x = 1");
   await assert.rejects(metricScriptQuery(client, "metric_script_template", { templateId: "nope" }), /Unknown metric script template 'nope'; available: zx90_median/);
   await assert.rejects(metricScriptQuery(client, "metric_script", {}), /scriptId is required/);
+});
+
+test("the dashboard_template query previews a starter template without writing", async () => {
+  const seen = [];
+  const client = { previewDashboardTemplate: async (id) => { seen.push(id); return { template_id: id, panels: [], scripts_to_create: [] }; } };
+  assert.equal((await metricScriptQuery(client, "dashboard_template", { templateId: "frequency-collision-map" })).template_id, "frequency-collision-map");
+  assert.deepEqual(seen, ["frequency-collision-map"]);
+  await assert.rejects(metricScriptQuery(client, "dashboard_template", {}), /templateId is required/);
 });

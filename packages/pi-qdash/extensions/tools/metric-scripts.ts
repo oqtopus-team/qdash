@@ -37,6 +37,7 @@ export type MetricScriptClient = Pick<
   | "listDashboards"
   | "getDashboard"
   | "listDashboardTemplates"
+  | "previewDashboardTemplate"
   | "createDashboard"
   | "updateDashboard"
 >;
@@ -122,6 +123,13 @@ type DashboardPanel = {
   latest_revision?: number | null;
 };
 
+type TemplatePreview = {
+  template_id: string;
+  name: string;
+  panels: DashboardPanel[];
+  scripts_to_create: Array<{ template_id: string; name: string }>;
+};
+
 type DashboardResponse = {
   dashboard_id: string;
   name: string;
@@ -143,6 +151,7 @@ export const METRIC_SCRIPT_QUERY_ACTIONS = [
   "dashboards",
   "dashboard",
   "dashboard_templates",
+  "dashboard_template",
 ] as const;
 
 export type MetricScriptQueryAction = (typeof METRIC_SCRIPT_QUERY_ACTIONS)[number];
@@ -189,6 +198,9 @@ export async function metricScriptQuery(
       return client.getDashboard(required(params.dashboardId, "dashboardId"));
     case "dashboard_templates":
       return client.listDashboardTemplates();
+    case "dashboard_template":
+      // What creating a dashboard from the template now would hold; writes nothing.
+      return client.previewDashboardTemplate(required(params.templateId, "templateId"));
   }
 }
 
@@ -437,6 +449,14 @@ export function formatSavedScript(result: ScriptResponse, created: boolean, url:
   return lines.join("\n");
 }
 
+/** The shared scripts a template-based creation adds, as one sentence; empty when it adds none. */
+export function templateScriptsNotice(preview: Pick<TemplatePreview, "scripts_to_create"> | undefined): string {
+  const scripts = preview?.scripts_to_create ?? [];
+  if (!scripts.length) return "";
+  const names = scripts.map((script) => `'${script.name}' (${script.template_id})`).join(", ");
+  return `It also adds ${scripts.length === 1 ? "a project-visible metric script" : `${scripts.length} project-visible metric scripts`} from the starter template: ${names}.`;
+}
+
 export function formatSavedDashboard(result: DashboardResponse, created: boolean, url: string | undefined): string {
   const lines = [
     `${created ? "Created" : "Saved"} dashboard '${result.name}' (${result.dashboard_id}), ${result.visibility}${result.chip_id ? `, chip ${result.chip_id}` : ""}, ${result.panels.length} panel${result.panels.length === 1 ? "" : "s"}.`,
@@ -681,7 +701,7 @@ export function registerMetricScriptTools(pi: Pick<ExtensionAPI, "registerTool">
       "type metric_script: config {script_id, metric_id, script_revision, period, params, view, direction, hops}. script_revision is required and pins the panel to that saved revision (use the script's active_revision); later saves of the script do not change the panel.",
       "period is {kind: \"relative\", days} or {kind: \"absolute\", start, end} with timezones; params are the metric's Parameter values; view is \"map\" or \"table\"; direction (pair maps) is \"both\", \"forward\" or \"reverse\"; hops is a subset of [1, 2] within the metric's declared hops.",
       "Other types: qubit_metric and coupling_metric {metric: <metrics catalog key>}, markdown {content}.",
-      "A project-visible dashboard cannot use private scripts. templateId (creation only) copies a starter template's panels when panels is empty.",
+      "A project-visible dashboard cannot use private scripts. templateId (creation only) copies a starter template's panels when panels is empty; when the project has no shared script for the template's script panels, creation also adds one (qdash_query dashboard_template lists it in scripts_to_create), and the confirmation names it.",
     ].join(" "),
     promptSnippet: "Create or update a dashboard with metric script panels",
     promptGuidelines: [
@@ -722,13 +742,25 @@ export function registerMetricScriptTools(pi: Pick<ExtensionAPI, "registerTool">
       const tool = "qdash_save_dashboard";
       const problems = dashboardSaveProblems(params);
       if (problems.length) return problemResult(tool, problems, "dashboard");
+      const client = await deps.makeClient(params);
+      // A template-based creation may add shared scripts; read what it would add so the
+      // confirmation discloses it before anything is written.
+      let preview: TemplatePreview | undefined;
+      if (!params.dashboardId && params.templateId && !params.panels?.length) {
+        try {
+          preview = (await client.previewDashboardTemplate(params.templateId)) as unknown as TemplatePreview;
+        } catch (error) {
+          return rejection(tool, error, "dashboard template", { saved: false });
+        }
+      }
+      const scriptsNotice = templateScriptsNotice(preview);
       if (!params.confirmWrite) {
         const what = params.dashboardId ? `dashboard ${params.dashboardId}` : `a new dashboard '${params.name}'`;
-        if (!ctx.hasUI || !(await ctx.ui.confirm("Save QDash dashboard?", `This saves ${what} to the project.`))) {
+        const message = [`This saves ${what} to the project.`, scriptsNotice].filter(Boolean).join(" ");
+        if (!ctx.hasUI || !(await ctx.ui.confirm("Save QDash dashboard?", message))) {
           throw new Error(`${tool} requires explicit confirmation`);
         }
       }
-      const client = await deps.makeClient(params);
       const panels = params.panels ? requestPanels(params.panels) : undefined;
       const fields = {
         ...(params.description !== undefined ? { description: params.description } : {}),
@@ -750,7 +782,8 @@ export function registerMetricScriptTools(pi: Pick<ExtensionAPI, "registerTool">
               ...(params.expectedVersion !== undefined ? { expected_version: params.expectedVersion } : {}),
             } as Parameters<MetricScriptClient["updateDashboard"]>[1])) as unknown as DashboardResponse;
         const page = url(client, dashboardPagePath(result.dashboard_id));
-        return toTextToolResult(formatSavedDashboard(result, created, page), { ...result, url: page }, {
+        const text = [formatSavedDashboard(result, created, page), ...(scriptsNotice ? [scriptsNotice.replace(/^It also adds/, "Creation also added")] : [])].join("\n");
+        return toTextToolResult(text, { ...result, url: page, scripts_created: preview?.scripts_to_create ?? [] }, {
           tool,
           saved: true,
           created,

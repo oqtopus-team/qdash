@@ -16,7 +16,7 @@ pi-qdash tools reuse the session's profile and chip when callers omit those para
 | `qdash_get_chip_metrics`, `qdash_list_chip_qubits`, `qdash_list_chip_couplings` | Chip metrics and targets. |
 | `qdash_list_cryostats`, `qdash_list_cooldowns` | Cryostats and cooldowns. |
 | `qdash_get_cooldown_wiring`, `qdash_wiring_insights`, `qdash_list_cooldown_wiring_events` | Wiring, attenuation insights, and event history. |
-| `qdash_get_timeseries`, `qdash_plot_timeseries`, `qdash_inspect_timeseries_csv`, `qdash_compare_timeseries` | Timeseries retrieval, plotting, local CSV inspection, and comparison. |
+| `qdash_get_timeseries`, `qdash_inspect_timeseries_csv`, `qdash_compare_timeseries` | Timeseries retrieval, local CSV inspection, and comparison. |
 | `qdash_list_task_results`, `qdash_get_task_result`, `qdash_get_task_knowledge` | Task results and full or summarized task knowledge. |
 | `qdash_list_flows`, `qdash_get_flow` | Saved flows. |
 | `qdash_list_executions`, `qdash_get_execution`, `qdash_wait_execution`, `qdash_compare_executions` | Execution history, status, and comparison. |
@@ -39,7 +39,7 @@ pi-qdash tools reuse the session's profile and chip when callers omit those para
 | Tools | Result |
 | --- | --- |
 | `qdash_investigate`, `qdash_compare_calibration` | Recent calibration correlations and repeated-output comparisons. |
-| `qdash_dashboard`, `qdash_dashboard_insights`, `qdash_recent_calibration_summary` | Dashboard and calibration summaries. |
+| `qdash_dashboard`, `qdash_dashboard_insights`, `qdash_recent_calibration_summary` | Status, insight, and calibration summaries. They do not read or change custom dashboards. |
 | `qdash_recommend_next_action`, `qdash_triage_overview`, `qdash_target_report` | Conservative next actions, triage, and target reports. |
 | `qdash_plan_calibration`, `qdash_validate_calibration` | Dry-run plan and read-only validation gates. |
 | `qdash_degradation_report` | Provenance drift, changes, locks, and downstream recommendations. |
@@ -100,9 +100,9 @@ These tools are deferred. Validation and previews execute the script on the QDas
 | `qdash_validate_metric_script` | Compile `source` in the worker and return its metrics (id, title, unit, target, hops, parameters) or diagnostics with line numbers. |
 | `qdash_preview_metric_script` | Evaluate one metric of draft `source`, or of a saved `scriptId` (optionally a `revision`), on a chip (default: the session chip) over a `period` (`{kind: "relative", days}` or `{kind: "absolute", start, end}`, default the last 14 days) with `params`. The text gives the metric, resolved period, status counts, legend, up to 12 sample cells with labels and counts, the first five errors with script lines, and truncation and log notices; `details.data` holds the full response. HTTP 422 details (`message`, `diagnostics`, `log`), 429 (queue full) and 503 (metric script runner not available) are returned as text. |
 | `qdash_save_metric_script` (confirmation-gated) | Create a script, or save a new revision of `scriptId` guarded by `expectedRevision` (409 on a concurrent save). Validates first and refuses source that would not validate without asking for confirmation. Reports the revision, status, active revision, diagnostics, and the editor page URL. |
-| `qdash_save_dashboard` (confirmation-gated) | Create a dashboard (optionally from a `templateId`), or update `dashboardId` guarded by `expectedVersion` (409 when the dashboard changed); `panels` replaces the whole list. Local checks reject missing names, grid overflow, and `metric_script` panels without an integer `script_revision` before confirmation. Reports pins with newer active revisions and the dashboard page URL. |
+| `qdash_save_dashboard` (confirmation-gated) | Create a dashboard (optionally from a `templateId`; the confirmation and the result name any project-visible starter script that creation adds), or update `dashboardId` guarded by `expectedVersion` (409 when the dashboard changed); `panels` replaces the whole list. Local checks reject missing names, grid overflow, and `metric_script` panels without an integer `script_revision` before confirmation. Reports pins with newer active revisions and the dashboard page URL. |
 
-`qdash_query` reads them with the actions `metric_script_catalog`, `metric_script_templates` (without source), `metric_script_template` (`templateId`), `metric_scripts`, `metric_script` (`scriptId`), `dashboards`, `dashboard` (`dashboardId`), and `dashboard_templates`. A single script or dashboard (`metric_script`, `dashboard`) carries `_links` to its web page.
+`qdash_query` reads them with the actions `metric_script_catalog`, `metric_script_templates` (without source), `metric_script_template` (`templateId`), `metric_scripts`, `metric_script` (`scriptId`), `dashboards`, `dashboard` (`dashboardId`), `dashboard_templates`, and `dashboard_template` (`templateId`: the panels a starter template would create now and the shared scripts creation would add, without writing). A single script or dashboard (`metric_script`, `dashboard`) carries `_links` to its web page.
 
 ## Safety
 

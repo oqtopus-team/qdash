@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { FlowExecuteConfirmModal } from "../FlowExecuteConfirmModal";
@@ -66,7 +66,7 @@ it("prefills code defaults and leaves the code in control until edited", () => {
   expect(onConfirm).toHaveBeenCalledWith(undefined);
 });
 
-it("validates edited IDs, switches target types, and can restore code defaults", () => {
+it("validates edited IDs, switches target types, and can restore code defaults", async () => {
   const onConfirm = vi.fn();
   render(
     <FlowExecuteConfirmModal
@@ -88,14 +88,14 @@ it("validates edited IDs, switches target types, and can restore code defaults",
     target: { value: "8, 9" },
   });
   fireEvent.click(screen.getByRole("button", { name: "Execute" }));
-  expect(onConfirm).toHaveBeenLastCalledWith({ qids: ["8", "9"] });
+  await waitFor(() => expect(onConfirm).toHaveBeenLastCalledWith({ qids: ["8", "9"] }));
   fireEvent.click(screen.getByRole("button", { name: "Use code defaults" }));
   expect(screen.getByRole("textbox", { name: "MUX IDs" })).toHaveValue("1");
   fireEvent.click(screen.getByRole("button", { name: "Execute" }));
   expect(onConfirm).toHaveBeenLastCalledWith(undefined);
 });
 
-it("submits explicit MUX targets even when defaults cannot be resolved", () => {
+it("submits explicit MUX targets even when defaults cannot be resolved", async () => {
   const onConfirm = vi.fn();
   render(<FlowExecuteConfirmModal {...props} disabledReason={null} onConfirm={onConfirm} />);
   fireEvent.change(screen.getByRole("textbox", { name: "MUX IDs" }), { target: { value: "0, 2" } });
@@ -103,7 +103,60 @@ it("submits explicit MUX targets even when defaults cannot be resolved", () => {
     target: { value: "1" },
   });
   fireEvent.click(screen.getByRole("button", { name: "Execute" }));
-  expect(onConfirm).toHaveBeenCalledWith({ mux_ids: [0, 2], exclude_qids: ["1"] });
+  await waitFor(() =>
+    expect(onConfirm).toHaveBeenCalledWith({ mux_ids: [0, 2], exclude_qids: ["1"] }),
+  );
+});
+
+it("shows no target error until the targets change", () => {
+  render(<FlowExecuteConfirmModal {...props} disabledReason={null} />);
+  expect(screen.getByRole("textbox", { name: "MUX IDs" })).toHaveValue("");
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Execute" })).toBeEnabled();
+  fireEvent.change(screen.getByRole("textbox", { name: "MUX IDs" }), { target: { value: " " } });
+  expect(screen.getByRole("alert")).toHaveTextContent("Enter at least one target ID.");
+});
+
+it("blocks an invalid submission and explains the problem", async () => {
+  const onConfirm = vi.fn();
+  render(<FlowExecuteConfirmModal {...props} disabledReason={null} onConfirm={onConfirm} />);
+  const field = screen.getByRole("textbox", { name: "MUX IDs" });
+  fireEvent.change(field, { target: { value: "1, 01" } });
+  const alert = screen.getByRole("alert");
+  expect(alert).toHaveTextContent("Remove duplicate target IDs.");
+  expect(field).toHaveAttribute("aria-invalid", "true");
+  expect(field).toHaveAccessibleDescription("Remove duplicate target IDs.");
+  fireEvent.change(screen.getByRole("textbox", { name: "Excluded qubit IDs" }), {
+    target: { value: "x" },
+  });
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    "Use non-negative integer IDs separated by commas or spaces.",
+  );
+  const button = screen.getByRole("button", { name: "Execute" });
+  expect(button).toBeDisabled();
+  expect(button).toHaveAccessibleDescription(
+    "Use non-negative integer IDs separated by commas or spaces.",
+  );
+  fireEvent.click(button);
+  await Promise.resolve();
+  expect(onConfirm).not.toHaveBeenCalled();
+});
+
+it("submits normalized MUX IDs and exclusions", async () => {
+  const onConfirm = vi.fn();
+  render(<FlowExecuteConfirmModal {...props} disabledReason={null} onConfirm={onConfirm} />);
+  fireEvent.change(screen.getByRole("textbox", { name: "MUX IDs" }), {
+    target: { value: " 01,\n 2  10 " },
+  });
+  fireEvent.change(screen.getByRole("textbox", { name: "Excluded qubit IDs" }), {
+    target: { value: "05 7" },
+  });
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Execute" }));
+  await waitFor(() =>
+    expect(onConfirm).toHaveBeenCalledWith({ mux_ids: [1, 2, 10], exclude_qids: ["05", "7"] }),
+  );
+  expect(onConfirm).toHaveBeenCalledOnce();
 });
 
 describe("coupling pair targets", () => {
@@ -118,7 +171,7 @@ describe("coupling pair targets", () => {
     expect(screen.getByRole("textbox", { name: "Coupling pairs" })).toHaveValue("");
   });
 
-  it("submits control-target pairs in order and keeps their direction", () => {
+  it("submits control-target pairs in order and keeps their direction", async () => {
     const onConfirm = vi.fn();
     render(
       <FlowExecuteConfirmModal
@@ -133,14 +186,16 @@ describe("coupling pair targets", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Execute" }));
     expect(screen.getByText(/scheduler groups exactly these pairs/)).toBeInTheDocument();
-    expect(onConfirm).toHaveBeenCalledWith({
-      coupling_pairs: [
-        ["63", "85"],
-        ["85", "63"],
-        ["64", "42"],
-        ["39", "61"],
-      ],
-    });
+    await waitFor(() =>
+      expect(onConfirm).toHaveBeenCalledWith({
+        coupling_pairs: [
+          ["63", "85"],
+          ["85", "63"],
+          ["64", "42"],
+          ["39", "61"],
+        ],
+      }),
+    );
   });
 
   it.each([
@@ -198,6 +253,38 @@ describe("coupling pair targets", () => {
     expect(field).toHaveValue("0-1, 5-4");
     fireEvent.click(screen.getByRole("button", { name: "Execute" }));
     expect(onConfirm).toHaveBeenLastCalledWith(undefined);
+  });
+
+  it("keeps the ID field working across target types and restores the default type", async () => {
+    const onConfirm = vi.fn();
+    render(
+      <FlowExecuteConfirmModal
+        {...props}
+        disabledReason={null}
+        onConfirm={onConfirm}
+        targetModes={["mux_ids", "coupling_pairs"]}
+        targetDefaults={{ mux_ids: [1], exclude_qids: ["5"] }}
+      />,
+    );
+    const select = screen.getByRole("combobox", { name: "Target type" });
+    fireEvent.change(select, { target: { value: "pairs" } });
+    const pairsField = screen.getByRole("textbox", { name: "Coupling pairs" });
+    expect(pairsField).toHaveValue("");
+    fireEvent.change(pairsField, { target: { value: "0-1" } });
+    fireEvent.change(select, { target: { value: "mux" } });
+    expect(screen.getByRole("textbox", { name: "MUX IDs" })).toHaveValue("");
+    expect(screen.getByRole("textbox", { name: "Excluded qubit IDs" })).toHaveValue("5");
+    fireEvent.change(select, { target: { value: "pairs" } });
+    fireEvent.click(screen.getByRole("button", { name: "Use code defaults" }));
+    expect(screen.getByRole("combobox", { name: "Target type" })).toHaveValue("mux");
+    expect(screen.getByRole("textbox", { name: "MUX IDs" })).toHaveValue("1");
+    fireEvent.change(screen.getByRole("textbox", { name: "MUX IDs" }), {
+      target: { value: "2 3" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Execute" }));
+    await waitFor(() =>
+      expect(onConfirm).toHaveBeenCalledWith({ mux_ids: [2, 3], exclude_qids: ["5"] }),
+    );
   });
 
   it.each([undefined, ["mux_ids", "qids"] as const])(
