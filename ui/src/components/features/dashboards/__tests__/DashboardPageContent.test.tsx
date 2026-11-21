@@ -6,6 +6,7 @@ import type { PageContextProvider } from "@/contexts/ChatDockContext";
 import type { DashboardResponse, DashboardPanelResponse } from "@/schemas";
 
 import { DashboardPageContent } from "../DashboardPageContent";
+import { COLUMN_PITCH, installGridEnvironment, pointerDrag, ROW_PITCH } from "./gridEnvironment";
 
 const mocks = vi.hoisted(() => ({
   canEdit: true,
@@ -991,5 +992,222 @@ describe("DashboardPageContent for a new dashboard", () => {
 
     expect(screen.getByText("You cannot create dashboards")).toBeInTheDocument();
     expect(screen.queryByRole("textbox", { name: "Dashboard name" })).not.toBeInTheDocument();
+  });
+});
+
+describe("DashboardPageContent layout editing on the grid", () => {
+  let grid: ReturnType<typeof installGridEnvironment>;
+
+  beforeEach(() => {
+    mocks.canEdit = true;
+    mocks.dashboard = dashboard();
+    mocks.error = null;
+    mocks.scripts = [];
+    mocks.withDock = true;
+    mocks.provider = null;
+    grid = installGridEnvironment(1200);
+  });
+
+  afterEach(() => {
+    cleanup();
+    grid.restore();
+    vi.clearAllMocks();
+  });
+
+  function panel(title: string): HTMLElement {
+    return screen.getByRole("region", { name: title });
+  }
+
+  function header(title: string): HTMLElement {
+    const element = panel(title).querySelector("header");
+    if (!element) throw new Error(`${title} has no header`);
+    return element;
+  }
+
+  function resizeHandle(title: string, corner: "se" | "sw"): Element | null {
+    return panel(title).parentElement?.querySelector(`.react-resizable-handle-${corner}`) ?? null;
+  }
+
+  function gridMode(): string | null {
+    return screen.getByTestId("dashboard-grid").getAttribute("data-layout-mode");
+  }
+
+  it("drags a panel by its header into the local draft and saves it with the stored version", () => {
+    renderPage();
+    const before = panel("Panel a");
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    expect(gridMode()).toBe("grid");
+
+    pointerDrag(header("Panel a"), 6 * COLUMN_PITCH, 0);
+
+    // The drop lands in "b"'s cells, so "b" moves below it; nothing is sent yet.
+    expect(screen.getByText("6×2 at 6,0")).toBeInTheDocument();
+    expect(screen.getByText("6×2 at 6,2")).toBeInTheDocument();
+    expect(screen.getByText("Unsaved changes")).toBeInTheDocument();
+    expect(mocks.update).not.toHaveBeenCalled();
+    // Entering edit mode and committing a drag keep the same panel element: no remount.
+    expect(panel("Panel a")).toBe(before);
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(mocks.update).toHaveBeenCalledTimes(1);
+    const [{ data }] = mocks.update.mock.calls[0];
+    expect(data.expected_version).toBe(7);
+    const layouts = Object.fromEntries(
+      data.panels.map((entry: DashboardPanelResponse) => [entry.panel_id, entry.layout]),
+    );
+    expect(layouts).toEqual({
+      a: { x: 6, y: 0, w: 6, h: 2 },
+      b: { x: 6, y: 2, w: 6, h: 2 },
+      c: { x: 0, y: 2, w: 6, h: 2 },
+    });
+  });
+
+  it("resizes from a bottom corner within the 12 columns and the 12-row limit", () => {
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    const handle = resizeHandle("Panel a", "se");
+    expect(handle).not.toBeNull();
+    expect(resizeHandle("Panel a", "sw")).not.toBeNull();
+
+    pointerDrag(handle!, 9 * COLUMN_PITCH, 20 * ROW_PITCH);
+
+    expect(screen.getByText("12×12 at 0,0")).toBeInTheDocument();
+    // Both panels it now covers move below it, in reading order.
+    expect(screen.getByText("6×2 at 6,12")).toBeInTheDocument();
+    expect(screen.getByText("6×2 at 0,12")).toBeInTheDocument();
+    expect(mocks.update).not.toHaveBeenCalled();
+  });
+
+  it("starts a drag only from the header, not from its menu button or the panel body", () => {
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+
+    pointerDrag(screen.getByRole("button", { name: "Panel actions for Panel a" }), 300, 300);
+    pointerDrag(screen.getByText("Content of a"), 300, 300);
+
+    expect(screen.getByText("6×2 at 0,0")).toBeInTheDocument();
+    expect(screen.queryByText("Unsaved changes")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+  });
+
+  it("offers no dragging or resizing outside edit mode or to a viewer", () => {
+    renderPage();
+    expect(gridMode()).toBe("grid");
+    expect(screen.queryByRole("button", { name: /^Move / })).not.toBeInTheDocument();
+    expect(resizeHandle("Panel a", "se")).toBeNull();
+    const item = panel("Panel a").parentElement!;
+    const position = item.style.transform;
+
+    pointerDrag(header("Panel a"), 6 * COLUMN_PITCH, ROW_PITCH);
+    expect(item.style.transform).toBe(position);
+    expect(screen.queryByRole("toolbar", { name: "Edit dashboard" })).not.toBeInTheDocument();
+
+    cleanup();
+    mocks.canEdit = false;
+    renderPage();
+    expect(screen.queryByRole("button", { name: /^Move / })).not.toBeInTheDocument();
+    expect(resizeHandle("Panel a", "se")).toBeNull();
+  });
+
+  it("moves and resizes from the keyboard on the header grip", () => {
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    const grip = screen.getByRole("button", { name: "Move Panel a" });
+    expect(grip).toHaveAccessibleDescription(/Arrow keys move it one cell/);
+    grip.focus();
+
+    fireEvent.keyDown(grip, { key: "ArrowRight" });
+    expect(screen.getByText("6×2 at 1,0")).toBeInTheDocument();
+    expect(screen.getByText("6×2 at 6,2")).toBeInTheDocument();
+
+    fireEvent.keyDown(grip, { key: "ArrowDown", shiftKey: true });
+    expect(screen.getByText("6×3 at 1,0")).toBeInTheDocument();
+    // An edge stays an edge: the panel cannot leave the grid.
+    fireEvent.keyDown(grip, { key: "ArrowUp" });
+    expect(screen.getByText("6×3 at 1,0")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Move Panel a" })).toHaveFocus();
+  });
+
+  it("stacks panels when the content narrows and never rewrites the stored layout", () => {
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    pointerDrag(header("Panel a"), 6 * COLUMN_PITCH, 0);
+    expect(screen.getByText("6×2 at 6,0")).toBeInTheDocument();
+
+    // The Agent sidebar opens and squeezes the content below the grid's width.
+    grid.resizeTo(560);
+    expect(gridMode()).toBe("stack");
+    expect(screen.queryByRole("button", { name: /^Move / })).not.toBeInTheDocument();
+    expect(resizeHandle("Panel a", "se")).toBeNull();
+    expect(screen.getByText(/Panels stack in a narrow view/)).toBeInTheDocument();
+    // Stacked in reading order, coordinates untouched.
+    expect(panelTitles()).toEqual(["Panel a", "Panel c", "Panel b"]);
+    expect(screen.getByText("6×2 at 6,0")).toBeInTheDocument();
+
+    grid.resizeTo(900);
+    expect(gridMode()).toBe("grid");
+    expect(screen.getByText("6×2 at 6,0")).toBeInTheDocument();
+    expect(screen.getByText("6×2 at 6,2")).toBeInTheDocument();
+    expect(mocks.update).not.toHaveBeenCalled();
+  });
+
+  it("does not mark a dashboard dirty or rearrange it when it loads or resizes", () => {
+    mocks.dashboard = dashboard({
+      // A gap and an overlap as stored: shown as they are, not compacted or pushed.
+      panels: [markdownPanel("a", 0, 0), markdownPanel("b", 6, 5), markdownPanel("c", 3, 1)],
+    });
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    grid.resizeTo(800);
+    grid.resizeTo(1400);
+
+    expect(screen.getByText("6×2 at 6,5")).toBeInTheDocument();
+    expect(screen.getByText("6×2 at 3,1")).toBeInTheDocument();
+    expect(panel("Panel b").parentElement?.style.transform).toMatch(
+      new RegExp(`,${5 * ROW_PITCH}px\\)$`),
+    );
+    expect(screen.queryByText("Unsaved changes")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+  });
+
+  it("shares one draft between dragging and the Agent, and keeps it when the save is stale", () => {
+    mocks.update.mockImplementation((_variables, options) =>
+      options.onError({ response: { status: 409, data: { detail: "Dashboard was changed" } } }),
+    );
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    pointerDrag(header("Panel a"), 6 * COLUMN_PITCH, 0);
+
+    // The Agent reads the dragged layout ...
+    const read = JSON.parse(agentPage()?.dashboard?.code ?? "");
+    const a = read.panels.find((entry: { panel_id: string }) => entry.panel_id === "a");
+    expect(a.layout).toEqual({ x: 6, y: 0, w: 6, h: 2 });
+    // ... and its proposal, applied, is what the grid shows and drags next.
+    expect(applyDraft({ panels: [...read.panels, proposedPanel] })).toBe(true);
+    expect(screen.getByText("Proposed note")).toBeInTheDocument();
+    pointerDrag(header("Panel c"), 0, ROW_PITCH);
+    expect(screen.getByText("6×2 at 0,3")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    const [{ data }] = mocks.update.mock.calls[0];
+    expect(data.expected_version).toBe(7);
+    expect(
+      data.panels.find((entry: DashboardPanelResponse) => entry.panel_id === "c").layout,
+    ).toEqual({ x: 0, y: 3, w: 6, h: 2 });
+    // Refused as stale: the draft stays, unsaved, with every edit.
+    expect(screen.getByText("Unsaved changes")).toBeInTheDocument();
+    expect(screen.getByText("6×2 at 6,0")).toBeInTheDocument();
+    expect(screen.getByText("6×2 at 0,3")).toBeInTheDocument();
+    expect(screen.getByText("Proposed note")).toBeInTheDocument();
+  });
+
+  it("shows a template preview on the grid without any editing affordance", () => {
+    mocks.preview = templatePreview();
+    renderPage(null);
+    applyDraft({ name: "Collisions", template_id: "frequency-collision-map", panels: [] });
+
+    expect(screen.getByTestId("template-preview-grid")).toHaveAttribute("data-layout-mode", "grid");
+    expect(screen.queryByRole("button", { name: /^Move / })).not.toBeInTheDocument();
+    expect(document.querySelector(".react-resizable-handle")).toBeNull();
   });
 });

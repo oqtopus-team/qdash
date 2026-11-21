@@ -1,13 +1,18 @@
 import type { DashboardPanelModel, DashboardPanelModelType, PanelLayoutModel } from "@/schemas";
 
 /** Width of the dashboard grid in columns; matches the backend's `GRID_COLUMNS`. */
-const GRID_COLUMNS = 12;
+export const GRID_COLUMNS = 12;
 /** Largest panel height in grid rows accepted by the backend. */
-const MAX_PANEL_HEIGHT = 12;
+export const MAX_PANEL_HEIGHT = 12;
 /** Height of one grid row in px. */
-const ROW_HEIGHT_PX = 120;
+export const ROW_HEIGHT_PX = 120;
 /** Gap between panels in px (Tailwind `gap-4`). */
-const GRID_GAP_PX = 16;
+export const GRID_GAP_PX = 16;
+
+/** Class of the panel header region that starts a drag in edit mode. */
+export const DRAG_HANDLE_CLASS = "dashboard-drag-handle";
+/** Class of the focusable grip inside the handle; it moves and resizes from the keyboard. */
+export const DRAG_GRIP_CLASS = "dashboard-drag-grip";
 
 export type LayoutAction =
   | "left"
@@ -29,7 +34,7 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 /** Clamp a layout into the grid so that `x + w <= 12` and all sizes stay in range. */
-function clampLayout(layout: PanelLayoutModel): PanelLayoutModel {
+export function clampLayout(layout: PanelLayoutModel): PanelLayoutModel {
   const w = clamp(Math.round(layout.w), 1, GRID_COLUMNS);
   const h = clamp(Math.round(layout.h), 1, MAX_PANEL_HEIGHT);
   const x = clamp(Math.round(layout.x), 0, GRID_COLUMNS - w);
@@ -75,6 +80,42 @@ function overlaps(a: PanelLayoutModel, b: PanelLayoutModel): boolean {
   return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 }
 
+/** Whether two layouts are the same cell rectangle. */
+export function sameLayout(a: PanelLayoutModel, b: PanelLayoutModel): boolean {
+  return a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h;
+}
+
+/** A layout keyed by the panel it belongs to. */
+export interface Placement {
+  id: string;
+  layout: PanelLayoutModel;
+}
+
+/**
+ * Push placements down until none overlaps another. The placement named by `pinnedId`
+ * keeps its place; every other one is placed in reading order below the placements it
+ * collides with. Placements that do not move keep their identity, and the result keeps
+ * the input order.
+ */
+export function settlePlacements<T extends Placement>(items: readonly T[], pinnedId?: string): T[] {
+  const pinned = items.find((item) => item.id === pinnedId);
+  const placed: T[] = pinned ? [pinned] : [];
+  const rest = items
+    .filter((item) => item !== pinned)
+    .sort((a, b) => a.layout.y - b.layout.y || a.layout.x - b.layout.x || 0);
+  for (const item of rest) {
+    let layout = { ...item.layout };
+    let blocker = placed.find((other) => overlaps(layout, other.layout));
+    while (blocker) {
+      layout = { ...layout, y: blocker.layout.y + blocker.layout.h };
+      blocker = placed.find((other) => overlaps(layout, other.layout));
+    }
+    placed.push(layout.y === item.layout.y ? item : { ...item, layout });
+  }
+  const byId = new Map(placed.map((item) => [item.id, item]));
+  return items.map((item) => byId.get(item.id) ?? item);
+}
+
 /**
  * Push panels down until none overlaps another. The panel named by `pinnedId`
  * keeps its place; every other panel is placed in reading order below the
@@ -84,21 +125,15 @@ export function resolveCollisions<T extends DashboardPanelModel>(
   panels: readonly T[],
   pinnedId?: string,
 ): T[] {
-  const pinned = panels.find((panel) => panel.panel_id === pinnedId);
-  const placed: T[] = pinned ? [pinned] : [];
-  const rest = sortPanels(panels.filter((panel) => panel !== pinned));
-  for (const panel of rest) {
-    let layout = { ...panel.layout };
-    let blocker = placed.find((other) => overlaps(layout, other.layout));
-    while (blocker) {
-      layout = { ...layout, y: blocker.layout.y + blocker.layout.h };
-      blocker = placed.find((other) => overlaps(layout, other.layout));
-    }
-    placed.push(layout.y === panel.layout.y ? panel : { ...panel, layout });
-  }
-  // Keep the caller's order so React keys and the editor list stay stable.
-  const byId = new Map(placed.map((panel) => [panel.panel_id, panel]));
-  return panels.map((panel) => byId.get(panel.panel_id) ?? panel);
+  const settled = settlePlacements(
+    panels.map((panel) => ({ id: panel.panel_id, layout: panel.layout })),
+    pinnedId,
+  );
+  // Keep the caller's order and unmoved panels so React keys and the editor list stay stable.
+  return panels.map((panel, index) => {
+    const layout = settled[index]?.layout ?? panel.layout;
+    return layout === panel.layout ? panel : { ...panel, layout };
+  });
 }
 
 /** Default size of a new panel of `type`. */

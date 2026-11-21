@@ -188,8 +188,17 @@ templates.
 Routes: `/dashboards` (list, with a `tab` query parameter for **Dashboards** and
 **Scripts**), `/dashboards/new` (a new dashboard as a local draft until **Save** creates
 it), `/dashboards/[dashboardId]`, and `/dashboards/scripts/[scriptId]`.
-Dashboard code lives in `ui/src/components/features/dashboards/`; panels are laid out with
-CSS grid from each panel's `layout`, and edit mode keeps the panel list in local state and
+Dashboard code lives in `ui/src/components/features/dashboards/`. `DashboardGrid` lays panels
+out with `react-grid-layout` from each panel's `layout`, using the content width that a
+`ResizeObserver` reports rather than the viewport, so the Agent sidebar re-lays the grid. Below
+640 px it stacks panels in reading order without dragging. The stored `layout` is the only layout
+state: the grid never reports a layout on mount, a width change, or a stacked view, and does not
+compact. Its compactor allows overlap so that the library pushes nothing by itself, and during a
+drag or resize it applies `settlePlacements` from `layout.ts` to the layout as it was when the
+gesture started. Only `onDragStop` and `onResizeStop` call `onLayoutCommit`. The page then takes
+the same path as a menu or arrow-key step (`clampLayout`, then `resolveCollisions` with the moved
+panel pinned), so the Agent draft and manual edits share one shape. Edit mode keeps the panel
+list in local state and
 persists it with one `PATCH` of `panels` and the `expected_version` read when editing started; a
 409 leaves the draft in place. `DashboardPageContent` serves both routes; with no
 `dashboardId` it starts in edit mode and **Save** creates a private dashboard, with
@@ -243,4 +252,6 @@ its page with the Agent dock so the Agent can propose edits; see
   template against the numbers of the original collision tests.
 - `ui/src/components/features/dashboards/__tests__/` and
   `ui/src/components/features/metric-scripts/__tests__/`: list tabs, panel editor, renderers,
-  the editor page, and the document hook.
+  the editor page, and the document hook. The dashboard page tests drive real
+  `react-grid-layout` drags and resizes in jsdom through `__tests__/gridEnvironment.ts`, which
+  supplies only the content width, offset parents, and element positions.
