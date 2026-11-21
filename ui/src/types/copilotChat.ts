@@ -85,7 +85,7 @@ export interface ApprovalRequest {
 
 /**
  * A change the assistant proposes to the code open in an editor (the Workflow editor, the
- * metric script editor, or a custom dashboard's draft as JSON); the user applies it there.
+ * metric script editor, or a dashboard's draft as JSON); the user applies it there.
  */
 export interface EditProposal {
   summary: string;
@@ -124,7 +124,7 @@ export interface MetricScriptEditorContext {
 }
 
 /**
- * A custom dashboard the user may edit, read when a turn is sent. Its unsaved draft is the
+ * A dashboard the user may edit, read when a turn is sent. Its unsaved draft is the
  * "code" of the dashboard: JSON with the panels, plus name, description, chip and template
  * for a new dashboard that is not created yet.
  */

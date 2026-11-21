@@ -40,12 +40,12 @@ export function forumPostPagePath(postId: string): string {
 
 /** Path of a metric script's editor page. */
 export function metricScriptPagePath(scriptId: string): string {
-  return `/custom-dashboards/scripts/${encodeURIComponent(scriptId)}`;
+  return `/dashboards/scripts/${encodeURIComponent(scriptId)}`;
 }
 
-/** Path of a custom dashboard's page. */
-export function customDashboardPagePath(dashboardId: string): string {
-  return `/custom-dashboards/${encodeURIComponent(dashboardId)}`;
+/** Path of a dashboard's page. */
+export function dashboardPagePath(dashboardId: string): string {
+  return `/dashboards/${encodeURIComponent(dashboardId)}`;
 }
 
 export function qdashObjectLinks(client: QDashClient, object: Record<string, unknown>): Record<string, string> {
@@ -61,7 +61,7 @@ export function qdashObjectLinks(client: QDashClient, object: Record<string, unk
   if (executionId) links.execution = qdashWebUrl(client, executionPagePath(executionId, chipId));
   if (postId) links.forum_post = qdashWebUrl(client, forumPostPagePath(postId));
   if (scriptId) links.metric_script = qdashWebUrl(client, metricScriptPagePath(scriptId));
-  if (dashboardId) links.custom_dashboard = qdashWebUrl(client, customDashboardPagePath(dashboardId));
+  if (dashboardId) links.dashboard = qdashWebUrl(client, dashboardPagePath(dashboardId));
   if (sessionId) links.agent_session = qdashWebUrl(client, `/agent-sessions/${encodeURIComponent(sessionId)}`);
   return links;
 }

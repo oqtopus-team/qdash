@@ -22,8 +22,8 @@ for the role to assign.
 | Page | Purpose | Guide |
 | --- | --- | --- |
 | **Home** | Start common work and review recent executions, upcoming scheduled workflow runs, and recent failed tasks. | This page |
-| **Overview** | Scan all configured chip metrics, coverage, distributions, and scoped notes. | [Overview](./dashboard.md) |
-| **Dashboards** | Compose metric maps, the results of your own metric scripts (such as collision checks or a median per coupling), and notes into a saved layout shared with the project. | [Dashboards](./custom-dashboards.md), [Metric Scripts](./metric-scripts.md) |
+| **Overview** | Scan all configured chip metrics, coverage, distributions, and scoped notes. | [Overview](./overview.md) |
+| **Dashboards** | Compose metric maps, the results of your own metric scripts (such as collision checks or a median per coupling), and notes into a saved layout shared with the project. | [Dashboards](./dashboards.md), [Metric Scripts](./metric-scripts.md) |
 | **Metrics** | Inspect one metric across qubits or couplings and compare its history. | [Calibration Data and Provenance](./data-and-provenance.md) |
 | **Chip** | Browse calibration tasks and the latest results on the chip topology. | [Calibration Data and Provenance](./data-and-provenance.md) |
 | **Analysis** | Plot and compare chip parameters over a selected time range. | [Calibration Data and Provenance](./data-and-provenance.md) |

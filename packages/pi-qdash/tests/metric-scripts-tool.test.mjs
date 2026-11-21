@@ -71,8 +71,8 @@ function setup(overrides = {}) {
     evaluateMetricScript: record("evaluate", overrides.evaluate),
     createMetricScript: record("create", overrides.create),
     updateMetricScript: record("update", overrides.update),
-    createCustomDashboard: record("createDashboard", overrides.createDashboard),
-    updateCustomDashboard: record("updateDashboard", overrides.updateDashboard),
+    createDashboard: record("createDashboard", overrides.createDashboard),
+    updateDashboard: record("updateDashboard", overrides.updateDashboard),
     listMetricScriptTemplates: record("templates", overrides.templates),
   };
   registerMetricScriptTools({ registerTool(tool) { tools.set(tool.name, tool); } }, {
@@ -222,7 +222,7 @@ test("without scriptId the save creates a script; with one it saves a revision g
   assert.equal(created.details.created, true);
   assert.equal(created.details.activeRevision, 1);
   assert.match(created.content[0].text, /Created metric script 'ZX90' \(ms_0123456789ab\) as revision 1, private\.\nIt validated: revision 1 is now the active revision\./);
-  assert.match(created.content[0].text, /Page: https:\/\/qdash\.example\/custom-dashboards\/scripts\/ms_0123456789ab/);
+  assert.match(created.content[0].text, /Page: https:\/\/qdash\.example\/dashboards\/scripts\/ms_0123456789ab/);
   assert.match(created.content[0].text, /panels keep the revision they pin/);
 
   const updated = await save.execute(
@@ -269,7 +269,7 @@ test("dashboard saves send the API's shape: create with a template, update with 
     ...overrides,
   });
   const { tools, calls } = setup({ createDashboard: response(), updateDashboard: response({ panels: [{ ...PANEL, script_name: "ZX90", latest_revision: 2 }] }) });
-  const save = tools.get("qdash_save_custom_dashboard");
+  const save = tools.get("qdash_save_dashboard");
 
   const created = await save.execute(
     "t",
@@ -281,7 +281,7 @@ test("dashboard saves send the API's shape: create with a template, update with 
   assert.deepEqual(calls[0], ["createDashboard", { name: "Couplings", visibility: "project", chip_id: "64Qv3", panels: [PANEL] }]);
   assert.match(created.content[0].text, /Created dashboard 'Couplings' \(cd_1\), project, chip 64Qv3, 1 panel\./);
   assert.match(created.content[0].text, /- ZX90 median: ZX90 \/ zx90_median, pinned to revision 2 \(revision 3 is active\)/);
-  assert.match(created.content[0].text, /Page: https:\/\/qdash\.example\/custom-dashboards\/cd_1/);
+  assert.match(created.content[0].text, /Page: https:\/\/qdash\.example\/dashboards\/cd_1/);
 
   // Response-only annotations are not sent back.
   await save.execute(
@@ -303,7 +303,7 @@ test("dashboard saves send the API's shape: create with a template, update with 
 test("dashboard problems are reported before confirmation, and the save is gated", async () => {
   const asked = { count: 0 };
   const { tools, calls } = setup({ createDashboard: {} });
-  const save = tools.get("qdash_save_custom_dashboard");
+  const save = tools.get("qdash_save_dashboard");
   const unpinned = { ...PANEL, layout: { x: 6, y: 0, w: 12, h: 4 }, config: { script_id: "ms_1", metric_id: "m" } };
   const result = await save.execute("t", { panels: [unpinned] }, undefined, undefined, uiContext(true, asked));
   assert.equal(asked.count, 0);

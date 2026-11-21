@@ -18,7 +18,7 @@ from qdash.api.db.session import lifespan
 from qdash.api.middleware.request_id import RequestIdMiddleware
 from qdash.config import Settings, get_settings, resolve_api_cors_origins
 from qdash.datamodel.calibration_pipeline import CalibrationPipelineSpec
-from qdash.datamodel.custom_dashboard import MetricScriptPanelConfig
+from qdash.datamodel.dashboard import MetricScriptPanelConfig
 
 # Models that request bodies carry as plain JSON objects but that clients should still get as
 # typed models. Publishing them as components changes no route: ValidatePipelineRequest.spec

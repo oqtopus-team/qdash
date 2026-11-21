@@ -3,7 +3,7 @@
 A metric script is a short Python file that computes one value per qubit or per directed qubit
 pair from your calibration data, such as the median ZX90 fidelity of each coupling over the
 last two weeks. QDash runs it on the server and shows the result in a metric panel on a
-[dashboard](./custom-dashboards.md), as a chip map or a table.
+[dashboard](./dashboards.md), as a chip map or a table.
 
 ## Create a Script
 
@@ -192,7 +192,7 @@ Each **Save** creates a revision, **r1**, **r2**, and so on. QDash checks the co
   panel.
 
 Dashboard panels stay on the revision they were added with until an editor updates them; see
-[Keep Panels on a Known Script Revision](./custom-dashboards.md#keep-panels-on-a-known-script-revision).
+[Keep Panels on a Known Script Revision](./dashboards.md#keep-panels-on-a-known-script-revision).
 When someone else saved the script while you were editing it, QDash keeps your draft and offers
 **Load saved version**; saving again replaces their revision.
 

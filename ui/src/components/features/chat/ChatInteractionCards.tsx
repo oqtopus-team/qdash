@@ -289,7 +289,7 @@ export function ApprovalCard({
 
 /**
  * A change the assistant proposes to the flow open in the Workflow editor, to
- * the metric script open in its editor, or to a custom dashboard's draft: the
+ * the metric script open in its editor, or to a dashboard's draft: the
  * diff against what the page holds now, applied there with one click. The card
  * never saves; the page's Save does, through QDash's validation.
  */

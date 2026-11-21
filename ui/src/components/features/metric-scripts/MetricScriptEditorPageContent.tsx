@@ -28,7 +28,7 @@ import {
   useValidateMetricScript,
 } from "@/client/metric-script/metric-script";
 import type { MetricInfo, MetricScriptResponseVisibility, ScriptDiagnostic } from "@/schemas";
-import { VisibilityLabel } from "@/components/features/custom-dashboards/VisibilityLabel";
+import { VisibilityLabel } from "@/components/features/dashboards/VisibilityLabel";
 import { ErrorCard } from "@/components/ui/ErrorCard";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { useToast } from "@/components/ui/Toast";
@@ -382,7 +382,7 @@ export function MetricScriptEditorPageContent({ scriptId }: { scriptId: string }
         current: () => {
           const { scriptId, name, ready, code, isDirty } = pageState.current;
           return {
-            path: `/custom-dashboards/scripts/${scriptId}`,
+            path: `/dashboards/scripts/${scriptId}`,
             title: `Metric script: ${name || scriptId}`,
             metricScript: ready
               ? ({ scriptId, name, code, dirty: isDirty } satisfies MetricScriptEditorContext)
@@ -404,7 +404,7 @@ export function MetricScriptEditorPageContent({ scriptId }: { scriptId: string }
         onSuccess: (response) => {
           void queryClient.invalidateQueries({ queryKey: getListMetricScriptsQueryKey() });
           toast.success(`Copied as "${response.data.name}"`);
-          router.push(`/custom-dashboards/scripts/${response.data.script_id}`);
+          router.push(`/dashboards/scripts/${response.data.script_id}`);
         },
         onError: (error) => toast.error(getApiErrorMessage(error, "Failed to copy the script")),
       },
@@ -432,7 +432,7 @@ export function MetricScriptEditorPageContent({ scriptId }: { scriptId: string }
           }
         />
         <div className="mt-4 flex justify-center">
-          <Link href="/custom-dashboards?tab=scripts" className="btn btn-sm">
+          <Link href="/dashboards?tab=scripts" className="btn btn-sm">
             <ArrowLeft data-icon="inline-start" aria-hidden="true" />
             All scripts
           </Link>
@@ -581,7 +581,7 @@ export function MetricScriptEditorPageContent({ scriptId }: { scriptId: string }
       <header className="flex flex-col gap-3 border-b border-base-300 bg-base-100 px-4 py-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex min-w-0 items-start gap-2">
           <Link
-            href="/custom-dashboards?tab=scripts"
+            href="/dashboards?tab=scripts"
             className="btn btn-ghost btn-sm btn-square shrink-0"
             aria-label="All scripts"
           >

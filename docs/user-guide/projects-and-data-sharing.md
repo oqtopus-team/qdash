@@ -6,7 +6,7 @@ results, discussions, and files.
 ## Active Project
 
 Use the project selector to switch between projects. The active project determines which chips,
-workflows, executions, task results, notes, forum threads, custom dashboards, and files QDash
+workflows, executions, task results, notes, forum threads, dashboards, and files QDash
 displays or changes.
 Confirm it before starting a calibration or editing shared state. Switching project drops the
 previous project's chip, cooldown, and execution from the page address, so **Chip** opens the new

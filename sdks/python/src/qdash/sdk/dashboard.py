@@ -1,4 +1,4 @@
-"""Metric scripts and custom dashboards, defined locally and saved through a QDash session.
+"""Metric scripts and dashboards, defined locally and saved through a QDash session.
 
 A :class:`Script` is the text of a metric script with its name and settings; a
 :class:`Dashboard` is a list of panels. Building either sends no request and never runs the
@@ -20,9 +20,9 @@ from typing import TYPE_CHECKING, Literal
 
 from qdash.client.services.models import (
     AbsolutePeriod,
-    CustomDashboardCreateRequest,
-    CustomDashboardUpdateRequest,
+    DashboardCreateRequest,
     DashboardPanelModel,
+    DashboardUpdateRequest,
     MetricInfo,
     MetricScriptCreateRequest,
     MetricScriptPanelConfig,
@@ -34,7 +34,7 @@ from qdash.client.services.models import (
 if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping, Sequence
 
-    from qdash.client.services.models import CustomDashboardResponse
+    from qdash.client.services.models import DashboardResponse
 
 Visibility = Literal["private", "project"]
 PeriodInput = int | RelativePeriod | AbsolutePeriod
@@ -177,7 +177,7 @@ def _layout(layout: LayoutInput) -> PanelLayoutModel:
 
 
 class Dashboard:
-    """A custom dashboard to save: name, settings and panels on a 12-column grid.
+    """A dashboard to save: name, settings and panels on a 12-column grid.
 
     ``add_metric`` and ``add_markdown`` place a new panel at the left edge below every
     existing panel, sized as the dashboard editor sizes new panels, and give it a readable ID
@@ -202,7 +202,7 @@ class Dashboard:
         self.panels: list[DashboardPanelModel] = list(panels)
 
     @classmethod
-    def from_response(cls, response: CustomDashboardResponse) -> Dashboard:
+    def from_response(cls, response: DashboardResponse) -> Dashboard:
         """A definition holding a saved dashboard's settings and panels, ready to edit."""
         fields = {"panel_id", "type", "title", "layout", "config"}
         return cls(
@@ -312,15 +312,13 @@ class Dashboard:
                 fields[key] = value
         return fields
 
-    def create_request(self) -> CustomDashboardCreateRequest:
-        """The ``POST /custom-dashboards`` body."""
-        return CustomDashboardCreateRequest.model_validate(self._fields())
+    def create_request(self) -> DashboardCreateRequest:
+        """The ``POST /dashboards`` body."""
+        return DashboardCreateRequest.model_validate(self._fields())
 
-    def update_request(
-        self, *, expected_version: int | None = None
-    ) -> CustomDashboardUpdateRequest:
-        """The ``PATCH /custom-dashboards/{id}`` body; its panels replace the stored ones."""
+    def update_request(self, *, expected_version: int | None = None) -> DashboardUpdateRequest:
+        """The ``PATCH /dashboards/{id}`` body; its panels replace the stored ones."""
         fields = self._fields()
         if expected_version is not None:
             fields["expected_version"] = expected_version
-        return CustomDashboardUpdateRequest.model_validate(fields)
+        return DashboardUpdateRequest.model_validate(fields)

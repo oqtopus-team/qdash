@@ -2,7 +2,7 @@
 
 `qdash.sdk` lets a Python script define a calibration as objects and validate or start it on a
 chip through the QDash API; each one runs as a [calibration pipeline](../workflow/calibration-pipeline.md).
-It also saves [metric scripts](./metric-scripts.md) and [custom dashboards](./custom-dashboards.md)
+It also saves [metric scripts](./metric-scripts.md) and [dashboards](./dashboards.md)
 defined in Python.
 It ships in the `qdash-sdk` distribution, which depends on `qdash-client`; the user-facing
 example is in the [Python Client reference](../../reference/clients/python.md#run-a-calibration).
@@ -31,7 +31,7 @@ Every operation belongs to one phase, and no phase starts the next one implicitl
 | Run | `chip.calibrate(targets, steps)`, `qdash.pipelines.execute(pipeline, chip_id=...)`, then `run.wait()` | Dispatches one execution that claims the hardware | `POST /calibration-pipelines/execute`, `GET /executions/{id}` |
 | Inspect a registered workflow | `qdash.workflows.list()`, `qdash.workflows.get(name)` | None; reads stored metadata and source | `GET /flows`, `GET /flows/{name}` |
 | Run a registered workflow | `workflow.run(parameters=...)`, `qdash.workflows.run(name, parameters=...)`, then `run.wait()` | Dispatches the saved deployment | `POST /flows/{name}/execute`, `GET /executions/{id}` |
-| Author metric scripts and dashboards | `Script(...)`, `Dashboard(...)`, then `qdash.scripts.create`/`update`, `qdash.dashboards.create`/`update` | Saves a script revision or a dashboard | `/metric-scripts`, `/custom-dashboards` |
+| Author metric scripts and dashboards | `Script(...)`, `Dashboard(...)`, then `qdash.scripts.create`/`update`, `qdash.dashboards.create`/`update` | Saves a script revision or a dashboard | `/metric-scripts`, `/dashboards` |
 
 `Chip` is a front door over `Pipelines`, not a second implementation:
 `validate_calibration` and `calibrate` build a `Pipeline` from `targets`, `steps` and the
@@ -59,7 +59,7 @@ imports or executes flow source locally; a spec cannot reference code.
 
 ## Metric scripts and dashboards
 
-`qdash.sdk.dashboard` defines a metric script and a custom dashboard locally;
+`qdash.sdk.dashboard` defines a metric script and a dashboard locally;
 `QDash.scripts` and `QDash.dashboards` save them. Two Python APIs are involved and must not be
 confused: a metric script's source is written against `qdash_metrics`, which exists only in the
 metric worker (`src/qdash/api/metric_runtime/sdk.py`) and computes cells; `qdash.sdk` treats
@@ -91,7 +91,7 @@ active revision. `qdash.scripts.template(id)` reads a starter template's source 
 
 `Dashboard.add_metric` builds a `metric_script` panel from a `ScriptMetric`, with a config of the
 generated `MetricScriptPanelConfig` model; `add_markdown` adds a note. The builder follows the
-dashboard editor's rules in `ui/src/components/features/custom-dashboards/layout.ts`: a new
+dashboard editor's rules in `ui/src/components/features/dashboards/layout.ts`: a new
 panel goes to the left edge below every panel, 6 by 4 for a metric and 12 by 2 for a note.
 `hops` defaults to the metric's declared distances, `period` to the last 14 days. Panel IDs are
 derived from the metric ID (`zx90_median`, then `zx90_median-2`), so rerunning a script produces
@@ -271,5 +271,5 @@ results or steps outside the catalog; the SDK does not convert them.
 - `sdks/python/src/qdash/sdk/dashboard.py`: `Script`, `Dashboard`, `ScriptMetric`, `MetricScriptError`.
 - `sdks/python/src/qdash/sdk/_dashboards.py`: `Scripts`, `SavedScript`, `Dashboards`, `SavedDashboard`.
 - `sdks/python/hatch_build.py`: the `qdash-client` pin.
-- `clients/python/src/qdash/client/services/client.py`: the pipeline, flow, metric script and custom dashboard route methods and `with_project`.
+- `clients/python/src/qdash/client/services/client.py`: the pipeline, flow, metric script and dashboard route methods and `with_project`.
 - `src/qdash/api/app/factory.py`: `OPENAPI_COMPONENT_MODELS`, which also publishes `MetricScriptPanelConfig`.

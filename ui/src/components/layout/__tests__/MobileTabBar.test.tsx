@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { MobileTabBar } from "@/components/layout/MobileTabBar";
 
-const mockPathname = vi.hoisted(() => vi.fn(() => "/dashboard"));
+const mockPathname = vi.hoisted(() => vi.fn(() => "/overview"));
 const projectState = vi.hoisted(() => ({ canEdit: true }));
 
 vi.mock("next/navigation", () => ({
@@ -25,7 +25,7 @@ function getTabBar() {
 describe("MobileTabBar", () => {
   afterEach(() => {
     cleanup();
-    mockPathname.mockReturnValue("/dashboard");
+    mockPathname.mockReturnValue("/overview");
     projectState.canEdit = true;
   });
 
@@ -41,7 +41,7 @@ describe("MobileTabBar", () => {
       "Agent",
     ]);
     expect(links.map((link) => link.getAttribute("href"))).toEqual([
-      "/dashboard",
+      "/overview",
       "/workflow",
       "/execution",
       "/chat",
@@ -87,7 +87,7 @@ describe("MobileTabBar", () => {
   });
 
   it.each([
-    ["/dashboard", "Overview"],
+    ["/overview", "Overview"],
     ["/workflow/new", "Workflow"],
     ["/workflow/calibrate-all", "Workflow"],
     ["/execution/chip-1/exec-1", "Execution"],

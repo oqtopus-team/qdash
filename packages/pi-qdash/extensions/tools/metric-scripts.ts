@@ -3,11 +3,11 @@ import type { QDashClient } from "@oqtopus-team/qdash-client";
 import { QDash, Script } from "@oqtopus-team/qdash-sdk";
 import { Type } from "typebox";
 
-import { customDashboardPagePath, metricScriptPagePath } from "../lib/links.js";
+import { dashboardPagePath, metricScriptPagePath } from "../lib/links.js";
 import { toTextToolResult } from "../lib/results.js";
 
 /**
- * Metric scripts and custom dashboards.
+ * Metric scripts and dashboards.
  *
  * A metric script is Python written against the `qdash_metrics` API; QDash runs
  * it in a bounded worker process and turns it into one value per qubit or
@@ -34,11 +34,11 @@ export type MetricScriptClient = Pick<
   | "evaluateMetricScript"
   | "createMetricScript"
   | "updateMetricScript"
-  | "listCustomDashboards"
-  | "getCustomDashboard"
-  | "listCustomDashboardTemplates"
-  | "createCustomDashboard"
-  | "updateCustomDashboard"
+  | "listDashboards"
+  | "getDashboard"
+  | "listDashboardTemplates"
+  | "createDashboard"
+  | "updateDashboard"
 >;
 
 export type MetricScriptDependencies = {
@@ -140,9 +140,9 @@ export const METRIC_SCRIPT_QUERY_ACTIONS = [
   "metric_script_templates",
   "metric_script_template",
   "metric_script_catalog",
-  "custom_dashboards",
-  "custom_dashboard",
-  "custom_dashboard_templates",
+  "dashboards",
+  "dashboard",
+  "dashboard_templates",
 ] as const;
 
 export type MetricScriptQueryAction = (typeof METRIC_SCRIPT_QUERY_ACTIONS)[number];
@@ -183,12 +183,12 @@ export async function metricScriptQuery(
     }
     case "metric_script_catalog":
       return client.getMetricScriptCatalog();
-    case "custom_dashboards":
-      return client.listCustomDashboards();
-    case "custom_dashboard":
-      return client.getCustomDashboard(required(params.dashboardId, "dashboardId"));
-    case "custom_dashboard_templates":
-      return client.listCustomDashboardTemplates();
+    case "dashboards":
+      return client.listDashboards();
+    case "dashboard":
+      return client.getDashboard(required(params.dashboardId, "dashboardId"));
+    case "dashboard_templates":
+      return client.listDashboardTemplates();
   }
 }
 
@@ -672,18 +672,18 @@ export function registerMetricScriptTools(pi: Pick<ExtensionAPI, "registerTool">
   });
 
   pi.registerTool({
-    name: "qdash_save_custom_dashboard",
-    label: "QDash Save Custom Dashboard",
+    name: "qdash_save_dashboard",
+    label: "QDash Save Dashboard",
     description: [
-      "Create a custom dashboard (no dashboardId) or update one (dashboardId). Confirmation-gated write operation.",
-      "panels replaces the whole panel list on update: read the dashboard with qdash_query custom_dashboard and send every panel.",
+      "Create a dashboard (no dashboardId) or update one (dashboardId). Confirmation-gated write operation.",
+      "panels replaces the whole panel list on update: read the dashboard with qdash_query dashboard and send every panel.",
       "A panel is {panel_id, type, title, layout: {x, y, w, h}, config} on a 12-column grid (x + w <= 12, h 1-12).",
       "type metric_script: config {script_id, metric_id, script_revision, period, params, view, direction, hops}. script_revision is required and pins the panel to that saved revision (use the script's active_revision); later saves of the script do not change the panel.",
       "period is {kind: \"relative\", days} or {kind: \"absolute\", start, end} with timezones; params are the metric's Parameter values; view is \"map\" or \"table\"; direction (pair maps) is \"both\", \"forward\" or \"reverse\"; hops is a subset of [1, 2] within the metric's declared hops.",
       "Other types: qubit_metric and coupling_metric {metric: <metrics catalog key>}, markdown {content}.",
       "A project-visible dashboard cannot use private scripts. templateId (creation only) copies a starter template's panels when panels is empty.",
     ].join(" "),
-    promptSnippet: "Create or update a custom dashboard with metric script panels",
+    promptSnippet: "Create or update a dashboard with metric script panels",
     promptGuidelines: [
       "Pin metric_script panels to the script's active_revision from qdash_query metric_script, and say which revision a panel shows.",
       "On update, send the complete panels list; omitted panels are removed.",
@@ -698,8 +698,8 @@ export function registerMetricScriptTools(pi: Pick<ExtensionAPI, "registerTool">
       visibility: Type.Optional(Type.Union([Type.Literal("private"), Type.Literal("project")])),
       chipId: Type.Optional(Type.String({ description: "Chip the dashboard shows." })),
       panels: Type.Optional(Type.Array(Type.Object({}, { additionalProperties: true }), { description: "The complete panel list (see the description for the shape)." })),
-      templateId: Type.Optional(Type.String({ description: "Creation only: a starter template to copy panels from (qdash_query custom_dashboard_templates)." })),
-      expectedVersion: Type.Optional(Type.Number({ description: "Update only if the dashboard is still at this version (its `version` from qdash_query custom_dashboard; 409 otherwise)." })),
+      templateId: Type.Optional(Type.String({ description: "Creation only: a starter template to copy panels from (qdash_query dashboard_templates)." })),
+      expectedVersion: Type.Optional(Type.Number({ description: "Update only if the dashboard is still at this version (its `version` from qdash_query dashboard; 409 otherwise)." })),
       confirmWrite: Type.Optional(Type.Boolean({ description: "Required for non-interactive execution. Set true only after explicit user confirmation." })),
     }),
     async execute(
@@ -719,7 +719,7 @@ export function registerMetricScriptTools(pi: Pick<ExtensionAPI, "registerTool">
       _onUpdate,
       ctx,
     ) {
-      const tool = "qdash_save_custom_dashboard";
+      const tool = "qdash_save_dashboard";
       const problems = dashboardSaveProblems(params);
       if (problems.length) return problemResult(tool, problems, "dashboard");
       if (!params.confirmWrite) {
@@ -739,17 +739,17 @@ export function registerMetricScriptTools(pi: Pick<ExtensionAPI, "registerTool">
       try {
         const created = !params.dashboardId;
         const result = (created
-          ? await client.createCustomDashboard({
+          ? await client.createDashboard({
               name: params.name as string,
               ...fields,
               ...(params.templateId ? { template_id: params.templateId } : {}),
-            } as Parameters<MetricScriptClient["createCustomDashboard"]>[0])
-          : await client.updateCustomDashboard(params.dashboardId as string, {
+            } as Parameters<MetricScriptClient["createDashboard"]>[0])
+          : await client.updateDashboard(params.dashboardId as string, {
               ...(params.name !== undefined ? { name: params.name } : {}),
               ...fields,
               ...(params.expectedVersion !== undefined ? { expected_version: params.expectedVersion } : {}),
-            } as Parameters<MetricScriptClient["updateCustomDashboard"]>[1])) as unknown as DashboardResponse;
-        const page = url(client, customDashboardPagePath(result.dashboard_id));
+            } as Parameters<MetricScriptClient["updateDashboard"]>[1])) as unknown as DashboardResponse;
+        const page = url(client, dashboardPagePath(result.dashboard_id));
         return toTextToolResult(formatSavedDashboard(result, created, page), { ...result, url: page }, {
           tool,
           saved: true,

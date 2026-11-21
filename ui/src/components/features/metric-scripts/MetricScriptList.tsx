@@ -15,7 +15,7 @@ import {
   useListMetricScripts,
 } from "@/client/metric-script/metric-script";
 import type { MetricScriptSummary } from "@/schemas";
-import { VisibilityLabel } from "@/components/features/custom-dashboards/VisibilityLabel";
+import { VisibilityLabel } from "@/components/features/dashboards/VisibilityLabel";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorCard } from "@/components/ui/ErrorCard";
@@ -63,7 +63,7 @@ interface ScriptRowProps {
 }
 
 function ScriptRow({ script, canCopy, canDelete, copying, onCopy, onDelete }: ScriptRowProps) {
-  const href = `/custom-dashboards/scripts/${script.script_id}`;
+  const href = `/dashboards/scripts/${script.script_id}`;
   return (
     <li
       className="flex items-start gap-3 px-4 py-3 sm:items-center"
@@ -186,7 +186,7 @@ export function MetricScriptList({ newButton }: { newButton: ReactNode }) {
           toast.success(`Copied as "${response.data.name}"`, {
             action: {
               label: "Open",
-              onClick: () => router.push(`/custom-dashboards/scripts/${copyId}`),
+              onClick: () => router.push(`/dashboards/scripts/${copyId}`),
             },
           });
         },

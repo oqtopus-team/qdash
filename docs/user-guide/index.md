@@ -38,8 +38,8 @@ Find pages and their guides in the [Application Tour](./application-tour.md).
 
 | Goal | Guide |
 | --- | --- |
-| Scan chip health | [Overview](./dashboard.md) |
-| Arrange and share your own maps, tables, and notes | [Dashboards](./custom-dashboards.md) |
+| Scan chip health | [Overview](./overview.md) |
+| Arrange and share your own maps, tables, and notes | [Dashboards](./dashboards.md) |
 | Compute your own per-qubit or per-coupling metric, such as a median over a period | [Metric Scripts](./metric-scripts.md) |
 | Investigate state, history, or provenance | [Calibration Data and Provenance](./data-and-provenance.md) |
 | Review, discuss, or hand off a result | [Reviewing and Sharing Results](./reviewing-results.md) |

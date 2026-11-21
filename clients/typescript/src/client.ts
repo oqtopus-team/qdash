@@ -23,11 +23,11 @@ import type {
   ListAgentCandidatesResponse,
   ListCouplingsResponse,
   ListFlowsResponse,
-  CustomDashboardCreateRequest,
-  CustomDashboardResponse,
-  CustomDashboardUpdateRequest,
-  ListCustomDashboardTemplatesResponse,
-  ListCustomDashboardsResponse,
+  DashboardCreateRequest,
+  DashboardResponse,
+  DashboardUpdateRequest,
+  ListDashboardTemplatesResponse,
+  ListDashboardsResponse,
   ListMetricScriptTemplatesResponse,
   ListMetricScriptsResponse,
   MetricScriptCatalogResponse,
@@ -501,30 +501,30 @@ export class QDashClient {
     return this.delete(`/metric-scripts/${pathPart(scriptId)}`);
   }
 
-  async listCustomDashboards(): Promise<ListCustomDashboardsResponse> {
-    return this.get("/custom-dashboards");
+  async listDashboards(): Promise<ListDashboardsResponse> {
+    return this.get("/dashboards");
   }
 
-  async getCustomDashboard(dashboardId: string): Promise<CustomDashboardResponse> {
-    return this.get(`/custom-dashboards/${pathPart(dashboardId)}`);
+  async getDashboard(dashboardId: string): Promise<DashboardResponse> {
+    return this.get(`/dashboards/${pathPart(dashboardId)}`);
   }
 
-  async listCustomDashboardTemplates(): Promise<ListCustomDashboardTemplatesResponse> {
-    return this.get("/custom-dashboards/templates");
+  async listDashboardTemplates(): Promise<ListDashboardTemplatesResponse> {
+    return this.get("/dashboards/templates");
   }
 
-  async createCustomDashboard(
-    request: CustomDashboardCreateRequest,
-  ): Promise<CustomDashboardResponse> {
-    return this.post("/custom-dashboards", request);
+  async createDashboard(
+    request: DashboardCreateRequest,
+  ): Promise<DashboardResponse> {
+    return this.post("/dashboards", request);
   }
 
   /** Update a dashboard; a provided `panels` list replaces the previous one. */
-  async updateCustomDashboard(
+  async updateDashboard(
     dashboardId: string,
-    request: CustomDashboardUpdateRequest,
-  ): Promise<CustomDashboardResponse> {
-    return this.patch(`/custom-dashboards/${pathPart(dashboardId)}`, request);
+    request: DashboardUpdateRequest,
+  ): Promise<DashboardResponse> {
+    return this.patch(`/dashboards/${pathPart(dashboardId)}`, request);
   }
 
   /** Count a chip's executions per calendar day over the trailing window. */

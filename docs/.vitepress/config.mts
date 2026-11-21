@@ -149,8 +149,8 @@ export default withMermaid(
             {
               text: "Review Results",
               items: [
-                { text: "Overview", link: "/user-guide/dashboard" },
-                { text: "Dashboards", link: "/user-guide/custom-dashboards" },
+                { text: "Overview", link: "/user-guide/overview" },
+                { text: "Dashboards", link: "/user-guide/dashboards" },
                 { text: "Metric Scripts", link: "/user-guide/metric-scripts" },
                 { text: "Data and Provenance", link: "/user-guide/data-and-provenance" },
                 { text: "Reviewing Results", link: "/user-guide/reviewing-results" },
@@ -260,7 +260,7 @@ export default withMermaid(
                 { text: "CR Scheduler", link: "/developer-guide/architecture/cr-scheduler" },
                 { text: "Square Lattice", link: "/developer-guide/architecture/square-lattice-topology" },
                 { text: "Notes", link: "/developer-guide/architecture/notes" },
-                { text: "Custom Dashboards", link: "/developer-guide/architecture/custom-dashboards" },
+                { text: "Dashboards", link: "/developer-guide/architecture/dashboards" },
                 { text: "Metric Scripts", link: "/developer-guide/architecture/metric-scripts" },
                 { text: "Provenance", link: "/developer-guide/architecture/provenance" },
                 { text: "Python SDK", link: "/developer-guide/architecture/python-sdk" },

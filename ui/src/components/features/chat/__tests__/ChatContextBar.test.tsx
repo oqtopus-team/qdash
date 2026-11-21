@@ -108,14 +108,14 @@ describe("ChatThread context near the composer", () => {
 
   it("says when the page sends a dashboard draft", () => {
     dock.page = {
-      path: "/custom-dashboards/new",
+      path: "/dashboards/new",
       title: "New dashboard",
       withEditorCode: true,
       editorKind: "dashboard",
     };
     render(<ChatThread variant="panel" />);
     expect(within(contextList()!).getByRole("listitem")).toHaveTextContent(
-      "/custom-dashboards/new · with dashboard draft",
+      "/dashboards/new · with dashboard draft",
     );
   });
 
@@ -123,7 +123,7 @@ describe("ChatThread context near the composer", () => {
     chat.send.mockClear();
     chat.session = { id: "s1", context: null };
     dock.page = {
-      path: "/custom-dashboards/new",
+      path: "/dashboards/new",
       title: "New dashboard",
       withEditorCode: true,
       editorKind: "dashboard",

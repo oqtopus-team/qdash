@@ -857,7 +857,18 @@ class TemplateId(RootModel[str]):
     """
 
 
-class CustomDashboardTemplateResponse(BaseModel):
+class Type(StrEnum):
+    """
+    Panel kind
+    """
+
+    qubit_metric = "qubit_metric"
+    coupling_metric = "coupling_metric"
+    metric_script = "metric_script"
+    markdown = "markdown"
+
+
+class DashboardTemplateResponse(BaseModel):
     """
     A starter template; its panels are copied into a dashboard on creation.
     """
@@ -882,17 +893,6 @@ class ExpectedVersion(RootModel[int]):
     """
     Reject with 409 unless the dashboard is still at this version; omit to update whatever is stored
     """
-
-
-class Type(StrEnum):
-    """
-    Panel kind
-    """
-
-    qubit_metric = "qubit_metric"
-    coupling_metric = "coupling_metric"
-    metric_script = "metric_script"
-    markdown = "markdown"
 
 
 class DegradationTrendResponse(BaseModel):
@@ -2516,12 +2516,12 @@ class ListCopilotChatSessionsResponse(BaseModel):
     sessions: Annotated[list[CopilotChatSessionSummary], Field(title="Sessions")]
 
 
-class ListCustomDashboardTemplatesResponse(BaseModel):
+class ListDashboardTemplatesResponse(BaseModel):
     """
     Available starter templates.
     """
 
-    templates: Annotated[list[CustomDashboardTemplateResponse], Field(title="Templates")]
+    templates: Annotated[list[DashboardTemplateResponse], Field(title="Templates")]
 
 
 class ListExecutionsResponse(BaseModel):
@@ -6165,24 +6165,9 @@ class CryostatResponse(BaseModel):
     note: NoteModel | None = None
 
 
-class CustomDashboardTemplatePreviewResponse(BaseModel):
-    """
-    What a dashboard created from a template now would hold. Reading it writes nothing.
-    """
-
-    template_id: Annotated[str, Field(title="Template Id")]
-    name: Annotated[str, Field(title="Name")]
-    description: Annotated[str, Field(title="Description")]
-    panels: Annotated[list[TemplatePreviewPanel], Field(title="Panels")]
-    scripts_to_create: Annotated[list[TemplateScriptToCreate], Field(title="Scripts To Create")]
-    """
-    Project-visible metric scripts creation adds because the project has no script from that starter that still defines the panels' metrics
-    """
-
-
 class DashboardPanelModel(BaseModel):
     """
-    One panel of a custom dashboard.
+    One panel of a dashboard.
 
     ``config`` is normalized when saved; its shape depends on ``type`` and is validated
     against the matching ``*PanelConfig`` model when the dashboard is saved.
@@ -6235,6 +6220,67 @@ class DashboardPanelResponse(BaseModel):
     """
     script_name: Annotated[str | None, Field(title="Script Name")] = None
     latest_revision: Annotated[int | None, Field(title="Latest Revision")] = None
+
+
+class DashboardResponse(BaseModel):
+    """
+    A dashboard as seen by the caller.
+    """
+
+    dashboard_id: Annotated[str, Field(title="Dashboard Id")]
+    project_id: Annotated[str, Field(title="Project Id")]
+    name: Annotated[str, Field(title="Name")]
+    description: Annotated[str, Field(title="Description")]
+    visibility: Annotated[Visibility, Field(title="Visibility")]
+    chip_id: Annotated[str | None, Field(title="Chip Id")]
+    panels: Annotated[list[DashboardPanelResponse], Field(title="Panels")]
+    owner_username: Annotated[str, Field(title="Owner Username")]
+    owner_user_id: Annotated[str | None, Field(title="Owner User Id")]
+    can_edit: Annotated[bool, Field(title="Can Edit")]
+    """
+    Whether the caller may update or delete it
+    """
+    version: Annotated[int, Field(title="Version")]
+    """
+    Write counter; send it as expected_version to guard an update
+    """
+    created_at: Annotated[AwareDatetime, Field(title="Created At")]
+    updated_at: Annotated[AwareDatetime, Field(title="Updated At")]
+
+
+class DashboardTemplatePreviewResponse(BaseModel):
+    """
+    What a dashboard created from a template now would hold. Reading it writes nothing.
+    """
+
+    template_id: Annotated[str, Field(title="Template Id")]
+    name: Annotated[str, Field(title="Name")]
+    description: Annotated[str, Field(title="Description")]
+    panels: Annotated[list[TemplatePreviewPanel], Field(title="Panels")]
+    scripts_to_create: Annotated[list[TemplateScriptToCreate], Field(title="Scripts To Create")]
+    """
+    Project-visible metric scripts creation adds because the project has no script from that starter that still defines the panels' metrics
+    """
+
+
+class Panels(RootModel[list[DashboardPanelModel]]):
+    root: Annotated[list[DashboardPanelModel], Field(max_length=50, title="Panels")]
+
+
+class DashboardUpdateRequest(BaseModel):
+    """
+    Body for updating a dashboard. ``panels`` replaces the whole list.
+    """
+
+    name: Annotated[Name | None, Field(title="Name")] = None
+    description: Annotated[Description | None, Field(title="Description")] = None
+    visibility: Annotated[Visibility | None, Field(title="Visibility")] = None
+    chip_id: Annotated[ChipId | None, Field(title="Chip Id")] = None
+    panels: Annotated[Panels | None, Field(title="Panels")] = None
+    expected_version: Annotated[ExpectedVersion | None, Field(title="Expected Version")] = None
+    """
+    Reject with 409 unless the dashboard is still at this version; omit to update whatever is stored
+    """
 
 
 class DeviceTopologyRequest(BaseModel):
@@ -6852,6 +6898,15 @@ class ListCouplingsResponse(BaseModel):
 
 class ListCryostatsResponse(BaseModel):
     cryostats: Annotated[list[CryostatResponse], Field(title="Cryostats")]
+
+
+class ListDashboardsResponse(BaseModel):
+    """
+    Dashboards visible to the caller.
+    """
+
+    dashboards: Annotated[list[DashboardResponse], Field(title="Dashboards")]
+    total: Annotated[int, Field(title="Total")]
 
 
 class ListEvaluationRunsResponse(BaseModel):
@@ -7756,9 +7811,9 @@ class CreateEvaluationRunResponse(BaseModel):
     """
 
 
-class CustomDashboardCreateRequest(BaseModel):
+class DashboardCreateRequest(BaseModel):
     """
-    Body for creating a custom dashboard.
+    Body for creating a dashboard.
     """
 
     name: Annotated[str, Field(max_length=200, min_length=1, title="Name")]
@@ -7769,52 +7824,6 @@ class CustomDashboardCreateRequest(BaseModel):
     template_id: Annotated[TemplateId | None, Field(title="Template Id")] = None
     """
     Template whose panels are copied into the dashboard when panels is empty
-    """
-
-
-class CustomDashboardResponse(BaseModel):
-    """
-    A custom dashboard as seen by the caller.
-    """
-
-    dashboard_id: Annotated[str, Field(title="Dashboard Id")]
-    project_id: Annotated[str, Field(title="Project Id")]
-    name: Annotated[str, Field(title="Name")]
-    description: Annotated[str, Field(title="Description")]
-    visibility: Annotated[Visibility, Field(title="Visibility")]
-    chip_id: Annotated[str | None, Field(title="Chip Id")]
-    panels: Annotated[list[DashboardPanelResponse], Field(title="Panels")]
-    owner_username: Annotated[str, Field(title="Owner Username")]
-    owner_user_id: Annotated[str | None, Field(title="Owner User Id")]
-    can_edit: Annotated[bool, Field(title="Can Edit")]
-    """
-    Whether the caller may update or delete it
-    """
-    version: Annotated[int, Field(title="Version")]
-    """
-    Write counter; send it as expected_version to guard an update
-    """
-    created_at: Annotated[AwareDatetime, Field(title="Created At")]
-    updated_at: Annotated[AwareDatetime, Field(title="Updated At")]
-
-
-class Panels(RootModel[list[DashboardPanelModel]]):
-    root: Annotated[list[DashboardPanelModel], Field(max_length=50, title="Panels")]
-
-
-class CustomDashboardUpdateRequest(BaseModel):
-    """
-    Body for updating a custom dashboard. ``panels`` replaces the whole list.
-    """
-
-    name: Annotated[Name | None, Field(title="Name")] = None
-    description: Annotated[Description | None, Field(title="Description")] = None
-    visibility: Annotated[Visibility | None, Field(title="Visibility")] = None
-    chip_id: Annotated[ChipId | None, Field(title="Chip Id")] = None
-    panels: Annotated[Panels | None, Field(title="Panels")] = None
-    expected_version: Annotated[ExpectedVersion | None, Field(title="Expected Version")] = None
-    """
-    Reject with 409 unless the dashboard is still at this version; omit to update whatever is stored
     """
 
 
@@ -7926,15 +7935,6 @@ class ImpactResponse(BaseModel):
     nodes: Annotated[list[LineageNodeResponse], Field(title="Nodes")]
     edges: Annotated[list[LineageEdgeResponse], Field(title="Edges")]
     max_depth: Annotated[int, Field(title="Max Depth")]
-
-
-class ListCustomDashboardsResponse(BaseModel):
-    """
-    Dashboards visible to the caller.
-    """
-
-    dashboards: Annotated[list[CustomDashboardResponse], Field(title="Dashboards")]
-    total: Annotated[int, Field(title="Total")]
 
 
 class ListMetricScriptsResponse(BaseModel):

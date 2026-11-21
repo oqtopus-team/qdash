@@ -24,7 +24,7 @@ test("a page context is taken only in the shape the API sends", () => {
 });
 
 test("a metric script page is taken in the API's snake_case shape and the UI's camelCase one", () => {
-  const path = "/custom-dashboards/scripts/ms_0123456789ab";
+  const path = "/dashboards/scripts/ms_0123456789ab";
   const expected = { path, metricScript: { scriptId: "ms_0123456789ab", name: "ZX90", code: "x = 1\n", dirty: true } };
   assert.deepEqual(
     parsePageContext({ path, flow: null, metric_script: { script_id: "ms_0123456789ab", name: "ZX90", code: "x = 1\n", dirty: true } }),
@@ -41,7 +41,7 @@ test("a metric script page is taken in the API's snake_case shape and the UI's c
 
 test("on the metric script editor the section carries the draft and the propose-not-save rule", () => {
   const section = buildPageContextSection({
-    path: "/custom-dashboards/scripts/ms_1",
+    path: "/dashboards/scripts/ms_1",
     title: "ZX90",
     metricScript: { scriptId: "ms_1", name: "ZX90", code: "from qdash_metrics import metric\n", dirty: true },
   });
@@ -92,7 +92,7 @@ test("the edit tool ends the turn with the proposal in its details", async () =>
 
 test("a proposal for a metric script names the script the way the UI matches it", async () => {
   const page = parsePageContext({
-    path: "/custom-dashboards/scripts/ms_1",
+    path: "/dashboards/scripts/ms_1",
     metric_script: { script_id: "ms_1", name: "ZX90", code: "x = 1\n" },
   });
   const editor = editorOf(page);
@@ -109,7 +109,7 @@ test("a proposal for a metric script names the script the way the UI matches it"
       chipId: null,
       scriptId: "ms_1",
       scriptName: "ZX90",
-      pagePath: "/custom-dashboards/scripts/ms_1",
+      pagePath: "/dashboards/scripts/ms_1",
     },
   });
   assert.deepEqual(result.control, { terminate: true });
@@ -123,7 +123,7 @@ const dashboardDraft = `${JSON.stringify(
 )}\n`;
 
 test("a dashboard page is taken in the API's snake_case shape and the UI's camelCase one", () => {
-  const path = "/custom-dashboards/dash-1";
+  const path = "/dashboards/dash-1";
   const expected = {
     path,
     dashboard: { dashboardId: "dash-1", name: "Review", visibility: "private", chipId: "chip-1", version: 3, code: "{}", dirty: true },
@@ -142,8 +142,8 @@ test("a dashboard page is taken in the API's snake_case shape and the UI's camel
     expected,
   );
   // A new dashboard has no ID; a dashboard without a draft is just a page.
-  assert.deepEqual(parsePageContext({ path: "/custom-dashboards/new", dashboard: { name: "", code: "{}" } }), {
-    path: "/custom-dashboards/new",
+  assert.deepEqual(parsePageContext({ path: "/dashboards/new", dashboard: { name: "", code: "{}" } }), {
+    path: "/dashboards/new",
     dashboard: { name: "", code: "{}" },
   });
   assert.deepEqual(parsePageContext({ path, dashboard: { dashboard_id: "dash-1", name: "Review" } }), { path });
@@ -152,27 +152,27 @@ test("a dashboard page is taken in the API's snake_case shape and the UI's camel
 
 test("on a dashboard the section carries the draft and the propose-not-save, never-share rule", () => {
   const section = buildPageContextSection({
-    path: "/custom-dashboards/dash-1",
+    path: "/dashboards/dash-1",
     title: "Dashboard: Review",
     dashboard: { dashboardId: "dash-1", name: "Review", visibility: "project", version: 3, chipId: "chip-1", code: dashboardDraft, dirty: true },
   });
-  assert.match(section, /custom dashboard `Review` \(dash-1\) open and may edit it \(visibility project, draft based on version 3, the page shows chip chip-1\), with unsaved changes/);
+  assert.match(section, /dashboard `Review` \(dash-1\) open and may edit it \(visibility project, draft based on version 3, the page shows chip chip-1\), with unsaved changes/);
   assert.match(section, /```json\n\{\n  "panels"/);
   assert.match(section, /call `propose_code_edit` with the complete new draft as JSON/);
-  assert.match(section, /Do not use qdash_save_custom_dashboard for this dashboard unless they ask you to save/);
+  assert.match(section, /Do not use qdash_save_dashboard for this dashboard unless they ask you to save/);
   assert.match(section, /never change its sharing/);
   assert.match(section, /draft holds only panels/);
   assert.match(section, /Keep the panel_id and the pinned script_revision/);
-  const fresh = buildPageContextSection({ path: "/custom-dashboards/new", dashboard: { name: "", code: "{}" } });
-  assert.match(fresh, /composing a new custom dashboard\. It exists only as a draft in their browser and is created when they press Save; the draft is still empty/);
+  const fresh = buildPageContextSection({ path: "/dashboards/new", dashboard: { name: "", code: "{}" } });
+  assert.match(fresh, /composing a new dashboard\. It exists only as a draft in their browser and is created when they press Save; the draft is still empty/);
   assert.match(fresh, /template_id names a starter template/);
 });
 
 test("a dashboard proposal is checked, written in the page's order, and ends the turn", async () => {
-  const page = parsePageContext({ path: "/custom-dashboards/dash-1", dashboard: { dashboard_id: "dash-1", name: "Review", code: dashboardDraft } });
+  const page = parsePageContext({ path: "/dashboards/dash-1", dashboard: { dashboard_id: "dash-1", name: "Review", code: dashboardDraft } });
   const tool = buildProposeCodeEditTool(editorOf(page), page.path);
   assert.equal(tool.name, "propose_code_edit");
-  assert.match(tool.description, /custom dashboard `Review`/);
+  assert.match(tool.description, /dashboard `Review`/);
   assert.match(tool.description, /Nothing is saved or shared by this call/);
   const proposed = { panels: [{ config: { content: "y" }, layout: { h: 2, w: 6, y: 0, x: 0 }, type: "markdown", panel_id: "a" }] };
   const result = await tool.execute({ summary: "Halve the note", code: JSON.stringify(proposed) }, {}, {});
@@ -184,7 +184,7 @@ test("a dashboard proposal is checked, written in the page's order, and ends the
     flowName: "Review",
     chipId: null,
     dashboardId: "dash-1",
-    pagePath: "/custom-dashboards/dash-1",
+    pagePath: "/dashboards/dash-1",
   });
   // An invalid draft fails the call, so the model can correct it; nothing reaches the user.
   await assert.rejects(tool.execute({ summary: "Share", code: JSON.stringify({ ...proposed, visibility: "project" }) }, {}, {}), /visibility is not part of a draft/);
@@ -196,7 +196,7 @@ test("a dashboard proposal is checked, written in the page's order, and ends the
 });
 
 test("a new dashboard's proposal carries its name, chip and template, and no ID", async () => {
-  const page = parsePageContext({ path: "/custom-dashboards/new", dashboard: { name: "", code: "{}" } });
+  const page = parsePageContext({ path: "/dashboards/new", dashboard: { name: "", code: "{}" } });
   const tool = buildProposeCodeEditTool(editorOf(page), page.path);
   const result = await tool.execute(
     { summary: "Start from collisions", code: JSON.stringify({ template_id: "frequency-collision-map", name: "Collisions", panels: [] }) },

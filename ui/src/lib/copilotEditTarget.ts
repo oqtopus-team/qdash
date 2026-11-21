@@ -7,7 +7,7 @@ const NEW_FLOW_PATH = "/workflow/new";
  * Whether a proposal was made for the editor the page shows now. A saved flow
  * is identified by its route, name and chip; the New flow page has one editor
  * and nothing saved, so the route alone identifies it. A metric script is
- * identified by its route and script ID, and a custom dashboard by its route and
+ * identified by its route and script ID, and a dashboard by its route and
  * dashboard ID (a new one, not created yet, by its route). Old proposals without
  * target metadata remain viewable, but cannot replace an editor buffer.
  */

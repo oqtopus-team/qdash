@@ -68,7 +68,7 @@ function NewScriptForm({ onCancel, onCreated }: NewScriptFormProps) {
           void queryClient.invalidateQueries({ queryKey: getListMetricScriptsQueryKey() });
           toast.success("Script created");
           onCreated();
-          router.push(`/custom-dashboards/scripts/${response.data.script_id}`);
+          router.push(`/dashboards/scripts/${response.data.script_id}`);
         },
         onError: (mutationError) =>
           setError(getApiErrorMessage(mutationError, "Failed to create the script")),

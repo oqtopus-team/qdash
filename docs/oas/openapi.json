@@ -16288,14 +16288,14 @@
         }
       }
     },
-    "/custom-dashboards": {
+    "/dashboards": {
       "get": {
         "tags": [
-          "custom-dashboard"
+          "dashboard"
         ],
-        "summary": "List custom dashboards visible to the caller",
+        "summary": "List dashboards visible to the caller",
         "description": "Return project-shared dashboards and the caller's own, newest update first.",
-        "operationId": "listCustomDashboards",
+        "operationId": "listDashboards",
         "security": [
           {
             "HTTPBearer": []
@@ -16325,7 +16325,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ListCustomDashboardsResponse"
+                  "$ref": "#/components/schemas/ListDashboardsResponse"
                 }
               }
             }
@@ -16344,11 +16344,11 @@
       },
       "post": {
         "tags": [
-          "custom-dashboard"
+          "dashboard"
         ],
-        "summary": "Create a custom dashboard",
+        "summary": "Create a dashboard",
         "description": "Create a dashboard owned by the caller.",
-        "operationId": "createCustomDashboard",
+        "operationId": "createDashboard",
         "security": [
           {
             "HTTPBearer": []
@@ -16377,7 +16377,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CustomDashboardCreateRequest"
+                "$ref": "#/components/schemas/DashboardCreateRequest"
               }
             }
           }
@@ -16388,7 +16388,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CustomDashboardResponse"
+                  "$ref": "#/components/schemas/DashboardResponse"
                 }
               }
             }
@@ -16406,14 +16406,14 @@
         }
       }
     },
-    "/custom-dashboards/templates": {
+    "/dashboards/templates": {
       "get": {
         "tags": [
-          "custom-dashboard"
+          "dashboard"
         ],
-        "summary": "List starter templates for custom dashboards",
+        "summary": "List starter templates for dashboards",
         "description": "Return the templates a new dashboard can copy its panels from.",
-        "operationId": "listCustomDashboardTemplates",
+        "operationId": "listDashboardTemplates",
         "security": [
           {
             "HTTPBearer": []
@@ -16443,7 +16443,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ListCustomDashboardTemplatesResponse"
+                  "$ref": "#/components/schemas/ListDashboardTemplatesResponse"
                 }
               }
             }
@@ -16461,14 +16461,14 @@
         }
       }
     },
-    "/custom-dashboards/templates/{template_id}/preview": {
+    "/dashboards/templates/{template_id}/preview": {
       "get": {
         "tags": [
-          "custom-dashboard"
+          "dashboard"
         ],
         "summary": "Preview the panels a starter template would create",
         "description": "Return the panels a dashboard created from the template now would hold.\n\nNothing is created: script panels point at the shared script creation would reuse, or,\nwhen the project has none yet, name the starter script creation would add.",
-        "operationId": "previewCustomDashboardTemplate",
+        "operationId": "previewDashboardTemplate",
         "security": [
           {
             "HTTPBearer": []
@@ -16507,7 +16507,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CustomDashboardTemplatePreviewResponse"
+                  "$ref": "#/components/schemas/DashboardTemplatePreviewResponse"
                 }
               }
             }
@@ -16525,14 +16525,14 @@
         }
       }
     },
-    "/custom-dashboards/{dashboard_id}": {
+    "/dashboards/{dashboard_id}": {
       "get": {
         "tags": [
-          "custom-dashboard"
+          "dashboard"
         ],
-        "summary": "Get a custom dashboard",
+        "summary": "Get a dashboard",
         "description": "Return a dashboard the caller owns or that is shared with the project.",
-        "operationId": "getCustomDashboard",
+        "operationId": "getDashboard",
         "security": [
           {
             "HTTPBearer": []
@@ -16571,7 +16571,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CustomDashboardResponse"
+                  "$ref": "#/components/schemas/DashboardResponse"
                 }
               }
             }
@@ -16590,11 +16590,11 @@
       },
       "patch": {
         "tags": [
-          "custom-dashboard"
+          "dashboard"
         ],
-        "summary": "Update a custom dashboard",
+        "summary": "Update a dashboard",
         "description": "Update a dashboard. A provided ``panels`` list replaces the previous one.",
-        "operationId": "updateCustomDashboard",
+        "operationId": "updateDashboard",
         "security": [
           {
             "HTTPBearer": []
@@ -16632,7 +16632,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CustomDashboardUpdateRequest"
+                "$ref": "#/components/schemas/DashboardUpdateRequest"
               }
             }
           }
@@ -16643,7 +16643,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CustomDashboardResponse"
+                  "$ref": "#/components/schemas/DashboardResponse"
                 }
               }
             }
@@ -16662,11 +16662,11 @@
       },
       "delete": {
         "tags": [
-          "custom-dashboard"
+          "dashboard"
         ],
-        "summary": "Delete a custom dashboard",
+        "summary": "Delete a dashboard",
         "description": "Delete a dashboard owned by the caller, or any dashboard as project owner.",
-        "operationId": "deleteCustomDashboard",
+        "operationId": "deleteDashboard",
         "security": [
           {
             "HTTPBearer": []
@@ -16723,14 +16723,14 @@
         }
       }
     },
-    "/custom-dashboards/{dashboard_id}/duplicate": {
+    "/dashboards/{dashboard_id}/duplicate": {
       "post": {
         "tags": [
-          "custom-dashboard"
+          "dashboard"
         ],
-        "summary": "Duplicate a custom dashboard",
+        "summary": "Duplicate a dashboard",
         "description": "Copy a visible dashboard into a private dashboard owned by the caller.",
-        "operationId": "duplicateCustomDashboard",
+        "operationId": "duplicateDashboard",
         "security": [
           {
             "HTTPBearer": []
@@ -16769,7 +16769,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CustomDashboardResponse"
+                  "$ref": "#/components/schemas/DashboardResponse"
                 }
               }
             }
@@ -22052,7 +22052,7 @@
         "title": "CryostatUpdateRequest",
         "description": "Body for updating a cryostat. All fields optional."
       },
-      "CustomDashboardCreateRequest": {
+      "DashboardCreateRequest": {
         "properties": {
           "name": {
             "type": "string",
@@ -22113,10 +22113,124 @@
         "required": [
           "name"
         ],
-        "title": "CustomDashboardCreateRequest",
-        "description": "Body for creating a custom dashboard."
+        "title": "DashboardCreateRequest",
+        "description": "Body for creating a dashboard."
       },
-      "CustomDashboardResponse": {
+      "DashboardPanelModel": {
+        "properties": {
+          "panel_id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Panel Id",
+            "description": "Dashboard-unique ID"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "qubit_metric",
+              "coupling_metric",
+              "metric_script",
+              "markdown"
+            ],
+            "title": "Type",
+            "description": "Panel kind"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Title",
+            "description": "Panel heading",
+            "default": ""
+          },
+          "layout": {
+            "$ref": "#/components/schemas/PanelLayoutModel"
+          },
+          "config": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Config",
+            "description": "Type-specific settings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "panel_id",
+          "type",
+          "layout"
+        ],
+        "title": "DashboardPanelModel",
+        "description": "One panel of a dashboard.\n\n``config`` is normalized when saved; its shape depends on ``type`` and is validated\nagainst the matching ``*PanelConfig`` model when the dashboard is saved."
+      },
+      "DashboardPanelResponse": {
+        "properties": {
+          "panel_id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Panel Id",
+            "description": "Dashboard-unique ID"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "qubit_metric",
+              "coupling_metric",
+              "metric_script",
+              "markdown"
+            ],
+            "title": "Type",
+            "description": "Panel kind"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Title",
+            "description": "Panel heading",
+            "default": ""
+          },
+          "layout": {
+            "$ref": "#/components/schemas/PanelLayoutModel"
+          },
+          "config": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Config",
+            "description": "Type-specific settings"
+          },
+          "script_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Script Name"
+          },
+          "latest_revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Revision"
+          }
+        },
+        "type": "object",
+        "required": [
+          "panel_id",
+          "type",
+          "layout"
+        ],
+        "title": "DashboardPanelResponse",
+        "description": "A panel as returned to the caller.\n\nFor ``metric_script`` panels whose script the caller can view, ``script_name`` and\n``latest_revision`` (the script's active, last-good revision) let the UI offer to move\nthe pinned ``config.script_revision`` forward. Both are null for other panels."
+      },
+      "DashboardResponse": {
         "properties": {
           "dashboard_id": {
             "type": "string",
@@ -22212,10 +22326,10 @@
           "created_at",
           "updated_at"
         ],
-        "title": "CustomDashboardResponse",
-        "description": "A custom dashboard as seen by the caller."
+        "title": "DashboardResponse",
+        "description": "A dashboard as seen by the caller."
       },
-      "CustomDashboardTemplatePreviewResponse": {
+      "DashboardTemplatePreviewResponse": {
         "properties": {
           "template_id": {
             "type": "string",
@@ -22253,10 +22367,10 @@
           "panels",
           "scripts_to_create"
         ],
-        "title": "CustomDashboardTemplatePreviewResponse",
+        "title": "DashboardTemplatePreviewResponse",
         "description": "What a dashboard created from a template now would hold. Reading it writes nothing."
       },
-      "CustomDashboardTemplateResponse": {
+      "DashboardTemplateResponse": {
         "properties": {
           "template_id": {
             "type": "string",
@@ -22290,10 +22404,10 @@
           "panel_count",
           "panel_types"
         ],
-        "title": "CustomDashboardTemplateResponse",
+        "title": "DashboardTemplateResponse",
         "description": "A starter template; its panels are copied into a dashboard on creation."
       },
-      "CustomDashboardUpdateRequest": {
+      "DashboardUpdateRequest": {
         "properties": {
           "name": {
             "anyOf": [
@@ -22377,122 +22491,8 @@
           }
         },
         "type": "object",
-        "title": "CustomDashboardUpdateRequest",
-        "description": "Body for updating a custom dashboard. ``panels`` replaces the whole list."
-      },
-      "DashboardPanelModel": {
-        "properties": {
-          "panel_id": {
-            "type": "string",
-            "maxLength": 64,
-            "minLength": 1,
-            "title": "Panel Id",
-            "description": "Dashboard-unique ID"
-          },
-          "type": {
-            "type": "string",
-            "enum": [
-              "qubit_metric",
-              "coupling_metric",
-              "metric_script",
-              "markdown"
-            ],
-            "title": "Type",
-            "description": "Panel kind"
-          },
-          "title": {
-            "type": "string",
-            "maxLength": 200,
-            "title": "Title",
-            "description": "Panel heading",
-            "default": ""
-          },
-          "layout": {
-            "$ref": "#/components/schemas/PanelLayoutModel"
-          },
-          "config": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Config",
-            "description": "Type-specific settings"
-          }
-        },
-        "type": "object",
-        "required": [
-          "panel_id",
-          "type",
-          "layout"
-        ],
-        "title": "DashboardPanelModel",
-        "description": "One panel of a custom dashboard.\n\n``config`` is normalized when saved; its shape depends on ``type`` and is validated\nagainst the matching ``*PanelConfig`` model when the dashboard is saved."
-      },
-      "DashboardPanelResponse": {
-        "properties": {
-          "panel_id": {
-            "type": "string",
-            "maxLength": 64,
-            "minLength": 1,
-            "title": "Panel Id",
-            "description": "Dashboard-unique ID"
-          },
-          "type": {
-            "type": "string",
-            "enum": [
-              "qubit_metric",
-              "coupling_metric",
-              "metric_script",
-              "markdown"
-            ],
-            "title": "Type",
-            "description": "Panel kind"
-          },
-          "title": {
-            "type": "string",
-            "maxLength": 200,
-            "title": "Title",
-            "description": "Panel heading",
-            "default": ""
-          },
-          "layout": {
-            "$ref": "#/components/schemas/PanelLayoutModel"
-          },
-          "config": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Config",
-            "description": "Type-specific settings"
-          },
-          "script_name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Script Name"
-          },
-          "latest_revision": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Latest Revision"
-          }
-        },
-        "type": "object",
-        "required": [
-          "panel_id",
-          "type",
-          "layout"
-        ],
-        "title": "DashboardPanelResponse",
-        "description": "A panel as returned to the caller.\n\nFor ``metric_script`` panels whose script the caller can view, ``script_name`` and\n``latest_revision`` (the script's active, last-good revision) let the UI offer to move\nthe pinned ``config.script_revision`` forward. Both are null for other panels."
+        "title": "DashboardUpdateRequest",
+        "description": "Body for updating a dashboard. ``panels`` replaces the whole list."
       },
       "DegradationTrendResponse": {
         "properties": {
@@ -27179,11 +27179,11 @@
         ],
         "title": "ListCryostatsResponse"
       },
-      "ListCustomDashboardTemplatesResponse": {
+      "ListDashboardTemplatesResponse": {
         "properties": {
           "templates": {
             "items": {
-              "$ref": "#/components/schemas/CustomDashboardTemplateResponse"
+              "$ref": "#/components/schemas/DashboardTemplateResponse"
             },
             "type": "array",
             "title": "Templates"
@@ -27193,14 +27193,14 @@
         "required": [
           "templates"
         ],
-        "title": "ListCustomDashboardTemplatesResponse",
+        "title": "ListDashboardTemplatesResponse",
         "description": "Available starter templates."
       },
-      "ListCustomDashboardsResponse": {
+      "ListDashboardsResponse": {
         "properties": {
           "dashboards": {
             "items": {
-              "$ref": "#/components/schemas/CustomDashboardResponse"
+              "$ref": "#/components/schemas/DashboardResponse"
             },
             "type": "array",
             "title": "Dashboards"
@@ -27215,7 +27215,7 @@
           "dashboards",
           "total"
         ],
-        "title": "ListCustomDashboardsResponse",
+        "title": "ListDashboardsResponse",
         "description": "Dashboards visible to the caller."
       },
       "ListEvaluationRunsResponse": {

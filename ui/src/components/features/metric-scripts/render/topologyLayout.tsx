@@ -2,7 +2,7 @@
 
 import { type KeyboardEvent, useMemo } from "react";
 
-import { topologyGridDimensions } from "@/components/features/custom-dashboards/panels/useElementSize";
+import { topologyGridDimensions } from "@/components/features/dashboards/panels/useElementSize";
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
 
 /** Side of one qubit tile in SVG units. */

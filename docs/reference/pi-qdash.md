@@ -91,7 +91,7 @@ Set `QDASH_WEB_URL` when the web UI is not at the API base URL minus `/api`.
 | `qdash_save_flow` (confirmation-gated) | Validate, format, save, and register a Prefect `@flow` workflow. |
 | `qdash_execute_flow` (confirmation-gated) | Run a saved flow with parameters and return its execution ID without waiting. The name is letters, digits and underscores. |
 
-## Metric scripts and custom dashboards
+## Metric scripts and dashboards
 
 These tools are deferred. Validation and previews execute the script on the QDash server within its time and memory limits but save nothing, so they are direct tools, not script-callable reads. The `qdash-metric-scripts` skill describes the authoring workflow and the `qdash_metrics` API.
 
@@ -100,9 +100,9 @@ These tools are deferred. Validation and previews execute the script on the QDas
 | `qdash_validate_metric_script` | Compile `source` in the worker and return its metrics (id, title, unit, target, hops, parameters) or diagnostics with line numbers. |
 | `qdash_preview_metric_script` | Evaluate one metric of draft `source`, or of a saved `scriptId` (optionally a `revision`), on a chip (default: the session chip) over a `period` (`{kind: "relative", days}` or `{kind: "absolute", start, end}`, default the last 14 days) with `params`. The text gives the metric, resolved period, status counts, legend, up to 12 sample cells with labels and counts, the first five errors with script lines, and truncation and log notices; `details.data` holds the full response. HTTP 422 details (`message`, `diagnostics`, `log`), 429 (queue full) and 503 (metric script runner not available) are returned as text. |
 | `qdash_save_metric_script` (confirmation-gated) | Create a script, or save a new revision of `scriptId` guarded by `expectedRevision` (409 on a concurrent save). Validates first and refuses source that would not validate without asking for confirmation. Reports the revision, status, active revision, diagnostics, and the editor page URL. |
-| `qdash_save_custom_dashboard` (confirmation-gated) | Create a dashboard (optionally from a `templateId`), or update `dashboardId` guarded by `expectedVersion` (409 when the dashboard changed); `panels` replaces the whole list. Local checks reject missing names, grid overflow, and `metric_script` panels without an integer `script_revision` before confirmation. Reports pins with newer active revisions and the dashboard page URL. |
+| `qdash_save_dashboard` (confirmation-gated) | Create a dashboard (optionally from a `templateId`), or update `dashboardId` guarded by `expectedVersion` (409 when the dashboard changed); `panels` replaces the whole list. Local checks reject missing names, grid overflow, and `metric_script` panels without an integer `script_revision` before confirmation. Reports pins with newer active revisions and the dashboard page URL. |
 
-`qdash_query` reads them with the actions `metric_script_catalog`, `metric_script_templates` (without source), `metric_script_template` (`templateId`), `metric_scripts`, `metric_script` (`scriptId`), `custom_dashboards`, `custom_dashboard` (`dashboardId`), and `custom_dashboard_templates`. A single script or dashboard (`metric_script`, `custom_dashboard`) carries `_links` to its web page.
+`qdash_query` reads them with the actions `metric_script_catalog`, `metric_script_templates` (without source), `metric_script_template` (`templateId`), `metric_scripts`, `metric_script` (`scriptId`), `dashboards`, `dashboard` (`dashboardId`), and `dashboard_templates`. A single script or dashboard (`metric_script`, `dashboard`) carries `_links` to its web page.
 
 ## Safety
 
@@ -180,4 +180,4 @@ The reference and examples come from one knowledge request as the configured QDa
 | `/skill:qdash-calibration-agent` | Confirmation-gated calibration workflows. |
 | `/skill:qdash-two-qubit-calibration-diagnosis` | Diagnose two-qubit calibration from read-only evidence. |
 | `/skill:qdash-timeseries-diagnosis` | Investigate multi-metric drift and local sensor series. |
-| `/skill:qdash-metric-scripts` | Write, validate, preview, and save metric scripts and put them on custom dashboards; `references/api.md` documents the `qdash_metrics` API. |
+| `/skill:qdash-metric-scripts` | Write, validate, preview, and save metric scripts and put them on dashboards; `references/api.md` documents the `qdash_metrics` API. |

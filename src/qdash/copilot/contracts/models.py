@@ -229,7 +229,7 @@ class MetricScriptEditorContext(BaseModel):
 
 
 class DashboardEditorContext(BaseModel):
-    """A custom dashboard the user may edit, with its unsaved draft as JSON.
+    """A dashboard the user may edit, with its unsaved draft as JSON.
 
     ``dashboard_id`` is unset for a new dashboard that exists only as a draft in the browser.
     """
@@ -258,7 +258,7 @@ class PageContext(BaseModel):
     )
     dashboard: DashboardEditorContext | None = Field(
         default=None,
-        description="Set on a custom dashboard the user may edit: the dashboard and its draft",
+        description="Set on a dashboard the user may edit: the dashboard and its draft",
     )
 
 
@@ -271,7 +271,7 @@ class ChatRequest(ImageAttachmentsRequest):
         description=(
             "The page the user has open while chatting from the sidebar. The runtime "
             "tells the model about it every turn; on the Workflow editor, the metric script "
-            "editor, or a custom dashboard the user may edit, the model can propose changes "
+            "editor, or a dashboard the user may edit, the model can propose changes "
             "the user applies on the page."
         ),
     )

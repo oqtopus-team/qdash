@@ -19,13 +19,13 @@ from qdash.datamodel.note import NoteModel
 from qdash.datamodel.project import ProjectRole
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.chip import ChipDocument
-from qdash.dbmodel.custom_dashboard import CustomDashboardDocument
+from qdash.dbmodel.dashboard import DashboardDocument
 from qdash.dbmodel.metric_script import MetricScriptDocument
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
-from qdash.repository.custom_dashboard import MongoCustomDashboardRepository
+from qdash.repository.dashboard import MongoDashboardRepository
 from qdash.repository.metric_script import MongoMetricScriptRepository
 from tests.qdash.api.metric_runtime.fakes import install_inprocess_runtime
-from tests.qdash.api.routers.test_custom_dashboard import (
+from tests.qdash.api.routers.test_dashboard import (
     PROJECT,
     _create_project_member,
     _create_project_owner,
@@ -373,7 +373,7 @@ def test_concurrent_source_saves_reject_the_later_one(
         )
         winner["response"] = response
         dashboard = test_client.post(
-            "/custom-dashboards",
+            "/dashboards",
             json={"name": "Pins", "panels": [_pinned_panel(script_id, 2)]},
             headers=owner,
         )
@@ -460,7 +460,7 @@ def test_rejected_save_keeps_pinned_revision_source(test_client, users, runtime,
     )
     assert saved.status_code == 200, saved.text
     dashboard = test_client.post(
-        "/custom-dashboards",
+        "/dashboards",
         json={"name": "Pins", "panels": [_pinned_panel(script_id, 2)]},
         headers=owner,
     )
@@ -521,7 +521,7 @@ def test_revision_history_is_capped_but_keeps_pins(test_client, users, runtime):
         "config": {"script_id": script_id, "metric_id": "scaled_frequency", "script_revision": 1},
     }
     dashboard = test_client.post(
-        "/custom-dashboards", json={"name": "Pins", "panels": [panel]}, headers=owner
+        "/dashboards", json={"name": "Pins", "panels": [panel]}, headers=owner
     )
     assert dashboard.status_code == 201, dashboard.text
     for index in range(55):
@@ -562,13 +562,13 @@ def _stored_doc(script_id: str) -> MetricScriptDocument:
 
 def _post_dashboard(client: Any, headers: dict[str, str], panels: list[Any], **body: Any) -> Any:
     return client.post(
-        "/custom-dashboards", json={"name": "Pins", "panels": panels, **body}, headers=headers
+        "/dashboards", json={"name": "Pins", "panels": panels, **body}, headers=headers
     )
 
 
 def _assert_every_dashboard_pin_holds(client: Any, headers: dict[str, str]) -> None:
     """Every stored panel's revision is pinned on its script and still evaluates."""
-    for dashboard in CustomDashboardDocument.find({"project_id": PROJECT}).run():
+    for dashboard in DashboardDocument.find({"project_id": PROJECT}).run():
         for panel in dashboard.panels:
             if panel.type != "metric_script":
                 continue
@@ -647,7 +647,7 @@ def test_script_save_during_pin_fails_the_dashboard_save(test_client, users, run
     assert dashboard.status_code == 422
     assert "revision 1 of metric script 'Ratio' was removed" in dashboard.json()["detail"]
     assert "reload the dashboard" in dashboard.json()["detail"]
-    assert CustomDashboardDocument.find({"project_id": PROJECT}).count() == 0
+    assert DashboardDocument.find({"project_id": PROJECT}).count() == 0
     script = _stored_doc(script_id)
     assert script.find_revision(1) is None
     assert script.pins == {}
@@ -669,7 +669,7 @@ def test_script_save_between_pin_and_dashboard_insert_keeps_the_pin(
             f"/metric-scripts/{script_id}", json={"source": RATIO + "\n# 51\n"}, headers=owner
         )
 
-    _interleave(monkeypatch, MongoCustomDashboardRepository, "insert", save_script)
+    _interleave(monkeypatch, MongoDashboardRepository, "insert", save_script)
     dashboard = _post_dashboard(test_client, owner, [_pinned_panel(script_id, 1)])
 
     assert dashboard.status_code == 201, dashboard.text
@@ -771,7 +771,7 @@ def test_delete_and_unshare_blocked_while_dashboards_reference_script(test_clien
         "config": {"script_id": script_id, "metric_id": "scaled_frequency", "script_revision": 1},
     }
     dashboard = test_client.post(
-        "/custom-dashboards",
+        "/dashboards",
         json={"name": "Uses ratio", "visibility": "project", "panels": [panel]},
         headers=editor,
     ).json()
@@ -786,7 +786,7 @@ def test_delete_and_unshare_blocked_while_dashboards_reference_script(test_clien
     assert unshare.status_code == 409
 
     test_client.patch(
-        f"/custom-dashboards/{dashboard['dashboard_id']}", json={"panels": []}, headers=editor
+        f"/dashboards/{dashboard['dashboard_id']}", json={"panels": []}, headers=editor
     )
     assert test_client.delete(f"/metric-scripts/{script_id}", headers=editor).status_code == 200
 
@@ -939,7 +939,7 @@ def test_runner_unavailable_returns_503_and_records_nothing(
     # Dashboard templates create their scripts through the same validation.
     assert_unavailable(
         test_client.post(
-            "/custom-dashboards",
+            "/dashboards",
             json={"name": "Collisions", "panels": [], "template_id": "frequency-collision-map"},
             headers=users["owner"],
         )
@@ -1033,27 +1033,25 @@ def test_ambiguous_dashboard_write_preserves_pins(
     dashboard_id = None
     if operation != "insert":
         dashboard_id = _post_dashboard(test_client, owner, [panel]).json()["dashboard_id"]
-    original = getattr(MongoCustomDashboardRepository, operation)
+    original = getattr(MongoDashboardRepository, operation)
 
     def uncertain(self, *args, **kwargs):
         if committed:
             original(self, *args, **kwargs)
         raise error("write outcome unknown")
 
-    monkeypatch.setattr(MongoCustomDashboardRepository, operation, uncertain)
+    monkeypatch.setattr(MongoDashboardRepository, operation, uncertain)
     with pytest.raises(error):
         if operation == "insert":
             _post_dashboard(test_client, owner, [panel])
         elif operation == "delete":
-            test_client.delete(f"/custom-dashboards/{dashboard_id}", headers=owner)
+            test_client.delete(f"/dashboards/{dashboard_id}", headers=owner)
         else:
-            test_client.patch(
-                f"/custom-dashboards/{dashboard_id}", json={"panels": []}, headers=owner
-            )
+            test_client.patch(f"/dashboards/{dashboard_id}", json={"panels": []}, headers=owner)
     # Even a noncommitted write cannot be distinguished from a lost acknowledgement.
     assert _stored_doc(script_id).pins
     assert test_client.delete(f"/metric-scripts/{script_id}", headers=owner).status_code == 409
-    for dashboard in CustomDashboardDocument.find({"project_id": PROJECT}).run():
+    for dashboard in DashboardDocument.find({"project_id": PROJECT}).run():
         for item in dashboard.panels:
             assert item.config["script_revision"] in _stored_doc(script_id).pinned_revisions()
 
@@ -1072,7 +1070,7 @@ def test_pin_failure_before_insert_releases_new_dashboard_pins(
     monkeypatch.setattr(MongoMetricScriptRepository, "add_pin", fail_after_pin)
     with pytest.raises(NetworkTimeout):
         _post_dashboard(test_client, owner, [_pinned_panel(script_id, 1)])
-    assert CustomDashboardDocument.find({"project_id": PROJECT}).count() == 0
+    assert DashboardDocument.find({"project_id": PROJECT}).count() == 0
     assert _stored_doc(script_id).pins == {}
     assert test_client.delete(f"/metric-scripts/{script_id}", headers=owner).status_code == 200
 
@@ -1097,9 +1095,9 @@ def test_pin_release_failures_preserve_live_references(
     monkeypatch.setattr(MongoMetricScriptRepository, operation, interrupted)
     with pytest.raises(NetworkTimeout):
         if operation == "narrow_pin":
-            test_client.patch(f"/custom-dashboards/{first}", json={"panels": []}, headers=owner)
+            test_client.patch(f"/dashboards/{first}", json={"panels": []}, headers=owner)
         else:
-            test_client.delete(f"/custom-dashboards/{first}", headers=owner)
+            test_client.delete(f"/dashboards/{first}", headers=owner)
     assert _stored_doc(script_id).pins[second].revisions == [1]
     assert test_client.delete(f"/metric-scripts/{script_id}", headers=owner).status_code == 409
 
@@ -1112,9 +1110,9 @@ def test_unacknowledged_delete_does_not_release_pins(test_client, users, runtime
     dashboard_id = _post_dashboard(test_client, owner, [_pinned_panel(script_id, 1)]).json()[
         "dashboard_id"
     ]
-    monkeypatch.setattr(CustomDashboardDocument, "delete", lambda self: DeleteResult({}, False))
+    monkeypatch.setattr(DashboardDocument, "delete", lambda self: DeleteResult({}, False))
     with pytest.raises(RuntimeError, match="not acknowledged"):
-        test_client.delete(f"/custom-dashboards/{dashboard_id}", headers=owner)
+        test_client.delete(f"/dashboards/{dashboard_id}", headers=owner)
     assert _stored_doc(script_id).pins[dashboard_id].revisions == [1]
 
 
@@ -1127,7 +1125,7 @@ def test_lost_insert_acknowledgement_protects_every_creation_path(
     dashboard_id = _post_dashboard(test_client, owner, [_pinned_panel(script_id, 1)]).json()[
         "dashboard_id"
     ]
-    insert = MongoCustomDashboardRepository.insert
+    insert = MongoDashboardRepository.insert
     persisted = []
 
     def committed(self, doc):
@@ -1135,13 +1133,13 @@ def test_lost_insert_acknowledgement_protects_every_creation_path(
         persisted.append(doc)
         raise NetworkTimeout("insert acknowledgement lost")
 
-    monkeypatch.setattr(MongoCustomDashboardRepository, "insert", committed)
+    monkeypatch.setattr(MongoDashboardRepository, "insert", committed)
     with pytest.raises(NetworkTimeout):
         if mode == "duplicate":
-            test_client.post(f"/custom-dashboards/{dashboard_id}/duplicate", headers=owner)
+            test_client.post(f"/dashboards/{dashboard_id}/duplicate", headers=owner)
         else:
             test_client.post(
-                "/custom-dashboards",
+                "/dashboards",
                 json={"name": "Template", "template_id": "frequency-collision-map"},
                 headers=owner,
             )
@@ -1173,16 +1171,16 @@ def test_non_integer_revision_is_rejected_without_pin_side_effects(
     created = _post_dashboard(test_client, owner, [invalid], visibility="project")
     assert created.status_code == 422, created.text
     assert "script_revision" in created.json()["detail"]
-    assert CustomDashboardDocument.find({"project_id": PROJECT}).count() == 0
+    assert DashboardDocument.find({"project_id": PROJECT}).count() == 0
     assert _stored_doc(script_id).pins == {}
 
     dashboard_id = _post_dashboard(test_client, owner, []).json()["dashboard_id"]
     version = _stored_doc(script_id).version
     updated = test_client.patch(
-        f"/custom-dashboards/{dashboard_id}", json={"panels": [invalid]}, headers=owner
+        f"/dashboards/{dashboard_id}", json={"panels": [invalid]}, headers=owner
     )
     assert updated.status_code == 422, updated.text
-    stored = test_client.get(f"/custom-dashboards/{dashboard_id}", headers=owner).json()
+    stored = test_client.get(f"/dashboards/{dashboard_id}", headers=owner).json()
     assert stored["panels"] == []
     script = _stored_doc(script_id)
     assert script.pins == {}
@@ -1210,12 +1208,12 @@ def test_integer_revision_is_pinned_and_other_fields_keep_normalizing(test_clien
         ).status_code
         == 409
     )
-    copied = test_client.post(f"/custom-dashboards/{dashboard_id}/duplicate", headers=owner)
+    copied = test_client.post(f"/dashboards/{dashboard_id}/duplicate", headers=owner)
     assert copied.status_code == 201, copied.text
     copy_id = copied.json()["dashboard_id"]
     assert _stored_doc(script_id).pins[copy_id].revisions == [1]
     for dashboard in (dashboard_id, copy_id):
-        response = test_client.delete(f"/custom-dashboards/{dashboard}", headers=owner)
+        response = test_client.delete(f"/dashboards/{dashboard}", headers=owner)
         assert response.status_code == 200
     assert test_client.delete(f"/metric-scripts/{script_id}", headers=owner).status_code == 200
 
@@ -1273,5 +1271,5 @@ def test_invalid_reference_never_creates_dashboard(test_client, users, runtime, 
     panel["config"][field] = value
     response = _post_dashboard(test_client, owner, [panel])
     assert response.status_code == 422, response.text
-    assert CustomDashboardDocument.find({"project_id": PROJECT}).count() == 0
+    assert DashboardDocument.find({"project_id": PROJECT}).count() == 0
     assert _stored_doc(script_id).pins == {}

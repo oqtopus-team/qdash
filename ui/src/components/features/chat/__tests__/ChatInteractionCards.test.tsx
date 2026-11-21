@@ -160,7 +160,7 @@ describe("EditProposalCard for metric scripts", () => {
     chipId: null,
     scriptId: "ms_1",
     scriptName: "zx90_median",
-    pagePath: "/custom-dashboards/scripts/ms_1",
+    pagePath: "/dashboards/scripts/ms_1",
   };
 
   it("names the script and its file", () => {
@@ -192,7 +192,7 @@ describe("EditProposalCard for dashboards", () => {
     flowName: "Collision review",
     chipId: null,
     dashboardId: "dash-1",
-    pagePath: "/custom-dashboards/dash-1",
+    pagePath: "/dashboards/dash-1",
   };
 
   it("diffs the dashboard draft and applies it to the draft, not a save", () => {

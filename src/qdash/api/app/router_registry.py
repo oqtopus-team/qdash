@@ -24,7 +24,7 @@ from qdash.api.routers import (
     cooldown_wiring_event,
     copilot,
     cryostat,
-    custom_dashboard,
+    dashboard,
     device_topology,
     evaluation,
     execution,
@@ -94,9 +94,7 @@ PROTECTED_ROUTERS: tuple[RouterRegistration, ...] = (
     RouterRegistration(cryostat.router, tags=("cryostat",)),
     RouterRegistration(cooldown.router, tags=("cooldown",)),
     RouterRegistration(cooldown_wiring_event.router, tags=("cooldown-wiring",)),
-    RouterRegistration(
-        custom_dashboard.router, prefix="/custom-dashboards", tags=("custom-dashboard",)
-    ),
+    RouterRegistration(dashboard.router, prefix="/dashboards", tags=("dashboard",)),
     RouterRegistration(metric_script.router, prefix="/metric-scripts", tags=("metric-script",)),
     RouterRegistration(topology.router, prefix="/topology", tags=("topology",)),
     RouterRegistration(config.router, tags=("config",)),

@@ -1,4 +1,4 @@
-"""Metric scripts and custom dashboards: local definitions and QDash.scripts / QDash.dashboards."""
+"""Metric scripts and dashboards: local definitions and QDash.scripts / QDash.dashboards."""
 
 from __future__ import annotations
 
@@ -219,10 +219,10 @@ def test_dashboard_update_sends_the_version_it_is_based_on() -> None:
     }
     server = Server(
         {
-            ("GET", f"/custom-dashboards/{DASHBOARD_ID}"): [
+            ("GET", f"/dashboards/{DASHBOARD_ID}"): [
                 httpx.Response(200, json=dashboard_body(version=4, panels=[panel]))
             ],
-            ("PATCH", f"/custom-dashboards/{DASHBOARD_ID}"): [
+            ("PATCH", f"/dashboards/{DASHBOARD_ID}"): [
                 httpx.Response(200, json=dashboard_body(version=5, panels=[panel])),
                 httpx.Response(409, json={"detail": "Dashboard was changed by another save"}),
             ],
@@ -250,13 +250,13 @@ def test_dashboard_update_sends_the_version_it_is_based_on() -> None:
     assert stale.value.status_code == 409
     assert body(server.requests[-1])["expected_version"] == 4
     assert server.paths()[-2:] == [
-        ("GET", f"/custom-dashboards/{DASHBOARD_ID}"),
-        ("PATCH", f"/custom-dashboards/{DASHBOARD_ID}"),
+        ("GET", f"/dashboards/{DASHBOARD_ID}"),
+        ("PATCH", f"/dashboards/{DASHBOARD_ID}"),
     ]
 
 
 def test_create_omits_unset_settings() -> None:
-    server = Server({("POST", "/custom-dashboards"): [httpx.Response(201, json=dashboard_body())]})
+    server = Server({("POST", "/dashboards"): [httpx.Response(201, json=dashboard_body())]})
     qdash = QDash(server.client())
 
     qdash.dashboards.create(Dashboard("Ops"))

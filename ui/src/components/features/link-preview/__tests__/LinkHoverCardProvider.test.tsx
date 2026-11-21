@@ -159,7 +159,7 @@ describe("link hover cards", () => {
     const onClick = vi.fn((event: React.MouseEvent) => event.defaultPrevented);
     render(
       <LinkHoverCardProvider>
-        <a href="/dashboard" onClick={onClick}>
+        <a href="/overview" onClick={onClick}>
           Overview
         </a>
       </LinkHoverCardProvider>,
@@ -237,11 +237,11 @@ describe("link hover cards", () => {
         <a href="javascript:void(0)">Script</a>
         <a>No destination</a>
         <button type="button">Go to dashboard</button>
-        <a href="/dashboard" aria-disabled="true">
+        <a href="/overview" aria-disabled="true">
           Disabled
         </a>
         <div data-link-preview="off">
-          <a href="/dashboard">Opted out</a>
+          <a href="/overview">Opted out</a>
         </div>
       </LinkHoverCardProvider>,
     );
@@ -327,7 +327,7 @@ describe("link hover cards", () => {
   it("does not open on focus that a pointer press or hover caused", () => {
     render(
       <LinkHoverCardProvider>
-        <a href="/dashboard">Overview</a>
+        <a href="/overview">Overview</a>
         <a href="/metrics">Metrics</a>
       </LinkHoverCardProvider>,
     );

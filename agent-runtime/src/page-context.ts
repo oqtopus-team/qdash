@@ -5,7 +5,7 @@
  * The API forwards the page with every turn, so the section below is rebuilt
  * each time: an editor's buffer changes as the user types, and the model must
  * see the current text, saved or not. On the Workflow editor, on the metric
- * script editor and on a custom dashboard the user may edit, the model also
+ * script editor and on a dashboard the user may edit, the model also
  * gets `propose_code_edit`: it proposes the complete new file (for a
  * dashboard, its draft as JSON), the chat shows a diff, and the user applies it
  * on the page and saves. The runtime never writes the flow, the script or the
@@ -34,7 +34,7 @@ export interface MetricScriptEditorContext {
 }
 
 /**
- * The custom dashboard the user may edit, with its unsaved draft. Sent only for a
+ * The dashboard the user may edit, with its unsaved draft. Sent only for a
  * dashboard the user can save: their own, or a new one not created yet.
  */
 export interface DashboardEditorContext {
@@ -55,7 +55,7 @@ export interface DashboardEditorContext {
 }
 
 export interface PageContext {
-  /** The route, such as `/workflow/t1_check` or `/custom-dashboards/scripts/ms_…`. */
+  /** The route, such as `/workflow/t1_check` or `/dashboards/scripts/ms_…`. */
   path: string;
   title?: string;
   flow?: FlowEditorContext;
@@ -312,8 +312,8 @@ function dashboardSection(dashboard: DashboardEditorContext): string[] {
     dashboard.chipId ? `the page shows chip ${dashboard.chipId}` : null,
   ].filter(Boolean);
   const head = isNew
-    ? `They are composing a new custom dashboard${dashboard.name ? ` \`${dashboard.name}\`` : ""}. It exists only as a draft in their browser and is created when they press Save${facts.length ? ` (${facts.join(", ")})` : ""}${dashboard.dirty ? "" : "; the draft is still empty"}.`
-    : `They have the custom dashboard \`${dashboard.name}\` (${dashboard.dashboardId}) open and may edit it${facts.length ? ` (${facts.join(", ")})` : ""}${dashboard.dirty ? ", with unsaved changes" : ""}.`;
+    ? `They are composing a new dashboard${dashboard.name ? ` \`${dashboard.name}\`` : ""}. It exists only as a draft in their browser and is created when they press Save${facts.length ? ` (${facts.join(", ")})` : ""}${dashboard.dirty ? "" : "; the draft is still empty"}.`
+    : `They have the dashboard \`${dashboard.name}\` (${dashboard.dashboardId}) open and may edit it${facts.length ? ` (${facts.join(", ")})` : ""}${dashboard.dirty ? ", with unsaved changes" : ""}.`;
   return [
     head,
     ...(dashboard.description ? [`Its description: ${dashboard.description.slice(0, 500)}`] : []),
@@ -323,9 +323,9 @@ function dashboardSection(dashboard: DashboardEditorContext): string[] {
     code,
     fence,
     "",
-    `To change the dashboard, call \`${EDIT_TOOL}\` with the complete new draft as JSON in \`code\` and a one-line summary. The user sees a diff in the chat, applies it to the page's draft, reviews the panels, and saves when they are ready. Do not use qdash_save_custom_dashboard for this dashboard unless they ask you to save, because a save from here would replace their draft; never change its sharing.`,
+    `To change the dashboard, call \`${EDIT_TOOL}\` with the complete new draft as JSON in \`code\` and a one-line summary. The user sees a diff in the chat, applies it to the page's draft, reviews the panels, and saves when they are ready. Do not use qdash_save_dashboard for this dashboard unless they ask you to save, because a save from here would replace their draft; never change its sharing.`,
     isNew
-      ? "A new draft holds name, description, chip_id (the default chip, or null for the newest chip), template_id and panels. template_id names a starter template (qdash_query custom_dashboard_templates); its panels are copied in when the dashboard is created, so set panels to [] when you use one; the page then previews the template's panels without creating anything. When the project has no shared script for the template's script panels, Save also adds one, and the page says so before the user saves."
+      ? "A new draft holds name, description, chip_id (the default chip, or null for the newest chip), template_id and panels. template_id names a starter template (qdash_query dashboard_templates); its panels are copied in when the dashboard is created, so set panels to [] when you use one; the page then previews the template's panels without creating anything. When the project has no shared script for the template's script panels, Save also adds one, and the page says so before the user saves."
       : "A saved dashboard's draft holds only panels; its name, description and default chip are changed in Dashboard settings.",
     "Each panel is {panel_id, type, title, layout: {x, y, w, h}, config} on a 12-column grid (x + w <= 12, h of 1 to 12 rows of 120 px). Types and their config: qubit_metric and coupling_metric {metric} (a metric key from qdash_get_chip_metrics); markdown {content}; metric_script {script_id, script_revision, metric_id, period, params, view, direction, hops}, where the script and its metric come from qdash_query metric_scripts and metric_script, and period is {kind: \"relative\", days} or {kind: \"absolute\", start, end} with timezones. Keep the panel_id and the pinned script_revision of every panel you do not mean to change; move a pin only when the user asks. A metric_script panel needs a saved script: when none computes what the user wants, write it and save it with qdash_save_metric_script, which asks the user to confirm, before you propose a panel for it; a draft never creates a script, apart from a starter template's shared script on Save. QDash checks scripts, revisions and metrics when the user saves, and a project-visible dashboard can only use project scripts.",
   ];
@@ -385,12 +385,12 @@ export function buildProposeCodeEditTool(editor: EditorContext, pagePath: string
   });
 }
 
-/** The edit tool on a custom dashboard: the same proposal, with the draft as JSON instead of a file. */
+/** The edit tool on a dashboard: the same proposal, with the draft as JSON instead of a file. */
 function buildProposeDashboardDraftTool(dashboard: DashboardEditorContext, pagePath: string) {
   const isNew = !dashboard.dashboardId;
   const what = isNew
-    ? "the new custom dashboard the user is composing"
-    : `the custom dashboard \`${dashboard.name}\` the user has open`;
+    ? "the new dashboard the user is composing"
+    : `the dashboard \`${dashboard.name}\` the user has open`;
   return defineTool({
     name: EDIT_TOOL,
     description:

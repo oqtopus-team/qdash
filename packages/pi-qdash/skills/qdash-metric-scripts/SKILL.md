@@ -1,6 +1,6 @@
 ---
 name: qdash-metric-scripts
-description: Write, check, preview and save QDash metric scripts (Python using the qdash_metrics API) and put them on custom dashboards. Use whenever the user wants a custom dashboard, a dashboard panel, a custom or derived metric, a per-qubit or per-coupling analysis, a map or table of something across the chip, a median, mean, minimum, count or trend of a metric over a period ("median ZX90 fidelity over the last 14 days per coupling", "show T2/T1 per qubit", "how many readout measurements per qubit this week"), frequency collision checks or a collision map, or when they have a metric script open in the QDash editor, even if they never say "script".
+description: Write, check, preview and save QDash metric scripts (Python using the qdash_metrics API) and put them on dashboards. Use whenever the user wants a dashboard, a dashboard panel, a custom or derived metric, a per-qubit or per-coupling analysis, a map or table of something across the chip, a median, mean, minimum, count or trend of a metric over a period ("median ZX90 fidelity over the last 14 days per coupling", "show T2/T1 per qubit", "how many readout measurements per qubit this week"), frequency collision checks or a collision map, or when they have a metric script open in the QDash editor, even if they never say "script".
 ---
 
 <!-- Confirmation gates are implemented by the host harness. Skills should state that a gate exists, not instruct how or when to ask for confirmation. -->
@@ -22,14 +22,14 @@ plausible-looking scripts go wrong.
 
 - `qdash_query` actions (read-only): `metric_script_catalog` (the metrics a script can read,
   with unit and scale), `metric_script_templates` / `metric_script_template` (`templateId`),
-  `metric_scripts` / `metric_script` (`scriptId`), `custom_dashboards` / `custom_dashboard`
-  (`dashboardId`), `custom_dashboard_templates`.
+  `metric_scripts` / `metric_script` (`scriptId`), `dashboards` / `dashboard`
+  (`dashboardId`), `dashboard_templates`.
 - `qdash_validate_metric_script` `{source}`: compiles the script in the worker and returns its
   metrics or diagnostics with line numbers. Nothing is saved and no data is read.
 - `qdash_preview_metric_script` `{source | scriptId, metricId, chipId?, period?, params?}`:
   evaluates one metric on a chip and summarises the cells. It runs the code on the server
   within the time and memory limits but persists nothing; `details.data` has every cell.
-- `qdash_save_metric_script` and `qdash_save_custom_dashboard`: confirmation-gated writes
+- `qdash_save_metric_script` and `qdash_save_dashboard`: confirmation-gated writes
   (the harness asks the user). The script save validates first and refuses source that would
   not validate.
 
@@ -59,7 +59,7 @@ offered.
 6. **Show the code** and the preview summary to the user, then save with
    `qdash_save_metric_script` when they want it kept. New scripts are private unless the user
    asks to share them with the project.
-7. **Optionally add it to a dashboard** with `qdash_save_custom_dashboard`: a `metric_script`
+7. **Optionally add it to a dashboard** with `qdash_save_dashboard`: a `metric_script`
    panel pinned to the saved script's `active_revision` (see below). On update, read the
    dashboard first and send the complete panel list; omitted panels are removed.
 
@@ -122,7 +122,7 @@ editor's current text (saved or not) is in the prompt. Work on that text:
 
 ## When a dashboard is open
 
-If the page context says the user has a custom dashboard open that they may edit, or is
+If the page context says the user has a dashboard open that they may edit, or is
 composing a new one, the dashboard's unsaved draft is in the prompt as JSON. Work on that draft:
 
 - Change it with `propose_code_edit` and the complete new draft as JSON. The user sees a diff,
@@ -138,7 +138,7 @@ composing a new one, the dashboard's unsaved draft is in the prompt as JSON. Wor
   references it. A draft never creates a script on its own; the one exception is a starter
   template, whose shared script QDash adds when the user saves the dashboard, as the page tells
   them before they save.
-- Do not call `qdash_save_custom_dashboard` for that dashboard unless the user asks you to save,
+- Do not call `qdash_save_dashboard` for that dashboard unless the user asks you to save,
   and never change its sharing.
 
 ## Limits and failures

@@ -21,6 +21,7 @@ describe("next.config.js", () => {
       expect.arrayContaining([
         { source: "/files", destination: "/config", permanent: true },
         { source: "/task-knowledge", destination: "/knowledge", permanent: true },
+        { source: "/dashboard", destination: "/overview", permanent: true },
       ]),
     );
   });

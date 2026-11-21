@@ -177,8 +177,8 @@ describe("qdash.dashboards", () => {
 
   it("sends the version an update is based on and surfaces a stale save", async () => {
     const { qdash, requests } = server({
-      "GET /custom-dashboards/dash_1": [{ body: dashboardBody(4, [panel]) }, { body: dashboardBody(4, [panel]) }],
-      "PATCH /custom-dashboards/dash_1": [
+      "GET /dashboards/dash_1": [{ body: dashboardBody(4, [panel]) }, { body: dashboardBody(4, [panel]) }],
+      "PATCH /dashboards/dash_1": [
         { body: dashboardBody(5, [panel]) },
         { status: 409, body: { detail: "Dashboard was changed by another save" } },
       ],
@@ -200,12 +200,12 @@ describe("qdash.dashboards", () => {
     const stale = qdash.dashboards.update("dash_1", edited);
     await expect(stale).rejects.toBeInstanceOf(QDashApiError);
     await expect(stale).rejects.toMatchObject({ statusCode: 409 });
-    expect(requests.slice(-2).map((request) => request.key)).toEqual(["GET /custom-dashboards/dash_1", "PATCH /custom-dashboards/dash_1"]);
+    expect(requests.slice(-2).map((request) => request.key)).toEqual(["GET /dashboards/dash_1", "PATCH /dashboards/dash_1"]);
     expect((requests.at(-1)?.body as { expected_version: number }).expected_version).toBe(4);
   });
 
   it("creates with only the settings given", async () => {
-    const { qdash, requests } = server({ "POST /custom-dashboards": [{ status: 201, body: dashboardBody(0) }] });
+    const { qdash, requests } = server({ "POST /dashboards": [{ status: 201, body: dashboardBody(0) }] });
     const saved = await qdash.dashboards.create(new Dashboard({ name: "Ops" }));
     expect(requests[0]?.body).toEqual({ name: "Ops", panels: [] });
     expect(saved.dashboardId).toBe("dash_1");

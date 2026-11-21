@@ -83,4 +83,5 @@ export const REDIRECTS: Record<string, string> = {
   "/user-guide/qdash-typescript-client": "/reference/clients/typescript",
   "/user-guide/migrations/project-scoped-calibration": "/user-guide/system-updates",
   "/user-guide/migrations/v1.8.0": "/user-guide/system-updates",
+  "/user-guide/dashboard": "/user-guide/overview",
 };

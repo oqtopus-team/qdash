@@ -55,9 +55,9 @@ from qdash.client.services.models import (
     ChipMetricsResponse,
     ChipResponse,
     CouplingResponse,
-    CustomDashboardCreateRequest,
-    CustomDashboardResponse,
-    CustomDashboardUpdateRequest,
+    DashboardCreateRequest,
+    DashboardResponse,
+    DashboardUpdateRequest,
     ExecuteFlowResponse,
     ExecutePipelineResponse,
     ExecutionActivityResponse,
@@ -71,7 +71,7 @@ from qdash.client.services.models import (
     LineageResponse,
     ListChipsResponse,
     ListCouplingsResponse,
-    ListCustomDashboardsResponse,
+    ListDashboardsResponse,
     ListExecutionsResponse,
     ListFlowsResponse,
     ListMetricScriptsResponse,
@@ -805,31 +805,29 @@ class QDashClient:
         )
         return self._validate_model_payload(MetricScriptResponse, response.data)
 
-    def list_custom_dashboards(self) -> ListCustomDashboardsResponse:
-        """Custom dashboards visible to the caller (project-shared and their own)."""
-        response = self._request("GET", "/custom-dashboards")
-        return self._validate_model_payload(ListCustomDashboardsResponse, response.data)
+    def list_dashboards(self) -> ListDashboardsResponse:
+        """Dashboards visible to the caller (project-shared and their own)."""
+        response = self._request("GET", "/dashboards")
+        return self._validate_model_payload(ListDashboardsResponse, response.data)
 
-    def get_custom_dashboard(self, dashboard_id: str) -> CustomDashboardResponse:
-        response = self._request("GET", f"/custom-dashboards/{_path_part(dashboard_id)}")
-        return self._validate_model_payload(CustomDashboardResponse, response.data)
+    def get_dashboard(self, dashboard_id: str) -> DashboardResponse:
+        response = self._request("GET", f"/dashboards/{_path_part(dashboard_id)}")
+        return self._validate_model_payload(DashboardResponse, response.data)
 
-    def create_custom_dashboard(
-        self, request: CustomDashboardCreateRequest
-    ) -> CustomDashboardResponse:
-        response = self._request("POST", "/custom-dashboards", json=_request_body(request))
-        return self._validate_model_payload(CustomDashboardResponse, response.data)
+    def create_dashboard(self, request: DashboardCreateRequest) -> DashboardResponse:
+        response = self._request("POST", "/dashboards", json=_request_body(request))
+        return self._validate_model_payload(DashboardResponse, response.data)
 
-    def update_custom_dashboard(
-        self, dashboard_id: str, request: CustomDashboardUpdateRequest
-    ) -> CustomDashboardResponse:
+    def update_dashboard(
+        self, dashboard_id: str, request: DashboardUpdateRequest
+    ) -> DashboardResponse:
         """Update a dashboard; a provided ``panels`` list replaces the previous one."""
         response = self._request(
             "PATCH",
-            f"/custom-dashboards/{_path_part(dashboard_id)}",
+            f"/dashboards/{_path_part(dashboard_id)}",
             json=_request_body(request),
         )
-        return self._validate_model_payload(CustomDashboardResponse, response.data)
+        return self._validate_model_payload(DashboardResponse, response.data)
 
     def get_calibration_pipeline_catalog(
         self, *, backend_name: str | None = None

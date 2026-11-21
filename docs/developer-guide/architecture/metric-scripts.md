@@ -4,7 +4,7 @@ The metric script runtime validates and evaluates user-authored Python in a work
 the dedicated `metric-runner` container starts as a per-job uid, with no credentials and no
 network; every value the script reads comes from a data broker inside the API process.
 Persistence, permissions and the dashboard revision policy are in
-[Custom Dashboards](./custom-dashboards.md); writing scripts is in
+[Dashboards](./dashboards.md); writing scripts is in
 [Metric Scripts](../../user-guide/metric-scripts.md). `qdash_metrics` exists only in the worker;
 saving scripts from a remote program is the
 [Python SDK](./python-sdk.md#metric-scripts-and-dashboards)'s job, which treats the source as text.

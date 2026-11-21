@@ -1,6 +1,6 @@
-"""Metric scripts and custom dashboards of a QDash session: save, read, pin.
+"""Metric scripts and dashboards of a QDash session: save, read, pin.
 
-These operations reach the server's ``/metric-scripts`` and ``/custom-dashboards`` routes with
+These operations reach the server's ``/metric-scripts`` and ``/dashboards`` routes with
 the session's project and the caller's permissions. Every create and update names its target
 explicitly: nothing is matched by name, cached locally, retried or rolled back.
 """
@@ -14,7 +14,7 @@ from qdash.sdk.dashboard import Dashboard, MetricScriptError, Script, ScriptMetr
 if TYPE_CHECKING:
     from qdash.client.services.client import QDashClient
     from qdash.client.services.models import (
-        CustomDashboardResponse,
+        DashboardResponse,
         MetricInfo,
         MetricScriptResponse,
         MetricScriptRevision,
@@ -193,13 +193,13 @@ class Scripts:
 
 
 class SavedDashboard:
-    """A custom dashboard as the server stored it; ``response`` is the API's answer.
+    """A dashboard as the server stored it; ``response`` is the API's answer.
 
     ``version`` is the dashboard's write counter at that time; :meth:`Dashboards.update`
     sends it so a save made by someone else since then is not overwritten.
     """
 
-    def __init__(self, response: CustomDashboardResponse) -> None:
+    def __init__(self, response: DashboardResponse) -> None:
         self.response = response
 
     @property
@@ -226,21 +226,21 @@ class SavedDashboard:
 
 
 class Dashboards:
-    """The project's custom dashboards, reached as ``QDash.dashboards``."""
+    """The project's dashboards, reached as ``QDash.dashboards``."""
 
     def __init__(self, client: QDashClient) -> None:
         self._client = client
 
-    def list(self) -> list[CustomDashboardResponse]:
+    def list(self) -> list[DashboardResponse]:
         """Dashboards visible to the caller: shared with the project or their own."""
-        return list(self._client.list_custom_dashboards().dashboards)
+        return list(self._client.list_dashboards().dashboards)
 
     def get(self, dashboard_id: str) -> SavedDashboard:
-        return SavedDashboard(self._client.get_custom_dashboard(dashboard_id))
+        return SavedDashboard(self._client.get_dashboard(dashboard_id))
 
     def create(self, dashboard: Dashboard) -> SavedDashboard:
         """Save a new dashboard owned by the caller."""
-        return SavedDashboard(self._client.create_custom_dashboard(dashboard.create_request()))
+        return SavedDashboard(self._client.create_dashboard(dashboard.create_request()))
 
     def update(
         self,
@@ -262,8 +262,8 @@ class Dashboards:
         else:
             dashboard_id = target
             if expected_version is None:
-                expected_version = self._client.get_custom_dashboard(dashboard_id).version
-        response = self._client.update_custom_dashboard(
+                expected_version = self._client.get_dashboard(dashboard_id).version
+        response = self._client.update_dashboard(
             dashboard_id, dashboard.update_request(expected_version=expected_version)
         )
         return SavedDashboard(response)

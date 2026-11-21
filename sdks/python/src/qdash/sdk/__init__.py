@@ -5,7 +5,7 @@ configuration, authentication, transport and errors. ``QDash.chip(chip_id)`` val
 starts calibrations defined with :mod:`qdash.sdk.calibration`; ``QDash.workflows`` lists,
 inspects and runs the workflows registered in the project; ``QDash.pipelines`` and
 :mod:`qdash.sdk.pipeline` work with whole pipeline specs. ``QDash.scripts`` and
-``QDash.dashboards`` save metric scripts and custom dashboards defined with
+``QDash.dashboards`` save metric scripts and dashboards defined with
 :mod:`qdash.sdk.dashboard`.
 """
 

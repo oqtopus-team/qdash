@@ -10,7 +10,7 @@ import type { DashboardPanelModelType } from './dashboardPanelModelType';
 import type { PanelLayoutModel } from './panelLayoutModel';
 
 /**
- * One panel of a custom dashboard.
+ * One panel of a dashboard.
  *
  * ``config`` is normalized when saved; its shape depends on ``type`` and is validated
  * against the matching ``*PanelConfig`` model when the dashboard is saved.

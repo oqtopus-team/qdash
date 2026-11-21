@@ -1,7 +1,7 @@
 # TypeScript SDK
 
 `@oqtopus-team/qdash-sdk` lets a TypeScript application validate or start a calibration on a chip,
-run the workflows registered in a project, and save metric scripts and custom dashboards, through
+run the workflows registered in a project, and save metric scripts and dashboards, through
 the QDash API. It is a separate npm
 package in `sdks/typescript/`, built on `@oqtopus-team/qdash-client`; the user-facing example is
 in the [TypeScript Client reference](../../reference/clients/typescript.md#run-a-calibration).
@@ -32,7 +32,7 @@ The SDK adds no transport, retries or caches; each call delegates to the client:
 | `chip.validateCalibration`, `chip.calibrate` | `qdash.pipelines.validate`, `qdash.pipelines.execute` with the spec `calibrationSpec` builds |
 | `qdash.workflows.list`, `get`, `run` | `client.listFlows`, `getFlow`, `executeFlow` |
 | `qdash.scripts.list`, `get`, `template`, `validate`, `create`, `update` | `client.listMetricScripts`, `getMetricScript`, `listMetricScriptTemplates`, `validateMetricScript`, `createMetricScript`, `updateMetricScript` |
-| `qdash.dashboards.list`, `get`, `create`, `update` | `client.listCustomDashboards`, `getCustomDashboard` (also before an update by ID), `createCustomDashboard`, `updateCustomDashboard` |
+| `qdash.dashboards.list`, `get`, `create`, `update` | `client.listDashboards`, `getDashboard` (also before an update by ID), `createDashboard`, `updateDashboard` |
 | `run.wait()` | `client.waitForExecution` with `wholePipeline: true` and `notFoundAsPending: true` |
 | `run.get()` | `client.getExecution` |
 | `new QDash(client, { projectId })` | `client.withProject`, a new client with the same transport options |
@@ -65,7 +65,7 @@ board.addMetric(script.metric("zx90_median"), { period: 14, params: { min_sample
 const saved = await qdash.dashboards.create(board);
 ```
 
-pi-qdash's `qdash_save_metric_script` saves through `qdash.scripts`. `qdash_save_custom_dashboard`
+pi-qdash's `qdash_save_metric_script` saves through `qdash.scripts`. `qdash_save_dashboard`
 keeps calling the client, because it updates only the fields given and the SDK replaces the whole
 definition; it forwards an optional `expectedVersion`.
 

@@ -332,7 +332,7 @@ How the SDK is built: [Python SDK](../../developer-guide/architecture/python-sdk
 ## Save Metric Scripts and Dashboards
 
 `qdash.scripts` and `qdash.dashboards` save [metric scripts](../../user-guide/metric-scripts.md)
-and [custom dashboards](../../user-guide/custom-dashboards.md) defined in Python. This example
+and [dashboards](../../user-guide/dashboards.md) defined in Python. This example
 saves the median ZX90 fidelity script from a file and shares a dashboard that shows it per
 directed coupling over the last 14 days:
 

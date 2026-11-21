@@ -25,7 +25,7 @@ describe("isPathWithin", () => {
 
   it("does not match a sibling route that shares a prefix", () => {
     expect(isPathWithin("/workflows", "/workflow")).toBe(false);
-    expect(isPathWithin("/dashboard-old", "/dashboard")).toBe(false);
+    expect(isPathWithin("/overview-old", "/overview")).toBe(false);
   });
 });
 
@@ -34,16 +34,16 @@ describe("getNavigationSections", () => {
     for (const sections of [editor, viewer]) {
       const explore = sections.find((section) => section.label === "Explore");
       const hrefs = explore?.items.map((item) => item.href) ?? [];
-      const item = explore?.items.find((entry) => entry.href === "/custom-dashboards");
+      const item = explore?.items.find((entry) => entry.href === "/dashboards");
 
-      expect(hrefs.indexOf("/custom-dashboards")).toBe(hrefs.indexOf("/dashboard") + 1);
+      expect(hrefs.indexOf("/dashboards")).toBe(hrefs.indexOf("/overview") + 1);
       expect(item).toMatchObject({ label: "Dashboards", match: "prefix" });
       expect(item?.visible).not.toBe(false);
     }
   });
 
   it("keeps Dashboards out of the Overview mobile tab", () => {
-    expect(isMobileTabActive(tabFor("/dashboard"), "/custom-dashboards/abc")).toBe(false);
+    expect(isMobileTabActive(tabFor("/overview"), "/dashboards/abc")).toBe(false);
   });
 });
 
@@ -58,7 +58,7 @@ describe("getMobileTabs", () => {
       "Agent",
     ]);
     expect(tabs.map((tab) => tab.item.href)).toEqual([
-      "/dashboard",
+      "/overview",
       "/workflow",
       "/execution",
       "/chat",
@@ -76,7 +76,7 @@ describe("getMobileTabs", () => {
 
 describe("isMobileTabActive", () => {
   it.each([
-    ["/dashboard", "/dashboard"],
+    ["/overview", "/overview"],
     ["/workflow", "/workflow"],
     ["/workflow/new", "/workflow"],
     ["/workflow/my-flow", "/workflow"],
@@ -94,7 +94,7 @@ describe("isMobileTabActive", () => {
   it.each(["/home", "/metrics", "/task-results/abc", "/workflows", "/chats", "/settings"])(
     "leaves every tab inactive on %s",
     (pathname) => {
-      for (const href of ["/dashboard", "/workflow", "/execution", "/chat"]) {
+      for (const href of ["/overview", "/workflow", "/execution", "/chat"]) {
         expect(isMobileTabActive(tabFor(href), pathname)).toBe(false);
       }
     },
@@ -107,14 +107,14 @@ describe("withoutMobileTabs", () => {
     const hrefs = sections.flatMap((section) => section.items.map((item) => item.href));
 
     expect(sections.map((section) => section.label)).toEqual(editor.map((s) => s.label));
-    expect(hrefs).not.toContain("/dashboard");
+    expect(hrefs).not.toContain("/overview");
     expect(hrefs).not.toContain("/workflow");
     expect(hrefs).not.toContain("/execution");
     expect(hrefs).not.toContain("/chat");
     expect(hrefs).toEqual(
       editor
         .flatMap((section) => section.items.map((item) => item.href))
-        .filter((href) => !["/dashboard", "/workflow", "/execution", "/chat"].includes(href)),
+        .filter((href) => !["/overview", "/workflow", "/execution", "/chat"].includes(href)),
     );
   });
 

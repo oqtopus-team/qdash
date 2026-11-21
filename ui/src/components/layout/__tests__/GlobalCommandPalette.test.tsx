@@ -194,7 +194,7 @@ describe("GlobalCommandPalette", () => {
 
     fireEvent.click(screen.getByRole("option", { name: "Overview" }));
 
-    expect(push).toHaveBeenCalledWith("/dashboard");
+    expect(push).toHaveBeenCalledWith("/overview");
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
@@ -207,10 +207,10 @@ describe("GlobalCommandPalette", () => {
     expect(screen.getByRole("option", { name: "Settings" })).toBeTruthy();
   });
 
-  it("shows dashboard metrics and jumps to the selected metric", async () => {
-    mockPathname.mockReturnValue("/dashboard");
+  it("shows overview metrics and jumps to the selected metric", async () => {
+    mockPathname.mockReturnValue("/overview");
     const target = document.createElement("div");
-    target.id = "dashboard-coupling-metric-zx90_gate_fidelity";
+    target.id = "overview-coupling-metric-zx90_gate_fidelity";
     const scrollIntoView = vi.fn();
     Object.defineProperty(target, "scrollIntoView", { value: scrollIntoView });
     document.body.appendChild(target);

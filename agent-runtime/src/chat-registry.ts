@@ -93,7 +93,7 @@ export function buildChatRegistry(
     );
   }
   // The page the user has open, after their preferences; on the Workflow editor,
-  // the metric script editor or an editable custom dashboard it brings the edit
+  // the metric script editor or an editable dashboard it brings the edit
   // tool, which proposes and never saves.
   const pageSection = buildPageContextSection(pageContext);
   const editor = editorOf(pageContext);

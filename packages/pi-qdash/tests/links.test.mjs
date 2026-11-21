@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { customDashboardPagePath, executionPagePath, forumPostPagePath, metricScriptPagePath, qdashObjectLinks, qdashWebBaseUrl } from "../.test-dist/lib/links.js";
+import { dashboardPagePath, executionPagePath, forumPostPagePath, metricScriptPagePath, qdashObjectLinks, qdashWebBaseUrl } from "../.test-dist/lib/links.js";
 
 const client = { config: { baseUrl: "https://qdash.example/api" } };
 
@@ -33,9 +33,9 @@ test("QDASH_WEB_URL overrides the web base derived from the API base URL", () =>
   assert.equal(qdashWebBaseUrl({ config: { baseUrl: "http://api:5715" } }, { QDASH_WEB_URL: "" }), "http://api:5715");
 });
 
-test("metric scripts and custom dashboards link to their pages", () => {
-  assert.equal(metricScriptPagePath("ms_1"), "/custom-dashboards/scripts/ms_1");
-  assert.equal(customDashboardPagePath("cd/1"), "/custom-dashboards/cd%2F1");
-  assert.deepEqual(qdashObjectLinks(client, { script_id: "ms_1" }), { metric_script: "https://qdash.example/custom-dashboards/scripts/ms_1" });
-  assert.deepEqual(qdashObjectLinks(client, { dashboard_id: "cd_1" }), { custom_dashboard: "https://qdash.example/custom-dashboards/cd_1" });
+test("metric scripts and dashboards link to their pages", () => {
+  assert.equal(metricScriptPagePath("ms_1"), "/dashboards/scripts/ms_1");
+  assert.equal(dashboardPagePath("cd/1"), "/dashboards/cd%2F1");
+  assert.deepEqual(qdashObjectLinks(client, { script_id: "ms_1" }), { metric_script: "https://qdash.example/dashboards/scripts/ms_1" });
+  assert.deepEqual(qdashObjectLinks(client, { dashboard_id: "cd_1" }), { dashboard: "https://qdash.example/dashboards/cd_1" });
 });

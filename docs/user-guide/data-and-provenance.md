@@ -19,10 +19,10 @@ what these pages show. Include that scope when sharing an observation.
 
 ## Scan Current State
 
-Follow [Overview](./dashboard.md#select-the-data-scope) to choose a chip, time range, and value
+Follow [Overview](./overview.md#select-the-data-scope) to choose a chip, time range, and value
 selection, then review coverage and distributions. Use **Metrics** to compare one parameter
 across targets, checking direction for couplings. The
-[Color range](./dashboard.md#scan-chip-health) control is shared by both pages.
+[Color range](./overview.md#scan-chip-health) control is shared by both pages.
 
 ## Inspect Measurements
 

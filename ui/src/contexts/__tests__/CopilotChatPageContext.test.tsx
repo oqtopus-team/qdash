@@ -7,7 +7,7 @@ import {
   useCopilotChatSessionContext,
 } from "../CopilotChatSessionContext";
 
-vi.mock("next/navigation", () => ({ usePathname: () => "/custom-dashboards/scripts/ms_1" }));
+vi.mock("next/navigation", () => ({ usePathname: () => "/dashboards/scripts/ms_1" }));
 
 let fetchMock: ReturnType<typeof vi.fn>;
 
@@ -45,7 +45,7 @@ it("sends the open metric script editor's text with the page", async () => {
   act(() => {
     result.current.sendMessage("Add a count check", {
       page: {
-        path: "/custom-dashboards/scripts/ms_1",
+        path: "/dashboards/scripts/ms_1",
         title: "Metric script: ZX90",
         metricScript: { scriptId: "ms_1", name: "ZX90", code: "print(1)\n", dirty: true },
       },
@@ -60,7 +60,7 @@ it("sends the open metric script editor's text with the page", async () => {
   const [, init] = fetchMock.mock.calls.find(([url]) => String(url).endsWith("/stream"))!;
   const body = JSON.parse(String(init.body));
   expect(body.page).toEqual({
-    path: "/custom-dashboards/scripts/ms_1",
+    path: "/dashboards/scripts/ms_1",
     title: "Metric script: ZX90",
     metric_script: { script_id: "ms_1", name: "ZX90", code: "print(1)\n", dirty: true },
   });
@@ -73,7 +73,7 @@ it("sends an editable dashboard's draft with the page in the API's shape", async
   act(() => {
     result.current.sendMessage("Add a ZX90 map", {
       page: {
-        path: "/custom-dashboards/dash-1",
+        path: "/dashboards/dash-1",
         title: "Dashboard: Review",
         dashboard: {
           dashboardId: "dash-1",
@@ -96,7 +96,7 @@ it("sends an editable dashboard's draft with the page in the API's shape", async
   );
   const [, init] = fetchMock.mock.calls.find(([url]) => String(url).endsWith("/stream"))!;
   expect(JSON.parse(String(init.body)).page).toEqual({
-    path: "/custom-dashboards/dash-1",
+    path: "/dashboards/dash-1",
     title: "Dashboard: Review",
     dashboard: {
       dashboard_id: "dash-1",

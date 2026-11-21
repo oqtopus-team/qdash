@@ -1,6 +1,6 @@
 ---
 name: qdash
-description: Query a running QDash instance from pi via the pi-qdash extension and @oqtopus-team/qdash-client. Use when inspecting chips, metrics, task results, tasks, projects, files, flows, metric scripts, custom dashboards, executions, forum posts, provenance, or QDash profile/configuration.
+description: Query a running QDash instance from pi via the pi-qdash extension and @oqtopus-team/qdash-client. Use when inspecting chips, metrics, task results, tasks, projects, files, flows, metric scripts, dashboards, executions, forum posts, provenance, or QDash profile/configuration.
 ---
 
 <!-- Confirmation gates are implemented by the host harness. Skills should state that a gate exists, not instruct how or when to ask for confirmation. -->
@@ -43,7 +43,7 @@ Prefer the dedicated tool that matches the question. Use `qdash_query` only as a
    - `qdash_create_forum_evidence_reply`, `qdash_create_forum_image_reply` — publish previously reviewed evidence replies
    - `qdash_run_pipeline` — run a validated pipeline spec as one execution
    - `qdash_save_flow`, `qdash_execute_flow` — save a Prefect flow you wrote as a QDash workflow, and run a saved flow (see Authoring a flow)
-   - `qdash_save_metric_script`, `qdash_save_custom_dashboard` — save a metric script, and create or update a custom dashboard with its panels (see the `qdash-metric-scripts` skill)
+   - `qdash_save_metric_script`, `qdash_save_dashboard` — save a metric script, and create or update a dashboard with its panels (see the `qdash-metric-scripts` skill)
 4. Agent workflow state tools:
    - `qdash_get_agent_session`, `qdash_get_agent_action`, `qdash_list_agent_actions`, `qdash_wait_agent_action` — inspect agent workflow state
    - `qdash_list_agent_action_candidates`, `qdash_get_agent_candidate_commit`, `qdash_wait_agent_candidate_apply` — inspect candidates and apply status
@@ -85,15 +85,15 @@ Workflow:
 3. Show the user the complete code and the chip it is for, then `qdash_save_flow`. QDash checks the `@flow` function, formats the file, registers a Prefect deployment, and replaces a flow of the same name. A rejection comes back as text with QDash's reason; fix the code and save again.
 4. Saving does not run anything. Run it only when the user asks: `qdash_execute_flow` with the flow's parameters (confirmation-gated, takes the project execution lock), then `qdash_wait_execution`.
 
-## Metric scripts and custom dashboards
+## Metric scripts and dashboards
 
-Custom dashboards show per-qubit and per-coupling values computed by metric scripts: Python
+Dashboards show per-qubit and per-coupling values computed by metric scripts: Python
 modules written against the `qdash_metrics` API that QDash runs in a bounded worker. For any
 request to build a dashboard, a derived or aggregated metric (a median over a period, a ratio,
 a count per coupling), or a collision map, follow the `qdash-metric-scripts` skill. Its reads
 are `qdash_query` actions: `metric_script_catalog`, `metric_script_templates`,
-`metric_script_template`, `metric_scripts`, `metric_script`, `custom_dashboards`,
-`custom_dashboard`, `custom_dashboard_templates`.
+`metric_script_template`, `metric_scripts`, `metric_script`, `dashboards`,
+`dashboard`, `dashboard_templates`.
 
 ## Session context
 

@@ -159,7 +159,7 @@ How the SDK is built: [TypeScript SDK](../../developer-guide/architecture/typesc
 
 ## Save Metric Scripts and Dashboards
 
-`qdash.scripts` and `qdash.dashboards` save metric scripts and custom dashboards with the same
+`qdash.scripts` and `qdash.dashboards` save metric scripts and dashboards with the same
 behavior as the [Python SDK](./python.md#save-metric-scripts-and-dashboards):
 
 ```ts

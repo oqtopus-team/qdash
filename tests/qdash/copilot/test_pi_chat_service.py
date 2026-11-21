@@ -762,7 +762,7 @@ def test_the_open_page_travels_with_the_turn(monkeypatch: pytest.MonkeyPatch) ->
             "message": "use the median",
             "session_id": "s1",
             "page": {
-                "path": "/custom-dashboards/scripts/ms_0123456789ab",
+                "path": "/dashboards/scripts/ms_0123456789ab",
                 "metric_script": {
                     "script_id": "ms_0123456789ab",
                     "name": "ZX90",
@@ -780,7 +780,7 @@ def test_the_open_page_travels_with_the_turn(monkeypatch: pytest.MonkeyPatch) ->
             "message": "add a ZX90 map",
             "session_id": "s1",
             "page": {
-                "path": "/custom-dashboards/new",
+                "path": "/dashboards/new",
                 "dashboard": {"name": "", "code": '{"panels": []}', "visibility": "private"},
             },
         }

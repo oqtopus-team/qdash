@@ -207,7 +207,7 @@ has its own sandbox, which `openSession` closes after the harness.
 
 Pi offers a tool with `deferred: true` to the model only after it is loaded. The pi-qdash tools in
 `DEFERRED_TOOL_NAMES` (cryostat and wiring context, forum, pipelines, agent workflow state, metric
-scripts and custom dashboards, source code, and similar narrower workflows) are deferred. The tool guide in the system prompt marks
+scripts and dashboards, source code, and similar narrower workflows) are deferred. The tool guide in the system prompt marks
 them with `*`, and the prompt lists the deferred tools the guide does not name. The
 model loads one with `tool_search`, which records it in the conversation's `modelTools`. The tool
 stays offered on that conversation branch, also after compaction or a runtime restart. A model
@@ -245,7 +245,7 @@ A chat from the sidebar or the floating window tells the assistant what the user
 Every turn carries `ChatRequest.page` (`PageContext`: route, title, and on an editor the
 editor's current text, unsaved changes included: `flow` with the flow's name and chip on the
 Workflow editor, `metric_script` with the script's ID and name on the metric script editor at
-`/custom-dashboards/scripts/<id>`); the runtime
+`/dashboards/scripts/<id>`); the runtime
 rebuilds a system prompt section from it each turn (`agent-runtime/src/page-context.ts`,
 `buildPageContextSection`). The chat page itself sends none. Above the message box, every chat
 surface lists the page with the session's saved task result or investigation
@@ -275,11 +275,11 @@ section also tells the model the file is a `qdash_metrics` module, points it to 
 `qdash_preview_metric_script`; `qdash_save_flow` and `qdash_save_metric_script` stay for code
 written from the chat alone or saved at the user's request.
 
-A custom dashboard is the third editor. `CustomDashboardPageContent` registers
+A dashboard is the third editor. `DashboardPageContent` registers
 `PageContext.dashboard` (`DashboardEditorContext` in `src/qdash/copilot/contracts/models.py`)
-only when the user may save the dashboard: their own, or a new one on `/custom-dashboards/new`,
+only when the user may save the dashboard: their own, or a new one on `/dashboards/new`,
 which has no `dashboard_id`. Its "code" is the draft as JSON written by
-`serializeDashboardDraft` (`ui/src/components/features/custom-dashboards/dashboardDraft.ts`):
+`serializeDashboardDraft` (`ui/src/components/features/dashboards/dashboardDraft.ts`):
 `{"panels": [...]}` for a stored dashboard, plus `name`, `description`, `chip_id` and
 `template_id` for a new one. `panels` is required in a proposal, and `[]` with a `template_id`
 lets the page preview the template; a missing list is refused instead of being read as "remove
@@ -290,7 +290,7 @@ with `target: "dashboard"` and `dashboardId` (null for a new dashboard). **Apply
 the page's `applyCode`, which parses the draft again and returns false, with a toast, for one it
 refuses; the card then stays unapplied. Applying replaces the page's local draft (entering edit
 mode for a stored dashboard) and never writes: the page's **Save** sends `PATCH` with
-`expected_version`, or for a new dashboard `POST /custom-dashboards` as private, so a 409 or 422
+`expected_version`, or for a new dashboard `POST /dashboards` as private, so a 409 or 422
 keeps the draft. A registration may also offer `suggestions`, which the empty chat shows in
 place of the general starters; picking one sends it like any suggestion.
 

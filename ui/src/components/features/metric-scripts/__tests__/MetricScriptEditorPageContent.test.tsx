@@ -247,7 +247,7 @@ describe("MetricScriptEditorPageContent", () => {
     await waitFor(() => expect(screen.getByLabelText("Code")).toHaveValue(SOURCE));
 
     expect(mocks.provider?.current()).toEqual({
-      path: "/custom-dashboards/scripts/ms_000000000001",
+      path: "/dashboards/scripts/ms_000000000001",
       title: "Metric script: Coherence",
       metricScript: { scriptId: "ms_000000000001", name: "Coherence", code: SOURCE, dirty: false },
     });

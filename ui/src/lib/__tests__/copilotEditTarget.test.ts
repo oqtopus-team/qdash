@@ -46,7 +46,7 @@ describe("matchesEditTarget", () => {
   it("identifies a dashboard by its route and ID, and a new one by its route", () => {
     const boardPage: PageContext = {
       title: "Dashboard: Review",
-      path: "/custom-dashboards/dash-1",
+      path: "/dashboards/dash-1",
       dashboard: { dashboardId: "dash-1", name: "Review", code: '{"panels":[]}' },
     };
     const boardEdit: EditProposal = {
@@ -56,7 +56,7 @@ describe("matchesEditTarget", () => {
       flowName: "Review",
       chipId: null,
       dashboardId: "dash-1",
-      pagePath: "/custom-dashboards/dash-1",
+      pagePath: "/dashboards/dash-1",
     };
     expect(matchesEditTarget(boardEdit, boardPage)).toBe(true);
     expect(editTargetCode(boardEdit, boardPage)).toBe('{"panels":[]}');
@@ -64,11 +64,11 @@ describe("matchesEditTarget", () => {
     expect(matchesEditTarget({ ...boardEdit, dashboardId: "dash-2" }, boardPage)).toBe(false);
     expect(matchesEditTarget(boardEdit, { ...boardPage, dashboard: undefined })).toBe(false);
     // A proposal for a new draft does not apply to the dashboard it became.
-    const newEdit = { ...boardEdit, dashboardId: null, pagePath: "/custom-dashboards/new" };
+    const newEdit = { ...boardEdit, dashboardId: null, pagePath: "/dashboards/new" };
     expect(matchesEditTarget(newEdit, boardPage)).toBe(false);
     const newPage: PageContext = {
       title: "New dashboard",
-      path: "/custom-dashboards/new",
+      path: "/dashboards/new",
       dashboard: { name: "", code: "{}" },
     };
     expect(matchesEditTarget(newEdit, newPage)).toBe(true);
@@ -78,7 +78,7 @@ describe("matchesEditTarget", () => {
   it("identifies a metric script editor by its route and script ID", () => {
     const scriptPage: PageContext = {
       title: "Metric script: ZX90",
-      path: "/custom-dashboards/scripts/ms_1",
+      path: "/dashboards/scripts/ms_1",
       metricScript: { scriptId: "ms_1", name: "ZX90", code: "old script", dirty: false },
     };
     const scriptEdit: EditProposal = {
@@ -89,7 +89,7 @@ describe("matchesEditTarget", () => {
       chipId: null,
       scriptId: "ms_1",
       scriptName: "ZX90",
-      pagePath: "/custom-dashboards/scripts/ms_1",
+      pagePath: "/dashboards/scripts/ms_1",
     };
     expect(matchesEditTarget(scriptEdit, scriptPage)).toBe(true);
     expect(editTargetCode(scriptEdit, scriptPage)).toBe("old script");
@@ -98,7 +98,7 @@ describe("matchesEditTarget", () => {
     expect(matchesEditTarget(scriptEdit, renamed)).toBe(true);
     expect(matchesEditTarget({ ...scriptEdit, scriptId: "ms_2" }, scriptPage)).toBe(false);
     expect(
-      matchesEditTarget({ ...scriptEdit, pagePath: "/custom-dashboards/scripts/ms_2" }, scriptPage),
+      matchesEditTarget({ ...scriptEdit, pagePath: "/dashboards/scripts/ms_2" }, scriptPage),
     ).toBe(false);
     // A flow proposal never lands in a script editor, nor a script proposal in a flow editor.
     expect(matchesEditTarget({ ...edit, pagePath: scriptPage.path }, scriptPage)).toBe(false);

@@ -62,7 +62,7 @@ if TYPE_CHECKING:
     from qdash.api.lib.project import ProjectContext
     from qdash.api.services.metrics_service import MetricsService
     from qdash.repository.chip import MongoChipRepository
-    from qdash.repository.custom_dashboard import MongoCustomDashboardRepository
+    from qdash.repository.dashboard import MongoDashboardRepository
     from qdash.repository.metric_script import MongoMetricScriptRepository
     from qdash.repository.task_result_history import MongoTaskResultHistoryRepository
 
@@ -171,13 +171,13 @@ class MetricScriptService:
     def __init__(
         self,
         metric_script_repository: MongoMetricScriptRepository,
-        custom_dashboard_repository: MongoCustomDashboardRepository,
+        dashboard_repository: MongoDashboardRepository,
         chip_repository: MongoChipRepository,
         metrics_service: MetricsService,
         task_result_repository: MongoTaskResultHistoryRepository,
     ) -> None:
         self._repo = metric_script_repository
-        self._dashboards = custom_dashboard_repository
+        self._dashboards = dashboard_repository
         self._chips = chip_repository
         self._metrics = metrics_service
         self._task_results = task_result_repository

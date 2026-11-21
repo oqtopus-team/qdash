@@ -134,7 +134,7 @@ On a dashboard you can edit, and on a new dashboard from **Create with Agent**, 
 the unsaved draft and proposes a new one as a diff. **Apply to draft** puts it on the page;
 **Save** on the page stores it. The empty chat there suggests dashboard requests, and nothing is
 sent until you pick one or type your own. See
-[Create a Dashboard with the Agent](./custom-dashboards.md#create-a-dashboard-with-the-agent).
+[Create a Dashboard with the Agent](./dashboards.md#create-a-dashboard-with-the-agent).
 
 ### Calculations and Scripts
 

@@ -47,9 +47,9 @@ export function getNavigationSections({ canEdit, isAdmin }: NavigationOptions): 
       label: "Explore",
       items: [
         { href: "/home", label: "Home", icon: House },
-        { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
+        { href: "/overview", label: "Overview", icon: LayoutDashboard },
         {
-          href: "/custom-dashboards",
+          href: "/dashboards",
           label: "Dashboards",
           badge: "Beta",
           icon: LayoutGrid,
@@ -130,7 +130,7 @@ export function getNavigationSections({ canEdit, isAdmin }: NavigationOptions): 
  * Every other destination stays in the header menu.
  */
 const MOBILE_TAB_BASES: ReadonlyArray<{ href: string; bases: readonly string[] }> = [
-  { href: "/dashboard", bases: ["/dashboard"] },
+  { href: "/overview", bases: ["/overview"] },
   { href: "/workflow", bases: ["/workflow"] },
   { href: "/execution", bases: ["/execution", "/executions"] },
   { href: "/chat", bases: ["/chat"] },

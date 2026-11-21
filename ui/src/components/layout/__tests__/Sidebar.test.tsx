@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Sidebar } from "@/components/layout/Sidebar";
 
 const push = vi.fn();
-const mockPathname = vi.hoisted(() => vi.fn(() => "/dashboard"));
+const mockPathname = vi.hoisted(() => vi.fn(() => "/overview"));
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push }),
@@ -102,7 +102,7 @@ describe("Sidebar", () => {
     cleanup();
     vi.restoreAllMocks();
     vi.clearAllMocks();
-    mockPathname.mockReturnValue("/dashboard");
+    mockPathname.mockReturnValue("/overview");
     sidebarState.isOpen = true;
     sidebarState.isMobileOpen = false;
     projectState.canEdit = false;
@@ -123,7 +123,7 @@ describe("Sidebar", () => {
     sidebarState.isMobileOpen = mobileOpen;
     const { container } = render(<Sidebar />);
     const surface = mobileOpen ? getMobileDrawer() : getAsides(container).desktop;
-    const link = surface.querySelector('a[href="/custom-dashboards"]');
+    const link = surface.querySelector('a[href="/dashboards"]');
 
     expect(link).not.toBeNull();
     expect(within(link as HTMLElement).getByText("Beta")).toBeTruthy();
@@ -166,7 +166,7 @@ describe("Sidebar", () => {
     const visible = desktop.querySelectorAll(
       '[data-testid="sidebar-active-indicator"][data-state="visible"]',
     );
-    const { link, indicator } = getSectionIndicator(desktop, "/dashboard");
+    const { link, indicator } = getSectionIndicator(desktop, "/overview");
 
     expect(link.getAttribute("aria-current")).toBe("page");
     expect(visible).toHaveLength(1);
@@ -195,7 +195,7 @@ describe("Sidebar", () => {
     rerender(<Sidebar />);
 
     const { desktop } = getAsides(container);
-    const overview = getSectionIndicator(desktop, "/dashboard").indicator;
+    const overview = getSectionIndicator(desktop, "/overview").indicator;
     const { link, indicator: operate } = getSectionIndicator(desktop, "/execution");
 
     expect(link.getAttribute("aria-current")).toBe("page");
@@ -692,7 +692,7 @@ describe("Sidebar", () => {
 
     it("pins the active pill with insets so it tracks the rail width", () => {
       const { container } = render(<Sidebar />);
-      const { indicator } = getSectionIndicator(getDesktopAside(container), "/dashboard");
+      const { indicator } = getSectionIndicator(getDesktopAside(container), "/overview");
       const style = (indicator as HTMLElement).style;
 
       expect(style.left).not.toBe("");

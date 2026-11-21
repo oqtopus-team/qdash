@@ -52,7 +52,7 @@ export {
 export type {
   CalibrationPipelineSpec,
   CalibrationPipelineSpecStepsItem,
-  CustomDashboardResponse,
+  DashboardResponse,
   CustomOneQubitStep,
   DashboardPanelModel,
   ExecuteFlowResponse,

@@ -22,6 +22,9 @@ const nextConfig = {
       { source: "/task-knowledge/:taskName", destination: "/knowledge/:taskName", permanent: true },
       // The knowledge file editor was removed: Knowledge is read-only.
       { source: "/knowledge/files", destination: "/knowledge", permanent: false },
+      // The chip Overview page moved from /dashboard to /overview in 2026-11 so that /dashboards
+      // could hold user-composed dashboards; old bookmarks and forum links keep working.
+      { source: "/dashboard", destination: "/overview", permanent: true },
     ];
   },
   transpilePackages: ["react-plotly.js", "plotly.js-dist-min"],

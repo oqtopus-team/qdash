@@ -1,5 +1,5 @@
 /**
- * Metric scripts and custom dashboards, defined locally and saved through a
+ * Metric scripts and dashboards, defined locally and saved through a
  * session, modelled on the Python `qdash.sdk.dashboard`.
  *
  * A `Script` is the text of a metric script with its name and settings; a
@@ -17,9 +17,9 @@ import { basename, extname } from "node:path";
 import type { QDashClient } from "@oqtopus-team/qdash-client";
 import type {
   AbsolutePeriod,
-  CustomDashboardCreateRequest,
-  CustomDashboardResponse,
-  CustomDashboardUpdateRequest,
+  DashboardCreateRequest,
+  DashboardResponse,
+  DashboardUpdateRequest,
   DashboardPanelModel,
   MetricInfo,
   MetricScriptCreateRequest,
@@ -182,7 +182,7 @@ function period(input: PeriodInput | undefined): RelativePeriod | AbsolutePeriod
 }
 
 /**
- * A custom dashboard to save: name, settings and panels on a 12-column grid.
+ * A dashboard to save: name, settings and panels on a 12-column grid.
  * `addMetric` and `addMarkdown` place a new panel at the left edge below every
  * existing panel, sized as the dashboard editor sizes new panels, with a
  * readable ID unique within the dashboard. `panels` may be edited directly.
@@ -203,7 +203,7 @@ export class Dashboard {
   }
 
   /** A definition holding a saved dashboard's settings and panels, ready to edit. */
-  static fromResponse(response: CustomDashboardResponse): Dashboard {
+  static fromResponse(response: DashboardResponse): Dashboard {
     return new Dashboard({
       name: response.name,
       description: response.description,
@@ -281,7 +281,7 @@ export class Dashboard {
     });
   }
 
-  private fields(): CustomDashboardCreateRequest {
+  private fields(): DashboardCreateRequest {
     return {
       name: this.name,
       panels: this.panels.map((panel) => ({ ...panel })),
@@ -291,13 +291,13 @@ export class Dashboard {
     };
   }
 
-  /** The `POST /custom-dashboards` body. */
-  createRequest(): CustomDashboardCreateRequest {
+  /** The `POST /dashboards` body. */
+  createRequest(): DashboardCreateRequest {
     return this.fields();
   }
 
-  /** The `PATCH /custom-dashboards/{id}` body; its panels replace the stored ones. */
-  updateRequest(expectedVersion?: number): CustomDashboardUpdateRequest {
+  /** The `PATCH /dashboards/{id}` body; its panels replace the stored ones. */
+  updateRequest(expectedVersion?: number): DashboardUpdateRequest {
     return { ...this.fields(), ...(expectedVersion !== undefined ? { expected_version: expectedVersion } : {}) };
   }
 }
@@ -438,11 +438,11 @@ export class Scripts {
   }
 }
 
-/** A custom dashboard as the server stored it. */
+/** A dashboard as the server stored it. */
 export class SavedDashboard {
   constructor(
     /** The dashboard as the API returned it. */
-    readonly response: CustomDashboardResponse,
+    readonly response: DashboardResponse,
   ) {}
 
   get dashboardId(): string {
@@ -464,22 +464,22 @@ export class SavedDashboard {
   }
 }
 
-/** The project's custom dashboards, reached as `qdash.dashboards`. */
+/** The project's dashboards, reached as `qdash.dashboards`. */
 export class Dashboards {
   constructor(private readonly client: QDashClient) {}
 
   /** Dashboards visible to the caller: shared with the project or their own. */
-  async list(): Promise<CustomDashboardResponse[]> {
-    return (await this.client.listCustomDashboards()).dashboards;
+  async list(): Promise<DashboardResponse[]> {
+    return (await this.client.listDashboards()).dashboards;
   }
 
   async get(dashboardId: string): Promise<SavedDashboard> {
-    return new SavedDashboard(await this.client.getCustomDashboard(dashboardId));
+    return new SavedDashboard(await this.client.getDashboard(dashboardId));
   }
 
   /** Save a new dashboard owned by the caller. */
   async create(dashboard: Dashboard): Promise<SavedDashboard> {
-    return new SavedDashboard(await this.client.createCustomDashboard(dashboard.createRequest()));
+    return new SavedDashboard(await this.client.createDashboard(dashboard.createRequest()));
   }
 
   /**
@@ -496,7 +496,7 @@ export class Dashboards {
     const dashboardId = typeof target === "string" ? target : target.dashboardId;
     const expected =
       options.expectedVersion ??
-      (typeof target === "string" ? (await this.client.getCustomDashboard(dashboardId)).version : target.version);
-    return new SavedDashboard(await this.client.updateCustomDashboard(dashboardId, dashboard.updateRequest(expected)));
+      (typeof target === "string" ? (await this.client.getDashboard(dashboardId)).version : target.version);
+    return new SavedDashboard(await this.client.updateDashboard(dashboardId, dashboard.updateRequest(expected)));
   }
 }

@@ -171,7 +171,7 @@ describe("QDashClient", () => {
     });
   });
 
-  it("wraps the metric script and custom dashboard endpoints", async () => {
+  it("wraps the metric script and dashboard endpoints", async () => {
     const requests: Request[] = [];
     const fetch = vi.fn(async (input: RequestInfo | URL) => {
       requests.push(new Request(input));
@@ -198,11 +198,11 @@ describe("QDashClient", () => {
     await client.updateMetricScript("ms_1", { source: "x = 2", expected_revision: 3 });
     await client.copyMetricScript("ms_1");
     await client.deleteMetricScript("ms_1");
-    await client.listCustomDashboards();
-    await client.getCustomDashboard("cd/1");
-    await client.listCustomDashboardTemplates();
-    await client.createCustomDashboard({ name: "Board" });
-    await client.updateCustomDashboard("cd_1", { panels: [] });
+    await client.listDashboards();
+    await client.getDashboard("cd/1");
+    await client.listDashboardTemplates();
+    await client.createDashboard({ name: "Board" });
+    await client.updateDashboard("cd_1", { panels: [] });
 
     expect(requests.map((request) => `${request.method} ${new URL(request.url).pathname}`)).toEqual([
       "GET /api/metric-scripts",
@@ -216,11 +216,11 @@ describe("QDashClient", () => {
       "PATCH /api/metric-scripts/ms_1",
       "POST /api/metric-scripts/ms_1/copy",
       "DELETE /api/metric-scripts/ms_1",
-      "GET /api/custom-dashboards",
-      "GET /api/custom-dashboards/cd%2F1",
-      "GET /api/custom-dashboards/templates",
-      "POST /api/custom-dashboards",
-      "PATCH /api/custom-dashboards/cd_1",
+      "GET /api/dashboards",
+      "GET /api/dashboards/cd%2F1",
+      "GET /api/dashboards/templates",
+      "POST /api/dashboards",
+      "PATCH /api/dashboards/cd_1",
     ]);
     expect(await requests[8]?.json()).toEqual({ source: "x = 2", expected_revision: 3 });
     expect(await requests[6]?.json()).toEqual({ metric_id: "m", chip_id: "chip-1", revision: 2 });

@@ -18,7 +18,7 @@ from qdash.client.services.models import MetricScriptEvaluateRequest
 from qdash.datamodel.project import ProjectRole
 from qdash.dbmodel.metric_script import MetricScriptDocument
 from qdash.sdk import Dashboard, MetricScriptError, QDash, Script
-from tests.qdash.api.routers.test_custom_dashboard import (
+from tests.qdash.api.routers.test_dashboard import (
     PROJECT,
     _create_project_member,
     _create_project_owner,
@@ -71,7 +71,7 @@ def test_shared_zx90_median_dashboard(test_client, init_db, runtime, tmp_path: P
     assert script.name == "zx90_median"
     assert (script.revision, zx90.hops, zx90.target) == (1, [1], "pair")
     assert saved.version == 0
-    stored = test_client.get(f"/custom-dashboards/{saved.dashboard_id}", headers=member).json()
+    stored = test_client.get(f"/dashboards/{saved.dashboard_id}", headers=member).json()
     assert stored["visibility"] == "project"
     assert [(p["panel_id"], p["layout"]) for p in stored["panels"]] == [
         ("markdown", {"x": 0, "y": 0, "w": 12, "h": 2}),
@@ -122,7 +122,7 @@ def test_read_edit_save_refuses_a_stale_version(test_client, init_db, runtime) -
     edited.add_markdown("Checked weekly.")
     # Someone else saves the dashboard after it was read.
     test_client.patch(
-        f"/custom-dashboards/{created.dashboard_id}", json={"name": "Renamed"}, headers=owner
+        f"/dashboards/{created.dashboard_id}", json={"name": "Renamed"}, headers=owner
     )
 
     with pytest.raises(QDashApiError) as stale:

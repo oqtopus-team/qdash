@@ -22,7 +22,7 @@ with QDash.from_env() as qdash:
     print(result.status)
 ```
 
-`qdash.scripts` and `qdash.dashboards` save metric scripts and custom dashboards; a session works
+`qdash.scripts` and `qdash.dashboards` save metric scripts and dashboards; a session works
 without `with` too:
 
 ```python
