@@ -66,6 +66,13 @@ class SaveFlowResponse(BaseModel):
     name: str = Field(..., description="Flow name")
     file_path: str = Field(..., description="Path to saved file")
     message: str = Field(..., description="Success message")
+    code: str | None = Field(
+        default=None,
+        description=(
+            "The stored source: the request code formatted with Ruff, or the code as given"
+            " when it could not be formatted"
+        ),
+    )
 
 
 class FlowSummary(BaseModel):

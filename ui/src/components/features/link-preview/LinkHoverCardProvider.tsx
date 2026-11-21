@@ -45,11 +45,19 @@ interface Timer {
 
 const LinkHoverCardContext = createContext(false);
 
+/**
+ * Which links get a card: `"all"` covers every explicit link, `"chat"` only links inside a
+ * `data-link-preview="chat"` subtree (chat answers), so ordinary page navigation stays free
+ * of hover popups.
+ */
+export type LinkHoverCardScope = "all" | "chat";
+
 /** The link an event happened on, unless it is in an opted-out subtree such as a card. */
-function eventLink(target: EventTarget | null): Element | null {
+function eventLink(target: EventTarget | null, scope: LinkHoverCardScope): Element | null {
   if (!(target instanceof Element)) return null;
   const anchor = target.closest(LINK_SELECTOR);
   if (!anchor || anchor.closest(OFF_SELECTOR)) return null;
+  if (scope === "chat" && !anchor.closest(CHAT_SELECTOR)) return null;
   if (anchor.getAttribute("aria-disabled") === "true") return null;
   return anchor;
 }
@@ -73,26 +81,33 @@ function describeAnchor(anchor: Element): LinkDescription | null {
 }
 
 /**
- * Shows a compact hover card for every explicit link in the app: `<a href>` and Next.js
+ * Shows a compact hover card for the explicit links in `scope`: `<a href>` and Next.js
  * `<Link>` alike, including links inside dialogs, menus and other portals. Links are found
  * by delegation on the document, so pages need no wrappers and clicks are left alone.
  *
  * A pointer opens the card after `CARD_OPEN_DELAY_MS`; keyboard focus opens it at once.
  * Touch never hovers, and focus that follows a press does not open a card. The app root
- * mounts one provider; a nested one (as the chat adds for isolated renders) is a no-op.
+ * mounts one chat-scoped provider; a nested one (as the chat adds for isolated renders)
+ * is a no-op.
  */
-export function LinkHoverCardProvider({ children }: { children: ReactNode }) {
+export function LinkHoverCardProvider({
+  scope = "all",
+  children,
+}: {
+  scope?: LinkHoverCardScope;
+  children: ReactNode;
+}) {
   const nested = useContext(LinkHoverCardContext);
   if (nested) return <>{children}</>;
   return (
     <LinkHoverCardContext.Provider value={true}>
       {children}
-      <LinkHoverCardRoot />
+      <LinkHoverCardRoot scope={scope} />
     </LinkHoverCardContext.Provider>
   );
 }
 
-function LinkHoverCardRoot() {
+function LinkHoverCardRoot({ scope }: { scope: LinkHoverCardScope }) {
   const [card, setCard] = useState<CardState | null>(null);
   const cardRef = useRef<CardState | null>(null);
   const openTimerRef = useRef<Timer | null>(null);
@@ -179,11 +194,11 @@ function LinkHoverCardRoot() {
   useEffect(() => {
     const onPointerOver = (event: PointerEvent) => {
       if (event.pointerType === "touch") return;
-      const anchor = eventLink(event.target);
+      const anchor = eventLink(event.target, scope);
       if (anchor) enterLink(anchor, "pointer");
     };
     const onPointerOut = (event: PointerEvent) => {
-      const anchor = eventLink(event.target);
+      const anchor = eventLink(event.target, scope);
       // Moving between a link's own children is not leaving it.
       if (!anchor || (event.relatedTarget instanceof Node && anchor.contains(event.relatedTarget)))
         return;
@@ -191,23 +206,23 @@ function LinkHoverCardRoot() {
     };
     const onPointerDown = (event: PointerEvent) => {
       modalityRef.current = "pointer";
-      const anchor = eventLink(event.target);
+      const anchor = eventLink(event.target, scope);
       if (anchor) dismiss();
     };
     const onKeyDown = () => {
       modalityRef.current = "keyboard";
     };
     const onFocusIn = (event: FocusEvent) => {
-      const anchor = eventLink(event.target);
+      const anchor = eventLink(event.target, scope);
       if (anchor) enterLink(anchor, "focus");
     };
     const onFocusOut = (event: FocusEvent) => {
-      const anchor = eventLink(event.target);
+      const anchor = eventLink(event.target, scope);
       if (anchor) leaveLink(anchor, "focus");
     };
     // Activating a link, by press or by Enter, closes its card; the click itself goes on.
     const onClick = (event: MouseEvent) => {
-      if (eventLink(event.target)) dismiss();
+      if (eventLink(event.target, scope)) dismiss();
     };
 
     document.addEventListener("pointerover", onPointerOver);
@@ -226,7 +241,7 @@ function LinkHoverCardRoot() {
       document.removeEventListener("focusout", onFocusOut);
       document.removeEventListener("click", onClick, true);
     };
-  }, [enterLink, leaveLink, dismiss]);
+  }, [enterLink, leaveLink, dismiss, scope]);
 
   // Pending timers die with the provider.
   useEffect(

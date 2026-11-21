@@ -8,6 +8,9 @@ function parseFlowTags(value: string): string[] {
     .filter(Boolean);
 }
 
+/** Comma-separated flow tags, normalized to trimmed, non-empty tags in their written order. */
+export const flowTagsSchema = z.string().transform(parseFlowTags);
+
 /**
  * Flow metadata written in the New Flow form and the workflow editor. Values are trimmed, tags
  * become the array a `SaveFlowRequest` carries, and an empty entrypoint is left out of the request.
@@ -24,7 +27,7 @@ export const flowMetadataSchema = z.object({
   description: z.string().trim(),
   flow_function_name: z.string().transform((value) => value.trim() || undefined),
   username: z.string().trim().min(1, "Please enter a username"),
-  tags: z.string().transform(parseFlowTags),
+  tags: flowTagsSchema,
   folder: z.string().trim(),
 });
 

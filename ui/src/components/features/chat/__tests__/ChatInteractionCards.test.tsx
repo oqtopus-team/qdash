@@ -78,6 +78,47 @@ describe("ApprovalCard", () => {
     );
   });
 
+  it("names the action and tool before the arguments and asks before running", () => {
+    render(<ApprovalCard approval={APPROVAL} state={state()} />);
+
+    const card = screen.getByRole("group", { name: "Approve QDash Execute Agent Action" });
+    expect(card.getAttribute("data-decision")).toBe("pending");
+    const text = card.textContent ?? "";
+    expect(text.indexOf("QDash Execute Agent Action")).toBeLessThan(
+      text.indexOf("qdash_execute_agent_action"),
+    );
+    expect(text.indexOf("qdash_execute_agent_action")).toBeLessThan(text.indexOf("sessionId"));
+    expect(screen.getByText("Runs only if you approve")).toBeTruthy();
+    // The card is neutral: no decorative status icon competes with the title.
+    expect(card.querySelector(".text-warning")).toBeNull();
+  });
+
+  it("keeps nested and long argument values inspectable", () => {
+    const longValue = "x".repeat(300);
+    render(
+      <ApprovalCard
+        approval={{
+          ...APPROVAL,
+          args: { qubits: ["Q00", "Q01"], options: { retries: 2 }, note: longValue },
+        }}
+        state={state()}
+      />,
+    );
+    expect(screen.getAllByRole("term").map((dt) => dt.textContent)).toEqual([
+      "qubits",
+      "options",
+      "note",
+    ]);
+    expect(screen.getByText(/"Q01"/).textContent).toContain('"Q00"');
+    expect(screen.getByText(/"retries": 2/)).toBeTruthy();
+    expect(screen.getByText(longValue)).toBeTruthy();
+  });
+
+  it("says so when the call has no arguments", () => {
+    render(<ApprovalCard approval={{ ...APPROVAL, args: {} }} state={state()} />);
+    expect(screen.getByText("No arguments")).toBeTruthy();
+  });
+
   it("shows the recorded decision instead of buttons", () => {
     render(
       <ApprovalCard
@@ -86,7 +127,28 @@ describe("ApprovalCard", () => {
       />,
     );
     expect(screen.queryByRole("button")).toBeNull();
-    expect(screen.getByText("Approved")).toBeTruthy();
+    expect(screen.getByRole("status").textContent).toBe("Approved");
+    expect(screen.getByRole("group").getAttribute("data-decision")).toBe("approved");
+  });
+
+  it("shows a decline as recorded", () => {
+    render(
+      <ApprovalCard
+        approval={APPROVAL}
+        state={state({ active: false, answer: "Declined: QDash Execute Agent Action" })}
+      />,
+    );
+    expect(screen.queryByRole("button")).toBeNull();
+    expect(screen.getByRole("status").textContent).toBe("Declined");
+    expect(screen.getByRole("group").getAttribute("data-decision")).toBe("declined");
+  });
+
+  it("offers no decision once the card is no longer the latest answer", () => {
+    render(<ApprovalCard approval={APPROVAL} state={state({ active: false })} />);
+    expect(screen.queryByRole("button")).toBeNull();
+    expect(screen.getByText("No decision was made")).toBeTruthy();
+    expect(screen.queryByText("Runs only if you approve")).toBeNull();
+    expect(screen.getByText("20261005-005")).toBeTruthy();
   });
 
   it("shows a flow about to be saved as code, not as a JSON string", () => {
@@ -115,6 +177,151 @@ describe("ApprovalCard", () => {
     expect(preview.textContent).toContain("def t1_sweep():");
     expect(screen.queryByText(/"code"/)).toBeNull();
     expect(screen.queryByText("code", { selector: "dt" })).toBeNull();
+    expect(preview.textContent).toContain("replaces a flow of the same name");
+    expect(preview.textContent).toContain("does not run it");
+  });
+
+  it("keeps flow-save arguments that have no preview in the argument list", () => {
+    render(
+      <ApprovalCard
+        approval={{
+          id: "call-3",
+          tool: "qdash_save_flow",
+          label: "QDash Save Flow",
+          args: { name: "t1_sweep", code: "pass\n", overwrite: true },
+        }}
+        state={state()}
+      />,
+    );
+    expect(screen.getByText("overwrite", { selector: "dt" })).toBeTruthy();
+    expect(screen.getByText("true")).toBeTruthy();
+    expect(screen.getByTestId("flow-save-preview").textContent).toContain("on the session's chip");
+  });
+});
+
+describe("ApprovalCard for metric scripts", () => {
+  it("shows a metric script about to be saved as code", () => {
+    const source =
+      "from qdash_metrics import metric\n\n@metric(title='T1', unit='us')\ndef t1(q, ctx):\n    return None\n";
+    render(
+      <ApprovalCard
+        approval={{
+          id: "call-3",
+          tool: "qdash_save_metric_script",
+          label: "QDash Save Metric Script",
+          args: {
+            scriptId: "ms_1",
+            name: "coherence",
+            visibility: "project",
+            description: "T1 per qubit",
+            source,
+            expectedRevision: 3,
+          },
+        }}
+        state={state()}
+      />,
+    );
+    const preview = screen.getByTestId("metric-script-save-preview");
+    expect(preview.textContent).toContain("Update metric script coherence");
+    expect(preview.textContent).toContain("shared with project");
+    expect(preview.textContent).toContain("T1 per qubit");
+    expect(preview.textContent).toContain("def t1(q, ctx):");
+    expect(screen.queryByText("source", { selector: "dt" })).toBeNull();
+    // Arguments the preview does not show stay in the list.
+    expect(screen.getByText("expectedRevision", { selector: "dt" })).toBeTruthy();
+  });
+});
+
+describe("EditProposalCard for metric scripts", () => {
+  const edit = {
+    summary: "Count observations",
+    code: "new script\n",
+    target: "metric_script" as const,
+    flowName: "zx90",
+    chipId: null,
+    scriptId: "ms_1",
+    scriptName: "zx90_median",
+    pagePath: "/dashboards/scripts/ms_1",
+  };
+
+  it("names the script and its file", () => {
+    render(
+      <EditProposalCard
+        edit={edit}
+        state={state({ applyCode: () => true, currentCode: () => "old script\n" })}
+      />,
+    );
+    expect(screen.getByRole("group", { name: "Proposed change to zx90_median" })).toBeTruthy();
+    expect(screen.getByText(/Proposed change to metric script/)).toBeTruthy();
+    expect(screen.getByTestId("diff").textContent).toBe("old script\n=>new script\n");
+  });
+
+  it("says where to apply it when the script editor is not open", () => {
+    render(<EditProposalCard edit={edit} state={state()} />);
+    expect(
+      screen.getByText("Open this metric script in its editor to apply the change there."),
+    ).toBeTruthy();
+    expect(screen.queryByText(/Workflow editor/)).toBeNull();
+  });
+});
+
+describe("EditProposalCard for dashboards", () => {
+  const edit = {
+    summary: "Add a ZX90 map",
+    code: '{\n  "panels": [1]\n}\n',
+    target: "dashboard" as const,
+    flowName: "Collision review",
+    chipId: null,
+    dashboardId: "dash-1",
+    pagePath: "/dashboards/dash-1",
+  };
+
+  it("diffs the dashboard draft and applies it to the draft, not a save", () => {
+    const applyCode = vi.fn(() => true);
+    render(
+      <EditProposalCard
+        edit={edit}
+        state={state({ applyCode, currentCode: () => '{\n  "panels": []\n}\n' })}
+      />,
+    );
+    expect(screen.getByRole("group", { name: "Proposed change to Collision review" })).toBeTruthy();
+    expect(screen.getByText(/Proposed change to dashboard/)).toBeTruthy();
+    expect(screen.getByTestId("diff").textContent).toBe(
+      '{\n  "panels": []\n}\n=>{\n  "panels": [1]\n}\n',
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Apply to draft" }));
+    expect(applyCode).toHaveBeenCalledWith(edit);
+    expect(
+      screen.getByText("Applied to the dashboard draft. Review the panels, then Save."),
+    ).toBeTruthy();
+  });
+
+  it("re-diffs instead of applying when the draft changed since the proposal", () => {
+    const applyCode = vi.fn(() => true);
+    let live = '{\n  "panels": []\n}\n';
+    render(<EditProposalCard edit={edit} state={state({ applyCode, currentCode: () => live })} />);
+    live = '{\n  "panels": [0]\n}\n';
+    fireEvent.click(screen.getByRole("button", { name: "Apply to draft" }));
+    expect(applyCode).not.toHaveBeenCalled();
+    expect(screen.getByRole("status").textContent).toMatch(/dashboard draft changed/);
+  });
+
+  it("is not marked applied when the page refuses the draft", () => {
+    render(
+      <EditProposalCard
+        edit={edit}
+        state={state({ applyCode: () => false, currentCode: () => "{}" })}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Apply to draft" }));
+    expect(screen.queryByText(/Applied to the dashboard draft/)).toBeNull();
+    expect(screen.getByRole("button", { name: "Apply to draft" })).toBeTruthy();
+  });
+
+  it("says where to apply it when the dashboard is not open", () => {
+    render(<EditProposalCard edit={edit} state={state()} />);
+    expect(screen.getByText(/Open this dashboard, as a member who can edit it/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Apply to draft" })).toBeNull();
   });
 });
 

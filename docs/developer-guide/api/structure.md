@@ -34,6 +34,7 @@ additional `/api` prefix.
 | `schemas/` | Define request and response models |
 | `services/` | Enforce domain rules and coordinate repositories or external systems |
 | `dependencies/` | Construct and cache repositories, services, and runtimes |
+| `metric_runtime/` | Send user metric scripts to the `metric-runner` container, answer their data requests through the project-scoped broker, and ship the worker and SDK the runner executes; see [Metric Scripts Architecture](../architecture/metric-scripts.md) |
 | `lib/auth.py` and `lib/project.py` | Resolve identity, project context, and permissions |
 | `middleware/` | Apply request-wide HTTP behavior |
 | `db/session.py` | Own the database connection lifecycle |

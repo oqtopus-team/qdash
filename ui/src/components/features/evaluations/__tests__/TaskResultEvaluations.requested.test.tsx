@@ -40,7 +40,7 @@ function renderSection() {
   );
 }
 
-describe("TaskResultEvaluations after Ask AI", () => {
+describe("TaskResultEvaluations after Ask Agent", () => {
   it("says an evaluation is on its way until its record arrives", () => {
     const { rerender } = renderSection();
     expect(screen.queryByRole("status")).toBeNull();

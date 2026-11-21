@@ -48,10 +48,18 @@ const VALID = {
   task_run_count: 12,
 };
 
-function registeredTools(api, chipId = "64Qv3") {
+function registeredTools(api, chipId = "64Qv3", projectId = "project-1") {
   const tools = new Map();
+  const client = {
+    api,
+    // null stands for a profile without a project.
+    config: { projectId: projectId ?? undefined },
+    // A tool that starts a run must not follow it.
+    async getExecution() { throw new Error("must not wait"); },
+    async waitForExecution() { throw new Error("must not wait"); },
+  };
   registerCalibrationPipelineTools({ registerTool(tool) { tools.set(tool.name, tool); } }, {
-    async makeClient() { return { api }; },
+    async makeClient() { return client; },
     async resolveChipId(_client, explicit) { return explicit ?? chipId; },
   });
   return tools;
@@ -169,6 +177,32 @@ test("run requires confirmation, then reports the execution", async () => {
 
   const viaUi = await run.execute("t", { chipId: "64Qv3", spec: SPEC }, undefined, undefined, uiContext(true));
   assert.equal(viaUi.details.started, true);
+  assert.equal(viaUi.details.data.execution_id, "20261006-012");
+  assert.deepEqual(result.details.data, execution);
+});
+
+test("without a project every tool keeps the server's default: the run is still confirmation-gated, then dispatched", async () => {
+  const calls = [];
+  const execution = { execution_id: "20261006-013", flow_run_id: "fr", flow_run_url: "", qdash_ui_url: "", message: "started", steps: STEPS, targets: VALID.targets };
+  const tools = registeredTools({
+    async executeCalibrationPipeline(request) { calls.push(request); return execution; },
+    async validateCalibrationPipeline(request) { calls.push(request); return VALID; },
+    async getCalibrationPipelineCatalog(params) { calls.push(params); return { backend_name: "fake", step_types: [], one_qubit_execution_modes: [], tasks: {}, spec_schema: {} }; },
+  }, "64Qv3", null);
+  const run = tools.get("qdash_run_pipeline");
+  await assert.rejects(run.execute("t", { chipId: "64Qv3", spec: SPEC }, undefined, undefined, { hasUI: false }), /requires explicit confirmation/);
+  await assert.rejects(run.execute("t", { chipId: "64Qv3", spec: SPEC }, undefined, undefined, uiContext(false)), /requires explicit confirmation/);
+  assert.equal(calls.length, 0);
+
+  const viaFlag = await run.execute("t", { chipId: "64Qv3", spec: SPEC, confirmWrite: true }, undefined, undefined, { hasUI: false });
+  const viaUi = await run.execute("t", { chipId: "64Qv3", spec: SPEC }, undefined, undefined, uiContext(true));
+  for (const result of [viaFlag, viaUi]) {
+    assert.equal(result.details.started, true);
+    assert.equal(result.details.executionId, "20261006-013");
+  }
+  await tools.get("qdash_plan_pipeline").execute("t", { spec: SPEC });
+  await tools.get("qdash_get_pipeline_catalog").execute("t", {});
+  assert.deepEqual(calls, [{ chip_id: "64Qv3", spec: SPEC }, { chip_id: "64Qv3", spec: SPEC }, { chip_id: "64Qv3", spec: SPEC }, undefined]);
 });
 
 test("run turns a 422 with problems into a readable rejection and nothing else into an error", async () => {

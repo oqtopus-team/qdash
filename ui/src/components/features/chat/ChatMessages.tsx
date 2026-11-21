@@ -28,7 +28,7 @@ import {
   type InteractionState,
 } from "@/components/features/chat/ChatInteractionCards";
 import { useOptionalChatDock } from "@/contexts/ChatDockContext";
-import { matchesEditTarget } from "@/lib/copilotEditTarget";
+import { editTargetCode } from "@/lib/copilotEditTarget";
 import { ImagePreviewDialog } from "@/components/ui/ImagePreviewDialog";
 import { QdashBotAvatar } from "@/components/ui/UserAvatar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
@@ -271,10 +271,7 @@ function BlocksContent({
     ? {
         ...interaction,
         applyCode: dock.applyCode,
-        currentCode: (edit) => {
-          const page = dock.currentPage();
-          return matchesEditTarget(edit, page) ? (page?.flow?.code ?? null) : null;
-        },
+        currentCode: (edit) => editTargetCode(edit, dock.currentPage()),
       }
     : interaction;
   return (

@@ -25,7 +25,8 @@ export default function Providers({ children }: { children: React.ReactNode }) {
             <ProjectProvider>
               <ThemeProvider>
                 <TooltipProvider>
-                  <LinkHoverCardProvider>
+                  {/* Hover cards preview links in chat answers only; page navigation has none. */}
+                  <LinkHoverCardProvider scope="chat">
                     {children}
                     <ToastContainer />
                   </LinkHoverCardProvider>

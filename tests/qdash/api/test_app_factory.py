@@ -2,10 +2,13 @@
 
 from typing import Any, cast
 
+import pytest
 from fastapi.middleware.cors import CORSMiddleware
 
-from qdash.api.app import OPENAPI_EXTRA, create_app
+from qdash.api.app import OPENAPI_EXTRA, create_app, factory
+from qdash.api.app.factory import _add_component_models
 from qdash.config import Settings
+from qdash.datamodel.calibration_pipeline import CalibrationPipelineSpec
 
 
 def test_create_app_accepts_settings_for_cors_origins() -> None:
@@ -66,3 +69,52 @@ def test_openapi_extra_defines_bearer_auth() -> None:
 
     assert bearer_auth["type"] == "http"
     assert bearer_auth["scheme"] == "bearer"
+
+
+def _settings() -> Settings:
+    return Settings.model_construct(
+        env="production",
+        client_url="",
+        api_cors_origins=(),
+        prefect_api_url="http://prefect.example.com",
+        postgres_data_path="/tmp/postgres",
+        mongo_data_path="/tmp/mongo",
+        calib_data_path="/tmp/calib",
+    )
+
+
+def test_openapi_publishes_the_pipeline_spec_without_changing_routes() -> None:
+    schemas = create_app(settings=_settings()).openapi()["components"]["schemas"]
+
+    spec = schemas["CalibrationPipelineSpec"]
+    assert spec["properties"]["steps"]["items"]["discriminator"]["propertyName"] == "type"
+    assert "CustomOneQubitStep" in schemas
+    assert "PipelineTargets" in schemas
+    # Requests keep a plain object, so the validate route still reports problems itself.
+    assert schemas["ValidatePipelineRequest"]["properties"]["spec"]["type"] == "object"
+
+
+def test_component_models_refuse_to_replace_another_model() -> None:
+    schema: dict[str, Any] = {"components": {"schemas": {"TaskCall": {"type": "string"}}}}
+
+    with pytest.raises(RuntimeError, match="TaskCall"):
+        _add_component_models(schema, (CalibrationPipelineSpec,))
+
+
+def test_a_failed_schema_transformation_is_not_cached(monkeypatch: pytest.MonkeyPatch) -> None:
+    # TaskCall is a component of the pipeline spec; publishing another TaskCall conflicts.
+    conflict = {"components": {"schemas": {"TaskCall": {"type": "string"}}}}
+    monkeypatch.setattr(factory, "OPENAPI_EXTRA", conflict)
+    app = create_app(settings=_settings())
+
+    with pytest.raises(RuntimeError, match="TaskCall"):
+        app.openapi()
+    assert app.openapi_schema is None
+    with pytest.raises(RuntimeError, match="TaskCall"):
+        app.openapi()
+
+    # Without the conflict the transformed schema is cached as usual.
+    monkeypatch.setattr(factory, "OPENAPI_EXTRA", OPENAPI_EXTRA)
+    schema = app.openapi()
+    assert "PipelineTargets" in schema["components"]["schemas"]
+    assert app.openapi() is schema

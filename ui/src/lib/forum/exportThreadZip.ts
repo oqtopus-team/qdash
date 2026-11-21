@@ -75,7 +75,7 @@ function resourceUrl(path: string): string {
 /** Mirrors `dashboardTargetHref` in ForumDetailPage.tsx without importing it. */
 function targetResourcePath(chipId: string, targetType: string, targetId: string): string {
   if (targetType === "qubit") return `/chip/${chipId}/qubit/${targetId}`;
-  return `/dashboard?chip=${encodeURIComponent(chipId)}&type=coupling`;
+  return `/overview?chip=${encodeURIComponent(chipId)}&type=coupling`;
 }
 
 /** Normalizes a possibly timezone-less API timestamp to ISO8601; returns the raw value if it can't be parsed. */

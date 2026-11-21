@@ -1,4 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { QDashClient } from "@oqtopus-team/qdash-client";
+import { QDash } from "@oqtopus-team/qdash-sdk";
 import { Type } from "typebox";
 
 import { toTextToolResult } from "../lib/results.js";
@@ -14,7 +16,11 @@ import { toTextToolResult } from "../lib/results.js";
  * only catch what would certainly be rejected, so the user is not asked to
  * approve a save that cannot succeed. Templates and helpers are read through
  * `qdash_query` (`flow_templates`, `flow_template`, `flow_helper_files`,
- * `flow_helper_file`), existing flows through `qdash_get_flow`.
+ * `flow_helper_file`), existing flows through `qdash_get_flow`. Running goes
+ * through the SDK's `qdash.workflows.run`, which checks the name before any
+ * request; the project is the profile's, or the server's default when none is
+ * set. Confirmation stays here, and the tool returns the execution ID without
+ * waiting.
  */
 
 type ConnectionParams = { profile?: string; configPath?: string; useEnv?: boolean };
@@ -40,11 +46,8 @@ export type FlowExecution = {
   message: string;
 };
 
-/** The slice of QDashClient these tools use; tests pass a stub. */
-export type FlowClient = {
-  saveFlow(request: SaveFlowRequest): Promise<unknown>;
-  executeFlow(name: string, parameters?: Record<string, unknown>): Promise<unknown>;
-};
+/** The client these tools use; tests pass a stub with `saveFlow`, `executeFlow` and `config`. */
+export type FlowClient = QDashClient;
 
 export type FlowAuthoringDependencies = {
   makeClient(params: ConnectionParams): Promise<FlowClient>;
@@ -203,7 +206,8 @@ export function registerFlowAuthoringTools(pi: Pick<ExtensionAPI, "registerTool"
     ],
     parameters: Type.Object({
       ...connectionParams,
-      name: Type.String({ description: "The saved flow's name." }),
+      // The names a flow can be saved under; pi rejects others before confirmation.
+      name: Type.String({ pattern: "^[A-Za-z0-9_]+$", description: "The saved flow's name: letters, digits and underscores." }),
       parameters: Type.Optional(Type.Object({}, { additionalProperties: true, description: "Flow function parameters; override the flow's default_parameters." })),
       confirmWrite: Type.Optional(Type.Boolean({ description: "Required for non-interactive execution. Set true only after explicit user confirmation." })),
     }),
@@ -213,8 +217,9 @@ export function registerFlowAuthoringTools(pi: Pick<ExtensionAPI, "registerTool"
           throw new Error("qdash_execute_flow requires explicit confirmation");
         }
       }
-      const client = await deps.makeClient(params);
-      const result = (await client.executeFlow(params.name, params.parameters ?? {})) as FlowExecution;
+      const qdash = new QDash(await deps.makeClient(params));
+      const run = await qdash.workflows.run(params.name, { parameters: params.parameters });
+      const result = run.response as FlowExecution;
       return toTextToolResult(formatFlowExecution(result, params.name), result, {
         tool: "qdash_execute_flow",
         flowName: params.name,

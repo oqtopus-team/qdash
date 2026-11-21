@@ -93,7 +93,9 @@ export function GlobalExecutionIndicator() {
       type="button"
       className="badge badge-info h-8 gap-2 px-3 transition-opacity hover:opacity-80"
       onClick={() => router.push(executionHref)}
-      title={`Open ${label} execution`}
+      // Named for screen readers, since the run label is hidden on narrow screens; no
+      // native title, so hovering the indicator shows no destination popup.
+      aria-label={`Open ${label} execution (${statusLabel})`}
     >
       {content}
     </button>

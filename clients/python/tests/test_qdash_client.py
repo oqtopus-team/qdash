@@ -803,6 +803,7 @@ def test_task_file_and_flow_read_helpers_return_models() -> None:
         "execution_id": "exec-1",
         "figure_path": [],
         "json_figure_path": [],
+        "raw_data_path": [],
         "input_parameters": {},
         "output_parameters": {"t1": 12.5},
     }
@@ -844,11 +845,24 @@ def test_task_file_and_flow_read_helpers_return_models() -> None:
                         "chip_id": "chip-1",
                         "days": 2,
                         "timezone": "Asia/Tokyo",
+                        "granularity": "day",
                         "since": "2026-11-01",
                         "until": "2026-11-02",
                         "buckets": [
-                            {"date": "2026-11-01", "completed": 2, "failed": 1, "total": 3},
-                            {"date": "2026-11-02", "total": 0},
+                            {
+                                "date": "2026-11-01",
+                                "start": "2026-11-01T00:00:00+09:00",
+                                "end": "2026-11-02T00:00:00+09:00",
+                                "completed": 2,
+                                "failed": 1,
+                                "total": 3,
+                            },
+                            {
+                                "date": "2026-11-02",
+                                "start": "2026-11-02T00:00:00+09:00",
+                                "end": "2026-11-03T00:00:00+09:00",
+                                "total": 0,
+                            },
                         ],
                     },
                 )
@@ -967,6 +981,7 @@ def test_file_and_git_write_helpers_send_json_bodies() -> None:
 def test_flow_and_execution_write_helpers_return_models() -> None:
     execute_payload = {
         "execution_id": "exec-1",
+        "flow_run_id": "run-1",
         "flow_run_url": "https://prefect.local/runs/exec-1",
         "qdash_ui_url": "https://qdash.local/executions/exec-1",
         "message": "started",
@@ -1041,6 +1056,32 @@ def test_flow_and_execution_write_helpers_return_models() -> None:
         client.close()
 
 
+def test_execute_flow_without_parameters_sends_an_empty_object() -> None:
+    # ExecuteFlowRequest.parameters is an object; null would be rejected with 422.
+    bodies: list[object] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        bodies.append(json.loads(request.content))
+        return httpx.Response(
+            200,
+            json={
+                "execution_id": "exec-1",
+                "flow_run_id": "run-1",
+                "flow_run_url": "http://prefect/run-1",
+                "qdash_ui_url": "http://qdash/executions/exec-1",
+                "message": "started",
+            },
+        )
+
+    client = _build_client(httpx.MockTransport(handler), api_token="api-token")
+    try:
+        client.execute_flow("demo")
+    finally:
+        client.close()
+
+    assert bodies == [{"parameters": {}}]
+
+
 def test_task_result_and_issue_write_helpers_return_models() -> None:
     issue_payload = {
         "id": "issue-1",
@@ -1063,6 +1104,7 @@ def test_task_result_and_issue_write_helpers_return_models() -> None:
     }
     execute_payload = {
         "execution_id": "exec-1",
+        "flow_run_id": "run-1",
         "flow_run_url": "https://prefect.local/runs/exec-1",
         "qdash_ui_url": "https://qdash.local/executions/exec-1",
         "message": "started",
@@ -1932,3 +1974,27 @@ def test_execute_agent_action_sends_the_source_execution_only_when_given(
     assert sent[0].get("source_execution_id") == expected
     assert ("source_execution_id" in sent[0]) is (source is not None)
     assert sent[0]["update_params"] is False
+
+
+def test_metric_script_and_dashboard_writes_send_set_fields_on_a_quoted_path() -> None:
+    from qdash.client.services.models import DashboardUpdateRequest
+
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(422, json={"detail": "rejected"})
+
+    client = _build_client(httpx.MockTransport(handler), api_token="token")
+    request = DashboardUpdateRequest.model_validate({"chip_id": None, "expected_version": 2})
+
+    with pytest.raises(QDashValidationError):
+        client.update_dashboard("a/b", request)
+    with pytest.raises(QDashValidationError):
+        client.validate_metric_script("x = 1\n")
+
+    assert requests[0].method == "PATCH"
+    assert requests[0].url.raw_path == b"/dashboards/a%2Fb"
+    # An explicit null clears the chip; unset fields stay out of the body.
+    assert json.loads(requests[0].content) == {"chip_id": None, "expected_version": 2}
+    assert json.loads(requests[1].content) == {"source": "x = 1\n"}

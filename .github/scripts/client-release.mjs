@@ -132,13 +132,26 @@ export function remoteGit(cwd = process.cwd()) {
   };
 }
 
-/** npm cannot resolve workspace:* or the client's source placeholder 0.0.0. */
+/**
+ * The npm libraries that release with QDash's version: the client and the SDK built on it.
+ * Every one of them carries the run's exact client version.
+ */
+export const QDASH_LIBRARIES = ["@oqtopus-team/qdash-client", "@oqtopus-team/qdash-sdk"];
+
+/**
+ * npm cannot resolve workspace:* or the source placeholder 0.0.0, so pin each QDash
+ * library a manifest depends on to the exact version this run built. The SDK takes the
+ * client's version, so one version pins both.
+ */
 export function pinClientDependency(manifest, version) {
-  if (!manifest.dependencies?.["@oqtopus-team/qdash-client"]) return manifest;
+  const names = QDASH_LIBRARIES.filter((name) => manifest.dependencies?.[name]);
+  if (names.length === 0) return manifest;
   if (typeof version !== "string" || !/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(-[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*)?$/.test(version) || version === "0.0.0") {
-    throw new Error("An exact built client version is required before packing pi-qdash");
+    throw new Error(`An exact built client version is required before packing ${manifest.name ?? "a package"}`);
   }
-  return { ...manifest, dependencies: { ...manifest.dependencies, "@oqtopus-team/qdash-client": version } };
+  const dependencies = { ...manifest.dependencies };
+  for (const name of names) dependencies[name] = version;
+  return { ...manifest, dependencies };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

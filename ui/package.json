@@ -57,6 +57,7 @@
     "plotly.js-dist-min": "^3.7.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
+    "react-grid-layout": "2.3.0",
     "react-hook-form": "^7.85.0",
     "react-markdown": "^10.1.0",
     "react-resizable-panels": "^4.12.2",

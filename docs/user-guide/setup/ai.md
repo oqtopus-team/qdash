@@ -5,7 +5,7 @@ QDash runs calibrations without AI endpoints.
 
 | Setting | Needed for | Required |
 | --- | --- | --- |
-| [Chat endpoint](#connect-model-endpoints) | **Agent**, the **Ask AI** sidebar, and forum AI replies | For chat |
+| [Chat endpoint](#connect-model-endpoints) | **Agent**, the **Ask Agent** sidebar, and forum AI replies | For chat |
 | [Evaluation endpoint](#connect-model-endpoints) | **AI Evaluations** and **Evaluate** on **Chip** | For evaluations |
 | [Deployment profile](#select-a-deployment-profile) | Chat and evaluation models specific to this deployment | No |
 | [Classifier endpoint](#add-a-classifier) | Fixed result layouts and category judgments in chat | No |

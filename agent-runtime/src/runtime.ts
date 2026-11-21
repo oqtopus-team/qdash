@@ -35,6 +35,7 @@ import {
 } from "./allowed-tools.ts";
 import { compactionBudget, type CompactionBudget } from "./budget.ts";
 import { chartTool } from "./chart-tool.ts";
+import { buildCompactionExtension } from "./compaction.ts";
 import {
   buildChatRegistry as buildChatRegistryFor,
   buildCopilotExtension,
@@ -401,6 +402,7 @@ export class SharedRuntime {
       copilot: copilotExtension,
       internalCalls: presentation ? PRESENTATION_INTERNAL_CALLS : {},
       codingTools: EXEC_CONFIG !== undefined,
+      compaction: buildCompactionExtension({ timeoutMs: MODEL_STREAM_TIMEOUT_MS }),
     };
     const buildChatRegistry = (
       connection: QDashConnection,

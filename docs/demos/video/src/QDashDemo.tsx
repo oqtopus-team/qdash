@@ -21,7 +21,7 @@ const FEATURES: Feature[] = [
       "Latest, best, or average per cooldown",
     ],
     screenshot: "screens/dashboard-t1-blur.png",
-    url: "qdash.example/dashboard",
+    url: "qdash.example/overview",
     accent: theme.violet,
     focusX: 0.35,
     focusY: 0.55,

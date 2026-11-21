@@ -12,20 +12,25 @@ const CODE = [
   "",
 ].join("\n");
 
-function registeredTools(saveFlow, chipId = "64Qv3", executeFlow = async () => { throw new Error("must not be called"); }) {
+function registeredTools(saveFlow, chipId = "64Qv3", executeFlow = async () => { throw new Error("must not be called"); }, projectId = "project-1") {
   const tools = new Map();
   const calls = [];
   registerFlowAuthoringTools({ registerTool(tool) { tools.set(tool.name, tool); } }, {
     async makeClient() {
       return {
+        // null stands for a profile without a project.
+        config: { projectId: projectId ?? undefined },
         async saveFlow(request) { calls.push(request); return saveFlow(request); },
         async executeFlow(name, parameters) { calls.push({ execute: name, parameters }); return executeFlow(name, parameters); },
+        // A tool that starts a run must not follow it.
+        async getExecution() { calls.push("getExecution"); throw new Error("must not wait"); },
+        async waitForExecution() { calls.push("waitForExecution"); throw new Error("must not wait"); },
       };
     },
     async resolveChipId(_client, explicit) { return explicit ?? chipId; },
     flowPageUrl: (_client, name) => `https://qdash.example/workflow/${name}`,
   });
-  return { tool: tools.get("qdash_save_flow"), run: tools.get("qdash_execute_flow"), calls };
+  return { tools, tool: tools.get("qdash_save_flow"), run: tools.get("qdash_execute_flow"), calls };
 }
 
 const uiContext = (answer) => ({ hasUI: true, ui: { async confirm() { return answer; } } });
@@ -77,6 +82,36 @@ test("running a saved flow is confirmation-gated and reports the execution", asy
   assert.equal(result.details.started, true);
   assert.equal(result.content[0].text, formatFlowExecution(started, "my_check"));
   assert.match(result.content[0].text, /Execution: 20261022-001[\s\S]*qdash_wait_execution/);
+
+  // Without parameters the saved defaults run: an empty object is sent, as before.
+  await run.execute("t", { name: "my_check", confirmWrite: true }, undefined, undefined, { hasUI: false });
+  assert.deepEqual(calls.at(-1), { execute: "my_check", parameters: {} });
+});
+
+test("running a flow without a project keeps the server's default and the confirmation gate", async () => {
+  const started = { execution_id: "20261022-002", flow_run_id: "fr-2", flow_run_url: "", qdash_ui_url: "", message: "started" };
+  const { run, calls } = registeredTools(async () => ({}), "64Qv3", async () => started, null);
+  await assert.rejects(run.execute("t", { name: "my_check" }, undefined, undefined, { hasUI: false }), /requires explicit confirmation/);
+  await assert.rejects(run.execute("t", { name: "my_check" }, undefined, undefined, uiContext(false)), /requires explicit confirmation/);
+  assert.equal(calls.length, 0);
+
+  const viaFlag = await run.execute("t", { name: "my_check", confirmWrite: true }, undefined, undefined, { hasUI: false });
+  const viaUi = await run.execute("t", { name: "my_check" }, undefined, undefined, uiContext(true));
+  assert.deepEqual(calls, [{ execute: "my_check", parameters: {} }, { execute: "my_check", parameters: {} }]);
+  for (const result of [viaFlag, viaUi]) {
+    assert.equal(result.details.started, true);
+    assert.equal(result.details.executionId, "20261022-002");
+  }
+});
+
+test("a flow name QDash cannot have is refused by the schema and sends nothing", async () => {
+  const { tools, run, calls } = registeredTools(async () => ({}));
+  const pattern = new RegExp(tools.get("qdash_execute_flow").parameters.properties.name.pattern);
+  assert.ok(pattern.test("my_check"));
+  for (const name of ["../chips", "bad name", ""]) assert.ok(!pattern.test(name), name);
+  // The SDK checks again when the tool is called directly.
+  await assert.rejects(run.execute("t", { name: "../chips", confirmWrite: true }, undefined, undefined, { hasUI: false }), /letters, digits and underscores/);
+  assert.equal(calls.length, 0);
 });
 
 test("the save is confirmation-gated and never runs on refusal or without a UI", async () => {

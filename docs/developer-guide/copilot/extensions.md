@@ -47,6 +47,18 @@ rather than appended on later runs. The QDash runtime does not run this hook; it
 same policy and guide with its own chat rules in `agent-runtime/src/prompt.ts`. Keep display,
 approval, and orchestration rules for one host out of `qdash-guidance.ts`.
 
+`extensions/tools/metric-scripts.ts` adds the metric script and dashboard tools: the
+`qdash_query` actions for scripts, templates, the data catalog and dashboards, the direct tools
+`qdash_validate_metric_script` and `qdash_preview_metric_script` (they execute code on the QDash
+server, so they are not script-callable reads), and the reviewed writes
+`qdash_save_metric_script` and `qdash_save_dashboard`. All four direct tools are deferred.
+The tools only reach the API and format its answers; the `qdash_metrics` API and the authoring
+workflow live in `skills/qdash-metric-scripts/`. When the web application's metric script
+editor is open, the runtime adds the editor's text to the prompt and offers
+`propose_code_edit` for it, as it does for the Workflow editor and for a dashboard the
+user may edit, where the proposal is the dashboard's draft as JSON; see
+[Page context and editor edits](./architecture.md#page-context-and-editor-edits).
+
 Keep API access through `@oqtopus-team/qdash-client`, redaction, rendering, and
 mechanical evidence extraction in extensions. Keep calibration interpretation,
 diagnosis recipes, thresholds, and runbooks in `packages/pi-qdash/skills/`.
@@ -89,6 +101,15 @@ Pipeline execution is separate from agent candidate approval. A valid
 `qdash_plan_pipeline` result precedes confirmation-gated `qdash_run_pipeline`;
 the latter persists completed task parameters directly. Do not use it to retry
 a failed agent action because that would bypass the candidate gate.
+
+The pipeline tools and `qdash_execute_flow` reach QDash through the
+[TypeScript SDK](../architecture/typescript-sdk.md) package `@oqtopus-team/qdash-sdk`
+(`qdash.pipelines` and `qdash.workflows.run`), which builds the requests; other
+tools use `@oqtopus-team/qdash-client` directly. A profile without a project keeps
+running on the server's default project. Confirmation, input checks, the 422 and
+503 handling and the structured results stay in the tools. A run tool returns the execution ID as soon as QDash
+accepts the run and never calls the SDK's `wait()`; `qdash_wait_execution` follows
+the run when asked.
 
 When adding a tool or command, update the [pi-qdash reference](../../reference/pi-qdash.md)
 and add focused tests under `packages/pi-qdash/tests/`. Keep pure extraction helpers

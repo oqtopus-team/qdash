@@ -106,7 +106,6 @@ function TaskRow({ task }: { task: Task }) {
         <ChatLink
           href={taskResultPath(task.task_id)}
           className="link link-hover min-w-0 truncate text-base-content/70 hover:text-base-content"
-          title={`Open the ${label} result`}
         >
           {label}
         </ChatLink>
@@ -253,7 +252,6 @@ function StepName({ step, chipId }: { step: PipelineStepProgress; chipId?: strin
         target="_blank"
         rel="noopener noreferrer"
         className="link link-hover min-w-0 truncate text-base-content/70 hover:text-base-content"
-        title={`Open the execution of step ${label}`}
       >
         {label}
       </a>

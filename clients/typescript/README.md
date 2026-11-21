@@ -73,6 +73,10 @@ const posts = await client.api.listForumPosts({ limit: 20 });
 
 Use the high-level methods for stable domain operations and polling helpers. Use `client.api` when an endpoint does not yet need a convenience method.
 
+## Calibration SDK
+
+[`@oqtopus-team/qdash-sdk`](https://www.npmjs.com/package/@oqtopus-team/qdash-sdk) validates and starts calibrations and registered workflows on top of this client. Install it separately with `npm install @oqtopus-team/qdash-sdk`; it installs the client of the same release. See the [TypeScript client reference](https://oqtopus-team.github.io/qdash/reference/clients/typescript#run-a-calibration).
+
 ## Forum Images
 
 Upload locally generated PNG, JPEG, GIF, or WebP images (up to 5 MB) using a Node `Blob` and filename:

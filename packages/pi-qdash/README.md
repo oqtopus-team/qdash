@@ -10,7 +10,7 @@
 
 `@oqtopus-team/pi-qdash` is a [pi](https://github.com/badlogic/pi-mono) extension for querying [QDash](https://github.com/oqtopus-team/qdash), the large-scale QPU calibration platform in the OQTOPUS ecosystem.
 
-It uses [`@oqtopus-team/qdash-client`](https://www.npmjs.com/package/@oqtopus-team/qdash-client) and reuses existing `QDASH_*` environment variables or profiles from `~/.config/qdash/config.ini` / `$XDG_CONFIG_HOME/qdash/config.ini`.
+It uses [`@oqtopus-team/qdash-client`](https://www.npmjs.com/package/@oqtopus-team/qdash-client), and [`@oqtopus-team/qdash-sdk`](https://www.npmjs.com/package/@oqtopus-team/qdash-sdk) for the pipeline and flow-run tools, and reuses existing `QDASH_*` environment variables or profiles from `~/.config/qdash/config.ini` / `$XDG_CONFIG_HOME/qdash/config.ini`.
 
 ## Features
 
@@ -19,6 +19,7 @@ It uses [`@oqtopus-team/qdash-client`](https://www.npmjs.com/package/@oqtopus-te
 - **Agent calibration workflow**: create agent sessions, submit and track agent actions, and commit/apply calibration candidates. Write operations are approval-gated.
 - **Calibration pipelines**: compose a declarative pipeline spec from QDash's step catalog (`qdash_get_pipeline_catalog`), validate it (`qdash_plan_pipeline`), and run it as one execution (`qdash_run_pipeline`, approval-gated).
 - **Figures**: fetch calibration PNG/JSON figures and render them in the interactive TUI.
+- **Metric scripts and dashboards**: write `qdash_metrics` scripts that compute per-qubit or per-coupling values, validate and preview them on a chip (`qdash_validate_metric_script`, `qdash_preview_metric_script`), and save scripts and dashboards after approval, guided by the `qdash-metric-scripts` skill.
 - **Scripts and tool loading**: with pi's `codemode` and `tool_search`, scripts batch read-only QDash calls and receive JSON data, and narrower tools load on demand. Scripts cannot reach write, figure, or shell tools. pi-qdash activates both for a new user and keeps a selection you make across reloads, new sessions, and forks. Set `PI_QDASH_CODEMODE=off`, or add `-codemode` to pi's `defaultTools` setting, to leave `codemode` inactive.
 - **Calibration evaluation**: with [pi-qcaleval](https://www.npmjs.com/package/@oqtopus-team/pi-qcaleval) installed, `qcal_evaluate` calls get the requested task's figure, QDash task knowledge, and (on request) labeled examples.
 - **Generic timeseries comparison**: inspect and align arbitrary QDash parameters/targets with explicitly mapped local CSV sensor columns, reuse schema-validated investigation presets, and report correlations plus optional shared-period/phase evidence without hard-coded metrics or schemas.
@@ -44,8 +45,8 @@ Or try it without installing:
 pi -e npm:@oqtopus-team/pi-qdash
 ```
 
-The package declares Node.js 20 or later and is tested with Node.js 24 and pi 1.5.2.
-Published releases pin the matching `@oqtopus-team/qdash-client` version.
+The package declares Node.js 20 or later and is tested with Node.js 24 and pi 1.6.0.
+Published releases pin the matching `@oqtopus-team/qdash-client` and `@oqtopus-team/qdash-sdk` versions.
 Use the `beta` dist-tag to try changes merged into QDash's `develop` branch:
 
 ```bash

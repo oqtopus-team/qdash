@@ -1,13 +1,13 @@
 # Application Tour
 
-QDash groups project-scoped calibration work into Overview, Operate, Collaborate, and Manage
+QDash groups project-scoped calibration work into Explore, Operate, Collaborate, and Manage
 sections in the application sidebar.
 
 <!-- MEDIA PLACEHOLDER
 File: /images/guides/application-sidebar.gif
 Start: Home with a project selected and every sidebar section visible.
 Sequence: Highlight each sidebar section, open the project selector, then return to Home.
-Alt: QDash sidebar grouped into Overview, Operate, Collaborate, and Manage sections.
+Alt: QDash sidebar grouped into Explore, Operate, Collaborate, and Manage sections.
 -->
 
 ## Project Context
@@ -22,7 +22,8 @@ for the role to assign.
 | Page | Purpose | Guide |
 | --- | --- | --- |
 | **Home** | Start common work and review recent executions, upcoming scheduled workflow runs, and recent failed tasks. | This page |
-| **Dashboard** | Scan all configured chip metrics, coverage, distributions, and scoped notes. | [Dashboard](./dashboard.md) |
+| **Overview** | Scan all configured chip metrics, coverage, distributions, and scoped notes. | [Overview](./overview.md) |
+| **Dashboards** | Compose metric maps, the results of your own metric scripts (such as collision checks or a median per coupling), and notes into a saved layout shared with the project. | [Dashboards](./dashboards.md), [Metric Scripts](./metric-scripts.md) |
 | **Metrics** | Inspect one metric across qubits or couplings and compare its history. | [Calibration Data and Provenance](./data-and-provenance.md) |
 | **Chip** | Browse calibration tasks and the latest results on the chip topology. | [Calibration Data and Provenance](./data-and-provenance.md) |
 | **Analysis** | Plot and compare chip parameters over a selected time range. | [Calibration Data and Provenance](./data-and-provenance.md) |

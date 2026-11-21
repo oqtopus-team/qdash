@@ -31,8 +31,10 @@ import { getNavigationSections, withoutMobileTabs } from "@/components/layout/na
 import type { NavItem, NavSection } from "@/components/layout/navigation";
 
 /**
- * Controlled open state for one rail tooltip. `open` is already false whenever
- * the tooltip is disabled (expanded rail, mobile drawer) or its context is stale.
+ * Controlled open state for the rail toggle tooltip. `open` is already false
+ * whenever the tooltip is disabled (mobile drawer) or its context is stale.
+ * Navigation rows and the profile entry carry no tooltip: their accessible names
+ * come from the mounted labels, and a hover popup only repeated the destination.
  */
 type RailTooltipControl = {
   open: boolean;
@@ -71,12 +73,12 @@ function revealActiveRow(navigation: HTMLElement | null) {
   navigation?.querySelector('[aria-current="page"]')?.scrollIntoView({ block: "nearest" });
 }
 
-/** Compact, high-contrast label shown to the right of an icon-only rail control. */
+/** Compact, high-contrast label shown to the right of the rail toggle. */
 const RAIL_TOOLTIP_CLASS =
   "border-neutral bg-neutral px-2 py-1 text-xs font-medium text-neutral-content shadow-md";
 
 /**
- * Wraps one sidebar control in a right-side tooltip. The trigger is always
+ * Wraps the rail toggle in a right-side tooltip. The trigger is always
  * rendered through the tooltip, even while it stays closed, so toggling the rail
  * does not remount the control and drop its keyboard focus. The content is
  * portalled, so the scrolling nav cannot clip it.
@@ -321,7 +323,6 @@ function SidebarNavItem({
   pathname,
   linkClass,
   desktopLinkClass,
-  tooltip,
   onClick,
 }: {
   item: NavItem;
@@ -330,7 +331,6 @@ function SidebarNavItem({
   pathname: string;
   linkClass: (active: boolean) => string;
   desktopLinkClass: (active: boolean) => string;
-  tooltip: RailTooltipControl;
   onClick: () => void;
 }) {
   const Icon = item.icon;
@@ -339,17 +339,18 @@ function SidebarNavItem({
 
   return (
     <li>
-      <RailTooltip label={item.title ?? item.label} control={tooltip}>
-        <Link
-          href={item.href}
-          className={isMobileOpen ? linkClass(active) : desktopLinkClass(active)}
-          aria-current={active ? "page" : undefined}
-          onClick={onClick}
-        >
-          <Icon size={18} className="shrink-0" aria-hidden="true" />
-          <span className={`ml-2 truncate ${railFadeClass(showLabel)}`}>{item.label}</span>
-        </Link>
-      </RailTooltip>
+      <Link
+        href={item.href}
+        className={`${isMobileOpen ? linkClass(active) : desktopLinkClass(active)}${item.badge ? " gap-0" : ""}`}
+        aria-current={active ? "page" : undefined}
+        onClick={onClick}
+      >
+        <Icon size={18} className="shrink-0" aria-hidden="true" />
+        <span className={`ml-2 truncate ${railFadeClass(showLabel)}`}>{item.label}</span>
+        {item.badge && showLabel && (
+          <span className="badge badge-xs ml-1 shrink-0 px-1">{item.badge}</span>
+        )}
+      </Link>
     </li>
   );
 }
@@ -364,7 +365,6 @@ function SidebarExternalNavItem({
   isOpen,
   linkClass,
   desktopLinkClass,
-  tooltip,
   onClick,
 }: {
   item: ExternalNavItem;
@@ -372,7 +372,6 @@ function SidebarExternalNavItem({
   isOpen: boolean;
   linkClass: (active: boolean) => string;
   desktopLinkClass: (active: boolean) => string;
-  tooltip: RailTooltipControl;
   onClick: () => void;
 }) {
   const Icon = item.icon;
@@ -380,18 +379,16 @@ function SidebarExternalNavItem({
 
   return (
     <li>
-      <RailTooltip label={item.title ?? item.label} control={tooltip}>
-        <a
-          href={item.href}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={isMobileOpen ? linkClass(false) : desktopLinkClass(false)}
-          onClick={onClick}
-        >
-          <Icon size={18} className="shrink-0" aria-hidden="true" />
-          <span className={`ml-2 truncate ${railFadeClass(showLabel)}`}>{item.label}</span>
-        </a>
-      </RailTooltip>
+      <a
+        href={item.href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={isMobileOpen ? linkClass(false) : desktopLinkClass(false)}
+        onClick={onClick}
+      >
+        <Icon size={18} className="shrink-0" aria-hidden="true" />
+        <span className={`ml-2 truncate ${railFadeClass(showLabel)}`}>{item.label}</span>
+      </a>
     </li>
   );
 }
@@ -496,8 +493,6 @@ export function Sidebar() {
       });
     },
   });
-  // Labels are hidden only on the collapsed desktop rail, so only it needs tooltips.
-  const desktopRailTooltips = !isOpen && !isMobileOpen;
 
   // Close mobile sidebar when clicking a link
   const handleLinkClick = () => {
@@ -541,7 +536,7 @@ export function Sidebar() {
 
   // The stack follows the rail width, so every row resizes with it; `min-w-16` keeps
   // the icon column intact if a classic scrollbar narrows the collapsed nav.
-  const renderSidebarContent = (sections: NavSection[], railTooltips: boolean) => (
+  const renderSidebarContent = (sections: NavSection[]) => (
     <div className="flex w-full min-w-16 flex-col">
       {sections.map((section) => {
         const visibleItems = section.items.filter((item) => item.visible !== false);
@@ -566,7 +561,6 @@ export function Sidebar() {
                 pathname={pathname}
                 linkClass={linkClass}
                 desktopLinkClass={desktopLinkClass}
-                tooltip={railTooltip(`nav:${item.href}`, railTooltips)}
                 onClick={handleLinkClick}
               />
             ))}
@@ -586,7 +580,6 @@ export function Sidebar() {
               isOpen={isOpen}
               linkClass={linkClass}
               desktopLinkClass={desktopLinkClass}
-              tooltip={railTooltip(`external:${item.href}`, railTooltips)}
               onClick={handleLinkClick}
             />
           ))}
@@ -597,46 +590,41 @@ export function Sidebar() {
   // The desktop profile keeps one layout in both rail states: a 32px avatar centred
   // on the icon column, with its details clipped and faded rather than unmounted.
   const profileDetailsVisible = isOpen || isMobileOpen;
-  const renderUserSection = (railTooltips: boolean) => (
+  const renderUserSection = () => (
     <div className={`border-t border-base-300 ${isMobileOpen ? "p-2" : "mx-2 py-2"}`}>
-      <RailTooltip
-        label={user?.username || "User profile"}
-        control={railTooltip("profile", railTooltips)}
+      <button
+        type="button"
+        onClick={openProfileModal}
+        aria-label={profileDetailsVisible ? undefined : "Open user profile"}
+        className={`btn btn-ghost h-auto w-full justify-start gap-3 py-2 ${
+          isMobileOpen ? "" : "flex-nowrap overflow-hidden px-2"
+        }`}
       >
-        <button
-          type="button"
-          onClick={openProfileModal}
-          aria-label={profileDetailsVisible ? undefined : "Open user profile"}
-          className={`btn btn-ghost h-auto w-full justify-start gap-3 py-2 ${
-            isMobileOpen ? "" : "flex-nowrap overflow-hidden px-2"
-          }`}
+        <div className="flex shrink-0 items-center justify-center">
+          <UserAvatar
+            username={user?.username || ""}
+            size={isMobileOpen ? 28 : 32}
+            showTitle={false}
+          />
+        </div>
+        <div
+          aria-hidden={profileDetailsVisible ? undefined : true}
+          data-testid="sidebar-profile-details"
+          className={`min-w-0 flex-1 text-left ${railFadeClass(profileDetailsVisible)}`}
         >
-          <div className="flex shrink-0 items-center justify-center">
-            <UserAvatar
-              username={user?.username || ""}
-              size={isMobileOpen ? 28 : 32}
-              showTitle={false}
-            />
-          </div>
-          <div
-            aria-hidden={profileDetailsVisible ? undefined : true}
-            data-testid="sidebar-profile-details"
-            className={`min-w-0 flex-1 text-left ${railFadeClass(profileDetailsVisible)}`}
-          >
-            <div className="text-sm font-medium truncate">{user?.username || "User"}</div>
-            <div className="text-xs opacity-60 truncate">{user?.display_name || ""}</div>
-            {user?.system_role && (
-              <div className="mt-0.5">
-                <span
-                  className={`badge badge-xs ${user.system_role === "admin" ? "badge-primary" : "badge-ghost"}`}
-                >
-                  {user.system_role}
-                </span>
-              </div>
-            )}
-          </div>
-        </button>
-      </RailTooltip>
+          <div className="text-sm font-medium truncate">{user?.username || "User"}</div>
+          <div className="text-xs opacity-60 truncate">{user?.display_name || ""}</div>
+          {user?.system_role && (
+            <div className="mt-0.5">
+              <span
+                className={`badge badge-xs ${user.system_role === "admin" ? "badge-primary" : "badge-ghost"}`}
+              >
+                {user.system_role}
+              </span>
+            </div>
+          )}
+        </div>
+      </button>
     </div>
   );
 
@@ -763,13 +751,13 @@ export function Sidebar() {
           ref={desktopNavRef}
           className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain"
         >
-          {renderSidebarContent(navSections, desktopRailTooltips)}
+          {renderSidebarContent(navSections)}
         </nav>
-        {renderUserSection(desktopRailTooltips)}
+        {renderUserSection()}
       </aside>
 
       {/* Mobile menu: the header menu button opens it below `lg`. The tab bar covers
-          Dashboard, Workflow, Execution, and Agent, so the drawer lists every other
+          Overview, Workflow, Execution, and Agent, so the drawer lists every other
           destination. Radix traps focus, closes on Escape or an outside press, and
           returns focus to the button that opened it. */}
       <Dialog open={isMobileOpen} onOpenChange={setMobileSidebarOpen}>
@@ -806,9 +794,9 @@ export function Sidebar() {
             aria-label="Menu navigation"
             className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
           >
-            {renderSidebarContent(withoutMobileTabs(navSections), false)}
+            {renderSidebarContent(withoutMobileTabs(navSections))}
           </nav>
-          {renderUserSection(false)}
+          {renderUserSection()}
         </DialogContent>
       </Dialog>
 

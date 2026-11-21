@@ -9,7 +9,7 @@ code itself.
 
 | Part | Owns | Leaves to others |
 | --- | --- | --- |
-| `agent-exec` container (`agent-runtime/exec/`) | Running commands and file operations, one pi-env daemon per conversation as the owner's own uid | Authentication, QDash data, model access |
+| `agent-exec` container (`agent-runtime/exec/`) | Running commands and file operations, one pi-env daemon per conversation as the owner's own uid | Authentication, QDash data, model access, [metric scripts](../architecture/metric-scripts.md) (the `metric-runner` container) |
 | Agent Runtime (`agent-runtime/src/exec-env.ts`) | One connection per open conversation, the conversation's directory, the four tools | Executing anything locally |
 
 The model gets data into the workspace by writing it into a file. The container uses
@@ -61,7 +61,7 @@ sequenceDiagram
 | Credentials | No `env_file`; the daemon's environment is `PATH`, `HOME`, `TMPDIR`, locale, and Python settings (`daemonEnv` in `exec/server.ts`) |
 | Network | `network_mode: none`; no TCP listener |
 | Users | A distinct uid in 20000–59999 per owner, persisted as directory ownership; 0700 owner directories |
-| Container | `read_only` root with `/tmp` as tmpfs, `cap_drop: ALL` plus the capabilities `setpriv` and `chown` need, `no-new-privileges`, a pid limit, a memory limit (`AGENT_EXEC_MEMORY_LIMIT`, default 2g) |
+| Container | `read_only` root with `/tmp` as tmpfs, `cap_drop: ALL` plus the capabilities `setpriv` and `chown` need, `no-new-privileges`, a pid limit (512), a memory limit (`AGENT_EXEC_MEMORY_LIMIT`, default 2g), a CPU limit (`AGENT_EXEC_CPU_LIMIT`, default 2) |
 | Runtime access | A root-owned Unix socket (0660) in a root-owned directory (0750), both assigned to the runtime's group (gid 1000 in Compose); workspace users have no access |
 
 The `agent-exec-socket` volume exposes the socket to the runtime as a read-only mount.
@@ -92,7 +92,8 @@ row also shows the tool's answer (`output` on `tool_end`, the tail when long, wi
 of a failed command). The user's open or closed choice persists as the call starts and finishes.
 While the model writes a call, an expanded row shows the code as it is typed (`tool_draft` and
 `tool_args_delta` in [Chat Streaming](./chat-streaming.md)). A save of a flow
-(`qdash_save_flow`) shows the whole flow as code on its approval card. Components:
+(`qdash_save_flow`) or a metric script (`qdash_save_metric_script`) shows the whole source as
+code on its approval card. Components:
 `ui/src/components/features/chat/ToolStepDetails.tsx`, `ChatInteractionCards.tsx`.
 
 ## Configuration
@@ -104,6 +105,7 @@ While the model writes a call, an expanded row shows the code as it is typed (`t
 | `AGENT_EXEC_WORKSPACE_ROOT` | both | Owner directories, default `/workspace` (the `agent-exec-workspace` volume) |
 | `AGENT_EXEC_ISOLATE_USERS` | agent-exec | Per-owner uids; default on when the server runs as root |
 | `AGENT_EXEC_MEMORY_LIMIT` | agent-exec | Container memory limit, default `2g` |
+| `AGENT_EXEC_CPU_LIMIT` | agent-exec | Container CPU limit, default `2` |
 
 The Python packages are pinned in `agent-runtime/exec/requirements.txt`; the daemon binary
 comes from the `@earendil-works/pi-env` package the runtime depends on, so its version follows

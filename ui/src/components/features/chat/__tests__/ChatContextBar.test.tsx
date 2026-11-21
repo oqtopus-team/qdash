@@ -1,4 +1,4 @@
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PageContextSummary } from "@/contexts/ChatDockContext";
 import type { InvestigationTarget, TaskChatContext } from "@/types/copilotChat";
@@ -11,6 +11,7 @@ const { chat, dock } = vi.hoisted(() => ({
       context: TaskChatContext | null;
       investigation?: InvestigationTarget | null;
     } | null,
+    send: vi.fn(),
   },
   dock: { present: true, page: null as PageContextSummary | null },
 }));
@@ -30,7 +31,7 @@ vi.mock("@/hooks/useCopilotChat", () => ({
     liveTurn: null,
     model: { options: [], selected: { key: "default" }, select: vi.fn() },
     thinking: { choice: "auto", select: vi.fn(), modelDefault: null },
-    send: vi.fn(),
+    send: chat.send,
     stop: vi.fn(),
     steers: [],
     steer: vi.fn(),
@@ -102,6 +103,41 @@ describe("ChatThread context near the composer", () => {
     render(<ChatThread variant="panel" />);
     expect(within(contextList()!).getByRole("listitem")).toHaveTextContent(
       "/workflow/my_flow · with editor code",
+    );
+  });
+
+  it("says when the page sends a dashboard draft", () => {
+    dock.page = {
+      path: "/dashboards/new",
+      title: "New dashboard",
+      withEditorCode: true,
+      editorKind: "dashboard",
+    };
+    render(<ChatThread variant="panel" />);
+    expect(within(contextList()!).getByRole("listitem")).toHaveTextContent(
+      "/dashboards/new · with dashboard draft",
+    );
+  });
+
+  it("offers the page's own requests in an empty chat and sends one only when picked", () => {
+    chat.send.mockClear();
+    chat.session = { id: "s1", context: null };
+    dock.page = {
+      path: "/dashboards/new",
+      title: "New dashboard",
+      withEditorCode: true,
+      editorKind: "dashboard",
+      suggestions: ["Build a frequency collision map from the starter template"],
+    };
+    render(<ChatThread variant="panel" />);
+    const pick = screen.getByRole("button", {
+      name: "Build a frequency collision map from the starter template",
+    });
+    expect(chat.send).not.toHaveBeenCalled();
+    fireEvent.click(pick);
+    expect(chat.send).toHaveBeenCalledWith(
+      "Build a frequency collision map from the starter template",
+      [],
     );
   });
 

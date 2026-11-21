@@ -18,6 +18,7 @@ import {
   MAX_NESTED_DATA_BYTES,
   MAX_SCRIPT_TIMEOUT_MS,
   NESTED_READ_TOOL_NAMES,
+  QDASH_TOOL_NAMESPACE,
   REVIEWED_WRITE_TOOL_NAMES,
   boundScriptData,
   jsonByteLength,
@@ -111,14 +112,19 @@ test("the shared lists name real pi-qdash tools and agree with each other", () =
     assert.equal(definition.outputSchema === SCRIPT_DATA_SCHEMA, read, name);
     if (read) assert.equal(definition.annotations?.readOnlyHint, true, name);
     if (REVIEWED_WRITE_TOOL_NAMES.includes(name)) assert.equal(definition.annotations?.destructiveHint, true, name);
+    // The same code mode namespace QDash chat declares on its qdash extension.
+    assert.equal(definition.namespace, QDASH_TOOL_NAMESPACE, name);
   }
 });
 
-test("applyToolPolicy keeps other extensions' tools and an exposure a tool states", () => {
+test("applyToolPolicy keeps other extensions' tools and an exposure or namespace a tool states", () => {
   const bash = { name: "bash" };
   assert.equal(applyToolPolicy(bash), bash);
   assert.equal(applyToolPolicy({ name: "qdash_raw_get" }).exposure, "model-only");
   assert.equal(applyToolPolicy({ name: "qdash_list_chips", exposure: "hidden" }).exposure, "hidden");
+  const own = { name: "qdash", description: "stated" };
+  assert.equal(applyToolPolicy({ name: "qdash_list_chips", namespace: own }).namespace, own);
+  assert.equal(applyToolPolicy(bash).namespace, undefined);
 });
 
 test("scripts reach only pi-qdash's audited reads and declared read-only tools", () => {

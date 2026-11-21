@@ -38,6 +38,7 @@ import {
   withScriptDeadline,
 } from "../src/codemode.ts";
 import { buildQDashExtension } from "../src/durable-tools.ts";
+import { QDASH_TOOL_NAMESPACE } from "@oqtopus-team/pi-qdash/extensions/lib/tool-policy.ts";
 import { buildPresentationTools, PRESENT_TOOL, PRESENTATION_INTERNAL_CALLS } from "../src/presentation-tool.ts";
 import { nestedCallSummary, toNdjsonEvents } from "../src/events.ts";
 import { pendingApproval } from "../src/runtime.ts";
@@ -661,6 +662,51 @@ test("present_results accepts a deferred read a script called, before and after 
     // After loading it is offered, and still accepted.
     assert.equal(seen[1].has("qdash_compare_executions"), true);
     assert.equal(byId.get("p3").isError, false, resultText(byId.get("p3")));
+  } finally {
+    await chat.close();
+  }
+});
+
+test("QDash tools form the qdash code mode namespace, limited to what scripts may call", async () => {
+  const chips = piTool("qdash_list_chips", () => CHIPS);
+  const metrics = piTool("qdash_get_chip_metrics", (params) => ({ chip_id: params.chipId }));
+  const save = piTool("qdash_save_flow");
+  const code = [
+    "const ns = await describeNamespace('qdash');",
+    "const found = await searchTools('chips', { namespace: 'qdash' });",
+    "text(JSON.stringify({ ns, found: found.map((tool) => tool.name ?? tool) }));",
+  ].join("\n");
+  let section;
+  const chat = await openChat({
+    piExtensions: [piExtension([chips, metrics, save])],
+    responses: [
+      (transcript) => {
+        section = transcript.messages.find((message) => message.role === "system" && message.sections?.codemode)?.sections.codemode;
+        return fauxAssistantMessage([fauxToolCall(CODEMODE_TOOL_NAME, { code }, { id: "s1" })], { stopReason: "toolUse" });
+      },
+      fauxAssistantMessage(fauxText("ok")),
+    ],
+  });
+  try {
+    assert.equal(chat.qdash.extension.namespace, QDASH_TOOL_NAMESPACE);
+    assert.equal((await ask(chat.conversation, "which tools?")).status, "done");
+
+    // The prompt lists the namespace once, with its one-line description, above the script tools.
+    assert.ok(section.includes(`## qdash\n${QDASH_TOOL_NAMESPACE.description}\n`), section);
+    assert.ok(section.indexOf("## qdash") < section.indexOf("qdash_list_chips"));
+    assert.match(section, /qdash_get_chip_metrics/);
+    // Instructions are only for describeNamespace(); write tools stay out of the listing.
+    assert.doesNotMatch(section, /audited read-only tools/);
+    assert.doesNotMatch(section, /qdash_save_flow/);
+
+    const [script] = await results(chat.conversation);
+    assert.equal(script.isError, false, resultText(script));
+    const { ns, found } = JSON.parse(resultText(script).slice(resultText(script).indexOf("{")));
+    assert.equal(ns.name, "qdash");
+    assert.equal(ns.instructions, QDASH_TOOL_NAMESPACE.instructions);
+    assert.deepEqual([...ns.tools].sort(), ["qdash_get_chip_metrics", "qdash_list_chips"]);
+    assert.ok(found.includes("qdash_list_chips"), JSON.stringify(found));
+    assert.ok(!found.includes("qdash_save_flow"));
   } finally {
     await chat.close();
   }

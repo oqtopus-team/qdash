@@ -2,8 +2,9 @@
  * Extracts a human-readable message from a failed API request.
  *
  * FastAPI returns `{ detail: "..." }` for an `HTTPException` and
- * `{ detail: [{ msg: "...", ... }] }` for 422 validation errors. Both shapes are
- * normalized here; otherwise the error's own message or the fallback is used.
+ * `{ detail: [{ msg: "...", ... }] }` for 422 validation errors; some endpoints send
+ * `{ detail: { message: "...", ... } }` (metric script runs, for example). These shapes
+ * are normalized here; otherwise the error's own message or the fallback is used.
  */
 export function getApiErrorMessage(error: unknown, fallback: string): string {
   const detail = (error as { response?: { data?: { detail?: unknown } } } | null)?.response?.data
@@ -17,6 +18,9 @@ export function getApiErrorMessage(error: unknown, fallback: string): string {
       .filter((msg): msg is string => typeof msg === "string" && msg !== "");
     if (messages.length > 0) return messages.join("; ");
   }
+
+  const message = (detail as { message?: unknown } | null | undefined)?.message;
+  if (typeof message === "string" && message) return message;
 
   if (error instanceof Error && error.message) return error.message;
 

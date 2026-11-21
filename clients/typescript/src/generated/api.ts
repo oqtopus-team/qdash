@@ -61,6 +61,10 @@ import type {
   CryostatCreateRequest,
   CryostatResponse,
   CryostatUpdateRequest,
+  DashboardCreateRequest,
+  DashboardResponse,
+  DashboardTemplatePreviewResponse,
+  DashboardUpdateRequest,
   DegradationTrendsResponse,
   DeleteChipNoteParams,
   DeleteChipParams,
@@ -102,6 +106,8 @@ import type {
   FlowExecutionPlanResponse,
   FlowTemplate,
   FlowTemplateWithCode,
+  FormatSourceRequest,
+  FormatSourceResponse,
   ForumCategoryCreate,
   ForumCategoryResponse,
   ForumCategoryUpdate,
@@ -172,6 +178,8 @@ import type {
   ListCopilotChatSessionsResponse,
   ListCouplingsResponse,
   ListCryostatsResponse,
+  ListDashboardTemplatesResponse,
+  ListDashboardsResponse,
   ListEvaluationRunsParams,
   ListEvaluationRunsResponse,
   ListEvaluationsParams,
@@ -187,6 +195,8 @@ import type {
   ListForumLabelsResponse,
   ListForumPostsParams,
   ListForumPostsResponse,
+  ListMetricScriptTemplatesResponse,
+  ListMetricScriptsResponse,
   ListMuxResponse,
   ListNoteEventsResponse,
   ListNotificationsParams,
@@ -215,6 +225,15 @@ import type {
   MemberResponse,
   MemberUpdate,
   MetricHeatmapResponse,
+  MetricScriptCatalogResponse,
+  MetricScriptCreateRequest,
+  MetricScriptDraftEvaluateRequest,
+  MetricScriptEvaluateRequest,
+  MetricScriptEvaluateResponse,
+  MetricScriptResponse,
+  MetricScriptUpdateRequest,
+  MetricScriptValidateRequest,
+  MetricScriptValidateResponse,
   MetricsSummaryResponse,
   MoveFlowRequest,
   MoveFlowResponse,
@@ -3576,6 +3595,24 @@ const listFlows = (
     }
 
 /**
+ * Format Python source with the project's Ruff settings.
+ *
+ * The source is parsed by Ruff, never imported or executed, and nothing is saved. A
+ * source that cannot be parsed returns ``syntax_error`` with the input unchanged.
+ * @summary Format flow source without saving it
+ */
+const formatFlowSource = (
+    formatSourceRequest: FormatSourceRequest,
+ options?: SecondParameter<typeof qdashRequest<FormatSourceResponse>>,) => {
+      return qdashRequest<FormatSourceResponse>(
+      {url: `/flows/format`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: formatSourceRequest
+    },
+      options);
+    }
+
+/**
  * List the flow templates, optionally filtered to one backend.
  * @summary List all flow templates
  */
@@ -4512,6 +4549,288 @@ const listCooldownWiringEvents = (
     }
 
 /**
+ * Return project-shared dashboards and the caller's own, newest update first.
+ * @summary List dashboards visible to the caller
+ */
+const listDashboards = (
+
+ options?: SecondParameter<typeof qdashRequest<ListDashboardsResponse>>,) => {
+      return qdashRequest<ListDashboardsResponse>(
+      {url: `/dashboards`, method: 'GET'
+    },
+      options);
+    }
+
+/**
+ * Create a dashboard owned by the caller.
+ * @summary Create a dashboard
+ */
+const createDashboard = (
+    dashboardCreateRequest: DashboardCreateRequest,
+ options?: SecondParameter<typeof qdashRequest<DashboardResponse>>,) => {
+      return qdashRequest<DashboardResponse>(
+      {url: `/dashboards`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: dashboardCreateRequest
+    },
+      options);
+    }
+
+/**
+ * Return the templates a new dashboard can copy its panels from.
+ * @summary List starter templates for dashboards
+ */
+const listDashboardTemplates = (
+
+ options?: SecondParameter<typeof qdashRequest<ListDashboardTemplatesResponse>>,) => {
+      return qdashRequest<ListDashboardTemplatesResponse>(
+      {url: `/dashboards/templates`, method: 'GET'
+    },
+      options);
+    }
+
+/**
+ * Return the panels a dashboard created from the template now would hold.
+ *
+ * Nothing is created: script panels point at the shared script creation would reuse, or,
+ * when the project has none yet, name the starter script creation would add.
+ * @summary Preview the panels a starter template would create
+ */
+const previewDashboardTemplate = (
+    templateId: string,
+ options?: SecondParameter<typeof qdashRequest<DashboardTemplatePreviewResponse>>,) => {
+      return qdashRequest<DashboardTemplatePreviewResponse>(
+      {url: `/dashboards/templates/${templateId}/preview`, method: 'GET'
+    },
+      options);
+    }
+
+/**
+ * Return a dashboard the caller owns or that is shared with the project.
+ * @summary Get a dashboard
+ */
+const getDashboard = (
+    dashboardId: string,
+ options?: SecondParameter<typeof qdashRequest<DashboardResponse>>,) => {
+      return qdashRequest<DashboardResponse>(
+      {url: `/dashboards/${dashboardId}`, method: 'GET'
+    },
+      options);
+    }
+
+/**
+ * Update a dashboard. A provided ``panels`` list replaces the previous one.
+ * @summary Update a dashboard
+ */
+const updateDashboard = (
+    dashboardId: string,
+    dashboardUpdateRequest: DashboardUpdateRequest,
+ options?: SecondParameter<typeof qdashRequest<DashboardResponse>>,) => {
+      return qdashRequest<DashboardResponse>(
+      {url: `/dashboards/${dashboardId}`, method: 'PATCH',
+      headers: {'Content-Type': 'application/json', },
+      data: dashboardUpdateRequest
+    },
+      options);
+    }
+
+/**
+ * Delete a dashboard owned by the caller, or any dashboard as project owner.
+ * @summary Delete a dashboard
+ */
+const deleteDashboard = (
+    dashboardId: string,
+ options?: SecondParameter<typeof qdashRequest<SuccessResponse>>,) => {
+      return qdashRequest<SuccessResponse>(
+      {url: `/dashboards/${dashboardId}`, method: 'DELETE'
+    },
+      options);
+    }
+
+/**
+ * Copy a visible dashboard into a private dashboard owned by the caller.
+ * @summary Duplicate a dashboard
+ */
+const duplicateDashboard = (
+    dashboardId: string,
+ options?: SecondParameter<typeof qdashRequest<DashboardResponse>>,) => {
+      return qdashRequest<DashboardResponse>(
+      {url: `/dashboards/${dashboardId}/duplicate`, method: 'POST'
+    },
+      options);
+    }
+
+/**
+ * Return project-shared scripts and the caller's own, newest update first.
+ * @summary List metric scripts visible to the caller
+ */
+const listMetricScripts = (
+
+ options?: SecondParameter<typeof qdashRequest<ListMetricScriptsResponse>>,) => {
+      return qdashRequest<ListMetricScriptsResponse>(
+      {url: `/metric-scripts`, method: 'GET'
+    },
+      options);
+    }
+
+/**
+ * Create a script owned by the caller from source text or a template.
+ * @summary Create a metric script
+ */
+const createMetricScript = (
+    metricScriptCreateRequest: MetricScriptCreateRequest,
+ options?: SecondParameter<typeof qdashRequest<MetricScriptResponse>>,) => {
+      return qdashRequest<MetricScriptResponse>(
+      {url: `/metric-scripts`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: metricScriptCreateRequest
+    },
+      options);
+    }
+
+/**
+ * Return the templates a new script can start from, with their source.
+ * @summary List starter metric scripts
+ */
+const listMetricScriptTemplates = (
+
+ options?: SecondParameter<typeof qdashRequest<ListMetricScriptTemplatesResponse>>,) => {
+      return qdashRequest<ListMetricScriptTemplatesResponse>(
+      {url: `/metric-scripts/templates`, method: 'GET'
+    },
+      options);
+    }
+
+/**
+ * Return the qubit and coupling metrics available through ``ctx.data``.
+ * @summary List the metrics scripts can read
+ */
+const getMetricScriptCatalog = (
+
+ options?: SecondParameter<typeof qdashRequest<MetricScriptCatalogResponse>>,) => {
+      return qdashRequest<MetricScriptCatalogResponse>(
+      {url: `/metric-scripts/catalog`, method: 'GET'
+    },
+      options);
+    }
+
+/**
+ * Compile the source in a worker and return its metrics or diagnostics.
+ * @summary Validate metric script source without saving it
+ */
+const validateMetricScript = (
+    metricScriptValidateRequest: MetricScriptValidateRequest,
+ options?: SecondParameter<typeof qdashRequest<MetricScriptValidateResponse>>,) => {
+      return qdashRequest<MetricScriptValidateResponse>(
+      {url: `/metric-scripts/validate`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: metricScriptValidateRequest
+    },
+      options);
+    }
+
+/**
+ * Format the source with the project's Ruff settings; it is parsed, never executed.
+ * @summary Format metric script source without saving it
+ */
+const formatMetricScriptSource = (
+    formatSourceRequest: FormatSourceRequest,
+ options?: SecondParameter<typeof qdashRequest<FormatSourceResponse>>,) => {
+      return qdashRequest<FormatSourceResponse>(
+      {url: `/metric-scripts/format`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: formatSourceRequest
+    },
+      options);
+    }
+
+/**
+ * Evaluate one metric of the given source over the chip; nothing is saved.
+ * @summary Preview unsaved metric script source on a chip
+ */
+const evaluateMetricScriptDraft = (
+    metricScriptDraftEvaluateRequest: MetricScriptDraftEvaluateRequest,
+ options?: SecondParameter<typeof qdashRequest<MetricScriptEvaluateResponse>>,) => {
+      return qdashRequest<MetricScriptEvaluateResponse>(
+      {url: `/metric-scripts/evaluate`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: metricScriptDraftEvaluateRequest
+    },
+      options);
+    }
+
+/**
+ * Return a script with its source, active source and revisions.
+ * @summary Get a metric script
+ */
+const getMetricScript = (
+    scriptId: string,
+ options?: SecondParameter<typeof qdashRequest<MetricScriptResponse>>,) => {
+      return qdashRequest<MetricScriptResponse>(
+      {url: `/metric-scripts/${scriptId}`, method: 'GET'
+    },
+      options);
+    }
+
+/**
+ * Update settings or save new source; invalid source keeps the last good revision active.
+ * @summary Update a metric script
+ */
+const updateMetricScript = (
+    scriptId: string,
+    metricScriptUpdateRequest: MetricScriptUpdateRequest,
+ options?: SecondParameter<typeof qdashRequest<MetricScriptResponse>>,) => {
+      return qdashRequest<MetricScriptResponse>(
+      {url: `/metric-scripts/${scriptId}`, method: 'PATCH',
+      headers: {'Content-Type': 'application/json', },
+      data: metricScriptUpdateRequest
+    },
+      options);
+    }
+
+/**
+ * Delete a script no dashboard references.
+ * @summary Delete a metric script
+ */
+const deleteMetricScript = (
+    scriptId: string,
+ options?: SecondParameter<typeof qdashRequest<SuccessResponse>>,) => {
+      return qdashRequest<SuccessResponse>(
+      {url: `/metric-scripts/${scriptId}`, method: 'DELETE'
+    },
+      options);
+    }
+
+/**
+ * Copy the active source of a visible script into a private script of the caller.
+ * @summary Copy a metric script
+ */
+const copyMetricScript = (
+    scriptId: string,
+ options?: SecondParameter<typeof qdashRequest<MetricScriptResponse>>,) => {
+      return qdashRequest<MetricScriptResponse>(
+      {url: `/metric-scripts/${scriptId}/copy`, method: 'POST'
+    },
+      options);
+    }
+
+/**
+ * Evaluate one metric of a validated revision (the active one by default).
+ * @summary Evaluate a saved metric script on a chip
+ */
+const evaluateMetricScript = (
+    scriptId: string,
+    metricScriptEvaluateRequest: MetricScriptEvaluateRequest,
+ options?: SecondParameter<typeof qdashRequest<MetricScriptEvaluateResponse>>,) => {
+      return qdashRequest<MetricScriptEvaluateResponse>(
+      {url: `/metric-scripts/${scriptId}/evaluate`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: metricScriptEvaluateRequest
+    },
+      options);
+    }
+
+/**
  * List all available topology definitions.
  *
  * Args:
@@ -4962,7 +5281,7 @@ const listUserAvatars = (
       options);
     }
 
-return {login,registerUser,getCurrentUser,updateCurrentUserProfile,logout,changePassword,resetPassword,reloadConfigCaches,listAllUsers,getUserDetails,updateUserSettings,deleteUser,bulkImportUsers,listAllProjects,adminDeleteProject,listProjectMembersAdmin,addProjectMemberAdmin,removeProjectMemberAdmin,createProjectForUser,listProjects,createProject,getProject,updateProject,deleteProject,listProjectMembers,inviteProjectMember,updateProjectMember,removeProjectMember,transferProjectOwnership,getFigureByPath,downloadArtifactByPath,downloadArtifactsAsArchive,previewArtifactByPath,getExecutionLockStatus,checkExecutionAvailability,listExecutions,getExecutionActivity,getExecution,cancelExecution,downloadFile,downloadZipFile,getFileTree,getFileContent,saveFileContent,getFileImage,validateFileContent,getGitStatus,gitPullConfig,gitPushConfig,createAgentSession,getAgentSession,evaluateAgentCandidateGate,submitAgentAction,listAgentActions,listAgentActionCandidates,commitAgentActionCandidate,commitAgentCandidateSet,getAgentCandidateSetCommit,getAgentCandidateCommit,applyAgentCandidateCommit,getAgentAction,executeAgentAction,retryCalibrationGitHubSync,getCalibrationNote,importSeedParameters,getAvailableSeedParameters,compareSeedValues,updateCalibrationParameters,deleteCalibrationParameter,getManualEdits,getCalibrationPipelineCatalog,validateCalibrationPipeline,executeCalibrationPipeline,getCopilotConfig,listCopilotChatSessions,createCopilotChatSession,getCopilotChatSession,updateCopilotChatSession,deleteCopilotChatSession,branchCopilotChatSession,listCopilotSourceRoots,searchCopilotSource,getCopilotSourceFile,getCopilotPreferences,updateCopilotPreferences,getCopilotSystemPrompt,getSettings,listChips,createChip,listChipConfigSources,updateChip,deleteChip,getChip,getChipDeletionImpact,getChipDates,getChipMux,listChipMuxes,getChipNote,upsertChipNote,deleteChipNote,listChipQubits,getChipQubit,reanalyzeResonatorSpectroscopy,reanalyzeQubitSpectroscopy,listChipCouplings,getChipCoupling,getChipMetricsSummary,getChipMetricHeatmap,listTasks,quickRunTask,getTaskResult,listTaskKnowledge,getTaskKnowledgeMarkdown,downloadTaskKnowledgeArchive,getTaskEvaluationPrompts,getTaskKnowledge,getTaskFileSettings,listTaskFileBackends,getBackendConfig,listTaskInfo,listTaskResults,getLatestQubitTaskResults,getHistoricalQubitTaskResults,getQubitTaskHistory,getLatestCouplingTaskResults,getHistoricalCouplingTaskResults,getCouplingTaskHistory,getTimeseriesTaskResults,reExecuteTaskResult,setTaskResultExcluded,downloadFiguresAsZip,createEvaluationRun,listEvaluationRuns,getEvaluationRun,retryEvaluationRun,cancelEvaluationRun,listEvaluations,setEvaluationVerdict,getEvaluationFigure,createKnowledgeDraft,getKnowledgeDraft,getKnowledgeDraftKnowledge,downloadKnowledgeDraftArchive,listForumCategories,createForumCategory,updateForumCategory,deleteForumCategory,listForumLabels,createForumLabel,updateForumLabel,deleteForumLabel,listForumPosts,createForumPost,getForumPost,updateForumPost,deleteForumPost,getForumPostReplies,uploadForumImage,closeForumPost,reopenForumPost,listTags,getDeviceTopology,getDeviceTopologyPlot,listBackends,saveFlow,listFlows,listFlowTemplates,getFlowTemplate,listFlowHelperFiles,getFlowHelperFile,listAllFlowSchedules,deleteFlowSchedule,updateFlowSchedule,getFlow,deleteFlow,getFlowExecutionPlan,executeFlow,moveFlow,scheduleFlow,listFlowSchedules,getMetricsConfig,getChipMetrics,getQubitMetricHistory,getCouplingMetricHistory,downloadMetricsPdf,upsertQubitNote,deleteQubitNote,createQubitNoteComment,updateQubitNoteComment,deleteQubitNoteComment,upsertQubitMetricNote,deleteQubitMetricNote,upsertCouplingNote,deleteCouplingNote,createCouplingNoteComment,updateCouplingNoteComment,deleteCouplingNoteComment,upsertCouplingMetricNote,deleteCouplingMetricNote,getTaskNote,upsertTaskNote,deleteTaskNote,getChipNotesSummary,listChipNoteEvents,listTargetNoteEvents,searchNoteEvents,listNotifications,getUnreadNotificationCount,markNotificationRead,markAllNotificationsRead,listCryostats,createCryostat,getCryostat,updateCryostat,deleteCryostat,listCooldowns,createCooldown,getCooldown,updateCooldown,deleteCooldown,assignChipToCooldown,unassignChipFromCooldown,createCooldownWiringCheckpoint,listCooldownWiringEvents,listTopologies,getTopologyById,getConfigAll,getProvenanceEntity,getProvenanceLineage,getProvenanceImpact,compareExecutions,getParameterHistory,getProvenanceStats,getRecentExecutions,getRecentChanges,getDegradationTrends,getRecalibrationRecommendations,getCurrentUserAvatar,updateCurrentUserAvatar,listUserAvatars}};
+return {login,registerUser,getCurrentUser,updateCurrentUserProfile,logout,changePassword,resetPassword,reloadConfigCaches,listAllUsers,getUserDetails,updateUserSettings,deleteUser,bulkImportUsers,listAllProjects,adminDeleteProject,listProjectMembersAdmin,addProjectMemberAdmin,removeProjectMemberAdmin,createProjectForUser,listProjects,createProject,getProject,updateProject,deleteProject,listProjectMembers,inviteProjectMember,updateProjectMember,removeProjectMember,transferProjectOwnership,getFigureByPath,downloadArtifactByPath,downloadArtifactsAsArchive,previewArtifactByPath,getExecutionLockStatus,checkExecutionAvailability,listExecutions,getExecutionActivity,getExecution,cancelExecution,downloadFile,downloadZipFile,getFileTree,getFileContent,saveFileContent,getFileImage,validateFileContent,getGitStatus,gitPullConfig,gitPushConfig,createAgentSession,getAgentSession,evaluateAgentCandidateGate,submitAgentAction,listAgentActions,listAgentActionCandidates,commitAgentActionCandidate,commitAgentCandidateSet,getAgentCandidateSetCommit,getAgentCandidateCommit,applyAgentCandidateCommit,getAgentAction,executeAgentAction,retryCalibrationGitHubSync,getCalibrationNote,importSeedParameters,getAvailableSeedParameters,compareSeedValues,updateCalibrationParameters,deleteCalibrationParameter,getManualEdits,getCalibrationPipelineCatalog,validateCalibrationPipeline,executeCalibrationPipeline,getCopilotConfig,listCopilotChatSessions,createCopilotChatSession,getCopilotChatSession,updateCopilotChatSession,deleteCopilotChatSession,branchCopilotChatSession,listCopilotSourceRoots,searchCopilotSource,getCopilotSourceFile,getCopilotPreferences,updateCopilotPreferences,getCopilotSystemPrompt,getSettings,listChips,createChip,listChipConfigSources,updateChip,deleteChip,getChip,getChipDeletionImpact,getChipDates,getChipMux,listChipMuxes,getChipNote,upsertChipNote,deleteChipNote,listChipQubits,getChipQubit,reanalyzeResonatorSpectroscopy,reanalyzeQubitSpectroscopy,listChipCouplings,getChipCoupling,getChipMetricsSummary,getChipMetricHeatmap,listTasks,quickRunTask,getTaskResult,listTaskKnowledge,getTaskKnowledgeMarkdown,downloadTaskKnowledgeArchive,getTaskEvaluationPrompts,getTaskKnowledge,getTaskFileSettings,listTaskFileBackends,getBackendConfig,listTaskInfo,listTaskResults,getLatestQubitTaskResults,getHistoricalQubitTaskResults,getQubitTaskHistory,getLatestCouplingTaskResults,getHistoricalCouplingTaskResults,getCouplingTaskHistory,getTimeseriesTaskResults,reExecuteTaskResult,setTaskResultExcluded,downloadFiguresAsZip,createEvaluationRun,listEvaluationRuns,getEvaluationRun,retryEvaluationRun,cancelEvaluationRun,listEvaluations,setEvaluationVerdict,getEvaluationFigure,createKnowledgeDraft,getKnowledgeDraft,getKnowledgeDraftKnowledge,downloadKnowledgeDraftArchive,listForumCategories,createForumCategory,updateForumCategory,deleteForumCategory,listForumLabels,createForumLabel,updateForumLabel,deleteForumLabel,listForumPosts,createForumPost,getForumPost,updateForumPost,deleteForumPost,getForumPostReplies,uploadForumImage,closeForumPost,reopenForumPost,listTags,getDeviceTopology,getDeviceTopologyPlot,listBackends,saveFlow,listFlows,formatFlowSource,listFlowTemplates,getFlowTemplate,listFlowHelperFiles,getFlowHelperFile,listAllFlowSchedules,deleteFlowSchedule,updateFlowSchedule,getFlow,deleteFlow,getFlowExecutionPlan,executeFlow,moveFlow,scheduleFlow,listFlowSchedules,getMetricsConfig,getChipMetrics,getQubitMetricHistory,getCouplingMetricHistory,downloadMetricsPdf,upsertQubitNote,deleteQubitNote,createQubitNoteComment,updateQubitNoteComment,deleteQubitNoteComment,upsertQubitMetricNote,deleteQubitMetricNote,upsertCouplingNote,deleteCouplingNote,createCouplingNoteComment,updateCouplingNoteComment,deleteCouplingNoteComment,upsertCouplingMetricNote,deleteCouplingMetricNote,getTaskNote,upsertTaskNote,deleteTaskNote,getChipNotesSummary,listChipNoteEvents,listTargetNoteEvents,searchNoteEvents,listNotifications,getUnreadNotificationCount,markNotificationRead,markAllNotificationsRead,listCryostats,createCryostat,getCryostat,updateCryostat,deleteCryostat,listCooldowns,createCooldown,getCooldown,updateCooldown,deleteCooldown,assignChipToCooldown,unassignChipFromCooldown,createCooldownWiringCheckpoint,listCooldownWiringEvents,listDashboards,createDashboard,listDashboardTemplates,previewDashboardTemplate,getDashboard,updateDashboard,deleteDashboard,duplicateDashboard,listMetricScripts,createMetricScript,listMetricScriptTemplates,getMetricScriptCatalog,validateMetricScript,formatMetricScriptSource,evaluateMetricScriptDraft,getMetricScript,updateMetricScript,deleteMetricScript,copyMetricScript,evaluateMetricScript,listTopologies,getTopologyById,getConfigAll,getProvenanceEntity,getProvenanceLineage,getProvenanceImpact,compareExecutions,getParameterHistory,getProvenanceStats,getRecentExecutions,getRecentChanges,getDegradationTrends,getRecalibrationRecommendations,getCurrentUserAvatar,updateCurrentUserAvatar,listUserAvatars}};
 export type LoginResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['login']>>>
 export type RegisterUserResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['registerUser']>>>
 export type GetCurrentUserResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getCurrentUser']>>>
@@ -5129,6 +5448,7 @@ export type GetDeviceTopologyPlotResult = NonNullable<Awaited<ReturnType<ReturnT
 export type ListBackendsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listBackends']>>>
 export type SaveFlowResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['saveFlow']>>>
 export type ListFlowsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listFlows']>>>
+export type FormatFlowSourceResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['formatFlowSource']>>>
 export type ListFlowTemplatesResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listFlowTemplates']>>>
 export type GetFlowTemplateResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getFlowTemplate']>>>
 export type ListFlowHelperFilesResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listFlowHelperFiles']>>>
@@ -5187,6 +5507,26 @@ export type AssignChipToCooldownResult = NonNullable<Awaited<ReturnType<ReturnTy
 export type UnassignChipFromCooldownResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['unassignChipFromCooldown']>>>
 export type CreateCooldownWiringCheckpointResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['createCooldownWiringCheckpoint']>>>
 export type ListCooldownWiringEventsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listCooldownWiringEvents']>>>
+export type ListDashboardsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listDashboards']>>>
+export type CreateDashboardResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['createDashboard']>>>
+export type ListDashboardTemplatesResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listDashboardTemplates']>>>
+export type PreviewDashboardTemplateResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['previewDashboardTemplate']>>>
+export type GetDashboardResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getDashboard']>>>
+export type UpdateDashboardResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['updateDashboard']>>>
+export type DeleteDashboardResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['deleteDashboard']>>>
+export type DuplicateDashboardResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['duplicateDashboard']>>>
+export type ListMetricScriptsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listMetricScripts']>>>
+export type CreateMetricScriptResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['createMetricScript']>>>
+export type ListMetricScriptTemplatesResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listMetricScriptTemplates']>>>
+export type GetMetricScriptCatalogResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getMetricScriptCatalog']>>>
+export type ValidateMetricScriptResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['validateMetricScript']>>>
+export type FormatMetricScriptSourceResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['formatMetricScriptSource']>>>
+export type EvaluateMetricScriptDraftResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['evaluateMetricScriptDraft']>>>
+export type GetMetricScriptResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getMetricScript']>>>
+export type UpdateMetricScriptResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['updateMetricScript']>>>
+export type DeleteMetricScriptResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['deleteMetricScript']>>>
+export type CopyMetricScriptResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['copyMetricScript']>>>
+export type EvaluateMetricScriptResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['evaluateMetricScript']>>>
 export type ListTopologiesResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listTopologies']>>>
 export type GetTopologyByIdResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getTopologyById']>>>
 export type GetConfigAllResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getConfigAll']>>>

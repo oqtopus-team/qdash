@@ -34,7 +34,9 @@ if TYPE_CHECKING:
 
     from qdash.client.services.agent_runner import AgentPlannerObservation
     from qdash.client.services.client import QDashClient
-    from qdash.client.services.models import TaskNextAction
+    from qdash.client.services.client_models import (
+        TaskNextAction,
+    )
 
 _RANGE_NUMBER_RE = re.compile(r"[-+]?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][-+]?\d+)?")
 

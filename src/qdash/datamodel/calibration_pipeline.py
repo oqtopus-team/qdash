@@ -58,7 +58,10 @@ from qdash.datamodel.task_call import (
     plan_digest,
 )
 from qdash.datamodel.task_settings import task_parameters_from_run_parameters
-from qdash.datamodel.two_qubit_execution_mode import TwoQubitExecutionMode  # noqa: TC001
+from qdash.datamodel.two_qubit_execution_mode import (
+    DEFAULT_MAX_PARALLEL_OPS,
+    TwoQubitExecutionMode,
+)
 
 SPEC_VERSION = 2
 
@@ -187,18 +190,33 @@ def calls_with_configure(
 
 
 class PipelineTargets(BaseModel):
-    """Which qubits the pipeline starts from: explicit qids or whole MUXes."""
+    """Which qubits the pipeline starts from: explicit qids or whole MUXes.
+
+    Set exactly one of qids and mux_ids to a nonempty list without duplicates.
+    exclude_qids may be nonempty only with mux_ids.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
     qids: list[str] | None = Field(
-        default=None, description='Qubit ids as QDash lists them, e.g. ["0", "1"].'
+        default=None,
+        description=(
+            'Qubit ids as QDash lists them, e.g. ["0", "1"]. Set exactly one of qids and '
+            "mux_ids, as a nonempty list without duplicates."
+        ),
     )
     mux_ids: list[int] | None = Field(
-        default=None, description="MUX ids; every qubit of each MUX is a target."
+        default=None,
+        description=(
+            "MUX ids; every qubit of each MUX is a target. Set exactly one of qids and "
+            "mux_ids, as a nonempty list without duplicates."
+        ),
     )
+    # A plain default, unlike default_factory, appears in the JSON schema, so generated
+    # clients treat the field as optional rather than nullable.
     exclude_qids: list[str] = Field(
-        default_factory=list, description="Qubits to leave out of the MUX targets."
+        default=[],
+        description="Qubits to leave out of the MUX targets. Must be empty with qids.",
     )
 
     @model_validator(mode="after")
@@ -265,7 +283,8 @@ _TWO_QUBIT_MODE_DESCRIPTION = (
     "candidate qubits. manual: run the pairs listed in `rounds` exactly as written."
 )
 _MAX_PARALLEL_OPS_DESCRIPTION = (
-    "Pairs per automatically generated CR group. Rejected with execution_mode manual."
+    f"Pairs per automatically generated CR group; omitted or null uses "
+    f"{DEFAULT_MAX_PARALLEL_OPS}. Rejected with execution_mode manual unless omitted or null."
 )
 
 QubitIdPair = Annotated[list[str], Field(min_length=2, max_length=2)]
@@ -277,8 +296,9 @@ def _check_qubit_rounds(step: Any) -> Any:
 
 
 def _check_pair_rounds(step: Any) -> Any:
-    explicit_cap = step.max_parallel_ops if "max_parallel_ops" in step.model_fields_set else None
-    pair_rounds_for_mode(step.execution_mode, step.rounds, explicit_cap, step=step_name(step))
+    pair_rounds_for_mode(
+        step.execution_mode, step.rounds, step.max_parallel_ops, step=step_name(step)
+    )
     return step
 
 
@@ -466,14 +486,23 @@ class GenerateCRScheduleStep(_StepBase):
 
 
 class _TwoQubitModeStep(_StepBase):
-    """Two-qubit steps with an execution_mode; adds no fields."""
+    """Two-qubit steps with an execution_mode; adds no fields.
+
+    ``max_parallel_ops`` is ``None`` when unset, as in the workflow's two-qubit steps, so a
+    client that serializes every field can send ``null`` for a manual step. Dumps keep their
+    earlier form, and so their plan digest: a manual step leaves the cap out and an automatic
+    step writes the cap it runs with.
+    """
 
     @model_serializer(mode="wrap")
-    def _drop_manual_cap(self, handler: SerializerFunctionWrapHandler) -> Any:
-        """Leave max_parallel_ops out of a manual step's dump so the dump validates again."""
+    def _dump_cap(self, handler: SerializerFunctionWrapHandler) -> Any:
+        """Drop a manual step's cap; write an automatic step's effective cap."""
         data = handler(self)
-        if isinstance(data, dict) and getattr(self, "execution_mode", None) == "manual":
-            data.pop("max_parallel_ops", None)
+        if isinstance(data, dict) and "max_parallel_ops" in data:
+            if getattr(self, "execution_mode", None) == "manual":
+                del data["max_parallel_ops"]
+            elif data["max_parallel_ops"] is None:
+                data["max_parallel_ops"] = DEFAULT_MAX_PARALLEL_OPS
         return data
 
 
@@ -496,8 +525,8 @@ class TwoQubitCalibrationStep(_TwoQubitModeStep):
     rounds: list[list[QubitIdPair]] | None = Field(
         default=None, exclude_if=lambda value: value is None, description=_PAIR_ROUNDS_DESCRIPTION
     )
-    max_parallel_ops: int = Field(
-        default=10, ge=1, le=100, description=_MAX_PARALLEL_OPS_DESCRIPTION
+    max_parallel_ops: int | None = Field(
+        default=None, ge=1, le=100, description=_MAX_PARALLEL_OPS_DESCRIPTION
     )
 
     _normalize_tasks = field_validator("tasks", mode="before")(_calls_or_none)
@@ -523,8 +552,8 @@ class CustomTwoQubitStep(_TwoQubitModeStep):
     rounds: list[list[QubitIdPair]] | None = Field(
         default=None, exclude_if=lambda value: value is None, description=_PAIR_ROUNDS_DESCRIPTION
     )
-    max_parallel_ops: int = Field(
-        default=10, ge=1, le=100, description=_MAX_PARALLEL_OPS_DESCRIPTION
+    max_parallel_ops: int | None = Field(
+        default=None, ge=1, le=100, description=_MAX_PARALLEL_OPS_DESCRIPTION
     )
     continue_on_failure: bool = Field(default=False, description=_CONTINUE_DESCRIPTION)
 
@@ -775,8 +804,10 @@ class CalibrationPipelineSpec(BaseModel):
     # Deprecated in the schema only: pydantic's ``deprecated=`` would also warn on
     # every attribute read inside QDash. Validation reports it through
     # pipeline_warnings instead.
+    # Plain defaults, unlike default_factory, appear in the JSON schema, so generated clients
+    # treat these fields as optional rather than nullable.
     task_parameters: dict[str, TaskSettings] = Field(
-        default_factory=dict,
+        default={},
         description=(
             "Deprecated: set run, input and update_calibration_parameters on each "
             "task call instead. Common per-task defaults keyed by task name; every "
@@ -786,10 +817,10 @@ class CalibrationPipelineSpec(BaseModel):
         json_schema_extra={"deprecated": True},
     )
     default_run_parameters: dict[str, Any] = Field(
-        default_factory=dict,
+        default={},
         description="Run parameters applied to every task, e.g. shots or interval.",
     )
-    tags: list[str] = Field(default_factory=list, max_length=16)
+    tags: list[str] = Field(default=[], max_length=16)
 
     @model_validator(mode="after")
     def _structure(self) -> CalibrationPipelineSpec:

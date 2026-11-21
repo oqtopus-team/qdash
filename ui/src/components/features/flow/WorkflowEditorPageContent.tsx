@@ -37,6 +37,7 @@ import {
   executeFlow,
   getListFlowsQueryKey,
   useListFlows,
+  formatFlowSource,
   listFlowSchedules,
 } from "@/client/flow/flow";
 import {
@@ -92,6 +93,12 @@ import { isExecutionTerminal } from "@/lib/executionStatus";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
 import { formatDateTime } from "@/lib/utils/datetime";
 import { monoFontFamily, remeasureMonacoFontsWhenLoaded } from "@/lib/fonts";
+import {
+  attachPythonFormatter,
+  describeFormatProblem,
+  formatEditorDocument,
+  type FormatRun,
+} from "@/lib/pythonFormatter";
 
 // Monaco Editor is only available on client side
 const Editor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
@@ -468,13 +475,43 @@ export function WorkflowEditorPageContent() {
     document.getElementById(showPropertiesModal ? ids.modal : ids.side)?.focus();
   }, [propertyFocusRequest, showPropertiesModal]);
 
-  // Save the given pane's workflow; Save buttons and the palette use the active pane.
+  // Format the pane's draft in its editor and return the text to save: the formatted text, or
+  // the draft as written when it cannot be formatted (a syntax error is then reported by the
+  // save). A draft edited while the formatter ran is not saved.
+  const formatForSave = async (pane: Pane, draft: string): Promise<string | null> => {
+    const run = await formatEditorDocument(editorRefs.current[pane], draft);
+    if (run.status === "stale") {
+      toast.warning("Not saved: the workflow changed while it was being formatted", {
+        description: "Save again to save the current text.",
+      });
+      return null;
+    }
+    if (run.status === "failed") {
+      toast.warning("Saving without formatting", { description: describeFormatProblem(run) });
+    }
+    return run.text;
+  };
+
+  // Save the given pane's workflow; Save buttons and the palette use the active pane. The draft
+  // is formatted first, so the editor shows the source that is saved.
   const savePane = (pane: Pane) => {
-    if (isEditorLocked) return;
-    docs[pane].save(captureJourneyContext(), (fieldErrors) =>
-      revealInvalidProperty(pane, fieldErrors),
+    if (isEditorLocked || docs[pane].isSaving) return;
+    docs[pane].save(
+      captureJourneyContext(),
+      (fieldErrors) => revealInvalidProperty(pane, fieldErrors),
+      (draft) => formatForSave(pane, draft),
     );
   };
+
+  // Format Document run from the palette, the context menu or Shift+Alt+F reports here.
+  const reportFormatRun = (run: FormatRun) => {
+    const problem = describeFormatProblem(run);
+    if (problem) toast.error("Could not format the workflow", { description: problem });
+  };
+  const reportFormatRunRef = useRef(reportFormatRun);
+  useEffect(() => {
+    reportFormatRunRef.current = reportFormatRun;
+  });
   const handleSave = () => savePane(currentPane);
 
   // Keep a ref to savePane for Monaco commands (avoids stale closure)
@@ -754,9 +791,9 @@ export function WorkflowEditorPageContent() {
       icon: FileCode,
       action: () => {
         activeEditor()?.focus();
-        activeEditor()?.getAction("editor.action.formatDocument")?.run();
+        void activeEditor()?.getAction("editor.action.formatDocument")?.run();
       },
-      enabled: true,
+      enabled: !isEditorLocked && ready && !active.isSaving,
     },
   ];
 
@@ -795,6 +832,11 @@ export function WorkflowEditorPageContent() {
         if (editorRefs.current[pane] === editor) editorRefs.current[pane] = null;
       });
       remeasureMonacoFontsWhenLoaded(monaco);
+      // Format Document formats with the project's Ruff settings; detached when the editor goes.
+      attachPythonFormatter(monaco, editor, {
+        format: async (source) => (await formatFlowSource({ source })).data,
+        onRun: (run) => reportFormatRunRef.current(run),
+      });
       editor.onDidChangeCursorPosition(
         (e: { position: { lineNumber: number; column: number } }) => {
           if (activePaneRef.current !== pane) return;
@@ -1086,7 +1128,6 @@ export function WorkflowEditorPageContent() {
               onClick={leaveEditor}
               className="btn btn-sm btn-ghost"
               disabled={active.isSaving || deleteMutation.isPending}
-              title="Back to workflows"
               aria-label="Back to workflows"
             >
               <ArrowLeft size={16} />

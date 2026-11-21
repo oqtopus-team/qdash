@@ -36,6 +36,8 @@ describe("describeLink", () => {
     expect(describe_("/")).toMatchObject({ kind: "page", path: "/", section: null });
     expect(describe_("/api/flows/export")).toMatchObject({ kind: "api" });
     expect(pageSection("/task-results")).toBe("Task Results");
+    expect(pageSection("/overview")).toBe("Overview");
+    expect(pageSection("/dashboards/dash-1")).toBe("Dashboards");
   });
 
   it("treats a hash on the current page as a fragment, and on another page as that page", () => {

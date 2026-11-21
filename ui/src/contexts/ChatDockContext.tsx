@@ -34,8 +34,18 @@ import {
 export interface PageContextProvider {
   /** Read at the moment a turn is sent, so an editor's buffer is current. */
   current(): PageContext | null;
-  /** Replace the page's editable code, for an edit the assistant proposed. */
-  applyCode?(code: string): void;
+  /**
+   * Replace the page's editable code, for an edit the assistant proposed. Returns false when
+   * the page refused it (e.g. a dashboard draft that does not parse); the page says why.
+   */
+  applyCode?(code: string): void | boolean;
+  /**
+   * Bring the code just applied into view and move focus to it, after the chat stepped aside
+   * so the page could be seen. Without it, the page is shown as it is.
+   */
+  revealAppliedCode?(): void;
+  /** Requests the empty chat offers on this page instead of the general ones. */
+  suggestions?(): string[];
 }
 
 /**
@@ -47,15 +57,38 @@ export interface PageContextSummary {
   path: string;
   title: string;
   withEditorCode: boolean;
+  /** What the editor code is, when it is not a file: a dashboard's draft. */
+  editorKind?: "dashboard";
+  /** The page's own starter requests for an empty chat. */
+  suggestions?: string[];
 }
 
-function summarizePage(page: PageContext | null): PageContextSummary | null {
-  return page ? { path: page.path, title: page.title, withEditorCode: Boolean(page.flow) } : null;
+function summarizePage(
+  page: PageContext | null,
+  suggestions: string[] | undefined,
+): PageContextSummary | null {
+  return page
+    ? {
+        path: page.path,
+        title: page.title,
+        withEditorCode: Boolean(page.flow || page.metricScript || page.dashboard),
+        ...(page.dashboard && !page.flow && !page.metricScript
+          ? { editorKind: "dashboard" as const }
+          : {}),
+        ...(suggestions?.length ? { suggestions } : {}),
+      }
+    : null;
 }
 
 function sameSummary(a: PageContextSummary | null, b: PageContextSummary | null): boolean {
   if (a === null || b === null) return a === b;
-  return a.path === b.path && a.title === b.title && a.withEditorCode === b.withEditorCode;
+  return (
+    a.path === b.path &&
+    a.title === b.title &&
+    a.withEditorCode === b.withEditorCode &&
+    a.editorKind === b.editorKind &&
+    (a.suggestions ?? []).join("\n") === (b.suggestions ?? []).join("\n")
+  );
 }
 
 /**
@@ -115,6 +148,18 @@ interface ChatDockValue {
 
 const ChatDockCtx = createContext<ChatDockValue | null>(null);
 
+/**
+ * Where the docked sidebar covers the whole page instead of sitting beside it: below the `lg`
+ * breakpoint, the exact complement of the `lg:` and `max-lg:` variants ChatSidebar uses.
+ */
+export const SIDEBAR_COVERS_PAGE_QUERY = "not all and (min-width: 64rem)";
+
+function sidebarCoversPage(): boolean {
+  return (
+    typeof window !== "undefined" && Boolean(window.matchMedia?.(SIDEBAR_COVERS_PAGE_QUERY).matches)
+  );
+}
+
 export function ChatDockProvider({ children }: { children: React.ReactNode }) {
   const {
     activeSession,
@@ -126,6 +171,11 @@ export function ChatDockProvider({ children }: { children: React.ReactNode }) {
     sendMessage,
   } = useCopilotChatSessionContext();
   const [isOpen, setIsOpen] = useState(false);
+  // Read by applyCode, which keeps one identity across renders.
+  const isOpenRef = useRef(isOpen);
+  useEffect(() => {
+    isOpenRef.current = isOpen;
+  }, [isOpen]);
   const [miniOpen, setMiniOpen] = useState(false);
   const pathname = usePathname();
   const pageProvider = useRef<PageContextProvider | null>(null);
@@ -172,7 +222,12 @@ export function ChatDockProvider({ children }: { children: React.ReactNode }) {
   // The last summary handed out, so an unchanged page returns the same object.
   const lastSummary = useRef<PageContextSummary | null>(null);
   const pageSummary = useCallback((): PageContextSummary | null => {
-    const next = summarizePage(currentPage());
+    const page = currentPage();
+    // Page suggestions only while that page's own context is the one a turn describes.
+    const next = summarizePage(
+      page,
+      page && pageProvider.current ? pageProvider.current.suggestions?.() : undefined,
+    );
     if (!sameSummary(lastSummary.current, next)) lastSummary.current = next;
     return lastSummary.current;
   }, [currentPage]);
@@ -180,7 +235,15 @@ export function ChatDockProvider({ children }: { children: React.ReactNode }) {
   const applyCode = useCallback((edit: EditProposal): boolean => {
     const provider = pageProvider.current;
     if (!provider?.applyCode || !matchesEditTarget(edit, provider.current())) return false;
-    provider.applyCode(edit.code);
+    if (provider.applyCode(edit.code) === false) return false;
+    // Where the sidebar covers the page, the change applied behind it: step aside so the user
+    // sees it. The chat, its session, and the card stay as they are; the tab reopens them. A
+    // refused or stale proposal never gets here, so its card stays on screen.
+    if (isOpenRef.current && sidebarCoversPage()) {
+      isOpenRef.current = false;
+      setIsOpen(false);
+      provider.revealAppliedCode?.();
+    }
     return true;
   }, []);
 

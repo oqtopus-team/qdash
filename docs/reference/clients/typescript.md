@@ -16,8 +16,9 @@ Each QDash release tag `vX.Y.Z` publishes the client as `X.Y.Z` under the `lates
 npm install @oqtopus-team/qdash-client@beta
 ```
 
-The pi packages release with the same QDash version, and pi-qdash pins the client
-version built in the same run. Earlier client versions under the `pi` dist-tag came from
+`@oqtopus-team/qdash-sdk` and the pi packages release with the same QDash version; the SDK
+takes the client's exact version and pins that client, and pi-qdash pins the client and SDK
+built in the same run. Earlier client versions under the `pi` dist-tag came from
 the former independent pi-qdash releases, which no longer exist. See
 [Pi packages](../../developer-guide/copilot/packages.md) for local development
 and release ordering.
@@ -52,6 +53,132 @@ console.log(metrics.qubit_metrics);
 ```
 
 The client provides polling helpers for QDash executions, agent action dispatch, execution linkage, and candidate application.
+
+## Run a Calibration
+
+The separate `@oqtopus-team/qdash-sdk` package validates and starts calibrations and registered
+workflows, with calls modelled on the [Python SDK](./python.md#run-a-calibration). It is built on
+this client, which stays the API for every other route, and installs the client of the same
+release:
+
+```bash
+npm install @oqtopus-team/qdash-sdk
+```
+
+This calibration runs `Configure`, `CheckT1` and `CheckT2Echo` on qubits 0 and 1 with the
+sweeps of the `coherence_check` template:
+
+```ts
+import { QDash, customOneQubit, qubitTargets, sweep } from "@oqtopus-team/qdash-sdk";
+
+const qdash = QDash.fromEnv(); // or new QDash(client, { projectId })
+const chip = qdash.chip("64Qv3");
+
+const timeRange = sweep.logspace(Math.log10(300), Math.log10(500_000), 51);
+const targets = qubitTargets(["0", "1"]);
+const steps = [
+  customOneQubit({
+    step_name: "coherence",
+    tasks: [
+      { name: "Configure" },
+      { name: "CheckT1", run: { time_range: timeRange } },
+      { name: "CheckT2Echo", run: { time_range: timeRange } },
+    ],
+  }),
+];
+const defaultRunParameters = { readout_duration: 1024, interval: 262_144 };
+
+const check = await chip.validateCalibration(targets, steps, { defaultRunParameters });
+if (!check.valid) throw new Error(check.problems?.map((p) => `${p.path}: ${p.message}`).join("\n"));
+
+const run = await chip.calibrate(targets, steps, { defaultRunParameters }); // measures
+console.log(run.executionId);
+const result = await run.wait({ timeoutSeconds: 3600 });
+console.log(result.status);
+```
+
+Both calls send the same spec version 2 object; the sweep is a declaration that the worker
+expands, not a list of points (the exponents are rounded here):
+
+```json
+{
+  "spec_version": 2,
+  "targets": { "qids": ["0", "1"] },
+  "steps": [{
+    "type": "CustomOneQubit",
+    "step_name": "coherence",
+    "tasks": [
+      { "name": "Configure" },
+      { "name": "CheckT1", "run": { "time_range": { "value": [2.477, 5.699, 51], "value_type": "np.logspace" } } },
+      { "name": "CheckT2Echo", "run": { "time_range": { "value": [2.477, 5.699, 51], "value_type": "np.logspace" } } }
+    ]
+  }],
+  "default_run_parameters": { "readout_duration": 1024, "interval": 262144 }
+}
+```
+
+| Call | Result |
+| --- | --- |
+| `QDash.fromEnv()`, `await QDash.fromProfile(...)`, `new QDash(client)` | A session over one `QDashClient`; nothing is sent and nothing needs closing |
+| `qdash.chip(chipId)` | A `Chip` bound to the session's client, project and chip; nothing is sent |
+| `chip.validateCalibration(targets, steps, options)` | `ValidatePipelineResponse`; problems are data, nothing is dispatched |
+| `chip.calibrate(targets, steps, options)` | `CalibrationRun` once dispatched; `QDashValidationError` (422) for a calibration with problems |
+| `run.wait({ timeoutSeconds: 3600, pollIntervalSeconds: 5 })` | `RunResult` with `executionId`, `status` and the raw `detail` once the whole run ends; `QDashTimeoutError` otherwise, and the run keeps going |
+| `run.get()` | `RunResult` for the current state; `QDashNotFoundError` before the execution exists |
+| `qdash.pipelines.catalog()`, `validate(spec, { chipId })`, `execute(spec, { chipId })` | The same routes for a whole spec, typed or a stored JSON object sent unchanged; `execute` returns a `PipelineRun` whose `wait()` returns the raw detail |
+
+`options` takes `name`, `defaultRunParameters`, `tags` and `backendName`; the server's defaults
+apply to each one left out. Targets, steps and task calls are the generated types
+(`PipelineTargets`, `CustomOneQubitStep`, `TaskCall` and the other step types), so an object
+literal in the spec's snake_case form works anywhere a helper does. `calibrate` does not
+validate first; the server validates again before dispatch. `result.status` is the whole run's,
+`detail.pipeline.status`, or `detail.status` when the server reports no pipeline progress, so a
+run whose first step completed and whose later step failed reports `failed`. A failed or
+cancelled run is returned, not thrown, and a 404 while the run is being created is polled again.
+`projectId` scopes the session without changing the given client's configuration. Without a
+project in the session or the client's configuration, requests carry no `X-Project-Id` and
+QDash applies the user's default project, as for every client call; the Python SDK instead
+refuses to run without a project. The SDK's error classes are the client's own, so
+`instanceof QDashNotFoundError` works with either import.
+
+Registered workflows, saved from the UI or with `saveFlow`, run the code stored in QDash:
+
+```ts
+for (const summary of await qdash.workflows.list()) console.log(summary.name, summary.chip_id);
+
+const workflow = await qdash.workflows.get("coherence_check");
+const workflowRun = await workflow.run({ parameters: { qids: ["0", "1"] } }); // measures
+console.log((await workflowRun.wait()).status);
+```
+
+`parameters` override the saved `default_parameters` for this run only, and `{}` is sent when
+they are left out. A name other than letters, digits and underscores throws `TypeError` before
+any request.
+
+How the SDK is built: [TypeScript SDK](../../developer-guide/architecture/typescript-sdk.md).
+
+## Save Metric Scripts and Dashboards
+
+`qdash.scripts` and `qdash.dashboards` save metric scripts and dashboards with the same
+behavior as the [Python SDK](./python.md#save-metric-scripts-and-dashboards):
+
+```ts
+import { Dashboard, QDash, Script } from "@oqtopus-team/qdash-sdk";
+
+const qdash = QDash.fromEnv();
+const script = await qdash.scripts.create(await Script.fromFile("zx90_median.py", { visibility: "project" }));
+const board = new Dashboard({ name: "ZX90 health", visibility: "project", chipId: "64Qv3" });
+board.addMetric(script.metric("zx90_median"), { period: 14, params: { min_samples: 3 } });
+const saved = await qdash.dashboards.create(board);
+
+const current = await qdash.dashboards.get(saved.dashboardId);
+const edited = current.edit();
+edited.addMarkdown("Reviewed weekly.");
+await qdash.dashboards.update(current, edited); // 409 when someone saved since `current`
+```
+
+`script.metric(id)` throws `MetricScriptError` when the saved revision is invalid or does not
+declare the metric.
 
 ## Generated API
 

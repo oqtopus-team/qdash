@@ -23,7 +23,7 @@ interface TaskResultEvaluationsProps {
 }
 
 /**
- * The AI evaluations of one task result, newest first, with the "Ask AI"
+ * The AI evaluations of one task result, newest first, with the "Ask Agent"
  * entry to request another or chat about the result. A single result's
  * evaluation takes the same path, with the same choices (model only or via
  * Copilot, labeled examples, a question), and leaves the same record as a
@@ -114,7 +114,7 @@ export function TaskResultEvaluations({
       )}
       {evaluations.length === 0 ? (
         <p className="text-sm text-base-content/50">
-          No AI evaluation yet. Ask AI sends the figure and the task&apos;s reference to the
+          No AI evaluation yet. Ask Agent sends the figure and the task&apos;s reference to the
           calibration evaluation model and keeps the record here, or opens a chat about the result.
         </p>
       ) : (

@@ -11,6 +11,7 @@ import {
   Gauge,
   House,
   LayoutDashboard,
+  LayoutGrid,
   ListTodo,
   MessagesSquare,
   Settings,
@@ -24,6 +25,7 @@ export type NavItem = {
   href: string;
   label: string;
   title?: string;
+  badge?: "Beta";
   icon: LucideIcon;
   match?: "exact" | "prefix";
   visible?: boolean;
@@ -42,10 +44,17 @@ interface NavigationOptions {
 export function getNavigationSections({ canEdit, isAdmin }: NavigationOptions): NavSection[] {
   return [
     {
-      label: "Overview",
+      label: "Explore",
       items: [
         { href: "/home", label: "Home", icon: House },
-        { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+        { href: "/overview", label: "Overview", icon: LayoutDashboard },
+        {
+          href: "/dashboards",
+          label: "Dashboards",
+          badge: "Beta",
+          icon: LayoutGrid,
+          match: "prefix",
+        },
         { href: "/metrics", label: "Metrics", icon: Gauge },
         { href: "/chip", label: "Chip", icon: Cpu },
         { href: "/analysis", label: "Analysis", icon: BarChart3 },
@@ -121,7 +130,7 @@ export function getNavigationSections({ canEdit, isAdmin }: NavigationOptions): 
  * Every other destination stays in the header menu.
  */
 const MOBILE_TAB_BASES: ReadonlyArray<{ href: string; bases: readonly string[] }> = [
-  { href: "/dashboard", bases: ["/dashboard"] },
+  { href: "/overview", bases: ["/overview"] },
   { href: "/workflow", bases: ["/workflow"] },
   { href: "/execution", bases: ["/execution", "/executions"] },
   { href: "/chat", bases: ["/chat"] },
