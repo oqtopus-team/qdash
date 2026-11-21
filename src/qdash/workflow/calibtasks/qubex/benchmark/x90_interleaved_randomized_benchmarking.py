@@ -8,7 +8,6 @@ from qdash.datamodel.task import (
     OutputParameterSpec,
     RunParameterSpec,
     TaskDocumentation,
-    TaskReference,
 )
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -41,16 +40,6 @@ class X90InterleavedRandomizedBenchmarking(QubexTask):
             (
                 "control_frequency (or qubit_frequency), readout_frequency (or "
                 "resonator_frequency), and readout_amplitude are stored for the qubit."
-            ),
-        ),
-        references=(
-            TaskReference(
-                title=(
-                    "Efficient Measurement of Quantum Gate Error by Interleaved Randomized "
-                    "Benchmarking"
-                ),
-                url="https://doi.org/10.1103/PhysRevLett.109.080505",
-                relevance="Interleaved randomized benchmarking for the error of one gate.",
             ),
         ),
     )

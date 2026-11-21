@@ -8,7 +8,6 @@ from qdash.datamodel.task import (
     OutputParameterSpec,
     RunParameterSpec,
     TaskDocumentation,
-    TaskReference,
 )
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -45,18 +44,6 @@ class RandomizedBenchmarking(QubexTask):
             (
                 "control_frequency (or qubit_frequency), readout_frequency (or "
                 "resonator_frequency), and readout_amplitude are stored for the qubit."
-            ),
-        ),
-        references=(
-            TaskReference(
-                title="Randomized benchmarking of quantum gates",
-                url="https://doi.org/10.1103/PhysRevA.77.012307",
-                relevance="Randomized benchmarking of quantum gates.",
-            ),
-            TaskReference(
-                title="Scalable and Robust Randomized Benchmarking of Quantum Processes",
-                url="https://doi.org/10.1103/PhysRevLett.106.180504",
-                relevance="Clifford randomized benchmarking and its exponential decay model.",
             ),
         ),
     )

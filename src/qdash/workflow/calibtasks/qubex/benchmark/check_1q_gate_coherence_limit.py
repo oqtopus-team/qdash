@@ -9,7 +9,6 @@ from qdash.datamodel.task import (
     OutputParameterSpec,
     RunParameterSpec,
     TaskDocumentation,
-    TaskReference,
 )
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -36,16 +35,6 @@ class Check1QGateCoherenceLimit(QubexTask):
         ),
         prerequisites=(
             "t1_average and t2_echo_average stored by CheckT1Average and CheckT2EchoAverage.",
-        ),
-        references=(
-            TaskReference(
-                title="Universal Fidelity Reduction of Quantum Operations from Weak Dissipation",
-                url="https://doi.org/10.1103/PhysRevLett.129.150504",
-                relevance=(
-                    "Gate-independent fidelity reduction from T1 and dephasing; the Qubex "
-                    "formula agrees with it to first order."
-                ),
-            ),
         ),
     )
 

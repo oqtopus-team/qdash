@@ -27,7 +27,6 @@ from qdash.datamodel.task import (
     OutputParameterSpec,
     RunParameterSpec,
     TaskDocumentation,
-    TaskReference,
 )
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -77,27 +76,6 @@ class CheckResonatorSpectroscopy(QubexTask):
         ),
         prerequisites=(
             "None from calibration storage; the frequency range defaults by readout band.",
-        ),
-        references=(
-            TaskReference(
-                title="Circuit quantum electrodynamics",
-                url="https://doi.org/10.1103/RevModPhys.93.025005",
-                relevance=(
-                    "Dispersive readout and the high-power punch-out of the resonator to its "
-                    "bare frequency."
-                ),
-            ),
-            TaskReference(
-                title=(
-                    "High-Fidelity Readout in Circuit Quantum Electrodynamics Using the "
-                    "Jaynes-Cummings Nonlinearity"
-                ),
-                url="https://doi.org/10.1103/PhysRevLett.105.173601",
-                relevance=(
-                    "Observation of the power-dependent bright-state transition used to "
-                    "identify the dispersive regime."
-                ),
-            ),
         ),
     )
     is_mux_level: bool = True

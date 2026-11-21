@@ -530,8 +530,7 @@ def test_extract_parameter_metadata_expands_rabi_normalization_inputs() -> None:
 DOCUMENTED_TASK_SOURCE = '''
 from typing import ClassVar
 
-from qdash.datamodel import task
-from qdash.datamodel.task import TaskDocumentation, TaskReference
+from qdash.datamodel.task import TaskDocumentation
 
 
 class DocumentedTask:
@@ -543,14 +542,6 @@ class DocumentedTask:
         description="Measures something specific.",
         when_to_use="Run it after the qubit frequency is known.",
         prerequisites=("qubit_frequency is stored.", "A calibrated readout."),
-        references=(
-            TaskReference(
-                title="A method paper",
-                url="https://doi.org/10.0/method",
-                relevance="The general method.",
-            ),
-            task.TaskReference(title="A second paper", url="https://arxiv.org/abs/0000.00000"),
-        ),
     )
 
 
@@ -582,14 +573,6 @@ def test_declared_documentation_takes_precedence_over_docstring(tmp_path: Path) 
         "qubit_frequency is stored.",
         "A calibrated readout.",
     )
-    assert [ref.model_dump() for ref in documented.documentation.references] == [
-        {
-            "title": "A method paper",
-            "url": "https://doi.org/10.0/method",
-            "relevance": "The general method.",
-        },
-        {"title": "A second paper", "url": "https://arxiv.org/abs/0000.00000", "relevance": ""},
-    ]
     assert service.documentation_errors == []
 
 
@@ -614,34 +597,7 @@ def test_undocumented_task_falls_back_to_docstring(tmp_path: Path) -> None:
         ('TaskDocumentation(description="")', "description"),
         ('TaskDocumentation(description="x", prerequisites=[1])', "prerequisites.0"),
         ('TaskDocumentation(description="x", next_actions=["y"])', "next_actions"),
-        ('TaskDocumentation(description="x", references=REFS)', "tuple or list of literal"),
-        (
-            'TaskDocumentation(description="x", references=[{"title": "t", "url": "https://x"}])',
-            "literal TaskReference(...) call",
-        ),
-        (
-            'TaskDocumentation(description="x", references=[make_reference("t")])',
-            "literal TaskReference(...) call",
-        ),
-        (
-            'TaskDocumentation(description="x", references=[TaskReference(title=TITLE, '
-            'url="https://x")])',
-            "TaskReference.title must be a string literal",
-        ),
-        (
-            'TaskDocumentation(description="x", references=[TaskReference("t", "https://x")])',
-            "keyword arguments",
-        ),
-        (
-            'TaskDocumentation(description="x", references=[TaskReference(title="t", '
-            'url="http://insecure")])',
-            "references.0.url",
-        ),
-        (
-            'TaskDocumentation(description="x", references=[TaskReference(title="t", '
-            'url="https://x", year=2020)])',
-            "references.0.year",
-        ),
+        ('TaskDocumentation(description="x", references=["y"])', "references"),
     ],
 )
 def test_unsupported_documentation_is_rejected_without_executing_the_module(

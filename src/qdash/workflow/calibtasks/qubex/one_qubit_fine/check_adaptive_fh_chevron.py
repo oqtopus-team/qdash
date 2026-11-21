@@ -11,7 +11,6 @@ from qdash.datamodel.task import (
     OutputParameterSpec,
     RunParameterSpec,
     TaskDocumentation,
-    TaskReference,
 )
 from qdash.workflow.calibtasks.base import PostProcessResult, RunResult
 from qdash.workflow.calibtasks.qubex.base import QubexTask, readout_duration_run_parameter
@@ -51,21 +50,6 @@ class CheckAdaptiveFHChevron(QubexTask):
             ),
             "control_frequency_ef (or ef_frequency) stored by CheckAdaptiveEFChevron.",
             "ef_pi_amplitude and ef_pi_duration stored by CreateEFPIPulse.",
-        ),
-        references=(
-            TaskReference(
-                title="Charge-insensitive qubit design derived from the Cooper pair box",
-                url="https://doi.org/10.1103/PhysRevA.76.042319",
-                relevance="Transmon level structure and matrix elements that grow roughly as sqrt(n+1).",
-            ),
-            TaskReference(
-                title=(
-                    "Coherence and Decay of Higher Energy Levels of a Superconducting Transmon "
-                    "Qubit"
-                ),
-                url="https://doi.org/10.1103/PhysRevLett.114.010501",
-                relevance="Driving successive transitions of a transmon with sequential pi pulses.",
-            ),
         ),
     )
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {

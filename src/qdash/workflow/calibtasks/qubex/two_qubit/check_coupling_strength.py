@@ -12,7 +12,6 @@ from qdash.datamodel.task import (
     OutputParameterSpec,
     RunParameterSpec,
     TaskDocumentation,
-    TaskReference,
 )
 from qdash.workflow.calibtasks.base import PostProcessResult, RunResult
 from qdash.workflow.calibtasks.qubex.base import (
@@ -54,27 +53,6 @@ class CheckCouplingStrength(QubexTask):
             (
                 "qubit_anharmonicity on both qubits, for example from CheckAdaptiveEFChevron, "
                 "enables the coupling-strength estimate."
-            ),
-        ),
-        references=(
-            TaskReference(
-                title=(
-                    "Experimental Demonstration of Fault-Tolerant State Preparation with "
-                    "Superconducting Qubits"
-                ),
-                url="https://doi.org/10.1103/PhysRevLett.119.180501",
-                relevance=(
-                    "Static ZZ measured by a Hahn echo with the spectator in each basis state "
-                    "and a varied final rotation."
-                ),
-            ),
-            TaskReference(
-                title="Suppression of Unwanted ZZ Interactions in a Hybrid Two-Qubit System",
-                url="https://doi.org/10.1103/PhysRevLett.125.200504",
-                relevance=(
-                    "Names the JAZZ protocol and gives the perturbative static ZZ expression "
-                    "used to infer coupling."
-                ),
             ),
         ),
     )

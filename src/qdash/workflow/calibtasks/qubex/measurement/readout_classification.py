@@ -11,7 +11,6 @@ from qdash.datamodel.task import (
     OutputParameterSpec,
     RunParameterSpec,
     TaskDocumentation,
-    TaskReference,
 )
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -48,13 +47,6 @@ class ReadoutClassification(QubexTask):
             (
                 "control_frequency (or qubit_frequency), readout_frequency (or "
                 "resonator_frequency), and readout_amplitude are stored for the qubit."
-            ),
-        ),
-        references=(
-            TaskReference(
-                title="Rapid High-Fidelity Single-Shot Dispersive Readout of Superconducting Qubits",
-                url="https://doi.org/10.1103/PhysRevApplied.7.054020",
-                relevance="Single-shot dispersive readout and state-assignment fidelity.",
             ),
         ),
     )

@@ -155,15 +155,6 @@ def test_tasks_used_by_templates_and_skills_are_documented() -> None:
         assert catalog[name]["description"] == documentation.description
 
 
-def test_a_reference_url_names_one_title_across_tasks() -> None:
-    titles: dict[str, set[str]] = {}
-    for entry in _packaged_catalog().values():
-        for reference in (entry.get("documentation") or {}).get("references", []):
-            titles.setdefault(reference["url"], set()).add(reference["title"])
-    assert titles
-    assert {url: found for url, found in titles.items() if len(found) > 1} == {}
-
-
 def test_template_inventory_is_independent_of_catalog_and_quote_style() -> None:
     source = """
 TaskCall(name = 'MissingFromCatalog')

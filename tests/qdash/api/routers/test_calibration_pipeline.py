@@ -155,8 +155,7 @@ class TestCatalog:
         assert t1["description"].startswith("Measures the energy relaxation time T1")
         assert t1["when_to_use"]
         assert any("CheckRabi" in item for item in t1["prerequisites"])
-        assert t1["references"]
-        assert all(ref["url"].startswith("https://") and ref["title"] for ref in t1["references"])
+        assert set(t1) == {"description", "when_to_use", "prerequisites"}
 
     def test_catalog_without_task_metadata_still_lists_tasks(self, test_client, chip, auth_headers):
         from fastapi import HTTPException

@@ -12,7 +12,6 @@ from qdash.datamodel.task import (
     OutputParameterSpec,
     RunParameterSpec,
     TaskDocumentation,
-    TaskReference,
 )
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -141,13 +140,6 @@ class CheckRabi(QubexTask):
             (
                 "control_amplitude and readout_amplitude use stored values when present and "
                 "task defaults otherwise."
-            ),
-        ),
-        references=(
-            TaskReference(
-                title="A quantum engineer's guide to superconducting qubits",
-                url="https://doi.org/10.1063/1.5089550",
-                relevance="Resonant Rabi driving of a transmon through capacitive X and Y control.",
             ),
         ),
     )

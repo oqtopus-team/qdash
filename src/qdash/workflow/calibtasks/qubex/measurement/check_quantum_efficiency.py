@@ -17,7 +17,6 @@ from qdash.datamodel.task import (
     OutputParameterSpec,
     RunParameterSpec,
     TaskDocumentation,
-    TaskReference,
 )
 from qdash.workflow.calibtasks.base import PostProcessResult, RunResult
 from qdash.workflow.calibtasks.qubex.base import (
@@ -87,19 +86,6 @@ class CheckQuantumEfficiency(QubexTask):
             (
                 "control_frequency (or qubit_frequency), readout_frequency (or "
                 "resonator_frequency), and readout_amplitude are stored for the qubit."
-            ),
-        ),
-        references=(
-            TaskReference(
-                title=(
-                    "General method for extracting the quantum efficiency of dispersive qubit "
-                    "readout in circuit QED"
-                ),
-                url="https://doi.org/10.1063/1.5015954",
-                relevance=(
-                    "Quantum efficiency from the ratio of measured SNR scaling to "
-                    "measurement-induced dephasing; the Qubex module cites this work."
-                ),
             ),
         ),
     )

@@ -25,5 +25,5 @@ Look up collection names and document classes in [Database Collections](./databa
 
 ## Calibration Tasks
 
-Look up the published sources cited for each task's measurement method in
+Find background reading on the measurement method behind each task in
 [Task Method Sources](./task-method-sources.md).

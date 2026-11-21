@@ -11,7 +11,6 @@ from qdash.datamodel.task import (
     OutputParameterSpec,
     RunParameterSpec,
     TaskDocumentation,
-    TaskReference,
 )
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -57,24 +56,6 @@ class CheckAdaptiveEFChevron(QubexTask):
             (
                 "control_frequency, control_amplitude, readout_frequency, and readout_amplitude"
                 " are stored; hpi_amplitude and hpi_duration stored by CreateHPIPulse."
-            ),
-        ),
-        references=(
-            TaskReference(
-                title="Charge-insensitive qubit design derived from the Cooper pair box",
-                url="https://doi.org/10.1103/PhysRevA.76.042319",
-                relevance=(
-                    "Transmon anharmonicity and the sqrt(2) larger e-f charge matrix element "
-                    "behind the amplitude seed."
-                ),
-            ),
-            TaskReference(
-                title=(
-                    "Coherence and Decay of Higher Energy Levels of a Superconducting Transmon "
-                    "Qubit"
-                ),
-                url="https://doi.org/10.1103/PhysRevLett.114.010501",
-                relevance="Driving successive transitions of a transmon with sequential pi pulses.",
             ),
         ),
     )

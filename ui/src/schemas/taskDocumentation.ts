@@ -5,16 +5,14 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { TaskReference } from './taskReference';
 
 /**
  * Human-readable guidance a task class declares about itself.
  *
  * A task class sets ``documentation: ClassVar[TaskDocumentation]`` to a literal
  * ``TaskDocumentation(...)`` call. The task catalog reads that call statically,
- * so every field must be a string literal, a list or tuple of string literals
- * for ``prerequisites``, or a list or tuple of literal ``TaskReference(...)``
- * calls for ``references``.
+ * so every field must be a string literal, or a list or tuple of string
+ * literals for ``prerequisites``.
  *
  * ``prerequisites`` explains to readers what the task expects; it is not
  * enforced. The task's ``input_spec`` remains the only declaration that decides
@@ -30,6 +28,4 @@ export interface TaskDocumentation {
   when_to_use?: string;
   /** Calibration state the task expects, explained for readers. Not enforced; input parameter metadata carries the enforced requirements. */
   prerequisites?: string[];
-  /** Published sources for the general method. They do not describe the QDash or Qubex implementation, which the task source defines. */
-  references?: TaskReference[];
 }

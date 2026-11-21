@@ -8,7 +8,6 @@ from qdash.datamodel.task import (
     OutputParameterSpec,
     RunParameterSpec,
     TaskDocumentation,
-    TaskReference,
 )
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -42,13 +41,6 @@ class CheckOptimalReadoutAmplitude(QubexTask):
                 "No declared inputs: it uses the frequencies and pi pulse already in the Qubex "
                 "session, so run it after Configure and the pulse calibrations in the same "
                 "flow."
-            ),
-        ),
-        references=(
-            TaskReference(
-                title="Rapid High-Fidelity Single-Shot Dispersive Readout of Superconducting Qubits",
-                url="https://doi.org/10.1103/PhysRevApplied.7.054020",
-                relevance="Single-shot dispersive readout fidelity and its dependence on readout drive.",
             ),
         ),
     )

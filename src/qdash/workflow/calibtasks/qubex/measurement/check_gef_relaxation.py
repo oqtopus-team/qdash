@@ -18,7 +18,6 @@ from qdash.datamodel.task import (
     OutputParameterSpec,
     RunParameterSpec,
     TaskDocumentation,
-    TaskReference,
 )
 from qdash.workflow.calibtasks.base import PostProcessResult, RunResult
 from qdash.workflow.calibtasks.qubex.base import QubexTask, readout_duration_run_parameter
@@ -89,16 +88,6 @@ class CheckGEFRelaxation(QubexTask):
             (
                 "control_frequency (or qubit_frequency), readout_frequency (or "
                 "resonator_frequency), and readout_amplitude are stored for the qubit."
-            ),
-        ),
-        references=(
-            TaskReference(
-                title=(
-                    "Coherence and Decay of Higher Energy Levels of a Superconducting Transmon "
-                    "Qubit"
-                ),
-                url="https://doi.org/10.1103/PhysRevLett.114.010501",
-                relevance="Decay of higher transmon levels, found to proceed mainly sequentially.",
             ),
         ),
     )

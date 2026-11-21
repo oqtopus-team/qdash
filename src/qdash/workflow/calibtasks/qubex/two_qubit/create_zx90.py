@@ -8,7 +8,6 @@ from qdash.datamodel.task import (
     OutputParameterSpec,
     RunParameterSpec,
     TaskDocumentation,
-    TaskReference,
 )
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -51,20 +50,6 @@ class CreateZX90(QubexTask):
             (
                 "CR parameters (cr_*, cancel_*, rotary_amplitude, zx_rotation_rate, "
                 "cr_ramptime) stored by CheckCrossResonance."
-            ),
-        ),
-        references=(
-            TaskReference(
-                title="Process verification of two-qubit quantum gates by randomized benchmarking",
-                url="https://doi.org/10.1103/PhysRevA.87.030301",
-                relevance="Echoed cross-resonance gate construction.",
-            ),
-            TaskReference(
-                title=(
-                    "Procedure for systematically tuning up cross-talk in the cross-resonance gate"
-                ),
-                url="https://doi.org/10.1103/PhysRevA.93.060302",
-                relevance="Calibrating the cross-resonance gate toward a ZX rotation.",
             ),
         ),
     )

@@ -13,7 +13,6 @@ from qdash.datamodel.task import (
     OutputParameterSpec,
     RunParameterSpec,
     TaskDocumentation,
-    TaskReference,
 )
 from qdash.workflow.calibtasks.base import PostProcessResult, RunResult
 from qdash.workflow.calibtasks.qubex.base import QubexTask, readout_duration_run_parameter
@@ -54,24 +53,6 @@ class CheckThermalExcitation(QubexTask):
             (
                 "control_frequency (or qubit_frequency), readout_frequency (or "
                 "resonator_frequency), and readout_amplitude are stored for the qubit."
-            ),
-        ),
-        references=(
-            TaskReference(
-                title="Demonstrating a Driven Reset Protocol for a Superconducting Qubit",
-                url="https://doi.org/10.1103/PhysRevLett.110.120501",
-                relevance=(
-                    "Population measurement that compares e-f Rabi signals with and without a "
-                    "GE pi pulse."
-                ),
-            ),
-            TaskReference(
-                title="Thermal and Residual Excited-State Population in a 3D Transmon Qubit",
-                url="https://doi.org/10.1103/PhysRevLett.114.240501",
-                relevance=(
-                    "Use of that protocol to measure thermal excited-state population; Qubex "
-                    "uses a two-point (0 or pi) EF amplitude variant."
-                ),
             ),
         ),
     )

@@ -8,7 +8,6 @@ from qdash.datamodel.task import (
     OutputParameterSpec,
     RunParameterSpec,
     TaskDocumentation,
-    TaskReference,
 )
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -45,21 +44,6 @@ class ZX90InterleavedRandomizedBenchmarking(QubexTask):
             (
                 "CR and ZX90 parameters (cr_*, cancel_*, rotary_amplitude, zx_rotation_rate, "
                 "zx90_gate_time) stored by CreateZX90 for the pair."
-            ),
-        ),
-        references=(
-            TaskReference(
-                title=(
-                    "Efficient Measurement of Quantum Gate Error by Interleaved Randomized "
-                    "Benchmarking"
-                ),
-                url="https://doi.org/10.1103/PhysRevLett.109.080505",
-                relevance="Interleaved randomized benchmarking for the error of one gate.",
-            ),
-            TaskReference(
-                title="Process verification of two-qubit quantum gates by randomized benchmarking",
-                url="https://doi.org/10.1103/PhysRevA.87.030301",
-                relevance="Two-qubit Clifford and interleaved benchmarking of a cross-resonance gate.",
             ),
         ),
     )

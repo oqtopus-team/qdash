@@ -70,19 +70,11 @@ export type PipelineExecution = {
   targets?: PipelineValidation["targets"];
 };
 
-export type TaskReference = {
-  title: string;
-  url: string;
-  /** Which part of the general method the source supports; not the QDash implementation. */
-  relevance?: string;
-};
-
 export type TaskDocumentation = {
   description: string;
   when_to_use?: string;
   /** Explanatory only: QDash enforces inputs from task metadata, not from this list. */
   prerequisites?: string[];
-  references?: TaskReference[];
 };
 
 export type PipelineCatalog = {
@@ -206,15 +198,15 @@ export function firstSentence(text: string): string {
 
 /**
  * Declared task guidance: the first sentence of each documented task's description,
- * plus the full description, when-to-use, prerequisites, and references for the
- * tasks named in `expand`.
+ * plus the full description, when-to-use, and prerequisites for the tasks named
+ * in `expand`.
  */
 function formatTaskDocumentation(documentation: Record<string, TaskDocumentation>, expand: string[]): string[] {
   const names = Object.keys(documentation).sort();
   const expanded = new Set(expand);
   const lines: string[] = [];
   if (names.length) {
-    lines.push("", `Task documentation (${names.length} documented; pass taskNames for the full description, when to use, prerequisites, and references):`);
+    lines.push("", `Task documentation (${names.length} documented; pass taskNames for the full description, when to use, and prerequisites):`);
     for (const name of names) {
       const doc = documentation[name];
       if (!expanded.has(name)) {
@@ -226,12 +218,6 @@ function formatTaskDocumentation(documentation: Record<string, TaskDocumentation
       if (doc.prerequisites?.length) {
         lines.push("  Prerequisites (explanatory; validation reports what is actually missing):");
         for (const item of doc.prerequisites) lines.push(`  - ${item}`);
-      }
-      if (doc.references?.length) {
-        lines.push("  References (general method, not the QDash implementation):");
-        for (const ref of doc.references) {
-          lines.push(`  - ${ref.title} <${ref.url}>${ref.relevance ? `: ${ref.relevance}` : ""}`);
-        }
       }
     }
   }
@@ -309,7 +295,7 @@ export function registerCalibrationPipelineTools(pi: Pick<ExtensionAPI, "registe
   pi.registerTool({
     name: "qdash_get_pipeline_catalog",
     label: "QDash Pipeline Catalog",
-    description: "List the step types, task names, declared task documentation, and spec schema for composing a calibration pipeline. Read-only. Call this before writing a pipeline spec, or with taskNames to read what a task does, when to use it, its prerequisites, and method references.",
+    description: "List the step types, task names, declared task documentation, and spec schema for composing a calibration pipeline. Read-only. Call this before writing a pipeline spec, or with taskNames to read what a task does, when to use it, and its prerequisites.",
     promptSnippet: "Look up the step types, tasks, and task documentation available for a QDash calibration pipeline",
     promptGuidelines: [
       "Use qdash_get_pipeline_catalog before composing a pipeline spec; use only the step types and task names it lists.",
@@ -318,7 +304,7 @@ export function registerCalibrationPipelineTools(pi: Pick<ExtensionAPI, "registe
     parameters: Type.Object({
       ...connectionParams,
       backendName: Type.Optional(Type.String({ description: "Backend to list tasks for. Defaults to the configured backend." })),
-      taskNames: Type.Optional(Type.Array(Type.String(), { description: "Task names whose full documentation (when to use, prerequisites, references) to include." })),
+      taskNames: Type.Optional(Type.Array(Type.String(), { description: "Task names whose full documentation (when to use, prerequisites) to include." })),
     }),
     async execute(_toolCallId, params: ConnectionParams & { backendName?: string; taskNames?: string[] }) {
       const qdash = new QDash(await deps.makeClient(params));

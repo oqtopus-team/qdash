@@ -8,7 +8,6 @@ from qdash.datamodel.task import (
     OutputParameterSpec,
     RunParameterSpec,
     TaskDocumentation,
-    TaskReference,
 )
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -46,16 +45,6 @@ class CreatePIPulse(QubexTask):
             (
                 "control_frequency (or qubit_frequency), readout_frequency (or "
                 "resonator_frequency), and readout_amplitude are stored for the qubit."
-            ),
-        ),
-        references=(
-            TaskReference(
-                title="A quantum engineer's guide to superconducting qubits",
-                url="https://doi.org/10.1063/1.5089550",
-                relevance=(
-                    "Single-qubit X and Y rotations from resonant drive pulses; the "
-                    "repeated-pulse amplitude fit is a Qubex procedure."
-                ),
             ),
         ),
     )

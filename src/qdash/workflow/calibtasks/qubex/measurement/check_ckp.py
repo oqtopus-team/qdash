@@ -12,7 +12,6 @@ from qdash.datamodel.task import (
     OutputParameterSpec,
     RunParameterSpec,
     TaskDocumentation,
-    TaskReference,
 )
 from qdash.workflow.calibtasks.base import PostProcessResult, RunResult
 from qdash.workflow.calibtasks.qubex.base import (
@@ -51,26 +50,6 @@ class CheckCKP(QubexTask):
             ),
             "hpi_amplitude and hpi_duration stored by CreateHPIPulse.",
             "control_frequency, readout_frequency, and readout_amplitude are stored.",
-        ),
-        references=(
-            TaskReference(
-                title=(
-                    "ac Stark Shift and Dephasing of a Superconducting Qubit Strongly Coupled "
-                    "to a Cavity Field"
-                ),
-                url="https://doi.org/10.1103/PhysRevLett.94.123602",
-                relevance="ac Stark shift of a qubit by photons in a dispersively coupled resonator.",
-            ),
-            TaskReference(
-                title="Quantum theory of a bandpass Purcell filter for qubit readout",
-                url="https://doi.org/10.1103/PhysRevA.92.012325",
-                relevance="Readout through a bandpass Purcell filter.",
-            ),
-            TaskReference(
-                title="Circuit quantum electrodynamics",
-                url="https://doi.org/10.1103/RevModPhys.93.025005",
-                relevance="Dispersive shift and critical photon number of circuit QED readout.",
-            ),
         ),
     )
 

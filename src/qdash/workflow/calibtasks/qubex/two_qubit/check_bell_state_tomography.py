@@ -10,7 +10,6 @@ from qdash.datamodel.task import (
     OutputParameterSpec,
     RunParameterSpec,
     TaskDocumentation,
-    TaskReference,
 )
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -50,21 +49,6 @@ class CheckBellStateTomography(QubexTask):
             (
                 "CR and ZX90 parameters (cr_*, cancel_*, rotary_amplitude, zx_rotation_rate, "
                 "zx90_gate_time) stored by CreateZX90 for the pair."
-            ),
-        ),
-        references=(
-            TaskReference(
-                title="Measurement of qubits",
-                url="https://doi.org/10.1103/PhysRevA.64.052312",
-                relevance="Two-qubit state tomography by linear reconstruction of the density matrix.",
-            ),
-            TaskReference(
-                title=(
-                    "Measurement of the Entanglement of Two Superconducting Qubits via State "
-                    "Tomography"
-                ),
-                url="https://doi.org/10.1126/science.1130886",
-                relevance="State tomography of entangled superconducting qubits.",
             ),
         ),
     )

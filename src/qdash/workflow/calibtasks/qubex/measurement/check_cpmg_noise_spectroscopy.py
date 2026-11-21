@@ -16,7 +16,6 @@ from qdash.datamodel.task import (
     OutputParameterSpec,
     RunParameterSpec,
     TaskDocumentation,
-    TaskReference,
 )
 from qdash.workflow.calibtasks.base import PostProcessResult, RunResult
 from qdash.workflow.calibtasks.qubex.base import (
@@ -84,19 +83,6 @@ class CheckCPMGNoiseSpectroscopy(QubexTask):
             (
                 "control_frequency (or qubit_frequency), readout_frequency (or "
                 "resonator_frequency), and readout_amplitude are stored for the qubit."
-            ),
-        ),
-        references=(
-            TaskReference(
-                title=(
-                    "Noise spectroscopy through dynamical decoupling with a superconducting "
-                    "flux qubit"
-                ),
-                url="https://doi.org/10.1038/nphys1994",
-                relevance=(
-                    "CPMG dynamical decoupling as a noise-spectroscopy filter; demonstrated on "
-                    "a flux qubit."
-                ),
             ),
         ),
     )

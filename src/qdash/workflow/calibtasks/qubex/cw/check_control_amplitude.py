@@ -11,7 +11,6 @@ from qdash.datamodel.task import (
     OutputParameterSpec,
     RunParameterSpec,
     TaskDocumentation,
-    TaskReference,
 )
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -57,16 +56,6 @@ class CheckControlAmplitude(QubexTask):
                 "control_frequency (or coarse_qubit_frequency), readout_frequency (or "
                 "resonator_frequency), readout_amplitude, and coarse_control_amplitude are "
                 "stored, normally by CheckQubitSpectroscopy."
-            ),
-        ),
-        references=(
-            TaskReference(
-                title="Circuit quantum electrodynamics",
-                url="https://doi.org/10.1103/RevModPhys.93.025005",
-                relevance=(
-                    "Steady-state spectroscopy line shape whose width grows with the Rabi "
-                    "frequency (power broadening)."
-                ),
             ),
         ),
     )

@@ -10,7 +10,6 @@ from qdash.datamodel.task import (
     OutputParameterSpec,
     RunParameterSpec,
     TaskDocumentation,
-    TaskReference,
 )
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -50,32 +49,6 @@ class CreateDRAGHPIPulse(QubexTask):
             (
                 "control_frequency (or qubit_frequency), readout_frequency (or "
                 "resonator_frequency), and readout_amplitude are stored for the qubit."
-            ),
-        ),
-        references=(
-            TaskReference(
-                title="Simple Pulses for Elimination of Leakage in Weakly Nonlinear Qubits",
-                url="https://doi.org/10.1103/PhysRevLett.103.110501",
-                relevance=(
-                    "DRAG derivative correction that suppresses leakage and phase error in a "
-                    "weakly anharmonic qubit."
-                ),
-            ),
-            TaskReference(
-                title=(
-                    "Analytic control methods for high-fidelity unitary operations in a weakly "
-                    "nonlinear oscillator"
-                ),
-                url="https://doi.org/10.1103/PhysRevA.83.012308",
-                relevance="Analysis of DRAG pulse families and their phase-error terms.",
-            ),
-            TaskReference(
-                title="Reduced phase error through optimized control of a superconducting qubit",
-                url="https://doi.org/10.1103/PhysRevA.82.042339",
-                relevance=(
-                    "Amplified phase error sequences of pseudo-identity pairs, similar to the "
-                    "beta sweep; shown on a phase qubit."
-                ),
             ),
         ),
     )

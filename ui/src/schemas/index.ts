@@ -1026,7 +1026,6 @@ export * from './taskOutputParametersAnyOfAnyOfDatabaseUpdatesItem';
 export * from './taskOutputParametersAnyOfAnyOfSource';
 export * from './taskQid';
 export * from './taskRawDataPath';
-export * from './taskReference';
 export * from './taskReferenceResponse';
 export * from './taskReferenceResponseParameters';
 export * from './taskReferenceResponseRangeFormat';

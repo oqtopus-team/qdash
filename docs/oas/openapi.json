@@ -34674,15 +34674,6 @@
             "title": "Prerequisites",
             "description": "Calibration state the task expects, explained for readers. Not enforced; input parameter metadata carries the enforced requirements.",
             "default": []
-          },
-          "references": {
-            "items": {
-              "$ref": "#/components/schemas/TaskReference"
-            },
-            "type": "array",
-            "title": "References",
-            "description": "Published sources for the general method. They do not describe the QDash or Qubex implementation, which the task source defines.",
-            "default": []
           }
         },
         "additionalProperties": false,
@@ -34691,7 +34682,7 @@
           "description"
         ],
         "title": "TaskDocumentation",
-        "description": "Human-readable guidance a task class declares about itself.\n\nA task class sets ``documentation: ClassVar[TaskDocumentation]`` to a literal\n``TaskDocumentation(...)`` call. The task catalog reads that call statically,\nso every field must be a string literal, a list or tuple of string literals\nfor ``prerequisites``, or a list or tuple of literal ``TaskReference(...)``\ncalls for ``references``.\n\n``prerequisites`` explains to readers what the task expects; it is not\nenforced. The task's ``input_spec`` remains the only declaration that decides\nwhich calibration values must exist before the task runs."
+        "description": "Human-readable guidance a task class declares about itself.\n\nA task class sets ``documentation: ClassVar[TaskDocumentation]`` to a literal\n``TaskDocumentation(...)`` call. The task catalog reads that call statically,\nso every field must be a string literal, or a list or tuple of string\nliterals for ``prerequisites``.\n\n``prerequisites`` explains to readers what the task expects; it is not\nenforced. The task's ``input_spec`` remains the only declaration that decides\nwhich calibration values must exist before the task runs."
       },
       "TaskFileBackend": {
         "properties": {
@@ -35039,36 +35030,6 @@
         ],
         "title": "TaskNoteEntry",
         "description": "Task-result note row for the dashboard summary."
-      },
-      "TaskReference": {
-        "properties": {
-          "title": {
-            "type": "string",
-            "minLength": 1,
-            "title": "Title",
-            "description": "Exact title of the cited work."
-          },
-          "url": {
-            "type": "string",
-            "pattern": "^https://\\S+$",
-            "title": "Url",
-            "description": "Stable HTTPS link, preferably a DOI or arXiv URL."
-          },
-          "relevance": {
-            "type": "string",
-            "title": "Relevance",
-            "description": "Which part of the task's method the source supports.",
-            "default": ""
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "title",
-          "url"
-        ],
-        "title": "TaskReference",
-        "description": "A published source for the general method a task implements.\n\nA reference supports the physics or protocol behind a task, not QDash's or\nQubex's implementation of it; ``relevance`` says which part it supports."
       },
       "TaskReferenceResponse": {
         "properties": {

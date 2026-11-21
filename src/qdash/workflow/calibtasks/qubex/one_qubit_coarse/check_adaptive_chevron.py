@@ -10,7 +10,6 @@ from qdash.datamodel.task import (
     OutputParameterSpec,
     RunParameterSpec,
     TaskDocumentation,
-    TaskReference,
 )
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -51,16 +50,6 @@ class CheckAdaptiveChevron(QubexTask):
                 "control_frequency (or coarse_qubit_frequency), readout_frequency (or "
                 "resonator_frequency), readout_amplitude, and coarse_control_amplitude are "
                 "stored, normally by CheckQubitSpectroscopy and CheckControlAmplitude."
-            ),
-        ),
-        references=(
-            TaskReference(
-                title="A quantum engineer's guide to superconducting qubits",
-                url="https://doi.org/10.1063/1.5089550",
-                relevance=(
-                    "Resonant and detuned Rabi driving of a transmon; the adaptive "
-                    "matched-transform search is Qubex-specific."
-                ),
             ),
         ),
     )

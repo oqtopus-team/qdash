@@ -16,7 +16,6 @@ from qdash.datamodel.task import (
     OutputParameterSpec,
     RunParameterSpec,
     TaskDocumentation,
-    TaskReference,
 )
 from qdash.workflow.calibtasks.base import PostProcessResult, RunResult
 from qdash.workflow.calibtasks.qubex.base import (
@@ -108,19 +107,6 @@ class CheckSpinLockSpectroscopy(QubexTask):
             (
                 "Stored t1 and t2_echo, when present, set the duration sweep; otherwise it "
                 "spans 100 ns to 200 us."
-            ),
-        ),
-        references=(
-            TaskReference(
-                title=(
-                    "Rotating-frame relaxation as a noise spectrum analyser of a "
-                    "superconducting qubit undergoing driven evolution"
-                ),
-                url="https://doi.org/10.1038/ncomms3337",
-                relevance=(
-                    "Rotating-frame (spin-locking) relaxation as a noise spectrum analyser; "
-                    "demonstrated on a flux qubit."
-                ),
             ),
         ),
     )

@@ -14,7 +14,6 @@ from qdash.datamodel.task import (
     OutputParameterSpec,
     RunParameterSpec,
     TaskDocumentation,
-    TaskReference,
 )
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -56,26 +55,6 @@ class CheckT1Average(QubexTask):
             (
                 "control_frequency (or qubit_frequency), readout_frequency (or "
                 "resonator_frequency), and readout_amplitude are stored for the qubit."
-            ),
-        ),
-        references=(
-            TaskReference(
-                title="A quantum engineer's guide to superconducting qubits",
-                url="https://doi.org/10.1063/1.5089550",
-                relevance="T1 measurement by excitation and delayed readout.",
-            ),
-            TaskReference(
-                title="Fluctuations of Energy-Relaxation Times in Superconducting Qubits",
-                url="https://doi.org/10.1103/PhysRevLett.121.090502",
-                relevance=(
-                    "T1 fluctuates in time because of two-level-system defects, so single "
-                    "values are noisy."
-                ),
-            ),
-            TaskReference(
-                title="Decoherence benchmarking of superconducting qubits",
-                url="https://doi.org/10.1038/s41534-019-0168-5",
-                relevance="Statistics of repeated T1 and dephasing measurements over long periods.",
             ),
         ),
     )

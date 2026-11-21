@@ -356,9 +356,7 @@ class TaskFileService:
         """
         if isinstance(node, ast.Constant) and node.value is None:
             return None
-        fields = TaskFileService._literal_call_fields(
-            node, "TaskDocumentation", nested={"references": "TaskReference"}
-        )
+        fields = TaskFileService._literal_call_fields(node, "TaskDocumentation")
         try:
             return TaskDocumentation.model_validate(fields)
         except ValidationError as exc:
@@ -369,14 +367,10 @@ class TaskFileService:
             raise ValueError(f"invalid TaskDocumentation: {problems}") from None
 
     @staticmethod
-    def _literal_call_fields(
-        node: ast.expr, class_name: str, nested: dict[str, str] | None = None
-    ) -> dict[str, object]:
+    def _literal_call_fields(node: ast.expr, class_name: str) -> dict[str, object]:
         """Return the literal keyword arguments of a ``class_name(...)`` call.
 
-        ``nested`` maps a keyword to the class name its value must call in each
-        element of a list or tuple, for example ``references`` to
-        ``TaskReference``. Nothing is imported or executed.
+        Nothing is imported or executed.
 
         Raises
         ------
@@ -400,18 +394,6 @@ class TaskFileService:
         for keyword in node.keywords:
             if keyword.arg is None:
                 raise ValueError(f"{class_name} does not accept ** arguments")
-            nested_class = (nested or {}).get(keyword.arg)
-            if nested_class is not None:
-                if not isinstance(keyword.value, (ast.Tuple, ast.List)):
-                    raise ValueError(
-                        f"{class_name}.{keyword.arg} must be a tuple or list of literal "
-                        f"{nested_class}(...) calls"
-                    )
-                fields[keyword.arg] = [
-                    TaskFileService._literal_call_fields(element, nested_class)
-                    for element in keyword.value.elts
-                ]
-                continue
             try:
                 fields[keyword.arg] = ast.literal_eval(keyword.value)
             except (ValueError, TypeError, SyntaxError, MemoryError, RecursionError):

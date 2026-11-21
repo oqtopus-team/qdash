@@ -17,7 +17,6 @@ from qdash.datamodel.task import (
     OutputParameterSpec,
     RunParameterSpec,
     TaskDocumentation,
-    TaskReference,
 )
 from qdash.workflow.calibtasks.base import PostProcessResult, RunResult
 from qdash.workflow.calibtasks.qubex.base import QubexTask
@@ -80,30 +79,6 @@ class CheckReadoutMIST(QubexTask):
             (
                 "control_frequency (or qubit_frequency), readout_frequency (or "
                 "resonator_frequency), and readout_amplitude are stored for the qubit."
-            ),
-        ),
-        references=(
-            TaskReference(
-                title=(
-                    "Measurement-Induced State Transitions in a Superconducting Qubit: Beyond "
-                    "the Rotating Wave Approximation"
-                ),
-                url="https://doi.org/10.1103/PhysRevLett.117.190503",
-                relevance=(
-                    "Measurement-induced state transitions out of the qubit subspace at high "
-                    "readout photon number."
-                ),
-            ),
-            TaskReference(
-                title=(
-                    "Measurement-induced state transitions in a superconducting qubit: Within "
-                    "the rotating-wave approximation"
-                ),
-                url="https://doi.org/10.1103/PhysRevApplied.20.054008",
-                relevance=(
-                    "Transmon measurement-induced transitions within the rotating-wave "
-                    "approximation."
-                ),
             ),
         ),
     )

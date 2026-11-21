@@ -11,7 +11,6 @@ from qdash.datamodel.task import (
     OutputParameterSpec,
     RunParameterSpec,
     TaskDocumentation,
-    TaskReference,
 )
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -56,21 +55,6 @@ class CheckQubitSpectroscopy(QubexTask):
         ),
         prerequisites=(
             "readout_frequency (or resonator_frequency) and readout_amplitude are stored.",
-        ),
-        references=(
-            TaskReference(
-                title="Circuit quantum electrodynamics",
-                url="https://doi.org/10.1103/RevModPhys.93.025005",
-                relevance=(
-                    "Qubit spectroscopy through the dispersive shift, including power "
-                    "broadening of the line."
-                ),
-            ),
-            TaskReference(
-                title="Charge-insensitive qubit design derived from the Cooper pair box",
-                url="https://doi.org/10.1103/PhysRevA.76.042319",
-                relevance="Transmon level structure: f12 lies below f01 by roughly the charging energy.",
-            ),
         ),
     )
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {

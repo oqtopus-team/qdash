@@ -10,7 +10,6 @@ from qdash.datamodel.task import (
     OutputParameterSpec,
     RunParameterSpec,
     TaskDocumentation,
-    TaskReference,
 )
 from qdash.workflow.calibtasks.base import PostProcessResult, RunResult
 from qdash.workflow.calibtasks.qubex.base import QubexTask, readout_duration_run_parameter
@@ -50,16 +49,6 @@ class CheckChevron(QubexTask):
             (
                 "The true qubit frequency lies inside the detuning_range sweep, which spans ±50"
                 " MHz by default."
-            ),
-        ),
-        references=(
-            TaskReference(
-                title="A quantum engineer's guide to superconducting qubits",
-                url="https://doi.org/10.1063/1.5089550",
-                relevance=(
-                    "Resonant and detuned Rabi driving of a transmon; the matched-transform "
-                    "analysis is Qubex-specific."
-                ),
             ),
         ),
     )
