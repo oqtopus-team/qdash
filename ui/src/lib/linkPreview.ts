@@ -49,11 +49,7 @@ export interface LinkInput {
   resolveFragment?: (id: string) => string | null;
 }
 
-// `/dashboard` redirects to `/overview` (next.config.js); older notes and posts still link to it.
-const SECTION_ALIASES = [
-  { href: "/executions", label: "Execution" },
-  { href: "/dashboard", label: "Overview" },
-];
+const SECTION_ALIASES = [{ href: "/executions", label: "Execution" }];
 
 /** Every sidebar destination, longest path first, so nested routes win. */
 const SECTIONS = [

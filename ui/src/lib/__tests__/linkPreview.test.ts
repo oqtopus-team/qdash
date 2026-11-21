@@ -37,7 +37,6 @@ describe("describeLink", () => {
     expect(describe_("/api/flows/export")).toMatchObject({ kind: "api" });
     expect(pageSection("/task-results")).toBe("Task Results");
     expect(pageSection("/overview")).toBe("Overview");
-    expect(pageSection("/dashboard")).toBe("Overview");
     expect(pageSection("/dashboards/dash-1")).toBe("Dashboards");
   });
 
