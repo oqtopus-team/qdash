@@ -595,14 +595,13 @@ export function LiveAssistantMessage({
       (s.kind === "thinking" && s.endedAt === undefined),
   );
   const idle = !answer && !busy;
+  const figures = answer ? figuresInSteps(work) : [];
 
   return (
     // The activity footer is the live region; the streaming text itself is not announced.
     <AssistantRow className="animate-fade-in-up" aria-busy="true">
-      <LiveTrace steps={work} />
-      {answer && figuresInSteps(work).length > 0 && (
-        <FigureStrip paths={figuresInSteps(work)} className="mb-3" />
-      )}
+      <LiveTrace steps={work} figuresOutside={figures.length > 0} />
+      {figures.length > 0 && <FigureStrip paths={figures} className="mb-3" />}
       {turn.blocks?.map((block, i) =>
         block.type === "ui" ? (
           <ChatUiBlock key={i} ui={block.ui} />
