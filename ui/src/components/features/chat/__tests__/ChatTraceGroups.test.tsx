@@ -241,6 +241,10 @@ describe("finished tool groups", () => {
     expect(group.textContent).toContain("Used 2 tools");
     expect(group.textContent).toContain("1 not run");
     expect(group.textContent).toContain("3s");
+    // The elapsed time follows the label instead of sitting at the far edge.
+    const duration = within(group).getByTestId("tool-group-duration");
+    expect(duration.previousElementSibling?.textContent).toBe("Used 2 tools");
+    expect(duration.className).not.toContain("ml-auto");
     expect(screen.getByText("Checking the readout next.").closest("[hidden]")).toBeNull();
     // The lone call after the prose is a row of its own.
     expect(screen.getAllByTestId("tool-group-summary")).toHaveLength(1);

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 
-import { useEffect, useId, useState, type ReactNode } from "react";
+import { useEffect, useId, useState } from "react";
 import { twMerge } from "tailwind-merge";
 import { Ban, Brain, ChevronRight, CircleX, Wrench } from "lucide-react";
 import type {
@@ -243,13 +243,11 @@ function ToolStepRow({
         >
           {title}
         </span>
-        {preview && (
-          <span className="min-w-0 flex-[1_1_0%] truncate text-xs text-base-content/40">
-            {preview}
-          </span>
-        )}
-        {details && <RowChevron open={open} />}
-        <span className="ml-auto flex shrink-0 items-center gap-1.5 text-xs tabular-nums text-base-content/40">
+        {/* Status and time sit beside the title, not at the far edge of the row. */}
+        <span
+          className="flex shrink-0 items-center gap-1.5 text-xs tabular-nums text-base-content/40"
+          data-testid="tool-step-meta"
+        >
           {failed ? (
             <span className="text-error">Failed</span>
           ) : cancelled ? (
@@ -259,6 +257,12 @@ function ToolStepRow({
           )}
           {!drafting && !cancelled && <span>{formatDuration(elapsed)}</span>}
         </span>
+        {preview && (
+          <span className="min-w-0 flex-[1_1_0%] truncate text-xs text-base-content/40">
+            {preview}
+          </span>
+        )}
+        {details && <RowChevron open={open} />}
       </ChainOfThoughtTrigger>
       {failure && (
         <p
@@ -501,6 +505,13 @@ function WorkGroup({
           >
             {label}
           </span>
+          <span
+            className="shrink-0 text-xs tabular-nums text-base-content/40"
+            aria-hidden="true"
+            data-testid="tool-group-duration"
+          >
+            {formatDuration(endedAt - startedAt)}
+          </span>
           {active && (
             <span className="shrink-0 text-xs text-base-content/40">
               · {plural(tools.length, "tool")}
@@ -516,12 +527,6 @@ function WorkGroup({
             <span className="shrink-0 text-xs text-base-content/40">· {notRun} not run</span>
           )}
           <RowChevron open={!folded} />
-          <span
-            className="ml-auto shrink-0 text-xs tabular-nums text-base-content/40"
-            aria-hidden="true"
-          >
-            {formatDuration(endedAt - startedAt)}
-          </span>
         </button>
       )}
       {folded && <FoldedGroupNotes steps={tools} showFigures={live && !figuresOutside} />}
@@ -666,14 +671,11 @@ export function TurnActivity({
   steps,
   startedAt,
   statusMessage,
-  leading,
   className,
 }: {
   steps: TraceStep[];
   startedAt: number;
   statusMessage: string | null;
-  /** Drawn before the activity when the footer is visible, e.g. the assistant's avatar. */
-  leading?: ReactNode;
   className?: string;
 }) {
   const now = useNow(true);
@@ -689,7 +691,6 @@ export function TurnActivity({
       data-testid="turn-activity"
       data-in-trace={inTrace}
     >
-      {!inTrace && leading}
       <div role="status" className="flex min-w-0 items-center">
         {inTrace ? (
           activity

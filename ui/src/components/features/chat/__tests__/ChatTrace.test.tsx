@@ -369,4 +369,27 @@ describe("ChatTrace", () => {
       vi.useRealTimers();
     }
   });
+
+  it("puts a row's status and time beside its title, before the preview", () => {
+    render(
+      <LiveTrace
+        steps={[
+          {
+            kind: "tool",
+            id: "c1",
+            tool: "qdash_execute_flow",
+            label: "Execute flow",
+            status: "error",
+            startedAt: 0,
+            endedAt: 2000,
+            args: { name: "daily" },
+          },
+        ]}
+      />,
+    );
+    const meta = screen.getByTestId("tool-step-meta");
+    expect(meta.textContent).toBe("Failed2s");
+    expect(meta.className).not.toContain("ml-auto");
+    expect(meta.nextElementSibling?.textContent).toBe("flow daily");
+  });
 });

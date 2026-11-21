@@ -30,7 +30,6 @@ import {
 import { useOptionalChatDock } from "@/contexts/ChatDockContext";
 import { editTargetCode } from "@/lib/copilotEditTarget";
 import { ImagePreviewDialog } from "@/components/ui/ImagePreviewDialog";
-import { QdashBotAvatar } from "@/components/ui/UserAvatar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import { useToast } from "@/components/ui/Toast";
 import { copyText } from "@/lib/utils/clipboard";
@@ -616,9 +615,6 @@ export function LiveAssistantMessage({
         startedAt={turn.startedAt}
         statusMessage={statusMessage}
         className={`h-7 gap-2.5 ${idle ? "text-sm" : "mt-1"}`}
-        leading={
-          idle ? <QdashBotAvatar size={20} className="chat-avatar-active chat-bot-mark" /> : null
-        }
       />
     </AssistantRow>
   );
