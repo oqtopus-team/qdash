@@ -10,6 +10,7 @@ import type { ParamInputs } from "./parameters";
 import type { MetricPeriod } from "./periods";
 import { PAIR_DIRECTIONS, type PairDirection } from "./render/PairMap";
 import type { ResultViewMode } from "./render/MetricResultView";
+import { isSeriesMetric, MAX_SERIES_TARGETS, parseTargets } from "./targets";
 
 export interface PreviewSettings {
   chipId: string;
@@ -19,6 +20,17 @@ export interface PreviewSettings {
   view: ResultViewMode;
   direction: PairDirection;
   hops: number[];
+  /** Series metrics: the typed qubits or directed pairs to evaluate. */
+  targets: string;
+}
+
+/** The view a preview shows for `metric`: a chart for a series, else the chosen map or table. */
+export function previewView(
+  metric: Pick<MetricInfo, "result"> | undefined,
+  view: ResultViewMode,
+): ResultViewMode {
+  if (isSeriesMetric(metric)) return "timeseries";
+  return view === "timeseries" ? "map" : view;
 }
 
 interface PreviewControlsProps {
@@ -35,7 +47,10 @@ interface PreviewControlsProps {
 export function PreviewControls({ id, metrics, value, onChange }: PreviewControlsProps) {
   const metric = metrics.find((entry) => entry.id === value.metricId);
   const isPair = metric?.target === "pair";
+  const isSeries = isSeriesMetric(metric);
   const hopOptions = declaredHops(metric);
+  const targetError =
+    isSeries && value.targets.trim() ? parseTargets(value.targets, metric?.target).error : null;
 
   return (
     <div className="flex flex-col gap-2">
@@ -61,7 +76,12 @@ export function PreviewControls({ id, metrics, value, onChange }: PreviewControl
             disabled={metrics.length === 0}
             onChange={(event) => {
               const next = metrics.find((entry) => entry.id === event.target.value);
-              onChange({ metricId: event.target.value, paramInputs: {}, hops: declaredHops(next) });
+              onChange({
+                metricId: event.target.value,
+                paramInputs: {},
+                hops: declaredHops(next),
+                targets: "",
+              });
             }}
           >
             <option value="" disabled>
@@ -73,6 +93,7 @@ export function PreviewControls({ id, metrics, value, onChange }: PreviewControl
                 <option key={entry.id} value={entry.id}>
                   {entry.title}
                   {unit ? ` (${unit})` : ""} · {entry.target}
+                  {isSeriesMetric(entry) ? " · time series" : ""}
                 </option>
               );
             })}
@@ -84,6 +105,7 @@ export function PreviewControls({ id, metrics, value, onChange }: PreviewControl
         id={`${id}-period`}
         value={value.period}
         onChange={(period) => onChange({ period })}
+        series={isSeries}
       />
 
       <ParameterFields
@@ -93,6 +115,28 @@ export function PreviewControls({ id, metrics, value, onChange }: PreviewControl
         onChange={(paramInputs) => onChange({ paramInputs })}
       />
 
+      {isSeries && (
+        <fieldset className="fieldset min-w-0">
+          <legend className="fieldset-legend">
+            <label htmlFor={`${id}-targets`}>{isPair ? "Directed pairs" : "Qubits"}</label>
+          </legend>
+          <input
+            id={`${id}-targets`}
+            className="input input-sm w-full font-mono"
+            value={value.targets}
+            placeholder={isPair ? "0>1, 1>0" : "0, 5"}
+            onChange={(event) => onChange({ targets: event.target.value })}
+          />
+          {targetError ? (
+            <p className="text-xs text-error">{targetError}</p>
+          ) : (
+            <p className="label whitespace-normal">
+              A time series metric evaluates only these, up to {MAX_SERIES_TARGETS}.
+            </p>
+          )}
+        </fieldset>
+      )}
+
       <div className="grid grid-cols-1 gap-x-3 sm:grid-cols-2">
         <fieldset className="fieldset min-w-0">
           <legend className="fieldset-legend">
@@ -101,14 +145,21 @@ export function PreviewControls({ id, metrics, value, onChange }: PreviewControl
           <select
             id={`${id}-view`}
             className="select select-sm w-full"
-            value={value.view}
+            value={previewView(metric, value.view)}
+            disabled={isSeries}
             onChange={(event) => onChange({ view: event.target.value as ResultViewMode })}
           >
-            <option value="map">Map</option>
-            <option value="table">Table</option>
+            {isSeries ? (
+              <option value="timeseries">Chart</option>
+            ) : (
+              <>
+                <option value="map">Map</option>
+                <option value="table">Table</option>
+              </>
+            )}
           </select>
         </fieldset>
-        {isPair && (
+        {isPair && !isSeries && (
           <fieldset className="fieldset min-w-0">
             <legend className="fieldset-legend">
               <label htmlFor={`${id}-direction`}>Direction</label>
@@ -127,7 +178,7 @@ export function PreviewControls({ id, metrics, value, onChange }: PreviewControl
             </select>
           </fieldset>
         )}
-        {isPair && hopOptions.length > 1 && (
+        {isPair && !isSeries && hopOptions.length > 1 && (
           <fieldset className="fieldset min-w-0">
             <legend className="fieldset-legend">Pair distance</legend>
             <div className="flex flex-wrap gap-x-4 gap-y-1">

@@ -93,7 +93,18 @@ active revision. `qdash.scripts.template(id)` reads a starter template's source 
 generated `MetricScriptPanelConfig` model; `add_markdown` adds a note. The builder follows the
 dashboard editor's rules in `ui/src/components/features/dashboards/layout.ts`: a new
 panel goes to the left edge below every panel, 6 by 4 for a metric and 12 by 2 for a note.
-`hops` defaults to the metric's declared distances, `period` to the last 14 days. Panel IDs are
+`hops` defaults to the metric's declared distances, `period` to the last 14 days. `view`
+defaults to `map` for a scalar metric and `timeseries` for a series metric
+(`ScriptMetric.result == "series"`); a series metric needs `targets` (1 to 16 cell keys), and
+`add_metric` raises `ValueError` for a view or targets that do not fit the metric, as the server
+would on save. A scalar panel's config has no `targets` key, so it stays valid on servers from
+before series metrics, whose config model forbids unknown keys:
+
+```python
+trend = qdash.scripts.create(qdash.scripts.template("zx90_daily_trend")).metric("zx90_daily_trend")
+board.add_metric(trend, period=28, targets=["0>1", "1>0"], params={"interval": "week"})
+```
+ Panel IDs are
 derived from the metric ID (`zx90_median`, then `zx90_median-2`), so rerunning a script produces
 the same IDs. An explicit `layout=(x, y, w, h)` or `panel_id=` overrides the default. The server
 still validates every panel on save.

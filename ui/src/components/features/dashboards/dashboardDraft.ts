@@ -38,6 +38,7 @@ export function dashboardSuggestions(isNew: boolean, empty: boolean): string[] {
     return [
       "Build a frequency collision map from the starter template",
       "Show the median ZX90 fidelity per coupling over the last 14 days",
+      "Chart the daily median ZX90 fidelity of Q0→Q1 over the last 4 weeks",
       "Show T1 and T2 echo per qubit side by side",
     ];
   }

@@ -43,6 +43,8 @@ ParamValue = bool | int | float | str
 
 # Pair distances the API knows; a metric's declared hops are limited to these.
 _KNOWN_HOPS = (1, 2)
+# Most targets a series panel may select; the server enforces the same limit.
+MAX_SERIES_TARGETS = 16
 # Default panel sizes (w, h) on the 12-column grid, as the dashboard editor uses them.
 _PANEL_SIZES = {"metric_script": (6, 4), "markdown": (12, 2)}
 _DEFAULT_SIZE = (6, 3)
@@ -158,6 +160,11 @@ class ScriptMetric:
         declared = [hop for hop in (self.info.hops or _KNOWN_HOPS) if hop in _KNOWN_HOPS]
         return declared or list(_KNOWN_HOPS)
 
+    @property
+    def result(self) -> str:
+        """``scalar`` (one value per target, a map or table) or ``series`` (a chart)."""
+        return str(self.info.result.value) if self.info.result is not None else "scalar"
+
 
 def _period(period: PeriodInput | None) -> RelativePeriod | AbsolutePeriod:
     if period is None:
@@ -248,7 +255,8 @@ class Dashboard:
         title: str | None = None,
         period: PeriodInput | None = None,
         params: Mapping[str, ParamValue] | None = None,
-        view: Literal["map", "table"] = "map",
+        view: Literal["map", "table", "timeseries"] | None = None,
+        targets: Sequence[str] | None = None,
         direction: Literal["both", "forward", "reverse"] = "both",
         hops: Sequence[int] | None = None,
         layout: LayoutInput | None = None,
@@ -260,9 +268,33 @@ class Dashboard:
         default is the last 14 days. ``params`` override the metric's parameter defaults.
         ``hops`` defaults to the distances the metric declares. The server checks the script,
         revision, metric, parameters and hops when the dashboard is saved.
+
+        A scalar metric is shown as a ``map`` (default) or ``table`` of the whole chip. A
+        series metric (``metric.result == "series"``) is shown as a ``timeseries`` chart of
+        ``targets``: 1 to 16 qubit IDs (``"5"``) or directed pairs (``"5>6"``), which are also
+        the only targets the server evaluates.
+
+        Raises:
+            ValueError: If the view does not fit the metric's result, or ``targets`` is missing
+                for a series metric, given for a scalar one, or longer than 16.
         """
         if not isinstance(metric, ScriptMetric):
             raise TypeError("metric must be a ScriptMetric from SavedScript.metric(...)")
+        selected = list(targets or [])
+        if metric.result == "series":
+            view = view or "timeseries"
+            if view != "timeseries":
+                raise ValueError(f"{metric.id} returns a time series; use view='timeseries'")
+            if not 1 <= len(selected) <= MAX_SERIES_TARGETS:
+                raise ValueError(
+                    f"{metric.id} is a series metric: pass 1 to {MAX_SERIES_TARGETS} targets"
+                )
+        else:
+            view = view or "map"
+            if view == "timeseries":
+                raise ValueError(f"{metric.id} returns one value per target; use 'map' or 'table'")
+            if selected:
+                raise ValueError("targets apply only to series metrics")
         config = MetricScriptPanelConfig(
             script_id=metric.script_id,
             script_revision=metric.revision,
@@ -270,9 +302,15 @@ class Dashboard:
             period=_period(period),
             params=dict(params or {}),
             view=view,  # type: ignore[arg-type]
+            targets=selected or None,
             direction=direction,  # type: ignore[arg-type]
             hops=list(hops) if hops is not None else metric.hops,
         )
+        payload = config.model_dump(mode="json")
+        if not selected:
+            # Servers before series metrics forbid unknown config keys, so a scalar panel
+            # sends no ``targets`` key at all.
+            payload.pop("targets", None)
         return self._add(
             DashboardPanelModel(
                 panel_id=panel_id if panel_id is not None else self._panel_id(metric.id),
@@ -281,7 +319,7 @@ class Dashboard:
                 layout=_layout(layout)
                 if layout is not None
                 else self._next_layout("metric_script"),
-                config=config.model_dump(mode="json"),
+                config=payload,
             )
         )
 

@@ -56,11 +56,15 @@ function configuredLabel(metric: ConfiguredMetric): string {
   return metric.unit ? `${metric.title} (${metric.unit})` : metric.title;
 }
 
-/** "Median ZX90 gate fidelity (%) · per pair": the title, unit and target of a script metric. */
+/**
+ * "Median ZX90 gate fidelity (%) · per pair": the title, unit and target of a script metric,
+ * and "· time series" for a metric drawn as a chart.
+ */
 export function scriptMetricLabel(metric: MetricInfo): string {
   const unit = displayUnit(metric.unit);
   const target = metric.target === "pair" ? "per pair" : "per qubit";
-  return `${metric.title}${unit ? ` (${unit})` : ""} · ${target}`;
+  const series = metric.result === "series" ? " · time series" : "";
+  return `${metric.title}${unit ? ` (${unit})` : ""} · ${target}${series}`;
 }
 
 export interface MetricChoiceSources {

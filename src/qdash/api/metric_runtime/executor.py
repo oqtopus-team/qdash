@@ -846,18 +846,22 @@ def evaluate(
     params: dict[str, Any],
     broker: BrokerHandler,
     settings: RuntimeSettings | None = None,
+    targets: list[str] | None = None,
 ) -> WorkerOutcome:
-    """Evaluate one metric of ``source`` over the chip, reading data through ``broker``."""
-    return run_worker(
-        {
-            "mode": "evaluate",
-            "source": source,
-            "metric_id": metric_id,
-            "chip_id": chip_id,
-            "start": start,
-            "end": end,
-            "params": params,
-        },
-        broker,
-        settings,
-    )
+    """Evaluate one metric of ``source`` over the chip, reading data through ``broker``.
+
+    ``targets`` selects the qubits or directed pairs (``"0>1"``) a series metric is evaluated
+    for; scalar metrics take none and are evaluated for the whole chip.
+    """
+    request: dict[str, Any] = {
+        "mode": "evaluate",
+        "source": source,
+        "metric_id": metric_id,
+        "chip_id": chip_id,
+        "start": start,
+        "end": end,
+        "params": params,
+    }
+    if targets is not None:
+        request["targets"] = list(targets)
+    return run_worker(request, broker, settings)

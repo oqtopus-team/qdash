@@ -23,9 +23,9 @@ runner knows nothing about users, projects or data.
 
 | Module | Responsibility |
 | --- | --- |
-| `sdk.py` | The `qdash_metrics` API: `@metric`, `Parameter`, `Legend`, `CellResult`, `MissingData`, `Quantity`/`units` (pint), `QubitPair`, `Topology`, `AnalysisContext` and the `ctx.data` accessors; `load_source` compiles a script and collects its metrics |
+| `sdk.py` | The `qdash_metrics` API: `@metric`, `Parameter`, `Legend`, `CellResult`, `SeriesPoint`, `SeriesResult`, `TimeBin`/`time_bins`, `MissingData`, `Quantity`/`units` (pint), `QubitPair`, `Topology`, `AnalysisContext` and the `ctx.data` accessors; `load_source` compiles a script and collects its metrics |
 | `policy.py` | Import allowlist, disabled builtins, checked `__import__`, and `diagnostic`/`error_message` that point at the script's own line and function |
-| `worker.py` | Entry point `python -m qdash.api.metric_runtime.worker`: umask, rlimits, private protocol streams, `catalog` and `evaluate` modes, per-cell evaluation |
+| `worker.py` | Entry point `python -m qdash.api.metric_runtime.worker`: umask, rlimits, private protocol streams, `catalog` and `evaluate` modes, per-cell evaluation, series target selection and point checks |
 | `executor.py` | Sends each job to the runner over `metric.sock`, answers the relayed data requests through the broker, enforces the API-side deadline, and maps runner messages to exceptions; `METRIC_RUNNER_MODE=local` runs the worker as an API subprocess instead (development only) |
 | `broker.py` | `MetricDataBroker`: the project-scoped data source of one evaluation, and its caps |
 | `template_library.py`, `templates/*.py` | The starter scripts |
@@ -74,7 +74,68 @@ answer). `evaluate` loads the source again, resolves the parameters, builds an
 `QubitPair` at the declared `hops`. Each call runs in its own `try`: `MissingData` makes the
 cell `missing`, any other exception makes it `error` with a diagnostic, and the other cells are
 unaffected. Failures of the whole run raise a `MetricRuntimeError` subclass, mapped as in
-[Failure mapping](#failure-mapping).
+[Failure mapping](#failure-mapping). A series metric is evaluated for its selected targets
+only; see [Series results](#series-results).
+
+### Series results
+
+`@metric(result="series")` declares a series metric; `MetricInfo.result` (`scalar` by default,
+so stored revisions keep their meaning) carries the kind into the catalog, the panel validation
+and the clients. A series metric has no legend.
+
+The request names its targets as cell keys, `"5"` or `"5>6"`. The API checks them before the
+worker starts: `normalize_targets` in `metric_script_service.py` refuses a scalar metric with
+targets, a series metric without targets, more than `MAX_SERIES_TARGETS = 16`, the wrong kind and
+duplicates; for a saved revision `check_targets_on_chip` also refuses a qubit that is not on the
+chip and a pair that is not coupled at the metric's declared `hops`, naming the distance. A
+draft's catalog is unknown to the API, so `worker.select_targets` repeats the topology and hop
+check before any data is read. Either way the worker calls the metric only for the selected
+targets, so the selection bounds the broker work: at most 16 history reads for the shipped
+template, against one per directed pair of the chip for a scalar pair metric.
+
+`serialize_series` checks every `SeriesPoint` and returns it as a `MetricSeriesPoint`: a
+timestamp with a timezone inside `[start, end]`, strictly later than the previous one; `start`
+and `end` both or neither, around the timestamp and inside the period; a finite value converted
+to the declared unit, or `None`; an `int` count of at least 0, and no value on count 0; a status
+of `ok`, `no_data` or `insufficient` that agrees with the value (inferred when omitted); and a
+reason cut to 200 characters. A point that breaks a rule makes its target an `error` cell; nothing
+is sorted, resampled, interpolated or dropped. A cell whose points are all gaps is `missing` with
+the gap counts. Series cells keep their 100 most recent references and set
+`references_truncated`.
+
+| Cap | Value | Where |
+| --- | --- | --- |
+| Targets per evaluation | 16 | API before the run, runner request validation (`TARGETS_MAX`), worker |
+| Points per series | 1024 | `serialize_series`: an error cell |
+| Points over all targets | 8192 | `worker.evaluate`: the run fails with 422 |
+| Cells as protocol JSON over all targets | 6 MiB (`MAX_SERIES_RESULT_BYTES`) | `worker.evaluate`: the run fails with 422 |
+| Period length | 400 days (`MAX_SERIES_PERIOD_DAYS`) | API for a saved revision, worker for a draft: 422 before any read |
+| Bins of `time_bins` | 1024 | `ValueError` in the script |
+
+16 targets of 400 daily bins (6,416 points) fit the total. The largest allowed response, 8,192
+points with every ASCII text at its cap and 100 references per cell, serializes to about 3.6 MiB
+(`test_largest_allowed_series_response_fits_the_output_bound`), under half of the 8 MiB worker
+output bound. The protocol JSON escapes non-ASCII text, so a CJK character costs 6 bytes and an
+emoji 12: 8,192 points with a 200-character CJK reason would pass 8 MiB. `worker.encoded_size`
+therefore measures every series cell whole (points, label, assessment, references, messages)
+exactly as `Channel.send` writes it, and the run fails with a message naming the target where
+the total passed `MAX_SERIES_RESULT_BYTES`, leaving 2 MiB for the log, metadata and data
+requests. Nothing is cut to fit (`test_non_ascii_series_text_is_held_to_the_result_byte_budget`).
+Results are computed on every evaluation and never stored; a panel stores only its script
+revision and settings.
+
+A series period longer than `MAX_SERIES_PERIOD_DAYS = 400`, the broker's `MAX_HISTORY_DAYS`, is
+refused rather than evaluated, because the broker would clamp each `history()` read to the most
+recent 400 days and the older bins would chart as `no_data` gaps. `_evaluate` in
+`metric_script_service.py` checks a saved revision's series metric before loading the topology;
+a draft's result kind is known only to the worker, so `worker.check_series_period` refuses it
+before the topology or any history is read. Scalar metrics keep longer absolute periods and the
+clamp notice. The UI's `periodError(period, { series: true })` shows the same limit at the
+period fields.
+
+`time_bins` anchors days at 00:00 UTC and weeks at Monday 00:00 UTC, clips the first and last
+bins to the period (`partial`), and makes each bin half-open except the last, which includes the
+period end, so every instant falls in exactly one bin.
 
 ### Source formatting
 
@@ -111,7 +172,9 @@ JSON, one object per line. `protocol.ts` is the reference; `executor.py` is the 
 
 1. **Request** (API → runner, first line): `{"v": 2, "mode": "catalog" | "evaluate", "source",
    "timeout_seconds", "memory_mb"}`, plus `metric_id`, `chip_id`, `start`, `end` and `params`
-   for `evaluate`. The runner refuses unknown fields, a wrong `v`, an unknown mode, wrong types,
+   for `evaluate`, and `targets` (at most 16 strings of at most 32 characters) for a series
+   evaluation. A runner older than `targets` refuses such a request as `invalid_request`, so
+   deploy the API and the runner together; scalar requests do not send the field. The runner refuses unknown fields, a wrong `v`, an unknown mode, wrong types,
    a line over 1 MiB (`REQUEST_MAX_BYTES`) or a source over 256 KiB (`SOURCE_MAX_BYTES`, the
    API's `MAX_SOURCE_BYTES`) with `{"type": "error", "code": "invalid_request"}` and closes.
    A connection that sends no request within 10 s is refused the same way. The runner clamps
@@ -165,7 +228,8 @@ The runner (or the executor in local mode) and the worker exchange line-delimite
 over the worker's stdin and stdout, documented in the `worker.py` module docstring:
 
 1. The parent writes one request line: `mode`, `source`, `memory_mb`, `timeout_seconds`, and
-   for `evaluate` the `metric_id`, `chip_id`, `start`, `end` and `params`.
+   for `evaluate` the `metric_id`, `chip_id`, `start`, `end`, `params` and, for a series
+   metric, `targets`.
 2. The worker sends `CALL {"op": ..., "args": ...}` lines for data and blocks until the parent
    answers with one `{"ok": true, "data": ...}` or `{"ok": false, "error": ...}` line.
 3. The worker ends with one `RESULT {...}` line carrying the result or the error, its
@@ -263,7 +327,7 @@ What is not enforced:
 | Runner `queue_full`, or no local slot within 5 s | `QueueFullError` | 429 |
 | Socket missing or refusing, no `accepted` within 30 s, connection closed without `result` or `failed` (before or after acceptance), or `failed`/`runner_error` | `RunnerUnavailableError` | 503 |
 | `failed`/`timeout`, the API deadline, `output_limit`, `crash` or `protocol`; `invalid_request`; a malformed runner line | `WorkerFailure` | 422 |
-| The script does not load, unknown metric or parameter, invalid legend | `ScriptFailure` | 422 |
+| The script does not load, unknown metric or parameter, invalid legend, invalid series targets, more than 8192 series points | `ScriptFailure` | 422 |
 
 A 503 means the runner produced no result. `validate_source` re-raises it (and 429) instead of reporting a failed
 validation, so a save never records a revision as invalid because the runner was down or busy.
@@ -426,8 +490,11 @@ differences:
   settings.
 - `tests/qdash/api/metric_runtime/test_collision_template.py`: the collision template against
   the reference numbers.
-- `tests/qdash/api/routers/test_metric_script.py`: the routes, including the ZX90 median
-  end to end through the worker, and 503 on validate, save (no revision) and evaluate when the
+- `tests/qdash/api/metric_runtime/test_series.py`: UTC day and week bins, point checks, target
+  selection, the `zx90_daily_trend` template daily and weekly through the real worker, wrong
+  return kinds, and the response size at the caps.
+- `tests/qdash/api/routers/test_metric_script.py`: the routes, including the ZX90 median and
+  the daily and weekly ZX90 trend end to end through the worker, target errors, and 503 on validate, save (no revision) and evaluate when the
   runner is unavailable.
 - `agent-runtime/test/metric-protocol.test.mjs`: request validation and clamping, answers,
   worker messages, the line splitter, options from the environment, and the memory budget with

@@ -58,6 +58,15 @@ TEMPLATES: dict[str, MetricScriptTemplate] = {
             ),
             filename="zx90_median.py",
         ),
+        MetricScriptTemplate(
+            template_id="zx90_daily_trend",
+            name="ZX90 fidelity trend",
+            description=(
+                "Daily or weekly (UTC) median ZX90 gate fidelity of selected directed "
+                "couplings over the period, with counts per point and gaps for empty bins"
+            ),
+            filename="zx90_daily_trend.py",
+        ),
     )
 }
 """Templates in display order."""

@@ -1,6 +1,6 @@
 # Metric script templates
 
-QDash ships three starter scripts. Read one with `qdash_query` `metric_script_template`
+QDash ships four starter scripts. Read one with `qdash_query` `metric_script_template`
 (`templateId`); a new script created from a template is a copy, so later template changes do
 not affect it.
 
@@ -43,6 +43,35 @@ coupling": preview `zx90_median` with `period {"kind": "relative", "days": 14}` 
 chip, report how many couplings have a value and how many are missing for lack of samples,
 then save the script and add a `metric_script` panel (`view: "map"` or `"table"`,
 `direction: "both"`, `hops: [1]`) pinned to the saved active revision.
+
+## `zx90_daily_trend`
+
+One series pair metric, `zx90_daily_trend` ("ZX90 gate fidelity trend", unit `%`, `hops=(1,)`,
+`result="series"`), for "daily or weekly median ZX90 over a period" requests:
+
+- Reads `ctx.data["zx90_gate_fidelity"][pair].history()` once per selected directed pair over
+  the period; excluded results are skipped and there is no reverse-direction fallback.
+- Splits the period with `time_bins(ctx.start, ctx.end, interval)`: UTC days, or ISO weeks
+  starting Monday 00:00 UTC. The first and last bins are clipped to the period and their
+  reason says `partial bin`.
+- Each point is the median of the bin's raw observations in percent (a fidelity stored as
+  0.99 `a.u.` is 99 %), with `count`, `start` and `end`. A bin without observations is a
+  `no_data` gap; one with fewer than `min_samples` valid observations is an `insufficient` gap,
+  including a bin whose observations all fall outside the valid range (reason such as
+  `0 of 2 observations valid; 2 outside 0-100 % left out`). Nothing is interpolated.
+- Observations outside `[min_valid, max_valid]` % (default 0 to 100, the physical range of a
+  fidelity) are left out of the median and counted in the point's reason and in the
+  `outside valid range` check; stored results are not changed. A record stored with unit
+  `%` and value 99 is read as catalog value x scale, 9,900 %, by the `history()` unit rules,
+  so it is left out and counted rather than silently included.
+- Parameters: `interval` (`day` or `week`, default `day`), `min_samples` (integer, default
+  1), `min_valid` and `max_valid` (percent).
+
+Walkthrough of "ZX90 daily median trend of 0>1 and 1>0 over the last 4 weeks": preview with
+`targets ["0>1", "1>0"]` and `period {"kind": "relative", "days": 28}`, report the points,
+gaps and `n=1` points per pair, then propose a `metric_script` panel with `view:
+"timeseries"`, the same `targets`, `params {"interval": "day"}` (or `"week"`) and `hops: [1]`,
+pinned to the script's active revision. Do not select every coupling of the chip.
 
 ## `collision`
 

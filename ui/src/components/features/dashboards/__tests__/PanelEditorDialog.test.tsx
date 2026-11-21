@@ -31,6 +31,19 @@ const COLLISION: MetricInfo = {
   has_legend: true,
 };
 
+const TREND: MetricInfo = {
+  id: "zx90_daily_trend",
+  title: "ZX90 gate fidelity trend",
+  unit: "%",
+  target: "pair",
+  result: "series",
+  hops: [1],
+  parameters: {
+    interval: { default: "day", kind: "choice", choices: ["day", "week"], label: "Time bin (UTC)" },
+  },
+  has_legend: false,
+};
+
 function summary(overrides: Partial<MetricScriptSummary>): MetricScriptSummary {
   return {
     script_id: "ms_zx90",
@@ -63,6 +76,13 @@ const SCRIPTS = [
     metrics: [COLLISION],
   }),
   summary({ script_id: "ms_broken", name: "Broken", status: "invalid", active_revision: null }),
+  summary({
+    script_id: "ms_trend",
+    name: "ZX90 trend",
+    revision: 1,
+    active_revision: 1,
+    metrics: [TREND],
+  }),
 ];
 
 vi.mock("@/client/metric-script/metric-script", () => ({
@@ -151,6 +171,7 @@ describe("PanelEditorDialog", () => {
       "Coupling metrics",
       "ZX90 median",
       "Collisions (private)",
+      "ZX90 trend",
     ]);
     expect(screen.queryByRole("group", { name: "Broken" })).not.toBeInTheDocument();
     expect(
@@ -190,6 +211,7 @@ describe("PanelEditorDialog", () => {
         period: { kind: "relative", days: 14 },
         params: { min_samples: 5 },
         view: "table",
+        targets: [],
         direction: "forward",
         hops: [1],
       },
@@ -256,11 +278,63 @@ describe("PanelEditorDialog", () => {
         period: { kind: "relative", days: 7 },
         params: { strict: true },
         view: "map",
+        targets: [],
         direction: "both",
         hops: [1],
       },
       script_name: "Collisions",
       latest_revision: 5,
+    });
+  });
+
+  it("charts a series metric for typed targets only, with no map or table offered", () => {
+    const onSave = renderEditor();
+    expect(
+      screen.getByRole("option", { name: "ZX90 gate fidelity trend (%) · per pair · time series" }),
+    ).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Show"), {
+      target: {
+        value: choiceValue({
+          kind: "metric_script",
+          script_id: "ms_trend",
+          metric_id: "zx90_daily_trend",
+        }),
+      },
+    });
+
+    const view = screen.getByLabelText("View");
+    expect(view).toHaveValue("timeseries");
+    expect(view).toBeDisabled();
+    expect(within(view).queryByRole("option", { name: "Map" })).not.toBeInTheDocument();
+    // Map-only settings are hidden; nothing defaults to every pair of the chip.
+    expect(screen.queryByLabelText("Direction")).not.toBeInTheDocument();
+    expect(screen.getByText("Select 1 to 16 directed pairs")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add panel" })).toBeDisabled();
+
+    const targets = screen.getByLabelText("Directed pairs");
+    fireEvent.change(targets, { target: { value: "0>1, 5" } });
+    expect(screen.getAllByText("“5” is not a directed pair such as 0>1").length).toBeGreaterThan(0);
+    fireEvent.change(targets, { target: { value: "Q00-Q01, 1>0" } });
+
+    // A fixed range over 400 days would chart the clamped-away bins as gaps: refused here.
+    fireEvent.change(screen.getByLabelText("Period"), { target: { value: "absolute" } });
+    fireEvent.change(screen.getByLabelText("Start"), { target: { value: "2025-01-01T00:00" } });
+    fireEvent.change(screen.getByLabelText("End"), { target: { value: "2026-11-01T00:00" } });
+    // Shown at the field and as the reason the footer action is disabled.
+    expect(screen.getAllByText(/A time series covers at most 400 days/)).toHaveLength(2);
+    expect(screen.getByLabelText("Start")).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByRole("button", { name: "Add panel" })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText("Start"), { target: { value: "2026-10-01T00:00" } });
+    expect(screen.queryByText(/A time series covers at most 400 days/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Add panel" }));
+
+    expect(onSave.mock.calls[0][0].config).toMatchObject({
+      script_id: "ms_trend",
+      metric_id: "zx90_daily_trend",
+      script_revision: 1,
+      view: "timeseries",
+      targets: ["0>1", "1>0"],
+      period: { kind: "absolute" },
     });
   });
 

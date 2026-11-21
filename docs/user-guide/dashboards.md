@@ -83,7 +83,10 @@ applies. A metric panel shows one metric on the chip topology or in a table:
    most recent number of days, measured when the panel loads; **Fixed range** shows the same
    start and end every time. For a metric computed per pair, choose the **Direction** to draw
    and the **Pair distance**: **1 hop** for neighbouring qubits, **2 hops** for qubits two
-   steps apart, among the distances the metric supports.
+   steps apart, among the distances the metric supports. A metric that returns a trend over
+   time, marked **time series**, is always a **Chart**: type up to 16 **Qubits** or **Directed
+   pairs** to draw instead, such as `0>1, 1>0`. Only those are evaluated; see
+   [Chart a Trend Over Time](./metric-scripts.md#chart-a-trend-over-time).
 5. Open **Advanced** to adjust the metric's **Parameters**, if it has any, and to see which
    script and revision the panel uses. Only parameter values that differ from the default are
    kept. The section opens by itself when the panel already has parameter values.

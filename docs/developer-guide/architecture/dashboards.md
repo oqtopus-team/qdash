@@ -48,7 +48,7 @@ The shared panel models live in `src/qdash/datamodel/dashboard.py`:
 | `PanelLayoutModel` | `x`, `y`, `w`, `h` on a 12-column grid; `x + w <= 12`, `1 <= h <= 12` |
 | `DashboardPanelModel` | `panel_id` (unique within the dashboard), `type`, `title`, `layout`, `config` |
 | `QubitMetricPanelConfig`, `CouplingMetricPanelConfig` | `metric` key from the metrics configuration |
-| `MetricScriptPanelConfig` | `script_id`, `metric_id`, `script_revision` (required), `period`, `params`, `view` (`map` or `table`), `direction` (`both`, `forward`, `reverse`), `hops` (subset of `[1, 2]`); extra keys are rejected |
+| `MetricScriptPanelConfig` | `script_id`, `metric_id`, `script_revision` (required), `period`, `params`, `view` (`map`, `table` or `timeseries`), `targets` (series metrics: up to 16 cell keys such as `5` or `5>6`, normalized on save), `direction` (`both`, `forward`, `reverse`), `hops` (subset of `[1, 2]`); extra keys are rejected |
 | `MarkdownPanelConfig` | `content`, at most 20000 characters |
 
 `config` is stored as a dictionary so the UI can keep display-only settings on the metric
@@ -59,6 +59,10 @@ panel's `type` on every create and update, and when the visibility of a dashboar
 project-visible dashboard uses only project-visible scripts, that the pinned revision exists and
 validated, that `metric_id` is in that revision's catalog, that `params` pass `check_params`
 (the metric's `Parameter` declarations), and that `hops` stay within the metric's declared hops.
+`_check_view` matches the view to the metric's `result`: a series metric needs `timeseries` and
+1 to 16 targets of its kind, and a scalar metric needs `map` or `table` and no targets, so a
+series is never reduced to one value per target. Whether the targets are on the chip is checked
+when the panel is evaluated, because a dashboard's chip can change.
 Violations return 422 naming the panel.
 
 ## Revision policy
@@ -205,7 +209,12 @@ Script code lives in `ui/src/components/features/metric-scripts/`:
 `MetricScriptEditorPageContent` (Monaco editor, settings, diagnostics, preview) with
 `useMetricScriptDocument` (draft, dirty state, save with `expected_revision`, 409 handling), and
 the shared renderers under `render/` (`QubitMap`, `PairMap`, `ResultTable`, `CellDetailsDialog`,
-`MetricResultView`). `panels/MetricScriptPanel.tsx` evaluates a panel's pinned revision with
+`SeriesChart`, `MetricResultView`). `MetricResultView` shows an alert instead of a view that
+cannot show the result (`viewMismatch`). `SeriesChart` draws series results with the shared
+Plotly `Plot` and `chartTheme` series colors: `seriesTraces.ts` builds one trace per target with
+gaps as `null` and `connectgaps: false`, UTC times, and the bin and observation count in the
+tooltip; targets without values are listed under the chart with their status. `targets.ts`
+parses typed targets the way the API normalizes them. `panels/MetricScriptPanel.tsx` evaluates a panel's pinned revision with
 `POST /metric-scripts/{id}/evaluate` and renders it with `MetricResultView`. The editor registers
 its page with the Agent dock so the Agent can propose edits; see
 [Page context and editor edits](../copilot/architecture.md#page-context-and-editor-edits).

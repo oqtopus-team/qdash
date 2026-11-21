@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { MetricInfoParameters } from './metricInfoParameters';
+import type { MetricInfoResult } from './metricInfoResult';
 import type { MetricInfoTarget } from './metricInfoTarget';
 
 /**
@@ -16,6 +17,8 @@ export interface MetricInfo {
   title: string;
   unit: string;
   target: MetricInfoTarget;
+  /** scalar: one value per qubit or pair, shown as a map or table. series: a time series per selected target, shown as a chart */
+  result?: MetricInfoResult;
   hops?: number[];
   parameters?: MetricInfoParameters;
   has_legend?: boolean;

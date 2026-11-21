@@ -11,7 +11,7 @@ import { useToast } from "@/components/ui/Toast";
 import { copyText } from "@/lib/utils/clipboard";
 import { formatDateTime } from "@/lib/utils/datetime";
 
-import { cellName, displayUnit, formatNumber, STATUS_LABELS } from "../format";
+import { cellName, countLabel, displayUnit, formatNumber, STATUS_LABELS } from "../format";
 
 function formatCheckValue(value: CellCheck["value"]): string {
   if (value === null || value === undefined) return "–";
@@ -59,7 +59,7 @@ function cellReport(cell: MetricCell, metric: Pick<MetricInfo, "title" | "unit">
   }
   const references = cell.references ?? [];
   if (references.length > 0) {
-    lines.push("", "Inputs:");
+    lines.push("", cell.references_truncated ? `Inputs (${TRUNCATED_INPUTS}):` : "Inputs:");
     for (const ref of references) {
       const value =
         typeof ref.value === "number"
@@ -73,6 +73,8 @@ function cellReport(cell: MetricCell, metric: Pick<MetricInfo, "title" | "unit">
   }
   return lines.join("\n");
 }
+
+const TRUNCATED_INPUTS = "the most recent only; earlier inputs were cut";
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -202,6 +204,11 @@ export function CellDetailsDialog({ cell, metric, color, onOpenChange }: CellDet
 
             {references.length > 0 && (
               <Section title="Inputs">
+                {cell.references_truncated && (
+                  <p className="mb-1 text-xs text-base-content/60">
+                    {countLabel(references.length, "input")} shown: {TRUNCATED_INPUTS}.
+                  </p>
+                )}
                 <div className="overflow-x-auto rounded-[var(--radius-box)] border border-base-content/10">
                   <table className="table table-sm">
                     <thead>

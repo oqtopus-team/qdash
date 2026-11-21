@@ -49,7 +49,7 @@ from qdash.api.services.dashboard_templates import (
     DashboardTemplate,
     instantiate_panels,
 )
-from qdash.api.services.metric_script_service import check_params
+from qdash.api.services.metric_script_service import check_params, normalize_targets
 from qdash.datamodel.dashboard import (
     PANEL_CONFIG_MODELS,
     DashboardPanelModel,
@@ -62,6 +62,7 @@ from qdash.dbmodel.dashboard import DashboardDocument
 if TYPE_CHECKING:
     from qdash.api.lib.project import ProjectContext
     from qdash.api.services.metric_script_service import MetricScriptService
+    from qdash.datamodel.metric_script import MetricInfo
     from qdash.dbmodel.metric_script import MetricScriptDocument
     from qdash.repository.dashboard import MongoDashboardRepository
     from qdash.repository.metric_script import MongoMetricScriptRepository
@@ -221,6 +222,40 @@ class DashboardService:
                     panel,
                     f"hops {config.hops} are outside the metric's declared hops {metric.hops}",
                 )
+            self._check_view(panel, config, metric)
+
+    @staticmethod
+    def _check_view(
+        panel: DashboardPanelModel, config: MetricScriptPanelConfig, metric: MetricInfo
+    ) -> None:
+        """Refuse a view that cannot show the metric's result kind, and check its targets.
+
+        A series is never reduced to one value for a map or table, and a scalar metric has no
+        time axis to draw. Targets are checked against the chip when the panel is evaluated.
+        """
+        if metric.result == "series":
+            if config.view != "timeseries":
+                raise _invalid(
+                    panel,
+                    f"metric '{metric.id}' returns a time series; set view to 'timeseries' "
+                    "(map and table show one value per target)",
+                )
+            try:
+                keys = normalize_targets(metric, list(config.targets))
+            except ValueError as exc:
+                raise _invalid(panel, str(exc)) from exc
+            panel.config = {**panel.config, "targets": keys}
+            return
+        if config.view == "timeseries":
+            raise _invalid(
+                panel,
+                f"metric '{metric.id}' returns one value per target; use view 'map' or 'table'",
+            )
+        if config.targets:
+            raise _invalid(
+                panel,
+                f"targets apply only to series metrics; '{metric.id}' covers the whole chip",
+            )
 
     def _to_response(
         self,

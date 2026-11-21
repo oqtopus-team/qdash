@@ -8,6 +8,7 @@
 import type { MetricScriptEvaluateRequestParams } from './metricScriptEvaluateRequestParams';
 import type { MetricScriptEvaluateRequestPeriod } from './metricScriptEvaluateRequestPeriod';
 import type { MetricScriptEvaluateRequestRevision } from './metricScriptEvaluateRequestRevision';
+import type { MetricScriptEvaluateRequestTargets } from './metricScriptEvaluateRequestTargets';
 
 /**
  * Body for evaluating a saved revision on a chip.
@@ -25,6 +26,8 @@ export interface MetricScriptEvaluateRequest {
   chip_id: string;
   period?: MetricScriptEvaluateRequestPeriod;
   params?: MetricScriptEvaluateRequestParams;
+  /** Series metrics only, and required for them: 1 to 16 qubit IDs ('5') or directed pairs ('5>6'); only these are evaluated. Scalar metrics take none and cover the whole chip */
+  targets?: MetricScriptEvaluateRequestTargets;
   /** Revision to evaluate; defaults to the active one */
   revision?: MetricScriptEvaluateRequestRevision;
 }

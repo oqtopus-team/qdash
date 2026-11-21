@@ -68,13 +68,16 @@ export function MetricScriptPanel({
       config.metric_id,
       config.period,
       config.params,
+      config.targets,
     ] as const,
     queryFn: ({ signal }) => {
+      // Only a series panel selects targets; the server evaluates nothing else.
       const body = {
         metric_id: config.metric_id,
         chip_id: chipId,
         period: config.period,
         params: config.params,
+        ...(config.targets.length > 0 ? { targets: config.targets } : {}),
       };
       return starterScript
         ? evaluateMetricScriptDraft({ ...body, source: starterScript.source }, undefined, signal)

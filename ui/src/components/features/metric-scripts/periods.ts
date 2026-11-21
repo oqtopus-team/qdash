@@ -10,8 +10,12 @@ export type MetricPeriod =
 
 export const DEFAULT_PERIOD_DAYS = 14;
 const MINUTES = "yyyy-MM-dd HH:mm";
-/** The API rejects longer relative periods and clamps longer history spans. */
+/**
+ * The API rejects longer relative periods and clamps longer history spans. A series metric
+ * also refuses a longer fixed range, since the clamped-away bins would chart as gaps.
+ */
 export const MAX_PERIOD_DAYS = 400;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 export function defaultPeriod(): MetricPeriod {
   return { kind: "relative", days: DEFAULT_PERIOD_DAYS };
@@ -35,14 +39,24 @@ export function readPeriod(value: unknown): MetricPeriod {
   return { kind: "relative", days: days ?? DEFAULT_PERIOD_DAYS };
 }
 
-/** Validation message for a period, or null when the API will accept it. */
-export function periodError(period: MetricPeriod): string | null {
+/**
+ * Validation message for a period, or null when the API will accept it. With `series`, a
+ * fixed range longer than `MAX_PERIOD_DAYS` is refused as the API refuses it.
+ */
+export function periodError(
+  period: MetricPeriod,
+  { series = false }: { series?: boolean } = {},
+): string | null {
   if (period.kind === "absolute") {
     const start = Date.parse(period.start);
     const end = Date.parse(period.end);
     if (!period.start || Number.isNaN(start)) return "Enter the period start";
     if (!period.end || Number.isNaN(end)) return "Enter the period end";
     if (end <= start) return "The period must end after it starts";
+    if (series && end - start > MAX_PERIOD_DAYS * DAY_MS) {
+      const days = Math.ceil((end - start) / DAY_MS);
+      return `A time series covers at most ${MAX_PERIOD_DAYS} days; this range spans ${days}. Shorten it or split it into several panels`;
+    }
     return null;
   }
   const days = period.days;

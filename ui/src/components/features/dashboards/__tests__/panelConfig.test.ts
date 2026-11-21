@@ -27,9 +27,14 @@ describe("readMetricScriptConfig", () => {
       period: { kind: "absolute", start: "2026-11-01T00:00:00Z", end: "2026-11-15T00:00:00Z" },
       params: { min_samples: 5, mode: "strict", strict: true },
       view: "table",
+      targets: [],
       direction: "forward",
       hops: [1],
     });
+    const series = readMetricScriptConfig({
+      config: { view: "timeseries", targets: ["0>1", 5, "1>0"] },
+    });
+    expect([series.view, series.targets]).toEqual(["timeseries", ["0>1", "1>0"]]);
   });
 
   it("fills defaults for missing or malformed fields", () => {
@@ -51,6 +56,7 @@ describe("readMetricScriptConfig", () => {
       period: { kind: "relative", days: 14 },
       params: { ok: 2 },
       view: "map",
+      targets: [],
       direction: "both",
       hops: [1, 2],
     });
@@ -84,6 +90,23 @@ describe("metricScriptConfigError", () => {
         period: { kind: "absolute", start: "2026-11-02T00:00:00Z", end: "2026-11-01T00:00:00Z" },
       }),
     ).toBe("The period must end after it starts");
+    expect(metricScriptConfigError({ ...valid, view: "timeseries", targets: [] })).toBe(
+      "Select the qubits or pairs to chart",
+    );
+  });
+
+  it("caps a series panel's fixed range at 400 days and leaves scalar panels alone", () => {
+    const end = "2026-11-01T00:00:00Z";
+    const range = (start: string) => ({ kind: "absolute" as const, start, end });
+    const series = { ...valid, view: "timeseries" as const, targets: ["0>1"] };
+    expect(metricScriptConfigError({ ...series, period: range("2025-09-26T00:00:00Z") })).toBe(
+      "A time series covers at most 400 days; this range spans 401. Shorten it or split it into several panels",
+    );
+    // Exactly 400 days fits, as the API's history cap does.
+    expect(
+      metricScriptConfigError({ ...series, period: range("2025-09-27T00:00:00Z") }),
+    ).toBeNull();
+    expect(metricScriptConfigError({ ...valid, period: range("2024-01-01T00:00:00Z") })).toBeNull();
   });
 });
 
@@ -100,6 +123,7 @@ describe("writeMetricScriptConfig", () => {
       "period",
       "script_id",
       "script_revision",
+      "targets",
       "view",
     ]);
   });

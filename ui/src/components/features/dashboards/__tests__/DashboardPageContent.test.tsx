@@ -122,6 +122,9 @@ vi.mock("@/client/metric-script/metric-script", () => ({
   useGetMetricScript: () => ({ data: undefined, isLoading: false }),
 }));
 
+vi.mock("@/components/charts/Plot", () => ({
+  default: () => <div data-testid="plot" />,
+}));
 vi.mock("@/hooks/useTopologyConfig", async () => {
   const { TOPOLOGY: topology } =
     await import("@/components/features/metric-scripts/__tests__/fixtures");
@@ -381,6 +384,66 @@ describe("DashboardPageContent", () => {
     // Response annotations are not sent back.
     expect(saved).not.toHaveProperty("script_name");
     expect(saved).not.toHaveProperty("latest_revision");
+  });
+
+  it("evaluates a series panel for its selected targets only and draws a chart", async () => {
+    const { evaluateResponse, pairCell } =
+      await import("@/components/features/metric-scripts/__tests__/fixtures");
+    const base = evaluateResponse("pair", [
+      pairCell("0", "1", {
+        series: [
+          {
+            timestamp: "2026-11-12T00:00:00+00:00",
+            value: 94,
+            count: 3,
+            status: "ok",
+          },
+        ],
+      }),
+    ]);
+    mocks.evaluate.mockResolvedValue({
+      data: { ...base, metric: { ...base.metric, result: "series" } },
+    });
+    const config = {
+      script_id: "ms_trend",
+      metric_id: "zx90_daily_trend",
+      script_revision: 1,
+      period: { kind: "relative", days: 28 },
+      params: { interval: "week" },
+      view: "timeseries",
+      targets: ["0>1", "1>0"],
+      direction: "both",
+      hops: [1],
+    };
+    mocks.dashboard = dashboard({
+      panels: [
+        {
+          panel_id: "trend",
+          type: "metric_script",
+          title: "ZX90 trend",
+          layout: { x: 0, y: 0, w: 6, h: 4 },
+          config,
+          script_name: "ZX90 trend",
+          latest_revision: 1,
+        },
+      ],
+    });
+    renderPage();
+
+    expect(await screen.findByTestId("plot")).toBeInTheDocument();
+    expect(mocks.evaluate).toHaveBeenCalledWith(
+      "ms_trend",
+      {
+        metric_id: "zx90_daily_trend",
+        chip_id: "chip-1",
+        period: { kind: "relative", days: 28 },
+        params: { interval: "week" },
+        targets: ["0>1", "1>0"],
+        revision: 1,
+      },
+      undefined,
+      expect.anything(),
+    );
   });
 
   function scriptPanel(scriptId: string): DashboardPanelResponse {

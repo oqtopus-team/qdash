@@ -23,8 +23,9 @@ from qdash.api.metric_runtime.executor import (
     ScriptFailure,
     WorkerFailure,
 )
-from qdash.api.metric_runtime.sdk import Parameter, resolve_parameters
+from qdash.api.metric_runtime.sdk import Parameter, Topology, resolve_parameters
 from qdash.api.metric_runtime.template_library import TEMPLATES
+from qdash.api.metric_runtime.worker import series_period_message
 from qdash.api.schemas.metric_script import (
     MAX_NAME_LENGTH,
     MAX_REVISIONS,
@@ -47,6 +48,7 @@ from qdash.api.schemas.success import SuccessResponse
 from qdash.common.config.topology import load_topology
 from qdash.common.utils.datetime import now
 from qdash.datamodel.metric_script import (
+    MAX_SERIES_TARGETS,
     AbsolutePeriod,
     MetricCell,
     MetricInfo,
@@ -54,6 +56,7 @@ from qdash.datamodel.metric_script import (
     MetricScriptRevision,
     RelativePeriod,
     ScriptDiagnostic,
+    normalize_target_key,
     resolve_period,
 )
 from qdash.datamodel.project import ProjectRole
@@ -177,6 +180,70 @@ def check_params(metric: MetricInfo, params: dict[str, Any]) -> dict[str, Any]:
         ValueError: On unknown names or invalid values.
     """
     return resolve_parameters(metric_parameters(metric), params)
+
+
+def normalize_targets(metric: MetricInfo | None, targets: list[str] | None) -> list[str] | None:
+    """Check the form of selected targets and return their cell keys (``"5"``, ``"5>6"``).
+
+    With ``metric`` known, a series metric needs 1 to ``MAX_SERIES_TARGETS`` targets of its
+    kind and a scalar metric takes none. A draft (``metric`` is None) is checked for form,
+    count and duplicates only; the worker checks the rest before evaluating anything.
+
+    Raises:
+        ValueError: With a message for the caller.
+    """
+    if metric is not None and metric.result == "scalar":
+        if targets:
+            raise ValueError(
+                f"targets apply only to series metrics; '{metric.id}' is evaluated for every "
+                "qubit or pair of the chip"
+            )
+        return None
+    if metric is None:
+        if not targets:
+            return None
+    elif not targets:
+        kind = "qubits" if metric.target == "qubit" else "directed pairs"
+        raise ValueError(
+            f"Series metric '{metric.id}' needs targets: select 1 to {MAX_SERIES_TARGETS} {kind}"
+        )
+    if len(targets) > MAX_SERIES_TARGETS:
+        raise ValueError(
+            f"{len(targets)} targets selected; a series metric evaluates at most "
+            f"{MAX_SERIES_TARGETS}"
+        )
+    target_kind = metric.target if metric is not None else None
+    keys = [normalize_target_key(value, target_kind) for value in targets]
+    duplicates = sorted({key for key in keys if keys.count(key) > 1})
+    if duplicates:
+        raise ValueError(f"Targets selected twice: {', '.join(duplicates)}")
+    return keys
+
+
+def check_targets_on_chip(metric: MetricInfo, keys: list[str], topology: dict[str, Any]) -> None:
+    """Check that every selected qubit is on the chip and every pair is coupled at its hops.
+
+    Raises:
+        ValueError: Naming the first target that is not on the chip or outside the hops.
+    """
+    chip = Topology(topology)
+    if metric.target == "qubit":
+        qubits = set(chip.qubits)
+        for key in keys:
+            if key not in qubits:
+                raise ValueError(f"Qubit {key} is not on this chip")
+        return
+    declared = {f"{p.source}>{p.target}" for p in chip.pairs(metric.hops)}
+    distance = {f"{p.source}>{p.target}": p.hops for p in chip.pairs((1, 2))}
+    for key in keys:
+        if key in declared:
+            continue
+        if key in distance:
+            raise ValueError(
+                f"Pair {key} is {distance[key]} hops apart; metric '{metric.id}' declares "
+                f"hops {metric.hops}"
+            )
+        raise ValueError(f"Pair {key} is not within 2 hops on this chip")
 
 
 class MetricScriptService:
@@ -595,9 +662,25 @@ class MetricScriptService:
         params: dict[str, Any],
         script_id: str | None,
         revision: int | None,
+        metric: MetricInfo | None,
+        targets: list[str] | None,
     ) -> MetricScriptEvaluateResponse:
+        try:
+            keys = normalize_targets(metric, targets)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
         start, end = resolve_period(period, now())
+        # A draft's result kind is unknown here; the worker refuses its period before reads.
+        if metric is not None and metric.result == "series":
+            too_long = series_period_message(start, end)
+            if too_long is not None:
+                raise HTTPException(status_code=422, detail=too_long)
         topology = self._topology(ctx.project_id, chip_id)
+        if metric is not None and keys is not None:
+            try:
+                check_targets_on_chip(metric, keys, topology)
+            except ValueError as exc:
+                raise HTTPException(status_code=422, detail=str(exc)) from exc
         broker = MetricDataBroker(
             project_id=ctx.project_id,
             username=ctx.user.username,
@@ -617,6 +700,7 @@ class MetricScriptService:
                 end=end.isoformat(),
                 params=params,
                 broker=broker,
+                targets=keys,
             )
         except MetricRuntimeError as exc:
             _raise_runtime(exc)
@@ -652,6 +736,8 @@ class MetricScriptService:
             params=dict(body.params),
             script_id=None,
             revision=None,
+            metric=None,
+            targets=body.targets,
         )
 
     def evaluate_saved(
@@ -693,4 +779,6 @@ class MetricScriptService:
             params=params,
             script_id=doc.script_id,
             revision=number,
+            metric=metric,
+            targets=body.targets,
         )

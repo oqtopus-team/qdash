@@ -53,7 +53,10 @@ workflow handle sends no request. A timeout throws `QDashTimeoutError` and leave
 `Script.fromFile(path, { visibility })` reads text, a save binds a `SavedScript` to the revision
 it produced, `metric(id)` throws `MetricScriptError` for an invalid revision or unknown metric,
 and `qdash.dashboards.update(target, board)` sends `expected_version`. Panels and their
-`MetricScriptPanelConfig` are the generated types in their snake_case JSON form.
+`MetricScriptPanelConfig` are the generated types in their snake_case JSON form. A series metric
+(`ScriptMetric.result === "series"`) gets a `timeseries` panel and needs `targets`, as in Python:
+`board.addMetric(trend, { period: 28, targets: ["0>1", "1>0"] })`. A scalar panel's config
+omits `targets`, as in Python.
 
 ```ts
 import { Dashboard, QDash, Script } from "@oqtopus-team/qdash-sdk";

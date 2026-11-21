@@ -388,6 +388,62 @@ def test_metric_script_panel_is_pinned_and_annotated(test_client, init_db, runti
     assert "invalid" in invalid.json()["detail"]
 
 
+def test_series_and_scalar_panels_need_compatible_views(test_client, init_db, runtime):
+    owner = _create_project_owner()
+    scalar_id = _script(test_client, owner)["script_id"]
+    series_id = _script(test_client, owner, name="Trend", template_id="zx90_daily_trend")[
+        "script_id"
+    ]
+
+    def trend_panel(**config: Any) -> dict[str, Any]:
+        settings: dict[str, Any] = {
+            "metric_id": "zx90_daily_trend",
+            "params": {"interval": "week"},
+            "view": "timeseries",
+            "targets": ["Q00-Q01", "1>0"],
+            **config,
+        }
+        return _script_panel(series_id, **settings)
+
+    created = _create(test_client, owner, name="Trend", panels=[trend_panel()])
+    stored = created["panels"][0]["config"]
+    # Targets are stored as cell keys; the panel stores settings, never results.
+    assert stored["targets"] == ["0>1", "1>0"]
+    assert stored["view"] == "timeseries"
+    assert set(stored) == {
+        "script_id",
+        "script_revision",
+        "metric_id",
+        "period",
+        "params",
+        "view",
+        "targets",
+        "direction",
+        "hops",
+    }
+
+    def rejected(panel: dict[str, Any]) -> str:
+        response = test_client.post(
+            "/dashboards", json={"name": "Bad", "panels": [panel]}, headers=owner
+        )
+        assert response.status_code == 422, response.text
+        detail: str = response.json()["detail"]
+        return detail
+
+    assert "set view to 'timeseries'" in rejected(trend_panel(view="map"))
+    assert "returns a time series" in rejected(trend_panel(view="table"))
+    assert "needs targets" in rejected(trend_panel(targets=[]))
+    assert "is a qubit" in rejected(trend_panel(targets=["0"]))
+    assert "repeat" in rejected(trend_panel(targets=["0>1", "0-1"]))
+    assert "targets" in rejected(trend_panel(targets=[f"{i}>{i + 1}" for i in range(17)]))
+    assert "use view 'map' or 'table'" in rejected(_script_panel(scalar_id, view="timeseries"))
+    assert "only to series" in rejected(_script_panel(scalar_id, targets=["0>1"]))
+    # Stored scalar panels without the new fields keep their meaning.
+    scalar = _create(test_client, owner, name="Map", panels=[_script_panel(scalar_id)])
+    assert scalar["panels"][0]["config"]["targets"] == []
+    assert scalar["panels"][0]["config"]["view"] == "table"
+
+
 def test_metric_script_panel_validation(test_client, init_db, runtime):
     owner = _create_project_owner()
     editor = _create_project_member(username="dash_editor")

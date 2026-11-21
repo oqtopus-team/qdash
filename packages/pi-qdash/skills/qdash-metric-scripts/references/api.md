@@ -1,8 +1,9 @@
 # The `qdash_metrics` API
 
 Metric scripts import from `qdash_metrics` only. The module exports `metric`, `CellResult`,
-`Legend`, `Parameter`, `MissingData`, `Measurement`, `Quantity`, `QubitPair`, `units` and
-`unit_name`.
+`Legend`, `Parameter`, `MissingData`, `Measurement`, `Quantity`, `QubitPair`, `SeriesPoint`,
+`SeriesResult`, `TimeBin`, `time_bins`, `units` and `unit_name`. Nothing else is importable:
+there is no `MetricContext`, `TimeBinSet` or options class.
 
 ## `@metric`
 
@@ -14,7 +15,7 @@ def coherence_ratio(target, ctx):
     return ctx.data["t2_echo"][target].latest() / ctx.data["t1"][target].latest()
 ```
 
-`@metric(title, unit, target="qubit", hops=(1, 2), parameters=None, legend=None)`
+`@metric(title, unit, target="qubit", hops=(1, 2), parameters=None, legend=None, result="scalar")`
 
 | Argument | Meaning |
 | --- | --- |
@@ -23,7 +24,8 @@ def coherence_ratio(target, ctx):
 | `target` | `"qubit"` (default) or `"pair"`. |
 | `hops` | Pair metrics only: the pair distances the metric is meaningful for, a non-empty subset of `(1, 2)`. `hops=(1,)` evaluates coupled pairs only. |
 | `parameters` | `{name: Parameter(...)}`; read the effective values from `ctx.params`. |
-| `legend` | A `Legend`, or a function `legend(ctx) -> Legend` (for legends that depend on parameters). |
+| `legend` | A `Legend`, or a function `legend(ctx) -> Legend` (for legends that depend on parameters). Scalar metrics only. |
+| `result` | `"scalar"` (default): one value per target, shown as a map or table. `"series"`: a time series per selected target, shown as a chart; see [Series metrics](#series-metrics). |
 
 The function name is the metric's ID (`metric_id` in previews and panels). Renaming the
 function makes it a different metric; panels that used the old name stop validating. Helper
@@ -35,7 +37,10 @@ The function is called as `function(target, ctx)` once per target:
   chip topology.
 - Pair metrics: `target` is a `QubitPair(source, target, hops)`, once for **each direction** of
   every pair whose coupling-graph distance is in `hops`, over the whole chip. `0>1` and `1>0`
-  are separate cells.
+  are separate cells. `QubitPair` has no string form; use `pair.source`, `pair.target`, or
+  index `ctx.data` with the pair itself.
+- Series metrics are called only for the targets the panel or preview selects, never for the
+  whole chip.
 
 ## Return values
 
@@ -55,6 +60,75 @@ Booleans, NaN and infinity are errors. `assessment` keys, all optional:
 - `checks`: a list of `(label, value)` rows; values are numbers, strings or `None`.
 - `estimates`: a list of strings (assumptions, fallbacks used).
 - `count`: the number of observations behind the value. Set it for every aggregate.
+
+## Series metrics
+
+A `result="series"` metric returns `SeriesResult(points, label=None, assessment=None)` (or
+`None` for `empty`) for each selected target. A panel or preview must select 1 to 16 targets:
+qubit IDs (`"5"`) for a qubit metric or directed pairs (`"5>6"`, also written `"5-6"`) for a
+pair metric. Each selected pair must be coupled at one of the metric's `hops`; otherwise the
+evaluation fails with HTTP 422 before the script runs. Scalar metrics take no targets.
+
+`SeriesPoint(timestamp, value=None, count=None, status=None, reason=None, start=None, end=None)`:
+
+| Field | Rule |
+| --- | --- |
+| `timestamp` | Where the point is drawn: ISO 8601 string or datetime **with a timezone**, inside `[ctx.start, ctx.end]`. |
+| `value` | A number in the declared unit, a Quantity (converted), or `None` for a gap. NaN, infinity and booleans are errors. |
+| `count` | Observations behind the value: an int of at least 0, or `None`. A value cannot rest on `count=0`. |
+| `status` | `"ok"` (has a value), `"no_data"` or `"insufficient"` (no value). Omitted: `ok` with a value, `no_data` with no value and no observations, `insufficient` with no value but observations. |
+| `reason` | Short text shown with the point (up to 200 characters kept), such as why it is a gap. |
+| `start`, `end` | The bin the point summarizes, both or neither, with `start <= timestamp <= end`, inside the period. |
+
+Timestamps must be strictly increasing. The worker never sorts, resamples, interpolates,
+clips or drops points: a series that breaks a rule makes that target an `error` cell naming
+the point. A series whose points are all gaps is `missing` with a message counting them.
+Caps: 1,024 points per series and 8,192 points over all selected targets (16 targets of 400
+daily bins fit), and 6 MiB for all series cells as JSON, where a non-ASCII character costs 6 to
+12 bytes; exceeding either total fails the whole evaluation (HTTP 422) rather than cutting
+points or text. Keep reasons short, especially non-ASCII ones. A series cell keeps
+its 100 most recent input references and sets `references_truncated` when it had more.
+
+`time_bins(start, end, every="day" | "week")` returns `TimeBin` objects that tile the period
+in UTC: days start at 00:00 UTC, weeks on Monday 00:00 UTC. The first and last bins are
+clipped to the period (`partial` is true); `start` is inclusive and `end` exclusive, except
+the last bin, which includes the period end. `bin.contains(moment)` and
+`bin.select(measurements)` pick the observations of a bin. More than 1,024 bins is a
+`ValueError`.
+
+```python
+import statistics
+
+from qdash_metrics import Parameter, SeriesPoint, SeriesResult, metric, time_bins
+
+
+@metric(
+    title="T1 trend",
+    unit="us",
+    result="series",
+    parameters={"interval": Parameter(default="day", choices=["day", "week"])},
+)
+def t1_trend(qubit, ctx):
+    history = ctx.data["t1"][qubit].history()
+    points = []
+    for time_bin in time_bins(ctx.start, ctx.end, ctx.params["interval"]):
+        values = [m.value.to("us").magnitude for m in time_bin.select(history)]
+        points.append(
+            SeriesPoint(
+                time_bin.start,
+                statistics.median(values) if values else None,
+                count=len(values),
+                start=time_bin.start,
+                end=time_bin.end,
+            )
+        )
+    return SeriesResult(points, label="median")
+```
+
+The chart draws one line per target in categorical colors, with the target and unit in the
+legend and the bin, value and `n` in each tooltip; `n = 1` is labelled as one observation.
+Gaps are not drawn and the line is not joined across them. Results are computed on every
+view; a dashboard stores only the script revision and the panel settings.
 
 ## The context `ctx`
 
@@ -133,7 +207,8 @@ A panel or preview gives the period; scripts do not choose it.
 - `{"kind": "relative", "days": N}` (1 to 400, default 14) resolves to `[now - N days, now]`
   when the metric is evaluated, so a saved panel always shows the latest N days.
 - `{"kind": "absolute", "start": ..., "end": ...}`: both ISO 8601 with a timezone, start on
-  or before end.
+  or before end. For a series metric it spans at most 400 days; a longer one is refused with
+  HTTP 422 before the script runs.
 
 `history()` with explicit bounds may read outside the panel period, but the broker clamps
 any span longer than 400 days to the most recent 400 days of the request (the response's
@@ -182,7 +257,9 @@ fail the evaluation (HTTP 422) and fail a dashboard save. Each panel stores its 
   cap. The other cells are valid.
 - **Whole-run failure** (HTTP 422, `detail = {message, diagnostics, log}`): the script does
   not compile or violates the import policy, the metric ID or a parameter is invalid, the
-  legend is invalid, or the worker hit the timeout, memory or output limit.
+  legend is invalid, a series metric has no, too many or invalid targets (or a scalar metric
+  has targets), the series points exceed 8,192 in total, or the worker hit the timeout, memory
+  or output limit.
 - **HTTP 429**: the evaluation queue is full (all worker slots busy for 5 s, or too many runs
   waiting). Retry later.
 - **HTTP 503**: the metric script runner is unavailable or stopped mid-run; there is no result

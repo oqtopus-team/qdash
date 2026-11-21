@@ -40,6 +40,8 @@ export type PeriodInput = number | RelativePeriod | AbsolutePeriod;
 
 // Pair distances the API knows; a metric's declared hops are limited to these.
 const KNOWN_HOPS = [1, 2];
+/** Most targets a series panel may select; the server enforces the same limit. */
+export const MAX_SERIES_TARGETS = 16;
 // Default panel sizes on the 12-column grid, as the dashboard editor uses them.
 const PANEL_SIZES: Record<string, { w: number; h: number }> = {
   metric_script: { w: 6, h: 4 },
@@ -144,6 +146,11 @@ export class ScriptMetric {
     const declared = (this.info.hops ?? KNOWN_HOPS).filter((hop) => KNOWN_HOPS.includes(hop));
     return declared.length > 0 ? declared : [...KNOWN_HOPS];
   }
+
+  /** `scalar` (one value per target, a map or table) or `series` (a chart). */
+  get result(): "scalar" | "series" {
+    return this.info.result === "series" ? "series" : "scalar";
+  }
 }
 
 export interface PanelOptions {
@@ -159,7 +166,13 @@ export interface MetricPanelOptions extends PanelOptions {
   period?: PeriodInput;
   /** Overrides of the metric's parameter defaults. */
   params?: Record<string, ParamValue>;
-  view?: "map" | "table";
+  /** `map` (default) or `table` for scalar metrics; `timeseries` (default) for series metrics. */
+  view?: "map" | "table" | "timeseries";
+  /**
+   * Series metrics only, and required for them: 1 to 16 qubit IDs (`"5"`) or
+   * directed pairs (`"5>6"`), the only targets the server evaluates.
+   */
+  targets?: string[];
   direction?: "both" | "forward" | "reverse";
   /** Pair distances shown; defaults to the ones the metric declares. */
   hops?: number[];
@@ -246,10 +259,26 @@ export class Dashboard {
   /**
    * Add a `metric_script` panel pinned to `metric`'s script revision. The
    * server checks the script, revision, metric, parameters and hops on save.
+   * A scalar metric is a `map` or `table` of the whole chip; a series metric is
+   * a `timeseries` chart of `targets`. A view that does not fit the metric's
+   * result, or missing, extra or too many targets, throws.
    */
   addMetric(metric: ScriptMetric, options: MetricPanelOptions = {}): DashboardPanelModel {
     if (!(metric instanceof ScriptMetric)) {
       throw new TypeError("metric must be a ScriptMetric from SavedScript.metric(...)");
+    }
+    const targets = [...(options.targets ?? [])];
+    let view = options.view;
+    if (metric.result === "series") {
+      view ??= "timeseries";
+      if (view !== "timeseries") throw new Error(`${metric.id} returns a time series; use view "timeseries"`);
+      if (targets.length < 1 || targets.length > MAX_SERIES_TARGETS) {
+        throw new Error(`${metric.id} is a series metric: pass 1 to ${MAX_SERIES_TARGETS} targets`);
+      }
+    } else {
+      view ??= "map";
+      if (view === "timeseries") throw new Error(`${metric.id} returns one value per target; use "map" or "table"`);
+      if (targets.length > 0) throw new Error("targets apply only to series metrics");
     }
     const config: MetricScriptPanelConfig = {
       script_id: metric.scriptId,
@@ -257,7 +286,9 @@ export class Dashboard {
       metric_id: metric.id,
       period: period(options.period),
       params: { ...(options.params ?? {}) },
-      view: options.view ?? "map",
+      view,
+      // Servers before series metrics forbid unknown config keys: a scalar panel sends none.
+      ...(targets.length > 0 ? { targets } : {}),
       direction: options.direction ?? "both",
       hops: options.hops ? [...options.hops] : metric.hops,
     };

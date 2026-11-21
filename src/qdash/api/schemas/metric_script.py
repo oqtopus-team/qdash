@@ -1,11 +1,12 @@
 """Schemas for metric script endpoints."""
 
 from datetime import datetime
-from typing import Any
+from typing import Annotated, Any
 
 from pydantic import BaseModel, Field
 
 from qdash.datamodel.metric_script import (
+    MAX_SERIES_TARGETS,
     MetricCell,
     MetricInfo,
     MetricLegend,
@@ -24,6 +25,12 @@ MAX_SOURCE_BYTES = 256 * 1024
 MAX_REVISIONS = 50
 
 ParamValues = dict[str, bool | int | float | str]
+TargetList = list[Annotated[str, Field(min_length=1, max_length=32)]]
+
+TARGETS_DESCRIPTION = (
+    "Series metrics only, and required for them: 1 to 16 qubit IDs ('5') or directed pairs "
+    "('5>6'); only these are evaluated. Scalar metrics take none and cover the whole chip"
+)
 
 
 class MetricScriptCreateRequest(BaseModel):
@@ -75,6 +82,9 @@ class MetricScriptDraftEvaluateRequest(BaseModel):
     chip_id: str = Field(..., min_length=1, max_length=100)
     period: MetricPeriod = Field(default_factory=default_period)
     params: ParamValues = Field(default_factory=dict)
+    targets: TargetList | None = Field(
+        default=None, max_length=MAX_SERIES_TARGETS, description=TARGETS_DESCRIPTION
+    )
 
 
 class MetricScriptEvaluateRequest(BaseModel):
@@ -84,6 +94,9 @@ class MetricScriptEvaluateRequest(BaseModel):
     chip_id: str = Field(..., min_length=1, max_length=100)
     period: MetricPeriod = Field(default_factory=default_period)
     params: ParamValues = Field(default_factory=dict)
+    targets: TargetList | None = Field(
+        default=None, max_length=MAX_SERIES_TARGETS, description=TARGETS_DESCRIPTION
+    )
     revision: StrictRevision | None = Field(
         default=None, description="Revision to evaluate; defaults to the active one"
     )

@@ -128,7 +128,12 @@ def test_templates_and_catalog_are_readable_by_viewers(test_client, users):
     templates = test_client.get("/metric-scripts/templates", headers=viewer)
     assert templates.status_code == 200, templates.text
     listed = templates.json()["templates"]
-    assert [t["template_id"] for t in listed] == ["getting_started", "collision", "zx90_median"]
+    assert [t["template_id"] for t in listed] == [
+        "getting_started",
+        "collision",
+        "zx90_median",
+        "zx90_daily_trend",
+    ]
     assert listed[2]["source"] == TEMPLATES["zx90_median"].source
 
     catalog = test_client.get("/metric-scripts/catalog", headers=viewer).json()
@@ -1019,6 +1024,172 @@ def test_zx90_median_end_to_end_with_real_worker(test_client, users, monkeypatch
     assert reverse["status"] == "missing"
     assert reverse["assessment"]["count"] == 1
     assert reverse["color"] == "#737373"
+
+
+def test_zx90_daily_and_weekly_trend_end_to_end_with_real_worker(test_client, users, monkeypatch):
+    """The trend template over stored task results: selected pairs, UTC bins, gaps, counts."""
+    monkeypatch.setenv("METRIC_RUNNER_MODE", "local")
+    _seed_chip()
+    current = now()
+    end = current.replace(hour=0, minute=0, second=0, microsecond=0)
+    start = end - timedelta(days=7)
+
+    def at(days: float, value: float, qid: str = "0-1", **extra: Any) -> None:
+        moment = start + timedelta(days=days)
+        _task_result(
+            qid=qid,
+            task_type="coupling",
+            outputs=_fidelity(value),
+            hours_ago=(current - moment).total_seconds() / 3600,
+            **extra,
+        )
+
+    at(0.1, 0.90)
+    at(0.2, 0.98)
+    at(0.3, 0.94)
+    at(2.5, 0.10, excluded=True)
+    at(5.5, 0.97)
+    at(3.5, 0.80, qid="1-0")
+    editor = users["editor"]
+    created = test_client.post(
+        "/metric-scripts",
+        json={"name": "Trend", "template_id": "zx90_daily_trend", "visibility": "project"},
+        headers=editor,
+    )
+    assert created.status_code == 201, created.text
+    script = created.json()
+    assert script["metrics"][0]["result"] == "series"
+    script_id = script["script_id"]
+    period = {"kind": "absolute", "start": start.isoformat(), "end": end.isoformat()}
+
+    def evaluate(**body: Any) -> Any:
+        return test_client.post(
+            f"/metric-scripts/{script_id}/evaluate",
+            json={"metric_id": "zx90_daily_trend", "chip_id": "chip-1", "period": period, **body},
+            headers=users["viewer"],
+        )
+
+    daily = evaluate(targets=["0>1"])
+    assert daily.status_code == 200, daily.text
+    body = daily.json()
+    assert [cell["key"] for cell in body["cells"]] == ["0>1"]
+    series = body["cells"][0]["series"]
+    assert len(series) == 7
+    assert series[0]["value"] == pytest.approx(94.0) and series[0]["count"] == 3
+    assert series[0]["start"].startswith(start.date().isoformat())
+    assert series[2] == {
+        "timestamp": series[2]["start"],
+        "start": series[2]["start"],
+        "end": series[3]["start"],
+        "value": None,
+        "count": 0,
+        "status": "no_data",
+        "reason": "no observations",
+    }
+    assert series[5]["value"] == pytest.approx(97.0) and series[5]["count"] == 1
+
+    weekly = evaluate(targets=["0>1", "1>0"], params={"interval": "week"})
+    assert weekly.status_code == 200, weekly.text
+    cells = {cell["key"]: cell for cell in weekly.json()["cells"]}
+    assert set(cells) == {"0>1", "1>0"}
+    assert sum(point["count"] for point in cells["0>1"]["series"]) == 4
+    assert sum(point["count"] for point in cells["1>0"]["series"]) == 1
+    assert all(
+        point["start"] is not None and point["end"] is not None for point in cells["0>1"]["series"]
+    )
+
+    for targets, message in (
+        (None, "needs targets"),
+        (["0>5"], "not within 2 hops"),
+        (["0"], "is a qubit"),
+        (["0>1", "0-1"], "twice"),
+    ):
+        response = evaluate(**({"targets": targets} if targets is not None else {}))
+        assert response.status_code == 422, response.text
+        assert message in str(response.json()["detail"]), response.text
+    too_many = evaluate(targets=[f"{i}>{i + 1}" for i in range(17)])
+    assert too_many.status_code == 422
+
+
+def test_series_periods_longer_than_the_history_cap_are_refused(
+    test_client, users, runtime, monkeypatch
+):
+    """A series period over 400 days is a 422, never a chart of clamped-away gaps."""
+    monkeypatch.setenv("METRIC_RUNNER_MODE", "local")
+    _seed_chip()
+    end = now().replace(microsecond=0)
+    longest = {
+        "kind": "absolute",
+        "start": (end - timedelta(days=400)).isoformat(),
+        "end": end.isoformat(),
+    }
+    too_long = {**longest, "start": (end - timedelta(days=401)).isoformat()}
+    editor = users["editor"]
+    created = test_client.post(
+        "/metric-scripts",
+        json={"name": "Trend", "template_id": "zx90_daily_trend", "visibility": "project"},
+        headers=editor,
+    )
+    assert created.status_code == 201, created.text
+    script_id = created.json()["script_id"]
+    body = {"metric_id": "zx90_daily_trend", "chip_id": "chip-1", "targets": ["0>1"]}
+
+    saved = test_client.post(
+        f"/metric-scripts/{script_id}/evaluate", json={**body, "period": too_long}, headers=editor
+    )
+    assert saved.status_code == 422, saved.text
+    assert "MAX_SERIES_PERIOD_DAYS = 400" in saved.json()["detail"]
+    # Refused before any worker evaluates.
+    assert [r for r in runtime if r.get("mode") == "evaluate"] == []
+    assert (
+        test_client.post(
+            f"/metric-scripts/{script_id}/evaluate",
+            json={**body, "period": longest},
+            headers=editor,
+        ).status_code
+        == 200
+    )
+
+    # A draft's result kind is known only to the worker, which refuses it before any read.
+    source = TEMPLATES["zx90_daily_trend"].source
+    draft = test_client.post(
+        "/metric-scripts/evaluate",
+        json={**body, "source": source, "period": too_long},
+        headers=editor,
+    )
+    assert draft.status_code == 422, draft.text
+    assert "MAX_SERIES_PERIOD_DAYS = 400" in draft.json()["detail"]["message"]
+
+    # Scalar metrics keep their contract: a long absolute period still evaluates.
+    scalar_id = _create(test_client, editor)["script_id"]
+    scalar = test_client.post(
+        f"/metric-scripts/{scalar_id}/evaluate",
+        json={"metric_id": "scaled_frequency", "chip_id": "chip-1", "period": too_long},
+        headers=editor,
+    )
+    assert scalar.status_code == 200, scalar.text
+
+
+def test_targets_are_refused_for_scalar_metrics(test_client, users, runtime):
+    _seed_chip()
+    script_id = _create(test_client, users["editor"])["script_id"]
+    response = test_client.post(
+        f"/metric-scripts/{script_id}/evaluate",
+        json={"metric_id": "scaled_frequency", "chip_id": "chip-1", "targets": ["0"]},
+        headers=users["editor"],
+    )
+    assert response.status_code == 422
+    assert "only to series" in response.json()["detail"]
+    # Without targets the scalar metric covers the whole chip, as before.
+    whole = test_client.post(
+        f"/metric-scripts/{script_id}/evaluate",
+        json={"metric_id": "scaled_frequency", "chip_id": "chip-1"},
+        headers=users["editor"],
+    )
+    assert whole.status_code == 200, whole.text
+    assert len(whole.json()["cells"]) == 16
+    assert all(cell["series"] is None for cell in whole.json()["cells"])
+    assert whole.json()["metric"]["result"] == "scalar"
 
 
 @pytest.mark.parametrize("error", [NetworkTimeout, OperationFailure, RuntimeError])

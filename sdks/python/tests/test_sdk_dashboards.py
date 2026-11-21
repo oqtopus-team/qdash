@@ -35,6 +35,15 @@ ZX90 = {
     "has_legend": True,
 }
 FREQ = {"id": "qubit_freq", "title": "Frequency", "unit": "GHz", "target": "qubit"}
+TREND = {
+    "id": "zx90_daily_trend",
+    "title": "ZX90 gate fidelity trend",
+    "unit": "%",
+    "target": "pair",
+    "result": "series",
+    "hops": [1],
+    "parameters": {"interval": {"default": "day", "kind": "choice", "choices": ["day", "week"]}},
+}
 
 
 def script_body(
@@ -149,6 +158,8 @@ def test_panels_get_readable_ids_and_the_editors_default_layout() -> None:
         "direction": "both",
         "hops": [1],
     }
+    # Wire compatible with servers before series metrics, whose config forbids extra keys.
+    assert all("targets" not in (p.config or {}) for p in (first, second, qubit))
     assert second.config is not None
     assert (second.config["view"], second.config["direction"]) == ("table", "forward")
     # A qubit metric that declares no hops keeps both, as the editor does.
@@ -159,6 +170,28 @@ def test_panels_get_readable_ids_and_the_editors_default_layout() -> None:
         board.add_markdown("x", panel_id="markdown")
     with pytest.raises(TypeError):
         board.add_metric(metric(), period=True)
+
+
+def test_series_metrics_get_a_timeseries_panel_of_selected_targets() -> None:
+    board = Dashboard("Trend")
+    trend = metric(TREND)
+    assert trend.result == "series"
+    assert metric().result == "scalar"
+    panel = board.add_metric(trend, targets=["0>1", "1>0"], params={"interval": "week"})
+    assert panel.config is not None
+    assert panel.config["view"] == "timeseries"
+    assert panel.config["targets"] == ["0>1", "1>0"]
+    assert panel.config["params"] == {"interval": "week"}
+    with pytest.raises(ValueError, match="1 to 16 targets"):
+        board.add_metric(trend)
+    with pytest.raises(ValueError, match="1 to 16 targets"):
+        board.add_metric(trend, targets=[f"{i}>{i + 1}" for i in range(17)])
+    with pytest.raises(ValueError, match="view='timeseries'"):
+        board.add_metric(trend, targets=["0>1"], view="map")
+    with pytest.raises(ValueError, match="'map' or 'table'"):
+        board.add_metric(metric(), view="timeseries")
+    with pytest.raises(ValueError, match="only to series"):
+        board.add_metric(metric(), targets=["0>1"])
 
 
 def test_saved_script_metric_is_bound_to_the_saved_revision() -> None:

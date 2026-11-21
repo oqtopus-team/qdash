@@ -85,6 +85,7 @@ def test_shared_zx90_median_dashboard(test_client, init_db, runtime, tmp_path: P
         "period": {"kind": "relative", "days": 14},
         "params": {"min_samples": 3},
         "view": "map",
+        "targets": [],
         "direction": "both",
         "hops": [1],
     }
@@ -207,3 +208,39 @@ def test_values_keep_missing_and_counts(test_client, init_db, runtime) -> None:
     counts = [cell.assessment.count for cell in result.cells if cell.assessment]
     assert counts
     assert all(count == 0 for count in counts)
+
+
+def test_series_trend_dashboard_through_the_sdk(test_client, init_db, runtime) -> None:
+    """A trend panel saves settings only, and evaluating it returns the selected series."""
+    qdash = _session(test_client, _create_project_owner())
+    _seed_chip()
+    script = qdash.scripts.create(qdash.scripts.template("zx90_daily_trend", visibility="project"))
+    trend = script.metric("zx90_daily_trend")
+    assert trend.result == "series"
+    board = Dashboard("ZX90 trend", visibility="project", chip_id="chip-1")
+    board.add_metric(trend, period=28, targets=["0>1", "1>0"], params={"interval": "week"})
+    saved = qdash.dashboards.create(board)
+    config = saved.response.panels[0].config
+    assert config is not None
+    assert (config["view"], config["targets"]) == ("timeseries", ["0>1", "1>0"])
+    assert "series" not in config and "cells" not in config
+
+    result = qdash.client.evaluate_metric_script(
+        script.script_id,
+        MetricScriptEvaluateRequest.model_validate(
+            {
+                "metric_id": trend.id,
+                "chip_id": "chip-1",
+                "period": config["period"],
+                "params": config["params"],
+                "targets": config["targets"],
+            }
+        ),
+    )
+    assert [cell.key for cell in result.cells] == ["0>1", "1>0"]
+    for cell in result.cells:
+        # No task results are stored: every weekly bin is an honest gap.
+        assert cell.status.value == "missing"
+        assert cell.series
+        assert all(point.value is None for point in cell.series)
+        assert all(point.status.value == "no_data" for point in cell.series)

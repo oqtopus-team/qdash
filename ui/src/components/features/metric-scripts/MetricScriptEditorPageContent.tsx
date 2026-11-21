@@ -52,7 +52,8 @@ import { describeMetricError } from "./errors";
 import { declaredHops } from "./hops";
 import { paramsFromInputs } from "./parameters";
 import { defaultPeriod, periodError } from "./periods";
-import { PreviewControls, type PreviewSettings } from "./PreviewControls";
+import { PreviewControls, type PreviewSettings, previewView } from "./PreviewControls";
+import { isSeriesMetric, parseTargets } from "./targets";
 import { DiagnosticLocation, MetricResultView } from "./render/MetricResultView";
 import { useChipTopologyId, useDefaultChipId } from "./useChipTopology";
 import { useMetricScriptDocument } from "./useMetricScriptDocument";
@@ -179,6 +180,7 @@ export function MetricScriptEditorPageContent({ scriptId }: { scriptId: string }
     view: "map",
     direction: "both",
     hops: [1, 2],
+    targets: "",
   }));
   const chipId = preview.chipId || defaultChipId;
   const topologyId = useChipTopologyId(chipId);
@@ -331,16 +333,29 @@ export function MetricScriptEditorPageContent({ scriptId }: { scriptId: string }
   };
 
   const { params, errors: paramErrors } = paramsFromInputs(metric, preview.paramInputs);
+  // A series metric evaluates only the typed targets; there is no whole-chip default.
+  const previewTargets = isSeriesMetric(metric)
+    ? parseTargets(preview.targets, metric?.target)
+    : null;
   const previewBlocked: string | null = !chipId
     ? "Select a chip"
     : !metric
       ? "No metric to preview"
-      : (periodError(preview.period) ??
-        (Object.keys(paramErrors).length > 0 ? "Fix the highlighted parameters" : null));
+      : (periodError(preview.period, { series: isSeriesMetric(metric) }) ??
+        (Object.keys(paramErrors).length > 0 ? "Fix the highlighted parameters" : null) ??
+        previewTargets?.error ??
+        null);
 
   const handlePreview = () => {
     if (previewBlocked || !metric) return;
-    const base = { metric_id: metric.id, chip_id: chipId, period: preview.period, params };
+    const targets = previewTargets?.keys;
+    const base = {
+      metric_id: metric.id,
+      chip_id: chipId,
+      period: preview.period,
+      params,
+      ...(targets ? { targets } : {}),
+    };
     setPane("details");
     if (canEdit) {
       draftMutation.mutate({ data: { ...base, source: code } });
@@ -627,7 +642,7 @@ export function MetricScriptEditorPageContent({ scriptId }: { scriptId: string }
             isLoading={previewMutation.isPending && !previewMutation.data}
             isFetching={previewMutation.isPending}
             topologyId={topologyId}
-            view={preview.view}
+            view={previewView(previewMutation.data?.data.metric, preview.view)}
             direction={preview.direction}
             hops={effectiveHops}
             onRetry={handlePreview}

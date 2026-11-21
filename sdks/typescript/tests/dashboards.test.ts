@@ -136,8 +136,30 @@ describe("Script and Dashboard definitions", () => {
       direction: "both",
       hops: [1],
     });
+    // Wire compatible with servers before series metrics, whose config forbids extra keys.
+    expect(board.panels.some((panel) => "targets" in (panel.config ?? {}))).toBe(false);
     expect(qubit.config?.hops).toEqual([1, 2]);
     expect(() => board.addMarkdown("x", { panelId: "markdown" })).toThrow(/already on the dashboard/);
+  });
+
+  it("give series metrics a timeseries panel of the selected targets only", () => {
+    const trend = new ScriptMetric("ms_1", 1, {
+      id: "zx90_daily_trend",
+      title: "ZX90 gate fidelity trend",
+      unit: "%",
+      target: "pair",
+      result: "series",
+      hops: [1],
+    });
+    expect([trend.result, new ScriptMetric("ms_1", 1, ZX90).result]).toEqual(["series", "scalar"]);
+    const board = new Dashboard({ name: "Trend" });
+    const panel = board.addMetric(trend, { targets: ["0>1", "1>0"], params: { interval: "week" } });
+    expect(panel.config).toMatchObject({ view: "timeseries", targets: ["0>1", "1>0"], params: { interval: "week" } });
+    expect(() => board.addMetric(trend)).toThrow(/1 to 16 targets/);
+    expect(() => board.addMetric(trend, { targets: Array.from({ length: 17 }, (_, i) => `${i}>${i + 1}`) })).toThrow(/1 to 16/);
+    expect(() => board.addMetric(trend, { targets: ["0>1"], view: "map" })).toThrow(/view "timeseries"/);
+    expect(() => board.addMetric(new ScriptMetric("ms_1", 1, ZX90), { view: "timeseries" })).toThrow(/"map" or "table"/);
+    expect(() => board.addMetric(new ScriptMetric("ms_1", 1, ZX90), { targets: ["0>1"] })).toThrow(/only to series/);
   });
 });
 

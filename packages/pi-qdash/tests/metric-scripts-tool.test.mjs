@@ -164,6 +164,53 @@ test("a preview takes a draft or a saved script, on the default chip unless one 
   assert.equal(calls.length, 2);
 });
 
+const TREND = {
+  id: "zx90_daily_trend",
+  title: "ZX90 gate fidelity trend",
+  unit: "%",
+  target: "pair",
+  result: "series",
+  hops: [1],
+  parameters: {},
+  has_legend: false,
+};
+
+function point(day, value, count, status = value === null ? "no_data" : "ok", reason = null) {
+  const start = `2026-11-${String(day).padStart(2, "0")}T00:00:00+00:00`;
+  return { timestamp: start, start, end: null, value, count, status, reason };
+}
+
+test("a series preview passes its targets and summarizes points, gaps and counts per target", async () => {
+  const series = {
+    ...evaluation([
+      {
+        key: "0>1",
+        status: "ok",
+        value: null,
+        label: "daily median",
+        series: [point(10, 94, 3), point(11, null, 0, "no_data", "no observations"), point(12, 97, 1), point(13, 96.5, 2), point(14, 98, 4)],
+      },
+      { key: "1>0", status: "missing", value: null, message: "No point has a value: 5 no_data", series: [point(10, null, 0), point(11, null, 0)] },
+      { key: "2>1", status: "error", value: null, message: "ZeroDivisionError" },
+    ]),
+    metric: TREND,
+    legend: null,
+  };
+  const { tools, calls } = setup({ evaluate: { ...series, script_id: "ms_1", revision: 1 } });
+  const preview = tools.get("qdash_preview_metric_script");
+  const result = await preview.execute("t", { scriptId: "ms_1", metricId: "zx90_daily_trend", targets: ["0>1", "1>0", "2>1"] });
+  assert.deepEqual(calls[0], ["evaluate", "ms_1", { metric_id: "zx90_daily_trend", chip_id: "64Qv3", targets: ["0>1", "1>0", "2>1"] }]);
+  const text = result.content[0].text;
+  assert.match(text, /pair, hops 1, series; script ms_1 revision 1/);
+  assert.match(text, /never interpolated or joined/);
+  assert.match(text, /- 0>1: ok \(daily median\); 5 points \(ok 4, no_data 1\), range 94\.\.98 %; 1 point rests on one observation \(n=1\)/);
+  assert.match(text, /2026-11-11T00:00:00\+00:00: gap \(no_data\), n=0 — no observations/);
+  assert.match(text, /    …\n    2026-11-13/);
+  assert.match(text, /- 1>0: missing; 2 points \(no_data 2\) — No point has a value/);
+  assert.match(text, /- 2>1: error — ZeroDivisionError/);
+  assert.doesNotMatch(text, /Sample cells/);
+});
+
 test("a failed evaluation is reported with QDash's detail, and a full queue says to wait", async () => {
   const { tools } = setup({
     evaluateDraft: () => { throw apiFailure(422, { message: "Metric 'nope' is not defined; expected one of: t1", diagnostics: [], log: "" }); },
@@ -351,6 +398,17 @@ test("dashboard problems are reported before confirmation, and the save is gated
   ]);
   assert.deepEqual(dashboardSaveProblems({ dashboardId: "cd_1", templateId: "t" }), ["templateId applies only when creating a dashboard"]);
   assert.deepEqual(dashboardSaveProblems({ name: "x", expectedVersion: 1 }), ["expectedVersion applies only when updating a dashboard"]);
+  const scriptPanel = (config) => ({
+    panel_id: "p",
+    type: "metric_script",
+    layout: { x: 0, y: 0, w: 6, h: 4 },
+    config: { script_id: "ms_1", metric_id: "m", script_revision: 1, ...config },
+  });
+  assert.deepEqual(dashboardSaveProblems({ name: "x", panels: [scriptPanel({ view: "timeseries", targets: ["0>1"] })] }), []);
+  assert.deepEqual(dashboardSaveProblems({ name: "x", panels: [scriptPanel({ view: "chart" })] }), ["panels[0].config.view must be one of map, table, timeseries"]);
+  assert.match(dashboardSaveProblems({ name: "x", panels: [scriptPanel({ view: "timeseries" })] })[0], /select 1 to 16/);
+  assert.match(dashboardSaveProblems({ name: "x", panels: [scriptPanel({ view: "map", targets: ["0>1"] })] })[0], /only to view "timeseries"/);
+  assert.match(dashboardSaveProblems({ name: "x", panels: [scriptPanel({ view: "timeseries", targets: Array.from({ length: 17 }, (_, i) => String(i)) })] })[0], /at most 16/);
   await assert.rejects(save.execute("t", { name: "x" }, undefined, undefined, uiContext(false)), /requires explicit confirmation/);
   assert.equal(calls.length, 0);
 });
