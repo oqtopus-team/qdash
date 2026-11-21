@@ -12,6 +12,8 @@ import type {
   AgentSessionPolicy,
   AgentActionType,
   AgentCandidateReference,
+  AgentInterventionResponse,
+  ListAgentInterventionsResponse,
   FileTreeNode,
   ForumImageUploadResponse,
   ForumPostCreate,
@@ -712,6 +714,23 @@ export class QDashClient {
 
   async getAgentAction(sessionId: string, actionId: string): Promise<AgentActionResponse> {
     return this.get(`/agent-sessions/${pathPart(sessionId)}/actions/${pathPart(actionId)}`);
+  }
+
+  /** A session's interventions, newest first: why the agent stopped and the expert's answer. */
+  async listAgentInterventions(sessionId: string): Promise<AgentInterventionResponse[]> {
+    const payload = await this.get<ListAgentInterventionsResponse>(
+      `/agent-sessions/${pathPart(sessionId)}/interventions`,
+    );
+    return payload.items;
+  }
+
+  async getAgentIntervention(
+    sessionId: string,
+    interventionId: string,
+  ): Promise<AgentInterventionResponse> {
+    return this.get(
+      `/agent-sessions/${pathPart(sessionId)}/interventions/${pathPart(interventionId)}`,
+    );
   }
 
   async listAgentActions(sessionId: string): Promise<AgentActionResponse[]> {

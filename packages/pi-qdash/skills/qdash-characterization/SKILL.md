@@ -1,6 +1,6 @@
 ---
 name: qdash-characterization
-description: Plan and run QDash qubit and coupling characterization with the coherence_check, characterization, ef_calibration, and coherence_limit flow templates, covering T1, T2, Ramsey, noise spectroscopy, EF-transition calibration, thermal excitation, static ZZ, and gate coherence limits. Use when the goal is to measure device properties or check coherence rather than to produce calibrated gates.
+description: Plan and run new QDash measurements of qubit and coupling properties, from remeasuring one property of named qubits to the coherence_check, characterization, ef_calibration, and coherence_limit flow templates, covering T1, T2, Ramsey, noise spectroscopy, EF-transition calibration, thermal excitation, static ZZ, and gate coherence limits. Use when the user wants a property measured or measured again ("remeasure the T1 of Q0", "check coherence on MUX2"), not calibrated gates. Not for reporting stored values or trends, which need no new measurement.
 license: Apache-2.0
 ---
 
@@ -25,6 +25,12 @@ read the `qdash` skill file at the path supplied by skill discovery.
 | Broad GE, EF, and coupling characterization in one run | `characterization` | Recalibrates GE pulses and the readout classifier before measuring |
 
 All four accept `mux_ids` (with optional `exclude_qids`) or `qids`.
+
+To measure one property again, such as the T1 of named qubits, a run of only that task is
+usually smaller than any of these templates: the `simple` template with `qids` and that task.
+Read the task's prerequisites with `qdash_get_pipeline_catalog` and the qubits' latest results
+in the current cooldown first; the run must apply the configuration the task needs, and a qubit
+without current pulses needs `qdash-one-qubit-calibration` before its coherence means much.
 
 - `coherence_check` runs `Configure`, a `CheckChevron` that does not update parameters,
   `CheckRabi`, `CheckT1`, `CheckT2Echo`, and a short `CheckRamsey`, then reconfigures and runs a

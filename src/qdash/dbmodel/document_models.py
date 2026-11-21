@@ -4,6 +4,7 @@ from qdash.dbmodel.agent_session import (
     AgentActionDocument,
     AgentCandidateCommitDocument,
     AgentCandidateSetCommitDocument,
+    AgentInterventionDocument,
     AgentSessionDocument,
 )
 from qdash.dbmodel.backend import BackendDocument
@@ -61,6 +62,7 @@ def document_models() -> list[Any]:
         AgentActionDocument,
         AgentCandidateCommitDocument,
         AgentCandidateSetCommitDocument,
+        AgentInterventionDocument,
         ExecutionHistoryDocument,
         TaskResultHistoryDocument,
         QubitDocument,

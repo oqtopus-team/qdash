@@ -11,6 +11,8 @@ invents a step, a parameter value, or a task outside the pre-authorized plan.
 Anything the table does not cover stops the plan for a person: an unknown
 status, a status without an entry, an evaluation that did not complete, a
 suggested range the session bounds do not allow, or a round budget that ran out.
+Each stop carries an ``AgentInterventionReason`` and the evaluation it was based
+on, so the runner can record it in QDash as an intervention.
 """
 
 from __future__ import annotations
@@ -18,13 +20,14 @@ from __future__ import annotations
 import math
 import re
 from collections import Counter
-from collections.abc import Mapping
-from dataclasses import dataclass, field
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING, Any
 
 from qdash.client.services.agent_runner import (
     PLAN_DEFAULT,
     PLAN_ESCALATE,
+    AgentInterventionReason,
     AgentPlannerDecision,
     AgentSkillTransition,
 )
@@ -50,6 +53,7 @@ class EvaluationVerdict:
     suggested_range: tuple[float, float] | None = None
     fit_reliability: str | None = None
     notes: str = ""
+    run_id: str = ""
 
 
 @dataclass
@@ -143,17 +147,35 @@ class EvaluationPlanner:
         candidate = outcome.candidate
         if candidate is None or not candidate.task_id:
             return self._escalate(
-                observation, None, None, "the last node left no task result to evaluate"
+                observation,
+                None,
+                None,
+                "the last node left no task result to evaluate",
+                AgentInterventionReason.EVALUATION_FAILED,
             )
         task_id = candidate.task_id
         task_name = candidate.task_name
-        verdict = self._evaluate(task_id, task_name)
+        try:
+            verdict = self._evaluate(task_id, task_name)
+        except Exception as exc:
+            return self._escalate(
+                observation,
+                task_id,
+                None,
+                f"the evaluation failed: {exc}",
+                AgentInterventionReason.EVALUATION_FAILED,
+            )
         history = self._history.setdefault(observation.last_node_id, [])
         history.append(verdict)
 
         stop = self._stop_reason(history)
         if stop is not None:
-            return self._escalate(observation, task_id, verdict, stop)
+            kind = (
+                AgentInterventionReason.EVALUATION_FAILED
+                if "unreliable" in stop
+                else AgentInterventionReason.RECOVERY_EXHAUSTED
+            )
+            return self._escalate(observation, task_id, verdict, stop, kind)
 
         table = self._table(task_name)
         action = table.get(verdict.status)
@@ -165,13 +187,16 @@ class EvaluationPlanner:
                 verdict,
                 f"{task_name} evaluation reported {verdict.status}, which has no next action "
                 f"(table covers {offered})",
+                AgentInterventionReason.UNKNOWN_OUTCOME,
             )
         reason = f"{task_name} evaluation {verdict.evaluation_id}: {verdict.status}"
         if action.note:
             reason = f"{reason}; {action.note}"
 
         if action.action == "request_human":
-            return self._escalate(observation, task_id, verdict, reason)
+            return self._escalate(
+                observation, task_id, verdict, reason, AgentInterventionReason.AGENT_REQUEST
+            )
         if action.action == "continue":
             if outcome.transition != AgentSkillTransition.PASS:
                 return self._escalate(
@@ -179,6 +204,7 @@ class EvaluationPlanner:
                     task_id,
                     verdict,
                     f"{reason}; the node did not pass, so the plan cannot continue",
+                    AgentInterventionReason.UNKNOWN_OUTCOME,
                 )
             return self._record(
                 observation, task_id, verdict, AgentPlannerDecision(PLAN_DEFAULT, reason)
@@ -194,6 +220,7 @@ class EvaluationPlanner:
                     task_id,
                     verdict,
                     f"{reason}; task {action.task!r} is not a node of this plan",
+                    AgentInterventionReason.UNKNOWN_OUTCOME,
                 )
             target = node_for_task
         visits = observation.node_visits.get(target, 0)
@@ -203,6 +230,7 @@ class EvaluationPlanner:
                 task_id,
                 verdict,
                 f"{reason}; node {target!r} already ran {visits} times (limit {self._max_rounds})",
+                AgentInterventionReason.RECOVERY_EXHAUSTED,
             )
 
         overrides = dict(action.overrides)
@@ -213,18 +241,55 @@ class EvaluationPlanner:
                     task_id,
                     verdict,
                     f"{reason}; the evaluation gave no suggested range",
+                    AgentInterventionReason.EVALUATION_FAILED,
                 )
             low, high = verdict.suggested_range
             overrides[action.suggested_range_parameter] = (low + high) / 2
         bounded, bound_error = self._within_bounds(overrides)
         if bound_error is not None:
-            return self._escalate(observation, task_id, verdict, f"{reason}; {bound_error}")
+            return self._escalate(
+                observation,
+                task_id,
+                verdict,
+                f"{reason}; {bound_error}",
+                AgentInterventionReason.POLICY_LIMIT,
+            )
         return self._record(
             observation,
             task_id,
             verdict,
             AgentPlannerDecision(target, reason, parameter_overrides=bounded),
         )
+
+    # ------------------------------------------------------------------ checkpoint
+
+    def export_history(self) -> dict[str, list[dict[str, Any]]]:
+        """The verdicts behind the stop rules, for a plan checkpoint."""
+        return {
+            node_id: [
+                {
+                    "status": v.status,
+                    "fit_reliability": v.fit_reliability,
+                    "evaluation_id": v.evaluation_id,
+                }
+                for v in history[-50:]
+            ]
+            for node_id, history in self._history.items()
+        }
+
+    def restore_history(self, history: Mapping[str, Sequence[Mapping[str, Any]]]) -> None:
+        """Restore the stop-rule verdicts of a resumed plan, so a resume does not reset them."""
+        self._history = {
+            node_id: [
+                EvaluationVerdict(
+                    evaluation_id=str(item.get("evaluation_id") or ""),
+                    status=str(item.get("status") or ""),
+                    fit_reliability=item.get("fit_reliability"),
+                )
+                for item in items
+            ]
+            for node_id, items in history.items()
+        }
 
     # ------------------------------------------------------------------ helpers
 
@@ -249,7 +314,15 @@ class EvaluationPlanner:
             raise RuntimeError(
                 f"evaluation {item.evaluation_id} did not complete ({item.status}): {item.error or ''}".strip()
             )
-        return verdict_from_diagnosis(item.evaluation_id, item.output.diagnosis)
+        verdict = verdict_from_diagnosis(item.evaluation_id, item.output.diagnosis)
+        return EvaluationVerdict(
+            evaluation_id=verdict.evaluation_id,
+            status=verdict.status,
+            suggested_range=verdict.suggested_range,
+            fit_reliability=verdict.fit_reliability,
+            notes=verdict.notes,
+            run_id=created.run.run_id,
+        )
 
     def _table(self, task_name: str) -> Mapping[str, TaskNextAction]:
         if task_name not in self._tables:
@@ -300,9 +373,13 @@ class EvaluationPlanner:
         task_id: str | None,
         verdict: EvaluationVerdict | None,
         reason: str,
+        kind: AgentInterventionReason,
     ) -> AgentPlannerDecision:
         return self._record(
-            observation, task_id, verdict, AgentPlannerDecision(PLAN_ESCALATE, reason)
+            observation,
+            task_id,
+            verdict,
+            AgentPlannerDecision(PLAN_ESCALATE, reason, escalation_reason=kind.value),
         )
 
     def _record(
@@ -312,6 +389,11 @@ class EvaluationPlanner:
         verdict: EvaluationVerdict | None,
         decision: AgentPlannerDecision,
     ) -> AgentPlannerDecision:
+        if verdict is not None:
+            evidence = {"evaluation_id": verdict.evaluation_id, "status": verdict.status}
+            if verdict.run_id:
+                evidence["evaluation_run_id"] = verdict.run_id
+            decision = replace(decision, evidence=evidence)
         self.traces.append(
             EvaluationPlannerTrace(
                 node_id=observation.last_node_id,

@@ -13,7 +13,7 @@ described instead of implying parity.
 
 | Concern | Owner |
 | --- | --- |
-| QDash tools, skills, investigation policy, tool routing guide, and tool policy lists | pi-qdash, for both hosts |
+| QDash tools, skills, investigation and request policies, tool routing guide, and tool policy lists | pi-qdash, for both hosts |
 | Presentation, sessions, the context a turn carries, orchestration, and which tools are exposed | Each host |
 
 - **Permissions.** Both hosts apply the same rule: reads run directly, and a reviewed write
@@ -37,14 +37,17 @@ described instead of implying parity.
 TUI renderers. Shared helpers live under `extensions/lib/`; domain tool registration
 lives under `extensions/tools/`, including `timeseries.ts`.
 
-The investigation policy and tool routing guide that every host gives the model live in
-`extensions/lib/qdash-guidance.ts`. The routing guide is the "Preferred tools" section of
+The investigation policy, request policy, and tool routing guide that every host gives the
+model live in `extensions/lib/qdash-guidance.ts`. The request policy lets a plain request such as
+"remeasure the T1 of Q0" select a skill by its description: it separates questions about stored
+values from requests to measure, takes targets from context before asking, and keeps plan-only
+requests free of writes. It names no flows, tasks, or thresholds, and grants no write permission. The routing guide is the "Preferred tools" section of
 `skills/qdash/SKILL.md`, limited to the tools the host offers. In pi CLI,
 `extensions/lib/guidance-hook.ts` sets them as the `qdash_guidance` system prompt section before
 each run, from the tools selected for that run. pi keeps its own prompt, `--system-prompt`,
 `--append-system-prompt`, and context files around the section, and the section is replaced
 rather than appended on later runs. The QDash runtime does not run this hook; it composes the
-same policy and guide with its own chat rules in `agent-runtime/src/prompt.ts`. Keep display,
+same policies and guide with its own chat rules in `agent-runtime/src/prompt.ts`. Keep display,
 approval, and orchestration rules for one host out of `qdash-guidance.ts`.
 
 `extensions/tools/metric-scripts.ts` adds the metric script and dashboard tools: the
@@ -68,7 +71,9 @@ The experiment-flow skills (`qdash-chip-bringup`, `qdash-one-qubit-calibration`,
 `qdash-two-qubit-calibration`, and `qdash-characterization`) compose the flow templates toward a
 goal and leave task physics to task knowledge. The runtime's `read_skill` returns only a skill's
 `SKILL.md`, so these skills keep their instructions in that file and retrieve templates and task
-documentation through tools; `agent-runtime/test/bundled-extensions.test.mjs` checks that they
+documentation through tools. Both hosts list each skill's description before the model loads it,
+so a description states the goal it serves in the user's terms and the requests it does not
+serve; `agent-runtime/test/bundled-extensions.test.mjs` checks that they
 load and name only tools the runtime offers.
 
 New tools are read-only by default. Writes and operational calls must use the

@@ -90,6 +90,11 @@ test("the investigation policy shared with pi CLI sits beside the runtime's own 
     assert.ok(guidelines.includes(`${bullet}\n`), `missing shared rule: ${bullet}`);
     assert.equal(prompt.split(bullet).length, 2, `shared rule appears more than once: ${bullet}`);
   }
+  const { requestPolicyBullets } = await import("@oqtopus-team/pi-qdash/extensions/lib/qdash-guidance.ts");
+  for (const bullet of requestPolicyBullets()) {
+    assert.ok(guidelines.includes(`${bullet}\n`), `missing request rule: ${bullet}`);
+    assert.equal(prompt.split(bullet).length, 2, `request rule appears more than once: ${bullet}`);
+  }
   // Host-specific rules stay in the runtime prompt.
   assert.match(prompt, /`render_ui`/);
   assert.match(prompt, /approval card/);

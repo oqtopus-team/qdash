@@ -1,6 +1,6 @@
 ---
 name: qdash
-description: Query a running QDash instance from pi via the pi-qdash extension and @oqtopus-team/qdash-client. Use when inspecting chips, metrics, task results, tasks, projects, files, flows, metric scripts, dashboards, executions, forum posts, provenance, or QDash profile/configuration.
+description: Query a running QDash instance from pi via the pi-qdash extension and @oqtopus-team/qdash-client. Use when inspecting chips, metrics, task results, tasks, projects, files, flows, metric scripts, dashboards, executions, forum posts, provenance, or QDash profile/configuration, including the latest stored value or status of a qubit or coupling ("what is the T1 of Q0?"). Also holds the execution paths and approval scope that the calibration and characterization skills load.
 ---
 
 <!-- Confirmation gates are implemented by the host harness. Skills should state that a gate exists, not instruct how or when to ask for confirmation. -->
@@ -46,6 +46,7 @@ Prefer the dedicated tool that matches the question. Use `qdash_query` only as a
    - `qdash_save_metric_script`, `qdash_save_dashboard` — save a metric script, and create or update a dashboard with its panels (see the `qdash-metric-scripts` skill)
 4. Agent workflow state tools:
    - `qdash_get_agent_session`, `qdash_get_agent_action`, `qdash_list_agent_actions`, `qdash_wait_agent_action` — inspect agent workflow state
+   - `qdash_list_agent_interventions` — read why a session stopped for a person and the expert's decision and guidance
    - `qdash_list_agent_action_candidates`, `qdash_get_agent_candidate_commit`, `qdash_wait_agent_candidate_apply` — inspect candidates and apply status
 5. `qdash_query` — fallback for read-only operations without a dedicated tool.
 6. `qdash_raw_get` — last-resort read-only GET for an uncovered endpoint.

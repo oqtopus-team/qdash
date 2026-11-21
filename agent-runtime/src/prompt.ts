@@ -1,4 +1,7 @@
-import { investigationPolicyBullets } from "@oqtopus-team/pi-qdash/extensions/lib/qdash-guidance.ts";
+import {
+  investigationPolicyBullets,
+  requestPolicyBullets,
+} from "@oqtopus-team/pi-qdash/extensions/lib/qdash-guidance.ts";
 
 /**
  * System prompt for the QDash Copilot chat agent.
@@ -9,7 +12,7 @@ import { investigationPolicyBullets } from "@oqtopus-team/pi-qdash/extensions/li
  * is configured. Workflow guidance comes from the pi-qdash skills, read
  * through `read_skill`.
  *
- * The investigation policy and the tool routing guide are shared with the pi
+ * The investigation policy, the request policy, and the tool routing guide are shared with the pi
  * CLI and come from pi-qdash (extensions/lib/qdash-guidance.ts); the rules
  * written here are the ones specific to this host: chat rendering, approval
  * cards, `ask_user`, the workspace, Code Mode and deferred tools.
@@ -45,6 +48,7 @@ export function buildSystemPrompt(
     "",
     "Guidelines:",
     ...investigationPolicyBullets(),
+    ...requestPolicyBullets(),
     "- Prefer a short direct answer over an exhaustive report. Expand only when asked.",
     "- Use `render_chart` when a plot communicates better than text.",
     "- Use `render_ui` for a compact read-only view of values from tool results (metric cards, a comparison table, a status alert, links to QDash pages). Only show values a tool returned, and still answer in text.",

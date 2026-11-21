@@ -34,6 +34,7 @@ export const ALLOWED_TOOL_NAMES = [
   "qdash_investigate",
   "qdash_list_agent_action_candidates",
   "qdash_list_agent_actions",
+  "qdash_list_agent_interventions",
   "qdash_list_chip_couplings",
   "qdash_list_chip_qubits",
   "qdash_list_chips",

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -13,6 +14,7 @@ from qdash.client.services.agent_runner import (
     AgentSkillTransition,
     AgentStepOutcome,
 )
+from qdash.client.services.errors import QDashApiError
 
 
 def test_start_session_uses_profile_and_bounded_policy(
@@ -426,3 +428,265 @@ def test_run_plan_evaluation_planner_refuses_per_node_commits(monkeypatch, capsy
     assert "--commit-on-success" in capsys.readouterr().err
     client.get_agent_session.assert_not_called()
     runner.return_value.run_plan.assert_not_called()
+
+
+def _intervention(status: str, **extra: object):
+    from qdash.client.services.client_models import AgentInterventionResponse
+
+    data: dict[str, object] = {
+        "intervention_id": "intervention-1",
+        "project_id": "project-1",
+        "session_id": "session-1",
+        "chip_id": "chip-1",
+        "reason": "unknown_outcome",
+        "summary": "stopped",
+        "question": "resume?",
+        "status": status,
+        "created_at": "2026-07-13T00:00:05Z",
+        "updated_at": "2026-07-13T00:00:05Z",
+    }
+    data.update(extra)
+    return AgentInterventionResponse.model_validate(data)
+
+
+_CHECKPOINT = {
+    "qid": "Q00",
+    "nodes": [
+        {"id": "rabi", "task_name": "CheckRabi", "candidate_parameter": "control_amplitude"},
+        {"id": "chevron", "task_name": "CheckChevron", "candidate_parameter": "qubit_frequency"},
+    ],
+    "idempotency_prefix": "plan-key",
+    "node_path": ["rabi"],
+    "visit_counts": {"rabi": 1},
+    "stopped_node_id": "rabi",
+    "max_node_executions": 4,
+    "max_node_visits": 2,
+    "commit_on_success": True,
+    "planner": "none",
+}
+
+
+def test_resume_plan_claims_continues_from_the_checkpoint_and_reports(monkeypatch, capsys) -> None:
+    client = MagicMock()
+    client.get_agent_intervention.return_value = _intervention("resume_authorized")
+    client.claim_agent_resume.return_value = _intervention(
+        "resumed",
+        checkpoint=_CHECKPOINT,
+        response={"decision": "resume", "resume_node_id": "chevron", "guidance": "Use Chevron"},
+    )
+    monkeypatch.setattr(agent_cli.QDashClient, "from_profile", lambda profile: client)
+    captured: dict[str, Any] = {}
+
+    class FakePlanRunner:
+        def __init__(self, runner_client, **kwargs):
+            pass
+
+        def run_plan(self, **kwargs):
+            captured.update(kwargs)
+            return AgentPlanOutcome(
+                transition=AgentSkillTransition.PASS,
+                reason="Plan completed 2 nodes",
+                session_id="session-1",
+                qid="Q00",
+                source_execution_id=None,
+                completed_nodes=2,
+                attempts=1,
+                outcomes=(),
+                node_path=("rabi", "chevron"),
+            )
+
+    monkeypatch.setattr(agent_cli, "AgentPlanRunner", FakePlanRunner)
+
+    exit_code = agent_cli.run(
+        [
+            "--profile",
+            "lab",
+            "resume-plan",
+            "--session-id",
+            "session-1",
+            "--intervention-id",
+            "intervention-1",
+            "--claim-key",
+            "claim-1",
+        ]
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    assert exit_code == 0
+    client.claim_agent_resume.assert_called_once_with(
+        "session-1", "intervention-1", claim_key="claim-1"
+    )
+    assert captured["idempotency_prefix"] == "plan-key"
+    assert captured["max_node_executions"] == 4
+    assert captured["max_node_visits"] == 2
+    assert captured["commit_on_success"] is True
+    assert captured["resume"].start_node_id == "chevron"
+    assert captured["resume"].visit_counts == {"rabi": 1}
+    assert captured["record_interventions"] is True
+    assert payload["resumed_from_node_id"] == "chevron"
+    assert payload["expert_guidance"] == "Use Chevron"
+    outcome_call = client.record_agent_resume_outcome.call_args
+    assert outcome_call.kwargs["claim_key"] == "claim-1"
+    assert outcome_call.kwargs["transition"] == "pass"
+
+
+def test_resume_plan_refuses_before_an_expert_answers(monkeypatch, capsys) -> None:
+    client = MagicMock()
+    client.get_agent_intervention.return_value = _intervention(
+        "open", resume_blockers=["The session used all 10 of its actions"]
+    )
+    monkeypatch.setattr(agent_cli.QDashClient, "from_profile", lambda profile: client)
+
+    exit_code = agent_cli.run(
+        ["resume-plan", "--session-id", "session-1", "--intervention-id", "intervention-1"]
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    assert exit_code == 2
+    assert payload["intervention_status"] == "open"
+    assert payload["resume_blockers"] == ["The session used all 10 of its actions"]
+    client.claim_agent_resume.assert_not_called()
+
+
+def _resume_args(*extra: str) -> list[str]:
+    return [
+        "--profile",
+        "lab",
+        "resume-plan",
+        "--session-id",
+        "session-1",
+        "--intervention-id",
+        "intervention-1",
+        *extra,
+    ]
+
+
+class _CountingPlanRunner:
+    """Stands in for AgentPlanRunner; every run_plan call would be a hardware run."""
+
+    runs: list[dict[str, Any]] = []
+    outcome = AgentSkillTransition.PASS
+
+    def __init__(self, runner_client, **kwargs):
+        pass
+
+    def run_plan(self, **kwargs):
+        type(self).runs.append(kwargs)
+        return AgentPlanOutcome(
+            transition=type(self).outcome,
+            reason="Plan stopped at node 1 (CheckChevron): measurement failed",
+            session_id="session-1",
+            qid="Q00",
+            source_execution_id=None,
+            completed_nodes=1,
+            attempts=1,
+            outcomes=(),
+            node_path=("rabi", "chevron"),
+        )
+
+
+@pytest.fixture
+def counting_runner(monkeypatch):
+    _CountingPlanRunner.runs = []
+    _CountingPlanRunner.outcome = AgentSkillTransition.PASS
+    monkeypatch.setattr(agent_cli, "AgentPlanRunner", _CountingPlanRunner)
+    return _CountingPlanRunner
+
+
+def test_resume_plan_fails_when_its_outcome_is_not_recorded(
+    monkeypatch, capsys, counting_runner
+) -> None:
+    """A measured plan whose ending QDash did not record is not a completed resume."""
+    client = MagicMock()
+    client.get_agent_intervention.return_value = _intervention("resume_authorized")
+    client.claim_agent_resume.return_value = _intervention(
+        "resumed", checkpoint=_CHECKPOINT, response={"decision": "resume"}
+    )
+    client.record_agent_resume_outcome.side_effect = QDashApiError(
+        "QDash is unavailable", status_code=503
+    )
+    monkeypatch.setattr(agent_cli.QDashClient, "from_profile", lambda profile: client)
+
+    exit_code = agent_cli.run(_resume_args("--claim-key", "claim-1"))
+
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out)
+    assert exit_code == 3
+    assert payload["transition"] == "pass"
+    assert "resume_outcome_error" in payload
+    assert "Do not run resume-plan again" in captured.err
+    assert "--claim-key claim-1 --record-outcome pass" in captured.err
+    assert len(counting_runner.runs) == 1
+
+
+def test_resume_plan_records_a_missing_outcome_without_running(
+    monkeypatch, capsys, counting_runner
+) -> None:
+    client = MagicMock()
+    client.get_agent_intervention.return_value = _intervention(
+        "resumed", checkpoint=_CHECKPOINT, resume_claim_key="claim-1"
+    )
+    client.record_agent_resume_outcome.return_value = _intervention("resumed")
+    monkeypatch.setattr(agent_cli.QDashClient, "from_profile", lambda profile: client)
+
+    exit_code = agent_cli.run(
+        _resume_args(
+            "--claim-key", "claim-1", "--record-outcome", "pass", "--outcome-reason", "done"
+        )
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    assert exit_code == 0
+    assert payload["recorded"] is True
+    assert counting_runner.runs == []
+    client.claim_agent_resume.assert_not_called()
+    call = client.record_agent_resume_outcome.call_args
+    assert call.kwargs == {
+        "claim_key": "claim-1",
+        "transition": "pass",
+        "reason": "done",
+        "follow_up_intervention_id": None,
+    }
+
+
+def test_same_claim_after_a_recorded_measurement_error_does_not_run_again(
+    monkeypatch, capsys, counting_runner
+) -> None:
+    """A retry with the claim key of a run that ended and was recorded measures nothing."""
+    client = MagicMock()
+    monkeypatch.setattr(agent_cli.QDashClient, "from_profile", lambda profile: client)
+    counting_runner.outcome = AgentSkillTransition.RETRY
+    client.get_agent_intervention.return_value = _intervention("resume_authorized")
+    client.claim_agent_resume.return_value = _intervention(
+        "resumed", checkpoint=_CHECKPOINT, response={"decision": "resume"}
+    )
+
+    first = agent_cli.run(_resume_args("--claim-key", "claim-1"))
+    capsys.readouterr()
+    assert first == 2
+    assert len(counting_runner.runs) == 1
+    recorded = client.record_agent_resume_outcome.call_args.kwargs
+    assert recorded["transition"] == "retry"
+
+    # QDash now holds the outcome; the same command again only reports it.
+    client.get_agent_intervention.return_value = _intervention(
+        "resumed",
+        checkpoint=_CHECKPOINT,
+        resume_claim_key="claim-1",
+        resume_outcome={"transition": "retry", "reason": recorded["reason"]},
+    )
+    client.claim_agent_resume.reset_mock()
+    again = agent_cli.run(_resume_args("--claim-key", "claim-1"))
+
+    payload = json.loads(capsys.readouterr().out)
+    assert again == 2
+    assert payload["already_recorded"] is True
+    assert payload["transition"] == "retry"
+    assert len(counting_runner.runs) == 1
+    client.claim_agent_resume.assert_not_called()
+
+    # Another claim key cannot take over the resumed intervention.
+    other = agent_cli.run(_resume_args("--claim-key", "claim-2"))
+    assert other == 2
+    assert "only its claim key" in json.loads(capsys.readouterr().out)["reason"]
+    assert len(counting_runner.runs) == 1

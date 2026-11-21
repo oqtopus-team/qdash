@@ -292,17 +292,63 @@ def test_missing_task_result_escalates_without_evaluating() -> None:
     client.create_evaluation_run.assert_not_called()
 
 
-def test_incomplete_evaluation_raises_for_the_runner_to_escalate() -> None:
+def test_incomplete_evaluation_escalates_as_an_evaluation_failure() -> None:
     planner = _planner(_client([_diagnosis("SUCCESS")], status="failed"))
-    with pytest.raises(RuntimeError, match="did not complete"):
-        planner.choose_next(_observation(candidate=_candidate()))
+    decision = planner.choose_next(_observation(candidate=_candidate()))
+    assert decision.target_node_id == PLAN_ESCALATE
+    assert decision.escalation_reason == "evaluation_failed"
+    assert "did not complete" in decision.reason
+    assert planner.traces[-1].decision is decision
 
 
-def test_skipped_task_result_raises() -> None:
+def test_skipped_task_result_escalates() -> None:
     client = _client([_diagnosis("SUCCESS")])
     client.create_evaluation_run.return_value = CreateEvaluationRunResponse(
         run=EvaluationRunSummary(run_id="run-1", status="completed"),
         skipped={"task-1": "no figure"},
     )
-    with pytest.raises(RuntimeError, match="no figure"):
-        _planner(client).choose_next(_observation(candidate=_candidate()))
+    decision = _planner(client).choose_next(_observation(candidate=_candidate()))
+    assert decision.target_node_id == PLAN_ESCALATE
+    assert decision.escalation_reason == "evaluation_failed"
+    assert "no figure" in decision.reason
+
+
+def test_escalations_are_classified_and_carry_the_evaluation() -> None:
+    planner = _planner(
+        _client([_diagnosis("ANOMALOUS"), _diagnosis("BEATING_PATTERN"), _diagnosis("SUCCESS")])
+    )
+    requested = planner.choose_next(_observation(candidate=_candidate()))
+    unknown = planner.choose_next(_observation(candidate=_candidate()))
+    known = planner.choose_next(_observation(candidate=_candidate()))
+
+    assert requested.escalation_reason == "agent_request"
+    assert unknown.escalation_reason == "unknown_outcome"
+    assert unknown.evidence["status"] == "BEATING_PATTERN"
+    assert unknown.evidence["evaluation_id"]
+    # A known recoverable status stays in the bounded loop with no escalation.
+    assert known.target_node_id != PLAN_ESCALATE
+    assert known.escalation_reason == ""
+
+
+def test_history_round_trips_so_a_resume_keeps_the_stop_rules() -> None:
+    first = _planner(
+        _client([_diagnosis("SUBOPTIMAL", suggested="(0.02, 0.04)")] * 2), max_rounds_per_target=10
+    )
+    for n in (1, 2):
+        first.choose_next(
+            _observation(
+                candidate=_candidate(), node_visits={"rabi": n, "chevron": 0, "configure": 0}
+            )
+        )
+    exported = first.export_history()
+
+    resumed = _planner(
+        _client([_diagnosis("SUBOPTIMAL", suggested="(0.02, 0.04)")]), max_rounds_per_target=10
+    )
+    resumed.restore_history(exported)
+    decision = resumed.choose_next(
+        _observation(candidate=_candidate(), node_visits={"rabi": 3, "chevron": 0, "configure": 0})
+    )
+    assert decision.target_node_id == PLAN_ESCALATE
+    assert decision.escalation_reason == "recovery_exhausted"
+    assert "came back 3 times" in decision.reason

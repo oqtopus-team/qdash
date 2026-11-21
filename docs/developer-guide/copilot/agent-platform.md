@@ -25,7 +25,9 @@ the expiry, the skill identity, the model identity, and whether hardware reconfi
 permitted. QDash rejects an action outside that grant, an action based on a stale state version,
 and a duplicate request whose idempotency key carries different arguments. The budget counts
 proposed actions; committing an accepted candidate advances the state version without spending
-one.
+one, and so does a `request_human` action, which QDash accepts even when the budget is spent.
+A request for a person records an intervention and pauses the session until an expert answers
+in QDash; see [Human interventions](./agentic-calibration.md#human-interventions).
 
 The immutable policy also records `autonomy`: `confirm_each` (default) requires per-measurement
 confirmation; `auto` grants the approved plan its bounds and budget once. In `auto`,
@@ -79,6 +81,10 @@ The client package carries the runners and the `qdash-agent` command
   off unless the immutable session policy grants it.
 - Every action is idempotent and bound to an expected state version.
 - An agent disconnect leaves the session resumable and not running.
+- A paused session starts no new measurement, commit, or backend apply until an expert
+  answers; one already dispatched before the pause continues, and resume waits for it. A resume
+  keeps the policy, budget, expiry, and visit counts, and a stopped, completed, or expired
+  session is never reactivated.
 - A parameter write-back needs the deterministic bounds and quality gates; a model's proposal
   alone cannot commit a value.
 - Each action records its skill hash, model identity, evidence references, decision, and the
@@ -105,6 +111,8 @@ claim needs results measured on QDash's own hardware, tasks, and gates.
 - `src/qdash/api/routers/agent_session.py`, `src/qdash/api/services/agent_session_service.py`,
   `src/qdash/api/schemas/agent_session.py`: session contract, actions, state versions, audit
 - `src/qdash/datamodel/agent_session.py`, `src/qdash/dbmodel/agent_session.py`: stored session
+  and interventions
+- `src/qdash/api/services/agent_intervention_service.py`: interventions, expert answers, resume
 - `src/qdash/workflow/register_system_flows.py`,
   `src/qdash/workflow/service/agent_candidate_apply_flow.py`: system deployments, backend apply
 - `clients/python/src/qdash/client/services/agent_runner.py`,

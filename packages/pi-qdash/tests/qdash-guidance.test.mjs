@@ -13,6 +13,8 @@ import {
   extractToolRouting,
   investigationPolicyBullets,
   QDASH_INVESTIGATION_POLICY,
+  QDASH_REQUEST_POLICY,
+  requestPolicyBullets,
   toolRoutingNames,
 } from "../.test-dist/lib/qdash-guidance.js";
 import qdashExtension from "../.test-dist/qdash.js";
@@ -66,6 +68,21 @@ test("the policy is host-neutral", () => {
   assert.match(QDASH_INVESTIGATION_POLICY.join("\n"), /tool result or from the user/);
 });
 
+test("the request policy is host-neutral and grants no write", () => {
+  assert.ok(QDASH_REQUEST_POLICY.length > 0);
+  assert.deepEqual(requestPolicyBullets(), QDASH_REQUEST_POLICY.map((rule) => `- ${rule}`));
+  for (const rule of QDASH_REQUEST_POLICY) {
+    assert.doesNotMatch(rule, RUNTIME_ONLY);
+    // Skills own flows and tasks; the shared rules name none.
+    assert.doesNotMatch(rule, /`|\bCheck[A-Z]|qdash-|_calibration\b/);
+  }
+  const text = QDASH_REQUEST_POLICY.join("\n");
+  assert.match(text, /not approval for a write/);
+  assert.match(text, /call no tool that executes or saves/);
+  // Targets come from the open page and read-only tools before a question.
+  assert.match(text, /page the user has open, then from read-only tools/);
+});
+
 test("the bundled skill has a routing guide that names real pi-qdash tools", () => {
   const { tools } = loadExtension();
   const routing = extractToolRouting(SKILL, tools);
@@ -91,6 +108,8 @@ test("the CLI section carries the policy and routing without runtime-only instru
   const { tools } = loadExtension();
   const section = buildQDashGuidanceSection(["read", "bash", ...tools], SKILL);
   for (const bullet of investigationPolicyBullets()) assert.ok(section.includes(bullet));
+  assert.match(section, /Plain-language requests:\n/);
+  for (const bullet of requestPolicyBullets()) assert.equal(section.split(bullet).length, 2, bullet);
   assert.match(section, /QDash tool routing:\nPrefer the dedicated tool/);
   assert.doesNotMatch(section, RUNTIME_ONLY);
   // Deferred tools are marked only by the runtime.
@@ -101,6 +120,7 @@ test("the section needs a QDash tool, and keeps the policy without the skill", (
   assert.equal(buildQDashGuidanceSection(["read", "bash"], SKILL), null);
   const policyOnly = buildQDashGuidanceSection(["qdash_list_chips"], null);
   assert.match(policyOnly, /Investigation and evidence:/);
+  assert.match(policyOnly, /Plain-language requests:/);
   assert.doesNotMatch(policyOnly, /QDash tool routing/);
 });
 

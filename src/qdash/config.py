@@ -15,6 +15,11 @@ class Settings(BaseSettings):
     slack_channel_id: str = ""
     slack_forum_notification: bool = False
     slack_forum_channel_id: str = ""
+    # Agent interventions post to their own channel with the same bot token. Everyone in
+    # that channel sees the project, chip, targets, and question of every project's
+    # intervention, so it is for a deployment-wide audience of experts.
+    slack_agent_notification: bool = False
+    slack_agent_channel_id: str = ""
     postgres_data_path: str
     mongo_data_path: str
     calib_data_path: str
@@ -37,7 +42,7 @@ class Settings(BaseSettings):
         """Return the browser-facing QDash URL: CLIENT_URL, else the local UI port."""
         return self.client_url.rstrip("/") or f"http://localhost:{self.ui_port}"
 
-    @field_validator("slack_forum_notification", mode="before")
+    @field_validator("slack_forum_notification", "slack_agent_notification", mode="before")
     @classmethod
     def _empty_str_as_false(cls, value: object) -> object:
         """Treat unset env vars (empty strings) as False for boolean fields."""

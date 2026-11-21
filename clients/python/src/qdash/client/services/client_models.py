@@ -49,6 +49,7 @@ class AgentSessionResponse(BaseModel):
     created_at: AwareDatetime
     updated_at: AwareDatetime
     expires_at: AwareDatetime
+    active_intervention_id: str | None = None
 
 
 class AgentActionResponse(BaseModel):
@@ -70,12 +71,58 @@ class AgentActionResponse(BaseModel):
     state_version_before: int
     state_version_after: int
     created_at: AwareDatetime
+    intervention_id: str | None = None
 
 
 class AgentActionListResponse(BaseModel):
     """Client representation of a session action audit list."""
 
     items: list[AgentActionResponse]
+    total: int
+
+
+class AgentInterventionResponse(BaseModel):
+    """Client representation of a recorded agent intervention.
+
+    Nested records stay plain dictionaries so a new server-side field does not break parsing;
+    ``checkpoint`` has the shape ``AgentPlanRunner`` writes and ``resume-plan`` reads.
+    """
+
+    intervention_id: str
+    project_id: str
+    session_id: str
+    chip_id: str
+    reason: str
+    summary: str
+    question: str
+    status: str
+    node_id: str | None = None
+    task_name: str | None = None
+    qids: list[str] = Field(default_factory=list)
+    attempts: list[dict[str, Any]] = Field(default_factory=list)
+    action_id: str | None = None
+    previous_intervention_id: str | None = None
+    checkpoint: dict[str, Any] | None = None
+    plan_hash: str = ""
+    pauses_session: bool = False
+    response: dict[str, Any] | None = None
+    resume_claim_key: str | None = None
+    resume_outcome: dict[str, Any] | None = None
+    notification: dict[str, Any] = Field(default_factory=dict)
+    session_status: str = ""
+    session_state_version: int = 0
+    can_resume: bool = False
+    resume_blockers: list[str] = Field(default_factory=list)
+    resume_command: str | None = None
+    page_path: str = ""
+    created_at: AwareDatetime
+    updated_at: AwareDatetime
+
+
+class AgentInterventionListResponse(BaseModel):
+    """Client representation of a session's interventions."""
+
+    items: list[AgentInterventionResponse]
     total: int
 
 

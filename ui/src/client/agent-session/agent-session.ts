@@ -28,17 +28,23 @@ import type {
   AgentActionResponse,
   AgentCandidateCommitResponse,
   AgentCandidateSetCommitResponse,
+  AgentInterventionResponse,
   AgentSessionResponse,
   ApplyAgentCandidateRequest,
   CandidateGateResponse,
+  ClaimAgentResumeRequest,
   CommitAgentCandidateRequest,
   CommitAgentCandidateSetRequest,
+  CreateAgentInterventionRequest,
   CreateAgentSessionRequest,
   EvaluateCandidateGateRequest,
   ExecuteAgentActionRequest,
   HTTPValidationError,
   ListAgentActionsResponse,
   ListAgentCandidatesResponse,
+  ListAgentInterventionsResponse,
+  RecordAgentResumeOutcomeRequest,
+  RespondAgentInterventionRequest,
   SubmitAgentActionRequest
 } from '../../schemas';
 
@@ -290,6 +296,9 @@ export const useEvaluateAgentCandidateGate = <TError = HTTPValidationError,
     }
     /**
  * Authorize and audit an action proposal without executing it.
+ *
+ * An authorized ``request_human`` also records an intervention, pauses the session on it,
+ * and queues its Slack message.
  * @summary Submit an agent action
  */
 export const submitAgentAction = (
@@ -1114,4 +1123,533 @@ export const useExecuteAgentAction = <TError = HTTPValidationError,
         TContext
       > => {
       return useMutation(getExecuteAgentActionMutationOptions(options), queryClient);
+    }
+    /**
+ * Record that the agent needs a person and pause the session if it is active.
+ *
+ * The record is saved before any Slack message is attempted, and it is saved even when the
+ * session has no actions left or has expired.
+ * @summary Record an agent intervention
+ */
+export const createAgentIntervention = (
+    sessionId: string,
+    createAgentInterventionRequest: CreateAgentInterventionRequest,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<AgentInterventionResponse>(
+      {url: `/agent-sessions/${sessionId}/interventions`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: createAgentInterventionRequest, signal
+    },
+      options);
+    }
+
+
+
+
+export const getCreateAgentInterventionMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createAgentIntervention>>, TError,{sessionId: string;data: CreateAgentInterventionRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof createAgentIntervention>>, TError,{sessionId: string;data: CreateAgentInterventionRequest}, TContext> => {
+
+const mutationKey = ['createAgentIntervention'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createAgentIntervention>>, {sessionId: string;data: CreateAgentInterventionRequest}> = (props) => {
+          const {sessionId,data} = props ?? {};
+
+          return  createAgentIntervention(sessionId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateAgentInterventionMutationResult = NonNullable<Awaited<ReturnType<typeof createAgentIntervention>>>
+    export type CreateAgentInterventionMutationBody = CreateAgentInterventionRequest
+    export type CreateAgentInterventionMutationError = HTTPValidationError
+
+    /**
+ * @summary Record an agent intervention
+ */
+export const useCreateAgentIntervention = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createAgentIntervention>>, TError,{sessionId: string;data: CreateAgentInterventionRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof createAgentIntervention>>,
+        TError,
+        {sessionId: string;data: CreateAgentInterventionRequest},
+        TContext
+      > => {
+      return useMutation(getCreateAgentInterventionMutationOptions(options), queryClient);
+    }
+    /**
+ * List a session's interventions, newest first.
+ * @summary List agent interventions
+ */
+export const listAgentInterventions = (
+    sessionId: string,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<ListAgentInterventionsResponse>(
+      {url: `/agent-sessions/${sessionId}/interventions`, method: 'GET', signal
+    },
+      options);
+    }
+
+
+
+
+export const getListAgentInterventionsQueryKey = (sessionId: string,) => {
+    return [
+    `/agent-sessions/${sessionId}/interventions`
+    ] as const;
+    }
+
+
+export const getListAgentInterventionsQueryOptions = <TData = Awaited<ReturnType<typeof listAgentInterventions>>, TError = HTTPValidationError>(sessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAgentInterventions>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListAgentInterventionsQueryKey(sessionId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAgentInterventions>>> = ({ signal }) => listAgentInterventions(sessionId, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: sessionId !== null && sessionId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAgentInterventions>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListAgentInterventionsQueryResult = NonNullable<Awaited<ReturnType<typeof listAgentInterventions>>>
+export type ListAgentInterventionsQueryError = HTTPValidationError
+
+
+export function useListAgentInterventions<TData = Awaited<ReturnType<typeof listAgentInterventions>>, TError = HTTPValidationError>(
+ sessionId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAgentInterventions>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listAgentInterventions>>,
+          TError,
+          Awaited<ReturnType<typeof listAgentInterventions>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListAgentInterventions<TData = Awaited<ReturnType<typeof listAgentInterventions>>, TError = HTTPValidationError>(
+ sessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAgentInterventions>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listAgentInterventions>>,
+          TError,
+          Awaited<ReturnType<typeof listAgentInterventions>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListAgentInterventions<TData = Awaited<ReturnType<typeof listAgentInterventions>>, TError = HTTPValidationError>(
+ sessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAgentInterventions>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List agent interventions
+ */
+
+export function useListAgentInterventions<TData = Awaited<ReturnType<typeof listAgentInterventions>>, TError = HTTPValidationError>(
+ sessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAgentInterventions>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListAgentInterventionsQueryOptions(sessionId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
+ * Get an intervention with the session state needed to answer it.
+ * @summary Get an agent intervention
+ */
+export const getAgentIntervention = (
+    sessionId: string,
+    interventionId: string,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<AgentInterventionResponse>(
+      {url: `/agent-sessions/${sessionId}/interventions/${interventionId}`, method: 'GET', signal
+    },
+      options);
+    }
+
+
+
+
+export const getGetAgentInterventionQueryKey = (sessionId: string,
+    interventionId: string,) => {
+    return [
+    `/agent-sessions/${sessionId}/interventions/${interventionId}`
+    ] as const;
+    }
+
+
+export const getGetAgentInterventionQueryOptions = <TData = Awaited<ReturnType<typeof getAgentIntervention>>, TError = HTTPValidationError>(sessionId: string,
+    interventionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAgentIntervention>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAgentInterventionQueryKey(sessionId,interventionId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAgentIntervention>>> = ({ signal }) => getAgentIntervention(sessionId,interventionId, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: sessionId !== null && sessionId !== undefined && interventionId !== null && interventionId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAgentIntervention>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetAgentInterventionQueryResult = NonNullable<Awaited<ReturnType<typeof getAgentIntervention>>>
+export type GetAgentInterventionQueryError = HTTPValidationError
+
+
+export function useGetAgentIntervention<TData = Awaited<ReturnType<typeof getAgentIntervention>>, TError = HTTPValidationError>(
+ sessionId: string,
+    interventionId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAgentIntervention>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAgentIntervention>>,
+          TError,
+          Awaited<ReturnType<typeof getAgentIntervention>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAgentIntervention<TData = Awaited<ReturnType<typeof getAgentIntervention>>, TError = HTTPValidationError>(
+ sessionId: string,
+    interventionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAgentIntervention>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAgentIntervention>>,
+          TError,
+          Awaited<ReturnType<typeof getAgentIntervention>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAgentIntervention<TData = Awaited<ReturnType<typeof getAgentIntervention>>, TError = HTTPValidationError>(
+ sessionId: string,
+    interventionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAgentIntervention>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get an agent intervention
+ */
+
+export function useGetAgentIntervention<TData = Awaited<ReturnType<typeof getAgentIntervention>>, TError = HTTPValidationError>(
+ sessionId: string,
+    interventionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAgentIntervention>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetAgentInterventionQueryOptions(sessionId,interventionId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
+ * Record an expert's guidance and either stop the session or authorize a resume.
+ *
+ * A plan with a checkpoint stays paused until its runner claims the resume.
+ * @summary Respond to an agent intervention
+ */
+export const respondAgentIntervention = (
+    sessionId: string,
+    interventionId: string,
+    respondAgentInterventionRequest: RespondAgentInterventionRequest,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<AgentInterventionResponse>(
+      {url: `/agent-sessions/${sessionId}/interventions/${interventionId}/respond`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: respondAgentInterventionRequest, signal
+    },
+      options);
+    }
+
+
+
+
+export const getRespondAgentInterventionMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof respondAgentIntervention>>, TError,{sessionId: string;interventionId: string;data: RespondAgentInterventionRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof respondAgentIntervention>>, TError,{sessionId: string;interventionId: string;data: RespondAgentInterventionRequest}, TContext> => {
+
+const mutationKey = ['respondAgentIntervention'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof respondAgentIntervention>>, {sessionId: string;interventionId: string;data: RespondAgentInterventionRequest}> = (props) => {
+          const {sessionId,interventionId,data} = props ?? {};
+
+          return  respondAgentIntervention(sessionId,interventionId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RespondAgentInterventionMutationResult = NonNullable<Awaited<ReturnType<typeof respondAgentIntervention>>>
+    export type RespondAgentInterventionMutationBody = RespondAgentInterventionRequest
+    export type RespondAgentInterventionMutationError = HTTPValidationError
+
+    /**
+ * @summary Respond to an agent intervention
+ */
+export const useRespondAgentIntervention = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof respondAgentIntervention>>, TError,{sessionId: string;interventionId: string;data: RespondAgentInterventionRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof respondAgentIntervention>>,
+        TError,
+        {sessionId: string;interventionId: string;data: RespondAgentInterventionRequest},
+        TContext
+      > => {
+      return useMutation(getRespondAgentInterventionMutationOptions(options), queryClient);
+    }
+    /**
+ * Reactivate the paused session for the one runner that holds the claim key.
+ * @summary Claim an authorized agent resume
+ */
+export const claimAgentInterventionResume = (
+    sessionId: string,
+    interventionId: string,
+    claimAgentResumeRequest: ClaimAgentResumeRequest,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<AgentInterventionResponse>(
+      {url: `/agent-sessions/${sessionId}/interventions/${interventionId}/claim-resume`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: claimAgentResumeRequest, signal
+    },
+      options);
+    }
+
+
+
+
+export const getClaimAgentInterventionResumeMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof claimAgentInterventionResume>>, TError,{sessionId: string;interventionId: string;data: ClaimAgentResumeRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof claimAgentInterventionResume>>, TError,{sessionId: string;interventionId: string;data: ClaimAgentResumeRequest}, TContext> => {
+
+const mutationKey = ['claimAgentInterventionResume'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof claimAgentInterventionResume>>, {sessionId: string;interventionId: string;data: ClaimAgentResumeRequest}> = (props) => {
+          const {sessionId,interventionId,data} = props ?? {};
+
+          return  claimAgentInterventionResume(sessionId,interventionId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ClaimAgentInterventionResumeMutationResult = NonNullable<Awaited<ReturnType<typeof claimAgentInterventionResume>>>
+    export type ClaimAgentInterventionResumeMutationBody = ClaimAgentResumeRequest
+    export type ClaimAgentInterventionResumeMutationError = HTTPValidationError
+
+    /**
+ * @summary Claim an authorized agent resume
+ */
+export const useClaimAgentInterventionResume = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof claimAgentInterventionResume>>, TError,{sessionId: string;interventionId: string;data: ClaimAgentResumeRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof claimAgentInterventionResume>>,
+        TError,
+        {sessionId: string;interventionId: string;data: ClaimAgentResumeRequest},
+        TContext
+      > => {
+      return useMutation(getClaimAgentInterventionResumeMutationOptions(options), queryClient);
+    }
+    /**
+ * Record how the resumed run ended.
+ * @summary Record the outcome of a resumed agent plan
+ */
+export const recordAgentResumeOutcome = (
+    sessionId: string,
+    interventionId: string,
+    recordAgentResumeOutcomeRequest: RecordAgentResumeOutcomeRequest,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<AgentInterventionResponse>(
+      {url: `/agent-sessions/${sessionId}/interventions/${interventionId}/resume-outcome`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: recordAgentResumeOutcomeRequest, signal
+    },
+      options);
+    }
+
+
+
+
+export const getRecordAgentResumeOutcomeMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof recordAgentResumeOutcome>>, TError,{sessionId: string;interventionId: string;data: RecordAgentResumeOutcomeRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof recordAgentResumeOutcome>>, TError,{sessionId: string;interventionId: string;data: RecordAgentResumeOutcomeRequest}, TContext> => {
+
+const mutationKey = ['recordAgentResumeOutcome'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof recordAgentResumeOutcome>>, {sessionId: string;interventionId: string;data: RecordAgentResumeOutcomeRequest}> = (props) => {
+          const {sessionId,interventionId,data} = props ?? {};
+
+          return  recordAgentResumeOutcome(sessionId,interventionId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RecordAgentResumeOutcomeMutationResult = NonNullable<Awaited<ReturnType<typeof recordAgentResumeOutcome>>>
+    export type RecordAgentResumeOutcomeMutationBody = RecordAgentResumeOutcomeRequest
+    export type RecordAgentResumeOutcomeMutationError = HTTPValidationError
+
+    /**
+ * @summary Record the outcome of a resumed agent plan
+ */
+export const useRecordAgentResumeOutcome = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof recordAgentResumeOutcome>>, TError,{sessionId: string;interventionId: string;data: RecordAgentResumeOutcomeRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof recordAgentResumeOutcome>>,
+        TError,
+        {sessionId: string;interventionId: string;data: RecordAgentResumeOutcomeRequest},
+        TContext
+      > => {
+      return useMutation(getRecordAgentResumeOutcomeMutationOptions(options), queryClient);
+    }
+    /**
+ * Try once more to send an unsent Slack message; a sent message is never posted again.
+ * @summary Retry an agent intervention Slack message
+ */
+export const retryAgentInterventionNotification = (
+    sessionId: string,
+    interventionId: string,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<AgentInterventionResponse>(
+      {url: `/agent-sessions/${sessionId}/interventions/${interventionId}/notification/retry`, method: 'POST', signal
+    },
+      options);
+    }
+
+
+
+
+export const getRetryAgentInterventionNotificationMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof retryAgentInterventionNotification>>, TError,{sessionId: string;interventionId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof retryAgentInterventionNotification>>, TError,{sessionId: string;interventionId: string}, TContext> => {
+
+const mutationKey = ['retryAgentInterventionNotification'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof retryAgentInterventionNotification>>, {sessionId: string;interventionId: string}> = (props) => {
+          const {sessionId,interventionId} = props ?? {};
+
+          return  retryAgentInterventionNotification(sessionId,interventionId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RetryAgentInterventionNotificationMutationResult = NonNullable<Awaited<ReturnType<typeof retryAgentInterventionNotification>>>
+
+    export type RetryAgentInterventionNotificationMutationError = HTTPValidationError
+
+    /**
+ * @summary Retry an agent intervention Slack message
+ */
+export const useRetryAgentInterventionNotification = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof retryAgentInterventionNotification>>, TError,{sessionId: string;interventionId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof retryAgentInterventionNotification>>,
+        TError,
+        {sessionId: string;interventionId: string},
+        TContext
+      > => {
+      return useMutation(getRetryAgentInterventionNotificationMutationOptions(options), queryClient);
     }

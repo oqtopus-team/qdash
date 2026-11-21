@@ -1,6 +1,6 @@
 ---
 name: qdash-one-qubit-calibration
-description: Plan, run, and recover single-qubit QDash calibration with the coarse_one, fine_one, one_qubit, fast_full_calibration, full_calibration, and simple flow templates, from readout search and pulse calibration through randomized benchmarking. Use when the user wants qubits calibrated or recalibrated, wants a failed single-qubit stage recovered, or asks which single-qubit flow fits the chip's state. Not for first-time spectroscopy (qdash-chip-bringup) or two-qubit gates (qdash-two-qubit-calibration).
+description: Plan, run, and recover single-qubit QDash calibration with the coarse_one, fine_one, one_qubit, fast_full_calibration, full_calibration, and simple flow templates, from readout search and pulse calibration through randomized benchmarking. Use when the user wants qubits or MUXes calibrated or recalibrated ("calibrate Q0"), wants a failed single-qubit stage recovered, or asks which single-qubit flow fits the chip's state. Not for first-time spectroscopy (qdash-chip-bringup), two-qubit gates (qdash-two-qubit-calibration), or remeasuring one property such as T1 (qdash-characterization).
 license: Apache-2.0
 ---
 

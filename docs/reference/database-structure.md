@@ -100,6 +100,7 @@ revisions each dashboard pins (`pins`, keyed by `dashboard_id`) and a `version` 
 | `agent_actions` | `AgentActionDocument` | `agent_session.py` |
 | `agent_candidate_commits` | `AgentCandidateCommitDocument` | `agent_session.py` |
 | `agent_candidate_set_commits` | `AgentCandidateSetCommitDocument` | `agent_session.py` |
+| `agent_interventions` | `AgentInterventionDocument` | `agent_session.py` |
 | `parameter_versions` | `ParameterVersionDocument` | `provenance.py` |
 | `provenance_relations` | `ProvenanceRelationDocument` | `provenance.py` |
 | `provenance_activities` | `ActivityDocument` | `provenance.py` |

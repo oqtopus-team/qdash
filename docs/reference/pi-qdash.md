@@ -55,7 +55,8 @@ pi-qdash tools reuse the session's profile and chip when callers omit those para
 | Tools | Result or limit |
 | --- | --- |
 | `qdash_create_agent_session`, `qdash_get_agent_session` | Create or inspect a session. The `policy` object passes through to QDash; `autonomy: auto` and `max_rounds_per_target` allow an approved plan to run without per-step confirmation. |
-| `qdash_submit_agent_action`, `qdash_get_agent_action`, `qdash_list_agent_actions`, `qdash_wait_agent_action` | Submit, inspect, list, and wait for actions. |
+| `qdash_submit_agent_action`, `qdash_get_agent_action`, `qdash_list_agent_actions`, `qdash_wait_agent_action` | Submit, inspect, list, and wait for actions. An authorized `request_human` action records an intervention and pauses the session until an expert answers in QDash. |
+| `qdash_list_agent_interventions` | List a session's interventions: the reason, question, expert decision and guidance, and resume blockers; read-only. |
 | `qdash_list_agent_action_candidates` | List candidates produced by an action. |
 | `qdash_execute_agent_action` | Run an action using current calibration inputs; outputs stay staged until commit. `sourceExecutionId` records the source of a decision. |
 | `qdash_commit_agent_candidate`, `qdash_commit_agent_candidate_set` | Commit one candidate or a set. |
@@ -111,7 +112,7 @@ These tools are deferred. Validation and previews execute the script on the QDas
 | Secret output | API tokens, passwords, and Cloudflare Access secrets are redacted. |
 | Write tools | Interactive pi asks for confirmation; non-interactive calls require `confirmWrite: true`. |
 | Saved profile and chip | The profile and chip selection outside a session is saved in `qdash-context.json` in pi's agent directory: `PI_CODING_AGENT_DIR` when set, otherwise `~/.pi/agent`. |
-| Investigation guidance | While a `qdash_*` tool is selected, the system prompt has a `qdash_guidance` section with evidence rules and the `qdash` skill's tool routing for the tools the model can call directly or load with `tool_search`. While `codemode` or `tool_search` is active, the section also gives QDash chat's script and deferred-tool rules. |
+| Investigation guidance | While a `qdash_*` tool is selected, the system prompt has a `qdash_guidance` section with evidence rules, rules for plain-language requests, and the `qdash` skill's tool routing for the tools the model can call directly or load with `tool_search`. While `codemode` or `tool_search` is active, the section also gives QDash chat's script and deferred-tool rules. |
 
 ## Scripts and deferred tools
 
@@ -180,6 +181,6 @@ The reference and examples come from one knowledge request as the configured QDa
 | `/skill:qdash-chip-bringup` | Run first-time bring-up from capture delay correction through resonator and qubit spectroscopy with the `box_setup`, `bringup`, and `check_waveform` flow templates. |
 | `/skill:qdash-one-qubit-calibration` | Choose, run, and recover single-qubit calibration with the `coarse_one`, `fine_one`, `one_qubit`, full calibration, and `simple` flow templates. |
 | `/skill:qdash-two-qubit-calibration` | Choose a two-qubit template by pair selection, run the CR and ZX90 chain, and diagnose poor two-qubit quality. |
-| `/skill:qdash-characterization` | Measure coherence, EF transitions, noise, coupling, and gate coherence limits with the `coherence_check`, `characterization`, `ef_calibration`, and `coherence_limit` flow templates. |
+| `/skill:qdash-characterization` | Measure or remeasure coherence, EF transitions, noise, coupling, and gate coherence limits with the `coherence_check`, `characterization`, `ef_calibration`, and `coherence_limit` flow templates. |
 | `/skill:qdash-timeseries-diagnosis` | Investigate multi-metric drift and local sensor series. |
 | `/skill:qdash-metric-scripts` | Write, validate, preview, and save metric scripts and put them on dashboards; `references/api.md` documents the `qdash_metrics` API. |

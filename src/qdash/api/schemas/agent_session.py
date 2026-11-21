@@ -3,13 +3,22 @@
 from __future__ import annotations
 
 from datetime import datetime  # noqa: TC003 - Pydantic resolves this runtime annotation
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
 from qdash.datamodel.agent_session import (
     AgentActionDecision,
     AgentActionType,
+    AgentInterventionAttempt,
+    AgentInterventionDecision,
+    AgentInterventionEvent,
+    AgentInterventionReason,
+    AgentInterventionResponseRecord,
+    AgentInterventionStatus,
+    AgentNotificationStatus,
+    AgentPlanCheckpoint,
+    AgentResumeOutcomeRecord,
     AgentSessionPolicy,
     AgentSessionStatus,
 )
@@ -45,6 +54,9 @@ class AgentSessionResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     expires_at: datetime
+    active_intervention_id: str | None = Field(
+        default=None, description="The intervention the session waits on, if any"
+    )
 
 
 class SubmitAgentActionRequest(BaseModel):
@@ -93,6 +105,9 @@ class AgentActionResponse(BaseModel):
     state_version_before: int
     state_version_after: int
     created_at: datetime
+    intervention_id: str | None = Field(
+        default=None, description="Intervention recorded for an authorized request_human"
+    )
 
 
 class ListAgentActionsResponse(BaseModel):
@@ -258,3 +273,147 @@ class AgentCandidateSetCommitResponse(BaseModel):
     state_version_after: int
     created_at: datetime
     committed_at: datetime | None = None
+
+
+class CreateAgentInterventionRequest(BaseModel):
+    """Record that an agent stopped and needs a person, with evidence references.
+
+    QDash records the request even when the session has no actions left or has expired; it
+    then pauses the session if it was active. Attempts reference actions, executions, task
+    results, and evaluations that QDash checks; free text stays short and human-facing.
+    """
+
+    idempotency_key: str = Field(min_length=1, max_length=128)
+    reason: AgentInterventionReason
+    summary: str = Field(min_length=1, max_length=2000)
+    question: str = Field(min_length=1, max_length=2000)
+    node_id: str | None = Field(default=None, min_length=1, max_length=200)
+    task_name: str | None = Field(default=None, min_length=1, max_length=200)
+    qids: list[str] = Field(default_factory=list, max_length=64)
+    attempts: list[AgentInterventionAttempt] = Field(default_factory=list, max_length=20)
+    checkpoint: AgentPlanCheckpoint | None = Field(
+        default=None,
+        description="Where the plan stopped; required for a runner to resume it",
+    )
+    previous_intervention_id: str | None = Field(default=None, min_length=1, max_length=200)
+
+
+class RespondAgentInterventionRequest(BaseModel):
+    """An expert's answer: resume within the approved plan, or stop the session.
+
+    Guidance is recorded for the agent and the audit trail; it does not change the plan,
+    the scope, or any parameter.
+    """
+
+    idempotency_key: str = Field(min_length=1, max_length=128)
+    expected_state_version: int = Field(ge=0)
+    decision: AgentInterventionDecision
+    guidance: str = Field(default="", max_length=5000)
+    resume_node_id: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=200,
+        description="Plan node to continue from; defaults to the node where the plan stopped",
+    )
+
+    @model_validator(mode="after")
+    def validate_resume_node(self) -> RespondAgentInterventionRequest:
+        """A resume node only makes sense when resuming."""
+        if self.resume_node_id is not None and self.decision != AgentInterventionDecision.RESUME:
+            raise ValueError("resume_node_id is only valid with decision=resume")
+        return self
+
+
+class ClaimAgentResumeRequest(BaseModel):
+    """A runner claims an authorized resume; one claim key owns the resumed run."""
+
+    claim_key: str = Field(min_length=1, max_length=128)
+
+
+class RecordAgentResumeOutcomeRequest(BaseModel):
+    """The resumed runner reports how its run ended."""
+
+    claim_key: str = Field(min_length=1, max_length=128)
+    transition: Literal["pass", "retry", "rollback", "human_escalation"]
+    reason: str = Field(default="", max_length=2000)
+    follow_up_intervention_id: str | None = Field(default=None, min_length=1, max_length=200)
+
+
+class AgentNotificationDeliveryResponse(BaseModel):
+    """Slack delivery state shown with an intervention."""
+
+    status: AgentNotificationStatus
+    attempts: int
+    last_error: str
+    last_attempt_at: datetime | None = None
+    next_attempt_at: datetime | None = None
+    channel_id: str | None = None
+    message_ts: str | None = None
+    sent_at: datetime | None = None
+    last_reply_error: str = ""
+
+
+class AgentResumeOption(BaseModel):
+    """A plan node the expert may resume from, with its remaining visit budget."""
+
+    node_id: str
+    task_name: str
+    visits: int
+    max_visits: int | None = None
+    available: bool
+    reason: str = ""
+
+
+class AgentInterventionResponse(BaseModel):
+    """An intervention with the session state an expert needs to decide."""
+
+    intervention_id: str
+    project_id: str
+    session_id: str
+    chip_id: str
+    idempotency_key: str
+    created_by: str
+    reason: AgentInterventionReason
+    summary: str
+    question: str
+    node_id: str | None = None
+    task_name: str | None = None
+    qids: list[str]
+    attempts: list[AgentInterventionAttempt]
+    action_id: str | None = None
+    previous_intervention_id: str | None = None
+    checkpoint: AgentPlanCheckpoint | None = None
+    plan_hash: str
+    pauses_session: bool
+    status: AgentInterventionStatus
+    response: AgentInterventionResponseRecord | None = None
+    resume_claim_key: str | None = None
+    resumed_by: str | None = None
+    resumed_at: datetime | None = None
+    resume_outcome: AgentResumeOutcomeRecord | None = None
+    notification: AgentNotificationDeliveryResponse
+    events: list[AgentInterventionEvent]
+    created_at: datetime
+    updated_at: datetime
+    session_status: AgentSessionStatus
+    session_state_version: int
+    session_expires_at: datetime
+    actions_used: int
+    max_actions: int
+    can_resume: bool = Field(description="Whether an expert can authorize a resume now")
+    resume_blockers: list[str] = Field(
+        default_factory=list, description="Why a resume is not possible, in plain words"
+    )
+    resume_options: list[AgentResumeOption] = Field(default_factory=list)
+    resume_command: str | None = Field(
+        default=None,
+        description="The client command that continues an authorized plan",
+    )
+    page_path: str
+
+
+class ListAgentInterventionsResponse(BaseModel):
+    """Interventions of one session, newest first."""
+
+    items: list[AgentInterventionResponse]
+    total: int

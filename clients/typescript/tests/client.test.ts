@@ -250,6 +250,31 @@ describe("QDashClient", () => {
     });
   });
 
+  it("reads a session's interventions without changing them", async () => {
+    const requests: Request[] = [];
+    const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const request = new Request(input, init);
+      requests.push(request);
+      return request.url.endsWith("/interventions")
+        ? jsonResponse({ items: [{ intervention_id: "int-1" }], total: 1 })
+        : jsonResponse({ intervention_id: "int-1" });
+    });
+    const client = new QDashClient(
+      new QDashConfig({ baseUrl: "https://qdash.example/api", apiToken: "token" }),
+      { fetch },
+    );
+
+    const items = await client.listAgentInterventions("session 1");
+    const one = await client.getAgentIntervention("session 1", "int-1");
+
+    expect(items.map((item) => item.intervention_id)).toEqual(["int-1"]);
+    expect(one.intervention_id).toBe("int-1");
+    expect(requests.map((request) => `${request.method} ${new URL(request.url).pathname}`)).toEqual([
+      "GET /api/agent-sessions/session%201/interventions",
+      "GET /api/agent-sessions/session%201/interventions/int-1",
+    ]);
+  });
+
   it("downloads execution figures as binary files", async () => {
     let request: Request | undefined;
     const bytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);

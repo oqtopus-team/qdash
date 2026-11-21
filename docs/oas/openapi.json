@@ -2853,7 +2853,7 @@
           "agent-session"
         ],
         "summary": "Submit an agent action",
-        "description": "Authorize and audit an action proposal without executing it.",
+        "description": "Authorize and audit an action proposal without executing it.\n\nAn authorized ``request_human`` also records an intervention, pauses the session on it,\nand queues its Slack message.",
         "operationId": "submitAgentAction",
         "security": [
           {
@@ -3590,6 +3590,537 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AgentActionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent-sessions/{session_id}/interventions": {
+      "post": {
+        "tags": [
+          "agent-session"
+        ],
+        "summary": "Record an agent intervention",
+        "description": "Record that the agent needs a person and pause the session if it is active.\n\nThe record is saved before any Slack message is attempted, and it is saved even when the\nsession has no actions left or has expired.",
+        "operationId": "createAgentIntervention",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAgentInterventionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentInterventionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "agent-session"
+        ],
+        "summary": "List agent interventions",
+        "description": "List a session's interventions, newest first.",
+        "operationId": "listAgentInterventions",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListAgentInterventionsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent-sessions/{session_id}/interventions/{intervention_id}": {
+      "get": {
+        "tags": [
+          "agent-session"
+        ],
+        "summary": "Get an agent intervention",
+        "description": "Get an intervention with the session state needed to answer it.",
+        "operationId": "getAgentIntervention",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "intervention_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Intervention Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentInterventionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent-sessions/{session_id}/interventions/{intervention_id}/respond": {
+      "post": {
+        "tags": [
+          "agent-session"
+        ],
+        "summary": "Respond to an agent intervention",
+        "description": "Record an expert's guidance and either stop the session or authorize a resume.\n\nA plan with a checkpoint stays paused until its runner claims the resume.",
+        "operationId": "respondAgentIntervention",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "intervention_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Intervention Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RespondAgentInterventionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentInterventionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent-sessions/{session_id}/interventions/{intervention_id}/claim-resume": {
+      "post": {
+        "tags": [
+          "agent-session"
+        ],
+        "summary": "Claim an authorized agent resume",
+        "description": "Reactivate the paused session for the one runner that holds the claim key.",
+        "operationId": "claimAgentInterventionResume",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "intervention_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Intervention Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClaimAgentResumeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentInterventionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent-sessions/{session_id}/interventions/{intervention_id}/resume-outcome": {
+      "post": {
+        "tags": [
+          "agent-session"
+        ],
+        "summary": "Record the outcome of a resumed agent plan",
+        "description": "Record how the resumed run ended.",
+        "operationId": "recordAgentResumeOutcome",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "intervention_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Intervention Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordAgentResumeOutcomeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentInterventionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent-sessions/{session_id}/interventions/{intervention_id}/notification/retry": {
+      "post": {
+        "tags": [
+          "agent-session"
+        ],
+        "summary": "Retry an agent intervention Slack message",
+        "description": "Try once more to send an unsent Slack message; a sent message is never posted again.",
+        "operationId": "retryAgentInterventionNotification",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "intervention_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Intervention Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentInterventionResponse"
                 }
               }
             }
@@ -18966,6 +19497,18 @@
             "type": "string",
             "format": "date-time",
             "title": "Created At"
+          },
+          "intervention_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Intervention Id",
+            "description": "Intervention recorded for an authorized request_human"
           }
         },
         "type": "object",
@@ -19457,6 +20000,983 @@
         "title": "AgentCandidateSetCommitResponse",
         "description": "Audited all-at-once QDash commit of the final candidate set."
       },
+      "AgentCheckpointCandidate": {
+        "properties": {
+          "action_id": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Action Id"
+          },
+          "parameter_name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Parameter Name"
+          },
+          "task_id": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Task Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "action_id",
+          "parameter_name",
+          "task_id"
+        ],
+        "title": "AgentCheckpointCandidate",
+        "description": "An accepted candidate the plan carries; the runner re-reads its value from QDash."
+      },
+      "AgentInterventionAttempt": {
+        "properties": {
+          "node_id": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Node Id",
+            "default": ""
+          },
+          "task_name": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Task Name",
+            "default": ""
+          },
+          "qid": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Qid",
+            "default": ""
+          },
+          "transition": {
+            "type": "string",
+            "maxLength": 64,
+            "title": "Transition",
+            "default": ""
+          },
+          "status": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Status",
+            "description": "Evaluation or execution status",
+            "default": ""
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 1000,
+            "title": "Reason",
+            "default": ""
+          },
+          "action_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action Id"
+          },
+          "execution_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Execution Id"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          },
+          "evaluation_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evaluation Id"
+          },
+          "evaluation_run_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evaluation Run Id"
+          }
+        },
+        "type": "object",
+        "title": "AgentInterventionAttempt",
+        "description": "One recent attempt shown to the expert, as references rather than log output."
+      },
+      "AgentInterventionDecision": {
+        "type": "string",
+        "enum": [
+          "resume",
+          "stop"
+        ],
+        "title": "AgentInterventionDecision",
+        "description": "What the expert decided for the paused session."
+      },
+      "AgentInterventionEvent": {
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "At"
+          },
+          "actor": {
+            "type": "string",
+            "title": "Actor"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "at",
+          "actor",
+          "kind"
+        ],
+        "title": "AgentInterventionEvent",
+        "description": "One audit entry: who did what to the intervention, and when."
+      },
+      "AgentInterventionReason": {
+        "type": "string",
+        "enum": [
+          "unknown_outcome",
+          "recovery_exhausted",
+          "evaluation_failed",
+          "platform_error",
+          "policy_limit",
+          "agent_request"
+        ],
+        "title": "AgentInterventionReason",
+        "description": "Why an agent stopped and asked a person for help."
+      },
+      "AgentInterventionResponse": {
+        "properties": {
+          "intervention_id": {
+            "type": "string",
+            "title": "Intervention Id"
+          },
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          },
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id"
+          },
+          "idempotency_key": {
+            "type": "string",
+            "title": "Idempotency Key"
+          },
+          "created_by": {
+            "type": "string",
+            "title": "Created By"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/AgentInterventionReason"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "question": {
+            "type": "string",
+            "title": "Question"
+          },
+          "node_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Node Id"
+          },
+          "task_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Name"
+          },
+          "qids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Qids"
+          },
+          "attempts": {
+            "items": {
+              "$ref": "#/components/schemas/AgentInterventionAttempt"
+            },
+            "type": "array",
+            "title": "Attempts"
+          },
+          "action_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action Id"
+          },
+          "previous_intervention_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Intervention Id"
+          },
+          "checkpoint": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentPlanCheckpoint"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "plan_hash": {
+            "type": "string",
+            "title": "Plan Hash"
+          },
+          "pauses_session": {
+            "type": "boolean",
+            "title": "Pauses Session"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AgentInterventionStatus"
+          },
+          "response": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentInterventionResponseRecord"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "resume_claim_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resume Claim Key"
+          },
+          "resumed_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resumed By"
+          },
+          "resumed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resumed At"
+          },
+          "resume_outcome": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentResumeOutcomeRecord"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "notification": {
+            "$ref": "#/components/schemas/AgentNotificationDeliveryResponse"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/AgentInterventionEvent"
+            },
+            "type": "array",
+            "title": "Events"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "session_status": {
+            "$ref": "#/components/schemas/AgentSessionStatus"
+          },
+          "session_state_version": {
+            "type": "integer",
+            "title": "Session State Version"
+          },
+          "session_expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Session Expires At"
+          },
+          "actions_used": {
+            "type": "integer",
+            "title": "Actions Used"
+          },
+          "max_actions": {
+            "type": "integer",
+            "title": "Max Actions"
+          },
+          "can_resume": {
+            "type": "boolean",
+            "title": "Can Resume",
+            "description": "Whether an expert can authorize a resume now"
+          },
+          "resume_blockers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Resume Blockers",
+            "description": "Why a resume is not possible, in plain words"
+          },
+          "resume_options": {
+            "items": {
+              "$ref": "#/components/schemas/AgentResumeOption"
+            },
+            "type": "array",
+            "title": "Resume Options"
+          },
+          "resume_command": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resume Command",
+            "description": "The client command that continues an authorized plan"
+          },
+          "page_path": {
+            "type": "string",
+            "title": "Page Path"
+          }
+        },
+        "type": "object",
+        "required": [
+          "intervention_id",
+          "project_id",
+          "session_id",
+          "chip_id",
+          "idempotency_key",
+          "created_by",
+          "reason",
+          "summary",
+          "question",
+          "qids",
+          "attempts",
+          "plan_hash",
+          "pauses_session",
+          "status",
+          "notification",
+          "events",
+          "created_at",
+          "updated_at",
+          "session_status",
+          "session_state_version",
+          "session_expires_at",
+          "actions_used",
+          "max_actions",
+          "can_resume",
+          "page_path"
+        ],
+        "title": "AgentInterventionResponse",
+        "description": "An intervention with the session state an expert needs to decide."
+      },
+      "AgentInterventionResponseRecord": {
+        "properties": {
+          "response_id": {
+            "type": "string",
+            "title": "Response Id"
+          },
+          "idempotency_key": {
+            "type": "string",
+            "title": "Idempotency Key",
+            "default": ""
+          },
+          "decision": {
+            "$ref": "#/components/schemas/AgentInterventionDecision"
+          },
+          "guidance": {
+            "type": "string",
+            "maxLength": 5000,
+            "title": "Guidance",
+            "default": ""
+          },
+          "resume_node_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resume Node Id"
+          },
+          "responded_by": {
+            "type": "string",
+            "title": "Responded By"
+          },
+          "responded_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Responded At"
+          },
+          "expected_state_version": {
+            "type": "integer",
+            "title": "Expected State Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "response_id",
+          "decision",
+          "responded_by",
+          "responded_at",
+          "expected_state_version"
+        ],
+        "title": "AgentInterventionResponseRecord",
+        "description": "The expert's recorded answer. Guidance is evidence for the agent, never a command."
+      },
+      "AgentInterventionStatus": {
+        "type": "string",
+        "enum": [
+          "open",
+          "responding",
+          "resume_authorized",
+          "resumed",
+          "stopped",
+          "discarded"
+        ],
+        "title": "AgentInterventionStatus",
+        "description": "Lifecycle of one human intervention.\n\n``open`` waits for an expert. ``responding`` is the short window while a response is\nbeing applied to the session. ``resume_authorized`` means an expert allowed the runner to\ncontinue but no runner has claimed it yet; ``resumed`` means a runner claimed it and the\nsession is active again. ``stopped`` means the expert ended the session. ``discarded``\nmarks a request that never paused its session."
+      },
+      "AgentNotificationDeliveryResponse": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/AgentNotificationStatus"
+          },
+          "attempts": {
+            "type": "integer",
+            "title": "Attempts"
+          },
+          "last_error": {
+            "type": "string",
+            "title": "Last Error"
+          },
+          "last_attempt_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Attempt At"
+          },
+          "next_attempt_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Attempt At"
+          },
+          "channel_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Channel Id"
+          },
+          "message_ts": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message Ts"
+          },
+          "sent_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sent At"
+          },
+          "last_reply_error": {
+            "type": "string",
+            "title": "Last Reply Error",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "attempts",
+          "last_error"
+        ],
+        "title": "AgentNotificationDeliveryResponse",
+        "description": "Slack delivery state shown with an intervention."
+      },
+      "AgentNotificationStatus": {
+        "type": "string",
+        "enum": [
+          "disabled",
+          "pending",
+          "sending",
+          "sent",
+          "failed"
+        ],
+        "title": "AgentNotificationStatus",
+        "description": "Delivery state of the Slack root message for one intervention."
+      },
+      "AgentPlanCheckpoint": {
+        "properties": {
+          "version": {
+            "type": "integer",
+            "maximum": 1.0,
+            "minimum": 1.0,
+            "title": "Version",
+            "default": 1
+          },
+          "qid": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Qid"
+          },
+          "source_execution_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Execution Id"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/AgentPlanCheckpointNode"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Nodes"
+          },
+          "idempotency_prefix": {
+            "type": "string",
+            "maxLength": 96,
+            "minLength": 1,
+            "title": "Idempotency Prefix"
+          },
+          "node_path": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "title": "Node Path"
+          },
+          "visit_counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Visit Counts"
+          },
+          "stopped_node_id": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Stopped Node Id"
+          },
+          "accepted_candidates": {
+            "items": {
+              "$ref": "#/components/schemas/AgentCheckpointCandidate"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Accepted Candidates"
+          },
+          "max_pre_dispatch_retries": {
+            "type": "integer",
+            "maximum": 10.0,
+            "minimum": 0.0,
+            "title": "Max Pre Dispatch Retries",
+            "default": 1
+          },
+          "max_node_executions": {
+            "type": "integer",
+            "maximum": 10000.0,
+            "minimum": 1.0,
+            "title": "Max Node Executions"
+          },
+          "max_node_visits": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 10000.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Node Visits"
+          },
+          "commit_on_success": {
+            "type": "boolean",
+            "title": "Commit On Success",
+            "default": false
+          },
+          "planner": {
+            "type": "string",
+            "pattern": "^(none|evaluation)$",
+            "title": "Planner",
+            "default": "none"
+          },
+          "planner_history": {
+            "additionalProperties": {
+              "items": {
+                "$ref": "#/components/schemas/AgentPlannerVerdictRecord"
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "Planner History"
+          }
+        },
+        "type": "object",
+        "required": [
+          "qid",
+          "nodes",
+          "idempotency_prefix",
+          "stopped_node_id",
+          "max_node_executions"
+        ],
+        "title": "AgentPlanCheckpoint",
+        "description": "Where a stopped plan was, so a runner can continue it without repeating work.\n\nThe checkpoint holds the approved plan, the idempotency prefix, and every counter the\nplan's bounds use. QDash does not take the counters on trust: it binds a session to the\nplan of its first checkpoint and rejects a checkpoint that changes the plan, its prefix,\nor its bounds, shortens the recorded path, or reports fewer node visits than the\nsession's run_task actions show."
+      },
+      "AgentPlanCheckpointNode": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Id"
+          },
+          "task_name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Task Name"
+          },
+          "candidate_parameter": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Candidate Parameter"
+          },
+          "on_pass": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "On Pass"
+          },
+          "on_rollback": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "On Rollback"
+          },
+          "parameter_overrides": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Parameter Overrides"
+          },
+          "diagnosis": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "Diagnosis",
+            "default": ""
+          },
+          "reconfigure_before_task": {
+            "type": "boolean",
+            "title": "Reconfigure Before Task",
+            "default": false
+          },
+          "commit_candidate": {
+            "type": "boolean",
+            "title": "Commit Candidate",
+            "default": false
+          },
+          "apply_backend": {
+            "type": "boolean",
+            "title": "Apply Backend",
+            "default": false
+          },
+          "push_to_github": {
+            "type": "boolean",
+            "title": "Push To Github",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "task_name",
+          "candidate_parameter"
+        ],
+        "title": "AgentPlanCheckpointNode",
+        "description": "One node of the approved plan, as the runner received it."
+      },
+      "AgentPlannerVerdictRecord": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Status"
+          },
+          "fit_reliability": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fit Reliability"
+          },
+          "evaluation_id": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Evaluation Id",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "AgentPlannerVerdictRecord",
+        "description": "One evaluation verdict the planner remembers for its stop rules."
+      },
+      "AgentResumeOption": {
+        "properties": {
+          "node_id": {
+            "type": "string",
+            "title": "Node Id"
+          },
+          "task_name": {
+            "type": "string",
+            "title": "Task Name"
+          },
+          "visits": {
+            "type": "integer",
+            "title": "Visits"
+          },
+          "max_visits": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Visits"
+          },
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "node_id",
+          "task_name",
+          "visits",
+          "available"
+        ],
+        "title": "AgentResumeOption",
+        "description": "A plan node the expert may resume from, with its remaining visit budget."
+      },
+      "AgentResumeOutcomeRecord": {
+        "properties": {
+          "transition": {
+            "type": "string",
+            "maxLength": 64,
+            "title": "Transition"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "Reason",
+            "default": ""
+          },
+          "follow_up_intervention_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Follow Up Intervention Id"
+          },
+          "recorded_by": {
+            "type": "string",
+            "title": "Recorded By"
+          },
+          "recorded_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Recorded At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "transition",
+          "recorded_by",
+          "recorded_at"
+        ],
+        "title": "AgentResumeOutcomeRecord",
+        "description": "What the resumed runner reported when its run ended."
+      },
       "AgentSessionPolicy": {
         "properties": {
           "qids": {
@@ -19593,6 +21113,18 @@
             "type": "string",
             "format": "date-time",
             "title": "Expires At"
+          },
+          "active_intervention_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active Intervention Id",
+            "description": "The intervention the session waits on, if any"
           }
         },
         "type": "object",
@@ -20754,6 +22286,22 @@
         "title": "ChipResponse",
         "description": "Chip response model.\n\nQubit and coupling data are stored in separate collections for scalability\nand should be fetched via dedicated endpoints (/chips/{chip_id}/qubits, etc.).\n\nAttributes\n----------\n    chip_id (str): The ID of the chip.\n    size (int): The size of the chip.\n    topology_id (str | None): Topology template ID.\n    qubit_count (int): Number of qubits in the chip.\n    coupling_count (int): Number of couplings in the chip.\n    installed_at (datetime | None): Installation timestamp."
       },
+      "ClaimAgentResumeRequest": {
+        "properties": {
+          "claim_key": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Claim Key"
+          }
+        },
+        "type": "object",
+        "required": [
+          "claim_key"
+        ],
+        "title": "ClaimAgentResumeRequest",
+        "description": "A runner claims an authorized resume; one claim key owns the resumed run."
+      },
       "CommitAgentCandidateRequest": {
         "properties": {
           "idempotency_key": {
@@ -21619,6 +23167,106 @@
         ],
         "title": "CouplingResponse",
         "description": "Response model for a single coupling."
+      },
+      "CreateAgentInterventionRequest": {
+        "properties": {
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Idempotency Key"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/AgentInterventionReason"
+          },
+          "summary": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Summary"
+          },
+          "question": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Question"
+          },
+          "node_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Node Id"
+          },
+          "task_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Name"
+          },
+          "qids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 64,
+            "title": "Qids"
+          },
+          "attempts": {
+            "items": {
+              "$ref": "#/components/schemas/AgentInterventionAttempt"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Attempts"
+          },
+          "checkpoint": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentPlanCheckpoint"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Where the plan stopped; required for a runner to resume it"
+          },
+          "previous_intervention_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Intervention Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "idempotency_key",
+          "reason",
+          "summary",
+          "question"
+        ],
+        "title": "CreateAgentInterventionRequest",
+        "description": "Record that an agent stopped and needs a person, with evidence references.\n\nQDash records the request even when the session has no actions left or has expired; it\nthen pauses the session if it was active. Attempts reference actions, executions, task\nresults, and evaluations that QDash checks; free text stays short and human-facing."
       },
       "CreateAgentSessionRequest": {
         "properties": {
@@ -27259,6 +28907,28 @@
         "title": "ListAgentCandidatesResponse",
         "description": "Task-result candidates and their deterministic gate decisions."
       },
+      "ListAgentInterventionsResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AgentInterventionResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "ListAgentInterventionsResponse",
+        "description": "Interventions of one session, newest first."
+      },
       "ListBackendsResponse": {
         "properties": {
           "backends": {
@@ -32883,6 +34553,52 @@
         "title": "RecommendedTaskResponse",
         "description": "Response model for a recommended recalibration task.\n\nAttributes\n----------\ntask_name : str\n    Name of the task to re-run\npriority : int\n    Priority level (1=highest, larger=lower priority)\naffected_parameters : list[str]\n    Parameters that would be recalibrated by this task\naffected_qids : list[str]\n    Qubit/coupling IDs affected\nreason : str\n    Human-readable explanation"
       },
+      "RecordAgentResumeOutcomeRequest": {
+        "properties": {
+          "claim_key": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Claim Key"
+          },
+          "transition": {
+            "type": "string",
+            "enum": [
+              "pass",
+              "retry",
+              "rollback",
+              "human_escalation"
+            ],
+            "title": "Transition"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "Reason",
+            "default": ""
+          },
+          "follow_up_intervention_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Follow Up Intervention Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "claim_key",
+          "transition"
+        ],
+        "title": "RecordAgentResumeOutcomeRequest",
+        "description": "The resumed runner reports how its run ended."
+      },
       "RelativePeriod": {
         "properties": {
           "kind": {
@@ -33042,6 +34758,52 @@
         ],
         "title": "ResolvedTaskCall",
         "description": "One call as it will run: identity and settings after per-task defaults."
+      },
+      "RespondAgentInterventionRequest": {
+        "properties": {
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Idempotency Key"
+          },
+          "expected_state_version": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Expected State Version"
+          },
+          "decision": {
+            "$ref": "#/components/schemas/AgentInterventionDecision"
+          },
+          "guidance": {
+            "type": "string",
+            "maxLength": 5000,
+            "title": "Guidance",
+            "default": ""
+          },
+          "resume_node_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resume Node Id",
+            "description": "Plan node to continue from; defaults to the node where the plan stopped"
+          }
+        },
+        "type": "object",
+        "required": [
+          "idempotency_key",
+          "expected_state_version",
+          "decision"
+        ],
+        "title": "RespondAgentInterventionRequest",
+        "description": "An expert's answer: resume within the approved plan, or stop the session.\n\nGuidance is recorded for the agent and the audit trail; it does not change the plan,\nthe scope, or any parameter."
       },
       "RetryEvaluationRunResponse": {
         "properties": {

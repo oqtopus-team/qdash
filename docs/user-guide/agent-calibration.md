@@ -99,7 +99,10 @@ never substitute a number of its own.
 `run-plan` runs an ordered plan of steps inside one approved session. Before the first
 measurement it checks the qubit, the tasks, the candidate parameters, the reconfiguration
 permission, and the remaining action budget against the session. A `rollback` or
-`human_escalation` stops the plan at once.
+`human_escalation` stops the plan at once, and every ending other than `pass` is recorded in
+QDash as an intervention that pauses the session for an expert; see
+[When the agent stops for an expert](#when-the-agent-stops-for-an-expert). Add
+`--no-record-intervention` to leave the session active instead.
 
 ```bash
 qdash-agent --profile local run-plan \
@@ -224,6 +227,74 @@ Any other planner, backed by a model, is injected through the
 [Python API](../reference/clients/python.md#agent-calibration); without `--planner` the command
 runs the plan as written. How this works:
 [Agentic Calibration](../developer-guide/copilot/agentic-calibration.md).
+
+## When the agent stops for an expert
+
+When a plan cannot continue on its own, QDash records why, what it tried, and what it asks,
+and pauses the session: nothing new starts in it until an expert answers. A measurement that
+was already sent to the hardware before the pause is not stopped; it finishes on its own. This happens when a
+result has no known next step, when retries or the round budget run out, when an evaluation
+fails or keeps judging the fit unreliable, when QDash or the hardware reports an error, and when
+the session's scope, budget, or expiry stops the plan. An agent operated from pi or chat asks
+the same way with a `request_human` action; asking never uses the action budget.
+
+The `run-plan` output names the intervention under `intervention`. With
+[Slack notifications](./setup.md#notify-experts-of-agent-interventions-in-slack) configured,
+the agent channel also gets a message linking to it. Project members can open the page;
+answering needs editor permission.
+
+1. Open the link from Slack or the `page_path` in the output. The link names the project, and
+   the page loads only after QDash selects that project; if your account is not a member of
+   it, or has no project at all, the page says so instead of opening another project. The page shows the reason, the
+   question, the task and targets, and the recent attempts with links to their **Execution**,
+   **Result and figures**, and **Evaluation**.
+2. Under **Guidance**, write what you found. It is recorded with your name and printed by
+   `resume-plan` for the person who runs the resume; the plan runner does not act on it, and it
+   does not change the plan, the scope, or any parameter.
+3. Choose one:
+   - **Authorize resume** continues the approved plan. **Resume from** offers only nodes of that
+     plan, each with the runs it has left; measurements already made are not repeated.
+   - **Stop session** cancels the session for good.
+4. After **Authorize resume**, the session stays paused until the plan's runner continues it.
+   QDash does not start the runner. Run the command the page shows, on the machine where the
+   plan ran:
+
+   ```bash
+   qdash-agent --profile local resume-plan \
+     --session-id SESSION_ID --intervention-id INTERVENTION_ID
+   ```
+
+   The command restores the plan, its idempotency prefix, and its visit counts from QDash,
+   re-reads the accepted values it carries, and continues from the chosen node within the same
+   session scope, budget, and expiry. It prints the expert's guidance with the result, records
+   the result on the intervention, and records a new intervention if the resumed plan stops
+   again. It prints a claim key when it starts; if the run is interrupted, run it again with
+   `--claim-key` and that key. When the run finished but QDash could not record its result,
+   the command exits with status 3 and prints a second command with `--record-outcome`; run
+   that one, not `resume-plan` again, so nothing is measured twice. Once the result is
+   recorded, `resume-plan` with the same claim key only prints it.
+
+A resume is refused, with the reason on the page, when the session expired, used all its
+actions, or still has a measurement, a calibration commit, or a backend apply in progress, or
+when the plan used its node executions or the chosen node its runs. If QDash cannot tell whether
+a measurement started (its request was interrupted while it was being sent), the page says so
+and the session can only be stopped. Expiry, the budget, and the visit counts carry over to the
+resumed run: QDash counts each node's runs from its own records, so a session accepts only the
+plan it first stopped with, and an expired or exhausted session needs a newly authorized
+session. For a `request_human` from pi or chat, which
+has no plan to resume, the button reads **Reactivate session**: the session becomes active again
+and the agent reads your guidance with `qdash_list_agent_interventions`. A plan stop also has no
+plan to resume when QDash cannot confirm the plan's progress from its own records, for example
+because steps were also run by hand in the same session. Its summary then ends with "QDash
+rejected the plan checkpoint, so this intervention cannot resume the plan.", the output shows
+the reason under `checkpoint_rejection`, and the button reads **Reactivate session**; to run
+the plan again, start a newly authorized session.
+
+The page also shows whether the Slack message was sent; **Retry Slack** posts an unsent message
+again. A post that timed out after Slack accepted it cannot be told apart from a lost one, so a
+retry can occasionally post a second message. Slack messages cannot be answered or acted on from
+Slack. How this works:
+[Human interventions](../developer-guide/copilot/agentic-calibration.md#human-interventions).
 
 ## Before the first run on hardware
 
