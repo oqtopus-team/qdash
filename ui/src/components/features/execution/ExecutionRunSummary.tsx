@@ -2,6 +2,7 @@
 
 import { LoaderCircle } from "lucide-react";
 
+import { AnimatedNumber, AnimatedText } from "@/components/ui/AnimatedNumber";
 import { QubitTile } from "@/components/ui/QubitTile";
 import { isExecutionInProgress, isExecutionTerminal } from "@/lib/executionStatus";
 
@@ -46,9 +47,13 @@ export function ExecutionRunSummary({ status, tasks, className = "" }: Execution
       />
       <span className="font-medium">{headline}</span>
       {done > 0 && (
-        <span className="text-base-content/60">
-          · {done} task{done === 1 ? "" : "s"} done
-        </span>
+        <AnimatedText
+          label={`· ${done} task${done === 1 ? "" : "s"} done`}
+          className="text-base-content/60"
+        >
+          · <AnimatedNumber value={done} />
+          {done === 1 ? " task done" : " tasks done"}
+        </AnimatedText>
       )}
       {current && status === "running" && (
         <span className="flex items-center gap-1.5 text-base-content/60">

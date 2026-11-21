@@ -26,6 +26,7 @@
     "@json-render/core": "0.22.0",
     "@json-render/react": "0.22.0",
     "@monaco-editor/react": "^4.7.0",
+    "@number-flow/react": "^0.6.2",
     "@pierre/diffs": "1.7.0-beta.4",
     "@pierre/highlights": "0.5.1",
     "@pierre/trees": "^1.0.0-beta.6",
