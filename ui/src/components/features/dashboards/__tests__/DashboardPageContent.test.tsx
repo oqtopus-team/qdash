@@ -693,12 +693,14 @@ describe("DashboardPageContent with the Agent", () => {
     expect(screen.getAllByRole("button", { name: "Add panel" })).toHaveLength(1);
   });
 
-  it("stacks the header and wraps its actions on narrow screens", () => {
+  it("stacks the header and wraps its actions when the content is narrow", () => {
     renderPage();
 
     const heading = screen.getByRole("heading", { name: "Collision review" });
-    const header = heading.closest("div.mb-4");
-    expect(header).toHaveClass("flex-col", "sm:flex-row");
+    // A container query, so the Agent sidebar narrowing the page also stacks it.
+    const container = heading.closest("div.\\@container");
+    expect(container).toHaveClass("mb-4");
+    expect(container?.firstElementChild).toHaveClass("flex-col", "@2xl:flex-row");
     expect(screen.getByRole("button", { name: "Edit with Agent" }).parentElement).toHaveClass(
       "flex-wrap",
     );

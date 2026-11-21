@@ -697,76 +697,79 @@ export function DashboardPageContent({ dashboardId }: { dashboardId: string | nu
 
   return (
     <PageContainer maxWidth>
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-        <div className="flex min-w-0 items-start gap-2">
-          <Link
-            href="/dashboards"
-            className="btn btn-ghost btn-sm btn-square shrink-0"
-            aria-label="All dashboards"
-          >
-            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-          </Link>
-          {dashboard ? (
-            <div className="min-w-0">
-              <h1 className="truncate text-xl font-medium">{dashboard.name}</h1>
-              {dashboard.description && (
-                <p className="mt-1 text-sm text-base-content/70">{dashboard.description}</p>
-              )}
-              <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-base-content/60">
-                <VisibilityLabel visibility={dashboard.visibility} />
-                <span>by {dashboard.owner_username}</span>
-                <span title={formatDateTime(dashboard.updated_at)}>
-                  Updated {formatRelativeTime(dashboard.updated_at)}
-                </span>
-                {dashboard.chip_id && (
-                  <span>
-                    Default chip <span className="font-mono">{dashboard.chip_id}</span>
-                  </span>
+      {/* Lay out by the content width, not the viewport: the Agent sidebar narrows it. */}
+      <div className="@container mb-4">
+        <div className="flex flex-col gap-3 @2xl:flex-row @2xl:items-start @2xl:justify-between @2xl:gap-4">
+          <div className="flex min-w-0 items-start gap-2">
+            <Link
+              href="/dashboards"
+              className="btn btn-ghost btn-sm btn-square shrink-0"
+              aria-label="All dashboards"
+            >
+              <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+            </Link>
+            {dashboard ? (
+              <div className="min-w-0">
+                <h1 className="truncate text-xl font-medium">{dashboard.name}</h1>
+                {dashboard.description && (
+                  <p className="mt-1 text-sm text-base-content/70">{dashboard.description}</p>
                 )}
-              </p>
-            </div>
-          ) : (
-            <div className="min-w-0 flex-1">
-              <h1 className="sr-only">New dashboard</h1>
-              <input
-                className={`input input-sm w-full text-base font-medium sm:w-80 ${
-                  nameMissing ? "input-error" : ""
-                }`}
-                aria-label="Dashboard name"
-                aria-invalid={nameMissing || undefined}
-                aria-describedby={nameMissing ? "new-dashboard-name-error" : undefined}
-                placeholder="Untitled dashboard"
-                maxLength={200}
-                value={newMeta.name}
-                onChange={(event) => {
-                  const name = event.target.value;
-                  setNewMeta((current) => ({ ...current, name }));
-                  if (name.trim()) setNameMissing(false);
-                }}
-              />
-              {nameMissing && (
-                <p id="new-dashboard-name-error" className="mt-1 text-xs text-error">
-                  Name the dashboard before saving
+                <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-base-content/60">
+                  <VisibilityLabel visibility={dashboard.visibility} />
+                  <span>by {dashboard.owner_username}</span>
+                  <span title={formatDateTime(dashboard.updated_at)}>
+                    Updated {formatRelativeTime(dashboard.updated_at)}
+                  </span>
+                  {dashboard.chip_id && (
+                    <span>
+                      Default chip <span className="font-mono">{dashboard.chip_id}</span>
+                    </span>
+                  )}
                 </p>
-              )}
-              {newMeta.description && (
-                <p className="mt-1 text-sm text-base-content/70">{newMeta.description}</p>
-              )}
-              <p className="mt-1 text-xs text-base-content/60">
-                Draft, not saved yet. It is created private when you save.
-              </p>
-            </div>
-          )}
-        </div>
-        <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">
-          {dashboard
-            ? viewActions
-            : openAgent && (
-                <button type="button" className="btn btn-sm" onClick={openAgent}>
-                  <Bot data-icon="inline-start" aria-hidden="true" />
-                  Ask Agent
-                </button>
-              )}
+              </div>
+            ) : (
+              <div className="min-w-0 flex-1">
+                <h1 className="sr-only">New dashboard</h1>
+                <input
+                  className={`input input-sm w-full text-base font-medium sm:w-80 ${
+                    nameMissing ? "input-error" : ""
+                  }`}
+                  aria-label="Dashboard name"
+                  aria-invalid={nameMissing || undefined}
+                  aria-describedby={nameMissing ? "new-dashboard-name-error" : undefined}
+                  placeholder="Untitled dashboard"
+                  maxLength={200}
+                  value={newMeta.name}
+                  onChange={(event) => {
+                    const name = event.target.value;
+                    setNewMeta((current) => ({ ...current, name }));
+                    if (name.trim()) setNameMissing(false);
+                  }}
+                />
+                {nameMissing && (
+                  <p id="new-dashboard-name-error" className="mt-1 text-xs text-error">
+                    Name the dashboard before saving
+                  </p>
+                )}
+                {newMeta.description && (
+                  <p className="mt-1 text-sm text-base-content/70">{newMeta.description}</p>
+                )}
+                <p className="mt-1 text-xs text-base-content/60">
+                  Draft, not saved yet. It is created private when you save.
+                </p>
+              </div>
+            )}
+          </div>
+          <div className="flex shrink-0 flex-wrap items-center gap-2 @2xl:justify-end">
+            {dashboard
+              ? viewActions
+              : openAgent && (
+                  <button type="button" className="btn btn-sm" onClick={openAgent}>
+                    <Bot data-icon="inline-start" aria-hidden="true" />
+                    Ask Agent
+                  </button>
+                )}
+          </div>
         </div>
       </div>
 
