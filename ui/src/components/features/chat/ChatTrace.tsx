@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import { twMerge } from "tailwind-merge";
-import { Ban, Brain, ChevronRight, CircleX } from "lucide-react";
+import { Ban, Brain, ChevronRight, CircleX, Wrench } from "lucide-react";
 import type {
   ChatTrace as ChatTraceData,
   ToolClassification,
@@ -12,7 +12,7 @@ import type {
   TraceStep,
 } from "@/types/copilotChat";
 import { ChatMarkdown } from "@/components/features/chat/ChatMarkdown";
-import { FigureStrip } from "@/components/features/chat/ChatFigures";
+import { FigureStrip, figuresInSteps } from "@/components/features/chat/ChatFigures";
 import {
   ToolDetails,
   hasDetails,
@@ -27,13 +27,11 @@ import {
 } from "@/components/features/chat/ExecutionProgress";
 import { ChatLink } from "@/components/features/chat/ChatPreviewLink";
 import {
-  ChainOfThought,
   ChainOfThoughtContent,
   ChainOfThoughtStep,
   ChainOfThoughtTrigger,
 } from "@/components/ui/ChainOfThought";
 import { Loader } from "@/components/ui/Loader";
-import { Reasoning, ReasoningContent, ReasoningTrigger } from "@/components/ui/Reasoning";
 
 function formatDuration(ms: number): string {
   const s = Math.max(0, Math.round(ms / 1000));
@@ -169,6 +167,11 @@ function failureLine(step: ToolStep): string | null {
   return last.length > 160 ? `${last.slice(0, 160)}…` : last;
 }
 
+/** The execution a wait call is about, or null for any other tool. */
+function waitedExecution(step: ToolStep): string | null {
+  return step.tool === "qdash_wait_execution" ? executionIdFromArgs(step.args) : null;
+}
+
 /** Lines up content under a row's title, past its inline icon. */
 const ROW_INDENT = "pl-5.5";
 
@@ -186,7 +189,16 @@ function RowChevron({ open }: { open: boolean }) {
   );
 }
 
-function ToolStepRow({ step, now }: { step: ToolStep; now: number }) {
+function ToolStepRow({
+  step,
+  now,
+  extrasOutside = false,
+}: {
+  step: ToolStep;
+  now: number;
+  /** The row sits in a folded group, which shows its failure, execution and figures instead. */
+  extrasOutside?: boolean;
+}) {
   const title = stepTitle(step);
   const preview = stepPreview(step);
   const elapsed = (step.endedAt ?? now) - step.startedAt;
@@ -200,9 +212,9 @@ function ToolStepRow({ step, now }: { step: ToolStep; now: number }) {
   // becoming a running call and that call finishing.
   const [userOpen, setUserOpen] = useState(false);
   const open = details && userOpen;
-  const failure = open ? null : failureLine(step);
+  const failure = open || extrasOutside ? null : failureLine(step);
   // While the assistant waits on an execution, show its tasks and figures as they land.
-  const waitingOn = step.tool === "qdash_wait_execution" ? executionIdFromArgs(step.args) : null;
+  const waitingOn = extrasOutside ? null : waitedExecution(step);
   // One icon per row: what the tool is, or that it failed or never ran.
   const Icon = failed ? CircleX : cancelled ? Ban : toolIcon(step.tool);
 
@@ -273,7 +285,7 @@ function ToolStepRow({ step, now }: { step: ToolStep; now: number }) {
           </ChatLink>
         </p>
       )}
-      {step.figures && step.figures.length > 0 && (
+      {!extrasOutside && step.figures && step.figures.length > 0 && (
         <FigureStrip paths={step.figures} compact className={`${ROW_INDENT} mt-1.5`} />
       )}
       {(step.evaluation || step.classification) && (
@@ -336,78 +348,270 @@ function ThinkingStepRow({
   );
 }
 
-function TraceSteps({ steps, live }: { steps: TraceStep[]; live: boolean }) {
+function isTool(step: TraceStep): step is ToolStep {
+  return step.kind === "tool";
+}
+
+type WorkStep = Exclude<TraceStep, { kind: "text" }>;
+
+/** A run of work steps between two pieces of prose, or one piece of prose. */
+type TraceSegment =
+  | { kind: "text"; index: number; step: Extract<TraceStep, { kind: "text" }> }
+  | { kind: "work"; start: number; steps: WorkStep[] };
+
+/**
+ * Splits a trace at its prose: each maximal run of tool and thinking steps
+ * becomes one work segment, keyed by where it starts. Steps are append-only
+ * within a turn, so a segment keeps its key as new calls join it.
+ */
+export function groupTraceSteps(steps: TraceStep[]): TraceSegment[] {
+  const segments: TraceSegment[] = [];
+  let run: Extract<TraceSegment, { kind: "work" }> | null = null;
+  for (let index = 0; index < steps.length; index++) {
+    const step = steps[index];
+    if (step.kind === "text") {
+      run = null;
+      segments.push({ kind: "text", index, step });
+    } else if (run) {
+      run.steps.push(step);
+    } else {
+      run = { kind: "work", start: index, steps: [step] };
+      segments.push(run);
+    }
+  }
+  return segments;
+}
+
+/** A run with this many tool calls folds into one summary row. */
+const GROUP_MIN_TOOLS = 2;
+
+function isStepActive(step: TraceStep): boolean {
+  if (step.kind === "tool") return step.status === "drafting" || step.status === "running";
+  return step.kind === "thinking" && step.endedAt === undefined;
+}
+
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
+/** What a folded group would hide but must not: failures, executions and, live, figures. */
+function FoldedGroupNotes({ steps, showFigures }: { steps: ToolStep[]; showFigures: boolean }) {
+  const failures = steps.filter((s) => s.status === "error");
+  const waits = steps
+    .map((step) => ({ step, executionId: waitedExecution(step) }))
+    .filter((w): w is { step: ToolStep; executionId: string } => w.executionId !== null);
+  const figures = showFigures ? figuresInSteps(steps) : [];
+  if (failures.length === 0 && waits.length === 0 && figures.length === 0) return null;
+  return (
+    <div className={`${ROW_INDENT} flex min-w-0 flex-col gap-1`}>
+      {failures.map((step, i) => {
+        const line = failureLine(step);
+        return (
+          <p
+            key={`failure-${i}`}
+            className="flex min-w-0 items-center gap-1.5 text-xs"
+            data-testid="tool-group-failure"
+          >
+            <CircleX className="w-3 h-3 shrink-0 text-error" aria-hidden="true" />
+            <span className="shrink-0 text-base-content/70">{stepTitle(step)}</span>
+            <span className="sr-only">failed</span>
+            {line && (
+              <span className="min-w-0 truncate font-mono text-error" title={line}>
+                {line}
+              </span>
+            )}
+          </p>
+        );
+      })}
+      {waits.map(({ step, executionId }, i) =>
+        step.status === "running" ? (
+          <ExecutionProgress key={`wait-${i}`} executionId={executionId} />
+        ) : step.status === "done" || step.status === "error" ? (
+          <p key={`wait-${i}`} className="text-xs">
+            <ChatLink
+              href={executionPagePath(executionId)}
+              className="link link-hover text-base-content/60 hover:text-base-content"
+            >
+              View execution {executionId}
+            </ChatLink>
+          </p>
+        ) : null,
+      )}
+      {figures.length > 0 && <FigureStrip paths={figures} compact />}
+    </div>
+  );
+}
+
+/**
+ * One run of work steps. Fewer than two tool calls show as their own rows;
+ * from the second call on, the run folds into a summary that names what it is
+ * doing and how many calls it made, and opens to the same rows. The rows stay
+ * mounted at the same place in the tree either way, so a row the user opened
+ * keeps its state as the run grows into a group.
+ */
+function WorkGroup({
+  steps,
+  start,
+  now,
+  live,
+  figuresOutside,
+}: {
+  steps: WorkStep[];
+  start: number;
+  now: number;
+  live: boolean;
+  /** The message already shows the turn's figures, so a folded group need not. */
+  figuresOutside: boolean;
+}) {
+  const contentId = useId();
+  const [userOpen, setUserOpen] = useState(false);
+  const tools = steps.filter(isTool);
+  const grouped = tools.length >= GROUP_MIN_TOOLS;
+  const folded = grouped && !userOpen;
+  const active = live && steps.some(isStepActive);
+  const failed = tools.filter((s) => s.status === "error").length;
+  const notRun = tools.filter((s) => s.status === "cancelled").length;
+  const startedAt = Math.min(...steps.map((s) => s.startedAt));
+  const endedAt = active ? now : Math.max(...steps.map((s) => s.endedAt ?? now));
+  const label = active
+    ? (currentActivity(steps, null) ?? "Working")
+    : `Used ${plural(tools.length, "tool")}`;
+
+  return (
+    <div className="min-w-0" data-testid="trace-work" data-grouped={grouped}>
+      {grouped && (
+        <button
+          type="button"
+          onClick={() => setUserOpen(!userOpen)}
+          aria-expanded={!folded}
+          aria-controls={contentId}
+          className="group flex w-full min-w-0 cursor-pointer items-center gap-2 text-left text-sm"
+          data-testid="tool-group-summary"
+          data-active={active}
+        >
+          <Wrench
+            className="w-3.5 h-3.5 shrink-0 text-base-content/45"
+            strokeWidth={1.75}
+            aria-hidden="true"
+          />
+          <span
+            className={`min-w-0 truncate ${
+              active
+                ? "loader-text-shimmer"
+                : "text-base-content/65 group-hover:text-base-content/85"
+            }`}
+          >
+            {label}
+          </span>
+          {active && (
+            <span className="shrink-0 text-xs text-base-content/40">
+              · {plural(tools.length, "tool")}
+            </span>
+          )}
+          {failed > 0 && (
+            <span className="inline-flex shrink-0 items-center gap-1 text-xs text-error">
+              · <CircleX className="w-3 h-3" aria-hidden="true" />
+              {failed} failed
+            </span>
+          )}
+          {notRun > 0 && (
+            <span className="shrink-0 text-xs text-base-content/40">· {notRun} not run</span>
+          )}
+          <RowChevron open={!folded} />
+          <span
+            className="ml-auto shrink-0 text-xs tabular-nums text-base-content/40"
+            aria-hidden="true"
+          >
+            {formatDuration(endedAt - startedAt)}
+          </span>
+        </button>
+      )}
+      {folded && <FoldedGroupNotes steps={tools} showFigures={live && !figuresOutside} />}
+      {/* Hidden, not unmounted, while folded: rows keep what the user opened. */}
+      <ol
+        id={contentId}
+        hidden={folded}
+        className={`flex flex-col gap-2 ${grouped ? `${ROW_INDENT} mt-2` : ""}`}
+      >
+        {steps.map((step, j) => (
+          <li key={`${step.kind}-${start + j}`} className="min-w-0">
+            {step.kind === "tool" ? (
+              // A draft's ID can change when execution starts; the position cannot.
+              <ToolStepRow step={step} now={now} extrasOutside={folded} />
+            ) : (
+              <ThinkingStepRow step={step} now={now} live={live} />
+            )}
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
+function TraceSteps({
+  steps,
+  live,
+  figuresOutside,
+}: {
+  steps: TraceStep[];
+  live: boolean;
+  figuresOutside: boolean;
+}) {
   const running = live && steps.some((s) => s.kind === "thinking" || s.kind === "tool");
   const now = useNow(running);
   return (
-    <ChainOfThought variant="plain">
-      {steps.map((step, i) => {
-        if (step.kind === "tool") {
-          // Steps are append-only within a turn; a draft ID can change when execution starts.
-          return <ToolStepRow key={`tool-${i}`} step={step} now={now} />;
-        }
-        if (step.kind === "thinking") {
-          return <ThinkingStepRow key={`thinking-${i}`} step={step} now={now} live={live} />;
-        }
-        return (
-          <ChainOfThoughtStep key={`text-${i}`} defaultOpen>
+    <ol className="flex flex-col gap-2">
+      {groupTraceSteps(steps).map((segment) =>
+        segment.kind === "work" ? (
+          <li key={`work-${segment.start}`} className="min-w-0">
+            <WorkGroup
+              steps={segment.steps}
+              start={segment.start}
+              now={now}
+              live={live}
+              figuresOutside={figuresOutside}
+            />
+          </li>
+        ) : (
+          // Prose between calls stays outside every group.
+          <li key={`text-${segment.index}`} className="min-w-0">
             <ChatMarkdown
               className="text-sm text-base-content/70"
-              streaming={live && i === steps.length - 1}
+              streaming={live && segment.index === steps.length - 1}
             >
-              {step.text}
+              {segment.step.text}
             </ChatMarkdown>
-          </ChainOfThoughtStep>
-        );
-      })}
-    </ChainOfThought>
+          </li>
+        ),
+      )}
+    </ol>
   );
 }
 
-function summarize(steps: TraceStep[]): string {
-  const tools = steps.filter((s) => s.kind === "tool").length;
-  const thought = steps.some((s) => s.kind === "thinking");
-  const parts: string[] = [];
-  if (thought) parts.push("Thought");
-  if (tools > 0) parts.push(`used ${tools} tool${tools === 1 ? "" : "s"}`);
-  const text = parts.join(", ") || "Worked";
-  return text.charAt(0).toUpperCase() + text.slice(1);
-}
-
-/** Collapsed "Used 3 tools · 12s" summary for a finished answer. */
+/**
+ * The work before a finished answer: its prose, and its calls folded into the
+ * same groups the live turn showed, so nothing jumps when the turn ends.
+ */
 export function ChatTraceSummary({ trace }: { trace: ChatTraceData }) {
-  const tools = trace.steps.filter((s): s is ToolStep => s.kind === "tool");
-  // Failures stay visible on the folded summary, so they are found without opening it.
-  const failed = tools.filter((s) => s.status === "error").length;
-  const notRun = tools.filter((s) => s.status === "cancelled").length;
+  if (trace.steps.length === 0) return null;
   return (
-    <Reasoning className="mb-2">
-      <ReasoningTrigger className="chat-trace-toggle max-w-full flex-wrap">
-        <span>{summarize(trace.steps)}</span>
-        <span className="text-base-content/50">· {formatDuration(trace.durationMs)}</span>
-        {failed > 0 && (
-          <span className="inline-flex items-center gap-1 text-error">
-            · <CircleX className="w-3 h-3" aria-hidden="true" />
-            {failed} failed
-          </span>
-        )}
-        {notRun > 0 && <span className="text-base-content/50">· {notRun} not run</span>}
-      </ReasoningTrigger>
-      <ReasoningContent>
-        <div className="mt-2">
-          <TraceSteps steps={trace.steps} live={false} />
-        </div>
-      </ReasoningContent>
-    </Reasoning>
+    <div className="mb-3">
+      <TraceSteps steps={trace.steps} live={false} figuresOutside />
+    </div>
   );
 }
 
-/** Steps of the turn that is still streaming, always expanded. */
-export function LiveTrace({ steps }: { steps: TraceStep[] }) {
+/** Steps of the turn that is still streaming. */
+export function LiveTrace({
+  steps,
+  figuresOutside = false,
+}: {
+  steps: TraceStep[];
+  /** The message already shows the turn's figures above its answer. */
+  figuresOutside?: boolean;
+}) {
   if (steps.length === 0) return null;
   return (
     <div className="mb-3">
-      <TraceSteps steps={steps} live />
+      <TraceSteps steps={steps} live figuresOutside={figuresOutside} />
     </div>
   );
 }

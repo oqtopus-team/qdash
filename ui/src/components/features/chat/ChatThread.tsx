@@ -12,6 +12,7 @@ import {
 import { useGetCopilotPreferences } from "@/client/copilot/copilot";
 import { ArrowDown, GitBranch, LayoutDashboard } from "lucide-react";
 import { StickToBottom, useStickToBottomContext } from "use-stick-to-bottom";
+import { useChatScrollIntent } from "@/hooks/useChatScrollIntent";
 import { useChatSuggestions, type ChatSuggestion } from "@/hooks/useChatSuggestions";
 import { replyAfter, useCopilotChat } from "@/hooks/useCopilotChat";
 import { useChatAttachments } from "@/hooks/useChatAttachments";
@@ -38,8 +39,21 @@ import type { TaskChatContext } from "@/types/copilotChat";
  */
 type ChatThreadVariant = "page" | "panel" | "compact";
 
-function ScrollToBottomButton() {
+/**
+ * Jump-to-latest control. It shows once the user scrolls away from the bottom,
+ * which also stops the thread following new content; it, scrolling back down,
+ * or sending a message resumes following.
+ */
+function ScrollToBottomButton({ followKey }: { followKey: number }) {
   const { isAtBottom, scrollToBottom } = useStickToBottomContext();
+  useChatScrollIntent();
+  const lastFollowKey = useRef(followKey);
+  useEffect(() => {
+    if (followKey === lastFollowKey.current) return;
+    lastFollowKey.current = followKey;
+    // What the user just sent is what they want to read the answer to.
+    void scrollToBottom();
+  }, [followKey, scrollToBottom]);
   if (isAtBottom) return null;
   return (
     <button
@@ -222,6 +236,7 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
   );
   const isEmpty = messages.length === 0 && !liveTurn && steers.length === 0;
   const lastIndex = messages.length - 1;
+  const sentCount = messages.filter((m) => m.role === "user").length + steers.length;
 
   // Focus the composer on session switch
   useEffect(() => {
@@ -388,7 +403,7 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
             />
             {chatNotice && <ChatNotice text={chatNotice} onDismiss={dismissNotice} />}
           </StickToBottom.Content>
-          <ScrollToBottomButton />
+          <ScrollToBottomButton followKey={sentCount} />
         </StickToBottom>
 
         <div className={`shrink-0 ${pad} pb-3`}>

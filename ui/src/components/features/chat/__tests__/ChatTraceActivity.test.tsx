@@ -65,6 +65,10 @@ describe("tool step transitions", () => {
         ]}
       />,
     );
+    // Four calls in a row fold into one group; opened, each row is still folded.
+    const group = screen.getByTestId("tool-group-summary");
+    expect(group.getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(group);
     for (const name of [/Writing fit.py/, /Running bun/, /Running a script/, /Writing flow rabi/]) {
       expect(expanded(name)).toBe("false");
     }
@@ -138,6 +142,7 @@ describe("tool step transitions", () => {
         ]}
       />,
     );
+    fireEvent.click(screen.getByTestId("tool-group-summary"));
     expect(expanded(/Acme lookup.*Running/)).toBe("false");
     const failed = screen.getByRole("button", { name: /Acme lookup.*Failed/ });
     expect(failed.querySelectorAll("svg:not(.lucide-chevron-right)")).toHaveLength(1);
@@ -203,10 +208,6 @@ describe("tool step transitions", () => {
         }}
       />,
     );
-    const summary = screen.getByRole("button", { name: /used 1 tool/i });
-    expect(summary.textContent).toContain("1 not run");
-    expect(summary.textContent).not.toContain("failed");
-    fireEvent.click(summary);
     const row = screen.getByRole("button", { name: /Command not run/ });
     expect(within(row).getByText("Not run")).toBeTruthy();
     expect(within(row).queryByText("Failed")).toBeNull();
