@@ -525,3 +525,171 @@ def test_extract_parameter_metadata_expands_rabi_normalization_inputs() -> None:
         "ui_group": "Rabi normalization",
         "ui_group_collapsed": True,
     }
+
+
+DOCUMENTED_TASK_SOURCE = '''
+from typing import ClassVar
+
+from qdash.datamodel import task
+from qdash.datamodel.task import TaskDocumentation, TaskReference
+
+
+class DocumentedTask:
+    """Legacy docstring that documentation replaces."""
+
+    name: str = "DocumentedTask"
+    task_type: str = "qubit"
+    documentation: ClassVar[TaskDocumentation] = TaskDocumentation(
+        description="Measures something specific.",
+        when_to_use="Run it after the qubit frequency is known.",
+        prerequisites=("qubit_frequency is stored.", "A calibrated readout."),
+        references=(
+            TaskReference(
+                title="A method paper",
+                url="https://doi.org/10.0/method",
+                relevance="The general method.",
+            ),
+            task.TaskReference(title="A second paper", url="https://arxiv.org/abs/0000.00000"),
+        ),
+    )
+
+
+class LegacyTask:
+    """Docstring-only task description."""
+
+    name = "LegacyTask"
+    task_type = "qubit"
+'''
+
+
+def _write_backend(tmp_path: Path, source: str) -> TaskFileService:
+    backend_dir = tmp_path / "qubex"
+    backend_dir.mkdir()
+    (backend_dir / "tasks.py").write_text(source, encoding="utf-8")
+    return TaskFileService(calibtasks_base_path=tmp_path)
+
+
+def test_declared_documentation_takes_precedence_over_docstring(tmp_path: Path) -> None:
+    service = _write_backend(tmp_path, DOCUMENTED_TASK_SOURCE)
+
+    tasks = {task.name: task for task in service.list_task_info("qubex").tasks}
+
+    documented = tasks["DocumentedTask"]
+    assert documented.description == "Measures something specific."
+    assert documented.documentation is not None
+    assert documented.documentation.when_to_use == "Run it after the qubit frequency is known."
+    assert documented.documentation.prerequisites == (
+        "qubit_frequency is stored.",
+        "A calibrated readout.",
+    )
+    assert [ref.model_dump() for ref in documented.documentation.references] == [
+        {
+            "title": "A method paper",
+            "url": "https://doi.org/10.0/method",
+            "relevance": "The general method.",
+        },
+        {"title": "A second paper", "url": "https://arxiv.org/abs/0000.00000", "relevance": ""},
+    ]
+    assert service.documentation_errors == []
+
+
+def test_undocumented_task_falls_back_to_docstring(tmp_path: Path) -> None:
+    service = _write_backend(tmp_path, DOCUMENTED_TASK_SOURCE)
+
+    legacy = {task.name: task for task in service.list_task_info("qubex").tasks}["LegacyTask"]
+
+    assert legacy.description == "Docstring-only task description."
+    assert legacy.documentation is None
+
+
+@pytest.mark.parametrize(
+    ("declaration", "reason"),
+    [
+        ("DOCS", "literal TaskDocumentation(...) call"),
+        ('build_docs(description="x")', "literal TaskDocumentation(...) call"),
+        ('TaskDocumentation("positional")', "keyword arguments"),
+        ("TaskDocumentation(**DOCS)", "** arguments"),
+        ('TaskDocumentation(description=f"{NAME} task")', "must be a string literal"),
+        ("TaskDocumentation(description=explode())", "must be a string literal"),
+        ('TaskDocumentation(description="")', "description"),
+        ('TaskDocumentation(description="x", prerequisites=[1])', "prerequisites.0"),
+        ('TaskDocumentation(description="x", next_actions=["y"])', "next_actions"),
+        ('TaskDocumentation(description="x", references=REFS)', "tuple or list of literal"),
+        (
+            'TaskDocumentation(description="x", references=[{"title": "t", "url": "https://x"}])',
+            "literal TaskReference(...) call",
+        ),
+        (
+            'TaskDocumentation(description="x", references=[make_reference("t")])',
+            "literal TaskReference(...) call",
+        ),
+        (
+            'TaskDocumentation(description="x", references=[TaskReference(title=TITLE, '
+            'url="https://x")])',
+            "TaskReference.title must be a string literal",
+        ),
+        (
+            'TaskDocumentation(description="x", references=[TaskReference("t", "https://x")])',
+            "keyword arguments",
+        ),
+        (
+            'TaskDocumentation(description="x", references=[TaskReference(title="t", '
+            'url="http://insecure")])',
+            "references.0.url",
+        ),
+        (
+            'TaskDocumentation(description="x", references=[TaskReference(title="t", '
+            'url="https://x", year=2020)])',
+            "references.0.year",
+        ),
+    ],
+)
+def test_unsupported_documentation_is_rejected_without_executing_the_module(
+    tmp_path: Path, declaration: str, reason: str
+) -> None:
+    source = f'''
+raise RuntimeError("task modules must not be imported for metadata")
+
+
+class BrokenTask:
+    """Docstring fallback."""
+
+    name = "BrokenTask"
+    documentation = {declaration}
+'''
+    service = _write_backend(tmp_path, source)
+
+    task = service.list_task_info("qubex").tasks[0]
+
+    assert task.description == "Docstring fallback."
+    assert task.documentation is None
+    assert len(service.documentation_errors) == 1
+    assert service.documentation_errors[0].startswith("tasks.py:BrokenTask: ")
+    assert reason in service.documentation_errors[0]
+
+
+def test_explicit_none_documentation_is_treated_as_undocumented(tmp_path: Path) -> None:
+    service = _write_backend(
+        tmp_path,
+        'class Task:\n    """Doc."""\n\n    name = "Task"\n    documentation = None\n',
+    )
+
+    task = service.list_task_info("qubex").tasks[0]
+
+    assert task.description == "Doc."
+    assert task.documentation is None
+    assert service.documentation_errors == []
+
+
+def test_catalog_publishes_the_same_documentation_for_fake_and_qubex_tasks() -> None:
+    """The fake backend runs qubex classes, so it publishes their documentation unchanged."""
+    clear_backend_config_cache()
+    qubex = {t.name: t for t in TaskFileService().list_task_info("qubex").tasks}
+    fake = {t.name: t for t in TaskFileService().list_task_info("fake").tasks}
+    for name, task in fake.items():
+        if name in qubex:
+            assert task.documentation == qubex[name].documentation, name
+    for name in ("CheckChevron", "CheckRabi", "CheckRamsey", "CheckT1"):
+        documentation = fake[name].documentation
+        assert documentation is not None, name
+        assert fake[name].description == documentation.description

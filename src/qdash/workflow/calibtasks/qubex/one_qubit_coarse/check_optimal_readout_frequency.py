@@ -7,6 +7,8 @@ from qdash.datamodel.task import (
     InputParameterSpec,
     OutputParameterSpec,
     RunParameterSpec,
+    TaskDocumentation,
+    TaskReference,
 )
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -24,6 +26,30 @@ class CheckOptimalReadoutFrequency(QubexTask):
 
     name: str = "CheckOptimalReadoutFrequency"
     task_type: str = "qubit"
+    documentation: ClassVar[TaskDocumentation] = TaskDocumentation(
+        description=(
+            "Sweeps the readout frequency around the resonator, measures single-shot IQ data "
+            "for prepared 0 and 1 states, and writes the lowest readout_frequency whose GMM "
+            "assignment fidelity reaches 99% of the peak."
+        ),
+        when_to_use=(
+            "Run it during fine calibration once pi pulses exist, then re-run Configure so "
+            "later tasks use the new frequency."
+        ),
+        prerequisites=(
+            (
+                "No declared inputs: it uses the frequencies, readout amplitude, and pi pulse "
+                "already in the Qubex session."
+            ),
+        ),
+        references=(
+            TaskReference(
+                title="Rapid High-Fidelity Single-Shot Dispersive Readout of Superconducting Qubits",
+                url="https://doi.org/10.1103/PhysRevApplied.7.054020",
+                relevance="Single-shot dispersive readout fidelity and the choice of readout frequency.",
+            ),
+        ),
+    )
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {}
     run_spec: ClassVar[dict[str, RunParameterSpec]] = {
         "readout_duration": readout_duration_run_parameter(),

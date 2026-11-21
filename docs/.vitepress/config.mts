@@ -278,6 +278,7 @@ export default withMermaid(
                 { text: "TypeScript Client", link: "/reference/clients/typescript" },
                 { text: "pi-qdash", link: "/reference/pi-qdash" },
                 { text: "pi-qcaleval", link: "/reference/pi-qcaleval" },
+                { text: "Task Method Sources", link: "/reference/task-method-sources" },
               ],
             },
             {

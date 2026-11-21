@@ -6,6 +6,7 @@ from qdash.datamodel.task import (
     InputParameterSpec,
     OutputParameterSpec,
     RunParameterSpec,
+    TaskDocumentation,
 )
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -20,6 +21,24 @@ class Configure(QubexTask):
 
     name: str = "Configure"
     task_type: str = "qubit"
+    documentation: ClassVar[TaskDocumentation] = TaskDocumentation(
+        description=(
+            "Reloads the Qubex system model from the chip's config and params files and pushes "
+            "the control and readout settings of one qubit to its QuEL boxes. It measures "
+            "nothing and writes no calibration values."
+        ),
+        when_to_use=(
+            "Run it before measurements whose frequencies or amplitudes changed in the params "
+            "files, or to apply a different channel layout; templates call it before and "
+            "between pulse stages. Prefer ConfigureAll to configure every selected MUX at once."
+        ),
+        prerequisites=(
+            (
+                "The chip's Qubex config and params files exist. configuration_mode defaults to"
+                " ge-cr-cr; ge-ef-cr and ge-ef-fh add EF and FH drive targets."
+            ),
+        ),
+    )
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {}
     run_spec: ClassVar[dict[str, RunParameterSpec]] = {
         "configuration_mode": RunParameterSpec(
@@ -92,6 +111,18 @@ class ConfigureEF(Configure):
 
     name: str = "ConfigureEF"
     task_type: str = "qubit"
+    documentation: ClassVar[TaskDocumentation] = TaskDocumentation(
+        description=(
+            "Same as Configure, but only accepts an EF-capable channel layout (ge-ef-cr by "
+            "default, or ge-ef-fh) so the session gains GE and EF drive targets."
+        ),
+        when_to_use=(
+            "Run it in the same session before EF tasks such as CheckAdaptiveEFChevron, "
+            "CheckEFRabi, and EFReadoutClassification, which refuse to run without EF targets. "
+            "Use ge-ef-fh before CheckAdaptiveFHChevron."
+        ),
+        prerequisites=("The chip's Qubex config and params files exist.",),
+    )
     run_spec: ClassVar[dict[str, RunParameterSpec]] = {
         "configuration_mode": RunParameterSpec(
             value_type="str",

@@ -7,6 +7,8 @@ from qdash.datamodel.task import (
     InputParameterSpec,
     OutputParameterSpec,
     RunParameterSpec,
+    TaskDocumentation,
+    TaskReference,
 )
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -25,6 +27,42 @@ class ZX90InterleavedRandomizedBenchmarking(QubexTask):
 
     name: str = "ZX90InterleavedRandomizedBenchmarking"
     task_type: str = "coupling"
+    documentation: ClassVar[TaskDocumentation] = TaskDocumentation(
+        description=(
+            "Interleaves the calibrated echoed-CR ZX90 gate between random two-qubit Cliffords "
+            "and writes zx90_gate_fidelity and zx90_depolarizing_rate for the pair."
+        ),
+        when_to_use="Run it after CreateZX90 and CheckZX90 to benchmark the two-qubit gate.",
+        prerequisites=(
+            (
+                "The coupling qid is control-target; control-qubit and target-qubit inputs are "
+                "read from each qubit's stored calibration."
+            ),
+            (
+                "DRAG half-pi pulses (CreateDRAGHPIPulse) on both qubits and a DRAG pi pulse "
+                "(CreateDRAGPIPulse) on the control qubit."
+            ),
+            (
+                "CR and ZX90 parameters (cr_*, cancel_*, rotary_amplitude, zx_rotation_rate, "
+                "zx90_gate_time) stored by CreateZX90 for the pair."
+            ),
+        ),
+        references=(
+            TaskReference(
+                title=(
+                    "Efficient Measurement of Quantum Gate Error by Interleaved Randomized "
+                    "Benchmarking"
+                ),
+                url="https://doi.org/10.1103/PhysRevLett.109.080505",
+                relevance="Interleaved randomized benchmarking for the error of one gate.",
+            ),
+            TaskReference(
+                title="Process verification of two-qubit quantum gates by randomized benchmarking",
+                url="https://doi.org/10.1103/PhysRevA.87.030301",
+                relevance="Two-qubit Clifford and interleaved benchmarking of a cross-resonance gate.",
+            ),
+        ),
+    )
     run_spec: ClassVar[dict[str, RunParameterSpec]] = {
         "readout_duration": readout_duration_run_parameter(),
         "n_trials": RunParameterSpec(

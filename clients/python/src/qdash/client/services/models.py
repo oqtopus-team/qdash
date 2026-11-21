@@ -4650,30 +4650,6 @@ class TaskFileSettings(BaseModel):
     sort_order: Annotated[str | None, Field(title="Sort Order")] = None
 
 
-class TaskInfo(BaseModel):
-    """
-    Task information extracted from Python file.
-    """
-
-    name: Annotated[str, Field(title="Name")]
-    class_name: Annotated[str, Field(title="Class Name")]
-    task_type: Annotated[str | None, Field(title="Task Type")] = None
-    description: Annotated[str | None, Field(title="Description")] = None
-    file_path: Annotated[str, Field(title="File Path")]
-    category: Annotated[str | None, Field(title="Category")] = None
-    enabled: Annotated[bool, Field(title="Enabled")] = True
-    input_parameters: Annotated[
-        dict[str, dict[str, Any]] | None, Field(title="Input Parameters")
-    ] = None
-    run_parameters: Annotated[dict[str, dict[str, Any]] | None, Field(title="Run Parameters")] = (
-        None
-    )
-    output_parameters: Annotated[list[str] | None, Field(title="Output Parameters")] = None
-    """
-    Names of the calibration parameters the task writes when it completes.
-    """
-
-
 class TaskInvocation(BaseModel):
     """
     The plan identity of one task result.
@@ -4725,6 +4701,31 @@ class TaskNoteEntry(BaseModel):
     task_id: Annotated[str, Field(title="Task Id")]
     qid: Annotated[str, Field(title="Qid")]
     note: NoteModel
+
+
+class TaskReference(BaseModel):
+    """
+    A published source for the general method a task implements.
+
+    A reference supports the physics or protocol behind a task, not QDash's or
+    Qubex's implementation of it; ``relevance`` says which part it supports.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    title: Annotated[str, Field(min_length=1, title="Title")]
+    """
+    Exact title of the cited work.
+    """
+    url: Annotated[str, Field(pattern="^https://\\S+$", title="Url")]
+    """
+    Stable HTTPS link, preferably a DOI or arXiv URL.
+    """
+    relevance: Annotated[str, Field(title="Relevance")] = ""
+    """
+    Which part of the task's method the source supports.
+    """
 
 
 class TaskReferenceResponse(BaseModel):
@@ -7173,14 +7174,6 @@ class ListTaskFileBackendsResponse(BaseModel):
     backends: Annotated[list[TaskFileBackend], Field(title="Backends")]
 
 
-class ListTaskInfoResponse(BaseModel):
-    """
-    Response model for listing task info.
-    """
-
-    tasks: Annotated[list[TaskInfo], Field(title="Tasks")]
-
-
 class ListTaskKnowledgeResponse(BaseModel):
     """
     Response model for listing all task knowledge entries.
@@ -7767,6 +7760,44 @@ class Task(BaseModel):
     default_view: Annotated[bool, Field(title="Default View")] = True
 
 
+class TaskDocumentation(BaseModel):
+    """
+    Human-readable guidance a task class declares about itself.
+
+    A task class sets ``documentation: ClassVar[TaskDocumentation]`` to a literal
+    ``TaskDocumentation(...)`` call. The task catalog reads that call statically,
+    so every field must be a string literal, a list or tuple of string literals
+    for ``prerequisites``, or a list or tuple of literal ``TaskReference(...)``
+    calls for ``references``.
+
+    ``prerequisites`` explains to readers what the task expects; it is not
+    enforced. The task's ``input_spec`` remains the only declaration that decides
+    which calibration values must exist before the task runs.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    description: Annotated[str, Field(min_length=1, title="Description")]
+    """
+    What the task measures or produces, in one or two sentences.
+    """
+    when_to_use: Annotated[str, Field(title="When To Use")] = ""
+    """
+    The situation in which an operator or agent should run the task.
+    """
+    prerequisites: Annotated[list[str], Field(title="Prerequisites")] = []
+    """
+    Calibration state the task expects, explained for readers. Not enforced; input parameter metadata carries the enforced requirements.
+    """
+    references: Annotated[
+        list[TaskReference], Field(title="References", validate_default=True)
+    ] = []
+    """
+    Published sources for the general method. They do not describe the QDash or Qubex implementation, which the task source defines.
+    """
+
+
 class TaskHistoryResponse(BaseModel):
     """
     Response model for fetching task history.
@@ -7774,6 +7805,37 @@ class TaskHistoryResponse(BaseModel):
 
     name: Annotated[str, Field(title="Name")]
     data: Annotated[dict[str, TaskResult], Field(title="Data")]
+
+
+class TaskInfo(BaseModel):
+    """
+    Task information extracted from Python file.
+    """
+
+    name: Annotated[str, Field(title="Name")]
+    class_name: Annotated[str, Field(title="Class Name")]
+    task_type: Annotated[str | None, Field(title="Task Type")] = None
+    description: Annotated[str | None, Field(title="Description")] = None
+    """
+    Short task description: documentation.description when the task declares documentation, otherwise the class docstring.
+    """
+    documentation: TaskDocumentation | None = None
+    """
+    Structured guidance the task class declares, when it declares any.
+    """
+    file_path: Annotated[str, Field(title="File Path")]
+    category: Annotated[str | None, Field(title="Category")] = None
+    enabled: Annotated[bool, Field(title="Enabled")] = True
+    input_parameters: Annotated[
+        dict[str, dict[str, Any]] | None, Field(title="Input Parameters")
+    ] = None
+    run_parameters: Annotated[dict[str, dict[str, Any]] | None, Field(title="Run Parameters")] = (
+        None
+    )
+    output_parameters: Annotated[list[str] | None, Field(title="Output Parameters")] = None
+    """
+    Names of the calibration parameters the task writes when it completes.
+    """
 
 
 class TaskKnowledgeResponse(BaseModel):
@@ -8123,6 +8185,14 @@ class ListMuxResponse(BaseModel):
     muxes: Annotated[dict[str, MuxDetailResponse], Field(title="Muxes")]
 
 
+class ListTaskInfoResponse(BaseModel):
+    """
+    Response model for listing task info.
+    """
+
+    tasks: Annotated[list[TaskInfo], Field(title="Tasks")]
+
+
 class MetricScriptResponse(BaseModel):
     """
     A script with its source, last-good source and revision list.
@@ -8170,6 +8240,12 @@ class PipelineCatalogResponse(BaseModel):
     tasks: Annotated[dict[str, list[str]], Field(title="Tasks")]
     """
     Available task names by task_type ("qubit", "coupling", ...).
+    """
+    task_documentation: Annotated[
+        dict[str, TaskDocumentation] | None, Field(title="Task Documentation")
+    ] = None
+    """
+    Guidance declared by available tasks, keyed by task name. Tasks that declare no documentation are omitted.
     """
     spec_version: Annotated[int, Field(title="Spec Version")]
     """

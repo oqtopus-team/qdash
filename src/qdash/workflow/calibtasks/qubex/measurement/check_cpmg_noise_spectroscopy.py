@@ -11,7 +11,13 @@ import numpy.typing as npt
 from qubex.core import DataModel
 from qubex.experiment.experiment_constants import DEFAULT_INTERVAL, DEFAULT_SHOTS
 
-from qdash.datamodel.task import InputParameterSpec, OutputParameterSpec, RunParameterSpec
+from qdash.datamodel.task import (
+    InputParameterSpec,
+    OutputParameterSpec,
+    RunParameterSpec,
+    TaskDocumentation,
+    TaskReference,
+)
 from qdash.workflow.calibtasks.base import PostProcessResult, RunResult
 from qdash.workflow.calibtasks.qubex.base import (
     QubexTask,
@@ -58,6 +64,42 @@ class CheckCPMGNoiseSpectroscopy(QubexTask):
 
     name: str = "CheckCPMGNoiseSpectroscopy"
     task_type: str = "qubit"
+    documentation: ClassVar[TaskDocumentation] = TaskDocumentation(
+        description=(
+            "Measures CPMG coherence decays for a sweep of effective filter frequencies (0.5 to"
+            " 4 MHz by default) and selectable pi-pulse sign patterns. It stores the T2 and "
+            "Gamma2 matrices as a data artifact and figures but no calibration values."
+        ),
+        when_to_use=(
+            "Run it during characterization to estimate low-frequency dephasing noise. It uses "
+            "the DRAG pi pulse as a Y pulse when calibrated, otherwise the plain pi pulse."
+        ),
+        prerequisites=(
+            (
+                "Rabi parameters from a CheckRabi run under the current readout_duration, with "
+                "rabi_r2 at or above the R² threshold; they normalize the IQ data."
+            ),
+            "hpi_amplitude and hpi_duration stored by CreateHPIPulse.",
+            "pi_amplitude and pi_duration stored by CreatePIPulse.",
+            (
+                "control_frequency (or qubit_frequency), readout_frequency (or "
+                "resonator_frequency), and readout_amplitude are stored for the qubit."
+            ),
+        ),
+        references=(
+            TaskReference(
+                title=(
+                    "Noise spectroscopy through dynamical decoupling with a superconducting "
+                    "flux qubit"
+                ),
+                url="https://doi.org/10.1038/nphys1994",
+                relevance=(
+                    "CPMG dynamical decoupling as a noise-spectroscopy filter; demonstrated on "
+                    "a flux qubit."
+                ),
+            ),
+        ),
+    )
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
         **required_rabi_normalization_inputs(),
         "control_frequency": InputParameterSpec.required_database(

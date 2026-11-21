@@ -9,6 +9,8 @@ from qdash.datamodel.task import (
     InputParameterSpec,
     OutputParameterSpec,
     RunParameterSpec,
+    TaskDocumentation,
+    TaskReference,
 )
 from qdash.workflow.calibtasks.base import PostProcessResult, RunResult
 from qdash.workflow.calibtasks.qubex.base import QubexTask, readout_duration_run_parameter
@@ -27,6 +29,40 @@ class CheckChevron(QubexTask):
 
     name: str = "CheckChevron"
     task_type: str = "qubit"
+    documentation: ClassVar[TaskDocumentation] = TaskDocumentation(
+        description=(
+            "Sweeps drive detuning and pulse duration on a fixed grid around control_frequency,"
+            " then estimates the qubit frequency with Qubex's matched-transform chevron "
+            "analysis and the control amplitude for a 12.5 MHz Rabi frequency."
+        ),
+        when_to_use=(
+            "Run it when the qubit frequency is known to within the sweep window, for example "
+            "from an earlier calibration or the fake bring-up. The estimated qubit_frequency is"
+            " also published as control_frequency, which drive tasks such as CheckRabi read. "
+            "Use CheckAdaptiveChevron when the frequency is less certain."
+        ),
+        prerequisites=(
+            (
+                "control_frequency (or qubit_frequency), readout_frequency (or "
+                "resonator_frequency), and readout_amplitude are stored for the qubit; "
+                "control_amplitude uses the stored value or 0.0625 otherwise."
+            ),
+            (
+                "The true qubit frequency lies inside the detuning_range sweep, which spans ±50"
+                " MHz by default."
+            ),
+        ),
+        references=(
+            TaskReference(
+                title="A quantum engineer's guide to superconducting qubits",
+                url="https://doi.org/10.1063/1.5089550",
+                relevance=(
+                    "Resonant and detuned Rabi driving of a transmon; the matched-transform "
+                    "analysis is Qubex-specific."
+                ),
+            ),
+        ),
+    )
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
         "control_frequency": InputParameterSpec.required_database(
             fallback_parameter_names=("qubit_frequency",)

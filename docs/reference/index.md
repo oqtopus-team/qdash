@@ -1,6 +1,7 @@
 # Reference
 
-Use these pages to look up QDash database collections, client APIs, and pi extension contracts.
+Use these pages to look up QDash database collections, client APIs, pi extension contracts, and
+the published sources behind calibration tasks.
 Explanations and change procedures remain in the Developer Guide.
 
 ## Database
@@ -21,3 +22,8 @@ Look up collection names and document classes in [Database Collections](./databa
 | --- | --- |
 | QDash tools, slash commands, and bundled skills | [pi-qdash](./pi-qdash.md) |
 | Calibration evaluation inputs, outputs, and model configuration | [pi-qcaleval](./pi-qcaleval.md) |
+
+## Calibration Tasks
+
+Look up the published sources cited for each task's measurement method in
+[Task Method Sources](./task-method-sources.md).

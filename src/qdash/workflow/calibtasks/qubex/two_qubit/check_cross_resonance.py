@@ -9,6 +9,8 @@ from qdash.datamodel.task import (
     InputParameterSpec,
     OutputParameterSpec,
     RunParameterSpec,
+    TaskDocumentation,
+    TaskReference,
 )
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -29,6 +31,52 @@ class CheckCrossResonance(QubexTask):
 
     name: str = "CheckCrossResonance"
     task_type: str = "coupling"
+    documentation: ClassVar[TaskDocumentation] = TaskDocumentation(
+        description=(
+            "Calibrates the cross-resonance drive of a fixed-frequency control-target pair by "
+            "iterative CR Hamiltonian tomography, adjusting a target cancel tone until the IX "
+            "and IY terms vanish. It writes CR amplitude, phase, and beta, cancel tone, rotary "
+            "amplitude, zx_rotation_rate, and ramp time."
+        ),
+        when_to_use=(
+            "Run it first in two-qubit calibration, after both qubits have DRAG half-pi pulses;"
+            " CreateZX90 starts from its parameters."
+        ),
+        prerequisites=(
+            (
+                "The coupling qid is control-target; control-qubit and target-qubit inputs are "
+                "read from each qubit's stored calibration."
+            ),
+            "DRAG half-pi pulses (CreateDRAGHPIPulse) and Rabi parameters on both qubits.",
+        ),
+        references=(
+            TaskReference(
+                title=(
+                    "Simple All-Microwave Entangling Gate for Fixed-Frequency Superconducting "
+                    "Qubits"
+                ),
+                url="https://doi.org/10.1103/PhysRevLett.107.080502",
+                relevance=(
+                    "All-microwave cross-resonance gate for fixed-frequency superconducting qubits."
+                ),
+            ),
+            TaskReference(
+                title=(
+                    "Procedure for systematically tuning up cross-talk in the cross-resonance gate"
+                ),
+                url="https://doi.org/10.1103/PhysRevA.93.060302",
+                relevance="CR Hamiltonian tomography and a target cancellation tone for unwanted terms.",
+            ),
+            TaskReference(
+                title=(
+                    "Reducing Unitary and Spectator Errors in Cross Resonance with Optimized "
+                    "Rotary Echoes"
+                ),
+                url="https://doi.org/10.1103/PRXQuantum.1.020318",
+                relevance="Target rotary pulses that reduce CR error terms.",
+            ),
+        ),
+    )
     run_spec: ClassVar[dict[str, RunParameterSpec]] = {
         "readout_duration": readout_duration_run_parameter(),
         "shots": RunParameterSpec(

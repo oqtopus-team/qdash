@@ -11,6 +11,8 @@ from qdash.datamodel.task import (
     InputParameterSpec,
     OutputParameterSpec,
     RunParameterSpec,
+    TaskDocumentation,
+    TaskReference,
 )
 from qdash.workflow.calibtasks.base import PostProcessResult, RunResult
 from qdash.workflow.calibtasks.qubex.base import (
@@ -30,6 +32,47 @@ class CheckCKP(QubexTask):
 
     name: str = "CheckCKP"
     task_type: str = "qubit"
+    documentation: ClassVar[TaskDocumentation] = TaskDocumentation(
+        description=(
+            "Filtered CKP (chi-kappa-power): drives the readout resonator at a range of "
+            "detunings, measures the qubit ac Stark shift with the qubit in 0 and 1, and fits a"
+            " resonator plus Purcell-filter model. It writes resonator_frequency, a "
+            "photon-limited readout_frequency, Purcell filter frequency, coupling and "
+            "linewidth, dispersive_shift, and critical_photon_number."
+        ),
+        when_to_use=(
+            "Run it during characterization to obtain readout-chain parameters such as chi and "
+            "kappa. Note that it overwrites resonator_frequency and readout_frequency."
+        ),
+        prerequisites=(
+            (
+                "Rabi parameters from a CheckRabi run under the current readout_duration, with "
+                "rabi_r2 at or above the R² threshold; they normalize the IQ data."
+            ),
+            "hpi_amplitude and hpi_duration stored by CreateHPIPulse.",
+            "control_frequency, readout_frequency, and readout_amplitude are stored.",
+        ),
+        references=(
+            TaskReference(
+                title=(
+                    "ac Stark Shift and Dephasing of a Superconducting Qubit Strongly Coupled "
+                    "to a Cavity Field"
+                ),
+                url="https://doi.org/10.1103/PhysRevLett.94.123602",
+                relevance="ac Stark shift of a qubit by photons in a dispersively coupled resonator.",
+            ),
+            TaskReference(
+                title="Quantum theory of a bandpass Purcell filter for qubit readout",
+                url="https://doi.org/10.1103/PhysRevA.92.012325",
+                relevance="Readout through a bandpass Purcell filter.",
+            ),
+            TaskReference(
+                title="Circuit quantum electrodynamics",
+                url="https://doi.org/10.1103/RevModPhys.93.025005",
+                relevance="Dispersive shift and critical photon number of circuit QED readout.",
+            ),
+        ),
+    )
 
     # ``filtered_ckp_experiment`` normalizes IQ data with the stored Rabi fit,
     # and builds the |1> preparation pulse from the calibrated HPI pulse.

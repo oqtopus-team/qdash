@@ -7,6 +7,8 @@ from qdash.datamodel.task import (
     InputParameterSpec,
     OutputParameterSpec,
     RunParameterSpec,
+    TaskDocumentation,
+    TaskReference,
 )
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -25,6 +27,33 @@ class X90InterleavedRandomizedBenchmarking(QubexTask):
 
     name: str = "X90InterleavedRandomizedBenchmarking"
     task_type: str = "qubit"
+    documentation: ClassVar[TaskDocumentation] = TaskDocumentation(
+        description=(
+            "Interleaves the DRAG X90 gate between random single-qubit Cliffords and writes the"
+            " x90_gate_fidelity and x90_depolarizing_rate relative to the reference decay."
+        ),
+        when_to_use="Run it after RandomizedBenchmarking to isolate the error of the X90 gate.",
+        prerequisites=(
+            (
+                "drag_hpi_amplitude, drag_hpi_duration, and drag_hpi_beta stored by "
+                "CreateDRAGHPIPulse."
+            ),
+            (
+                "control_frequency (or qubit_frequency), readout_frequency (or "
+                "resonator_frequency), and readout_amplitude are stored for the qubit."
+            ),
+        ),
+        references=(
+            TaskReference(
+                title=(
+                    "Efficient Measurement of Quantum Gate Error by Interleaved Randomized "
+                    "Benchmarking"
+                ),
+                url="https://doi.org/10.1103/PhysRevLett.109.080505",
+                relevance="Interleaved randomized benchmarking for the error of one gate.",
+            ),
+        ),
+    )
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
         # RabiParam normalizes measured IQ values; its readout duration is validated.
         **required_rabi_normalization_inputs(),

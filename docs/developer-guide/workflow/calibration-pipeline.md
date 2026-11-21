@@ -55,7 +55,7 @@ The spec cannot reference code. Each `type` maps to one Step class, task names m
 
 | Endpoint | Permission | Purpose |
 | --- | --- | --- |
-| `GET /calibration-pipelines/catalog` | viewer | Step types with their dependencies, default calls, default step id, and step-level metrics; the backend's tasks by type; the accepted `spec_version`; and the JSON schema of the spec |
+| `GET /calibration-pipelines/catalog` | viewer | Step types with their dependencies, default calls, default step id, and step-level metrics; the backend's tasks by type; the declared documentation of enabled tasks (`task_documentation`, see [Document a calibration task](./engine-architecture.md#document-a-calibration-task)); the accepted `spec_version`; and the JSON schema of the spec |
 | `POST /calibration-pipelines/validate` | viewer | Dry run: every problem with a path into the spec, warnings, and the resolved steps with each call's id, failure policy, and effective settings |
 | `POST /calibration-pipelines/execute` | editor | Validate, then run the spec as one execution through the worker's `system-calibration-pipeline` deployment |
 

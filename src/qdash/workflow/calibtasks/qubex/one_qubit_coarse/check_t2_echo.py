@@ -10,6 +10,8 @@ from qdash.datamodel.task import (
     InputParameterSpec,
     OutputParameterSpec,
     RunParameterSpec,
+    TaskDocumentation,
+    TaskReference,
 )
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -28,6 +30,36 @@ class CheckT2Echo(QubexTask):
 
     name: str = "CheckT2Echo"
     task_type: str = "qubit"
+    documentation: ClassVar[TaskDocumentation] = TaskDocumentation(
+        description=(
+            "Measures the Hahn echo coherence time with a half-pi pulse, a Y pi pulse at mid "
+            "delay, and a final half-pi pulse over a logarithmic delay sweep, then writes "
+            "t2_echo in microseconds."
+        ),
+        when_to_use=(
+            "Run it to characterize dephasing with low-frequency noise refocused; compare with "
+            "CheckRamsey's T2*. Use CheckT2EchoAverage for repeated statistics."
+        ),
+        prerequisites=(
+            (
+                "Rabi parameters from a CheckRabi run under the current readout_duration, with "
+                "rabi_r2 at or above the R² threshold; they normalize the IQ data."
+            ),
+            "hpi_amplitude and hpi_duration stored by CreateHPIPulse.",
+            "pi_amplitude and pi_duration stored by CreatePIPulse.",
+            (
+                "control_frequency (or qubit_frequency), readout_frequency (or "
+                "resonator_frequency), and readout_amplitude are stored for the qubit."
+            ),
+        ),
+        references=(
+            TaskReference(
+                title="A quantum engineer's guide to superconducting qubits",
+                url="https://doi.org/10.1063/1.5089550",
+                relevance="Hahn echo measurement with a refocusing pi pulse.",
+            ),
+        ),
+    )
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
         # RabiParam normalizes measured IQ values; its readout duration is validated.
         **required_rabi_normalization_inputs(),

@@ -9,6 +9,8 @@ from qdash.datamodel.task import (
     InputParameterSpec,
     OutputParameterSpec,
     RunParameterSpec,
+    TaskDocumentation,
+    TaskReference,
 )
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -28,6 +30,45 @@ class CreateDRAGPIPulse(QubexTask):
 
     name: str = "CreateDRAGPIPulse"
     task_type: str = "qubit"
+    documentation: ClassVar[TaskDocumentation] = TaskDocumentation(
+        description=(
+            "Calibrates a 24 ns DRAG pi pulse: two iterations of amplitude calibration and a "
+            "DRAG beta sweep over repeated X180 and -X180 pairs. It writes drag_pi_amplitude, "
+            "drag_pi_beta, and drag_pi_duration."
+        ),
+        when_to_use=(
+            "Run it after CheckRabi. CreateZX90 and the other cross-resonance tasks use it as "
+            "the control-qubit echo pulse, and Qubex prefers it for state preparation."
+        ),
+        prerequisites=(
+            (
+                "Rabi parameters from a CheckRabi run under the current readout_duration, with "
+                "rabi_r2 at or above the R² threshold; they normalize the IQ data."
+            ),
+            (
+                "control_frequency (or qubit_frequency), readout_frequency (or "
+                "resonator_frequency), and readout_amplitude are stored for the qubit."
+            ),
+        ),
+        references=(
+            TaskReference(
+                title="Simple Pulses for Elimination of Leakage in Weakly Nonlinear Qubits",
+                url="https://doi.org/10.1103/PhysRevLett.103.110501",
+                relevance=(
+                    "DRAG derivative correction that suppresses leakage and phase error in a "
+                    "weakly anharmonic qubit."
+                ),
+            ),
+            TaskReference(
+                title=(
+                    "Analytic control methods for high-fidelity unitary operations in a weakly "
+                    "nonlinear oscillator"
+                ),
+                url="https://doi.org/10.1103/PhysRevA.83.012308",
+                relevance="Analysis of DRAG pulse families and their phase-error terms.",
+            ),
+        ),
+    )
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
         # RabiParam calibrates the pulse and normalizes IQ; validate its readout context.
         **required_rabi_normalization_inputs(),

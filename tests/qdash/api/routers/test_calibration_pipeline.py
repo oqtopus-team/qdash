@@ -142,6 +142,38 @@ class TestCatalog:
         assert "scheduled" not in data["one_qubit_execution_modes"]
         assert "CalibrationPipelineSpec" in data["spec_schema"]["title"]
 
+    def test_catalog_carries_declared_task_documentation(self, test_client, chip, auth_headers):
+        response = test_client.get("/calibration-pipelines/catalog", headers=auth_headers)
+        assert response.status_code == 200
+        data = response.json()
+        documentation = data["task_documentation"]
+        # Only listed tasks appear, keyed by name.
+        listed = {name for names in data["tasks"].values() for name in names}
+        assert {"CheckChevron", "CheckRabi", "CheckRamsey", "CheckT1"} <= set(documentation)
+        assert set(documentation) <= listed
+        t1 = documentation["CheckT1"]
+        assert t1["description"].startswith("Measures the energy relaxation time T1")
+        assert t1["when_to_use"]
+        assert any("CheckRabi" in item for item in t1["prerequisites"])
+        assert t1["references"]
+        assert all(ref["url"].startswith("https://") and ref["title"] for ref in t1["references"])
+
+    def test_catalog_without_task_metadata_still_lists_tasks(self, test_client, chip, auth_headers):
+        from fastapi import HTTPException
+
+        from qdash.api.services.task_file_service import TaskFileService
+
+        with patch.object(
+            TaskFileService,
+            "list_task_info",
+            side_effect=HTTPException(status_code=404, detail="Backend directory not found"),
+        ):
+            response = test_client.get("/calibration-pipelines/catalog", headers=auth_headers)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["task_documentation"] == {}
+        assert "CheckT1" in data["tasks"]["qubit"]
+
     def test_catalog_requires_authentication(self, test_client, chip):
         assert test_client.get("/calibration-pipelines/catalog").status_code == 401
 

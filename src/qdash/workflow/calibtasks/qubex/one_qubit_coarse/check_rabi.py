@@ -11,6 +11,8 @@ from qdash.datamodel.task import (
     InputParameterSpec,
     OutputParameterSpec,
     RunParameterSpec,
+    TaskDocumentation,
+    TaskReference,
 )
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -119,6 +121,36 @@ class CheckRabi(QubexTask):
 
     name: str = "CheckRabi"
     task_type: str = "qubit"
+    documentation: ClassVar[TaskDocumentation] = TaskDocumentation(
+        description=(
+            "Measures a Rabi oscillation at a fixed control amplitude and fits it to record the"
+            " Rabi parameters, the maximum Rabi frequency per unit amplitude, and the control "
+            "amplitude estimated for a 12.5 MHz Rabi frequency."
+        ),
+        when_to_use=(
+            "Run it once control and readout frequencies are known, and again whenever readout "
+            "conditions change. Pulse calibrations and measurements that normalize IQ data, "
+            "such as CreateHPIPulse, CheckT1, and CheckRamsey, require the Rabi parameters it "
+            "stores."
+        ),
+        prerequisites=(
+            (
+                "control_frequency (or qubit_frequency) and readout_frequency (or "
+                "resonator_frequency) are stored for the qubit."
+            ),
+            (
+                "control_amplitude and readout_amplitude use stored values when present and "
+                "task defaults otherwise."
+            ),
+        ),
+        references=(
+            TaskReference(
+                title="A quantum engineer's guide to superconducting qubits",
+                url="https://doi.org/10.1063/1.5089550",
+                relevance="Resonant Rabi driving of a transmon through capacitive X and Y control.",
+            ),
+        ),
+    )
     r2_threshold: float = DEFAULT_RABI_R2_THRESHOLD
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
         "control_frequency": InputParameterSpec.required_database(

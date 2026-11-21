@@ -13,7 +13,13 @@ import numpy.typing as npt
 from qubex.core import DataModel
 from qubex.measurement.measurement_defaults import DEFAULT_INTERVAL
 
-from qdash.datamodel.task import InputParameterSpec, OutputParameterSpec, RunParameterSpec
+from qdash.datamodel.task import (
+    InputParameterSpec,
+    OutputParameterSpec,
+    RunParameterSpec,
+    TaskDocumentation,
+    TaskReference,
+)
 from qdash.workflow.calibtasks.base import PostProcessResult, RunResult
 from qdash.workflow.calibtasks.qubex.base import QubexTask, readout_duration_run_parameter
 from qdash.workflow.calibtasks.qubex.validation import require_ef_configuration
@@ -62,6 +68,40 @@ class CheckGEFRelaxation(QubexTask):
 
     name: str = "CheckGEFRelaxation"
     task_type: str = "qubit"
+    documentation: ClassVar[TaskDocumentation] = TaskDocumentation(
+        description=(
+            "Prepares g, e, and f, measures their population trajectories over a delay sweep, "
+            "and fits a six-rate continuous-time Markov model. It writes t1 (e to g), t1_fe, "
+            "and t1_fg in microseconds as inverse transition rates."
+        ),
+        when_to_use=(
+            "Run it during EF characterization to separate direct f-to-g decay from sequential "
+            "decay. Its t1 is a model-based value; use CheckT1 for the standard GE measurement."
+        ),
+        prerequisites=(
+            (
+                "GE and EF drive targets configured in the current session: run ConfigureEF, or"
+                " start with ConfigureAll, using configuration_mode ge-ef-cr or ge-ef-fh."
+            ),
+            "control_frequency_ef (or ef_frequency) stored by CheckAdaptiveEFChevron.",
+            "pi_amplitude and pi_duration stored by CreatePIPulse.",
+            "ef_pi_amplitude and ef_pi_duration stored by CreateEFPIPulse.",
+            (
+                "control_frequency (or qubit_frequency), readout_frequency (or "
+                "resonator_frequency), and readout_amplitude are stored for the qubit."
+            ),
+        ),
+        references=(
+            TaskReference(
+                title=(
+                    "Coherence and Decay of Higher Energy Levels of a Superconducting Transmon "
+                    "Qubit"
+                ),
+                url="https://doi.org/10.1103/PhysRevLett.114.010501",
+                relevance="Decay of higher transmon levels, found to proceed mainly sequentially.",
+            ),
+        ),
+    )
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
         "control_frequency": InputParameterSpec.required_database(
             fallback_parameter_names=("qubit_frequency",),

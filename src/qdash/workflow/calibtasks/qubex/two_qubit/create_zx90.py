@@ -7,6 +7,8 @@ from qdash.datamodel.task import (
     InputParameterSpec,
     OutputParameterSpec,
     RunParameterSpec,
+    TaskDocumentation,
+    TaskReference,
 )
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -26,6 +28,46 @@ class CreateZX90(QubexTask):
 
     name: str = "CreateZX90"
     task_type: str = "coupling"
+    documentation: ClassVar[TaskDocumentation] = TaskDocumentation(
+        description=(
+            "Builds an echoed CR ZX90 gate with a DRAG pi echo on the control qubit, calibrates"
+            " its CR amplitude by sweeping and fitting the target response, and writes the CR "
+            "parameters plus zx90_gate_time."
+        ),
+        when_to_use=(
+            "Run it after CheckCrossResonance. CheckZX90, the Bell tasks, "
+            "ZX90InterleavedRandomizedBenchmarking, and Check2QGateCoherenceLimit use its "
+            "result."
+        ),
+        prerequisites=(
+            (
+                "The coupling qid is control-target; control-qubit and target-qubit inputs are "
+                "read from each qubit's stored calibration."
+            ),
+            (
+                "DRAG half-pi pulses (CreateDRAGHPIPulse) on both qubits and a DRAG pi pulse "
+                "(CreateDRAGPIPulse) on the control qubit."
+            ),
+            (
+                "CR parameters (cr_*, cancel_*, rotary_amplitude, zx_rotation_rate, "
+                "cr_ramptime) stored by CheckCrossResonance."
+            ),
+        ),
+        references=(
+            TaskReference(
+                title="Process verification of two-qubit quantum gates by randomized benchmarking",
+                url="https://doi.org/10.1103/PhysRevA.87.030301",
+                relevance="Echoed cross-resonance gate construction.",
+            ),
+            TaskReference(
+                title=(
+                    "Procedure for systematically tuning up cross-talk in the cross-resonance gate"
+                ),
+                url="https://doi.org/10.1103/PhysRevA.93.060302",
+                relevance="Calibrating the cross-resonance gate toward a ZX rotation.",
+            ),
+        ),
+    )
     run_spec: ClassVar[dict[str, RunParameterSpec]] = {
         "readout_duration": readout_duration_run_parameter(),
         "shots": RunParameterSpec(

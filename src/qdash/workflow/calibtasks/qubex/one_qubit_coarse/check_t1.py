@@ -10,6 +10,8 @@ from qdash.datamodel.task import (
     InputParameterSpec,
     OutputParameterSpec,
     RunParameterSpec,
+    TaskDocumentation,
+    TaskReference,
 )
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -28,6 +30,35 @@ class CheckT1(QubexTask):
 
     name: str = "CheckT1"
     task_type: str = "qubit"
+    documentation: ClassVar[TaskDocumentation] = TaskDocumentation(
+        description=(
+            "Measures the energy relaxation time T1 by exciting the qubit with two half-pi "
+            "pulses and fitting the decay over a logarithmic delay sweep, then writes t1 in "
+            "microseconds."
+        ),
+        when_to_use=(
+            "Run it to characterize or track T1 once the half-pi pulse is calibrated. Use "
+            "CheckT1Average when a single measurement is too noisy to compare."
+        ),
+        prerequisites=(
+            (
+                "Rabi parameters from a CheckRabi run under the current readout_duration, with "
+                "rabi_r2 at or above the R² threshold; they normalize the IQ data."
+            ),
+            "hpi_amplitude and hpi_duration stored by CreateHPIPulse.",
+            (
+                "control_frequency (or qubit_frequency), readout_frequency (or "
+                "resonator_frequency), and readout_amplitude are stored for the qubit."
+            ),
+        ),
+        references=(
+            TaskReference(
+                title="A quantum engineer's guide to superconducting qubits",
+                url="https://doi.org/10.1063/1.5089550",
+                relevance="T1 measurement by excitation and delayed readout.",
+            ),
+        ),
+    )
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
         # RabiParam normalizes measured IQ values; its readout duration is validated.
         **required_rabi_normalization_inputs(),

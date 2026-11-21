@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 from fastapi import HTTPException
+from pydantic import ValidationError
 
 from qdash.api.schemas.task_file import (
     BackendConfigResponse,
@@ -32,13 +33,14 @@ from qdash.common.config.backend import (
 from qdash.common.config.calibration import DEFAULT_READOUT_DURATION
 from qdash.common.config.loader import ConfigLoader
 from qdash.common.config.path_resolver import resolve_calibtasks_base_path
+from qdash.datamodel.task import TaskDocumentation
 
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-TASK_METADATA_CACHE_VERSION = 4
+TASK_METADATA_CACHE_VERSION = 5
 TASK_CATALOG_FILENAME = "task_catalog.json"
 RABI_NORMALIZATION_INPUT_UNITS = {
     "control_amplitude": "a.u.",
@@ -68,6 +70,9 @@ class TaskFileService:
         """
         self._base_path = calibtasks_base_path or resolve_calibtasks_base_path()
         self._task_cache: dict[str, tuple[float, list[TaskInfo]]] = {}
+        # Task documentation declarations that could not be read statically, as
+        # "<file>:<class>: <reason>". The catalog generator refuses to publish them.
+        self.documentation_errors: list[str] = []
 
     def get_settings(self) -> TaskFileSettings:
         """Get task file settings from config/app/settings.yaml.
@@ -268,11 +273,14 @@ class TaskFileService:
             input_parameters: dict[str, dict[str, object]] = {}
             run_parameters: dict[str, dict[str, object]] = {}
             output_parameters: list[str] = []
+            documentation_node: ast.expr | None = None
             docstring = ast.get_docstring(node)
 
             for item in node.body:
                 if isinstance(item, ast.AnnAssign) and isinstance(item.target, ast.Name):
-                    if item.target.id == "name":
+                    if item.target.id == "documentation":
+                        documentation_node = item.value
+                    elif item.target.id == "name":
                         name_value = self._extract_string_value(item.value)
                     elif item.target.id == "task_type":
                         task_type_value = self._extract_string_value(item.value)
@@ -288,7 +296,9 @@ class TaskFileService:
                 elif isinstance(item, ast.Assign):
                     for target in item.targets:
                         if isinstance(target, ast.Name):
-                            if target.id == "name":
+                            if target.id == "documentation":
+                                documentation_node = item.value
+                            elif target.id == "name":
                                 name_value = self._extract_string_value(item.value)
                             elif target.id == "task_type":
                                 task_type_value = self._extract_string_value(item.value)
@@ -308,12 +318,22 @@ class TaskFileService:
                                 output_parameters = self._extract_parameter_names(item.value)
 
             if name_value and isinstance(name_value, str):
+                documentation = None
+                if documentation_node is not None:
+                    try:
+                        documentation = self._extract_documentation(documentation_node)
+                    except ValueError as exc:
+                        error = f"{relative_path}:{node.name}: {exc}"
+                        logger.warning("Ignoring task documentation in %s", error)
+                        if error not in self.documentation_errors:
+                            self.documentation_errors.append(error)
                 tasks.append(
                     TaskInfo(
                         name=name_value,
                         class_name=node.name,
                         task_type=task_type_value,
-                        description=docstring,
+                        description=documentation.description if documentation else docstring,
+                        documentation=documentation,
                         file_path=relative_path,
                         input_parameters=input_parameters,
                         run_parameters=run_parameters,
@@ -322,6 +342,84 @@ class TaskFileService:
                 )
 
         return tasks
+
+    @staticmethod
+    def _extract_documentation(node: ast.expr) -> TaskDocumentation | None:
+        """Read a literal ``TaskDocumentation(...)`` declaration without executing it.
+
+        Raises
+        ------
+        ValueError
+            If the declaration is not a call with literal keyword arguments that
+            validate as ``TaskDocumentation``.
+
+        """
+        if isinstance(node, ast.Constant) and node.value is None:
+            return None
+        fields = TaskFileService._literal_call_fields(
+            node, "TaskDocumentation", nested={"references": "TaskReference"}
+        )
+        try:
+            return TaskDocumentation.model_validate(fields)
+        except ValidationError as exc:
+            problems = "; ".join(
+                f"{'.'.join(str(part) for part in error['loc']) or 'documentation'}: {error['msg']}"
+                for error in exc.errors()
+            )
+            raise ValueError(f"invalid TaskDocumentation: {problems}") from None
+
+    @staticmethod
+    def _literal_call_fields(
+        node: ast.expr, class_name: str, nested: dict[str, str] | None = None
+    ) -> dict[str, object]:
+        """Return the literal keyword arguments of a ``class_name(...)`` call.
+
+        ``nested`` maps a keyword to the class name its value must call in each
+        element of a list or tuple, for example ``references`` to
+        ``TaskReference``. Nothing is imported or executed.
+
+        Raises
+        ------
+        ValueError
+            If the node is not such a call or an argument is not literal.
+
+        """
+        func = node.func if isinstance(node, ast.Call) else None
+        func_name = (
+            func.id
+            if isinstance(func, ast.Name)
+            else func.attr
+            if isinstance(func, ast.Attribute)
+            else None
+        )
+        if not isinstance(node, ast.Call) or func_name != class_name:
+            raise ValueError(f"expected a literal {class_name}(...) call")
+        if node.args:
+            raise ValueError(f"{class_name} fields must be passed as keyword arguments")
+        fields: dict[str, object] = {}
+        for keyword in node.keywords:
+            if keyword.arg is None:
+                raise ValueError(f"{class_name} does not accept ** arguments")
+            nested_class = (nested or {}).get(keyword.arg)
+            if nested_class is not None:
+                if not isinstance(keyword.value, (ast.Tuple, ast.List)):
+                    raise ValueError(
+                        f"{class_name}.{keyword.arg} must be a tuple or list of literal "
+                        f"{nested_class}(...) calls"
+                    )
+                fields[keyword.arg] = [
+                    TaskFileService._literal_call_fields(element, nested_class)
+                    for element in keyword.value.elts
+                ]
+                continue
+            try:
+                fields[keyword.arg] = ast.literal_eval(keyword.value)
+            except (ValueError, TypeError, SyntaxError, MemoryError, RecursionError):
+                raise ValueError(
+                    f"{class_name}.{keyword.arg} must be a string literal "
+                    "or a list of string literals"
+                ) from None
+        return fields
 
     @staticmethod
     def _extract_parameter_names(node: ast.expr | None) -> list[str]:

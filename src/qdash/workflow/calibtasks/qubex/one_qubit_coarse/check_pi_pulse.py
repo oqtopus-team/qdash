@@ -7,6 +7,7 @@ from qdash.datamodel.task import (
     InputParameterSpec,
     OutputParameterSpec,
     RunParameterSpec,
+    TaskDocumentation,
 )
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -25,6 +26,27 @@ class CheckPIPulse(QubexTask):
 
     name: str = "CheckPIPulse"
     task_type: str = "qubit"
+    documentation: ClassVar[TaskDocumentation] = TaskDocumentation(
+        description=(
+            "Applies the stored pi pulse repeatedly (20 times by default) and plots the "
+            "normalized signal after each repetition. It writes no calibration values."
+        ),
+        when_to_use=(
+            "Run it after CreatePIPulse to see amplitude error accumulate: a correct pulse "
+            "alternates between ground and excited states."
+        ),
+        prerequisites=(
+            (
+                "Rabi parameters from a CheckRabi run under the current readout_duration, with "
+                "rabi_r2 at or above the R² threshold; they normalize the IQ data."
+            ),
+            "pi_amplitude and pi_duration stored by CreatePIPulse.",
+            (
+                "control_frequency (or qubit_frequency), readout_frequency (or "
+                "resonator_frequency), and readout_amplitude are stored for the qubit."
+            ),
+        ),
+    )
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
         # RabiParam normalizes measured IQ values; its readout duration is validated.
         **required_rabi_normalization_inputs(),

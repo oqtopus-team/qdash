@@ -39,7 +39,12 @@ from qdash.analysis.capture_delay import (
     total_delay_ns,
 )
 from qdash.common.visualization.figure_metadata import set_figure_role
-from qdash.datamodel.task import InputParameterSpec, OutputParameterSpec, RunParameterSpec
+from qdash.datamodel.task import (
+    InputParameterSpec,
+    OutputParameterSpec,
+    RunParameterSpec,
+    TaskDocumentation,
+)
 from qdash.workflow.calibtasks.base import PostProcessResult, RunResult
 from qdash.workflow.calibtasks.qubex.base import QubexTask, readout_duration_run_parameter
 
@@ -96,6 +101,25 @@ class CorrectCaptureDelay(QubexTask):
 
     name: str = "CorrectCaptureDelay"
     task_type: str = "qubit"
+    documentation: ClassVar[TaskDocumentation] = TaskDocumentation(
+        description=(
+            "MUX-level task that sweeps the readout capture delay with a fixed readout tone and"
+            " picks a delay that centers the readout pulse in the capture window. It writes "
+            "capture_delay (and capture_delay_word on QuEL-1) for every qubit of the MUX and "
+            "updates the Qubex params files."
+        ),
+        when_to_use=(
+            "Run it first during box setup, before resonator spectroscopy, on QuEL-1 or QuEL-3 "
+            "hardware; it does not need calibrated readout parameters. Later sessions reload "
+            "the corrected delays."
+        ),
+        prerequisites=(
+            (
+                "None from calibration storage. The default tone sits 0.25 GHz above the "
+                "readout box's default resonator spectroscopy range, away from the resonators."
+            ),
+        ),
+    )
     is_mux_level: bool = True
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {}
     run_spec: ClassVar[dict[str, RunParameterSpec]] = {

@@ -13,6 +13,8 @@ from qdash.datamodel.task import (
     InputParameterSpec,
     OutputParameterSpec,
     RunParameterSpec,
+    TaskDocumentation,
+    TaskReference,
 )
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -35,6 +37,41 @@ class CheckT2EchoAverage(QubexTask):
 
     name: str = "CheckT2EchoAverage"
     task_type: str = "qubit"
+    documentation: ClassVar[TaskDocumentation] = TaskDocumentation(
+        description=(
+            "Repeats the CheckT2Echo measurement n_runs times (10 by default) and writes the "
+            "mean t2_echo_average and its standard deviation t2_echo_std, with a fluctuation "
+            "figure."
+        ),
+        when_to_use=(
+            "Run it when echo coherence must be compared over time, or before the "
+            "coherence-limit tasks, which read t2_echo_average."
+        ),
+        prerequisites=(
+            (
+                "Rabi parameters from a CheckRabi run under the current readout_duration, with "
+                "rabi_r2 at or above the R² threshold; they normalize the IQ data."
+            ),
+            "hpi_amplitude and hpi_duration stored by CreateHPIPulse.",
+            "pi_amplitude and pi_duration stored by CreatePIPulse.",
+            (
+                "control_frequency (or qubit_frequency), readout_frequency (or "
+                "resonator_frequency), and readout_amplitude are stored for the qubit."
+            ),
+        ),
+        references=(
+            TaskReference(
+                title="A quantum engineer's guide to superconducting qubits",
+                url="https://doi.org/10.1063/1.5089550",
+                relevance="Hahn echo measurement with a refocusing pi pulse.",
+            ),
+            TaskReference(
+                title="Decoherence benchmarking of superconducting qubits",
+                url="https://doi.org/10.1038/s41534-019-0168-5",
+                relevance="Statistics of repeated coherence measurements over long periods.",
+            ),
+        ),
+    )
 
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
         # RabiParam normalizes measured IQ values; its readout duration is validated.

@@ -9,6 +9,8 @@ from qdash.datamodel.task import (
     InputParameterSpec,
     OutputParameterSpec,
     RunParameterSpec,
+    TaskDocumentation,
+    TaskReference,
 )
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -28,6 +30,55 @@ class CreateDRAGHPIPulse(QubexTask):
 
     name: str = "CreateDRAGHPIPulse"
     task_type: str = "qubit"
+    documentation: ClassVar[TaskDocumentation] = TaskDocumentation(
+        description=(
+            "Calibrates a 16 ns DRAG half-pi pulse: two iterations of amplitude calibration and"
+            " a DRAG beta sweep whose zero crossing cancels the phase error amplified by "
+            "repeated X90 and -X90 pairs. It writes drag_hpi_amplitude, drag_hpi_beta, and "
+            "drag_hpi_duration."
+        ),
+        when_to_use=(
+            "Run it after CheckRabi when gates must be short or high fidelity. "
+            "RandomizedBenchmarking, ReadoutClassification, and the two-qubit tasks use the "
+            "DRAG half-pi pulse."
+        ),
+        prerequisites=(
+            (
+                "Rabi parameters from a CheckRabi run under the current readout_duration, with "
+                "rabi_r2 at or above the R² threshold; they normalize the IQ data."
+            ),
+            (
+                "control_frequency (or qubit_frequency), readout_frequency (or "
+                "resonator_frequency), and readout_amplitude are stored for the qubit."
+            ),
+        ),
+        references=(
+            TaskReference(
+                title="Simple Pulses for Elimination of Leakage in Weakly Nonlinear Qubits",
+                url="https://doi.org/10.1103/PhysRevLett.103.110501",
+                relevance=(
+                    "DRAG derivative correction that suppresses leakage and phase error in a "
+                    "weakly anharmonic qubit."
+                ),
+            ),
+            TaskReference(
+                title=(
+                    "Analytic control methods for high-fidelity unitary operations in a weakly "
+                    "nonlinear oscillator"
+                ),
+                url="https://doi.org/10.1103/PhysRevA.83.012308",
+                relevance="Analysis of DRAG pulse families and their phase-error terms.",
+            ),
+            TaskReference(
+                title="Reduced phase error through optimized control of a superconducting qubit",
+                url="https://doi.org/10.1103/PhysRevA.82.042339",
+                relevance=(
+                    "Amplified phase error sequences of pseudo-identity pairs, similar to the "
+                    "beta sweep; shown on a phase qubit."
+                ),
+            ),
+        ),
+    )
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
         # RabiParam calibrates the pulse and normalizes IQ; validate its readout context.
         **required_rabi_normalization_inputs(),

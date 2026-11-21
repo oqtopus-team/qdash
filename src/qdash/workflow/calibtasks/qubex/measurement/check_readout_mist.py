@@ -12,7 +12,13 @@ import numpy.typing as npt
 from qubex.core import DataModel
 from qubex.measurement.measurement_defaults import DEFAULT_INTERVAL
 
-from qdash.datamodel.task import InputParameterSpec, OutputParameterSpec, RunParameterSpec
+from qdash.datamodel.task import (
+    InputParameterSpec,
+    OutputParameterSpec,
+    RunParameterSpec,
+    TaskDocumentation,
+    TaskReference,
+)
 from qdash.workflow.calibtasks.base import PostProcessResult, RunResult
 from qdash.workflow.calibtasks.qubex.base import QubexTask
 from qdash.workflow.calibtasks.qubex.validation import require_ef_configuration
@@ -53,6 +59,54 @@ class CheckReadoutMIST(QubexTask):
 
     name: str = "CheckReadoutMIST"
     task_type: str = "qubit"
+    documentation: ClassVar[TaskDocumentation] = TaskDocumentation(
+        description=(
+            "Prepares g, e, and f, applies repeated readout cycles, and fits an effective GEF "
+            "transition matrix per readout cycle, optionally against a blank reference. It "
+            "stores a data artifact and figures but no calibration values."
+        ),
+        when_to_use=(
+            "Run it during characterization to check whether the readout drive causes "
+            "measurement-induced state transitions or leakage."
+        ),
+        prerequisites=(
+            (
+                "GE and EF drive targets configured in the current session: run ConfigureEF, or"
+                " start with ConfigureAll, using configuration_mode ge-ef-cr or ge-ef-fh."
+            ),
+            "control_frequency_ef (or ef_frequency) stored by CheckAdaptiveEFChevron.",
+            "pi_amplitude and pi_duration stored by CreatePIPulse.",
+            "ef_pi_amplitude and ef_pi_duration stored by CreateEFPIPulse.",
+            (
+                "control_frequency (or qubit_frequency), readout_frequency (or "
+                "resonator_frequency), and readout_amplitude are stored for the qubit."
+            ),
+        ),
+        references=(
+            TaskReference(
+                title=(
+                    "Measurement-Induced State Transitions in a Superconducting Qubit: Beyond "
+                    "the Rotating Wave Approximation"
+                ),
+                url="https://doi.org/10.1103/PhysRevLett.117.190503",
+                relevance=(
+                    "Measurement-induced state transitions out of the qubit subspace at high "
+                    "readout photon number."
+                ),
+            ),
+            TaskReference(
+                title=(
+                    "Measurement-induced state transitions in a superconducting qubit: Within "
+                    "the rotating-wave approximation"
+                ),
+                url="https://doi.org/10.1103/PhysRevApplied.20.054008",
+                relevance=(
+                    "Transmon measurement-induced transitions within the rotating-wave "
+                    "approximation."
+                ),
+            ),
+        ),
+    )
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
         "control_frequency": InputParameterSpec.required_database(
             fallback_parameter_names=("qubit_frequency",),

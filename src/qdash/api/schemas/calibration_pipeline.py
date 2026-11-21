@@ -7,6 +7,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from qdash.api.schemas.flow import ExecuteFlowResponse
+from qdash.datamodel.task import TaskDocumentation  # noqa: TC001 - pydantic field type
 from qdash.datamodel.task_call import TaskCall  # noqa: TC001 - pydantic field type
 
 _SPEC_EXAMPLE: dict[str, Any] = {
@@ -209,6 +210,13 @@ class PipelineCatalogResponse(BaseModel):
     )
     tasks: dict[str, list[str]] = Field(
         description='Available task names by task_type ("qubit", "coupling", ...).'
+    )
+    task_documentation: dict[str, TaskDocumentation] = Field(
+        default_factory=dict,
+        description=(
+            "Guidance declared by available tasks, keyed by task name. Tasks that "
+            "declare no documentation are omitted."
+        ),
     )
     spec_version: int = Field(description="The spec version this QDash accepts.")
     spec_schema: dict[str, Any] = Field(description="JSON schema of CalibrationPipelineSpec.")

@@ -3,7 +3,22 @@
     "fake": [
       {
         "class_name": "CheckChevron",
-        "description": "Estimate qubit frequency and control amplitude from a fixed-grid Chevron.",
+        "description": "Sweeps drive detuning and pulse duration on a fixed grid around control_frequency, then estimates the qubit frequency with Qubex's matched-transform chevron analysis and the control amplitude for a 12.5 MHz Rabi frequency.",
+        "documentation": {
+          "description": "Sweeps drive detuning and pulse duration on a fixed grid around control_frequency, then estimates the qubit frequency with Qubex's matched-transform chevron analysis and the control amplitude for a 12.5 MHz Rabi frequency.",
+          "prerequisites": [
+            "control_frequency (or qubit_frequency), readout_frequency (or resonator_frequency), and readout_amplitude are stored for the qubit; control_amplitude uses the stored value or 0.0625 otherwise.",
+            "The true qubit frequency lies inside the detuning_range sweep, which spans ±50 MHz by default."
+          ],
+          "references": [
+            {
+              "relevance": "Resonant and detuned Rabi driving of a transmon; the matched-transform analysis is Qubex-specific.",
+              "title": "A quantum engineer's guide to superconducting qubits",
+              "url": "https://doi.org/10.1063/1.5089550"
+            }
+          ],
+          "when_to_use": "Run it when the qubit frequency is known to within the sweep window, for example from an earlier calibration or the fake bring-up. The estimated qubit_frequency is also published as control_frequency, which drive tasks such as CheckRabi read. Use CheckAdaptiveChevron when the frequency is less certain."
+        },
         "file_path": "one_qubit_coarse/check_chevron.py",
         "input_parameters": {
           "control_amplitude": {
@@ -98,7 +113,17 @@
       },
       {
         "class_name": "CheckHPIPulse",
-        "description": "Task to check the HPI pulse.",
+        "description": "Applies the stored half-pi pulse repeatedly (20 times by default) and plots the normalized signal after each repetition. It writes no calibration values.",
+        "documentation": {
+          "description": "Applies the stored half-pi pulse repeatedly (20 times by default) and plots the normalized signal after each repetition. It writes no calibration values.",
+          "prerequisites": [
+            "Rabi parameters from a CheckRabi run under the current readout_duration, with rabi_r2 at or above the R² threshold; they normalize the IQ data.",
+            "hpi_amplitude and hpi_duration stored by CreateHPIPulse.",
+            "control_frequency (or qubit_frequency), readout_frequency (or resonator_frequency), and readout_amplitude are stored for the qubit."
+          ],
+          "references": [],
+          "when_to_use": "Run it after CreateHPIPulse to see amplitude error accumulate: a correct pulse returns to the same state every four repetitions."
+        },
         "file_path": "one_qubit_coarse/check_hpi_pulse.py",
         "input_parameters": {
           "control_amplitude": {
@@ -265,7 +290,17 @@
       },
       {
         "class_name": "CheckPIPulse",
-        "description": "Task to check the PI pulse.",
+        "description": "Applies the stored pi pulse repeatedly (20 times by default) and plots the normalized signal after each repetition. It writes no calibration values.",
+        "documentation": {
+          "description": "Applies the stored pi pulse repeatedly (20 times by default) and plots the normalized signal after each repetition. It writes no calibration values.",
+          "prerequisites": [
+            "Rabi parameters from a CheckRabi run under the current readout_duration, with rabi_r2 at or above the R² threshold; they normalize the IQ data.",
+            "pi_amplitude and pi_duration stored by CreatePIPulse.",
+            "control_frequency (or qubit_frequency), readout_frequency (or resonator_frequency), and readout_amplitude are stored for the qubit."
+          ],
+          "references": [],
+          "when_to_use": "Run it after CreatePIPulse to see amplitude error accumulate: a correct pulse alternates between ground and excited states."
+        },
         "file_path": "one_qubit_coarse/check_pi_pulse.py",
         "input_parameters": {
           "control_amplitude": {
@@ -435,7 +470,22 @@
       },
       {
         "class_name": "CheckRabi",
-        "description": "Task to check the Rabi oscillation.",
+        "description": "Measures a Rabi oscillation at a fixed control amplitude and fits it to record the Rabi parameters, the maximum Rabi frequency per unit amplitude, and the control amplitude estimated for a 12.5 MHz Rabi frequency.",
+        "documentation": {
+          "description": "Measures a Rabi oscillation at a fixed control amplitude and fits it to record the Rabi parameters, the maximum Rabi frequency per unit amplitude, and the control amplitude estimated for a 12.5 MHz Rabi frequency.",
+          "prerequisites": [
+            "control_frequency (or qubit_frequency) and readout_frequency (or resonator_frequency) are stored for the qubit.",
+            "control_amplitude and readout_amplitude use stored values when present and task defaults otherwise."
+          ],
+          "references": [
+            {
+              "relevance": "Resonant Rabi driving of a transmon through capacitive X and Y control.",
+              "title": "A quantum engineer's guide to superconducting qubits",
+              "url": "https://doi.org/10.1063/1.5089550"
+            }
+          ],
+          "when_to_use": "Run it once control and readout frequencies are known, and again whenever readout conditions change. Pulse calibrations and measurements that normalize IQ data, such as CreateHPIPulse, CheckT1, and CheckRamsey, require the Rabi parameters it stores."
+        },
         "file_path": "one_qubit_coarse/check_rabi.py",
         "input_parameters": {
           "control_amplitude": {
@@ -519,7 +569,23 @@
       },
       {
         "class_name": "CheckRamsey",
-        "description": "Task to check the Ramsey interference.",
+        "description": "Runs Ramsey interference at a fixed detuning with X and Y second rotations, fits the axis with the better R², and writes the Ramsey frequency, the qubit frequency, and T2*.",
+        "documentation": {
+          "description": "Runs Ramsey interference at a fixed detuning with X and Y second rotations, fits the axis with the better R², and writes the Ramsey frequency, the qubit frequency, and T2*.",
+          "prerequisites": [
+            "Rabi parameters stored by CheckRabi, used to normalize the measured IQ data.",
+            "hpi_amplitude and hpi_duration stored by a half-pi pulse calibration such as CreateHPIPulse.",
+            "control_frequency (or qubit_frequency), readout_frequency (or resonator_frequency), and readout_amplitude are stored for the qubit."
+          ],
+          "references": [
+            {
+              "relevance": "Ramsey interferometry with an intentional detuning to measure frequency offset and T2*.",
+              "title": "A quantum engineer's guide to superconducting qubits",
+              "url": "https://doi.org/10.1063/1.5089550"
+            }
+          ],
+          "when_to_use": "Run it to refine the qubit frequency and measure T2* once a half-pi pulse is calibrated. The qubit_frequency it writes is also published as control_frequency; repeat it with a longer time range and smaller detuning for a finer estimate."
+        },
         "file_path": "one_qubit_coarse/check_ramsey.py",
         "input_parameters": {
           "control_amplitude": {
@@ -700,7 +766,23 @@
       },
       {
         "class_name": "CheckT1",
-        "description": "Task to check the T1 time.",
+        "description": "Measures the energy relaxation time T1 by exciting the qubit with two half-pi pulses and fitting the decay over a logarithmic delay sweep, then writes t1 in microseconds.",
+        "documentation": {
+          "description": "Measures the energy relaxation time T1 by exciting the qubit with two half-pi pulses and fitting the decay over a logarithmic delay sweep, then writes t1 in microseconds.",
+          "prerequisites": [
+            "Rabi parameters from a CheckRabi run under the current readout_duration, with rabi_r2 at or above the R² threshold; they normalize the IQ data.",
+            "hpi_amplitude and hpi_duration stored by CreateHPIPulse.",
+            "control_frequency (or qubit_frequency), readout_frequency (or resonator_frequency), and readout_amplitude are stored for the qubit."
+          ],
+          "references": [
+            {
+              "relevance": "T1 measurement by excitation and delayed readout.",
+              "title": "A quantum engineer's guide to superconducting qubits",
+              "url": "https://doi.org/10.1063/1.5089550"
+            }
+          ],
+          "when_to_use": "Run it to characterize or track T1 once the half-pi pulse is calibrated. Use CheckT1Average when a single measurement is too noisy to compare."
+        },
         "file_path": "one_qubit_coarse/check_t1.py",
         "input_parameters": {
           "control_amplitude": {
@@ -873,7 +955,24 @@
       },
       {
         "class_name": "CheckT2Echo",
-        "description": "Task to check the T2 echo time.",
+        "description": "Measures the Hahn echo coherence time with a half-pi pulse, a Y pi pulse at mid delay, and a final half-pi pulse over a logarithmic delay sweep, then writes t2_echo in microseconds.",
+        "documentation": {
+          "description": "Measures the Hahn echo coherence time with a half-pi pulse, a Y pi pulse at mid delay, and a final half-pi pulse over a logarithmic delay sweep, then writes t2_echo in microseconds.",
+          "prerequisites": [
+            "Rabi parameters from a CheckRabi run under the current readout_duration, with rabi_r2 at or above the R² threshold; they normalize the IQ data.",
+            "hpi_amplitude and hpi_duration stored by CreateHPIPulse.",
+            "pi_amplitude and pi_duration stored by CreatePIPulse.",
+            "control_frequency (or qubit_frequency), readout_frequency (or resonator_frequency), and readout_amplitude are stored for the qubit."
+          ],
+          "references": [
+            {
+              "relevance": "Hahn echo measurement with a refocusing pi pulse.",
+              "title": "A quantum engineer's guide to superconducting qubits",
+              "url": "https://doi.org/10.1063/1.5089550"
+            }
+          ],
+          "when_to_use": "Run it to characterize dephasing with low-frequency noise refocused; compare with CheckRamsey's T2*. Use CheckT2EchoAverage for repeated statistics."
+        },
         "file_path": "one_qubit_coarse/check_t2_echo.py",
         "input_parameters": {
           "control_amplitude": {
@@ -1059,7 +1158,22 @@
       },
       {
         "class_name": "CreateHPIPulse",
-        "description": "Task to create the HPI pulse.",
+        "description": "Calibrates the amplitude of a 32 ns flat-top half-pi pulse by sweeping amplitude around the Rabi-model estimate over a train of repeated pulses. It writes hpi_amplitude and hpi_duration.",
+        "documentation": {
+          "description": "Calibrates the amplitude of a 32 ns flat-top half-pi pulse by sweeping amplitude around the Rabi-model estimate over a train of repeated pulses. It writes hpi_amplitude and hpi_duration.",
+          "prerequisites": [
+            "Rabi parameters from a CheckRabi run under the current readout_duration, with rabi_r2 at or above the R² threshold; they normalize the IQ data.",
+            "control_frequency (or qubit_frequency), readout_frequency (or resonator_frequency), and readout_amplitude are stored for the qubit."
+          ],
+          "references": [
+            {
+              "relevance": "Single-qubit X and Y rotations from resonant drive pulses; the repeated-pulse amplitude fit is a Qubex procedure.",
+              "title": "A quantum engineer's guide to superconducting qubits",
+              "url": "https://doi.org/10.1063/1.5089550"
+            }
+          ],
+          "when_to_use": "Run it after CheckRabi. Most later single-qubit measurements require the half-pi pulse, and CheckHPIPulse verifies it."
+        },
         "file_path": "one_qubit_coarse/create_hpi_pulse.py",
         "input_parameters": {
           "control_amplitude": {
@@ -1219,7 +1333,22 @@
       },
       {
         "class_name": "CreatePIPulse",
-        "description": "Task to create the pi pulse.",
+        "description": "Calibrates the amplitude of a 32 ns flat-top pi pulse by sweeping amplitude around the Rabi-model estimate over a train of repeated pulses. It writes pi_amplitude and pi_duration.",
+        "documentation": {
+          "description": "Calibrates the amplitude of a 32 ns flat-top pi pulse by sweeping amplitude around the Rabi-model estimate over a train of repeated pulses. It writes pi_amplitude and pi_duration.",
+          "prerequisites": [
+            "Rabi parameters from a CheckRabi run under the current readout_duration, with rabi_r2 at or above the R² threshold; they normalize the IQ data.",
+            "control_frequency (or qubit_frequency), readout_frequency (or resonator_frequency), and readout_amplitude are stored for the qubit."
+          ],
+          "references": [
+            {
+              "relevance": "Single-qubit X and Y rotations from resonant drive pulses; the repeated-pulse amplitude fit is a Qubex procedure.",
+              "title": "A quantum engineer's guide to superconducting qubits",
+              "url": "https://doi.org/10.1063/1.5089550"
+            }
+          ],
+          "when_to_use": "Run it after CheckRabi. CheckT2Echo, CheckGEFRelaxation, and readout optimization rely on a pi pulse; CheckPIPulse verifies it."
+        },
         "file_path": "one_qubit_coarse/create_pi_pulse.py",
         "input_parameters": {
           "control_amplitude": {
@@ -1379,7 +1508,15 @@
       },
       {
         "class_name": "FakeBringUp",
-        "description": "Publish the simulated device's qubit and readout parameters to calibration storage.\n\nThe qubex tasks that run on the fake backend read their inputs from the calibration\ndatabase exactly as they do on hardware, and a fresh fake project holds no values yet.\nThis task stands in for the hardware bring-up (resonator and qubit spectroscopy, control\namplitude search) that the simulator does not emulate: it writes the simulator's own\nfrequencies and amplitudes once, after which the qubex chain (CheckChevron, CheckRabi,\nCreateHPIPulse, ...) resolves every required input.",
+        "description": "Fake-backend utility that copies the simulator's qubit frequency, resonator frequency, and readout and control amplitudes into calibration storage. It is not a hardware measurement.",
+        "documentation": {
+          "description": "Fake-backend utility that copies the simulator's qubit frequency, resonator frequency, and readout and control amplitudes into calibration storage. It is not a hardware measurement.",
+          "prerequisites": [
+            "Only runs on the fake backend."
+          ],
+          "references": [],
+          "when_to_use": "Run it first in a fresh fake-backend project, in place of hardware bring-up, so the qubex task chain (CheckChevron, CheckRabi, ...) finds its inputs."
+        },
         "file_path": "fake_bring_up.py",
         "input_parameters": {},
         "name": "FakeBringUp",
@@ -1397,7 +1534,21 @@
     "qubex": [
       {
         "class_name": "Check1QGateCoherenceLimit",
-        "description": "Task to calculate 1Q gate coherence limit from T1, T2, and gate duration.",
+        "description": "Computes the coherence-limited single-qubit gate fidelity from stored t1_average and t2_echo_average and a gate time (drag_hpi_duration run parameter, 16 ns by default). It measures nothing.",
+        "documentation": {
+          "description": "Computes the coherence-limited single-qubit gate fidelity from stored t1_average and t2_echo_average and a gate time (drag_hpi_duration run parameter, 16 ns by default). It measures nothing.",
+          "prerequisites": [
+            "t1_average and t2_echo_average stored by CheckT1Average and CheckT2EchoAverage."
+          ],
+          "references": [
+            {
+              "relevance": "Gate-independent fidelity reduction from T1 and dephasing; the Qubex formula agrees with it to first order.",
+              "title": "Universal Fidelity Reduction of Quantum Operations from Weak Dissipation",
+              "url": "https://doi.org/10.1103/PhysRevLett.129.150504"
+            }
+          ],
+          "when_to_use": "Run it after CheckT1Average and CheckT2EchoAverage to compare benchmarked fidelity with the decoherence limit."
+        },
         "file_path": "benchmark/check_1q_gate_coherence_limit.py",
         "input_parameters": {
           "t1_average": {
@@ -1427,7 +1578,22 @@
       },
       {
         "class_name": "Check2QGateCoherenceLimit",
-        "description": "Task to calculate 2Q gate coherence limit from T1, T2, and gate duration.",
+        "description": "Computes the coherence-limited two-qubit gate fidelity from both qubits' t1_average and t2_echo_average and the pair's zx90_gate_time. It measures nothing.",
+        "documentation": {
+          "description": "Computes the coherence-limited two-qubit gate fidelity from both qubits' t1_average and t2_echo_average and the pair's zx90_gate_time. It measures nothing.",
+          "prerequisites": [
+            "zx90_gate_time stored by CreateZX90; the task fails when it is missing.",
+            "t1_average and t2_echo_average stored for both qubits; missing values default to 0 and give no meaningful limit."
+          ],
+          "references": [
+            {
+              "relevance": "Gate-independent fidelity reduction from T1 and dephasing; the Qubex formula agrees with it to first order.",
+              "title": "Universal Fidelity Reduction of Quantum Operations from Weak Dissipation",
+              "url": "https://doi.org/10.1103/PhysRevLett.129.150504"
+            }
+          ],
+          "when_to_use": "Run it after CreateZX90 and the averaged coherence tasks to compare ZX90 benchmarking with the decoherence limit."
+        },
         "file_path": "benchmark/check_2q_gate_coherence_limit.py",
         "input_parameters": {
           "control_t1_average": {
@@ -1480,7 +1646,21 @@
       },
       {
         "class_name": "CheckAdaptiveChevron",
-        "description": "Estimate qubit frequency and control amplitude with an adaptive Chevron.",
+        "description": "Measures a coarse chevron (drive detuning versus pulse duration) over a wide window, extends the search to the side bands when the peak is weak, then remeasures a regular chevron with a rescaled amplitude. Qubex's matched-transform analysis gives qubit_frequency (also published as control_frequency) and control_amplitude.",
+        "documentation": {
+          "description": "Measures a coarse chevron (drive detuning versus pulse duration) over a wide window, extends the search to the side bands when the peak is weak, then remeasures a regular chevron with a rescaled amplitude. Qubex's matched-transform analysis gives qubit_frequency (also published as control_frequency) and control_amplitude.",
+          "prerequisites": [
+            "control_frequency (or coarse_qubit_frequency), readout_frequency (or resonator_frequency), readout_amplitude, and coarse_control_amplitude are stored, normally by CheckQubitSpectroscopy and CheckControlAmplitude."
+          ],
+          "references": [
+            {
+              "relevance": "Resonant and detuned Rabi driving of a transmon; the adaptive matched-transform search is Qubex-specific.",
+              "title": "A quantum engineer's guide to superconducting qubits",
+              "url": "https://doi.org/10.1063/1.5089550"
+            }
+          ],
+          "when_to_use": "Run it at the end of bring-up when the qubit frequency is known only to tens of MHz. Use CheckChevron instead when the frequency is already within its fixed ±50 MHz window."
+        },
         "file_path": "one_qubit_coarse/check_adaptive_chevron.py",
         "input_parameters": {
           "coarse_control_amplitude": {
@@ -1549,7 +1729,27 @@
       },
       {
         "class_name": "CheckAdaptiveEFChevron",
-        "description": "Adaptively measure f_ef and alpha = f_ef - f_ge using a stored Qubex GE pulse.\n\nThe recorded HPI inputs enforce the calibration prerequisite. Qubex resolves the actual\npreparation waveform from the synchronized session when it constructs each sequence.",
+        "description": "Prepares the first excited state with the session's GE pulse and runs an adaptive chevron on the e-to-f transition. It writes ef_frequency (also published as control_frequency_ef) and qubit_anharmonicity = ef_frequency - control_frequency.",
+        "documentation": {
+          "description": "Prepares the first excited state with the session's GE pulse and runs an adaptive chevron on the e-to-f transition. It writes ef_frequency (also published as control_frequency_ef) and qubit_anharmonicity = ef_frequency - control_frequency.",
+          "prerequisites": [
+            "GE and EF drive targets configured in the current session: run ConfigureEF, or start with ConfigureAll, using configuration_mode ge-ef-cr or ge-ef-fh.",
+            "control_frequency, control_amplitude, readout_frequency, and readout_amplitude are stored; hpi_amplitude and hpi_duration stored by CreateHPIPulse."
+          ],
+          "references": [
+            {
+              "relevance": "Transmon anharmonicity and the sqrt(2) larger e-f charge matrix element behind the amplitude seed.",
+              "title": "Charge-insensitive qubit design derived from the Cooper pair box",
+              "url": "https://doi.org/10.1103/PhysRevA.76.042319"
+            },
+            {
+              "relevance": "Driving successive transitions of a transmon with sequential pi pulses.",
+              "title": "Coherence and Decay of Higher Energy Levels of a Superconducting Transmon Qubit",
+              "url": "https://doi.org/10.1103/PhysRevLett.114.010501"
+            }
+          ],
+          "when_to_use": "Run it to start EF calibration. The search starts from the configured EF frequency or, without one, from 18/19 of the GE frequency, with the GE amplitude divided by sqrt(2)."
+        },
         "file_path": "one_qubit_fine/check_adaptive_ef_chevron.py",
         "input_parameters": {
           "control_amplitude": {
@@ -1651,7 +1851,29 @@
       },
       {
         "class_name": "CheckAdaptiveFHChevron",
-        "description": "Adaptively measure the FH transition using stored Qubex GE and EF pulses.\n\nThe recorded HPI and EF pi inputs enforce the calibration prerequisites. Qubex resolves the\nactual preparation waveforms from the synchronized session when it constructs each sequence.",
+        "description": "Prepares the second excited state with the session's GE and EF pulses and runs an adaptive chevron on the f-to-h transition. It writes fh_frequency (also published as control_frequency_fh).",
+        "documentation": {
+          "description": "Prepares the second excited state with the session's GE and EF pulses and runs an adaptive chevron on the f-to-h transition. It writes fh_frequency (also published as control_frequency_fh).",
+          "prerequisites": [
+            "GE, EF, and FH drive targets in the current session: configuration_mode ge-ef-fh.",
+            "control_frequency, control_amplitude, readout_frequency, and readout_amplitude are stored; hpi_amplitude and hpi_duration stored by CreateHPIPulse.",
+            "control_frequency_ef (or ef_frequency) stored by CheckAdaptiveEFChevron.",
+            "ef_pi_amplitude and ef_pi_duration stored by CreateEFPIPulse."
+          ],
+          "references": [
+            {
+              "relevance": "Transmon level structure and matrix elements that grow roughly as sqrt(n+1).",
+              "title": "Charge-insensitive qubit design derived from the Cooper pair box",
+              "url": "https://doi.org/10.1103/PhysRevA.76.042319"
+            },
+            {
+              "relevance": "Driving successive transitions of a transmon with sequential pi pulses.",
+              "title": "Coherence and Decay of Higher Energy Levels of a Superconducting Transmon Qubit",
+              "url": "https://doi.org/10.1103/PhysRevLett.114.010501"
+            }
+          ],
+          "when_to_use": "Run it after EF pulses are calibrated when the third transition is needed. The search starts from the configured FH frequency or 2*ef - ge, with the GE amplitude divided by sqrt(3)."
+        },
         "file_path": "one_qubit_fine/check_adaptive_fh_chevron.py",
         "input_parameters": {
           "control_amplitude": {
@@ -1773,7 +1995,17 @@
       },
       {
         "class_name": "CheckBellState",
-        "description": "Task to check the bell state.",
+        "description": "Prepares a Bell state with a control Y90 and the stored ZX90 gate and plots the Z-basis outcome probabilities, raw and readout-mitigated. It writes no calibration values.",
+        "documentation": {
+          "description": "Prepares a Bell state with a control Y90 and the stored ZX90 gate and plots the Z-basis outcome probabilities, raw and readout-mitigated. It writes no calibration values.",
+          "prerequisites": [
+            "The coupling qid is control-target; control-qubit and target-qubit inputs are read from each qubit's stored calibration.",
+            "DRAG half-pi pulses (CreateDRAGHPIPulse) on both qubits and a DRAG pi pulse (CreateDRAGPIPulse) on the control qubit.",
+            "CR and ZX90 parameters (cr_*, cancel_*, rotary_amplitude, zx_rotation_rate, zx90_gate_time) stored by CreateZX90 for the pair."
+          ],
+          "references": [],
+          "when_to_use": "Run it as a quick entangling check after CreateZX90; use CheckBellStateTomography for a fidelity value."
+        },
         "file_path": "two_qubit/check_bell_state.py",
         "input_parameters": {
           "cancel_amplitude": {
@@ -2032,7 +2264,28 @@
       },
       {
         "class_name": "CheckBellStateTomography",
-        "description": "Task to check the bell state tomography.",
+        "description": "Prepares a Bell state with the stored ZX90 gate, measures it in all nine Pauli basis pairs with readout mitigation, reconstructs the density matrix by linear inversion, and writes bell_state_fidelity.",
+        "documentation": {
+          "description": "Prepares a Bell state with the stored ZX90 gate, measures it in all nine Pauli basis pairs with readout mitigation, reconstructs the density matrix by linear inversion, and writes bell_state_fidelity.",
+          "prerequisites": [
+            "The coupling qid is control-target; control-qubit and target-qubit inputs are read from each qubit's stored calibration.",
+            "DRAG half-pi pulses (CreateDRAGHPIPulse) on both qubits and a DRAG pi pulse (CreateDRAGPIPulse) on the control qubit.",
+            "CR and ZX90 parameters (cr_*, cancel_*, rotary_amplitude, zx_rotation_rate, zx90_gate_time) stored by CreateZX90 for the pair."
+          ],
+          "references": [
+            {
+              "relevance": "Two-qubit state tomography by linear reconstruction of the density matrix.",
+              "title": "Measurement of qubits",
+              "url": "https://doi.org/10.1103/PhysRevA.64.052312"
+            },
+            {
+              "relevance": "State tomography of entangled superconducting qubits.",
+              "title": "Measurement of the Entanglement of Two Superconducting Qubits via State Tomography",
+              "url": "https://doi.org/10.1126/science.1130886"
+            }
+          ],
+          "when_to_use": "Run it after CreateZX90 to quantify entanglement quality, including state preparation and readout effects that interleaved benchmarking excludes."
+        },
         "file_path": "two_qubit/check_bell_state_tomography.py",
         "input_parameters": {
           "cancel_amplitude": {
@@ -2293,7 +2546,33 @@
       },
       {
         "class_name": "CheckCKP",
-        "description": "Estimate readout-resonator and Purcell-filter parameters with filtered CKP.",
+        "description": "Filtered CKP (chi-kappa-power): drives the readout resonator at a range of detunings, measures the qubit ac Stark shift with the qubit in 0 and 1, and fits a resonator plus Purcell-filter model. It writes resonator_frequency, a photon-limited readout_frequency, Purcell filter frequency, coupling and linewidth, dispersive_shift, and critical_photon_number.",
+        "documentation": {
+          "description": "Filtered CKP (chi-kappa-power): drives the readout resonator at a range of detunings, measures the qubit ac Stark shift with the qubit in 0 and 1, and fits a resonator plus Purcell-filter model. It writes resonator_frequency, a photon-limited readout_frequency, Purcell filter frequency, coupling and linewidth, dispersive_shift, and critical_photon_number.",
+          "prerequisites": [
+            "Rabi parameters from a CheckRabi run under the current readout_duration, with rabi_r2 at or above the R² threshold; they normalize the IQ data.",
+            "hpi_amplitude and hpi_duration stored by CreateHPIPulse.",
+            "control_frequency, readout_frequency, and readout_amplitude are stored."
+          ],
+          "references": [
+            {
+              "relevance": "ac Stark shift of a qubit by photons in a dispersively coupled resonator.",
+              "title": "ac Stark Shift and Dephasing of a Superconducting Qubit Strongly Coupled to a Cavity Field",
+              "url": "https://doi.org/10.1103/PhysRevLett.94.123602"
+            },
+            {
+              "relevance": "Readout through a bandpass Purcell filter.",
+              "title": "Quantum theory of a bandpass Purcell filter for qubit readout",
+              "url": "https://doi.org/10.1103/PhysRevA.92.012325"
+            },
+            {
+              "relevance": "Dispersive shift and critical photon number of circuit QED readout.",
+              "title": "Circuit quantum electrodynamics",
+              "url": "https://doi.org/10.1103/RevModPhys.93.025005"
+            }
+          ],
+          "when_to_use": "Run it during characterization to obtain readout-chain parameters such as chi and kappa. Note that it overwrites resonator_frequency and readout_frequency."
+        },
         "file_path": "measurement/check_ckp.py",
         "input_parameters": {
           "control_amplitude": {
@@ -2493,7 +2772,24 @@
       },
       {
         "class_name": "CheckCPMGNoiseSpectroscopy",
-        "description": "Measure CPMG coherence over an effective noise-frequency sweep.",
+        "description": "Measures CPMG coherence decays for a sweep of effective filter frequencies (0.5 to 4 MHz by default) and selectable pi-pulse sign patterns. It stores the T2 and Gamma2 matrices as a data artifact and figures but no calibration values.",
+        "documentation": {
+          "description": "Measures CPMG coherence decays for a sweep of effective filter frequencies (0.5 to 4 MHz by default) and selectable pi-pulse sign patterns. It stores the T2 and Gamma2 matrices as a data artifact and figures but no calibration values.",
+          "prerequisites": [
+            "Rabi parameters from a CheckRabi run under the current readout_duration, with rabi_r2 at or above the R² threshold; they normalize the IQ data.",
+            "hpi_amplitude and hpi_duration stored by CreateHPIPulse.",
+            "pi_amplitude and pi_duration stored by CreatePIPulse.",
+            "control_frequency (or qubit_frequency), readout_frequency (or resonator_frequency), and readout_amplitude are stored for the qubit."
+          ],
+          "references": [
+            {
+              "relevance": "CPMG dynamical decoupling as a noise-spectroscopy filter; demonstrated on a flux qubit.",
+              "title": "Noise spectroscopy through dynamical decoupling with a superconducting flux qubit",
+              "url": "https://doi.org/10.1038/nphys1994"
+            }
+          ],
+          "when_to_use": "Run it during characterization to estimate low-frequency dephasing noise. It uses the DRAG pi pulse as a Y pulse when calibrated, otherwise the plain pi pulse."
+        },
         "file_path": "measurement/check_cpmg_noise_spectroscopy.py",
         "input_parameters": {
           "control_amplitude": {
@@ -2734,7 +3030,22 @@
       },
       {
         "class_name": "CheckChevron",
-        "description": "Estimate qubit frequency and control amplitude from a fixed-grid Chevron.",
+        "description": "Sweeps drive detuning and pulse duration on a fixed grid around control_frequency, then estimates the qubit frequency with Qubex's matched-transform chevron analysis and the control amplitude for a 12.5 MHz Rabi frequency.",
+        "documentation": {
+          "description": "Sweeps drive detuning and pulse duration on a fixed grid around control_frequency, then estimates the qubit frequency with Qubex's matched-transform chevron analysis and the control amplitude for a 12.5 MHz Rabi frequency.",
+          "prerequisites": [
+            "control_frequency (or qubit_frequency), readout_frequency (or resonator_frequency), and readout_amplitude are stored for the qubit; control_amplitude uses the stored value or 0.0625 otherwise.",
+            "The true qubit frequency lies inside the detuning_range sweep, which spans ±50 MHz by default."
+          ],
+          "references": [
+            {
+              "relevance": "Resonant and detuned Rabi driving of a transmon; the matched-transform analysis is Qubex-specific.",
+              "title": "A quantum engineer's guide to superconducting qubits",
+              "url": "https://doi.org/10.1063/1.5089550"
+            }
+          ],
+          "when_to_use": "Run it when the qubit frequency is known to within the sweep window, for example from an earlier calibration or the fake bring-up. The estimated qubit_frequency is also published as control_frequency, which drive tasks such as CheckRabi read. Use CheckAdaptiveChevron when the frequency is less certain."
+        },
         "file_path": "one_qubit_coarse/check_chevron.py",
         "input_parameters": {
           "control_amplitude": {
@@ -2829,7 +3140,15 @@
       },
       {
         "class_name": "CheckCoarseReadoutParams",
-        "description": "Task to check the Optimal Readout Frequency",
+        "description": "Runs a short Rabi sweep at each point of a readout frequency and amplitude grid around the stored values and writes the readout_frequency and readout_amplitude with the largest Rabi response range. This is a Qubex contrast heuristic, not a single-shot fidelity optimization.",
+        "documentation": {
+          "description": "Runs a short Rabi sweep at each point of a readout frequency and amplitude grid around the stored values and writes the readout_frequency and readout_amplitude with the largest Rabi response range. This is a Qubex contrast heuristic, not a single-shot fidelity optimization.",
+          "prerequisites": [
+            "control_frequency (or qubit_frequency), control_amplitude, readout_frequency (or resonator_frequency), and readout_amplitude are stored."
+          ],
+          "references": [],
+          "when_to_use": "Run it after bring-up and before CheckRabi when the spectroscopy readout point gives weak Rabi contrast; coarse_one starts with it. Use CheckOptimalReadoutFrequency and CheckOptimalReadoutAmplitude for fidelity-based tuning once pi pulses exist."
+        },
         "file_path": "one_qubit_coarse/check_coarse_readout_params.py",
         "input_parameters": {
           "control_amplitude": {
@@ -2931,7 +3250,21 @@
       },
       {
         "class_name": "CheckControlAmplitude",
-        "description": "Task to estimate the control amplitude.\n\nSweeps the drive frequency around the operational control frequency\n(``control_frequency`` ± ``frequency_span``) using the dedicated 1024 ns\nQubex spectroscopy readout pulse and fits a sqrt-Lorentzian\nto scale the drive amplitude so that the resulting Rabi rate matches\n``target_rabi_rate``.",
+        "description": "Sweeps the drive frequency over ±150 MHz around control_frequency and fits the phase response to a square-root Lorentzian whose width gives the Rabi rate. It rescales the drive amplitude to the target Rabi rate (12.5 MHz by default) and refines coarse_qubit_frequency and coarse_control_amplitude.",
+        "documentation": {
+          "description": "Sweeps the drive frequency over ±150 MHz around control_frequency and fits the phase response to a square-root Lorentzian whose width gives the Rabi rate. It rescales the drive amplitude to the target Rabi rate (12.5 MHz by default) and refines coarse_qubit_frequency and coarse_control_amplitude.",
+          "prerequisites": [
+            "control_frequency (or coarse_qubit_frequency), readout_frequency (or resonator_frequency), readout_amplitude, and coarse_control_amplitude are stored, normally by CheckQubitSpectroscopy."
+          ],
+          "references": [
+            {
+              "relevance": "Steady-state spectroscopy line shape whose width grows with the Rabi frequency (power broadening).",
+              "title": "Circuit quantum electrodynamics",
+              "url": "https://doi.org/10.1103/RevModPhys.93.025005"
+            }
+          ],
+          "when_to_use": "Run it after CheckQubitSpectroscopy to improve the amplitude and frequency seeds for CheckAdaptiveChevron. The values remain coarse and are not calibrated control_amplitude or qubit_frequency."
+        },
         "file_path": "cw/check_control_amplitude.py",
         "input_parameters": {
           "coarse_control_amplitude": {
@@ -3008,7 +3341,28 @@
       },
       {
         "class_name": "CheckCouplingStrength",
-        "description": "Measure JAZZ and estimate coupling strength when both anharmonicities are known.\n\nThe first qid is the measured/control qubit and the second is the spectator/target qubit.\nFrequencies and anharmonicities used by the estimate are resolved from QDash calibration\ninputs rather than from Qubex's implicit anharmonicity fallback.",
+        "description": "Measures the static ZZ interaction with a JAZZ echo sequence (Ramsey on the control with simultaneous pi pulses on both qubits) and writes static_zz_interaction in kHz. When both anharmonicities are stored it also writes qubit_qubit_coupling_strength in MHz from the perturbative ZZ formula.",
+        "documentation": {
+          "description": "Measures the static ZZ interaction with a JAZZ echo sequence (Ramsey on the control with simultaneous pi pulses on both qubits) and writes static_zz_interaction in kHz. When both anharmonicities are stored it also writes qubit_qubit_coupling_strength in MHz from the perturbative ZZ formula.",
+          "prerequisites": [
+            "The first qid is the measured qubit and the second the spectator.",
+            "Both qubits have Rabi parameters, control_frequency, hpi_amplitude, hpi_duration, readout_frequency, and readout_amplitude stored.",
+            "qubit_anharmonicity on both qubits, for example from CheckAdaptiveEFChevron, enables the coupling-strength estimate."
+          ],
+          "references": [
+            {
+              "relevance": "Static ZZ measured by a Hahn echo with the spectator in each basis state and a varied final rotation.",
+              "title": "Experimental Demonstration of Fault-Tolerant State Preparation with Superconducting Qubits",
+              "url": "https://doi.org/10.1103/PhysRevLett.119.180501"
+            },
+            {
+              "relevance": "Names the JAZZ protocol and gives the perturbative static ZZ expression used to infer coupling.",
+              "title": "Suppression of Unwanted ZZ Interactions in a Hybrid Two-Qubit System",
+              "url": "https://doi.org/10.1103/PhysRevLett.125.200504"
+            }
+          ],
+          "when_to_use": "Run it during coupling characterization to quantify residual ZZ crosstalk on a fixed-coupling pair."
+        },
         "file_path": "two_qubit/check_coupling_strength.py",
         "input_parameters": {
           "control_control_amplitude": {
@@ -3383,7 +3737,32 @@
       },
       {
         "class_name": "CheckCrossResonance",
-        "description": "Task to check the cross resonance pulse (obtain_cr_params).",
+        "description": "Calibrates the cross-resonance drive of a fixed-frequency control-target pair by iterative CR Hamiltonian tomography, adjusting a target cancel tone until the IX and IY terms vanish. It writes CR amplitude, phase, and beta, cancel tone, rotary amplitude, zx_rotation_rate, and ramp time.",
+        "documentation": {
+          "description": "Calibrates the cross-resonance drive of a fixed-frequency control-target pair by iterative CR Hamiltonian tomography, adjusting a target cancel tone until the IX and IY terms vanish. It writes CR amplitude, phase, and beta, cancel tone, rotary amplitude, zx_rotation_rate, and ramp time.",
+          "prerequisites": [
+            "The coupling qid is control-target; control-qubit and target-qubit inputs are read from each qubit's stored calibration.",
+            "DRAG half-pi pulses (CreateDRAGHPIPulse) and Rabi parameters on both qubits."
+          ],
+          "references": [
+            {
+              "relevance": "All-microwave cross-resonance gate for fixed-frequency superconducting qubits.",
+              "title": "Simple All-Microwave Entangling Gate for Fixed-Frequency Superconducting Qubits",
+              "url": "https://doi.org/10.1103/PhysRevLett.107.080502"
+            },
+            {
+              "relevance": "CR Hamiltonian tomography and a target cancellation tone for unwanted terms.",
+              "title": "Procedure for systematically tuning up cross-talk in the cross-resonance gate",
+              "url": "https://doi.org/10.1103/PhysRevA.93.060302"
+            },
+            {
+              "relevance": "Target rotary pulses that reduce CR error terms.",
+              "title": "Reducing Unitary and Spectator Errors in Cross Resonance with Optimized Rotary Echoes",
+              "url": "https://doi.org/10.1103/PRXQuantum.1.020318"
+            }
+          ],
+          "when_to_use": "Run it first in two-qubit calibration, after both qubits have DRAG half-pi pulses; CreateZX90 starts from its parameters."
+        },
         "file_path": "two_qubit/check_cross_resonance.py",
         "input_parameters": {
           "control_control_amplitude": {
@@ -3756,7 +4135,17 @@
       },
       {
         "class_name": "CheckDRAGHPIPulse",
-        "description": "Task to check the DRAG HPI pulse.",
+        "description": "Applies the stored DRAG half-pi pulse repeatedly (20 times by default) and plots the normalized signal. It writes no calibration values.",
+        "documentation": {
+          "description": "Applies the stored DRAG half-pi pulse repeatedly (20 times by default) and plots the normalized signal. It writes no calibration values.",
+          "prerequisites": [
+            "Rabi parameters from a CheckRabi run under the current readout_duration, with rabi_r2 at or above the R² threshold; they normalize the IQ data.",
+            "drag_hpi_amplitude, drag_hpi_duration, and drag_hpi_beta stored by CreateDRAGHPIPulse.",
+            "control_frequency (or qubit_frequency), readout_frequency (or resonator_frequency), and readout_amplitude are stored for the qubit."
+          ],
+          "references": [],
+          "when_to_use": "Run it after CreateDRAGHPIPulse to see accumulated amplitude or phase error before benchmarking."
+        },
         "file_path": "one_qubit_fine/check_drag_hpi_pulse.py",
         "input_parameters": {
           "control_amplitude": {
@@ -3931,7 +4320,17 @@
       },
       {
         "class_name": "CheckDRAGPIPulse",
-        "description": "Task to check the DRAG PI pulse.",
+        "description": "Applies the stored DRAG pi pulse repeatedly (20 times by default) and plots the normalized signal. It writes no calibration values.",
+        "documentation": {
+          "description": "Applies the stored DRAG pi pulse repeatedly (20 times by default) and plots the normalized signal. It writes no calibration values.",
+          "prerequisites": [
+            "Rabi parameters from a CheckRabi run under the current readout_duration, with rabi_r2 at or above the R² threshold; they normalize the IQ data.",
+            "drag_pi_amplitude, drag_pi_duration, and drag_pi_beta stored by CreateDRAGPIPulse.",
+            "control_frequency (or qubit_frequency), readout_frequency (or resonator_frequency), and readout_amplitude are stored for the qubit."
+          ],
+          "references": [],
+          "when_to_use": "Run it after CreateDRAGPIPulse to see accumulated error before two-qubit calibration."
+        },
         "file_path": "one_qubit_fine/check_drag_pi_pulse.py",
         "input_parameters": {
           "control_amplitude": {
@@ -4106,7 +4505,25 @@
       },
       {
         "class_name": "CheckEFRabi",
-        "description": "Measure the EF Rabi oscillation using the Qubex session's GE pulses.",
+        "description": "Prepares the excited state and measures a Rabi oscillation on the e-to-f transition, storing EF Rabi parameters (ef_rabi_*) that EF pulse calibration uses for normalization.",
+        "documentation": {
+          "description": "Prepares the excited state and measures a Rabi oscillation on the e-to-f transition, storing EF Rabi parameters (ef_rabi_*) that EF pulse calibration uses for normalization.",
+          "prerequisites": [
+            "GE and EF drive targets configured in the current session: run ConfigureEF, or start with ConfigureAll, using configuration_mode ge-ef-cr or ge-ef-fh.",
+            "Rabi parameters from a CheckRabi run under the current readout_duration, with rabi_r2 at or above the R² threshold; they normalize the IQ data.",
+            "control_frequency_ef (or ef_frequency) stored by CheckAdaptiveEFChevron.",
+            "hpi_amplitude and hpi_duration stored by CreateHPIPulse.",
+            "control_frequency (or qubit_frequency), readout_frequency (or resonator_frequency), and readout_amplitude are stored for the qubit."
+          ],
+          "references": [
+            {
+              "relevance": "Coherent driving of higher transmon transitions after a GE pi pulse.",
+              "title": "Coherence and Decay of Higher Energy Levels of a Superconducting Transmon Qubit",
+              "url": "https://doi.org/10.1103/PhysRevLett.114.010501"
+            }
+          ],
+          "when_to_use": "Run it after CheckAdaptiveEFChevron. Qubex prepares the excited state with its x180, which prefers a stored DRAG pi, then pi, then DRAG half-pi pulse over the recorded half-pi pulse."
+        },
         "file_path": "one_qubit_fine/check_ef_rabi.py",
         "input_parameters": {
           "control_amplitude": {
@@ -4301,7 +4718,25 @@
       },
       {
         "class_name": "CheckGEFRelaxation",
-        "description": "Characterize continuous-time transitions in the GEF manifold.",
+        "description": "Prepares g, e, and f, measures their population trajectories over a delay sweep, and fits a six-rate continuous-time Markov model. It writes t1 (e to g), t1_fe, and t1_fg in microseconds as inverse transition rates.",
+        "documentation": {
+          "description": "Prepares g, e, and f, measures their population trajectories over a delay sweep, and fits a six-rate continuous-time Markov model. It writes t1 (e to g), t1_fe, and t1_fg in microseconds as inverse transition rates.",
+          "prerequisites": [
+            "GE and EF drive targets configured in the current session: run ConfigureEF, or start with ConfigureAll, using configuration_mode ge-ef-cr or ge-ef-fh.",
+            "control_frequency_ef (or ef_frequency) stored by CheckAdaptiveEFChevron.",
+            "pi_amplitude and pi_duration stored by CreatePIPulse.",
+            "ef_pi_amplitude and ef_pi_duration stored by CreateEFPIPulse.",
+            "control_frequency (or qubit_frequency), readout_frequency (or resonator_frequency), and readout_amplitude are stored for the qubit."
+          ],
+          "references": [
+            {
+              "relevance": "Decay of higher transmon levels, found to proceed mainly sequentially.",
+              "title": "Coherence and Decay of Higher Energy Levels of a Superconducting Transmon Qubit",
+              "url": "https://doi.org/10.1103/PhysRevLett.114.010501"
+            }
+          ],
+          "when_to_use": "Run it during EF characterization to separate direct f-to-g decay from sequential decay. Its t1 is a model-based value; use CheckT1 for the standard GE measurement."
+        },
         "file_path": "measurement/check_gef_relaxation.py",
         "input_parameters": {
           "control_frequency": {
@@ -4428,7 +4863,17 @@
       },
       {
         "class_name": "CheckHPIPulse",
-        "description": "Task to check the HPI pulse.",
+        "description": "Applies the stored half-pi pulse repeatedly (20 times by default) and plots the normalized signal after each repetition. It writes no calibration values.",
+        "documentation": {
+          "description": "Applies the stored half-pi pulse repeatedly (20 times by default) and plots the normalized signal after each repetition. It writes no calibration values.",
+          "prerequisites": [
+            "Rabi parameters from a CheckRabi run under the current readout_duration, with rabi_r2 at or above the R² threshold; they normalize the IQ data.",
+            "hpi_amplitude and hpi_duration stored by CreateHPIPulse.",
+            "control_frequency (or qubit_frequency), readout_frequency (or resonator_frequency), and readout_amplitude are stored for the qubit."
+          ],
+          "references": [],
+          "when_to_use": "Run it after CreateHPIPulse to see amplitude error accumulate: a correct pulse returns to the same state every four repetitions."
+        },
         "file_path": "one_qubit_coarse/check_hpi_pulse.py",
         "input_parameters": {
           "control_amplitude": {
@@ -4596,6 +5041,7 @@
       {
         "class_name": "CheckJAZZ",
         "description": "Measure ZZ for a coupling; the first qid is measured, the second is the spectator.",
+        "documentation": null,
         "file_path": "two_qubit/check_jazz.py",
         "input_parameters": {
           "control_control_amplitude": {
@@ -4930,6 +5376,7 @@
       {
         "class_name": "CheckNoise",
         "description": "Task to check the noise.",
+        "documentation": null,
         "file_path": "box_setup/check_noise.py",
         "input_parameters": {},
         "name": "CheckNoise",
@@ -4939,7 +5386,21 @@
       },
       {
         "class_name": "CheckOptimalReadoutAmplitude",
-        "description": "Task to check the Optimal Readout Amplitude",
+        "description": "Sweeps readout amplitude (0.01 to 0.25 by default), measures single-shot IQ data for prepared 0 and 1 states, and writes the smallest readout_amplitude whose GMM assignment fidelity reaches 99% of the peak.",
+        "documentation": {
+          "description": "Sweeps readout amplitude (0.01 to 0.25 by default), measures single-shot IQ data for prepared 0 and 1 states, and writes the smallest readout_amplitude whose GMM assignment fidelity reaches 99% of the peak.",
+          "prerequisites": [
+            "No declared inputs: it uses the frequencies and pi pulse already in the Qubex session, so run it after Configure and the pulse calibrations in the same flow."
+          ],
+          "references": [
+            {
+              "relevance": "Single-shot dispersive readout fidelity and its dependence on readout drive.",
+              "title": "Rapid High-Fidelity Single-Shot Dispersive Readout of Superconducting Qubits",
+              "url": "https://doi.org/10.1103/PhysRevApplied.7.054020"
+            }
+          ],
+          "when_to_use": "Run it during fine calibration once pi pulses exist, together with CheckOptimalReadoutFrequency, then re-run Configure so later tasks use the new value."
+        },
         "file_path": "one_qubit_coarse/check_optimal_readout_amplitude.py",
         "input_parameters": {},
         "name": "CheckOptimalReadoutAmplitude",
@@ -4980,7 +5441,21 @@
       },
       {
         "class_name": "CheckOptimalReadoutFrequency",
-        "description": "Task to check the Optimal Readout Frequency",
+        "description": "Sweeps the readout frequency around the resonator, measures single-shot IQ data for prepared 0 and 1 states, and writes the lowest readout_frequency whose GMM assignment fidelity reaches 99% of the peak.",
+        "documentation": {
+          "description": "Sweeps the readout frequency around the resonator, measures single-shot IQ data for prepared 0 and 1 states, and writes the lowest readout_frequency whose GMM assignment fidelity reaches 99% of the peak.",
+          "prerequisites": [
+            "No declared inputs: it uses the frequencies, readout amplitude, and pi pulse already in the Qubex session."
+          ],
+          "references": [
+            {
+              "relevance": "Single-shot dispersive readout fidelity and the choice of readout frequency.",
+              "title": "Rapid High-Fidelity Single-Shot Dispersive Readout of Superconducting Qubits",
+              "url": "https://doi.org/10.1103/PhysRevApplied.7.054020"
+            }
+          ],
+          "when_to_use": "Run it during fine calibration once pi pulses exist, then re-run Configure so later tasks use the new frequency."
+        },
         "file_path": "one_qubit_coarse/check_optimal_readout_frequency.py",
         "input_parameters": {},
         "name": "CheckOptimalReadoutFrequency",
@@ -5011,7 +5486,17 @@
       },
       {
         "class_name": "CheckPIPulse",
-        "description": "Task to check the PI pulse.",
+        "description": "Applies the stored pi pulse repeatedly (20 times by default) and plots the normalized signal after each repetition. It writes no calibration values.",
+        "documentation": {
+          "description": "Applies the stored pi pulse repeatedly (20 times by default) and plots the normalized signal after each repetition. It writes no calibration values.",
+          "prerequisites": [
+            "Rabi parameters from a CheckRabi run under the current readout_duration, with rabi_r2 at or above the R² threshold; they normalize the IQ data.",
+            "pi_amplitude and pi_duration stored by CreatePIPulse.",
+            "control_frequency (or qubit_frequency), readout_frequency (or resonator_frequency), and readout_amplitude are stored for the qubit."
+          ],
+          "references": [],
+          "when_to_use": "Run it after CreatePIPulse to see amplitude error accumulate: a correct pulse alternates between ground and excited states."
+        },
         "file_path": "one_qubit_coarse/check_pi_pulse.py",
         "input_parameters": {
           "control_amplitude": {
@@ -5181,7 +5666,23 @@
       },
       {
         "class_name": "CheckQuantumEfficiency",
-        "description": "Measure the readout-chain quantum efficiency of one qubit.",
+        "description": "Sweeps readout amplitude and measures both the readout signal-to-noise ratio and the measurement-induced dephasing of a Ramsey superposition, then writes the quantum_efficiency from the fitted scalings.",
+        "documentation": {
+          "description": "Sweeps readout amplitude and measures both the readout signal-to-noise ratio and the measurement-induced dephasing of a Ramsey superposition, then writes the quantum_efficiency from the fitted scalings.",
+          "prerequisites": [
+            "Rabi parameters from a CheckRabi run under the current readout_duration, with rabi_r2 at or above the R² threshold; they normalize the IQ data.",
+            "hpi_amplitude and hpi_duration stored by CreateHPIPulse.",
+            "control_frequency (or qubit_frequency), readout_frequency (or resonator_frequency), and readout_amplitude are stored for the qubit."
+          ],
+          "references": [
+            {
+              "relevance": "Quantum efficiency from the ratio of measured SNR scaling to measurement-induced dephasing; the Qubex module cites this work.",
+              "title": "General method for extracting the quantum efficiency of dispersive qubit readout in circuit QED",
+              "url": "https://doi.org/10.1063/1.5015954"
+            }
+          ],
+          "when_to_use": "Run it during characterization to assess the readout amplifier chain."
+        },
         "file_path": "measurement/check_quantum_efficiency.py",
         "input_parameters": {
           "control_amplitude": {
@@ -5366,7 +5867,26 @@
       },
       {
         "class_name": "CheckQubitSpectroscopy",
-        "description": "Task to check the qubit frequencies.\n\nThis task performs qubit spectroscopy with the dedicated 1024 ns Qubex\nreadout pulse and estimates the qubit frequency (f01) and optionally the f12\ntransition frequency from the spectroscopy data. The f12 estimate remains\ndiagnostic and is not published as calibrated anharmonicity.",
+        "description": "2D drive frequency and power spectroscopy read out dispersively. It estimates f01 on a 5 MHz grid, published as coarse_qubit_frequency and control_frequency, and a coarse_control_amplitude seed from the power at which the f01 line appears. An f12 estimate is reported only in logs and figures.",
+        "documentation": {
+          "description": "2D drive frequency and power spectroscopy read out dispersively. It estimates f01 on a 5 MHz grid, published as coarse_qubit_frequency and control_frequency, and a coarse_control_amplitude seed from the power at which the f01 line appears. An f12 estimate is reported only in logs and figures.",
+          "prerequisites": [
+            "readout_frequency (or resonator_frequency) and readout_amplitude are stored."
+          ],
+          "references": [
+            {
+              "relevance": "Qubit spectroscopy through the dispersive shift, including power broadening of the line.",
+              "title": "Circuit quantum electrodynamics",
+              "url": "https://doi.org/10.1103/RevModPhys.93.025005"
+            },
+            {
+              "relevance": "Transmon level structure: f12 lies below f01 by roughly the charging energy.",
+              "title": "Charge-insensitive qubit design derived from the Cooper pair box",
+              "url": "https://doi.org/10.1103/PhysRevA.76.042319"
+            }
+          ],
+          "when_to_use": "Run it after resonator spectroscopy when the qubit frequency is unknown. Its outputs are seeds: CheckControlAmplitude and CheckAdaptiveChevron refine them."
+        },
         "file_path": "cw/check_qubit_spectroscopy.py",
         "input_parameters": {
           "readout_amplitude": {
@@ -5430,7 +5950,22 @@
       },
       {
         "class_name": "CheckRabi",
-        "description": "Task to check the Rabi oscillation.",
+        "description": "Measures a Rabi oscillation at a fixed control amplitude and fits it to record the Rabi parameters, the maximum Rabi frequency per unit amplitude, and the control amplitude estimated for a 12.5 MHz Rabi frequency.",
+        "documentation": {
+          "description": "Measures a Rabi oscillation at a fixed control amplitude and fits it to record the Rabi parameters, the maximum Rabi frequency per unit amplitude, and the control amplitude estimated for a 12.5 MHz Rabi frequency.",
+          "prerequisites": [
+            "control_frequency (or qubit_frequency) and readout_frequency (or resonator_frequency) are stored for the qubit.",
+            "control_amplitude and readout_amplitude use stored values when present and task defaults otherwise."
+          ],
+          "references": [
+            {
+              "relevance": "Resonant Rabi driving of a transmon through capacitive X and Y control.",
+              "title": "A quantum engineer's guide to superconducting qubits",
+              "url": "https://doi.org/10.1063/1.5089550"
+            }
+          ],
+          "when_to_use": "Run it once control and readout frequencies are known, and again whenever readout conditions change. Pulse calibrations and measurements that normalize IQ data, such as CreateHPIPulse, CheckT1, and CheckRamsey, require the Rabi parameters it stores."
+        },
         "file_path": "one_qubit_coarse/check_rabi.py",
         "input_parameters": {
           "control_amplitude": {
@@ -5514,7 +6049,23 @@
       },
       {
         "class_name": "CheckRamsey",
-        "description": "Task to check the Ramsey interference.",
+        "description": "Runs Ramsey interference at a fixed detuning with X and Y second rotations, fits the axis with the better R², and writes the Ramsey frequency, the qubit frequency, and T2*.",
+        "documentation": {
+          "description": "Runs Ramsey interference at a fixed detuning with X and Y second rotations, fits the axis with the better R², and writes the Ramsey frequency, the qubit frequency, and T2*.",
+          "prerequisites": [
+            "Rabi parameters stored by CheckRabi, used to normalize the measured IQ data.",
+            "hpi_amplitude and hpi_duration stored by a half-pi pulse calibration such as CreateHPIPulse.",
+            "control_frequency (or qubit_frequency), readout_frequency (or resonator_frequency), and readout_amplitude are stored for the qubit."
+          ],
+          "references": [
+            {
+              "relevance": "Ramsey interferometry with an intentional detuning to measure frequency offset and T2*.",
+              "title": "A quantum engineer's guide to superconducting qubits",
+              "url": "https://doi.org/10.1063/1.5089550"
+            }
+          ],
+          "when_to_use": "Run it to refine the qubit frequency and measure T2* once a half-pi pulse is calibrated. The qubit_frequency it writes is also published as control_frequency; repeat it with a longer time range and smaller detuning for a finer estimate."
+        },
         "file_path": "one_qubit_coarse/check_ramsey.py",
         "input_parameters": {
           "control_amplitude": {
@@ -5695,7 +6246,30 @@
       },
       {
         "class_name": "CheckReadoutMIST",
-        "description": "Characterize effective GEF transitions caused by a readout cycle.",
+        "description": "Prepares g, e, and f, applies repeated readout cycles, and fits an effective GEF transition matrix per readout cycle, optionally against a blank reference. It stores a data artifact and figures but no calibration values.",
+        "documentation": {
+          "description": "Prepares g, e, and f, applies repeated readout cycles, and fits an effective GEF transition matrix per readout cycle, optionally against a blank reference. It stores a data artifact and figures but no calibration values.",
+          "prerequisites": [
+            "GE and EF drive targets configured in the current session: run ConfigureEF, or start with ConfigureAll, using configuration_mode ge-ef-cr or ge-ef-fh.",
+            "control_frequency_ef (or ef_frequency) stored by CheckAdaptiveEFChevron.",
+            "pi_amplitude and pi_duration stored by CreatePIPulse.",
+            "ef_pi_amplitude and ef_pi_duration stored by CreateEFPIPulse.",
+            "control_frequency (or qubit_frequency), readout_frequency (or resonator_frequency), and readout_amplitude are stored for the qubit."
+          ],
+          "references": [
+            {
+              "relevance": "Measurement-induced state transitions out of the qubit subspace at high readout photon number.",
+              "title": "Measurement-Induced State Transitions in a Superconducting Qubit: Beyond the Rotating Wave Approximation",
+              "url": "https://doi.org/10.1103/PhysRevLett.117.190503"
+            },
+            {
+              "relevance": "Transmon measurement-induced transitions within the rotating-wave approximation.",
+              "title": "Measurement-induced state transitions in a superconducting qubit: Within the rotating-wave approximation",
+              "url": "https://doi.org/10.1103/PhysRevApplied.20.054008"
+            }
+          ],
+          "when_to_use": "Run it during characterization to check whether the readout drive causes measurement-induced state transitions or leakage."
+        },
         "file_path": "measurement/check_readout_mist.py",
         "input_parameters": {
           "control_frequency": {
@@ -5814,7 +6388,26 @@
       },
       {
         "class_name": "CheckResonatorSpectroscopy",
-        "description": "Task to check the resonator spectroscopy.\n\nThis is a MUX-level task that performs spectroscopy on all resonators\nwith the dedicated 8192 ns Qubex spectroscopy pulse. The scheduler executes it once\nper MUX, and the result will be used by all qubits in that MUX.\n\nNote: task_type remains \"qubit\" for frontend compatibility, but\nis_mux_level=True indicates this task runs once per MUX.",
+        "description": "MUX-level 2D readout frequency and power sweep that locates each resonator of the MUX and the power at which it shifts to its bare (punched-out) frequency. It writes resonator_frequency (also published as readout_frequency) and a readout_amplitude derived from an optimal power set a margin below that power boundary.",
+        "documentation": {
+          "description": "MUX-level 2D readout frequency and power sweep that locates each resonator of the MUX and the power at which it shifts to its bare (punched-out) frequency. It writes resonator_frequency (also published as readout_frequency) and a readout_amplitude derived from an optimal power set a margin below that power boundary.",
+          "prerequisites": [
+            "None from calibration storage; the frequency range defaults by readout band."
+          ],
+          "references": [
+            {
+              "relevance": "Dispersive readout and the high-power punch-out of the resonator to its bare frequency.",
+              "title": "Circuit quantum electrodynamics",
+              "url": "https://doi.org/10.1103/RevModPhys.93.025005"
+            },
+            {
+              "relevance": "Observation of the power-dependent bright-state transition used to identify the dispersive regime.",
+              "title": "High-Fidelity Readout in Circuit Quantum Electrodynamics Using the Jaynes-Cummings Nonlinearity",
+              "url": "https://doi.org/10.1103/PhysRevLett.105.173601"
+            }
+          ],
+          "when_to_use": "Run it at the start of bring-up, after capture delay correction, to obtain the first readout frequency and amplitude. Check resonator_assignment_order when the MUX's resonator frequency order differs from the default."
+        },
         "file_path": "cw/check_resonator_spectroscopy.py",
         "input_parameters": {},
         "name": "CheckResonatorSpectroscopy",
@@ -5868,7 +6461,24 @@
       },
       {
         "class_name": "CheckSpinLockSpectroscopy",
-        "description": "Measure T1-rho and T2-rho over a hardware-feasible Rabi-frequency sweep.",
+        "description": "Measures relaxation and dephasing in the rotating frame (T1rho, T2rho) while spin-locking over a sweep of drive Rabi frequencies (4 to 100 MHz by default), skipping points the Rabi model cannot reach. It stores a data artifact and figures but no calibration values.",
+        "documentation": {
+          "description": "Measures relaxation and dephasing in the rotating frame (T1rho, T2rho) while spin-locking over a sweep of drive Rabi frequencies (4 to 100 MHz by default), skipping points the Rabi model cannot reach. It stores a data artifact and figures but no calibration values.",
+          "prerequisites": [
+            "Rabi parameters from a CheckRabi run under the current readout_duration, with rabi_r2 at or above the R² threshold; they normalize the IQ data.",
+            "hpi_amplitude and hpi_duration stored by CreateHPIPulse.",
+            "control_frequency (or qubit_frequency), readout_frequency (or resonator_frequency), and readout_amplitude are stored for the qubit.",
+            "Stored t1 and t2_echo, when present, set the duration sweep; otherwise it spans 100 ns to 200 us."
+          ],
+          "references": [
+            {
+              "relevance": "Rotating-frame (spin-locking) relaxation as a noise spectrum analyser; demonstrated on a flux qubit.",
+              "title": "Rotating-frame relaxation as a noise spectrum analyser of a superconducting qubit undergoing driven evolution",
+              "url": "https://doi.org/10.1038/ncomms3337"
+            }
+          ],
+          "when_to_use": "Run it during characterization to probe noise near the spin-lock Rabi frequency, a higher-frequency range than CPMG noise spectroscopy covers."
+        },
         "file_path": "measurement/check_spin_lock_spectroscopy.py",
         "input_parameters": {
           "control_amplitude": {
@@ -6078,6 +6688,7 @@
       {
         "class_name": "CheckStatus",
         "description": "Task to check the status of the experiment.",
+        "documentation": null,
         "file_path": "box_setup/check_status.py",
         "input_parameters": {},
         "name": "CheckStatus",
@@ -6087,7 +6698,23 @@
       },
       {
         "class_name": "CheckT1",
-        "description": "Task to check the T1 time.",
+        "description": "Measures the energy relaxation time T1 by exciting the qubit with two half-pi pulses and fitting the decay over a logarithmic delay sweep, then writes t1 in microseconds.",
+        "documentation": {
+          "description": "Measures the energy relaxation time T1 by exciting the qubit with two half-pi pulses and fitting the decay over a logarithmic delay sweep, then writes t1 in microseconds.",
+          "prerequisites": [
+            "Rabi parameters from a CheckRabi run under the current readout_duration, with rabi_r2 at or above the R² threshold; they normalize the IQ data.",
+            "hpi_amplitude and hpi_duration stored by CreateHPIPulse.",
+            "control_frequency (or qubit_frequency), readout_frequency (or resonator_frequency), and readout_amplitude are stored for the qubit."
+          ],
+          "references": [
+            {
+              "relevance": "T1 measurement by excitation and delayed readout.",
+              "title": "A quantum engineer's guide to superconducting qubits",
+              "url": "https://doi.org/10.1063/1.5089550"
+            }
+          ],
+          "when_to_use": "Run it to characterize or track T1 once the half-pi pulse is calibrated. Use CheckT1Average when a single measurement is too noisy to compare."
+        },
         "file_path": "one_qubit_coarse/check_t1.py",
         "input_parameters": {
           "control_amplitude": {
@@ -6260,7 +6887,33 @@
       },
       {
         "class_name": "CheckT1Average",
-        "description": "Task to measure T1 relaxation time multiple times and compute statistics.\n\nRuns T1 measurement n_runs times, computes mean, std, and CV%,\nand generates a 4-panel fluctuation analysis figure.",
+        "description": "Repeats the CheckT1 measurement n_runs times (10 by default) and writes the mean t1_average and its standard deviation t1_std, with a fluctuation figure.",
+        "documentation": {
+          "description": "Repeats the CheckT1 measurement n_runs times (10 by default) and writes the mean t1_average and its standard deviation t1_std, with a fluctuation figure.",
+          "prerequisites": [
+            "Rabi parameters from a CheckRabi run under the current readout_duration, with rabi_r2 at or above the R² threshold; they normalize the IQ data.",
+            "hpi_amplitude and hpi_duration stored by CreateHPIPulse.",
+            "control_frequency (or qubit_frequency), readout_frequency (or resonator_frequency), and readout_amplitude are stored for the qubit."
+          ],
+          "references": [
+            {
+              "relevance": "T1 measurement by excitation and delayed readout.",
+              "title": "A quantum engineer's guide to superconducting qubits",
+              "url": "https://doi.org/10.1063/1.5089550"
+            },
+            {
+              "relevance": "T1 fluctuates in time because of two-level-system defects, so single values are noisy.",
+              "title": "Fluctuations of Energy-Relaxation Times in Superconducting Qubits",
+              "url": "https://doi.org/10.1103/PhysRevLett.121.090502"
+            },
+            {
+              "relevance": "Statistics of repeated T1 and dephasing measurements over long periods.",
+              "title": "Decoherence benchmarking of superconducting qubits",
+              "url": "https://doi.org/10.1038/s41534-019-0168-5"
+            }
+          ],
+          "when_to_use": "Run it when T1 must be compared over time or across qubits, or before Check1QGateCoherenceLimit, which reads t1_average. It takes about n_runs times as long as CheckT1."
+        },
         "file_path": "one_qubit_coarse/check_t1_average.py",
         "input_parameters": {
           "control_amplitude": {
@@ -6440,7 +7093,24 @@
       },
       {
         "class_name": "CheckT2Echo",
-        "description": "Task to check the T2 echo time.",
+        "description": "Measures the Hahn echo coherence time with a half-pi pulse, a Y pi pulse at mid delay, and a final half-pi pulse over a logarithmic delay sweep, then writes t2_echo in microseconds.",
+        "documentation": {
+          "description": "Measures the Hahn echo coherence time with a half-pi pulse, a Y pi pulse at mid delay, and a final half-pi pulse over a logarithmic delay sweep, then writes t2_echo in microseconds.",
+          "prerequisites": [
+            "Rabi parameters from a CheckRabi run under the current readout_duration, with rabi_r2 at or above the R² threshold; they normalize the IQ data.",
+            "hpi_amplitude and hpi_duration stored by CreateHPIPulse.",
+            "pi_amplitude and pi_duration stored by CreatePIPulse.",
+            "control_frequency (or qubit_frequency), readout_frequency (or resonator_frequency), and readout_amplitude are stored for the qubit."
+          ],
+          "references": [
+            {
+              "relevance": "Hahn echo measurement with a refocusing pi pulse.",
+              "title": "A quantum engineer's guide to superconducting qubits",
+              "url": "https://doi.org/10.1063/1.5089550"
+            }
+          ],
+          "when_to_use": "Run it to characterize dephasing with low-frequency noise refocused; compare with CheckRamsey's T2*. Use CheckT2EchoAverage for repeated statistics."
+        },
         "file_path": "one_qubit_coarse/check_t2_echo.py",
         "input_parameters": {
           "control_amplitude": {
@@ -6626,7 +7296,29 @@
       },
       {
         "class_name": "CheckT2EchoAverage",
-        "description": "Task to measure T2 echo time multiple times and compute statistics.\n\nRuns T2 echo measurement n_runs times, computes mean and std,\nand generates a 4-panel fluctuation analysis figure.",
+        "description": "Repeats the CheckT2Echo measurement n_runs times (10 by default) and writes the mean t2_echo_average and its standard deviation t2_echo_std, with a fluctuation figure.",
+        "documentation": {
+          "description": "Repeats the CheckT2Echo measurement n_runs times (10 by default) and writes the mean t2_echo_average and its standard deviation t2_echo_std, with a fluctuation figure.",
+          "prerequisites": [
+            "Rabi parameters from a CheckRabi run under the current readout_duration, with rabi_r2 at or above the R² threshold; they normalize the IQ data.",
+            "hpi_amplitude and hpi_duration stored by CreateHPIPulse.",
+            "pi_amplitude and pi_duration stored by CreatePIPulse.",
+            "control_frequency (or qubit_frequency), readout_frequency (or resonator_frequency), and readout_amplitude are stored for the qubit."
+          ],
+          "references": [
+            {
+              "relevance": "Hahn echo measurement with a refocusing pi pulse.",
+              "title": "A quantum engineer's guide to superconducting qubits",
+              "url": "https://doi.org/10.1063/1.5089550"
+            },
+            {
+              "relevance": "Statistics of repeated coherence measurements over long periods.",
+              "title": "Decoherence benchmarking of superconducting qubits",
+              "url": "https://doi.org/10.1038/s41534-019-0168-5"
+            }
+          ],
+          "when_to_use": "Run it when echo coherence must be compared over time, or before the coherence-limit tasks, which read t2_echo_average."
+        },
         "file_path": "one_qubit_coarse/check_t2_echo_average.py",
         "input_parameters": {
           "control_amplitude": {
@@ -6819,7 +7511,30 @@
       },
       {
         "class_name": "CheckThermalExcitation",
-        "description": "Estimate the thermal excitation probability of a qubit.",
+        "description": "Estimates the residual excited-state population from two averaged sequences, with and without a preceding GE pi pulse, each comparing an EF pi pulse against no EF pulse. It writes thermal_excitation_probability as the ratio of the two signal differences.",
+        "documentation": {
+          "description": "Estimates the residual excited-state population from two averaged sequences, with and without a preceding GE pi pulse, each comparing an EF pi pulse against no EF pulse. It writes thermal_excitation_probability as the ratio of the two signal differences.",
+          "prerequisites": [
+            "GE and EF drive targets configured in the current session: run ConfigureEF, or start with ConfigureAll, using configuration_mode ge-ef-cr or ge-ef-fh.",
+            "control_frequency_ef (or ef_frequency) stored by CheckAdaptiveEFChevron.",
+            "hpi_amplitude and hpi_duration stored by CreateHPIPulse.",
+            "ef_pi_amplitude and ef_pi_duration stored by CreateEFPIPulse.",
+            "control_frequency (or qubit_frequency), readout_frequency (or resonator_frequency), and readout_amplitude are stored for the qubit."
+          ],
+          "references": [
+            {
+              "relevance": "Population measurement that compares e-f Rabi signals with and without a GE pi pulse.",
+              "title": "Demonstrating a Driven Reset Protocol for a Superconducting Qubit",
+              "url": "https://doi.org/10.1103/PhysRevLett.110.120501"
+            },
+            {
+              "relevance": "Use of that protocol to measure thermal excited-state population; Qubex uses a two-point (0 or pi) EF amplitude variant.",
+              "title": "Thermal and Residual Excited-State Population in a 3D Transmon Qubit",
+              "url": "https://doi.org/10.1103/PhysRevLett.114.240501"
+            }
+          ],
+          "when_to_use": "Run it during characterization to check effective qubit temperature or reset quality. It uses 1024 times the default shot count, so it is slow."
+        },
         "file_path": "measurement/check_thermal_excitation.py",
         "input_parameters": {
           "control_frequency": {
@@ -6908,7 +7623,15 @@
       },
       {
         "class_name": "CheckWaveform",
-        "description": "Task to check readout waveforms.",
+        "description": "Captures and plots the averaged readout waveform for each target qubit with Qubex check_waveform. It writes no calibration values.",
+        "documentation": {
+          "description": "Captures and plots the averaged readout waveform for each target qubit with Qubex check_waveform. It writes no calibration values.",
+          "prerequisites": [
+            "None from calibration storage."
+          ],
+          "references": [],
+          "when_to_use": "Run it to inspect readout timing and signal level, for example after capture delay correction or when readout looks wrong. Readout amplitude, duration, and margins default to the Qubex session values."
+        },
         "file_path": "cw/check_waveform.py",
         "input_parameters": {},
         "name": "CheckWaveform",
@@ -6955,7 +7678,17 @@
       },
       {
         "class_name": "CheckZX90",
-        "description": "Task to check ZX90 pulse.",
+        "description": "Applies the stored ZX90 gate repeatedly (20 times by default) and plots the target response. It writes no calibration values.",
+        "documentation": {
+          "description": "Applies the stored ZX90 gate repeatedly (20 times by default) and plots the target response. It writes no calibration values.",
+          "prerequisites": [
+            "The coupling qid is control-target; control-qubit and target-qubit inputs are read from each qubit's stored calibration.",
+            "DRAG half-pi pulses (CreateDRAGHPIPulse) on both qubits and a DRAG pi pulse (CreateDRAGPIPulse) on the control qubit.",
+            "CR and ZX90 parameters (cr_*, cancel_*, rotary_amplitude, zx_rotation_rate, zx90_gate_time) stored by CreateZX90 for the pair."
+          ],
+          "references": [],
+          "when_to_use": "Run it after CreateZX90 to see accumulated rotation error; templates run it again with more shots as a fine check."
+        },
         "file_path": "two_qubit/check_zx90.py",
         "input_parameters": {
           "cancel_amplitude": {
@@ -7393,7 +8126,15 @@
       },
       {
         "class_name": "Configure",
-        "description": "Task to configure the box.",
+        "description": "Reloads the Qubex system model from the chip's config and params files and pushes the control and readout settings of one qubit to its QuEL boxes. It measures nothing and writes no calibration values.",
+        "documentation": {
+          "description": "Reloads the Qubex system model from the chip's config and params files and pushes the control and readout settings of one qubit to its QuEL boxes. It measures nothing and writes no calibration values.",
+          "prerequisites": [
+            "The chip's Qubex config and params files exist. configuration_mode defaults to ge-cr-cr; ge-ef-cr and ge-ef-fh add EF and FH drive targets."
+          ],
+          "references": [],
+          "when_to_use": "Run it before measurements whose frequencies or amplitudes changed in the params files, or to apply a different channel layout; templates call it before and between pulse stages. Prefer ConfigureAll to configure every selected MUX at once."
+        },
         "file_path": "box_setup/configure.py",
         "input_parameters": {},
         "name": "Configure",
@@ -7409,7 +8150,15 @@
       },
       {
         "class_name": "ConfigureAll",
-        "description": "Task to configure all boxes for the selected MUXes.",
+        "description": "System task that builds a Qubex experiment for the selected MUXes, reloads the system model, and pushes the settings of every target in those MUXes to the QuEL boxes. It measures nothing and writes no calibration values.",
+        "documentation": {
+          "description": "System task that builds a Qubex experiment for the selected MUXes, reloads the system model, and pushes the settings of every target in those MUXes to the QuEL boxes. It measures nothing and writes no calibration values.",
+          "prerequisites": [
+            "mux_ids name MUXes defined by the chip topology; standalone qubits without a MUX cannot be targeted."
+          ],
+          "references": [],
+          "when_to_use": "Run it once at the start of a pipeline instead of per-qubit Configure; the ConfigureAll step type wraps this task and fills mux_ids from the step targets. Set configuration_mode to ge-ef-cr or ge-ef-fh when later steps need EF or FH targets."
+        },
         "file_path": "box_setup/configure_all.py",
         "input_parameters": {},
         "name": "ConfigureAll",
@@ -7431,7 +8180,15 @@
       },
       {
         "class_name": "ConfigureEF",
-        "description": "Configure GE and EF drive channels before EF calibration in the same session.",
+        "description": "Same as Configure, but only accepts an EF-capable channel layout (ge-ef-cr by default, or ge-ef-fh) so the session gains GE and EF drive targets.",
+        "documentation": {
+          "description": "Same as Configure, but only accepts an EF-capable channel layout (ge-ef-cr by default, or ge-ef-fh) so the session gains GE and EF drive targets.",
+          "prerequisites": [
+            "The chip's Qubex config and params files exist."
+          ],
+          "references": [],
+          "when_to_use": "Run it in the same session before EF tasks such as CheckAdaptiveEFChevron, CheckEFRabi, and EFReadoutClassification, which refuse to run without EF targets. Use ge-ef-fh before CheckAdaptiveFHChevron."
+        },
         "file_path": "box_setup/configure.py",
         "input_parameters": {},
         "name": "ConfigureEF",
@@ -7447,7 +8204,15 @@
       },
       {
         "class_name": "CorrectCaptureDelay",
-        "description": "Center the readout pulse in the capture window of each MUX.\n\nThis is a MUX-level task: it runs once for the representative qubit and\nwrites the same capture delay to every qubit in the MUX: ``capture_delay``\nand ``capture_delay_word`` on QuEL-1, ``capture_delay`` in ns on QuEL-3.\nThe delay is a setting of the MUX, so the task captures only the\nrepresentative qubit's readout at a fixed tone frequency. The capture units\nof a MUX read the same ADC samples, so capturing more qubits adds no information.",
+        "description": "MUX-level task that sweeps the readout capture delay with a fixed readout tone and picks a delay that centers the readout pulse in the capture window. It writes capture_delay (and capture_delay_word on QuEL-1) for every qubit of the MUX and updates the Qubex params files.",
+        "documentation": {
+          "description": "MUX-level task that sweeps the readout capture delay with a fixed readout tone and picks a delay that centers the readout pulse in the capture window. It writes capture_delay (and capture_delay_word on QuEL-1) for every qubit of the MUX and updates the Qubex params files.",
+          "prerequisites": [
+            "None from calibration storage. The default tone sits 0.25 GHz above the readout box's default resonator spectroscopy range, away from the resonators."
+          ],
+          "references": [],
+          "when_to_use": "Run it first during box setup, before resonator spectroscopy, on QuEL-1 or QuEL-3 hardware; it does not need calibrated readout parameters. Later sessions reload the corrected delays."
+        },
         "file_path": "box_setup/correct_capture_delay.py",
         "input_parameters": {},
         "name": "CorrectCaptureDelay",
@@ -7521,7 +8286,32 @@
       },
       {
         "class_name": "CreateDRAGHPIPulse",
-        "description": "Task to create the DRAG HPI pulse.",
+        "description": "Calibrates a 16 ns DRAG half-pi pulse: two iterations of amplitude calibration and a DRAG beta sweep whose zero crossing cancels the phase error amplified by repeated X90 and -X90 pairs. It writes drag_hpi_amplitude, drag_hpi_beta, and drag_hpi_duration.",
+        "documentation": {
+          "description": "Calibrates a 16 ns DRAG half-pi pulse: two iterations of amplitude calibration and a DRAG beta sweep whose zero crossing cancels the phase error amplified by repeated X90 and -X90 pairs. It writes drag_hpi_amplitude, drag_hpi_beta, and drag_hpi_duration.",
+          "prerequisites": [
+            "Rabi parameters from a CheckRabi run under the current readout_duration, with rabi_r2 at or above the R² threshold; they normalize the IQ data.",
+            "control_frequency (or qubit_frequency), readout_frequency (or resonator_frequency), and readout_amplitude are stored for the qubit."
+          ],
+          "references": [
+            {
+              "relevance": "DRAG derivative correction that suppresses leakage and phase error in a weakly anharmonic qubit.",
+              "title": "Simple Pulses for Elimination of Leakage in Weakly Nonlinear Qubits",
+              "url": "https://doi.org/10.1103/PhysRevLett.103.110501"
+            },
+            {
+              "relevance": "Analysis of DRAG pulse families and their phase-error terms.",
+              "title": "Analytic control methods for high-fidelity unitary operations in a weakly nonlinear oscillator",
+              "url": "https://doi.org/10.1103/PhysRevA.83.012308"
+            },
+            {
+              "relevance": "Amplified phase error sequences of pseudo-identity pairs, similar to the beta sweep; shown on a phase qubit.",
+              "title": "Reduced phase error through optimized control of a superconducting qubit",
+              "url": "https://doi.org/10.1103/PhysRevA.82.042339"
+            }
+          ],
+          "when_to_use": "Run it after CheckRabi when gates must be short or high fidelity. RandomizedBenchmarking, ReadoutClassification, and the two-qubit tasks use the DRAG half-pi pulse."
+        },
         "file_path": "one_qubit_fine/create_drag_hpi_pulse.py",
         "input_parameters": {
           "control_amplitude": {
@@ -7682,7 +8472,27 @@
       },
       {
         "class_name": "CreateDRAGPIPulse",
-        "description": "Task to create the DRAG pi pulse.",
+        "description": "Calibrates a 24 ns DRAG pi pulse: two iterations of amplitude calibration and a DRAG beta sweep over repeated X180 and -X180 pairs. It writes drag_pi_amplitude, drag_pi_beta, and drag_pi_duration.",
+        "documentation": {
+          "description": "Calibrates a 24 ns DRAG pi pulse: two iterations of amplitude calibration and a DRAG beta sweep over repeated X180 and -X180 pairs. It writes drag_pi_amplitude, drag_pi_beta, and drag_pi_duration.",
+          "prerequisites": [
+            "Rabi parameters from a CheckRabi run under the current readout_duration, with rabi_r2 at or above the R² threshold; they normalize the IQ data.",
+            "control_frequency (or qubit_frequency), readout_frequency (or resonator_frequency), and readout_amplitude are stored for the qubit."
+          ],
+          "references": [
+            {
+              "relevance": "DRAG derivative correction that suppresses leakage and phase error in a weakly anharmonic qubit.",
+              "title": "Simple Pulses for Elimination of Leakage in Weakly Nonlinear Qubits",
+              "url": "https://doi.org/10.1103/PhysRevLett.103.110501"
+            },
+            {
+              "relevance": "Analysis of DRAG pulse families and their phase-error terms.",
+              "title": "Analytic control methods for high-fidelity unitary operations in a weakly nonlinear oscillator",
+              "url": "https://doi.org/10.1103/PhysRevA.83.012308"
+            }
+          ],
+          "when_to_use": "Run it after CheckRabi. CreateZX90 and the other cross-resonance tasks use it as the control-qubit echo pulse, and Qubex prefers it for state preparation."
+        },
         "file_path": "one_qubit_fine/create_drag_pi_pulse.py",
         "input_parameters": {
           "control_amplitude": {
@@ -7843,7 +8653,18 @@
       },
       {
         "class_name": "CreateEFHPIPulse",
-        "description": "Calibrate and store a flat-top EF half-pi pulse.",
+        "description": "Calibrates the amplitude of a flat-top half-pi pulse on the e-to-f transition and writes ef_hpi_amplitude and ef_hpi_duration.",
+        "documentation": {
+          "description": "Calibrates the amplitude of a flat-top half-pi pulse on the e-to-f transition and writes ef_hpi_amplitude and ef_hpi_duration.",
+          "prerequisites": [
+            "GE and EF drive targets configured in the current session: run ConfigureEF, or start with ConfigureAll, using configuration_mode ge-ef-cr or ge-ef-fh.",
+            "EF Rabi parameters (ef_rabi_*) stored by CheckEFRabi.",
+            "control_frequency_ef (or ef_frequency) stored by CheckAdaptiveEFChevron.",
+            "control_frequency, control_amplitude, readout_frequency, and readout_amplitude are stored; hpi_amplitude and hpi_duration stored by CreateHPIPulse."
+          ],
+          "references": [],
+          "when_to_use": "Run it after CheckEFRabi. EFReadoutClassification requires the EF half-pi pulse."
+        },
         "file_path": "one_qubit_fine/create_ef_hpi_pulse.py",
         "input_parameters": {
           "control_amplitude": {
@@ -8004,7 +8825,18 @@
       },
       {
         "class_name": "CreateEFPIPulse",
-        "description": "Calibrate and store a flat-top EF pi pulse.",
+        "description": "Calibrates the amplitude of a flat-top pi pulse on the e-to-f transition and writes ef_pi_amplitude and ef_pi_duration.",
+        "documentation": {
+          "description": "Calibrates the amplitude of a flat-top pi pulse on the e-to-f transition and writes ef_pi_amplitude and ef_pi_duration.",
+          "prerequisites": [
+            "GE and EF drive targets configured in the current session: run ConfigureEF, or start with ConfigureAll, using configuration_mode ge-ef-cr or ge-ef-fh.",
+            "EF Rabi parameters (ef_rabi_*) stored by CheckEFRabi.",
+            "control_frequency_ef (or ef_frequency) stored by CheckAdaptiveEFChevron.",
+            "control_frequency, control_amplitude, readout_frequency, and readout_amplitude are stored; hpi_amplitude and hpi_duration stored by CreateHPIPulse."
+          ],
+          "references": [],
+          "when_to_use": "Run it after CheckEFRabi. CheckThermalExcitation, CheckGEFRelaxation, CheckReadoutMIST, and CheckAdaptiveFHChevron require the EF pi pulse."
+        },
         "file_path": "one_qubit_fine/create_ef_pi_pulse.py",
         "input_parameters": {
           "control_amplitude": {
@@ -8165,7 +8997,22 @@
       },
       {
         "class_name": "CreateHPIPulse",
-        "description": "Task to create the HPI pulse.",
+        "description": "Calibrates the amplitude of a 32 ns flat-top half-pi pulse by sweeping amplitude around the Rabi-model estimate over a train of repeated pulses. It writes hpi_amplitude and hpi_duration.",
+        "documentation": {
+          "description": "Calibrates the amplitude of a 32 ns flat-top half-pi pulse by sweeping amplitude around the Rabi-model estimate over a train of repeated pulses. It writes hpi_amplitude and hpi_duration.",
+          "prerequisites": [
+            "Rabi parameters from a CheckRabi run under the current readout_duration, with rabi_r2 at or above the R² threshold; they normalize the IQ data.",
+            "control_frequency (or qubit_frequency), readout_frequency (or resonator_frequency), and readout_amplitude are stored for the qubit."
+          ],
+          "references": [
+            {
+              "relevance": "Single-qubit X and Y rotations from resonant drive pulses; the repeated-pulse amplitude fit is a Qubex procedure.",
+              "title": "A quantum engineer's guide to superconducting qubits",
+              "url": "https://doi.org/10.1063/1.5089550"
+            }
+          ],
+          "when_to_use": "Run it after CheckRabi. Most later single-qubit measurements require the half-pi pulse, and CheckHPIPulse verifies it."
+        },
         "file_path": "one_qubit_coarse/create_hpi_pulse.py",
         "input_parameters": {
           "control_amplitude": {
@@ -8325,7 +9172,22 @@
       },
       {
         "class_name": "CreatePIPulse",
-        "description": "Task to create the pi pulse.",
+        "description": "Calibrates the amplitude of a 32 ns flat-top pi pulse by sweeping amplitude around the Rabi-model estimate over a train of repeated pulses. It writes pi_amplitude and pi_duration.",
+        "documentation": {
+          "description": "Calibrates the amplitude of a 32 ns flat-top pi pulse by sweeping amplitude around the Rabi-model estimate over a train of repeated pulses. It writes pi_amplitude and pi_duration.",
+          "prerequisites": [
+            "Rabi parameters from a CheckRabi run under the current readout_duration, with rabi_r2 at or above the R² threshold; they normalize the IQ data.",
+            "control_frequency (or qubit_frequency), readout_frequency (or resonator_frequency), and readout_amplitude are stored for the qubit."
+          ],
+          "references": [
+            {
+              "relevance": "Single-qubit X and Y rotations from resonant drive pulses; the repeated-pulse amplitude fit is a Qubex procedure.",
+              "title": "A quantum engineer's guide to superconducting qubits",
+              "url": "https://doi.org/10.1063/1.5089550"
+            }
+          ],
+          "when_to_use": "Run it after CheckRabi. CheckT2Echo, CheckGEFRelaxation, and readout optimization rely on a pi pulse; CheckPIPulse verifies it."
+        },
         "file_path": "one_qubit_coarse/create_pi_pulse.py",
         "input_parameters": {
           "control_amplitude": {
@@ -8485,7 +9347,28 @@
       },
       {
         "class_name": "CreateZX90",
-        "description": "Task to create ZX90 gate.",
+        "description": "Builds an echoed CR ZX90 gate with a DRAG pi echo on the control qubit, calibrates its CR amplitude by sweeping and fitting the target response, and writes the CR parameters plus zx90_gate_time.",
+        "documentation": {
+          "description": "Builds an echoed CR ZX90 gate with a DRAG pi echo on the control qubit, calibrates its CR amplitude by sweeping and fitting the target response, and writes the CR parameters plus zx90_gate_time.",
+          "prerequisites": [
+            "The coupling qid is control-target; control-qubit and target-qubit inputs are read from each qubit's stored calibration.",
+            "DRAG half-pi pulses (CreateDRAGHPIPulse) on both qubits and a DRAG pi pulse (CreateDRAGPIPulse) on the control qubit.",
+            "CR parameters (cr_*, cancel_*, rotary_amplitude, zx_rotation_rate, cr_ramptime) stored by CheckCrossResonance."
+          ],
+          "references": [
+            {
+              "relevance": "Echoed cross-resonance gate construction.",
+              "title": "Process verification of two-qubit quantum gates by randomized benchmarking",
+              "url": "https://doi.org/10.1103/PhysRevA.87.030301"
+            },
+            {
+              "relevance": "Calibrating the cross-resonance gate toward a ZX rotation.",
+              "title": "Procedure for systematically tuning up cross-talk in the cross-resonance gate",
+              "url": "https://doi.org/10.1103/PhysRevA.93.060302"
+            }
+          ],
+          "when_to_use": "Run it after CheckCrossResonance. CheckZX90, the Bell tasks, ZX90InterleavedRandomizedBenchmarking, and Check2QGateCoherenceLimit use its result."
+        },
         "file_path": "two_qubit/create_zx90.py",
         "input_parameters": {
           "cancel_amplitude": {
@@ -8922,6 +9805,7 @@
       {
         "class_name": "DumpBox",
         "description": "DumpBox class to dump the box information.",
+        "documentation": null,
         "file_path": "box_setup/dump_box.py",
         "input_parameters": {},
         "name": "DumpBox",
@@ -8931,7 +9815,19 @@
       },
       {
         "class_name": "EFReadoutClassification",
-        "description": "Build a three-state classifier for the ground, excited, and second-excited states.",
+        "description": "Prepares g, e, and f states, trains a three-state Qubex classifier, saves it, and writes average_ef_readout_fidelity and per-state fidelities ef_readout_fidelity_g/e/f.",
+        "documentation": {
+          "description": "Prepares g, e, and f states, trains a three-state Qubex classifier, saves it, and writes average_ef_readout_fidelity and per-state fidelities ef_readout_fidelity_g/e/f.",
+          "prerequisites": [
+            "GE and EF drive targets configured in the current session: run ConfigureEF, or start with ConfigureAll, using configuration_mode ge-ef-cr or ge-ef-fh.",
+            "control_frequency_ef (or ef_frequency) stored by CheckAdaptiveEFChevron.",
+            "hpi_amplitude and hpi_duration stored by CreateHPIPulse.",
+            "ef_hpi_amplitude and ef_hpi_duration stored by CreateEFHPIPulse.",
+            "control_frequency (or qubit_frequency), readout_frequency (or resonator_frequency), and readout_amplitude are stored for the qubit."
+          ],
+          "references": [],
+          "when_to_use": "Run it at the end of EF calibration, before measurements that classify f, such as CheckGEFRelaxation or CheckReadoutMIST."
+        },
         "file_path": "measurement/ef_readout_classification.py",
         "input_parameters": {
           "control_frequency": {
@@ -9024,6 +9920,7 @@
       {
         "class_name": "LinkUp",
         "description": "Task to link up the box.",
+        "documentation": null,
         "file_path": "box_setup/link_up.py",
         "input_parameters": {},
         "name": "LinkUp",
@@ -9033,7 +9930,27 @@
       },
       {
         "class_name": "RandomizedBenchmarking",
-        "description": "Task to perform randomized benchmarking.",
+        "description": "Runs single-qubit Clifford randomized benchmarking built from the DRAG half-pi pulse and writes the average_gate_fidelity and depolarizing_rate from the Qubex decay fit.",
+        "documentation": {
+          "description": "Runs single-qubit Clifford randomized benchmarking built from the DRAG half-pi pulse and writes the average_gate_fidelity and depolarizing_rate from the Qubex decay fit.",
+          "prerequisites": [
+            "drag_hpi_amplitude, drag_hpi_duration, and drag_hpi_beta stored by CreateDRAGHPIPulse.",
+            "control_frequency (or qubit_frequency), readout_frequency (or resonator_frequency), and readout_amplitude are stored for the qubit."
+          ],
+          "references": [
+            {
+              "relevance": "Randomized benchmarking of quantum gates.",
+              "title": "Randomized benchmarking of quantum gates",
+              "url": "https://doi.org/10.1103/PhysRevA.77.012307"
+            },
+            {
+              "relevance": "Clifford randomized benchmarking and its exponential decay model.",
+              "title": "Scalable and Robust Randomized Benchmarking of Quantum Processes",
+              "url": "https://doi.org/10.1103/PhysRevLett.106.180504"
+            }
+          ],
+          "when_to_use": "Run it after fine calibration to benchmark single-qubit gates as a whole; use X90InterleavedRandomizedBenchmarking for the X90 gate alone."
+        },
         "file_path": "benchmark/randomized_benchmarking.py",
         "input_parameters": {
           "control_amplitude": {
@@ -9211,7 +10128,22 @@
       },
       {
         "class_name": "ReadoutClassification",
-        "description": "Task to classify the readout.",
+        "description": "Prepares 0 and 1 states, trains the Qubex state classifier (k-means or GMM, as the session configures), saves it for later measurements, and writes average_readout_fidelity, readout_fidelity_0, and readout_fidelity_1.",
+        "documentation": {
+          "description": "Prepares 0 and 1 states, trains the Qubex state classifier (k-means or GMM, as the session configures), saves it for later measurements, and writes average_readout_fidelity, readout_fidelity_0, and readout_fidelity_1.",
+          "prerequisites": [
+            "drag_hpi_amplitude, drag_hpi_duration, and drag_hpi_beta stored by CreateDRAGHPIPulse.",
+            "control_frequency (or qubit_frequency), readout_frequency (or resonator_frequency), and readout_amplitude are stored for the qubit."
+          ],
+          "references": [
+            {
+              "relevance": "Single-shot dispersive readout and state-assignment fidelity.",
+              "title": "Rapid High-Fidelity Single-Shot Dispersive Readout of Superconducting Qubits",
+              "url": "https://doi.org/10.1103/PhysRevApplied.7.054020"
+            }
+          ],
+          "when_to_use": "Run it after readout and pulse calibration to quantify two-state assignment fidelity and refresh the classifier that subsequent Qubex measurements use."
+        },
         "file_path": "measurement/readout_classification.py",
         "input_parameters": {
           "control_frequency": {
@@ -9285,6 +10217,7 @@
       {
         "class_name": "ReadoutConfigure",
         "description": "Task to configure the box.",
+        "documentation": null,
         "file_path": "box_setup/readout_configure.py",
         "input_parameters": {},
         "name": "ReadoutConfigure",
@@ -9302,6 +10235,7 @@
       {
         "class_name": "X180InterleavedRandomizedBenchmarking",
         "description": "Task to perform X180 interleaved randomized benchmarking.",
+        "documentation": null,
         "file_path": "benchmark/x180_interleaved_randoized_benchmarking.py",
         "input_parameters": {
           "control_amplitude": {
@@ -9497,7 +10431,22 @@
       },
       {
         "class_name": "X90InterleavedRandomizedBenchmarking",
-        "description": "Task to perform X90 interleaved randomized benchmarking.",
+        "description": "Interleaves the DRAG X90 gate between random single-qubit Cliffords and writes the x90_gate_fidelity and x90_depolarizing_rate relative to the reference decay.",
+        "documentation": {
+          "description": "Interleaves the DRAG X90 gate between random single-qubit Cliffords and writes the x90_gate_fidelity and x90_depolarizing_rate relative to the reference decay.",
+          "prerequisites": [
+            "drag_hpi_amplitude, drag_hpi_duration, and drag_hpi_beta stored by CreateDRAGHPIPulse.",
+            "control_frequency (or qubit_frequency), readout_frequency (or resonator_frequency), and readout_amplitude are stored for the qubit."
+          ],
+          "references": [
+            {
+              "relevance": "Interleaved randomized benchmarking for the error of one gate.",
+              "title": "Efficient Measurement of Quantum Gate Error by Interleaved Randomized Benchmarking",
+              "url": "https://doi.org/10.1103/PhysRevLett.109.080505"
+            }
+          ],
+          "when_to_use": "Run it after RandomizedBenchmarking to isolate the error of the X90 gate."
+        },
         "file_path": "benchmark/x90_interleaved_randomized_benchmarking.py",
         "input_parameters": {
           "control_amplitude": {
@@ -9675,7 +10624,28 @@
       },
       {
         "class_name": "ZX90InterleavedRandomizedBenchmarking",
-        "description": "Task to perform ZX90 interleaved randomized benchmarking.",
+        "description": "Interleaves the calibrated echoed-CR ZX90 gate between random two-qubit Cliffords and writes zx90_gate_fidelity and zx90_depolarizing_rate for the pair.",
+        "documentation": {
+          "description": "Interleaves the calibrated echoed-CR ZX90 gate between random two-qubit Cliffords and writes zx90_gate_fidelity and zx90_depolarizing_rate for the pair.",
+          "prerequisites": [
+            "The coupling qid is control-target; control-qubit and target-qubit inputs are read from each qubit's stored calibration.",
+            "DRAG half-pi pulses (CreateDRAGHPIPulse) on both qubits and a DRAG pi pulse (CreateDRAGPIPulse) on the control qubit.",
+            "CR and ZX90 parameters (cr_*, cancel_*, rotary_amplitude, zx_rotation_rate, zx90_gate_time) stored by CreateZX90 for the pair."
+          ],
+          "references": [
+            {
+              "relevance": "Interleaved randomized benchmarking for the error of one gate.",
+              "title": "Efficient Measurement of Quantum Gate Error by Interleaved Randomized Benchmarking",
+              "url": "https://doi.org/10.1103/PhysRevLett.109.080505"
+            },
+            {
+              "relevance": "Two-qubit Clifford and interleaved benchmarking of a cross-resonance gate.",
+              "title": "Process verification of two-qubit quantum gates by randomized benchmarking",
+              "url": "https://doi.org/10.1103/PhysRevA.87.030301"
+            }
+          ],
+          "when_to_use": "Run it after CreateZX90 and CheckZX90 to benchmark the two-qubit gate."
+        },
         "file_path": "benchmark/zx90_interleaved_randoized_benchmarking.py",
         "input_parameters": {
           "cancel_amplitude": {

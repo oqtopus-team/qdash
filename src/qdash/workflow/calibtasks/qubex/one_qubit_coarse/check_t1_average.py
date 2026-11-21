@@ -13,6 +13,8 @@ from qdash.datamodel.task import (
     InputParameterSpec,
     OutputParameterSpec,
     RunParameterSpec,
+    TaskDocumentation,
+    TaskReference,
 )
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -35,6 +37,48 @@ class CheckT1Average(QubexTask):
 
     name: str = "CheckT1Average"
     task_type: str = "qubit"
+    documentation: ClassVar[TaskDocumentation] = TaskDocumentation(
+        description=(
+            "Repeats the CheckT1 measurement n_runs times (10 by default) and writes the mean "
+            "t1_average and its standard deviation t1_std, with a fluctuation figure."
+        ),
+        when_to_use=(
+            "Run it when T1 must be compared over time or across qubits, or before "
+            "Check1QGateCoherenceLimit, which reads t1_average. It takes about n_runs times as "
+            "long as CheckT1."
+        ),
+        prerequisites=(
+            (
+                "Rabi parameters from a CheckRabi run under the current readout_duration, with "
+                "rabi_r2 at or above the R² threshold; they normalize the IQ data."
+            ),
+            "hpi_amplitude and hpi_duration stored by CreateHPIPulse.",
+            (
+                "control_frequency (or qubit_frequency), readout_frequency (or "
+                "resonator_frequency), and readout_amplitude are stored for the qubit."
+            ),
+        ),
+        references=(
+            TaskReference(
+                title="A quantum engineer's guide to superconducting qubits",
+                url="https://doi.org/10.1063/1.5089550",
+                relevance="T1 measurement by excitation and delayed readout.",
+            ),
+            TaskReference(
+                title="Fluctuations of Energy-Relaxation Times in Superconducting Qubits",
+                url="https://doi.org/10.1103/PhysRevLett.121.090502",
+                relevance=(
+                    "T1 fluctuates in time because of two-level-system defects, so single "
+                    "values are noisy."
+                ),
+            ),
+            TaskReference(
+                title="Decoherence benchmarking of superconducting qubits",
+                url="https://doi.org/10.1038/s41534-019-0168-5",
+                relevance="Statistics of repeated T1 and dephasing measurements over long periods.",
+            ),
+        ),
+    )
 
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
         # RabiParam normalizes measured IQ values; its readout duration is validated.

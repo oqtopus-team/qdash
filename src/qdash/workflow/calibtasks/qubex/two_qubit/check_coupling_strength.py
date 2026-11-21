@@ -7,7 +7,13 @@ import numpy as np
 from qubex.experiment.experiment_constants import CALIBRATION_SHOTS
 from qubex.measurement.measurement_defaults import DEFAULT_INTERVAL
 
-from qdash.datamodel.task import InputParameterSpec, OutputParameterSpec, RunParameterSpec
+from qdash.datamodel.task import (
+    InputParameterSpec,
+    OutputParameterSpec,
+    RunParameterSpec,
+    TaskDocumentation,
+    TaskReference,
+)
 from qdash.workflow.calibtasks.base import PostProcessResult, RunResult
 from qdash.workflow.calibtasks.qubex.base import (
     QubexTask,
@@ -28,6 +34,50 @@ class CheckCouplingStrength(QubexTask):
 
     name: str = "CheckCouplingStrength"
     task_type: str = "coupling"
+    documentation: ClassVar[TaskDocumentation] = TaskDocumentation(
+        description=(
+            "Measures the static ZZ interaction with a JAZZ echo sequence (Ramsey on the "
+            "control with simultaneous pi pulses on both qubits) and writes "
+            "static_zz_interaction in kHz. When both anharmonicities are stored it also writes "
+            "qubit_qubit_coupling_strength in MHz from the perturbative ZZ formula."
+        ),
+        when_to_use=(
+            "Run it during coupling characterization to quantify residual ZZ crosstalk on a "
+            "fixed-coupling pair."
+        ),
+        prerequisites=(
+            "The first qid is the measured qubit and the second the spectator.",
+            (
+                "Both qubits have Rabi parameters, control_frequency, hpi_amplitude, "
+                "hpi_duration, readout_frequency, and readout_amplitude stored."
+            ),
+            (
+                "qubit_anharmonicity on both qubits, for example from CheckAdaptiveEFChevron, "
+                "enables the coupling-strength estimate."
+            ),
+        ),
+        references=(
+            TaskReference(
+                title=(
+                    "Experimental Demonstration of Fault-Tolerant State Preparation with "
+                    "Superconducting Qubits"
+                ),
+                url="https://doi.org/10.1103/PhysRevLett.119.180501",
+                relevance=(
+                    "Static ZZ measured by a Hahn echo with the spectator in each basis state "
+                    "and a varied final rotation."
+                ),
+            ),
+            TaskReference(
+                title="Suppression of Unwanted ZZ Interactions in a Hybrid Two-Qubit System",
+                url="https://doi.org/10.1103/PhysRevLett.125.200504",
+                relevance=(
+                    "Names the JAZZ protocol and gives the perturbative static ZZ expression "
+                    "used to infer coupling."
+                ),
+            ),
+        ),
+    )
     run_spec: ClassVar[dict[str, RunParameterSpec]] = {
         "readout_duration": readout_duration_run_parameter(),
         "time_range": RunParameterSpec(

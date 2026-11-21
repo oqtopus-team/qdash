@@ -9,6 +9,8 @@ from qdash.datamodel.task import (
     InputParameterSpec,
     OutputParameterSpec,
     RunParameterSpec,
+    TaskDocumentation,
+    TaskReference,
 )
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -31,6 +33,37 @@ class CheckAdaptiveChevron(QubexTask):
 
     name: str = "CheckAdaptiveChevron"
     task_type: str = "qubit"
+    documentation: ClassVar[TaskDocumentation] = TaskDocumentation(
+        description=(
+            "Measures a coarse chevron (drive detuning versus pulse duration) over a wide "
+            "window, extends the search to the side bands when the peak is weak, then "
+            "remeasures a regular chevron with a rescaled amplitude. Qubex's matched-transform "
+            "analysis gives qubit_frequency (also published as control_frequency) and "
+            "control_amplitude."
+        ),
+        when_to_use=(
+            "Run it at the end of bring-up when the qubit frequency is known only to tens of "
+            "MHz. Use CheckChevron instead when the frequency is already within its fixed ±50 "
+            "MHz window."
+        ),
+        prerequisites=(
+            (
+                "control_frequency (or coarse_qubit_frequency), readout_frequency (or "
+                "resonator_frequency), readout_amplitude, and coarse_control_amplitude are "
+                "stored, normally by CheckQubitSpectroscopy and CheckControlAmplitude."
+            ),
+        ),
+        references=(
+            TaskReference(
+                title="A quantum engineer's guide to superconducting qubits",
+                url="https://doi.org/10.1063/1.5089550",
+                relevance=(
+                    "Resonant and detuned Rabi driving of a transmon; the adaptive "
+                    "matched-transform search is Qubex-specific."
+                ),
+            ),
+        ),
+    )
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
         "control_frequency": InputParameterSpec.required_database(
             fallback_parameter_names=("coarse_qubit_frequency",)

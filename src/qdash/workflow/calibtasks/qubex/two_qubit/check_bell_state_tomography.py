@@ -9,6 +9,8 @@ from qdash.datamodel.task import (
     InputParameterSpec,
     OutputParameterSpec,
     RunParameterSpec,
+    TaskDocumentation,
+    TaskReference,
 )
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -26,6 +28,46 @@ class CheckBellStateTomography(QubexTask):
 
     name: str = "CheckBellStateTomography"
     task_type: str = "coupling"
+    documentation: ClassVar[TaskDocumentation] = TaskDocumentation(
+        description=(
+            "Prepares a Bell state with the stored ZX90 gate, measures it in all nine Pauli "
+            "basis pairs with readout mitigation, reconstructs the density matrix by linear "
+            "inversion, and writes bell_state_fidelity."
+        ),
+        when_to_use=(
+            "Run it after CreateZX90 to quantify entanglement quality, including state "
+            "preparation and readout effects that interleaved benchmarking excludes."
+        ),
+        prerequisites=(
+            (
+                "The coupling qid is control-target; control-qubit and target-qubit inputs are "
+                "read from each qubit's stored calibration."
+            ),
+            (
+                "DRAG half-pi pulses (CreateDRAGHPIPulse) on both qubits and a DRAG pi pulse "
+                "(CreateDRAGPIPulse) on the control qubit."
+            ),
+            (
+                "CR and ZX90 parameters (cr_*, cancel_*, rotary_amplitude, zx_rotation_rate, "
+                "zx90_gate_time) stored by CreateZX90 for the pair."
+            ),
+        ),
+        references=(
+            TaskReference(
+                title="Measurement of qubits",
+                url="https://doi.org/10.1103/PhysRevA.64.052312",
+                relevance="Two-qubit state tomography by linear reconstruction of the density matrix.",
+            ),
+            TaskReference(
+                title=(
+                    "Measurement of the Entanglement of Two Superconducting Qubits via State "
+                    "Tomography"
+                ),
+                url="https://doi.org/10.1126/science.1130886",
+                relevance="State tomography of entangled superconducting qubits.",
+            ),
+        ),
+    )
     run_spec: ClassVar[dict[str, RunParameterSpec]] = {
         "readout_duration": readout_duration_run_parameter(),
         "shots": RunParameterSpec(

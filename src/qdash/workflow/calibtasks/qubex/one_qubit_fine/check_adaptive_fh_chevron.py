@@ -6,7 +6,13 @@ from typing import ClassVar
 from qubex.contrib.experiment import estimate_fh_frequency_from_chevron_adaptive
 from qubex.measurement.measurement_defaults import DEFAULT_INTERVAL, DEFAULT_SHOTS
 
-from qdash.datamodel.task import InputParameterSpec, OutputParameterSpec, RunParameterSpec
+from qdash.datamodel.task import (
+    InputParameterSpec,
+    OutputParameterSpec,
+    RunParameterSpec,
+    TaskDocumentation,
+    TaskReference,
+)
 from qdash.workflow.calibtasks.base import PostProcessResult, RunResult
 from qdash.workflow.calibtasks.qubex.base import QubexTask, readout_duration_run_parameter
 from qdash.workflow.calibtasks.qubex.validation import (
@@ -26,6 +32,42 @@ class CheckAdaptiveFHChevron(QubexTask):
 
     name: str = "CheckAdaptiveFHChevron"
     task_type: str = "qubit"
+    documentation: ClassVar[TaskDocumentation] = TaskDocumentation(
+        description=(
+            "Prepares the second excited state with the session's GE and EF pulses and runs an "
+            "adaptive chevron on the f-to-h transition. It writes fh_frequency (also published "
+            "as control_frequency_fh)."
+        ),
+        when_to_use=(
+            "Run it after EF pulses are calibrated when the third transition is needed. The "
+            "search starts from the configured FH frequency or 2*ef - ge, with the GE amplitude"
+            " divided by sqrt(3)."
+        ),
+        prerequisites=(
+            ("GE, EF, and FH drive targets in the current session: configuration_mode ge-ef-fh."),
+            (
+                "control_frequency, control_amplitude, readout_frequency, and readout_amplitude"
+                " are stored; hpi_amplitude and hpi_duration stored by CreateHPIPulse."
+            ),
+            "control_frequency_ef (or ef_frequency) stored by CheckAdaptiveEFChevron.",
+            "ef_pi_amplitude and ef_pi_duration stored by CreateEFPIPulse.",
+        ),
+        references=(
+            TaskReference(
+                title="Charge-insensitive qubit design derived from the Cooper pair box",
+                url="https://doi.org/10.1103/PhysRevA.76.042319",
+                relevance="Transmon level structure and matrix elements that grow roughly as sqrt(n+1).",
+            ),
+            TaskReference(
+                title=(
+                    "Coherence and Decay of Higher Energy Levels of a Superconducting Transmon "
+                    "Qubit"
+                ),
+                url="https://doi.org/10.1103/PhysRevLett.114.010501",
+                relevance="Driving successive transitions of a transmon with sequential pi pulses.",
+            ),
+        ),
+    )
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
         "control_frequency": InputParameterSpec.required_database(
             fallback_parameter_names=("qubit_frequency",), unit="GHz"
