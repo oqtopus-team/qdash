@@ -293,11 +293,11 @@ describe("CustomDashboardListPageContent", () => {
     expect(screen.getByText("No dashboards yet")).toBeInTheDocument();
   });
 
-  it("leads with Create with AI, which opens a draft and the Agent panel without creating", () => {
+  it("leads with Create with Agent, which opens a draft and the Agent panel without creating", () => {
     mocks.withDock = true;
     renderPage();
 
-    const withAi = screen.getByRole("button", { name: "Create with AI" });
+    const withAi = screen.getByRole("button", { name: "Create with Agent" });
     const manual = screen.getByRole("button", { name: "New dashboard" });
     expect(withAi).toHaveClass("btn-primary");
     expect(manual).not.toHaveClass("btn-primary");
@@ -313,7 +313,7 @@ describe("CustomDashboardListPageContent", () => {
   it("keeps manual creation as the only action without the Agent panel", () => {
     renderPage();
 
-    expect(screen.queryByRole("button", { name: "Create with AI" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Create with Agent" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "New dashboard" })).toHaveClass("btn-primary");
   });
 });

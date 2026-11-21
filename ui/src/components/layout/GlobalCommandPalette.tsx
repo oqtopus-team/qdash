@@ -108,7 +108,7 @@ export function GlobalCommandPalette() {
     router.push(href);
   };
 
-  // Resumes the current general chat in the sidebar, or starts one, as the Ask AI tab does.
+  // Resumes the current general chat in the sidebar, or starts one, as the Ask Agent tab does.
   const openAgentChat = () => {
     setOpen(false);
     openGeneralChat();

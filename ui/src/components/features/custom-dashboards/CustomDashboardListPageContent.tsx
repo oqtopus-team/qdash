@@ -266,7 +266,7 @@ export function CustomDashboardListPageContent() {
       {dock && (
         <button type="button" className="btn btn-primary btn-sm" onClick={createWithAi}>
           <Bot data-icon="inline-start" aria-hidden="true" />
-          Create with AI
+          Create with Agent
         </button>
       )}
       <button

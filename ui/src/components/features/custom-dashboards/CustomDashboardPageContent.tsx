@@ -648,7 +648,7 @@ export function CustomDashboardPageContent({ dashboardId }: { dashboardId: strin
       {mayEdit && openAgent && (
         <button type="button" className="btn btn-ghost btn-sm" onClick={openAgent}>
           <Bot data-icon="inline-start" aria-hidden="true" />
-          Edit with AI
+          Edit with Agent
         </button>
       )}
       {mayEdit && !editing && (
@@ -769,7 +769,7 @@ export function CustomDashboardPageContent({ dashboardId }: { dashboardId: strin
             : openAgent && (
                 <button type="button" className="btn btn-sm" onClick={openAgent}>
                   <Bot data-icon="inline-start" aria-hidden="true" />
-                  Ask AI
+                  Ask Agent
                 </button>
               )}
         </div>
@@ -935,7 +935,7 @@ export function CustomDashboardPageContent({ dashboardId }: { dashboardId: strin
                 {openAgent && (
                   <button type="button" className="btn btn-primary btn-sm" onClick={openAgent}>
                     <Bot data-icon="inline-start" aria-hidden="true" />
-                    Ask AI
+                    Ask Agent
                   </button>
                 )}
                 <button

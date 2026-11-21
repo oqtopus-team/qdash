@@ -571,7 +571,7 @@ describe("CustomDashboardPageContent with the Agent", () => {
   it("opens the Agent panel with the dashboard's draft as context and changes nothing", () => {
     renderPage();
 
-    fireEvent.click(screen.getByRole("button", { name: "Edit with AI" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit with Agent" }));
 
     expect(mocks.openGeneralChat).toHaveBeenCalledTimes(1);
     expect(mocks.update).not.toHaveBeenCalled();
@@ -602,7 +602,7 @@ describe("CustomDashboardPageContent with the Agent", () => {
     mocks.dashboard = dashboard({ can_edit: false });
     renderPage();
 
-    expect(screen.queryByRole("button", { name: "Edit with AI" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Edit with Agent" })).not.toBeInTheDocument();
     expect(agentPage()?.dashboard).toBeUndefined();
     expect(mocks.provider?.suggestions?.()).toEqual([]);
     // A proposal from an earlier chat cannot change their view.
@@ -676,7 +676,7 @@ describe("CustomDashboardPageContent with the Agent", () => {
     mocks.dashboard = dashboard({ panels: [] });
     renderPage();
 
-    const ask = screen.getByRole("button", { name: "Ask AI" });
+    const ask = screen.getByRole("button", { name: "Ask Agent" });
     expect(ask).toHaveClass("btn-primary");
     expect(screen.getByRole("button", { name: "Add panel" })).not.toHaveClass("btn-primary");
     fireEvent.click(ask);
@@ -691,8 +691,8 @@ describe("CustomDashboardPageContent with the Agent", () => {
     mocks.dashboard = dashboard({ panels: [] });
     renderPage();
 
-    expect(screen.queryByRole("button", { name: "Edit with AI" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Ask AI" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Edit with Agent" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Ask Agent" })).not.toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "Add panel" })).toHaveLength(1);
   });
 
@@ -702,7 +702,7 @@ describe("CustomDashboardPageContent with the Agent", () => {
     const heading = screen.getByRole("heading", { name: "Collision review" });
     const header = heading.closest("div.mb-4");
     expect(header).toHaveClass("flex-col", "sm:flex-row");
-    expect(screen.getByRole("button", { name: "Edit with AI" }).parentElement).toHaveClass(
+    expect(screen.getByRole("button", { name: "Edit with Agent" }).parentElement).toHaveClass(
       "flex-wrap",
     );
   });

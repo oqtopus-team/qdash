@@ -68,7 +68,7 @@ edit does not change what everyone else's evaluations and chats read.
 
 ## Request an AI Review
 
-Select **Ask AI** on one result to start a recorded evaluation or open a chat with that result's
+Select **Ask Agent** on one result to start a recorded evaluation or open a chat with that result's
 context. Select **Evaluate** on **Chip** to evaluate the displayed task across eligible targets.
 
 AI output is supporting evidence, not an automatic calibration decision. Confirm it against the

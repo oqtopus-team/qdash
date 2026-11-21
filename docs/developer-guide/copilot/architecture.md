@@ -17,7 +17,7 @@ only in what they open with:
 
 | Entry point | Request | Opening context | Typical question |
 | --- | --- | --- | --- |
-| Chat about a task result (**Ask AI** in a metrics modal, task history, or execution detail) | `POST /copilot/chat/stream` with `task: {task_name, chip_id, qid, execution_id, task_id}` | `TaskContext` (knowledge, qubit and coupling parameters, results, history, neighbors) and figures in the opening message | "Is this T1 result normal?" |
+| Chat about a task result (**Ask Agent** in a metrics modal, task history, or execution detail) | `POST /copilot/chat/stream` with `task: {task_name, chip_id, qid, execution_id, task_id}` | `TaskContext` (knowledge, qubit and coupling parameters, results, history, neighbors) and figures in the opening message | "Is this T1 result normal?" |
 | Chat page (`/copilot`, `useCopilotChat`) | `POST /copilot/chat/stream` | Chip ID, optional qubit ID, scoring thresholds | "Compare T1 across all qubits" |
 | Failure investigation | `POST /copilot/chat/stream` with `investigation` | Error message, stack trace, and source roots; see [Failure Investigations and Source Access](#failure-investigations-and-source-access) | "Why did this run fail?" |
 | Forum AI reply | `thread_reply` / `complete_once` in `pi_chat_service.py` | The thread's history and its latest post | One planner turn per reply |

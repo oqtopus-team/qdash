@@ -96,14 +96,14 @@ vi.mock("@/components/features/provenance/ParameterLineageDialog", () => ({
     <button type="button">{children}</button>
   ),
 }));
-// A direct Ask AI entry in a modal would render this probe.
+// A direct Ask Agent entry in a modal would render this probe.
 vi.mock("@/components/features/evaluations/AskAiButton", () => ({
   AskAiButton: () => {
     mocks.askAiButton();
-    return <button type="button">Ask AI</button>;
+    return <button type="button">Ask Agent</button>;
   },
 }));
-// The canonical entry: the evaluation section's own Ask AI.
+// The canonical entry: the evaluation section's own Ask Agent.
 vi.mock("@/components/features/evaluations/TaskResultEvaluations", () => ({
   TaskResultEvaluations: (props: {
     taskId: string;
@@ -118,7 +118,7 @@ vi.mock("@/components/features/evaluations/TaskResultEvaluations", () => ({
       data-execution-id={props.executionId ?? ""}
       onClick={props.onChat}
     >
-      Ask AI
+      Ask Agent
     </button>
   ),
 }));
@@ -201,18 +201,18 @@ const cases: {
   },
 ];
 
-describe.each(cases)("$name Ask AI", ({ qid, render: renderModal, chat }) => {
-  it("offers one Ask AI entry, the evaluation section's, beside Lineage", () => {
+describe.each(cases)("$name Ask Agent", ({ qid, render: renderModal, chat }) => {
+  it("offers one Ask Agent entry, the evaluation section's, beside Lineage", () => {
     renderModal();
 
     expect(screen.getByRole("button", { name: "Lineage" })).not.toBeNull();
-    expect(screen.getAllByRole("button", { name: "Ask AI" })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "Ask Agent" })).toHaveLength(1);
     expect(mocks.askAiButton).not.toHaveBeenCalled();
   });
 
   it("keeps the selected result as the evaluation and chat context", () => {
     renderModal();
-    const askAi = screen.getByRole("button", { name: "Ask AI" });
+    const askAi = screen.getByRole("button", { name: "Ask Agent" });
 
     expect(askAi.dataset.taskId).toBe(`task-${qid}`);
     expect(askAi.dataset.qid).toBe(qid);

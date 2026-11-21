@@ -131,7 +131,7 @@ Every judgement the evaluation model makes becomes an `evaluation` document unde
 | Trigger | Who | How |
 | --- | --- | --- |
 | `bulk` | Chip page | `POST /evaluations/runs` with a task and a chip, a day, or a list of task results |
-| `single` | A task result's **Ask AI** | The same route with one task result |
+| `single` | A task result's **Ask Agent** | The same route with one task result |
 | `chat` | The planner, during a chat | Recorded from the `qcal_evaluate` tool result; see below |
 
 A bulk request selects the latest evaluable result of the task per qubit or coupling of the

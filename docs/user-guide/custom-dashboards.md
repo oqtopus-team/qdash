@@ -19,8 +19,8 @@ Project editors and owners can create dashboards; viewers can open the dashboard
 them. The quickest start is to describe the dashboard to the [Agent](./ai-chat.md) and review
 the draft it proposes.
 
-1. Open **Dashboards** and select **Create with AI**. A new, unsaved dashboard opens with the
-   **Ask AI** sidebar beside it. Nothing is sent until you ask.
+1. Open **Dashboards** and select **Create with Agent**. A new, unsaved dashboard opens with the
+   **Ask Agent** sidebar beside it. Nothing is sent until you ask.
 2. Describe what you need, or pick a suggested request such as "Build a frequency collision map
    from the starter template" or "Show the median ZX90 fidelity per coupling over the last 14
    days". The Agent reads the available metrics, scripts, and templates and proposes a draft as
@@ -92,9 +92,9 @@ applies. A metric panel shows one metric on the chip topology or in a table:
 Each panel sits on a 12-column grid. Use the panel menu to move it, make it wider or narrower,
 taller or shorter, duplicate it, or remove it. On a narrow screen every panel spans the full width.
 
-On your own dashboard, select **Edit with AI** to open the **Ask AI** sidebar with the dashboard,
+On your own dashboard, select **Edit with Agent** to open the **Ask Agent** sidebar with the dashboard,
 the chip it shows, and its current panels, unsaved changes included. On a dashboard without
-panels, **Ask AI** comes first, next to **Add panel**. The Agent proposes a new panel list as a
+panels, **Ask Agent** comes first, next to **Add panel**. The Agent proposes a new panel list as a
 diff; **Apply to draft** enters edit mode with the proposed panels, and nothing is stored until
 you select **Save**. The Agent does not change sharing, and it keeps each panel's script
 revision unless you ask it to move one.

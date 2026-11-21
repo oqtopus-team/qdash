@@ -12,8 +12,8 @@ The Agent needs a chat model endpoint; an administrator configures it as describ
 | Entry point | Use it for |
 | --- | --- |
 | **Agent** in the sidebar | A project-wide conversation with cited QDash records |
-| **Ask AI** on the right edge of any page | The same chat beside the page you are on |
-| **Ask AI** on a task result | Discussing or evaluating one result |
+| **Ask Agent** on the right edge of any page | The same chat beside the page you are on |
+| **Ask Agent** on a task result | Discussing or evaluating one result |
 | **Investigate with AI** in an **Error Log** | Finding the likely cause of a failed execution or task |
 | [Agent Calibration](./agent-calibration.md) | Running a separately authorized, bounded calibration plan through the client |
 
@@ -35,7 +35,7 @@ shows only what QDash knows and sends; a general chat on the **Agent** page show
 | --- | --- | --- |
 | **Result** | The chat is about one task result | The task, qubit, and chip saved with this chat; every message names them |
 | **Investigating** | The chat investigates a failure | The failed execution, with the task, qubit, and chip when known, saved with this chat |
-| **Page** | You chat from the **Ask AI** sidebar or the floating window | The page you have open now; it follows you as you navigate, and adds **with editor code** on the **Workflow** editor and the metric script editor, and **with dashboard draft** on a dashboard you can edit |
+| **Page** | You chat from the **Ask Agent** sidebar or the floating window | The page you have open now; it follows you as you navigate, and adds **with editor code** on the **Workflow** editor and the metric script editor, and **with dashboard draft** on a dashboard you can edit |
 
 Hover over an item for its full details. The link icon on **Result** or **Investigating** opens
 the execution. The saved result or investigation cannot be removed from a chat; start a general
@@ -113,9 +113,9 @@ remove them right away, QDash retries the next time it loads your chat list.
 If a branch fails because the assistant service could not be reached, select **Branch from
 here** again: QDash finishes the same branch rather than making a second one.
 
-### Ask AI Beside Any Page
+### Ask Agent Beside Any Page {#ask-ai-beside-any-page}
 
-**Ask AI** opens a sidebar with the current page as context. Drag its left edge to resize it, or
+**Ask Agent** opens a sidebar with the current page as context. Drag its left edge to resize it, or
 double-click to restore the default width. Your browser remembers the width.
 
 On the **Workflow** editor the assistant also sees the flow's code as it is in the editor,
@@ -130,7 +130,7 @@ editor, checks its changes by validating and previewing the draft, and proposes 
 that **Apply to editor** puts into the editor of that script. See
 [Write a Script with the Agent](./metric-scripts.md#write-a-script-with-the-agent).
 
-On a dashboard you can edit, and on a new dashboard from **Create with AI**, the assistant sees
+On a dashboard you can edit, and on a new dashboard from **Create with Agent**, the assistant sees
 the unsaved draft and proposes a new one as a diff. **Apply to draft** puts it on the page;
 **Save** on the page stores it. The empty chat there suggests dashboard requests, and nothing is
 sent until you pick one or type your own. See
@@ -200,9 +200,9 @@ every task result is judged by the same gates as a saved workflow. The execution
 **Execution** page tagged `pipeline`. See
 [Calibration Pipeline Spec](../developer-guide/workflow/calibration-pipeline.md) for the spec format.
 
-## Ask AI About a Task Result
+## Ask Agent About a Task Result {#ask-ai-about-a-task-result}
 
-**Ask AI** appears on a task result and in a metric's history on **Metrics**. It offers two routes
+**Ask Agent** appears on a task result and in a metric's history on **Metrics**. It offers two routes
 before anything starts:
 
 - **Evaluate the figure** creates a recorded evaluation with the settings described in
