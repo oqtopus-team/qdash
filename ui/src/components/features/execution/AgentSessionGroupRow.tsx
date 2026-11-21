@@ -15,6 +15,7 @@ import {
   sessionJourneyHref,
   sessionStatusBadgeClass,
 } from "./agentSessionDisplay";
+import { AgentActorLabel, recordedUserLabel } from "./ExecutionAttribution";
 import { ExecutionListCard } from "./ExecutionListCard";
 
 interface AgentSessionGroupRowProps {
@@ -80,7 +81,7 @@ export function AgentSessionGroupRow({
             </span>
             <span className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-sm text-base-content/60">
               <span>{formatDateTime(item.sort_at ?? summary.latest_activity_at)}</span>
-              <span>@{summary.created_by}</span>
+              <AgentActorLabel userLabel={recordedUserLabel(null, summary.created_by)} />
               <span>{sessionActivityLabel(summary)}</span>
             </span>
             <span className="mt-1 block text-xs text-base-content/60">

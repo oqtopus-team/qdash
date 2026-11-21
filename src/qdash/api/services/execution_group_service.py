@@ -47,6 +47,7 @@ from qdash.api.services.agent_execution_links import (
     effective_session_status,
     keys_on_other_chips,
     resolve_chip_links,
+    summary_link,
     utc,
 )
 from qdash.api.services.execution_service import day_window, execution_summary
@@ -558,7 +559,9 @@ class ExecutionGroupService:
                 if doc is not None:
                     items.append(
                         ExecutionGroupItem(
-                            kind="execution", sort_at=sort_at, execution=execution_summary(doc)
+                            kind="execution",
+                            sort_at=sort_at,
+                            execution=execution_summary(doc, summary_link(links, key)),
                         )
                     )
                 continue
@@ -588,7 +591,9 @@ class ExecutionGroupService:
                             else None
                         ),
                         in_filter=in_window(link.start_at),
-                        execution=execution_summary(execution),
+                        execution=execution_summary(
+                            execution, summary_link(links, link.execution_id)
+                        ),
                     )
                 )
             items.append(

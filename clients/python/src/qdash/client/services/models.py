@@ -1977,6 +1977,14 @@ class ExecutionAgentSessionLink(BaseModel):
     """
     The session's state, when the session is in this project
     """
+    created_by: Annotated[str | None, Field(title="Created By")] = None
+    """
+    The user who created the session and is responsible for it; set only when linked. Answers, resumes, and commit authorizations are recorded separately in the audit
+    """
+    model_name: Annotated[str, Field(title="Model Name")] = ""
+    """
+    The model the session recorded, if any
+    """
 
 
 class ExecutionAvailabilityRequest(BaseModel):
@@ -2158,6 +2166,10 @@ class ExecutionResponseSummary(BaseModel):
     elapsed_time: Annotated[timedelta | None, Field(title="Elapsed Time")] = None
     tags: Annotated[list[str], Field(title="Tags")]
     note: Annotated[dict[str, Any], Field(title="Note")]
+    agent_session: ExecutionAgentSessionLink | None = None
+    """
+    Set only when an action of an agent session dispatched this execution; a tag alone never sets it
+    """
 
 
 class FidelityCondition(BaseModel):

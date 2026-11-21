@@ -167,6 +167,8 @@ def test_viewer_reads_grouped_list_journey_and_detail_link(test_client) -> None:
         "linked": True,
         "action_id": action_id,
         "status": "active",
+        "created_by": "owner",
+        "model_name": "",
     }
     manual = test_client.get("/executions/manual-1", headers=_headers("viewer-token"))
     assert manual.json()["agent_session"] is None

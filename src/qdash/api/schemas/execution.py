@@ -91,6 +91,30 @@ class Task(BaseModel):
         return format_elapsed_time(v) if v else None
 
 
+class ExecutionAgentSessionLink(BaseModel):
+    """The agent session an execution belongs to, as its records establish it."""
+
+    session_id: str
+    linked: bool = Field(
+        description=(
+            "True when an action of the session dispatched this execution on the same chip; "
+            "false when only a tag names the session, which is no authority to group it"
+        )
+    )
+    action_id: str | None = None
+    status: AgentSessionStatus | None = Field(
+        default=None, description="The session's state, when the session is in this project"
+    )
+    created_by: str | None = Field(
+        default=None,
+        description=(
+            "The user who created the session and is responsible for it; set only when linked. "
+            "Answers, resumes, and commit authorizations are recorded separately in the audit"
+        ),
+    )
+    model_name: str = Field(default="", description="The model the session recorded, if any")
+
+
 class ExecutionResponseSummary(BaseModel):
     """ExecutionResponseSummary is a Pydantic model that represents the summary of an execution response.
 
@@ -120,6 +144,13 @@ class ExecutionResponseSummary(BaseModel):
     elapsed_time: timedelta | None = None
     tags: list[str]
     note: dict[str, Any]
+    agent_session: ExecutionAgentSessionLink | None = Field(
+        default=None,
+        description=(
+            "Set only when an action of an agent session dispatched this execution; a tag "
+            "alone never sets it"
+        ),
+    )
 
     @field_validator("elapsed_time", mode="before")
     @classmethod
@@ -172,22 +203,6 @@ class PipelineProgress(BaseModel):
     )
     status: str
     steps: list[PipelineStepProgress]
-
-
-class ExecutionAgentSessionLink(BaseModel):
-    """The agent session an execution belongs to, as its records establish it."""
-
-    session_id: str
-    linked: bool = Field(
-        description=(
-            "True when an action of the session dispatched this execution on the same chip; "
-            "false when only a tag names the session, which is no authority to group it"
-        )
-    )
-    action_id: str | None = None
-    status: AgentSessionStatus | None = Field(
-        default=None, description="The session's state, when the session is in this project"
-    )
 
 
 class ExecutionResponseDetail(BaseModel):

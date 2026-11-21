@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { ExecutionAgentSessionLinkActionId } from './executionAgentSessionLinkActionId';
+import type { ExecutionAgentSessionLinkCreatedBy } from './executionAgentSessionLinkCreatedBy';
 import type { ExecutionAgentSessionLinkStatus } from './executionAgentSessionLinkStatus';
 
 /**
@@ -18,4 +19,8 @@ export interface ExecutionAgentSessionLink {
   action_id?: ExecutionAgentSessionLinkActionId;
   /** The session's state, when the session is in this project */
   status?: ExecutionAgentSessionLinkStatus;
+  /** The user who created the session and is responsible for it; set only when linked. Answers, resumes, and commit authorizations are recorded separately in the audit */
+  created_by?: ExecutionAgentSessionLinkCreatedBy;
+  /** The model the session recorded, if any */
+  model_name?: string;
 }

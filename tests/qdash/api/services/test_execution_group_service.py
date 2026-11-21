@@ -591,6 +591,43 @@ def test_legacy_tag_without_action_link_stays_an_execution(
     assert orphan_link is not None and orphan_link.status is None and not orphan_link.linked
 
 
+def test_list_rows_carry_agent_attribution_only_from_action_links(
+    sessions: AgentSessionService, groups: ExecutionGroupService
+) -> None:
+    """Flat and grouped rows attribute an execution to an agent only through its action."""
+    session = _session(sessions)
+    action = _submit(sessions, session.session_id, key="a-1")
+    _dispatch(session.session_id, action.action_id, sequence=1, start=BASE)
+    _execution(
+        "legacy-1",
+        start=BASE + timedelta(minutes=1),
+        tags=[f"agent-session:{session.session_id}"],
+    )
+    _execution("manual-1", start=BASE + timedelta(minutes=2))
+
+    flat = ExecutionService(MongoExecutionHistoryRepository(), MongoExecutionLockRepository())
+    rows = {row.execution_id: row for row in flat.list_executions(PROJECT, CHIP, limit=100)}
+    link = rows["agent-exec-1"].agent_session
+    assert link is not None and link.linked and link.action_id == action.action_id
+    assert link.session_id == session.session_id and link.created_by == OWNER
+    assert link.status == AgentSessionStatus.ACTIVE
+    # The recorded actor is kept as is.
+    assert rows["agent-exec-1"].username == OWNER
+    assert rows["legacy-1"].agent_session is None
+    assert rows["manual-1"].agent_session is None
+
+    grouped = groups.list_groups(project_id=PROJECT, chip_id=CHIP)
+    group = next(item for item in grouped.items if item.kind == "agent_session")
+    assert group.children[0].execution.agent_session == link
+    for item in grouped.items:
+        if item.kind == "execution":
+            assert item.execution is not None and item.execution.agent_session is None
+
+    # The detail reports the same verified link, creator included.
+    detail = flat.get_execution(PROJECT, "agent-exec-1")
+    assert detail is not None and detail.agent_session == link
+
+
 def test_link_for_execution_is_authoritative_and_chip_scoped(
     sessions: AgentSessionService, groups: ExecutionGroupService
 ) -> None:

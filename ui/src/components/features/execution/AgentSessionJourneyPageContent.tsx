@@ -40,6 +40,7 @@ import {
   EDGE_KIND_LABELS,
   KIND_LABELS,
 } from "./AgentSessionJourneyGraph";
+import { AgentActorLabel, recordedUserLabel } from "./ExecutionAttribution";
 import { getStatusBadgeClass } from "./ExecutionListCard";
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
@@ -549,7 +550,18 @@ export function AgentSessionJourneyPageContent({
       {back}
       <PageHeader
         title={data.session.skill_name || "Agent session"}
-        description={`${data.session.chip_id} · created by ${data.session.created_by} ${formatDateTime(data.session.created_at)}`}
+        description={
+          <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span>{data.session.chip_id}</span>
+            <span aria-hidden="true">·</span>
+            <AgentActorLabel userLabel={recordedUserLabel(null, data.session.created_by)} />
+            <span aria-hidden="true">·</span>
+            <span>
+              Started {formatDateTime(data.session.created_at)}
+              {data.session.model_name ? ` · Model: ${data.session.model_name}` : ""}
+            </span>
+          </span>
+        }
       />
       {/* A new project or session starts with nothing selected. */}
       <JourneyBody

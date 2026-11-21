@@ -28240,6 +28240,24 @@
               }
             ],
             "description": "The session's state, when the session is in this project"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By",
+            "description": "The user who created the session and is responsible for it; set only when linked. Answers, resumes, and commit authorizations are recorded separately in the audit"
+          },
+          "model_name": {
+            "type": "string",
+            "title": "Model Name",
+            "description": "The model the session recorded, if any",
+            "default": ""
           }
         },
         "type": "object",
@@ -28912,6 +28930,17 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Note"
+          },
+          "agent_session": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExecutionAgentSessionLink"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Set only when an action of an agent session dispatched this execution; a tag alone never sets it"
           }
         },
         "type": "object",

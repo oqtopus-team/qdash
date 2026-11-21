@@ -611,6 +611,15 @@ execution results and evaluations, while preserving its recorded dispatch status
 an action stays its own row, and its detail reports `linked: false`. No record is written to
 group, and no `upstream_id` is changed.
 
+**Attribution.** Each `ExecutionResponseSummary` of `GET /executions` and of the grouped list
+carries `agent_session` only when an action holds the execution, from one `resolve_chip_links`
+per request rather than a lookup per row; a tag never sets it. A linked `agent_session` also
+carries the session's `created_by` and, when recorded, `model_name`. The UI labels such a run
+**Agent** · @user with the execution's recorded user, and names `created_by` as the user
+responsible for the session. It never derives the label from a name or tag, and it does not
+present `created_by` as the expert who answered, resumed, or authorized a commit; those stay
+in the audit records.
+
 **Pagination.** `GET /executions/groups` (`listExecutionGroups`) groups before it pages. Rows
 are the chip's sessions plus the executions no session holds, merged newest first: an execution
 by `start_at`, as `GET /executions` orders it, and a session by its latest activity, the latest

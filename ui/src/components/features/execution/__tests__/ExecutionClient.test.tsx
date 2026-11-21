@@ -100,6 +100,29 @@ describe("ExecutionDetailClient agent session link", () => {
     );
   });
 
+  it("shows the agent as the actor and the session creator as responsible", () => {
+    execution = {
+      name: "agent:CheckRabi",
+      status: "completed",
+      chip_id: "64Q",
+      username: "alice",
+      task: [],
+      agent_session: {
+        session_id: "s-1",
+        linked: true,
+        action_id: "a-1",
+        status: "active",
+        created_by: "alice",
+      },
+    };
+    render(<ExecutionDetailClient chipId="64Q" executionId="exec-1" />);
+    const actor = screen.getByText("Run by:").parentElement as HTMLElement;
+    expect(actor.textContent).toBe("Run by:Agent·@alice");
+    expect(screen.getByRole("note").textContent).toContain(
+      "@alice created the session and is responsible for it",
+    );
+  });
+
   it("says a tag alone does not group the execution", () => {
     execution = {
       name: "agent:CheckRabi",
@@ -111,6 +134,8 @@ describe("ExecutionDetailClient agent session link", () => {
     render(<ExecutionDetailClient chipId="64Q" executionId="exec-1" />);
     expect(screen.getByRole("note").textContent).toContain("listed as its own execution");
     expect(screen.queryByRole("link", { name: "Open journey" })).toBeNull();
+    expect(screen.queryByText("Run by:")).toBeNull();
+    expect(screen.queryByText("Agent")).toBeNull();
   });
 
   it("shows nothing for an execution outside agent sessions", () => {

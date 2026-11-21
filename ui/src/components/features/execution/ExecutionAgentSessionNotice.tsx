@@ -12,8 +12,9 @@ import { sessionJourneyHref } from "./agentSessionDisplay";
 
 /**
  * Where an execution sits in an agent session. A linked execution points to its session's
- * journey; one only tagged for a session says so, because the tag is no link and the execution
- * stays an ordinary one.
+ * journey and names the user responsible for the session, apart from the agent that ran it;
+ * one only tagged for a session says so, because the tag is no link and the execution stays
+ * an ordinary one with no agent attribution.
  */
 export function ExecutionAgentSessionNotice({
   link,
@@ -39,10 +40,20 @@ export function ExecutionAgentSessionNotice({
   return (
     <div role="note" className={`alert alert-info alert-soft text-sm ${className}`}>
       <Bot className="h-4 w-4" aria-hidden="true" />
-      <span>
-        One measurement of agent session <span className="font-mono">{link.session_id}</span>
-        {link.status ? ` (${sessionStatusLabel(link.status)})` : ""}
-      </span>
+      <div className="flex flex-col gap-0.5">
+        <span>
+          One measurement of agent session <span className="font-mono">{link.session_id}</span>
+          {link.status ? ` (${sessionStatusLabel(link.status)})` : ""}
+        </span>
+        <span>
+          Run by an agent;{" "}
+          {link.created_by
+            ? `@${link.created_by} created the session and is responsible for it.`
+            : "the session records no creator."}
+          {link.model_name ? ` Model: ${link.model_name}.` : ""} Expert answers and commits keep
+          their own users in the session audit.
+        </span>
+      </div>
       <Link href={sessionJourneyHref(chipId, link.session_id)} className="link link-hover">
         Open journey
       </Link>

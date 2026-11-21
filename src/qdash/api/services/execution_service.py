@@ -23,6 +23,7 @@ from qdash.api.schemas.execution import (
     ExecutionActivityDay,
     ExecutionActivityGranularity,
     ExecutionActivityResponse,
+    ExecutionAgentSessionLink,
     ExecutionLockStatusResponse,
     ExecutionResponseDetail,
     ExecutionResponseSummary,
@@ -30,7 +31,11 @@ from qdash.api.schemas.execution import (
     PipelineStepProgress,
     Task,
 )
-from qdash.api.services.agent_execution_links import link_for_execution
+from qdash.api.services.agent_execution_links import (
+    link_for_execution,
+    resolve_chip_links,
+    summary_link,
+)
 from qdash.common.utils.datetime import now, parse_elapsed_time
 from qdash.datamodel.execution import ExecutionStatusModel
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
@@ -195,8 +200,11 @@ def by_index_ids(by_index: dict[int, ExecutionHistoryDocument]) -> set[str]:
     return {doc.execution_id for doc in by_index.values()}
 
 
-def execution_summary(execution: ExecutionHistoryDocument) -> ExecutionResponseSummary:
-    """The list row of one execution."""
+def execution_summary(
+    execution: ExecutionHistoryDocument,
+    agent_session: ExecutionAgentSessionLink | None = None,
+) -> ExecutionResponseSummary:
+    """The list row of one execution, with its verified agent session link if any."""
     return ExecutionResponseSummary(
         name=f"{execution.name}-{execution.execution_id}",
         execution_id=execution.execution_id,
@@ -209,6 +217,7 @@ def execution_summary(execution: ExecutionHistoryDocument) -> ExecutionResponseS
         elapsed_time=parse_elapsed_time(execution.elapsed_time),
         tags=execution.tags,
         note=execution.note,
+        agent_session=agent_session,
     )
 
 
@@ -334,7 +343,14 @@ class ExecutionService:
             limit=limit,
             started_between=_day_window(date, _resolve_zone(timezone)) if date else None,
         )
-        return [execution_summary(execution) for execution in executions]
+        if not executions:
+            return []
+        # One chip-wide resolution, shared with the grouped list, instead of a lookup per row.
+        links = resolve_chip_links(project_id, chip_id)
+        return [
+            execution_summary(execution, summary_link(links, execution.execution_id))
+            for execution in executions
+        ]
 
     def count_executions(
         self,

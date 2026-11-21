@@ -244,6 +244,39 @@ describe("AgentSessionJourneyPageContent", () => {
     ).toBe("/agent-sessions/session-1/interventions/int-1?project=project-1");
   });
 
+  it("attributes the session to the agent and its creator, apart from the expert who answered", () => {
+    journeyResult = ok({
+      ...JOURNEY,
+      session: { ...JOURNEY.session, model_name: "claude-opus-5-5" },
+      nodes: JOURNEY.nodes.map((node) =>
+        "intervention" in node
+          ? {
+              ...node,
+              status: "answered",
+              intervention: {
+                ...node.intervention,
+                status: "answered",
+                response_decision: "approve",
+                responded_by: "bob",
+              },
+            }
+          : node,
+      ),
+    });
+    render(<AgentSessionJourneyPageContent chipId="chip-1" sessionId="session-1" />);
+    const header = screen.getByRole("heading", { level: 1 }).parentElement as HTMLElement;
+    expect(within(header).getByText("Agent")).toBeTruthy();
+    expect(within(header).getByText("@alice")).toBeTruthy();
+    expect(within(header).getByText(/Model: claude-opus-5-5/)).toBeTruthy();
+    // No runtime is named unless the session recorded one.
+    expect(header.textContent).not.toMatch(/\bpi\b/);
+
+    fireEvent.click(screen.getByTestId("node-intervention:int-1"));
+    const detail = screen.getByTestId("journey-selected");
+    expect(within(detail).getByText(/approve by bob/)).toBeTruthy();
+    expect(within(detail).queryByText(/alice/)).toBeNull();
+  });
+
   it("draws dispatch order apart from recorded links", () => {
     render(<AgentSessionJourneyPageContent chipId="chip-1" sessionId="session-1" />);
     const edges = (mocks.flowProps?.edges ?? []) as {

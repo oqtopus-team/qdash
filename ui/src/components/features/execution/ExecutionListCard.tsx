@@ -10,7 +10,6 @@ import {
   CircleX,
   Clock,
   StopCircle,
-  UserRound,
   type LucideIcon,
 } from "lucide-react";
 
@@ -18,15 +17,9 @@ import type { ExecutionResponseSummary } from "@/schemas";
 
 import { formatDateTime } from "@/lib/utils/datetime";
 
-type ActorFields = {
-  user_id?: string | null;
-  username?: string;
-};
+import { ExecutionActor } from "./ExecutionAttribution";
 
-export function formatActorLabel(actor?: ActorFields | null) {
-  if (actor?.username) return `@${actor.username}`;
-  return actor?.user_id || "Unknown";
-}
+export { recordedUserLabel as formatActorLabel } from "./ExecutionAttribution";
 
 function getStatusLabel(status: string) {
   return status.charAt(0).toUpperCase() + status.slice(1);
@@ -150,10 +143,7 @@ export function ExecutionListCard({
             <span className="hidden sm:inline">Duration: {execution.elapsed_time}</span>
           )}
           {execution.elapsed_time && <span className="sm:hidden">{execution.elapsed_time}</span>}
-          <span className="inline-flex items-center gap-1 min-w-0">
-            <UserRound className="h-3 w-3 flex-shrink-0" />
-            <span className="truncate">{formatActorLabel(execution)}</span>
-          </span>
+          <ExecutionActor actor={execution} link={execution.agent_session} />
         </div>
         {execution.status === "failed" && execution.message && (
           <p className="mt-2 line-clamp-2 text-xs text-error">{execution.message}</p>

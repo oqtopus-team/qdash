@@ -163,8 +163,15 @@ most the latest 1000 steps and says so when it leaves earlier ones out; the audi
 them. Use **Policy and audit** for the session's limits and the full audit, and **Answer the
 expert request** while the session waits.
 
+A run a session step started shows **Agent** · @user in the list and on its page. The user is
+the recorded execution user, falling back to the session creator if no execution user was
+recorded, then **Unknown** if neither is available. The session group row shows the session
+creator. A run someone started by hand shows only its recorded user. Expert respondents and
+people who approve changes remain separate actors in the session audit.
+
 A run tagged with a session that no step of the session started, such as one from an older
-version, stays in the list as its own run; its page says it is only tagged.
+version, stays in the list as its own run without the **Agent** label; its page says it is only
+tagged.
 How this works: [Execution grouping](../developer-guide/copilot/agentic-calibration.md#execution-grouping).
 
 ## Run a fixed plan from the command line

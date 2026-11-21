@@ -112,6 +112,8 @@ class ChipLinks:
     """Every agent session of one chip and the executions their actions dispatched."""
 
     session_created: dict[str, datetime] = field(default_factory=dict)
+    # Status, expiry, creator, and model of each session, from the same session read.
+    session_info: dict[str, dict[str, Any]] = field(default_factory=dict)
     by_execution: dict[str, ExecutionLink] = field(default_factory=dict)
     by_session: dict[str, list[ExecutionLink]] = field(default_factory=dict)
     by_action: dict[str, ExecutionLink] = field(default_factory=dict)
@@ -234,6 +236,43 @@ _ACTION_FIELDS = {
 }
 
 
+_SESSION_FIELDS = {
+    "session_id": 1,
+    "created_at": 1,
+    "status": 1,
+    "expires_at": 1,
+    "created_by": 1,
+    "model_name": 1,
+}
+
+
+def _linked(link: ExecutionLink, session: dict[str, Any]) -> ExecutionAgentSessionLink:
+    """The verified link of an execution an action of ``session`` dispatched."""
+    return ExecutionAgentSessionLink(
+        session_id=link.session_id,
+        linked=True,
+        action_id=link.action_id,
+        status=effective_session_status(
+            AgentSessionStatus(session["status"]), session.get("expires_at")
+        ),
+        created_by=session.get("created_by") or None,
+        model_name=session.get("model_name") or "",
+    )
+
+
+def summary_link(links: ChipLinks, execution_id: str) -> ExecutionAgentSessionLink | None:
+    """The verified link of one listed execution, from links already resolved for its chip.
+
+    Only an action link counts; an ``agent-session:`` tag without one returns None, so a list
+    row never shows a tagged execution as dispatched by an agent.
+    """
+    link = links.by_execution.get(execution_id)
+    session = links.session_info.get(link.session_id) if link is not None else None
+    if link is None or session is None:
+        return None
+    return _linked(link, session)
+
+
 def _action_order(action: dict[str, Any]) -> tuple[datetime, int, str]:
     return (
         utc(action.get("created_at")) or datetime.min.replace(tzinfo=UTC),
@@ -250,12 +289,13 @@ def resolve_chip_links(project_id: str, chip_id: str) -> ChipLinks:
     """
     links = ChipLinks()
     sessions = AgentSessionDocument.get_motor_collection().find(
-        {"project_id": project_id, "chip_id": chip_id}, {"_id": 0, "session_id": 1, "created_at": 1}
+        {"project_id": project_id, "chip_id": chip_id}, {"_id": 0, **_SESSION_FIELDS}
     )
     for doc in sessions:
         created = utc(doc.get("created_at"))
         if created is not None:
             links.session_created[str(doc["session_id"])] = created
+            links.session_info[str(doc["session_id"])] = doc
     if not links.session_created:
         return links
     actions = list(
@@ -324,7 +364,7 @@ def link_for_execution(
                     "chip_id": execution.chip_id,
                     "session_id": {"$in": session_ids},
                 },
-                {"_id": 0, "session_id": 1, "status": 1, "expires_at": 1},
+                {"_id": 0, **_SESSION_FIELDS},
             )
         }
         same_chip = sorted(
@@ -341,15 +381,7 @@ def link_for_execution(
             _assign(same_chip, executions, links)
             link = links.by_execution.get(execution.execution_id)
             if link is not None:
-                session = sessions[link.session_id]
-                return ExecutionAgentSessionLink(
-                    session_id=link.session_id,
-                    linked=True,
-                    action_id=link.action_id,
-                    status=effective_session_status(
-                        AgentSessionStatus(session["status"]), session.get("expires_at")
-                    ),
-                )
+                return _linked(link, sessions[link.session_id])
     tagged = next((tag for tag in execution.tags if tag.startswith(AGENT_SESSION_TAG_PREFIX)), None)
     if tagged is None:
         return None
