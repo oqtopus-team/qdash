@@ -25,6 +25,9 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  Detail,
+  FormatSourceRequest,
+  FormatSourceResponse,
   HTTPValidationError,
   ListMetricScriptTemplatesResponse,
   ListMetricScriptsResponse,
@@ -470,6 +473,71 @@ export const useValidateMetricScript = <TError = HTTPValidationError,
         TContext
       > => {
       return useMutation(getValidateMetricScriptMutationOptions(options), queryClient);
+    }
+    /**
+ * Format the source with the project's Ruff settings; it is parsed, never executed.
+ * @summary Format metric script source without saving it
+ */
+export const formatMetricScriptSource = (
+    formatSourceRequest: FormatSourceRequest,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<FormatSourceResponse>(
+      {url: `/metric-scripts/format`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: formatSourceRequest, signal
+    },
+      options);
+    }
+
+
+
+
+export const getFormatMetricScriptSourceMutationOptions = <TError = Detail | HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof formatMetricScriptSource>>, TError,{data: FormatSourceRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof formatMetricScriptSource>>, TError,{data: FormatSourceRequest}, TContext> => {
+
+const mutationKey = ['formatMetricScriptSource'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof formatMetricScriptSource>>, {data: FormatSourceRequest}> = (props) => {
+          const {data} = props ?? {};
+
+          return  formatMetricScriptSource(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type FormatMetricScriptSourceMutationResult = NonNullable<Awaited<ReturnType<typeof formatMetricScriptSource>>>
+    export type FormatMetricScriptSourceMutationBody = FormatSourceRequest
+    export type FormatMetricScriptSourceMutationError = Detail | HTTPValidationError
+
+    /**
+ * @summary Format metric script source without saving it
+ */
+export const useFormatMetricScriptSource = <TError = Detail | HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof formatMetricScriptSource>>, TError,{data: FormatSourceRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof formatMetricScriptSource>>,
+        TError,
+        {data: FormatSourceRequest},
+        TContext
+      > => {
+      return useMutation(getFormatMetricScriptSourceMutationOptions(options), queryClient);
     }
     /**
  * Evaluate one metric of the given source over the chip; nothing is saved.

@@ -114,8 +114,8 @@ sequenceDiagram
     participant DB as FlowRepository
 
     Client->>API: save flow source and metadata
-    API->>API: validate name and expected function
-    API->>Files: write and format project flow file
+    API->>API: format source with Ruff, validate name and expected function
+    API->>Files: write project flow file
     API->>Deploy: register file path and function
     Deploy->>Files: import file and verify function
     Deploy->>Prefect: ensure pool and create deployment
@@ -123,8 +123,13 @@ sequenceDiagram
     API->>DB: create or update project flow metadata
 ```
 
-`FlowService.save_flow()` writes `<project_id>/<flow_name>.py`, formats it with Ruff, and maps the
-API-visible path to the deployment container's shared volume. Registration fails when the file
+`FlowService.save_flow()` formats the request code with `format_source_for_save()` from
+`src/qdash/api/lib/python_format.py` before it validates the code. It then writes the formatted
+text to `<project_id>/<flow_name>.py`, returns it as `SaveFlowResponse.code`, and maps the
+API-visible path to the deployment container's shared volume. Code that Ruff cannot parse, or
+a formatter failure, keeps the code as sent. A syntax error then fails validation with 400. The
+editor's **Format Document** calls `POST /flows/format`, which formats without saving; see
+[Source formatting](../architecture/metric-scripts.md#source-formatting). Registration fails when the file
 cannot be imported or the expected function is absent.
 
 A save creates the flow or replaces an existing one, which is what the flow editor's **Save**

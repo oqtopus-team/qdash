@@ -365,7 +365,11 @@ behavior of each mode is unchanged.
 ## Save and Test the Workflow
 
 1. Select **Save Flow** for a new workflow. For an existing workflow, select **Edit**, make the
-   change, then select **Save**.
+   change, then select **Save**. Save formats the source in QDash's standard Python layout and
+   stores the formatted text, which the editor then shows. A source with a syntax error is not
+   formatted, and the save reports the error. To format without saving, run **Format Document**
+   from the command palette (Cmd/Ctrl+Shift+P) or press Shift+Alt+F in the editor; undo restores
+   the previous text.
 2. Confirm that **Flow saved successfully!** appears without a save error.
 3. Select **Execute** and review **Flow Name**, **Username**, **Chip ID**, and **Tags** on
    **Settings**. Open **Execution preview** to see the steps and rounds the saved source states;

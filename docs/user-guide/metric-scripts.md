@@ -24,10 +24,13 @@ to jump to the line), and **Preview** shows the result on a chip. On a narrow sc
 **Code** and **Settings & preview** tabs switch between the two sides without losing unsaved
 changes.
 
+- **Format** (Shift+Alt+F in the editor) rewrites the code in the editor in QDash's standard
+  Python layout. Nothing is saved or run, and undo (Cmd/Ctrl+Z) restores the previous text. Code
+  with a syntax error stays as it is, and a message gives the line of the error.
 - **Validate** checks the code without saving it.
 - **Preview** runs one metric of the code in the editor, saved or not, on the chip and period
   you choose. Nothing is saved.
-- **Save** (Cmd/Ctrl+S) stores the code as a new revision.
+- **Save** (Cmd/Ctrl+S) formats the code in the editor, then stores that text as a new revision.
 
 A member who cannot edit the script previews its saved version and can select **Copy to my
 scripts** to get a private copy to change.
@@ -183,7 +186,12 @@ in UTC, and the preview and the panel footer show the period that was used.
 
 ## Save and the Active Revision
 
-Each **Save** creates a revision, **r1**, **r2**, and so on. QDash checks the code on save:
+Each **Save** creates a revision, **r1**, **r2**, and so on. The saved revision is the formatted
+code that the editor shows after the save. A save whose only change is layout that formatting
+removes creates no revision. Code that cannot be formatted because of a syntax error is saved as
+written. When formatting is unavailable, **Saving without formatting** appears and the code is
+saved as written. When you edit the code while it is being formatted, nothing is saved; save
+again. QDash checks the code on save:
 
 - When it validates, the new revision becomes the *active* revision.
 - When it does not, the code and its diagnostics are saved, the script is marked invalid, and

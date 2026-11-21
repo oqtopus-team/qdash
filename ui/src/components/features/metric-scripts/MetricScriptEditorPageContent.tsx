@@ -16,11 +16,13 @@ import {
   Play,
   Save,
   ShieldCheck,
+  TextAlignStart,
   TriangleAlert,
 } from "lucide-react";
 import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from "react-resizable-panels";
 
 import {
+  formatMetricScriptSource,
   getListMetricScriptsQueryKey,
   useCopyMetricScript,
   useEvaluateMetricScript,
@@ -36,6 +38,13 @@ import { useChatDock } from "@/contexts/ChatDockContext";
 import { useProject } from "@/contexts/ProjectContext";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { monoFontFamily, remeasureMonacoFontsWhenLoaded } from "@/lib/fonts";
+import {
+  attachPythonFormatter,
+  describeFormatProblem,
+  formatEditorDocument,
+  type FormatRun,
+  type FormatterEditor,
+} from "@/lib/pythonFormatter";
 import type { MetricScriptEditorContext } from "@/types/copilotChat";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
 
@@ -194,10 +203,31 @@ export function MetricScriptEditorPageContent({ scriptId }: { scriptId: string }
   const editorRef = useRef<MonacoEditorLike | null>(null);
   const monacoRef = useRef<MonacoLike | null>(null);
   const [editorMounts, setEditorMounts] = useState(0);
+  // Format Document run from the context menu or Shift+Alt+F reports here.
+  const reportFormatRun = useCallback(
+    (run: FormatRun, explicit: boolean) => {
+      const problem = describeFormatProblem(run);
+      if (problem) {
+        toast.error("Could not format the script", { description: problem });
+      } else if (explicit && run.status === "unchanged") {
+        toast.info("The script is already formatted");
+      }
+    },
+    [toast],
+  );
+  const reportFormatRunRef = useRef(reportFormatRun);
+  useEffect(() => {
+    reportFormatRunRef.current = reportFormatRun;
+  });
   const handleMount = useCallback<OnMount>((editor, monaco) => {
     editorRef.current = editor as unknown as MonacoEditorLike;
     monacoRef.current = monaco as unknown as MonacoLike;
     remeasureMonacoFontsWhenLoaded(monaco);
+    // Format Document formats with the project's Ruff settings; detached when the editor goes.
+    attachPythonFormatter(monaco, editor, {
+      format: async (source) => (await formatMetricScriptSource({ source })).data,
+      onRun: (run) => reportFormatRunRef.current(run, false),
+    });
     setEditorMounts((count) => count + 1);
   }, []);
 
@@ -319,18 +349,51 @@ export function MetricScriptEditorPageContent({ scriptId }: { scriptId: string }
     }
   };
 
-  const canSave = mayEdit && isReady && !doc.isSaving && settings.name.trim() !== "";
+  // Format the draft in the editor without saving it; undo restores the previous text.
+  const [isFormatting, setIsFormatting] = useState(false);
+  const canFormat = mayEdit && isReady && !isFormatting && !doc.isSaving;
+  const handleFormat = async () => {
+    if (!canFormat) return;
+    setIsFormatting(true);
+    try {
+      reportFormatRun(
+        await formatEditorDocument(editorRef.current as FormatterEditor | null, code),
+        true,
+      );
+    } finally {
+      setIsFormatting(false);
+    }
+  };
+
+  // Save formats the draft first, so the editor shows the source that is saved. A draft that
+  // cannot be parsed is saved as written: it becomes a revision with errors and the last
+  // valid revision stays active. A draft edited while the formatter ran is not saved.
+  const formatForSave = async (draft: string): Promise<string | null> => {
+    const run = await formatEditorDocument(editorRef.current as FormatterEditor | null, draft);
+    if (run.status === "stale") {
+      toast.warning("Not saved: the script changed while it was being formatted", {
+        description: "Save again to save the current text.",
+      });
+      return null;
+    }
+    if (run.status === "failed") {
+      toast.warning("Saving without formatting", { description: describeFormatProblem(run) });
+    }
+    return run.text;
+  };
+
+  const canSave =
+    mayEdit && isReady && !doc.isSaving && !isFormatting && settings.name.trim() !== "";
   const save = async () => {
     if (!canSave) return;
-    const submitted = code;
-    const saved = await doc.save();
+    const saved = await doc.save(formatForSave);
     if (saved) {
       setReport({
         kind: "saved",
         ok: saved.status === "valid",
         diagnostics: saved.diagnostics,
         metrics: null,
-        code: saved.source === submitted ? submitted : saved.source,
+        code: saved.source,
       });
     }
   };
@@ -652,6 +715,22 @@ export function MetricScriptEditorPageContent({ scriptId }: { scriptId: string }
             >
               <Copy data-icon="inline-start" aria-hidden="true" />
               Copy to my scripts
+            </button>
+          )}
+          {mayEdit && (
+            <button
+              type="button"
+              className="btn btn-sm"
+              onClick={() => void handleFormat()}
+              disabled={!canFormat}
+              title="Format with Ruff (Shift+Alt+F in the editor)"
+            >
+              {isFormatting ? (
+                <span data-icon="inline-start" className="loading loading-spinner loading-xs" />
+              ) : (
+                <TextAlignStart data-icon="inline-start" aria-hidden="true" />
+              )}
+              Format
             </button>
           )}
           {mayEdit && (

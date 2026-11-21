@@ -4,7 +4,9 @@ Project editors write Python metric scripts that run in a bounded worker process
 produce per-qubit or per-pair cells for dashboard panels. A script is private to its owner
 until shared with the project; the owner or a project owner may modify it. Validation and
 draft previews execute unsaved code and therefore require editor rights; any member who
-can view a saved script may evaluate its validated revisions.
+can view a saved script may evaluate its validated revisions. Formatting parses the source
+with Ruff without executing it; it also requires editor rights, and saves store the
+formatted source.
 """
 
 from __future__ import annotations
@@ -19,6 +21,7 @@ from qdash.api.lib.project import (
     get_project_context,
     get_project_context_editor,
 )
+from qdash.api.schemas.error import Detail
 from qdash.api.schemas.metric_script import (
     ListMetricScriptsResponse,
     ListMetricScriptTemplatesResponse,
@@ -32,8 +35,10 @@ from qdash.api.schemas.metric_script import (
     MetricScriptValidateRequest,
     MetricScriptValidateResponse,
 )
+from qdash.api.schemas.source_format import FormatSourceRequest, FormatSourceResponse
 from qdash.api.schemas.success import SuccessResponse
 from qdash.api.services.metric_script_service import MetricScriptService
+from qdash.api.services.source_format_service import format_source
 
 router = APIRouter()
 
@@ -88,6 +93,21 @@ def validate_metric_script(
 ) -> MetricScriptValidateResponse:
     """Compile the source in a worker and return its metrics or diagnostics."""
     return service.validate(body.source)
+
+
+@router.post(
+    "/format",
+    summary="Format metric script source without saving it",
+    operation_id="formatMetricScriptSource",
+    response_model=FormatSourceResponse,
+    responses={
+        413: {"model": Detail, "description": "The source exceeds the formatting size limit"},
+        503: {"model": Detail, "description": "The formatter could not run"},
+    },
+)
+def format_metric_script_source(body: FormatSourceRequest, _ctx: Editor) -> FormatSourceResponse:
+    """Format the source with the project's Ruff settings; it is parsed, never executed."""
+    return format_source(body.source)
 
 
 @router.post(

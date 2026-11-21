@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any, NoReturn
 
 from fastapi import HTTPException
 
+from qdash.api.lib.python_format import format_source_for_save
 from qdash.api.metric_runtime import executor
 from qdash.api.metric_runtime.broker import (
     MetricDataBroker,
@@ -95,6 +96,19 @@ def _check_source_size(source: str) -> None:
             status_code=422,
             detail=f"Script source exceeds {MAX_SOURCE_BYTES // 1024} KiB",
         )
+
+
+def _source_to_store(source: str) -> str:
+    """Check the size of ``source`` and return the text a save stores.
+
+    The stored text is the source formatted with Ruff; a source Ruff cannot parse, or a
+    formatter failure, stores the source as written (see ``format_source_for_save``).
+    """
+    _check_source_size(source)
+    formatted = format_source_for_save(source)
+    if len(formatted.encode("utf-8")) > MAX_SOURCE_BYTES:
+        return source
+    return formatted
 
 
 def _raise_runtime(exc: MetricRuntimeError) -> NoReturn:
@@ -358,8 +372,8 @@ class MetricScriptService:
         source: str,
         template_id: str | None = None,
     ) -> MetricScriptDocument:
-        """Validate and insert a new script owned by the caller."""
-        _check_source_size(source)
+        """Format, validate and insert a new script owned by the caller."""
+        source = _source_to_store(source)
         result = validate_source(source)
         doc = MetricScriptDocument(
             project_id=ctx.project_id,
@@ -496,9 +510,11 @@ class MetricScriptService:
                     detail=f"Project dashboards use this script: {names}; it must stay shared",
                 )
         if body.source is not None and body.source != doc.source:
-            _check_source_size(body.source)
-            result = validate_source(body.source)
-            self._apply_source(doc, body.source, result)
+            source = _source_to_store(body.source)
+            # Text that formats to the stored source is not a new revision.
+            if source != doc.source:
+                result = validate_source(source)
+                self._apply_source(doc, source, result)
         if body.name is not None:
             doc.name = body.name
         if body.description is not None:

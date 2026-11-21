@@ -49,8 +49,15 @@ export interface MetricScriptDocument {
    * Save the draft with the revision it was opened from. A conflict (409) keeps the draft,
    * moves the baseline to the version saved elsewhere and offers to load it. Resolves with
    * the saved script, or null when nothing was saved.
+   *
+   * `prepare`, when given, returns the code to save, such as the draft after formatting, or
+   * null to save nothing. The server stores the source formatted; a draft still equal to the
+   * submitted code afterwards is replaced by the stored source.
    */
-  save: () => Promise<MetricScriptResponse | null>;
+  save: (
+    prepare?: (draft: string) => Promise<string | null>,
+  ) => Promise<MetricScriptResponse | null>;
+  /** A save is being prepared or is pending. */
   isSaving: boolean;
   /** Drop the draft and show the saved script. */
   discardDraft: () => void;
@@ -80,6 +87,7 @@ export function useMetricScriptDocument(scriptId: string): MetricScriptDocument 
   // Counts each load, so a save that answers after a reload does not move the new baseline.
   const openCountRef = useRef(0);
   const savingRef = useRef(false);
+  const [isPreparing, setIsPreparing] = useState(false);
   const [baseline, setBaseline] = useState<Baseline | null>(null);
   const [code, setCode] = useState("");
   const [settings, setSettingsState] = useState<MetricScriptSettings>(EMPTY_SETTINGS);
@@ -127,67 +135,89 @@ export function useMetricScriptDocument(scriptId: string): MetricScriptDocument 
   }, [load, refetch]);
 
   const mutateAsync = updateMutation.mutateAsync;
-  const save = useCallback(async (): Promise<MetricScriptResponse | null> => {
-    if (!isReady || !baseline || savingRef.current) return null;
-    const id = scriptId;
-    const openCount = openCountRef.current;
-    savingRef.current = true;
-    try {
-      const response = await mutateAsync({
-        scriptId: id,
-        data: {
-          name: settings.name.trim(),
-          description: settings.description,
-          visibility: settings.visibility,
-          ...(code !== baseline.code ? { source: code } : {}),
-          expected_revision: baseline.revision,
-        },
-      });
-      const saved = response.data;
-      storeScript(saved);
-      if (loadedIdRef.current !== id || openCountRef.current !== openCount) return saved;
-      setBaseline(baselineOf(saved));
-      if (saved.status === "invalid") {
-        toast.warning(
-          saved.active_revision
-            ? `Saved r${saved.revision} with errors; r${saved.active_revision} stays active`
-            : `Saved r${saved.revision} with errors; the script has no valid revision yet`,
-        );
-      } else {
-        toast.success(`Saved r${saved.revision}`);
-      }
-      return saved;
-    } catch (error) {
-      if (errorStatus(error) === 409) {
-        // Keep the draft; compare it with the version saved elsewhere from now on.
-        const result = await refetch();
-        const latest = result.data?.data;
-        if (latest && loadedIdRef.current === id && openCountRef.current === openCount) {
-          setBaseline(baselineOf(latest));
+  const save = useCallback(
+    async (
+      prepare?: (draft: string) => Promise<string | null>,
+    ): Promise<MetricScriptResponse | null> => {
+      if (!isReady || !baseline || savingRef.current) return null;
+      const id = scriptId;
+      const openCount = openCountRef.current;
+      savingRef.current = true;
+      try {
+        let submitted = code;
+        if (prepare) {
+          setIsPreparing(true);
+          try {
+            const prepared = await prepare(code);
+            if (prepared === null) return null;
+            submitted = prepared;
+          } finally {
+            setIsPreparing(false);
+          }
+          // The script was reloaded while preparing; its draft is not this one.
+          if (loadedIdRef.current !== id || openCountRef.current !== openCount) return null;
         }
-        toast.error("This script was saved elsewhere", {
-          description: `${getApiErrorMessage(error, "The script changed")}. Your draft is kept; save again to replace it.`,
-          action: { label: "Load saved version", onClick: discardDraft },
+        const response = await mutateAsync({
+          scriptId: id,
+          data: {
+            name: settings.name.trim(),
+            description: settings.description,
+            visibility: settings.visibility,
+            ...(submitted !== baseline.code ? { source: submitted } : {}),
+            expected_revision: baseline.revision,
+          },
         });
-      } else {
-        toast.error(getApiErrorMessage(error, "Failed to save the script"));
+        const saved = response.data;
+        storeScript(saved);
+        if (loadedIdRef.current !== id || openCountRef.current !== openCount) return saved;
+        setBaseline(baselineOf(saved));
+        if (saved.source !== submitted) {
+          // Show the stored (formatted) source unless the draft changed after submitting.
+          setCode((current) => (current === submitted ? saved.source : current));
+        }
+        if (saved.status === "invalid") {
+          toast.warning(
+            saved.active_revision
+              ? `Saved r${saved.revision} with errors; r${saved.active_revision} stays active`
+              : `Saved r${saved.revision} with errors; the script has no valid revision yet`,
+          );
+        } else {
+          toast.success(`Saved r${saved.revision}`);
+        }
+        return saved;
+      } catch (error) {
+        if (errorStatus(error) === 409) {
+          // Keep the draft; compare it with the version saved elsewhere from now on.
+          const result = await refetch();
+          const latest = result.data?.data;
+          if (latest && loadedIdRef.current === id && openCountRef.current === openCount) {
+            setBaseline(baselineOf(latest));
+          }
+          toast.error("This script was saved elsewhere", {
+            description: `${getApiErrorMessage(error, "The script changed")}. Your draft is kept; save again to replace it.`,
+            action: { label: "Load saved version", onClick: discardDraft },
+          });
+        } else {
+          toast.error(getApiErrorMessage(error, "Failed to save the script"));
+        }
+        return null;
+      } finally {
+        savingRef.current = false;
       }
-      return null;
-    } finally {
-      savingRef.current = false;
-    }
-  }, [
-    baseline,
-    code,
-    discardDraft,
-    isReady,
-    mutateAsync,
-    refetch,
-    scriptId,
-    settings,
-    storeScript,
-    toast,
-  ]);
+    },
+    [
+      baseline,
+      code,
+      discardDraft,
+      isReady,
+      mutateAsync,
+      refetch,
+      scriptId,
+      settings,
+      storeScript,
+      toast,
+    ],
+  );
 
   const isDirty =
     isReady &&
@@ -208,7 +238,7 @@ export function useMetricScriptDocument(scriptId: string): MetricScriptDocument 
     setSettings,
     isDirty,
     save,
-    isSaving: updateMutation.isPending,
+    isSaving: isPreparing || updateMutation.isPending,
     discardDraft,
   };
 }

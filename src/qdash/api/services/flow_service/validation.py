@@ -1,19 +1,11 @@
-"""Validation and formatting rules for user flow sources."""
+"""Validation rules for user flow sources."""
 
 from __future__ import annotations
 
 import ast
-import logging
 import re
-import subprocess
-from typing import TYPE_CHECKING
 
 from fastapi import HTTPException
-
-if TYPE_CHECKING:
-    from pathlib import Path
-
-logger = logging.getLogger("uvicorn.app")
 
 # Use full-string matching (fullmatch) so trailing newlines are rejected
 _NAME_PATTERN = re.compile(r"^[a-zA-Z0-9_]+$")
@@ -92,29 +84,3 @@ def _has_flow_decorator(node: ast.FunctionDef) -> bool:
         ):
             return True
     return False
-
-
-def format_with_ruff(file_path: Path) -> None:
-    """Format a flow file in place; a missing or failing ruff is only logged."""
-    try:
-        result = subprocess.run(
-            ["ruff", "format", str(file_path)],
-            capture_output=True,
-            text=True,
-            timeout=10,
-            check=False,
-        )
-    except subprocess.TimeoutExpired:
-        logger.warning("Ruff format timeout - skipping auto-format")
-        return
-    except FileNotFoundError:
-        logger.warning("Ruff not found - skipping auto-format")
-        return
-    except Exception as exc:
-        logger.warning(f"Failed to auto-format with ruff: {exc} - skipping")
-        return
-
-    if result.returncode == 0:
-        logger.info(f"Auto-formatted flow code with ruff: {file_path}")
-    else:
-        logger.warning(f"Ruff format returned non-zero exit code: {result.stderr}")

@@ -3,17 +3,12 @@
 from __future__ import annotations
 
 import ast
-import logging
-import subprocess
-from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi import HTTPException
 
 from qdash.api.services.flow_service.validation import (
     _has_flow_decorator,
-    format_with_ruff,
     normalize_folder,
     validate_flow_code,
     validate_flow_name,
@@ -167,51 +162,3 @@ class TestHasFlowDecorator:
     def test_other_decorator(self):
         node = _function_def("@other\ndef my_func():\n    pass\n")
         assert _has_flow_decorator(node) is False
-
-
-class TestFormatWithRuff:
-    """format_with_ruff is best-effort; failures are logged, not raised."""
-
-    @patch("subprocess.run")
-    def test_success_logs_info(self, mock_run, caplog):
-        """A successful ruff run logs at INFO."""
-        mock_run.return_value = MagicMock(returncode=0, stderr="")
-        with caplog.at_level(logging.INFO, logger="uvicorn.app"):
-            format_with_ruff(Path("/tmp/test_flow.py"))
-        assert mock_run.called
-        cmd = mock_run.call_args[0][0]
-        assert cmd[0] == "ruff"
-        assert cmd[1] == "format"
-        assert "Auto-formatted flow code with ruff" in caplog.text
-
-    @patch("subprocess.run")
-    def test_timeout_logs_warning(self, mock_run, caplog):
-        mock_run.side_effect = subprocess.TimeoutExpired("ruff", 10)
-        with caplog.at_level(logging.WARNING):
-            format_with_ruff(Path("/tmp/test_flow.py"))
-        assert "Ruff format timeout" in caplog.text
-
-    @patch("subprocess.run")
-    def test_not_found_logs_warning(self, mock_run, caplog):
-        mock_run.side_effect = FileNotFoundError("ruff not found")
-        with caplog.at_level(logging.WARNING):
-            format_with_ruff(Path("/tmp/test_flow.py"))
-        assert "Ruff not found" in caplog.text
-
-    @patch("subprocess.run")
-    def test_non_zero_exit_logs_warning(self, mock_run, caplog):
-        mock_run.return_value = MagicMock(returncode=1, stderr="some error")
-        with caplog.at_level(logging.WARNING):
-            format_with_ruff(Path("/tmp/test_flow.py"))
-        assert "non-zero exit code" in caplog.text
-
-
-class TestFormatWithRuffGeneric:
-    """format_with_ruff generic exception branch."""
-
-    @patch("subprocess.run")
-    def test_generic_exception_logs_warning(self, mock_run, caplog):
-        mock_run.side_effect = ValueError("boom")
-        with caplog.at_level(logging.WARNING):
-            format_with_ruff(Path("/tmp/test_flow.py"))
-        assert "Failed to auto-format with ruff" in caplog.text

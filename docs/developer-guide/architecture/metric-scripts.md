@@ -76,6 +76,30 @@ cell `missing`, any other exception makes it `error` with a diagnostic, and the 
 unaffected. Failures of the whole run raise a `MetricRuntimeError` subclass, mapped as in
 [Failure mapping](#failure-mapping).
 
+### Source formatting
+
+The Workflow and metric script editors share one formatter, `src/qdash/api/lib/python_format.py`.
+`format_python_source()` pipes the source to `ruff format --isolated` on stdin and reads stdout,
+with fixed arguments that mirror the repository's `[tool.ruff]` line length and target version.
+Ruff only parses the text, so formatting runs in the API process rather than in the metric
+runner: it never imports or executes the script, and no path or option comes from the request.
+A run is bounded to 512 KiB of input, twice that of output, 10 seconds, and four concurrent runs.
+The `ruff` package is a dependency of `qdash-api`, so the API image provides the binary.
+
+`POST /metric-scripts/format` and `POST /flows/format` require editor rights. They return
+`formatted`, `unchanged`, or `syntax_error` with the input unchanged and the error location.
+They return 413 above the size limit and 503 when Ruff cannot run. Nothing is stored. Create
+and update store the formatted source, so the response `source` is the stored text. An update
+whose formatted source equals the stored source adds no revision. Source that Ruff cannot parse
+is stored as written, as an invalid revision with its diagnostics. A formatter failure is logged
+and stores the source as written. Copies and pins are unaffected.
+
+In the UI, `attachPythonFormatter()` in `ui/src/lib/pythonFormatter.ts` registers one Monaco
+Python formatting provider while any editor is attached. The provider formats only the models of
+attached editors. **Format Document** applies the result as an undoable edit. Save runs the same
+action through `formatEditorDocument()` and sends the text the editor then holds. A result that
+answers after the text changed is dropped, and the save is abandoned.
+
 A relative period is resolved to `[now - days, now]` by `resolve_period` when the evaluation
 starts, so the same panel moves with time; absolute periods need timezones
 (`src/qdash/datamodel/metric_script.py`).

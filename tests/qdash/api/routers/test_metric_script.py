@@ -317,8 +317,8 @@ def test_expected_revision_conflict(test_client, users, runtime):
     assert current["revision"] == 2
 
 
-SOURCE_A = RATIO + "\n# saved by A\n"
-SOURCE_B = RATIO + "\n# saved by B\n"
+SOURCE_A = RATIO + "\n\n# saved by A\n"
+SOURCE_B = RATIO + "\n\n# saved by B\n"
 CONFLICT = "Script was changed by another save; reload it before saving"
 
 
@@ -465,7 +465,7 @@ def test_rejected_save_keeps_pinned_revision_source(test_client, users, runtime,
         headers=owner,
     )
     assert dashboard.status_code == 201, dashboard.text
-    newest = RATIO + "\n# saved by B again\n"
+    newest = RATIO + "\n\n# saved by B again\n"
     winner: dict[str, Any] = {}
 
     def save_b() -> None:
@@ -1273,3 +1273,84 @@ def test_invalid_reference_never_creates_dashboard(test_client, users, runtime, 
     assert response.status_code == 422, response.text
     assert DashboardDocument.find({"project_id": PROJECT}).count() == 0
     assert _stored_doc(script_id).pins == {}
+
+
+# Equivalent to RATIO once formatted: single quotes and a cramped call.
+UNFORMATTED_RATIO = RATIO.replace('ctx.params["factor"]', "ctx.params[ 'factor' ]")
+
+
+def test_format_returns_formatted_source_without_saving_or_running(test_client, users, runtime):
+    editor = users["editor"]
+
+    response = test_client.post(
+        "/metric-scripts/format", json={"source": UNFORMATTED_RATIO}, headers=editor
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "formatted", "source": RATIO, "diagnostic": None}
+    assert runtime == []
+    listed = test_client.get("/metric-scripts", headers=editor).json()
+    assert listed["total"] == 0
+
+
+def test_format_keeps_a_broken_source_and_locates_the_error(test_client, users, runtime):
+    response = test_client.post(
+        "/metric-scripts/format", json={"source": BROKEN}, headers=users["editor"]
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "syntax_error"
+    assert body["source"] == BROKEN
+    assert body["diagnostic"]["line"] == 3
+    assert runtime == []
+
+
+def test_format_requires_editor_rights(test_client, users, runtime):
+    payload = {"source": RATIO}
+
+    assert test_client.post("/metric-scripts/format", json=payload).status_code == 401
+    assert (
+        test_client.post(
+            "/metric-scripts/format", json=payload, headers=users["viewer"]
+        ).status_code
+        == 403
+    )
+
+
+def test_saves_store_formatted_source_and_skip_equivalent_revisions(test_client, users, runtime):
+    editor = users["editor"]
+    created = _create(test_client, editor, source=UNFORMATTED_RATIO)
+    assert created["source"] == RATIO
+    assert created["active_source"] == RATIO
+    assert created["revision"] == 1
+    script_id = created["script_id"]
+    validations = len(runtime)
+
+    same = test_client.patch(
+        f"/metric-scripts/{script_id}",
+        json={"source": UNFORMATTED_RATIO, "expected_revision": 1},
+        headers=editor,
+    )
+
+    assert same.status_code == 200, same.text
+    body = same.json()
+    assert body["revision"] == 1
+    assert [r["revision"] for r in body["revisions"]] == [1]
+    assert len(runtime) == validations
+
+
+def test_save_keeps_the_source_when_the_formatter_fails(
+    test_client, users, runtime, monkeypatch: pytest.MonkeyPatch
+):
+    from qdash.api.lib import python_format
+
+    def unavailable(_source: str) -> None:
+        raise python_format.FormatterUnavailableError("Formatting took longer than 10 s")
+
+    monkeypatch.setattr(python_format, "format_python_source", unavailable)
+
+    created = _create(test_client, users["editor"], source=UNFORMATTED_RATIO)
+
+    assert created["source"] == UNFORMATTED_RATIO
+    assert created["status"] == "valid"

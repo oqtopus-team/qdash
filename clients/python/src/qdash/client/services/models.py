@@ -1807,6 +1807,56 @@ class FlowTemplateWithCode(BaseModel):
     """
 
 
+class FormatSourceDiagnostic(BaseModel):
+    """
+    Why the source could not be formatted.
+    """
+
+    message: Annotated[str, Field(title="Message")]
+    line: Annotated[int | None, Field(title="Line")] = None
+    column: Annotated[int | None, Field(title="Column")] = None
+
+
+class FormatSourceRequest(BaseModel):
+    """
+    Python source to format; nothing is saved or executed.
+    """
+
+    source: Annotated[str, Field(max_length=524288, title="Source")]
+    """
+    Python source (≤ 512 KiB)
+    """
+
+
+class Status5(StrEnum):
+    """
+    formatted: source differs from the input; unchanged: the input is already formatted; syntax_error: the input cannot be parsed and is returned as given
+    """
+
+    formatted = "formatted"
+    unchanged = "unchanged"
+    syntax_error = "syntax_error"
+
+
+class FormatSourceResponse(BaseModel):
+    """
+    The source formatted with Ruff, or the input unchanged when it cannot be parsed.
+    """
+
+    status: Annotated[Status5, Field(title="Status")]
+    """
+    formatted: source differs from the input; unchanged: the input is already formatted; syntax_error: the input cannot be parsed and is returned as given
+    """
+    source: Annotated[str, Field(title="Source")]
+    """
+    Formatted source, or the input on a syntax error
+    """
+    diagnostic: FormatSourceDiagnostic | None = None
+    """
+    Location of the syntax error that prevented formatting
+    """
+
+
 class Key(RootModel[str]):
     root: Annotated[
         str,
@@ -2069,7 +2119,7 @@ class AssigneeUsername(RootModel[str]):
     """
 
 
-class Status5(StrEnum):
+class Status6(StrEnum):
     """
     Thread workflow status
     """
@@ -2156,7 +2206,7 @@ class ForumPostCreate(BaseModel):
     """
     Assigned project member username
     """
-    status: Annotated[Status5, Field(title="Status")] = Status5.open
+    status: Annotated[Status6, Field(title="Status")] = Status6.open
     """
     Thread workflow status
     """
@@ -2218,7 +2268,7 @@ class AssigneeUsername1(RootModel[str]):
     """
 
 
-class Status7(StrEnum):
+class Status8(StrEnum):
     """
     Updated thread workflow status
     """
@@ -2286,7 +2336,7 @@ class ForumPostUpdate(BaseModel):
     """
     Updated assigned project member username
     """
-    status: Annotated[Status7 | None, Field(title="Status")] = None
+    status: Annotated[Status8 | None, Field(title="Status")] = None
     """
     Updated thread workflow status
     """
@@ -2686,7 +2736,7 @@ class MetricCatalogEntry(BaseModel):
     description: Annotated[str, Field(title="Description")]
 
 
-class Status8(StrEnum):
+class Status9(StrEnum):
     ok = "ok"
     missing = "missing"
     empty = "empty"
@@ -2899,7 +2949,7 @@ class Revision(RootModel[int]):
     """
 
 
-class Status9(StrEnum):
+class Status10(StrEnum):
     valid = "valid"
     invalid = "invalid"
 
@@ -4118,6 +4168,10 @@ class SaveFlowResponse(BaseModel):
     message: Annotated[str, Field(title="Message")]
     """
     Success message
+    """
+    code: Annotated[str | None, Field(title="Code")] = None
+    """
+    The stored source: the request code formatted with Ruff, or the code as given when it could not be formatted
     """
 
 
@@ -6680,7 +6734,7 @@ class ForumPostResponse(BaseModel):
     """
     Assigned project member username
     """
-    status: Annotated[Status5, Field(title="Status")] = Status5.open
+    status: Annotated[Status6, Field(title="Status")] = Status6.open
     """
     Thread workflow status
     """
@@ -7123,7 +7177,7 @@ class MetricCell(BaseModel):
     source: Annotated[str | None, Field(title="Source")] = None
     target: Annotated[str | None, Field(title="Target")] = None
     hops: Annotated[int | None, Field(title="Hops")] = None
-    status: Annotated[Status8, Field(title="Status")]
+    status: Annotated[Status9, Field(title="Status")]
     value: Annotated[float | None, Field(title="Value")] = None
     color: Annotated[str | None, Field(title="Color")] = None
     label: Annotated[str | None, Field(title="Label")] = None
@@ -7228,7 +7282,7 @@ class MetricScriptRevision(BaseModel):
     revision: Annotated[int, Field(title="Revision")]
     source: Annotated[str, Field(title="Source")]
     created_at: Annotated[AwareDatetime, Field(title="Created At")]
-    status: Annotated[Status9, Field(title="Status")]
+    status: Annotated[Status10, Field(title="Status")]
     metrics: Annotated[list[MetricInfo] | None, Field(title="Metrics")] = None
     """
     Catalog of this revision (valid revisions only)
@@ -7245,7 +7299,7 @@ class MetricScriptSummary(BaseModel):
     name: Annotated[str, Field(title="Name")]
     description: Annotated[str, Field(title="Description")]
     visibility: Annotated[Visibility, Field(title="Visibility")]
-    status: Annotated[Status9, Field(title="Status")]
+    status: Annotated[Status10, Field(title="Status")]
     revision: Annotated[int, Field(title="Revision")]
     active_revision: Annotated[int | None, Field(title="Active Revision")]
     metrics: Annotated[list[MetricInfo], Field(title="Metrics")]
@@ -7964,7 +8018,7 @@ class MetricScriptResponse(BaseModel):
     name: Annotated[str, Field(title="Name")]
     description: Annotated[str, Field(title="Description")]
     visibility: Annotated[Visibility, Field(title="Visibility")]
-    status: Annotated[Status9, Field(title="Status")]
+    status: Annotated[Status10, Field(title="Status")]
     revision: Annotated[int, Field(title="Revision")]
     active_revision: Annotated[int | None, Field(title="Active Revision")]
     metrics: Annotated[list[MetricInfo], Field(title="Metrics")]

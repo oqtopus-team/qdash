@@ -11074,6 +11074,91 @@
         }
       }
     },
+    "/flows/format": {
+      "post": {
+        "tags": [
+          "flow"
+        ],
+        "summary": "Format flow source without saving it",
+        "description": "Format Python source with the project's Ruff settings.\n\nThe source is parsed by Ruff, never imported or executed, and nothing is saved. A\nsource that cannot be parsed returns ``syntax_error`` with the input unchanged.",
+        "operationId": "formatFlowSource",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FormatSourceRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FormatSourceResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The source exceeds the formatting size limit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Detail"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The formatter could not run",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Detail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/flows/templates": {
       "get": {
         "tags": [
@@ -17063,6 +17148,91 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/MetricScriptValidateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/metric-scripts/format": {
+      "post": {
+        "tags": [
+          "metric-script"
+        ],
+        "summary": "Format metric script source without saving it",
+        "description": "Format the source with the project's Ruff settings; it is parsed, never executed.",
+        "operationId": "formatMetricScriptSource",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FormatSourceRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FormatSourceResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The source exceeds the formatting size limit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Detail"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The formatter could not run",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Detail"
                 }
               }
             }
@@ -25412,6 +25582,95 @@
         "title": "FlowTemplateWithCode",
         "description": "Flow template with code content."
       },
+      "FormatSourceDiagnostic": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "line": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Line"
+          },
+          "column": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Column"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "title": "FormatSourceDiagnostic",
+        "description": "Why the source could not be formatted."
+      },
+      "FormatSourceRequest": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "maxLength": 524288,
+            "title": "Source",
+            "description": "Python source (≤ 512 KiB)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source"
+        ],
+        "title": "FormatSourceRequest",
+        "description": "Python source to format; nothing is saved or executed."
+      },
+      "FormatSourceResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "formatted",
+              "unchanged",
+              "syntax_error"
+            ],
+            "title": "Status",
+            "description": "formatted: source differs from the input; unchanged: the input is already formatted; syntax_error: the input cannot be parsed and is returned as given"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "Formatted source, or the input on a syntax error"
+          },
+          "diagnostic": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FormatSourceDiagnostic"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Location of the syntax error that prevented formatting"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "source"
+        ],
+        "title": "FormatSourceResponse",
+        "description": "The source formatted with Ruff, or the input unchanged when it cannot be parsed."
+      },
       "ForumCategoryCreate": {
         "properties": {
           "key": {
@@ -32776,6 +33035,18 @@
             "type": "string",
             "title": "Message",
             "description": "Success message"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code",
+            "description": "The stored source: the request code formatted with Ruff, or the code as given when it could not be formatted"
           }
         },
         "type": "object",

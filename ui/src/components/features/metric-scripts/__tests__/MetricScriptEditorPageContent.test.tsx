@@ -5,18 +5,33 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { PageContextProvider } from "@/contexts/ChatDockContext";
 
+import { createFakeEditor, createFakeMonaco, deferred } from "@/lib/__tests__/fakeMonaco";
+import type { FormatSourceResponse } from "@/schemas";
+
 import { MetricScriptEditorPageContent } from "../MetricScriptEditorPageContent";
 import { evaluateResponse, qubitCell } from "./fixtures";
 import { scriptResponse, SOURCE } from "./scriptFixtures";
 
+const plainEditor = () => ({
+  revealLineInCenter: vi.fn(),
+  setPosition: vi.fn(),
+  focus: vi.fn(),
+  getModel: () => ({ id: "model" }) as unknown,
+});
+
 const mocks = vi.hoisted(() => ({
   script: null as unknown,
-  editor: {
-    revealLineInCenter: vi.fn(),
-    setPosition: vi.fn(),
-    focus: vi.fn(),
-    getModel: () => ({ id: "model" }),
+  // The editor handed to onMount; format tests use a fake with a model and Format Document.
+  editor: null as unknown as {
+    revealLineInCenter: (line: number) => void;
+    setPosition: (position: unknown) => void;
+    focus: () => void;
+    getModel: () => unknown;
   },
+  monacoLanguages: undefined as unknown,
+  // The mounted editor's onChange, so the fake editor's edits reach the page.
+  editorOnChange: undefined as ((value?: string) => void) | undefined,
+  formatSource: vi.fn(),
   setModelMarkers: vi.fn(),
   editorMounted: vi.fn(),
   validate: vi.fn(),
@@ -25,7 +40,7 @@ const mocks = vi.hoisted(() => ({
   previewResult: null as unknown,
   mutateAsync: vi.fn(),
   provider: null as PageContextProvider | null,
-  toast: { success: vi.fn(), warning: vi.fn(), error: vi.fn() },
+  toast: { success: vi.fn(), warning: vi.fn(), error: vi.fn(), info: vi.fn() },
 }));
 
 vi.mock("next/navigation", () => ({
@@ -49,10 +64,12 @@ vi.mock("next/dynamic", () => ({
       useEffect(() => {
         mocks.editorMounted();
       }, []);
+      mocks.editorOnChange = onChange;
       useEffect(() => {
         onMount?.(mocks.editor, {
           editor: { remeasureFonts: () => undefined, setModelMarkers: mocks.setModelMarkers },
           MarkerSeverity: { Error: 8 },
+          languages: mocks.monacoLanguages,
         });
       }, [onMount]);
       return (
@@ -109,6 +126,8 @@ vi.mock("@/client/metric-script/metric-script", async () => {
     },
     useEvaluateMetricScript: idle,
     useCopyMetricScript: idle,
+    formatMetricScriptSource: (body: { source: string }) =>
+      Promise.resolve(mocks.formatSource(body)).then((data) => ({ data })),
   };
 });
 
@@ -162,6 +181,8 @@ describe("MetricScriptEditorPageContent", () => {
   beforeEach(() => {
     mocks.script = scriptResponse();
     mocks.provider = null;
+    mocks.editor = plainEditor();
+    mocks.monacoLanguages = undefined;
   });
 
   afterEach(() => {
@@ -277,6 +298,154 @@ describe("MetricScriptEditorPageContent", () => {
         data: expect.objectContaining({ source: `${SOURCE}# more\n`, expected_revision: 3 }),
       }),
     );
+  });
+
+  describe("formatting", () => {
+    const FORMATTED = `${SOURCE}\n# formatted\n`;
+    let fakeEditor: ReturnType<typeof createFakeEditor>;
+
+    beforeEach(() => {
+      const fake = createFakeMonaco();
+      fakeEditor = createFakeEditor(fake, SOURCE, {
+        onChange: (text) => act(() => mocks.editorOnChange?.(text)),
+      });
+      mocks.editor = { ...plainEditor(), ...fakeEditor };
+      mocks.monacoLanguages = fake.monaco.languages;
+    });
+
+    async function renderLoaded() {
+      renderPage();
+      await waitFor(() => expect(screen.getByLabelText("Code")).toHaveValue(SOURCE));
+    }
+
+    it("formats the draft with Format without saving, validating or running it", async () => {
+      mocks.formatSource.mockResolvedValue({ status: "formatted", source: FORMATTED });
+      await renderLoaded();
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Format" }));
+      });
+
+      expect(mocks.formatSource).toHaveBeenCalledWith({ source: SOURCE });
+      expect(screen.getByLabelText("Code")).toHaveValue(FORMATTED);
+      expect(screen.getByTestId("script-status")).toHaveTextContent("Unsaved changes");
+      expect(mocks.mutateAsync).not.toHaveBeenCalled();
+      expect(mocks.validate).not.toHaveBeenCalled();
+      expect(mocks.draftEvaluate).not.toHaveBeenCalled();
+      // The formatting is one undoable edit.
+      act(() => fakeEditor.undo());
+      expect(screen.getByLabelText("Code")).toHaveValue(SOURCE);
+    });
+
+    it("keeps a draft that cannot be parsed and says why", async () => {
+      mocks.formatSource.mockResolvedValue({
+        status: "syntax_error",
+        source: SOURCE,
+        diagnostic: { message: "Expected an expression", line: 5, column: 12 },
+      } satisfies FormatSourceResponse);
+      await renderLoaded();
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Format" }));
+      });
+
+      expect(screen.getByLabelText("Code")).toHaveValue(SOURCE);
+      expect(mocks.toast.error).toHaveBeenCalledWith("Could not format the script", {
+        description: "Line 5:12: Expected an expression",
+      });
+    });
+
+    it("saves the formatted text the editor shows", async () => {
+      mocks.formatSource.mockResolvedValue({ status: "formatted", source: FORMATTED });
+      mocks.mutateAsync.mockResolvedValue({
+        data: scriptResponse({ revision: 4, source: FORMATTED }),
+      });
+      await renderLoaded();
+
+      await act(async () => {
+        fireEvent.keyDown(window, { key: "s", metaKey: true });
+      });
+
+      await waitFor(() =>
+        expect(mocks.mutateAsync).toHaveBeenCalledWith(
+          expect.objectContaining({ data: expect.objectContaining({ source: FORMATTED }) }),
+        ),
+      );
+      expect(screen.getByLabelText("Code")).toHaveValue(FORMATTED);
+      await waitFor(() =>
+        expect(screen.getByTestId("script-status")).not.toHaveTextContent("Unsaved changes"),
+      );
+    });
+
+    it("saves a draft that cannot be parsed as written", async () => {
+      const broken = "def broken(:\n";
+      mocks.formatSource.mockResolvedValue({ status: "syntax_error", source: broken });
+      mocks.mutateAsync.mockResolvedValue({
+        data: scriptResponse({ revision: 4, status: "invalid", source: broken }),
+      });
+      await renderLoaded();
+      act(() => fakeEditor.type(broken));
+
+      await act(async () => {
+        fireEvent.keyDown(window, { key: "s", metaKey: true });
+      });
+
+      await waitFor(() =>
+        expect(mocks.mutateAsync).toHaveBeenCalledWith(
+          expect.objectContaining({ data: expect.objectContaining({ source: broken }) }),
+        ),
+      );
+      expect(screen.getByLabelText("Code")).toHaveValue(broken);
+    });
+
+    it("does not save a draft edited while it was being formatted", async () => {
+      const answer = deferred<FormatSourceResponse>();
+      mocks.formatSource.mockReturnValue(answer.promise);
+      await renderLoaded();
+
+      await act(async () => {
+        fireEvent.keyDown(window, { key: "s", metaKey: true });
+      });
+      expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+      act(() => fakeEditor.type(`${SOURCE}# newer\n`));
+      await act(async () => {
+        answer.resolve({ status: "formatted", source: FORMATTED });
+      });
+
+      expect(mocks.mutateAsync).not.toHaveBeenCalled();
+      expect(screen.getByLabelText("Code")).toHaveValue(`${SOURCE}# newer\n`);
+      expect(mocks.toast.warning).toHaveBeenCalledWith(
+        "Not saved: the script changed while it was being formatted",
+        expect.anything(),
+      );
+    });
+
+    it("saves unformatted when the formatter fails and shows the stored source", async () => {
+      const draft = `${SOURCE}x=1\n`;
+      const stored = `${SOURCE}x = 1\n`;
+      mocks.formatSource.mockRejectedValue({
+        response: { data: { detail: "Formatting failed: busy" } },
+      });
+      mocks.mutateAsync.mockResolvedValue({
+        data: scriptResponse({ revision: 4, source: stored }),
+      });
+      await renderLoaded();
+      act(() => fakeEditor.type(draft));
+
+      await act(async () => {
+        fireEvent.keyDown(window, { key: "s", metaKey: true });
+      });
+
+      await waitFor(() =>
+        expect(mocks.mutateAsync).toHaveBeenCalledWith(
+          expect.objectContaining({ data: expect.objectContaining({ source: draft }) }),
+        ),
+      );
+      expect(mocks.toast.warning).toHaveBeenCalledWith("Saving without formatting", {
+        description: "Formatting failed: busy",
+      });
+      await waitFor(() => expect(screen.getByLabelText("Code")).toHaveValue(stored));
+    });
   });
 
   describe("on a narrow screen", () => {

@@ -485,11 +485,9 @@ def flow_service_on_tmp(tmp_path, monkeypatch):
     """Route /flows saves to a real flow service on a temporary flow tree."""
     from qdash.api.dependencies import get_flow_repository, get_flow_service
     from qdash.api.main import app
-    from qdash.api.services.flow_service import service as flow_service_module
     from qdash.api.services.flow_service.service import FlowService
     from qdash.api.services.flow_service.source_store import FlowSourceStore
 
-    monkeypatch.setattr(flow_service_module, "format_with_ruff", lambda _path: None)
     deployment = _RecordingDeploymentClient()
     store = FlowSourceStore(tmp_path / "user_flows")
     previous_overrides = app.dependency_overrides.copy()
@@ -566,6 +564,93 @@ class TestFlowCreateOnly:
         assert after is not None
         assert after.chip_id == "chip-2"
         assert Path(after.file_path).read_text(encoding="utf-8").endswith("# edited\n")
+
+
+UNFORMATTED_FLOW = "from prefect import flow\n@flow\ndef first_calibration( ):\n  pass\n"
+
+
+class TestFlowFormat:
+    """Formatting flow source formats data only; saves store the formatted source."""
+
+    def test_format_returns_the_formatted_source_and_saves_nothing(
+        self, test_client, test_project, auth_headers, flow_service_on_tmp
+    ):
+        response = test_client.post(
+            "/flows/format", json={"source": UNFORMATTED_FLOW}, headers=auth_headers
+        )
+
+        assert response.status_code == 200
+        assert response.json() == {"status": "formatted", "source": FLOW_SOURCE, "diagnostic": None}
+        assert FlowDocument.find_by_project_and_name("test_project", "first_calibration") is None
+        assert not flow_service_on_tmp.store.exists(
+            flow_service_on_tmp.store.path_for("test_project", "first_calibration")
+        )
+        assert flow_service_on_tmp.deployment.calls == []
+
+    def test_format_reports_a_syntax_error_with_the_input(
+        self, test_client, test_project, auth_headers
+    ):
+        source = "from prefect import flow\n\ndef broken(:\n"
+
+        response = test_client.post("/flows/format", json={"source": source}, headers=auth_headers)
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["status"] == "syntax_error"
+        assert body["source"] == source
+        assert body["diagnostic"]["line"] == 3
+
+    def test_format_reports_an_unavailable_formatter(
+        self, test_client, test_project, auth_headers, monkeypatch
+    ):
+        from qdash.api.lib import python_format
+
+        def unavailable(_source):
+            raise python_format.FormatterUnavailableError("Formatting took longer than 10 s")
+
+        monkeypatch.setattr(
+            "qdash.api.services.source_format_service.format_python_source", unavailable
+        )
+
+        response = test_client.post(
+            "/flows/format", json={"source": "x = 1\n"}, headers=auth_headers
+        )
+
+        assert response.status_code == 503
+        assert "longer than" in response.json()["detail"]
+
+    def test_format_requires_an_editor(self, test_client, test_project):
+        payload = {"source": "x = 1\n"}
+
+        assert test_client.post("/flows/format", json=payload).status_code == 401
+        assert (
+            test_client.post("/flows/format", json=payload, headers=_viewer_headers()).status_code
+            == 403
+        )
+
+    def test_save_validates_stores_and_returns_the_formatted_source(
+        self, test_client, test_project, auth_headers, flow_service_on_tmp
+    ):
+        body = {"name": "first_calibration", "code": UNFORMATTED_FLOW, "chip_id": "chip-1"}
+
+        response = test_client.post("/flows", json=body, headers=auth_headers)
+
+        assert response.status_code == 200
+        assert response.json()["code"] == FLOW_SOURCE
+        stored = FlowDocument.find_by_project_and_name("test_project", "first_calibration")
+        assert stored is not None
+        assert Path(stored.file_path).read_text(encoding="utf-8") == FLOW_SOURCE
+
+    def test_save_still_rejects_a_syntax_error(
+        self, test_client, test_project, auth_headers, flow_service_on_tmp
+    ):
+        body = {"name": "first_calibration", "code": "def broken(:\n", "chip_id": "chip-1"}
+
+        response = test_client.post("/flows", json=body, headers=auth_headers)
+
+        assert response.status_code == 400
+        assert "syntax error" in response.json()["detail"]
+        assert flow_service_on_tmp.deployment.calls == []
 
 
 MANUAL_FLOW = """

@@ -5,6 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { SaveFlowResponseCode } from './saveFlowResponseCode';
 
 /**
  * Response after saving a flow.
@@ -16,4 +17,6 @@ export interface SaveFlowResponse {
   file_path: string;
   /** Success message */
   message: string;
+  /** The stored source: the request code formatted with Ruff, or the code as given when it could not be formatted */
+  code?: SaveFlowResponseCode;
 }
