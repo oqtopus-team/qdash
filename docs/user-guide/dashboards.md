@@ -92,8 +92,15 @@ applies. A metric panel shows one metric on the chip topology or in a table:
    kept. The section opens by itself when the panel already has parameter values.
 6. Select **Apply** (or **Add panel**).
 
-Each panel sits on a 12-column grid. Use the panel menu to move it, make it wider or narrower,
-taller or shorter, duplicate it, or remove it. On a narrow screen every panel spans the full width.
+Each panel sits on a 12-column grid. In edit mode, drag a panel by its header to move it, and
+drag a bottom corner to resize it; panels in the way move down, and the outline shows where the
+panel lands. From the keyboard, focus the grip at the left of the header (**Move** and the panel
+title) and use the arrow keys to move the panel one cell, or Shift and the arrow keys to resize
+it. The panel menu also moves and resizes a panel, duplicates it, or removes it. A panel is at
+most 12 rows tall. When the dashboard area is narrow, for example on a phone or with the
+**Ask Agent** sidebar wide open, panels stack at full width in reading order; dragging is
+unavailable there, but the panel menu still works, and the stored layout changes only when you
+move or resize a panel.
 
 On your own dashboard, select **Edit with Agent** to open the **Ask Agent** sidebar with the dashboard,
 the chip it shows, and its current panels, unsaved changes included. On a dashboard without

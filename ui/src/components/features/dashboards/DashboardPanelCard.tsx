@@ -1,6 +1,6 @@
 "use client";
 
-import type { CSSProperties } from "react";
+import { type KeyboardEvent, memo, useId } from "react";
 
 import {
   ArrowDown,
@@ -11,6 +11,7 @@ import {
   EllipsisVertical,
   FoldHorizontal,
   FoldVertical,
+  GripVertical,
   Pencil,
   Trash2,
   UnfoldHorizontal,
@@ -27,7 +28,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/DropdownMenu";
 
-import { canApplyLayoutAction, type LayoutAction, panelHeightPx } from "./layout";
+import {
+  canApplyLayoutAction,
+  DRAG_GRIP_CLASS,
+  DRAG_HANDLE_CLASS,
+  type LayoutAction,
+} from "./layout";
 import { panelTypeMeta, readMarkdownContent, readMetricConfig } from "./panelConfig";
 import { MarkdownPanel } from "./panels/MarkdownPanel";
 import { CouplingMetricPanel, QubitMetricPanel } from "./panels/MetricPanels";
@@ -50,6 +56,14 @@ const LAYOUT_ITEMS: ReadonlyArray<{
   { action: "taller", label: "Taller", icon: UnfoldVertical },
   { action: "shorter", label: "Shorter", icon: FoldVertical },
 ];
+
+/** Arrow keys on the grip move a panel one cell; with Shift they resize it. */
+const GRIP_KEYS: Record<string, { move: LayoutAction; resize: LayoutAction }> = {
+  ArrowLeft: { move: "left", resize: "narrower" },
+  ArrowRight: { move: "right", resize: "wider" },
+  ArrowUp: { move: "up", resize: "shorter" },
+  ArrowDown: { move: "down", resize: "taller" },
+};
 
 function PanelBody({
   panel,
@@ -111,20 +125,24 @@ interface DashboardPanelCardProps {
   chipId: string;
   topologyId: string;
   editing: boolean;
+  /** Whether the header drags the panel; only in edit mode on the full grid. */
+  dragEnabled?: boolean;
   onCommand: (panelId: string, command: PanelCommand) => void;
   /** A template preview's starter script for a `metric_script` panel; see MetricScriptPanel. */
   starterScript?: { name: string; source: string };
 }
 
 /**
- * One panel on the 12-column grid. From `md` up it sits at its stored
- * position; below that panels stack full width in reading order.
+ * One panel, filling the grid cell that `DashboardGrid` sizes and positions. In edit mode
+ * the header holds the panel menu and, on the full grid, a grip: the header drags the panel,
+ * and the grip moves it with the arrow keys and resizes it with Shift and the arrow keys.
  */
-export function DashboardPanelCard({
+export const DashboardPanelCard = memo(function DashboardPanelCard({
   panel,
   chipId,
   topologyId,
   editing,
+  dragEnabled = false,
   onCommand,
   starterScript,
 }: DashboardPanelCardProps) {
@@ -132,24 +150,47 @@ export function DashboardPanelCard({
   const meta = panelTypeMeta(panel.type);
   const Icon = meta.icon;
   const title = panel.title || meta.label;
-  const style = {
-    "--panel-col": `${x + 1} / span ${w}`,
-    "--panel-row": `${y + 1} / span ${h}`,
-    "--panel-height": `${panelHeightPx(h)}px`,
-  } as CSSProperties;
+  const hintId = useId();
+
+  const handleGripKey = (event: KeyboardEvent<HTMLButtonElement>) => {
+    const step = GRIP_KEYS[event.key];
+    if (!step || event.altKey || event.ctrlKey || event.metaKey) return;
+    event.preventDefault();
+    const action = event.shiftKey ? step.resize : step.move;
+    if (canApplyLayoutAction(panel.layout, action)) onCommand(panel.panel_id, action);
+  };
 
   return (
     <section
       aria-label={title}
       data-panel-id={panel.panel_id}
-      style={style}
-      className={`card card-border card-sm h-[var(--panel-height)] min-w-0 bg-base-100 md:h-auto md:[grid-column:var(--panel-col)] md:[grid-row:var(--panel-row)] ${
+      className={`card card-border card-sm h-full min-w-0 bg-base-100 ${
         editing ? "border-primary/30" : ""
       }`}
     >
       <div className="card-body min-h-0 gap-2 p-3">
-        <header className="flex min-h-8 items-center gap-2">
-          <Icon className="h-4 w-4 shrink-0 text-base-content/60" aria-hidden="true" />
+        <header
+          className={`flex min-h-8 items-center gap-2 ${
+            dragEnabled ? `${DRAG_HANDLE_CLASS} cursor-grab select-none` : ""
+          }`}
+        >
+          {dragEnabled ? (
+            <button
+              type="button"
+              className={`${DRAG_GRIP_CLASS} btn btn-ghost btn-xs btn-square -ml-1 cursor-grab text-base-content/60`}
+              aria-label={`Move ${title}`}
+              aria-describedby={hintId}
+              onKeyDown={handleGripKey}
+            >
+              <GripVertical className="h-4 w-4" aria-hidden="true" />
+              <span id={hintId} className="sr-only">
+                Drag the header to move the panel and a bottom corner to resize it. Arrow keys move
+                it one cell; Shift with the arrow keys resizes it.
+              </span>
+            </button>
+          ) : (
+            <Icon className="h-4 w-4 shrink-0 text-base-content/60" aria-hidden="true" />
+          )}
           <h2 className="card-title min-w-0 flex-1 truncate text-sm">{title}</h2>
           {editing && (
             <>
@@ -220,4 +261,4 @@ export function DashboardPanelCard({
       </div>
     </section>
   );
-}
+});

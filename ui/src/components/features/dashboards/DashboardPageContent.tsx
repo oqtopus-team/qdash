@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -37,7 +37,13 @@ import {
   useUpdateDashboard,
 } from "@/client/dashboard/dashboard";
 import { useListMetricScripts } from "@/client/metric-script/metric-script";
-import type { DashboardResponse, DashboardUpdateRequest, DashboardPanelResponse } from "@/schemas";
+import type {
+  DashboardResponse,
+  DashboardUpdateRequest,
+  DashboardPanelResponse,
+  PanelLayoutModel,
+  TemplatePreviewPanel,
+} from "@/schemas";
 import { ChipSelector } from "@/components/selectors/ChipSelector";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
@@ -73,8 +79,16 @@ import {
   toPanelModel,
 } from "./dashboardDraft";
 import { DashboardFormDialog, type DashboardFormValues } from "./DashboardFormDialog";
+import { DashboardGrid } from "./DashboardGrid";
 import { DashboardPanelCard, type PanelCommand } from "./DashboardPanelCard";
-import { applyLayoutAction, nextPanelLayout, resolveCollisions, sortPanels } from "./layout";
+import {
+  applyLayoutAction,
+  clampLayout,
+  nextPanelLayout,
+  resolveCollisions,
+  sameLayout,
+  sortPanels,
+} from "./layout";
 import { type PanelDraft, PanelEditorDialog } from "./PanelEditorDialog";
 import { readMetricScriptConfig } from "./panelConfig";
 import { VisibilityLabel } from "./VisibilityLabel";
@@ -87,6 +101,8 @@ function newPanelId(): string {
   }
   return `panel-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
+
+function ignorePanelCommand() {}
 
 function panelsEqual(a: readonly DashboardPanelResponse[], b: readonly DashboardPanelResponse[]) {
   return JSON.stringify(a) === JSON.stringify(b);
@@ -499,7 +515,8 @@ export function DashboardPageContent({ dashboardId }: { dashboardId: string | nu
     );
   };
 
-  const handlePanelCommand = (panelId: string, command: PanelCommand) => {
+  // Stable, so memoized panel cards and the grid do not re-render on every page render.
+  const handlePanelCommand = useCallback((panelId: string, command: PanelCommand) => {
     if (command === "edit") {
       setEditorPanelId(panelId);
       setEditorOpen(true);
@@ -537,7 +554,55 @@ export function DashboardPageContent({ dashboardId }: { dashboardId: string | nu
       );
       return resolveCollisions(moved, panelId);
     });
-  };
+  }, []);
+
+  /**
+   * A drag or resize that ended on a new cell. It takes the same path as a menu or keyboard
+   * step: clamp into the grid, then push the panels it covers down, so every edit leaves the
+   * draft in one canonical shape that Save sends as is.
+   */
+  const handleLayoutCommit = useCallback((panelId: string, layout: PanelLayoutModel) => {
+    setDraft((current) => {
+      const panel = current.find((entry) => entry.panel_id === panelId);
+      const next = clampLayout(layout);
+      if (!panel || sameLayout(panel.layout, next)) return current;
+      const moved = current.map((entry) =>
+        entry.panel_id === panelId ? { ...entry, layout: next } : entry,
+      );
+      return resolveCollisions(moved, panelId);
+    });
+  }, []);
+
+  const renderPanel = useCallback(
+    (panel: DashboardPanelResponse, dragEnabled: boolean) => (
+      <DashboardPanelCard
+        panel={panel}
+        chipId={chipId}
+        topologyId={topologyId}
+        editing={editing}
+        dragEnabled={dragEnabled}
+        onCommand={handlePanelCommand}
+      />
+    ),
+    [chipId, topologyId, editing, handlePanelCommand],
+  );
+
+  // A template preview is read-only: no menus, no dragging, starter scripts run as drafts.
+  const renderPreviewPanel = useCallback(
+    (panel: TemplatePreviewPanel) => (
+      <DashboardPanelCard
+        panel={panel}
+        chipId={chipId}
+        topologyId={topologyId}
+        editing={false}
+        onCommand={ignorePanelCommand}
+        starterScript={
+          panel.script_template_id ? starterScripts.get(panel.script_template_id) : undefined
+        }
+      />
+    ),
+    [chipId, topologyId, starterScripts],
+  );
 
   const handleEditorSave = (panelDraft: PanelDraft) => {
     setDraft((current) => {
@@ -909,27 +974,12 @@ export function DashboardPageContent({ dashboardId }: { dashboardId: string | nu
               )}
             </div>
           ) : (
-            <div
-              className="grid grid-cols-1 gap-4 md:auto-rows-[120px] md:grid-cols-12"
+            <DashboardGrid
               data-testid="template-preview-grid"
-            >
-              {previewPanels.map((panel) => {
-                const starter = panel.script_template_id
-                  ? starterScripts.get(panel.script_template_id)
-                  : undefined;
-                return (
-                  <DashboardPanelCard
-                    key={panel.panel_id}
-                    panel={panel}
-                    chipId={chipId}
-                    topologyId={topologyId}
-                    editing={false}
-                    onCommand={() => {}}
-                    starterScript={starter}
-                  />
-                );
-              })}
-            </div>
+              panels={previewPanels}
+              editable={false}
+              renderPanel={renderPreviewPanel}
+            />
           )}
         </div>
       ) : orderedPanels.length === 0 ? (
@@ -969,21 +1019,13 @@ export function DashboardPageContent({ dashboardId }: { dashboardId: string | nu
           }
         />
       ) : (
-        <div
-          className="grid grid-cols-1 gap-4 md:auto-rows-[120px] md:grid-cols-12"
+        <DashboardGrid
           data-testid="dashboard-grid"
-        >
-          {orderedPanels.map((panel) => (
-            <DashboardPanelCard
-              key={panel.panel_id}
-              panel={panel}
-              chipId={chipId}
-              topologyId={topologyId}
-              editing={editing}
-              onCommand={handlePanelCommand}
-            />
-          ))}
-        </div>
+          panels={orderedPanels}
+          editable={editing && mayEdit}
+          renderPanel={renderPanel}
+          onLayoutCommit={handleLayoutCommit}
+        />
       )}
 
       {mayEdit && (
