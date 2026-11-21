@@ -27,6 +27,7 @@ import type {
 import type {
   CustomDashboardCreateRequest,
   CustomDashboardResponse,
+  CustomDashboardTemplatePreviewResponse,
   CustomDashboardUpdateRequest,
   HTTPValidationError,
   ListCustomDashboardTemplatesResponse,
@@ -296,6 +297,102 @@ export function useListCustomDashboardTemplates<TData = Awaited<ReturnType<typeo
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getListCustomDashboardTemplatesQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
+ * Return the panels a dashboard created from the template now would hold.
+ *
+ * Nothing is created: script panels point at the shared script creation would reuse, or,
+ * when the project has none yet, name the starter script creation would add.
+ * @summary Preview the panels a starter template would create
+ */
+export const previewCustomDashboardTemplate = (
+    templateId: string,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<CustomDashboardTemplatePreviewResponse>(
+      {url: `/custom-dashboards/templates/${templateId}/preview`, method: 'GET', signal
+    },
+      options);
+    }
+
+
+
+
+export const getPreviewCustomDashboardTemplateQueryKey = (templateId: string,) => {
+    return [
+    `/custom-dashboards/templates/${templateId}/preview`
+    ] as const;
+    }
+
+
+export const getPreviewCustomDashboardTemplateQueryOptions = <TData = Awaited<ReturnType<typeof previewCustomDashboardTemplate>>, TError = HTTPValidationError>(templateId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof previewCustomDashboardTemplate>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getPreviewCustomDashboardTemplateQueryKey(templateId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof previewCustomDashboardTemplate>>> = ({ signal }) => previewCustomDashboardTemplate(templateId, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: templateId !== null && templateId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof previewCustomDashboardTemplate>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type PreviewCustomDashboardTemplateQueryResult = NonNullable<Awaited<ReturnType<typeof previewCustomDashboardTemplate>>>
+export type PreviewCustomDashboardTemplateQueryError = HTTPValidationError
+
+
+export function usePreviewCustomDashboardTemplate<TData = Awaited<ReturnType<typeof previewCustomDashboardTemplate>>, TError = HTTPValidationError>(
+ templateId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof previewCustomDashboardTemplate>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof previewCustomDashboardTemplate>>,
+          TError,
+          Awaited<ReturnType<typeof previewCustomDashboardTemplate>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function usePreviewCustomDashboardTemplate<TData = Awaited<ReturnType<typeof previewCustomDashboardTemplate>>, TError = HTTPValidationError>(
+ templateId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof previewCustomDashboardTemplate>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof previewCustomDashboardTemplate>>,
+          TError,
+          Awaited<ReturnType<typeof previewCustomDashboardTemplate>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function usePreviewCustomDashboardTemplate<TData = Awaited<ReturnType<typeof previewCustomDashboardTemplate>>, TError = HTTPValidationError>(
+ templateId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof previewCustomDashboardTemplate>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Preview the panels a starter template would create
+ */
+
+export function usePreviewCustomDashboardTemplate<TData = Awaited<ReturnType<typeof previewCustomDashboardTemplate>>, TError = HTTPValidationError>(
+ templateId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof previewCustomDashboardTemplate>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getPreviewCustomDashboardTemplateQueryOptions(templateId,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

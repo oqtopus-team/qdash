@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { Copy, Plus, Trash2 } from "lucide-react";
+import { Bot, Copy, Plus, Trash2 } from "lucide-react";
 import { parseAsStringLiteral, useQueryState } from "nuqs";
 
 import {
@@ -27,10 +27,12 @@ import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { useToast } from "@/components/ui/Toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { useOptionalChatDock } from "@/contexts/ChatDockContext";
 import { useProject } from "@/contexts/ProjectContext";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
 import { formatDateTime, formatRelativeTime } from "@/lib/utils/datetime";
 
+import { NEW_DASHBOARD_PATH } from "./dashboardDraft";
 import { DashboardFormDialog, type DashboardFormValues } from "./DashboardFormDialog";
 import { VisibilityLabel } from "./VisibilityLabel";
 
@@ -155,6 +157,7 @@ export function CustomDashboardListPageContent() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { canEdit } = useProject();
+  const dock = useOptionalChatDock();
   const [tab, setTab] = useQueryState("tab", parseAsStringLiteral(TABS).withDefault("dashboards"));
   const [newScriptOpen, setNewScriptOpen] = useState(false);
 
@@ -251,18 +254,33 @@ export function CustomDashboardListPageContent() {
     />
   );
 
+  // Creating with the Agent opens an unsaved draft beside the Agent panel; nothing is sent or
+  // saved until the user asks and then saves. The form below stays for a manual start.
+  const createWithAi = () => {
+    router.push(NEW_DASHBOARD_PATH);
+    dock?.openGeneralChat();
+  };
+
   const newButton = canEdit ? (
-    <button
-      type="button"
-      className="btn btn-primary btn-sm"
-      onClick={() => {
-        setCreateError(null);
-        setCreateOpen(true);
-      }}
-    >
-      <Plus data-icon="inline-start" aria-hidden="true" />
-      New dashboard
-    </button>
+    <div className="flex flex-wrap items-center gap-2">
+      {dock && (
+        <button type="button" className="btn btn-primary btn-sm" onClick={createWithAi}>
+          <Bot data-icon="inline-start" aria-hidden="true" />
+          Create with AI
+        </button>
+      )}
+      <button
+        type="button"
+        className={`btn btn-sm ${dock ? "btn-ghost" : "btn-primary"}`}
+        onClick={() => {
+          setCreateError(null);
+          setCreateOpen(true);
+        }}
+      >
+        <Plus data-icon="inline-start" aria-hidden="true" />
+        New dashboard
+      </button>
+    </div>
   ) : null;
 
   const newScriptButton = canEdit ? (
@@ -333,7 +351,9 @@ export function CustomDashboardListPageContent() {
             title="No dashboards yet"
             description={
               canEdit
-                ? "Create a dashboard and add metric and note panels"
+                ? dock
+                  ? "Describe a dashboard to the Agent, or start one yourself from a template"
+                  : "Create a dashboard and add metric and note panels"
                 : "Dashboards that project members share will appear here"
             }
             action={newButton}

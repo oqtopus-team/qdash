@@ -35,7 +35,7 @@ shows only what QDash knows and sends; a general chat on the **Agent** page show
 | --- | --- | --- |
 | **Result** | The chat is about one task result | The task, qubit, and chip saved with this chat; every message names them |
 | **Investigating** | The chat investigates a failure | The failed execution, with the task, qubit, and chip when known, saved with this chat |
-| **Page** | You chat from the **Ask AI** sidebar or the floating window | The page you have open now; it follows you as you navigate, and adds **with editor code** on the **Workflow** editor and the metric script editor |
+| **Page** | You chat from the **Ask AI** sidebar or the floating window | The page you have open now; it follows you as you navigate, and adds **with editor code** on the **Workflow** editor and the metric script editor, and **with dashboard draft** on a dashboard you can edit |
 
 Hover over an item for its full details. The link icon on **Result** or **Investigating** opens
 the execution. The saved result or investigation cannot be removed from a chat; start a general
@@ -129,6 +129,12 @@ The metric script editor works the same way: the assistant sees the script as it
 editor, checks its changes by validating and previewing the draft, and proposes them as a diff
 that **Apply to editor** puts into the editor of that script. See
 [Write a Script with the Agent](./metric-scripts.md#write-a-script-with-the-agent).
+
+On a dashboard you can edit, and on a new dashboard from **Create with AI**, the assistant sees
+the unsaved draft and proposes a new one as a diff. **Apply to draft** puts it on the page;
+**Save** on the page stores it. The empty chat there suggests dashboard requests, and nothing is
+sent until you pick one or type your own. See
+[Create a Dashboard with the Agent](./custom-dashboards.md#create-a-dashboard-with-the-agent).
 
 ### Calculations and Scripts
 

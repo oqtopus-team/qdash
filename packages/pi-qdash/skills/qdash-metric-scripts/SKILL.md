@@ -120,6 +120,27 @@ editor's current text (saved or not) is in the prompt. Work on that text:
 - Do not call `qdash_save_metric_script` for that script unless the user asks you to save; a
   save from the Agent would replace the draft in front of them.
 
+## When a dashboard is open
+
+If the page context says the user has a custom dashboard open that they may edit, or is
+composing a new one, the dashboard's unsaved draft is in the prompt as JSON. Work on that draft:
+
+- Change it with `propose_code_edit` and the complete new draft as JSON. The user sees a diff,
+  applies it to the page's draft, reviews the panels and saves when ready.
+- Always send the `panels` list, every panel included; a draft without it is refused. For a new
+  dashboard that starts from a starter template, set `template_id` and `panels: []`: the page
+  previews the template's panels, and Save creates the dashboard with them.
+- Keep each unchanged panel's `panel_id` and pinned `script_revision`; move a pin only when the
+  user asks.
+- A `metric_script` panel references a saved script and revision. When no saved script computes
+  what the user asked for, write and preview one as in the authoring workflow, save it with
+  `qdash_save_metric_script` (a confirmation-gated write), and only then propose a panel that
+  references it. A draft never creates a script on its own; the one exception is a starter
+  template, whose shared script QDash adds when the user saves the dashboard, as the page tells
+  them before they save.
+- Do not call `qdash_save_custom_dashboard` for that dashboard unless the user asks you to save,
+  and never change its sharing.
+
 ## Limits and failures
 
 Scripts can import only `numpy`, `scipy`, `math`, `statistics` and `qdash_metrics`;

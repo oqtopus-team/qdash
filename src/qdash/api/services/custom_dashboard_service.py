@@ -30,14 +30,18 @@ from uuid import uuid4
 from pydantic import BaseModel, ValidationError
 from starlette.exceptions import HTTPException
 
+from qdash.api.metric_runtime.template_library import TEMPLATES as SCRIPT_TEMPLATES
 from qdash.api.schemas.custom_dashboard import (
     CustomDashboardCreateRequest,
     CustomDashboardResponse,
+    CustomDashboardTemplatePreviewResponse,
     CustomDashboardTemplateResponse,
     CustomDashboardUpdateRequest,
     DashboardPanelResponse,
     ListCustomDashboardsResponse,
     ListCustomDashboardTemplatesResponse,
+    TemplatePreviewPanel,
+    TemplateScriptToCreate,
 )
 from qdash.api.schemas.success import SuccessResponse
 from qdash.api.services.custom_dashboard_templates import (
@@ -363,6 +367,59 @@ class CustomDashboardService:
     def list_templates(self) -> ListCustomDashboardTemplatesResponse:
         return ListCustomDashboardTemplatesResponse(
             templates=[self._template_response(t) for t in TEMPLATES.values()]
+        )
+
+    def preview_template(
+        self, ctx: ProjectContext, template_id: str
+    ) -> CustomDashboardTemplatePreviewResponse:
+        """The panels creating a dashboard from ``template_id`` would copy in now.
+
+        Writes nothing. Script panels are pinned to the shared script creation would reuse;
+        when there is none, they name the starter script creation would add instead.
+        """
+        template = TEMPLATES.get(template_id)
+        if template is None:
+            raise HTTPException(
+                status_code=404, detail=f"Unknown dashboard template '{template_id}'"
+            )
+        found: dict[str, MetricScriptDocument] = {}
+        pins: dict[str, tuple[str, int]] = {}
+        missing: list[str] = []
+        for script_template, metrics in template.script_requirements().items():
+            script = self._script_service.find_template_script(ctx, script_template, metrics)
+            if script is not None and script.active_revision is not None:
+                found[script_template] = script
+                pins[script_template] = (script.script_id, script.active_revision)
+            else:
+                missing.append(script_template)
+        panels = []
+        for blueprint, model in zip(
+            template.panels,
+            instantiate_panels(template, pins, partial=True),
+            strict=True,
+        ):
+            item = TemplatePreviewPanel(**model.model_dump())
+            if blueprint.script_template is not None:
+                script = found.get(blueprint.script_template)
+                if script is None:
+                    item.script_template_id = blueprint.script_template
+                else:
+                    item.script_name = script.name
+                    item.latest_revision = script.active_revision
+            panels.append(item)
+        return CustomDashboardTemplatePreviewResponse(
+            template_id=template.template_id,
+            name=template.name,
+            description=template.description,
+            panels=panels,
+            scripts_to_create=[
+                TemplateScriptToCreate(
+                    template_id=key,
+                    name=SCRIPT_TEMPLATES[key].name,
+                    source=SCRIPT_TEMPLATES[key].source,
+                )
+                for key in missing
+            ],
         )
 
     def create(

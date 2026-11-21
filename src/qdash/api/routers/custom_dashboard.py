@@ -19,6 +19,7 @@ from qdash.api.lib.project import (
 from qdash.api.schemas.custom_dashboard import (
     CustomDashboardCreateRequest,
     CustomDashboardResponse,
+    CustomDashboardTemplatePreviewResponse,
     CustomDashboardUpdateRequest,
     ListCustomDashboardsResponse,
     ListCustomDashboardTemplatesResponse,
@@ -57,6 +58,25 @@ def list_custom_dashboard_templates(
 ) -> ListCustomDashboardTemplatesResponse:
     """Return the templates a new dashboard can copy its panels from."""
     return service.list_templates()
+
+
+@router.get(
+    "/templates/{template_id}/preview",
+    summary="Preview the panels a starter template would create",
+    operation_id="previewCustomDashboardTemplate",
+    response_model=CustomDashboardTemplatePreviewResponse,
+)
+def preview_custom_dashboard_template(
+    template_id: str,
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    service: ServiceDep,
+) -> CustomDashboardTemplatePreviewResponse:
+    """Return the panels a dashboard created from the template now would hold.
+
+    Nothing is created: script panels point at the shared script creation would reuse, or,
+    when the project has none yet, name the starter script creation would add.
+    """
+    return service.preview_template(ctx, template_id)
 
 
 @router.get(

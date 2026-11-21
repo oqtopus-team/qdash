@@ -65,3 +65,48 @@ it("sends the open metric script editor's text with the page", async () => {
     metric_script: { script_id: "ms_1", name: "ZX90", code: "print(1)\n", dirty: true },
   });
 });
+
+it("sends an editable dashboard's draft with the page in the API's shape", async () => {
+  const { result } = renderHook(() => useCopilotChatSessionContext(), { wrapper });
+  await waitFor(() => expect(result.current.isLoadingSessions).toBe(false));
+
+  act(() => {
+    result.current.sendMessage("Add a ZX90 map", {
+      page: {
+        path: "/custom-dashboards/dash-1",
+        title: "Dashboard: Review",
+        dashboard: {
+          dashboardId: "dash-1",
+          name: "Review",
+          description: "",
+          visibility: "private",
+          chipId: "chip-1",
+          version: 3,
+          code: '{"panels":[]}',
+          dirty: false,
+        },
+      },
+    });
+  });
+
+  await waitFor(() =>
+    expect(
+      fetchMock.mock.calls.some(([url, init]) => String(url).endsWith("/stream") && init?.body),
+    ).toBe(true),
+  );
+  const [, init] = fetchMock.mock.calls.find(([url]) => String(url).endsWith("/stream"))!;
+  expect(JSON.parse(String(init.body)).page).toEqual({
+    path: "/custom-dashboards/dash-1",
+    title: "Dashboard: Review",
+    dashboard: {
+      dashboard_id: "dash-1",
+      name: "Review",
+      description: null,
+      visibility: "private",
+      chip_id: "chip-1",
+      version: 3,
+      code: '{"panels":[]}',
+      dirty: false,
+    },
+  });
+});

@@ -92,8 +92,9 @@ export function buildChatRegistry(
       }),
     );
   }
-  // The page the user has open, after their preferences; on the Workflow or
-  // metric script editor it brings the edit tool, which proposes and never saves.
+  // The page the user has open, after their preferences; on the Workflow editor,
+  // the metric script editor or an editable custom dashboard it brings the edit
+  // tool, which proposes and never saves.
   const pageSection = buildPageContextSection(pageContext);
   const editor = editorOf(pageContext);
   if (pageSection) {

@@ -563,6 +563,53 @@ def test_templates_listed_and_copied_on_create(test_client, init_db, runtime):
     assert bad.status_code == 422
 
 
+def test_template_preview_shows_the_panels_and_writes_nothing(test_client, init_db, runtime):
+    owner = _create_project_owner()
+    viewer = _create_project_member(username="dash_viewer", role=ProjectRole.VIEWER)
+    url = "/custom-dashboards/templates/frequency-collision-map/preview"
+
+    # Before any script exists: the panels, the starter script creation would add, no writes.
+    first = test_client.get(url, headers=owner)
+    assert first.status_code == 200, first.text
+    preview = first.json()
+    assert [p["type"] for p in preview["panels"]] == [
+        "qubit_metric",
+        *["metric_script"] * 6,
+        "markdown",
+    ]
+    script_panels = [p for p in preview["panels"] if p["type"] == "metric_script"]
+    assert all("script_id" not in p["config"] for p in script_panels)
+    assert {p["script_template_id"] for p in script_panels} == {"collision"}
+    assert [s["template_id"] for s in preview["scripts_to_create"]] == ["collision"]
+    assert "Type2C" in preview["scripts_to_create"][0]["source"]
+    assert test_client.get(url, headers=viewer).status_code == 200
+    assert test_client.get("/metric-scripts", headers=owner).json()["total"] == 0
+    assert test_client.get("/custom-dashboards", headers=owner).json()["total"] == 0
+
+    # Once the shared script exists, the preview pins the panels as creation would.
+    created = _create(
+        test_client, owner, name="Collisions", panels=[], template_id="frequency-collision-map"
+    )
+    created_script = next(p for p in created["panels"] if p["type"] == "metric_script")
+    again = test_client.get(url, headers=owner).json()
+    assert again["scripts_to_create"] == []
+    pinned = [p for p in again["panels"] if p["type"] == "metric_script"]
+    assert {p["config"]["script_id"] for p in pinned} == {created_script["config"]["script_id"]}
+    assert all(p["config"]["script_revision"] == 1 for p in pinned)
+    assert all(p["script_template_id"] is None for p in pinned)
+    assert all(p["script_name"] == "Frequency collision checks" for p in pinned)
+    # The same panels apart from their freshly minted IDs.
+    same = ("type", "title", "layout", "config")
+    assert [{k: p[k] for k in same} for p in again["panels"]] == [
+        {k: p[k] for k in same} for p in created["panels"]
+    ]
+    assert test_client.get("/metric-scripts", headers=owner).json()["total"] == 1
+    assert test_client.get("/custom-dashboards", headers=owner).json()["total"] == 1
+
+    missing = test_client.get("/custom-dashboards/templates/nope/preview", headers=owner)
+    assert missing.status_code == 404
+
+
 def _pins(script_id: str) -> dict[str, Any]:
     """The pins stored on a script, as plain data."""
     doc = MetricScriptDocument.find_one({"script_id": script_id}).run()

@@ -400,6 +400,20 @@ class MetricScriptService:
         )
         return self._to_response(doc, ctx)
 
+    def find_template_script(
+        self, ctx: ProjectContext, template_id: str, required_metrics: set[str]
+    ) -> MetricScriptDocument | None:
+        """The project's shared script from ``template_id`` that defines ``required_metrics``.
+
+        Reads only; ``ensure_template_script`` reuses the same choice.
+        """
+        for doc in self._repo.find_by_template(project_id=ctx.project_id, template_id=template_id):
+            if doc.visibility != "project" or doc.active_revision is None:
+                continue
+            if required_metrics <= {metric.id for metric in doc.metrics}:
+                return doc
+        return None
+
     def ensure_template_script(
         self, ctx: ProjectContext, template_id: str, required_metrics: set[str]
     ) -> MetricScriptDocument:
@@ -408,11 +422,9 @@ class MetricScriptService:
         A script qualifies when it is project-visible and its active revision still defines
         every metric in ``required_metrics``.
         """
-        for doc in self._repo.find_by_template(project_id=ctx.project_id, template_id=template_id):
-            if doc.visibility != "project" or doc.active_revision is None:
-                continue
-            if required_metrics <= {metric.id for metric in doc.metrics}:
-                return doc
+        existing = self.find_template_script(ctx, template_id, required_metrics)
+        if existing is not None:
+            return existing
         template = TEMPLATES[template_id]
         doc = self.create_document(
             ctx,

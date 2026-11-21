@@ -263,8 +263,8 @@ summary holds no code, so a keystroke in the editor does not rerender the chat.
 On either editor the runtime also offers `propose_code_edit` (`buildProposeCodeEditTool`, for
 the editor `editorOf` finds on the page): the model passes the complete new file and a one-line
 summary, the call ends the turn, and the chat renders an `edit` block (`EditProposalCard`) with a
-diff against what the editor holds now. The proposal carries `target` (`flow` or
-`metric_script`), `pagePath`, and the editor's identity: `flowName` and `chipId` for a flow,
+diff against what the editor holds now. The proposal carries `target` (`flow`,
+`metric_script`, or `dashboard`, described below), `pagePath`, and the editor's identity: `flowName` and `chipId` for a flow,
 `scriptId` and `scriptName` for a script (`flowName` repeats the script name). **Apply to
 editor** replaces the buffer only when the open editor matches (`ui/src/lib/copilotEditTarget.ts`)
 and unlocks the editor; saving stays with the user and goes through the editor's Save, so
@@ -274,6 +274,25 @@ section also tells the model the file is a `qdash_metrics` module, points it to 
 `qdash-metric-scripts` skill, and has it check the draft with `qdash_validate_metric_script` and
 `qdash_preview_metric_script`; `qdash_save_flow` and `qdash_save_metric_script` stay for code
 written from the chat alone or saved at the user's request.
+
+A custom dashboard is the third editor. `CustomDashboardPageContent` registers
+`PageContext.dashboard` (`DashboardEditorContext` in `src/qdash/copilot/contracts/models.py`)
+only when the user may save the dashboard: their own, or a new one on `/custom-dashboards/new`,
+which has no `dashboard_id`. Its "code" is the draft as JSON written by
+`serializeDashboardDraft` (`ui/src/components/features/custom-dashboards/dashboardDraft.ts`):
+`{"panels": [...]}` for a stored dashboard, plus `name`, `description`, `chip_id` and
+`template_id` for a new one. `panels` is required in a proposal, and `[]` with a `template_id`
+lets the page preview the template; a missing list is refused instead of being read as "remove
+every panel". Visibility is never part of a draft, so sharing stays an explicit action. For this editor `propose_code_edit` takes the draft JSON in `code`; the runtime checks
+its shape with `parseDashboardDraft` (`agent-runtime/src/page-context.ts`), fails the call with
+the problems so the model can correct it, and otherwise sends the draft in the page's key order
+with `target: "dashboard"` and `dashboardId` (null for a new dashboard). **Apply to draft** calls
+the page's `applyCode`, which parses the draft again and returns false, with a toast, for one it
+refuses; the card then stays unapplied. Applying replaces the page's local draft (entering edit
+mode for a stored dashboard) and never writes: the page's **Save** sends `PATCH` with
+`expected_version`, or for a new dashboard `POST /custom-dashboards` as private, so a 409 or 422
+keeps the draft. A registration may also offer `suggestions`, which the empty chat shows in
+place of the general starters; picking one sends it like any suggestion.
 
 ## Failure investigations and source access
 

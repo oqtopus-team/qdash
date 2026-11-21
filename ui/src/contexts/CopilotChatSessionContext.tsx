@@ -466,6 +466,20 @@ function buildTurnRequest(
                     },
                   }
                 : {}),
+              ...(page.dashboard
+                ? {
+                    dashboard: {
+                      dashboard_id: page.dashboard.dashboardId,
+                      name: page.dashboard.name,
+                      description: page.dashboard.description || null,
+                      visibility: page.dashboard.visibility ?? null,
+                      chip_id: page.dashboard.chipId ?? null,
+                      version: page.dashboard.version ?? null,
+                      code: page.dashboard.code,
+                      dirty: page.dashboard.dirty ?? false,
+                    },
+                  }
+                : {}),
             },
           }
         : {}),

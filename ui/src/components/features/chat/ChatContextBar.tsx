@@ -120,7 +120,9 @@ export function ChatContextBar({ context, investigation, page }: ChatContextBarP
             page.withEditorCode ? `${page.title} (${page.path})` : page.path
           }`}
         >
-          {page.withEditorCode ? `${page.path} · with editor code` : page.path}
+          {page.withEditorCode
+            ? `${page.path} · ${page.editorKind === "dashboard" ? "with dashboard draft" : "with editor code"}`
+            : page.path}
         </ContextItem>
       )}
     </ul>

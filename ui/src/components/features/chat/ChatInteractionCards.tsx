@@ -288,14 +288,19 @@ export function ApprovalCard({
 }
 
 /**
- * A change the assistant proposes to the flow open in the Workflow editor, or to
- * the metric script open in its editor: the diff against what the editor holds
- * now, applied there with one click. The card never saves; the editor's Save
- * does, through QDash's validation.
+ * A change the assistant proposes to the flow open in the Workflow editor, to
+ * the metric script open in its editor, or to a custom dashboard's draft: the
+ * diff against what the page holds now, applied there with one click. The card
+ * never saves; the page's Save does, through QDash's validation.
  */
 export function EditProposalCard({ edit, state }: { edit: EditProposal; state: InteractionState }) {
   const isScript = edit.target === "metric_script";
-  const name = (isScript ? edit.scriptName || edit.flowName : edit.flowName) || "script";
+  const isDashboard = edit.target === "dashboard";
+  const name =
+    (isScript ? edit.scriptName || edit.flowName : edit.flowName) ||
+    (isDashboard ? "new dashboard" : "script");
+  const filename = isDashboard ? "dashboard.json" : `${name}.py`;
+  const language = isDashboard ? "json" : "python";
   const [outcome, setOutcome] = useState<"applied" | "discarded" | null>(null);
   // The editor text the diff was made against. The chat does not rerender as
   // the user types in the editor, so Apply reads the text again first and, when
@@ -325,40 +330,49 @@ export function EditProposalCard({ edit, state }: { edit: EditProposal; state: I
         <FileDiff className="w-4 h-4 mt-0.5 text-primary shrink-0" />
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium leading-snug">
-            Proposed change to {isScript ? "metric script " : ""}
-            <span className="font-mono">{name}</span>
+            Proposed change to {isScript ? "metric script " : isDashboard ? "dashboard " : ""}
+            <span className={isDashboard ? undefined : "font-mono"}>{name}</span>
           </p>
           <p className="text-xs text-base-content/70 mt-0.5">{edit.summary}</p>
         </div>
       </div>
       <div className="mt-3 max-h-[28rem] overflow-auto rounded-lg border border-base-300/70">
         {current !== null && !unchanged ? (
-          <PierreDiffViewer filename={`${name}.py`} oldContent={current} newContent={edit.code} />
+          <PierreDiffViewer filename={filename} oldContent={current} newContent={edit.code} />
         ) : (
-          <CodeBlock compact language="python" title={`${name}.py`}>
+          <CodeBlock compact language={language} title={filename}>
             {edit.code}
           </CodeBlock>
         )}
       </div>
       {unchanged && (
-        <p className="mt-2 text-xs text-base-content/50">The editor already holds this code.</p>
+        <p className="mt-2 text-xs text-base-content/50">
+          {isDashboard ? "The draft already holds this." : "The editor already holds this code."}
+        </p>
       )}
       {changed && outcome === null && (
         <p className="mt-2 text-xs text-warning" role="status">
-          The editor changed since this diff was made. Review the updated diff, then apply.
+          {isDashboard
+            ? "The dashboard draft changed since this diff was made. Review the updated diff, then apply."
+            : "The editor changed since this diff was made. Review the updated diff, then apply."}
         </p>
       )}
       {(!state.applyCode || current === null) && (
         <p className="mt-2 text-xs text-base-content/50">
-          {isScript
-            ? "Open this metric script in its editor to apply the change there."
-            : "Open this flow in the Workflow editor on the same chip to apply the change there."}
+          {isDashboard
+            ? "Open this dashboard, as a member who can edit it, to apply the change to its draft."
+            : isScript
+              ? "Open this metric script in its editor to apply the change there."
+              : "Open this flow in the Workflow editor on the same chip to apply the change there."}
         </p>
       )}
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {outcome === "applied" && (
           <span className="inline-flex items-center gap-1 text-xs text-success">
-            <Check className="w-3.5 h-3.5" /> Applied to the editor. Review it, then Save.
+            <Check className="w-3.5 h-3.5" />
+            {isDashboard
+              ? "Applied to the dashboard draft. Review the panels, then Save."
+              : "Applied to the editor. Review it, then Save."}
           </span>
         )}
         {outcome === "discarded" && (
@@ -369,7 +383,7 @@ export function EditProposalCard({ edit, state }: { edit: EditProposal; state: I
         {canApply && (
           <>
             <button type="button" className="btn btn-primary btn-xs" onClick={apply}>
-              Apply to editor
+              {isDashboard ? "Apply to draft" : "Apply to editor"}
             </button>
             <button
               type="button"

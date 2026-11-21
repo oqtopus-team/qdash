@@ -253,7 +253,7 @@ test("the production chat registry: present_results reaches its classifier; scri
   }
 });
 
-test("the edit tool comes with either editor and is model-only; other pages have none", () => {
+test("the edit tool comes with an editor or an editable dashboard and is model-only; other pages have none", () => {
   const parts = {
     extensions: [piExtension([piTool("qdash_list_chips", () => [])])],
     modelRuntime,
@@ -277,6 +277,9 @@ test("the edit tool comes with either editor and is model-only; other pages have
   assert.match(script.description, /metric script `ZX90`/);
   assert.deepEqual(script.callers, ["model"]);
   assert.match(editTool({ path: "/workflow/t1", flow: { name: "t1", code: "x = 1\n" } }).description, /flow `t1`/);
+  const board = editTool({ path: "/custom-dashboards/new", dashboard: { name: "", code: "{}" } });
+  assert.match(board.description, /new custom dashboard/);
+  assert.deepEqual(board.callers, ["model"]);
   assert.equal(editTool({ path: "/chip" }), undefined);
 });
 

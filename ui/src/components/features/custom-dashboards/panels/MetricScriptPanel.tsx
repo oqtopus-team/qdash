@@ -5,7 +5,10 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowUpCircle, Info } from "lucide-react";
 
-import { evaluateMetricScript } from "@/client/metric-script/metric-script";
+import {
+  evaluateMetricScript,
+  evaluateMetricScriptDraft,
+} from "@/client/metric-script/metric-script";
 import type { DashboardPanelResponse } from "@/schemas";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import { formatParams } from "@/components/features/metric-scripts/parameters";
@@ -23,6 +26,11 @@ interface MetricScriptPanelProps {
   editing: boolean;
   /** Move the pinned revision to the script's active revision (edit mode only). */
   onUpdateRevision: () => void;
+  /**
+   * For a template preview whose script is not in the project yet: the starter script that
+   * Save adds. Its source is evaluated as an unsaved draft; nothing is stored.
+   */
+  starterScript?: { name: string; source: string };
 }
 
 /**
@@ -36,9 +44,13 @@ export function MetricScriptPanel({
   topologyId,
   editing,
   onUpdateRevision,
+  starterScript,
 }: MetricScriptPanelProps) {
   const config = readMetricScriptConfig(panel);
-  const configError = metricScriptConfigError(config);
+  // A starter script has no ID or revision yet; the rest of the config still applies.
+  const configError = starterScript
+    ? metricScriptConfigError({ ...config, script_id: "starter", script_revision: 0 })
+    : metricScriptConfigError(config);
   // Viewers may flip the direction for themselves; the stored default comes back on reload.
   const [direction, setDirection] = useState<PairDirection>(config.direction);
   const [storedDirection, setStoredDirection] = useState<PairDirection>(config.direction);
@@ -50,26 +62,29 @@ export function MetricScriptPanel({
   const query = useQuery({
     queryKey: [
       "metric-script-evaluate",
-      config.script_id,
+      starterScript ? { starter: starterScript.source } : config.script_id,
       config.script_revision,
       chipId,
       config.metric_id,
       config.period,
       config.params,
     ] as const,
-    queryFn: ({ signal }) =>
-      evaluateMetricScript(
-        config.script_id,
-        {
-          metric_id: config.metric_id,
-          chip_id: chipId,
-          period: config.period,
-          params: config.params,
-          revision: config.script_revision,
-        },
-        undefined,
-        signal,
-      ),
+    queryFn: ({ signal }) => {
+      const body = {
+        metric_id: config.metric_id,
+        chip_id: chipId,
+        period: config.period,
+        params: config.params,
+      };
+      return starterScript
+        ? evaluateMetricScriptDraft({ ...body, source: starterScript.source }, undefined, signal)
+        : evaluateMetricScript(
+            config.script_id,
+            { ...body, revision: config.script_revision },
+            undefined,
+            signal,
+          );
+    },
     enabled: !!chipId && configError === null,
     staleTime: 30_000,
     retry: false,
@@ -84,7 +99,7 @@ export function MetricScriptPanel({
   const newer = latest !== null && latest > pinned;
   const scriptName = panel.script_name ?? config.script_id;
   const footerParts = [
-    `${scriptName} r${pinned}`,
+    starterScript ? `${starterScript.name} (added on save)` : `${scriptName} r${pinned}`,
     result?.metric.title ?? config.metric_id,
     formatPeriod(config.period),
   ];

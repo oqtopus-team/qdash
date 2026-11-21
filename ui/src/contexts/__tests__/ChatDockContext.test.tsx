@@ -71,3 +71,44 @@ it("reports editor code for a metric script page and applies a script proposal t
   expect(applyCode).toHaveBeenLastCalledWith("new");
   expect(result.current.applyCode({ ...edit, scriptId: "ms_2" })).toBe(false);
 });
+
+it("summarizes a dashboard draft with its suggestions and reports a refused draft", () => {
+  const { result } = renderHook(() => useChatDock(), { wrapper: ChatDockProvider });
+  const page: PageContext = {
+    title: "New dashboard",
+    path: "/workflow/t1",
+    dashboard: { name: "", code: "{}" },
+  };
+  const applyCode = vi.fn(() => false);
+  act(() => {
+    result.current.registerPage({
+      current: () => page,
+      applyCode,
+      suggestions: () => ["Show T1 per qubit"],
+    });
+  });
+
+  const summary = result.current.pageSummary();
+  expect(summary).toEqual({
+    path: "/workflow/t1",
+    title: "New dashboard",
+    withEditorCode: true,
+    editorKind: "dashboard",
+    suggestions: ["Show T1 per qubit"],
+  });
+  // Unchanged pages keep the same summary object, so the chat does not rerender.
+  expect(result.current.pageSummary()).toBe(summary);
+  const edit: EditProposal = {
+    summary: "Add a panel",
+    code: "{bad",
+    target: "dashboard",
+    flowName: "",
+    chipId: null,
+    dashboardId: null,
+    pagePath: "/workflow/t1",
+  };
+  expect(result.current.applyCode(edit)).toBe(false);
+  expect(applyCode).toHaveBeenLastCalledWith("{bad");
+  applyCode.mockReturnValue(true as never);
+  expect(result.current.applyCode(edit)).toBe(true);
+});

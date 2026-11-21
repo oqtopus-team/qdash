@@ -57,12 +57,14 @@ function PanelBody({
   topologyId,
   editing,
   onCommand,
+  starterScript,
 }: {
   panel: DashboardPanelResponse;
   chipId: string;
   topologyId: string;
   editing: boolean;
   onCommand: (panelId: string, command: PanelCommand) => void;
+  starterScript?: { name: string; source: string };
 }) {
   switch (panel.type) {
     case "qubit_metric": {
@@ -95,6 +97,7 @@ function PanelBody({
           topologyId={topologyId}
           editing={editing}
           onUpdateRevision={() => onCommand(panel.panel_id, "update-revision")}
+          starterScript={starterScript}
         />
       );
     case "markdown":
@@ -109,6 +112,8 @@ interface DashboardPanelCardProps {
   topologyId: string;
   editing: boolean;
   onCommand: (panelId: string, command: PanelCommand) => void;
+  /** A template preview's starter script for a `metric_script` panel; see MetricScriptPanel. */
+  starterScript?: { name: string; source: string };
 }
 
 /**
@@ -121,6 +126,7 @@ export function DashboardPanelCard({
   topologyId,
   editing,
   onCommand,
+  starterScript,
 }: DashboardPanelCardProps) {
   const { x, y, w, h } = panel.layout;
   const meta = panelTypeMeta(panel.type);
@@ -208,6 +214,7 @@ export function DashboardPanelCard({
             topologyId={topologyId}
             editing={editing}
             onCommand={onCommand}
+            starterScript={starterScript}
           />
         </div>
       </div>

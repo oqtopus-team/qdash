@@ -141,7 +141,7 @@ dependency.
 
 | Operation | Project dependency | Service rule |
 | --- | --- | --- |
-| List, get (dashboards and scripts), script catalog and templates | `get_project_context` (any member) | `visibility == "project"` or `user_id` equals the caller's |
+| List, get (dashboards and scripts), script catalog, templates and template preview | `get_project_context` (any member) | `visibility == "project"` or `user_id` equals the caller's |
 | Evaluate a saved script revision | `get_project_context` | The script is visible; the revision validated |
 | Create, duplicate, copy | `get_project_context_editor` | The source is visible; the copy is private and owned by the caller |
 | Validate and evaluate draft source | `get_project_context_editor` | Runs unsaved code, so editors only |
@@ -165,6 +165,14 @@ owned by the caller and shared with the project, and the panels are pinned to it
 revision. Explicit `panels` take precedence over the template, and an unknown `template_id`
 returns 422.
 
+`GET /custom-dashboards/templates/{template_id}/preview` (`preview_template`, any member) returns
+the panels a create would copy in now and writes nothing. It resolves script panels with
+`MetricScriptService.find_template_script`, the read-only lookup `ensure_template_script` also
+uses, so a preview pins them to the script a create would reuse. When the project has no such
+script, `instantiate_panels(..., partial=True)` leaves those panels without a script reference,
+each `TemplatePreviewPanel` names its `script_template_id`, and `scripts_to_create` lists the
+starter scripts a create would add, with their source. An unknown template returns 404.
+
 Script templates are Python files in `src/qdash/api/metric_runtime/templates/`, listed in
 `TEMPLATES` of `src/qdash/api/metric_runtime/template_library.py` (`getting_started`,
 `collision`, `zx90_median`). Creating a script with `template_id` copies the source; the script
@@ -174,11 +182,22 @@ templates.
 ## UI
 
 Routes: `/custom-dashboards` (list, with a `tab` query parameter for **Dashboards** and
-**Scripts**), `/custom-dashboards/[dashboardId]`, and `/custom-dashboards/scripts/[scriptId]`.
+**Scripts**), `/custom-dashboards/new` (a new dashboard as a local draft until **Save** creates
+it), `/custom-dashboards/[dashboardId]`, and `/custom-dashboards/scripts/[scriptId]`.
 Dashboard code lives in `ui/src/components/features/custom-dashboards/`; panels are laid out with
 CSS grid from each panel's `layout`, and edit mode keeps the panel list in local state and
 persists it with one `PATCH` of `panels` and the `expected_version` read when editing started; a
-409 leaves the draft in place. `panelConfig.ts` reads and writes panel configs;
+409 leaves the draft in place. `CustomDashboardPageContent` serves both routes; with no
+`dashboardId` it starts in edit mode and **Save** creates a private dashboard, with
+`template_id` only while the draft has no panels. While it does, the page shows the template
+preview read-only; a panel whose script is still to be created passes `starterScript` to
+`MetricScriptPanel`, which evaluates the starter source with `POST /metric-scripts/evaluate`
+instead of a saved revision, and the page says that **Save** adds the shared script. It
+registers the draft with the Agent dock
+(`dashboardDraft.ts` writes and checks it) so the Agent can propose a new draft that the user
+applies and saves; see
+[Page context and editor edits](../copilot/architecture.md#page-context-and-editor-edits).
+`panelConfig.ts` reads and writes panel configs;
 `metricChoices.ts` flattens the configured chip metrics and the catalogs of the visible scripts
 into the grouped **Show** list of `PanelEditorDialog`, from which the panel type follows.
 

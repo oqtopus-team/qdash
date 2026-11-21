@@ -55,7 +55,8 @@ server, so they are not script-callable reads), and the reviewed writes
 The tools only reach the API and format its answers; the `qdash_metrics` API and the authoring
 workflow live in `skills/qdash-metric-scripts/`. When the web application's metric script
 editor is open, the runtime adds the editor's text to the prompt and offers
-`propose_code_edit` for it, as it does for the Workflow editor; see
+`propose_code_edit` for it, as it does for the Workflow editor and for a custom dashboard the
+user may edit, where the proposal is the dashboard's draft as JSON; see
 [Page context and editor edits](./architecture.md#page-context-and-editor-edits).
 
 Keep API access through `@oqtopus-team/qdash-client`, redaction, rendering, and

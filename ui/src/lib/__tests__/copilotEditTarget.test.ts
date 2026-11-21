@@ -43,6 +43,38 @@ describe("matchesEditTarget", () => {
     expect(matchesEditTarget(legacy, draft)).toBe(false);
   });
 
+  it("identifies a dashboard by its route and ID, and a new one by its route", () => {
+    const boardPage: PageContext = {
+      title: "Dashboard: Review",
+      path: "/custom-dashboards/dash-1",
+      dashboard: { dashboardId: "dash-1", name: "Review", code: '{"panels":[]}' },
+    };
+    const boardEdit: EditProposal = {
+      summary: "Add a map",
+      code: '{"panels":[1]}',
+      target: "dashboard",
+      flowName: "Review",
+      chipId: null,
+      dashboardId: "dash-1",
+      pagePath: "/custom-dashboards/dash-1",
+    };
+    expect(matchesEditTarget(boardEdit, boardPage)).toBe(true);
+    expect(editTargetCode(boardEdit, boardPage)).toBe('{"panels":[]}');
+    // Another dashboard, or the same route without an editable draft (a viewer).
+    expect(matchesEditTarget({ ...boardEdit, dashboardId: "dash-2" }, boardPage)).toBe(false);
+    expect(matchesEditTarget(boardEdit, { ...boardPage, dashboard: undefined })).toBe(false);
+    // A proposal for a new draft does not apply to the dashboard it became.
+    const newEdit = { ...boardEdit, dashboardId: null, pagePath: "/custom-dashboards/new" };
+    expect(matchesEditTarget(newEdit, boardPage)).toBe(false);
+    const newPage: PageContext = {
+      title: "New dashboard",
+      path: "/custom-dashboards/new",
+      dashboard: { name: "", code: "{}" },
+    };
+    expect(matchesEditTarget(newEdit, newPage)).toBe(true);
+    expect(matchesEditTarget(boardEdit, newPage)).toBe(false);
+  });
+
   it("identifies a metric script editor by its route and script ID", () => {
     const scriptPage: PageContext = {
       title: "Metric script: ZX90",

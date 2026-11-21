@@ -755,6 +755,7 @@ def test_the_open_page_travels_with_the_turn(monkeypatch: pytest.MonkeyPatch) ->
         "title": "Workflow t1",
         "flow": {"name": "t1", "chip_id": "64Qv3", "code": "x = 1\n", "dirty": True},
         "metric_script": None,
+        "dashboard": None,
     }
     on_script = ChatRequest.model_validate(
         {
@@ -774,6 +775,36 @@ def test_the_open_page_travels_with_the_turn(monkeypatch: pytest.MonkeyPatch) ->
     assert pi_chat_service._request_payload(on_script, config, "alice")["page_context"][
         "metric_script"
     ] == {"script_id": "ms_0123456789ab", "name": "ZX90", "code": "x = 1\n", "dirty": True}
+    on_dashboard = ChatRequest.model_validate(
+        {
+            "message": "add a ZX90 map",
+            "session_id": "s1",
+            "page": {
+                "path": "/custom-dashboards/new",
+                "dashboard": {"name": "", "code": '{"panels": []}', "visibility": "private"},
+            },
+        }
+    )
+    assert pi_chat_service._request_payload(on_dashboard, config, "alice")["page_context"][
+        "dashboard"
+    ] == {
+        "dashboard_id": None,
+        "name": "",
+        "description": None,
+        "visibility": "private",
+        "chip_id": None,
+        "version": None,
+        "code": '{"panels": []}',
+        "dirty": False,
+    }
+    with pytest.raises(ValueError):
+        ChatRequest.model_validate(
+            {
+                "message": "share it",
+                "session_id": "s1",
+                "page": {"path": "/x", "dashboard": {"code": "{}", "visibility": "public"}},
+            }
+        )
 
 
 @pytest.mark.parametrize("contents", ["runtime-secret\n", ""])
@@ -1148,6 +1179,9 @@ async def test_a_fork_failure_says_whether_the_request_may_still_run(
         BranchRefusedError,
         ForkSettledError,
     )
+
+    # The store generation is read from MongoDB; this test is about the runtime call only.
+    monkeypatch.setattr(pi_chat_service, "store_generation", lambda _user, _store: "g1")
 
     async def fork() -> Any:
         return await pi_chat_service.fork_runtime_branch(

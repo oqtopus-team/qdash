@@ -688,6 +688,7 @@ export function registerMetricScriptTools(pi: Pick<ExtensionAPI, "registerTool">
       "Pin metric_script panels to the script's active_revision from qdash_query metric_script, and say which revision a panel shows.",
       "On update, send the complete panels list; omitted panels are removed.",
       "Pass expectedVersion (the version you read) when updating so a concurrent save is not overwritten.",
+      "When the user has the dashboard, or a new dashboard draft, open in QDash, propose changes with propose_code_edit instead; save with this tool only when they ask, because a save replaces their unsaved draft.",
     ],
     parameters: Type.Object({
       ...connectionParams,

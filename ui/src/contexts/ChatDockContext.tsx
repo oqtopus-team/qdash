@@ -34,8 +34,13 @@ import {
 export interface PageContextProvider {
   /** Read at the moment a turn is sent, so an editor's buffer is current. */
   current(): PageContext | null;
-  /** Replace the page's editable code, for an edit the assistant proposed. */
-  applyCode?(code: string): void;
+  /**
+   * Replace the page's editable code, for an edit the assistant proposed. Returns false when
+   * the page refused it (e.g. a dashboard draft that does not parse); the page says why.
+   */
+  applyCode?(code: string): void | boolean;
+  /** Requests the empty chat offers on this page instead of the general ones. */
+  suggestions?(): string[];
 }
 
 /**
@@ -47,21 +52,38 @@ export interface PageContextSummary {
   path: string;
   title: string;
   withEditorCode: boolean;
+  /** What the editor code is, when it is not a file: a dashboard's draft. */
+  editorKind?: "dashboard";
+  /** The page's own starter requests for an empty chat. */
+  suggestions?: string[];
 }
 
-function summarizePage(page: PageContext | null): PageContextSummary | null {
+function summarizePage(
+  page: PageContext | null,
+  suggestions: string[] | undefined,
+): PageContextSummary | null {
   return page
     ? {
         path: page.path,
         title: page.title,
-        withEditorCode: Boolean(page.flow || page.metricScript),
+        withEditorCode: Boolean(page.flow || page.metricScript || page.dashboard),
+        ...(page.dashboard && !page.flow && !page.metricScript
+          ? { editorKind: "dashboard" as const }
+          : {}),
+        ...(suggestions?.length ? { suggestions } : {}),
       }
     : null;
 }
 
 function sameSummary(a: PageContextSummary | null, b: PageContextSummary | null): boolean {
   if (a === null || b === null) return a === b;
-  return a.path === b.path && a.title === b.title && a.withEditorCode === b.withEditorCode;
+  return (
+    a.path === b.path &&
+    a.title === b.title &&
+    a.withEditorCode === b.withEditorCode &&
+    a.editorKind === b.editorKind &&
+    (a.suggestions ?? []).join("\n") === (b.suggestions ?? []).join("\n")
+  );
 }
 
 /**
@@ -178,7 +200,12 @@ export function ChatDockProvider({ children }: { children: React.ReactNode }) {
   // The last summary handed out, so an unchanged page returns the same object.
   const lastSummary = useRef<PageContextSummary | null>(null);
   const pageSummary = useCallback((): PageContextSummary | null => {
-    const next = summarizePage(currentPage());
+    const page = currentPage();
+    // Page suggestions only while that page's own context is the one a turn describes.
+    const next = summarizePage(
+      page,
+      page && pageProvider.current ? pageProvider.current.suggestions?.() : undefined,
+    );
     if (!sameSummary(lastSummary.current, next)) lastSummary.current = next;
     return lastSummary.current;
   }, [currentPage]);
@@ -186,8 +213,7 @@ export function ChatDockProvider({ children }: { children: React.ReactNode }) {
   const applyCode = useCallback((edit: EditProposal): boolean => {
     const provider = pageProvider.current;
     if (!provider?.applyCode || !matchesEditTarget(edit, provider.current())) return false;
-    provider.applyCode(edit.code);
-    return true;
+    return provider.applyCode(edit.code) !== false;
   }, []);
 
   /** Resume the chat about this result, or start one. */

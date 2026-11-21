@@ -1,8 +1,16 @@
 "use client";
 
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useGetCopilotPreferences } from "@/client/copilot/copilot";
-import { ArrowDown, GitBranch } from "lucide-react";
+import { ArrowDown, GitBranch, LayoutDashboard } from "lucide-react";
 import { StickToBottom, useStickToBottomContext } from "use-stick-to-bottom";
 import { useChatSuggestions, type ChatSuggestion } from "@/hooks/useChatSuggestions";
 import { useCopilotChat } from "@/hooks/useCopilotChat";
@@ -201,7 +209,17 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
   // Subscribed, so the shown page follows navigation and the editor registering, loading, or
   // switching panes; a send still reads the dock's current page at that moment.
   const page = useChatPageSummary();
-  const suggestions = useChatSuggestions(Boolean(context));
+  const generalSuggestions = useChatSuggestions(Boolean(context));
+  // A page with its own starter requests (a dashboard draft) offers those in a general chat;
+  // picking one sends it, like any suggestion.
+  const pageSuggestions = page?.suggestions;
+  const suggestions = useMemo<ChatSuggestion[]>(
+    () =>
+      !context && pageSuggestions?.length
+        ? pageSuggestions.map((text) => ({ text, Icon: LayoutDashboard }))
+        : generalSuggestions,
+    [context, generalSuggestions, pageSuggestions],
+  );
   const isEmpty = messages.length === 0 && !liveTurn && steers.length === 0;
   const lastIndex = messages.length - 1;
 

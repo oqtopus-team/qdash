@@ -184,6 +184,66 @@ describe("EditProposalCard for metric scripts", () => {
   });
 });
 
+describe("EditProposalCard for dashboards", () => {
+  const edit = {
+    summary: "Add a ZX90 map",
+    code: '{\n  "panels": [1]\n}\n',
+    target: "dashboard" as const,
+    flowName: "Collision review",
+    chipId: null,
+    dashboardId: "dash-1",
+    pagePath: "/custom-dashboards/dash-1",
+  };
+
+  it("diffs the dashboard draft and applies it to the draft, not a save", () => {
+    const applyCode = vi.fn(() => true);
+    render(
+      <EditProposalCard
+        edit={edit}
+        state={state({ applyCode, currentCode: () => '{\n  "panels": []\n}\n' })}
+      />,
+    );
+    expect(screen.getByRole("group", { name: "Proposed change to Collision review" })).toBeTruthy();
+    expect(screen.getByText(/Proposed change to dashboard/)).toBeTruthy();
+    expect(screen.getByTestId("diff").textContent).toBe(
+      '{\n  "panels": []\n}\n=>{\n  "panels": [1]\n}\n',
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Apply to draft" }));
+    expect(applyCode).toHaveBeenCalledWith(edit);
+    expect(
+      screen.getByText("Applied to the dashboard draft. Review the panels, then Save."),
+    ).toBeTruthy();
+  });
+
+  it("re-diffs instead of applying when the draft changed since the proposal", () => {
+    const applyCode = vi.fn(() => true);
+    let live = '{\n  "panels": []\n}\n';
+    render(<EditProposalCard edit={edit} state={state({ applyCode, currentCode: () => live })} />);
+    live = '{\n  "panels": [0]\n}\n';
+    fireEvent.click(screen.getByRole("button", { name: "Apply to draft" }));
+    expect(applyCode).not.toHaveBeenCalled();
+    expect(screen.getByRole("status").textContent).toMatch(/dashboard draft changed/);
+  });
+
+  it("is not marked applied when the page refuses the draft", () => {
+    render(
+      <EditProposalCard
+        edit={edit}
+        state={state({ applyCode: () => false, currentCode: () => "{}" })}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Apply to draft" }));
+    expect(screen.queryByText(/Applied to the dashboard draft/)).toBeNull();
+    expect(screen.getByRole("button", { name: "Apply to draft" })).toBeTruthy();
+  });
+
+  it("says where to apply it when the dashboard is not open", () => {
+    render(<EditProposalCard edit={edit} state={state()} />);
+    expect(screen.getByText(/Open this dashboard, as a member who can edit it/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Apply to draft" })).toBeNull();
+  });
+});
+
 describe("EditProposalCard", () => {
   const edit = {
     summary: "Add a T2 step",

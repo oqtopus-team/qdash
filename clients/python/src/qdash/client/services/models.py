@@ -4934,6 +4934,50 @@ class TaskResultResponse(BaseModel):
     elapsed_time: Annotated[timedelta | None, Field(title="Elapsed Time")] = None
 
 
+class TemplatePreviewPanel(BaseModel):
+    """
+    A template panel as it would be created now.
+
+    A ``metric_script`` panel whose project script exists is pinned to it as on creation.
+    When the project has no such script yet, ``config`` has no script reference and
+    ``script_template_id`` names the starter script that creating the dashboard adds.
+    """
+
+    panel_id: Annotated[str, Field(max_length=64, min_length=1, title="Panel Id")]
+    """
+    Dashboard-unique ID
+    """
+    type: Annotated[Type, Field(title="Type")]
+    """
+    Panel kind
+    """
+    title: Annotated[str, Field(max_length=200, title="Title")] = ""
+    """
+    Panel heading
+    """
+    layout: PanelLayoutModel
+    config: Annotated[dict[str, Any] | None, Field(title="Config")] = None
+    """
+    Type-specific settings
+    """
+    script_name: Annotated[str | None, Field(title="Script Name")] = None
+    latest_revision: Annotated[int | None, Field(title="Latest Revision")] = None
+    script_template_id: Annotated[str | None, Field(title="Script Template Id")] = None
+
+
+class TemplateScriptToCreate(BaseModel):
+    """
+    A shared metric script that creating a dashboard from the template adds.
+    """
+
+    template_id: Annotated[str, Field(title="Template Id")]
+    name: Annotated[str, Field(title="Name")]
+    source: Annotated[str, Field(title="Source")]
+    """
+    The starter source, for an unsaved preview
+    """
+
+
 class TimeSeriesData(BaseModel):
     """
     Response model for time series data.
@@ -6119,6 +6163,21 @@ class CryostatResponse(BaseModel):
     commissioned_at: Annotated[AwareDatetime | None, Field(title="Commissioned At")]
     decommissioned_at: Annotated[AwareDatetime | None, Field(title="Decommissioned At")]
     note: NoteModel | None = None
+
+
+class CustomDashboardTemplatePreviewResponse(BaseModel):
+    """
+    What a dashboard created from a template now would hold. Reading it writes nothing.
+    """
+
+    template_id: Annotated[str, Field(title="Template Id")]
+    name: Annotated[str, Field(title="Name")]
+    description: Annotated[str, Field(title="Description")]
+    panels: Annotated[list[TemplatePreviewPanel], Field(title="Panels")]
+    scripts_to_create: Annotated[list[TemplateScriptToCreate], Field(title="Scripts To Create")]
+    """
+    Project-visible metric scripts creation adds because the project has no script from that starter that still defines the panels' metrics
+    """
 
 
 class DashboardPanelModel(BaseModel):

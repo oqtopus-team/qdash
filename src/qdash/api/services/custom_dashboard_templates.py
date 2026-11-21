@@ -120,21 +120,30 @@ TEMPLATES: dict[str, DashboardTemplate] = {
 
 
 def instantiate_panels(
-    template: DashboardTemplate, scripts: dict[str, tuple[str, int]] | None = None
+    template: DashboardTemplate,
+    scripts: dict[str, tuple[str, int]] | None = None,
+    *,
+    partial: bool = False,
 ) -> list[DashboardPanelModel]:
-    """Copy a template's panels with fresh panel IDs.
+    """Copy a template's panels with fresh panel IDs, in the template's order.
 
     Args:
         template: Template to copy.
         scripts: Script template ID → ``(script_id, revision)`` the metric_script panels
             are pinned to.
+        partial: Leave a metric_script panel without a script reference when ``scripts``
+            has no entry for its script template, as a preview does, instead of failing.
     """
     panels = []
     for panel in template.panels:
         config = dict(panel.config)
         if panel.script_template is not None:
-            script_id, revision = (scripts or {})[panel.script_template]
-            config = {"script_id": script_id, "script_revision": revision, **config}
+            pinned = (scripts or {}).get(panel.script_template)
+            if pinned is not None:
+                script_id, revision = pinned
+                config = {"script_id": script_id, "script_revision": revision, **config}
+            elif not partial:
+                raise KeyError(panel.script_template)
         panels.append(
             DashboardPanelModel(
                 panel_id=uuid4().hex,

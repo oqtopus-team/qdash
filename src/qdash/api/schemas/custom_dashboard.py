@@ -95,3 +95,38 @@ class ListCustomDashboardTemplatesResponse(BaseModel):
     """Available starter templates."""
 
     templates: list[CustomDashboardTemplateResponse]
+
+
+class TemplatePreviewPanel(DashboardPanelResponse):
+    """A template panel as it would be created now.
+
+    A ``metric_script`` panel whose project script exists is pinned to it as on creation.
+    When the project has no such script yet, ``config`` has no script reference and
+    ``script_template_id`` names the starter script that creating the dashboard adds.
+    """
+
+    script_template_id: str | None = None
+
+
+class TemplateScriptToCreate(BaseModel):
+    """A shared metric script that creating a dashboard from the template adds."""
+
+    template_id: str
+    name: str
+    source: str = Field(..., description="The starter source, for an unsaved preview")
+
+
+class CustomDashboardTemplatePreviewResponse(BaseModel):
+    """What a dashboard created from a template now would hold. Reading it writes nothing."""
+
+    template_id: str
+    name: str
+    description: str
+    panels: list[TemplatePreviewPanel]
+    scripts_to_create: list[TemplateScriptToCreate] = Field(
+        ...,
+        description=(
+            "Project-visible metric scripts creation adds because the project has no "
+            "script from that starter that still defines the panels' metrics"
+        ),
+    )

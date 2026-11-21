@@ -16,6 +16,12 @@ const mocks = vi.hoisted(() => ({
   copyScript: vi.fn(),
   deleteScript: vi.fn(),
   push: vi.fn(),
+  withDock: false,
+  openGeneralChat: vi.fn(),
+}));
+
+vi.mock("@/contexts/ChatDockContext", () => ({
+  useOptionalChatDock: () => (mocks.withDock ? { openGeneralChat: mocks.openGeneralChat } : null),
 }));
 
 vi.mock("next/navigation", () => ({
@@ -166,6 +172,7 @@ function renderPage() {
 
 describe("CustomDashboardListPageContent", () => {
   beforeEach(() => {
+    mocks.withDock = false;
     mocks.canEdit = true;
     mocks.tab = null;
     mocks.scripts = [
@@ -285,10 +292,35 @@ describe("CustomDashboardListPageContent", () => {
 
     expect(screen.getByText("No dashboards yet")).toBeInTheDocument();
   });
+
+  it("leads with Create with AI, which opens a draft and the Agent panel without creating", () => {
+    mocks.withDock = true;
+    renderPage();
+
+    const withAi = screen.getByRole("button", { name: "Create with AI" });
+    const manual = screen.getByRole("button", { name: "New dashboard" });
+    expect(withAi).toHaveClass("btn-primary");
+    expect(manual).not.toHaveClass("btn-primary");
+
+    fireEvent.click(withAi);
+
+    expect(mocks.push).toHaveBeenCalledWith("/custom-dashboards/new");
+    expect(mocks.openGeneralChat).toHaveBeenCalledTimes(1);
+    expect(mocks.create).not.toHaveBeenCalled();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("keeps manual creation as the only action without the Agent panel", () => {
+    renderPage();
+
+    expect(screen.queryByRole("button", { name: "Create with AI" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "New dashboard" })).toHaveClass("btn-primary");
+  });
 });
 
 describe("CustomDashboardListPageContent scripts tab", () => {
   beforeEach(() => {
+    mocks.withDock = false;
     mocks.canEdit = true;
     mocks.tab = null;
     mocks.dashboards = [];
