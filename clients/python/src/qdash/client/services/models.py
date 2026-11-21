@@ -444,6 +444,150 @@ class AgentInterventionStatus(StrEnum):
     discarded = "discarded"
 
 
+class AgentJourneyDecision(BaseModel):
+    """
+    The agent's reading of earlier results and the step it chose; agent reported.
+    """
+
+    decision_id: Annotated[str, Field(title="Decision Id")]
+    assessment: Annotated[str | None, Field(title="Assessment")] = None
+    interpretation: Annotated[str, Field(title="Interpretation")]
+    next_action: Annotated[str, Field(title="Next Action")]
+    next_detail: Annotated[str, Field(title="Next Detail")] = ""
+    evidence_action_ids: Annotated[list[str] | None, Field(title="Evidence Action Ids")] = None
+    evaluation_ids: Annotated[list[str] | None, Field(title="Evaluation Ids")] = None
+    next_action_id: Annotated[str | None, Field(title="Next Action Id")] = None
+    superseded_by_decision_id: Annotated[str | None, Field(title="Superseded By Decision Id")] = (
+        None
+    )
+    supersedes_decision_id: Annotated[str | None, Field(title="Supersedes Decision Id")] = None
+
+
+class Kind(StrEnum):
+    sequence = "sequence"
+    evidence = "evidence"
+    next_action = "next_action"
+    retry_of = "retry_of"
+    escalation = "escalation"
+    follow_up = "follow_up"
+
+
+class AgentJourneyEdge(BaseModel):
+    """
+    A typed link between two nodes.
+
+    ``sequence`` is temporal only: the next measurement dispatched. Every other kind comes from
+    an explicit reference in a record (a decision's evidence or next action, a declared repeat,
+    an intervention's action or predecessor); no scientific dependency is inferred from time.
+    """
+
+    edge_id: Annotated[str, Field(title="Edge Id")]
+    kind: Annotated[Kind, Field(title="Kind")]
+    source: Annotated[str, Field(title="Source")]
+    target: Annotated[str, Field(title="Target")]
+
+
+class AgentJourneyIntervention(BaseModel):
+    """
+    A stop for an expert and the expert's answer.
+    """
+
+    intervention_id: Annotated[str, Field(title="Intervention Id")]
+    reason: Annotated[str, Field(title="Reason")]
+    status: Annotated[str, Field(title="Status")]
+    question: Annotated[str, Field(title="Question")]
+    summary: Annotated[str, Field(title="Summary")] = ""
+    pauses_session: Annotated[bool, Field(title="Pauses Session")] = False
+    response_decision: Annotated[str | None, Field(title="Response Decision")] = None
+    response_guidance: Annotated[str, Field(title="Response Guidance")] = ""
+    responded_by: Annotated[str | None, Field(title="Responded By")] = None
+    responded_at: Annotated[AwareDatetime | None, Field(title="Responded At")] = None
+    resumed_at: Annotated[AwareDatetime | None, Field(title="Resumed At")] = None
+    resume_outcome: Annotated[str | None, Field(title="Resume Outcome")] = None
+
+
+class AgentJourneyMeasurement(BaseModel):
+    """
+    A measurement the session authorized, and what its real execution reports.
+    """
+
+    action_id: Annotated[str, Field(title="Action Id")]
+    task_name: Annotated[str | None, Field(title="Task Name")] = None
+    qid: Annotated[str | None, Field(title="Qid")] = None
+    sequence: Annotated[int | None, Field(title="Sequence")] = None
+    """
+    1-based dispatch order among the session's measurements; null before dispatch
+    """
+    attempt: Annotated[int | None, Field(title="Attempt")] = None
+    """
+    1-based count of dispatched measurements of this task on this target
+    """
+    repeat_of_action_id: Annotated[str | None, Field(title="Repeat Of Action Id")] = None
+    """
+    The measurement this one repeats, as the agent declared it
+    """
+    dispatch_status: Annotated[str, Field(title="Dispatch Status")]
+    """
+    The action's own dispatch state
+    """
+    execution_id: Annotated[str | None, Field(title="Execution Id")] = None
+    execution_status: Annotated[str | None, Field(title="Execution Status")] = None
+    """
+    The real execution's status; null before it exists
+    """
+    task_id: Annotated[str | None, Field(title="Task Id")] = None
+    task_status: Annotated[str | None, Field(title="Task Status")] = None
+    started_at: Annotated[AwareDatetime | None, Field(title="Started At")] = None
+    finished_at: Annotated[AwareDatetime | None, Field(title="Finished At")] = None
+    figure_count: Annotated[int, Field(title="Figure Count")] = 0
+    evaluation_id: Annotated[str | None, Field(title="Evaluation Id")] = None
+    """
+    The latest evaluation of the task
+    """
+    evaluation_status: Annotated[str | None, Field(title="Evaluation Status")] = None
+    intent: Annotated[str, Field(title="Intent")] = ""
+    """
+    The agent's stated intent; agent reported
+    """
+
+
+class Kind1(StrEnum):
+    measurement = "measurement"
+    proposal = "proposal"
+    session_action = "session_action"
+    decision = "decision"
+    intervention = "intervention"
+
+
+class AgentJourneyProposal(BaseModel):
+    """
+    An action that did not reach hardware: rejected by the policy.
+    """
+
+    action_id: Annotated[str, Field(title="Action Id")]
+    action_type: Annotated[str, Field(title="Action Type")]
+    task_name: Annotated[str | None, Field(title="Task Name")] = None
+    qids: Annotated[list[str] | None, Field(title="Qids")] = None
+    reason: Annotated[str, Field(title="Reason")] = ""
+    """
+    Why the policy rejected it
+    """
+    intent: Annotated[str, Field(title="Intent")] = ""
+    """
+    The agent's stated intent; agent reported
+    """
+
+
+class AgentJourneySessionAction(BaseModel):
+    """
+    An authorized action other than a measurement: asking for an expert, or completing.
+    """
+
+    action_id: Annotated[str, Field(title="Action Id")]
+    action_type: Annotated[str, Field(title="Action Type")]
+    reason: Annotated[str, Field(title="Reason")] = ""
+
+
 class AgentNotificationStatus(StrEnum):
     """
     Delivery state of the Slack root message for one intervention.
@@ -533,6 +677,49 @@ class AgentResumeOutcomeRecord(BaseModel):
     )
     recorded_by: Annotated[str, Field(title="Recorded By")]
     recorded_at: Annotated[AwareDatetime, Field(title="Recorded At")]
+
+
+class AgentSessionGroupCounts(BaseModel):
+    """
+    What one agent session has done, counted from its own records.
+    """
+
+    actions: Annotated[int, Field(title="Actions")]
+    """
+    Actions the session counted against its budget
+    """
+    max_actions: Annotated[int, Field(title="Max Actions")]
+    """
+    The session's action budget
+    """
+    measurements: Annotated[int, Field(title="Measurements")]
+    """
+    Dispatched measurements linked to a real execution on the session's chip
+    """
+    pending_dispatch: Annotated[int, Field(title="Pending Dispatch")]
+    """
+    Authorized measurements without an execution yet: not dispatched, being dispatched, queued, or whose execution record was not found
+    """
+    dispatch_failed: Annotated[int, Field(title="Dispatch Failed")] = 0
+    """
+    Authorized measurements whose dispatch failed before an execution
+    """
+    in_flight: Annotated[int, Field(title="In Flight")]
+    """
+    Measurements being dispatched or queued, or whose execution is scheduled, running, or cancelling
+    """
+    rejected_proposals: Annotated[int, Field(title="Rejected Proposals")]
+    """
+    Proposals the session policy rejected; they never reached hardware
+    """
+    open_interventions: Annotated[int, Field(title="Open Interventions")]
+    """
+    Requests for an expert not answered yet
+    """
+    decisions: Annotated[int, Field(title="Decisions")]
+    """
+    Agent decisions recorded in the session
+    """
 
 
 class AgentSessionStatus(StrEnum):
@@ -1775,6 +1962,23 @@ class ExecutionActivityResponse(BaseModel):
     """
 
 
+class ExecutionAgentSessionLink(BaseModel):
+    """
+    The agent session an execution belongs to, as its records establish it.
+    """
+
+    session_id: Annotated[str, Field(title="Session Id")]
+    linked: Annotated[bool, Field(title="Linked")]
+    """
+    True when an action of the session dispatched this execution on the same chip; false when only a tag names the session, which is no authority to group it
+    """
+    action_id: Annotated[str | None, Field(title="Action Id")] = None
+    status: AgentSessionStatus | None = None
+    """
+    The session's state, when the session is in this project
+    """
+
+
 class ExecutionAvailabilityRequest(BaseModel):
     """
     Targets to check without reserving hardware or creating an execution.
@@ -1791,6 +1995,11 @@ class ExecutionAvailabilityResponse(BaseModel):
 
     available: Annotated[bool, Field(title="Available")]
     reason: Annotated[str | None, Field(title="Reason")] = None
+
+
+class Kind2(StrEnum):
+    execution = "execution"
+    agent_session = "agent_session"
 
 
 class ExecutionIdResponse(BaseModel):
@@ -3255,7 +3464,7 @@ class Result(StrEnum):
     series = "series"
 
 
-class Kind(StrEnum):
+class Kind3(StrEnum):
     categorical = "categorical"
     continuous = "continuous"
 
@@ -3265,12 +3474,12 @@ class MetricLegend(BaseModel):
     Legend declared by a metric.
     """
 
-    kind: Annotated[Kind, Field(title="Kind")]
+    kind: Annotated[Kind3, Field(title="Kind")]
     items: Annotated[list[LegendItem] | None, Field(title="Items")] = None
     stops: Annotated[list[LegendStop] | None, Field(title="Stops")] = None
 
 
-class Kind1(StrEnum):
+class Kind4(StrEnum):
     integer = "integer"
     number = "number"
     boolean = "boolean"
@@ -3284,7 +3493,7 @@ class MetricParameterInfo(BaseModel):
 
     default: Annotated[bool | int | float | str, Field(title="Default")]
     label: Annotated[str, Field(title="Label")] = ""
-    kind: Annotated[Kind1, Field(title="Kind")]
+    kind: Annotated[Kind4, Field(title="Kind")]
     min: Annotated[float | None, Field(title="Min")] = None
     max: Annotated[float | None, Field(title="Max")] = None
     step: Annotated[float | None, Field(title="Step")] = None
@@ -6529,6 +6738,41 @@ class AgentActionResponse(BaseModel):
     """
 
 
+class AgentJourneyNode(BaseModel):
+    """
+    One step of the journey. Exactly the field named by ``kind`` is set.
+    """
+
+    node_id: Annotated[str, Field(title="Node Id")]
+    """
+    Stable id: the kind and the id of its record
+    """
+    kind: Annotated[Kind1, Field(title="Kind")]
+    order: Annotated[int, Field(title="Order")]
+    """
+    0-based position in time among all nodes of the journey
+    """
+    at: Annotated[AwareDatetime, Field(title="At")]
+    label: Annotated[str, Field(title="Label")]
+    status: Annotated[str, Field(title="Status")]
+    """
+    Measurement: the execution status, or the dispatch state before one exists; link_claimed or link_ambiguous when the action was dispatched but no execution can be attributed to it. Proposal: rejected. Decision: recorded or superseded. Intervention: its status
+    """
+    status_is_current: Annotated[bool, Field(title="Status Is Current")] = False
+    """
+    The status is read live from a record that can still change
+    """
+    missing: Annotated[list[str] | None, Field(title="Missing")] = None
+    """
+    Facts the records do not hold, such as execution, execution_on_session_chip, execution_link_claimed, execution_link_ambiguous, task_result, or action_record (shown from the session's pending payload, not written yet)
+    """
+    measurement: AgentJourneyMeasurement | None = None
+    proposal: AgentJourneyProposal | None = None
+    session_action: AgentJourneySessionAction | None = None
+    decision: AgentJourneyDecision | None = None
+    intervention: AgentJourneyIntervention | None = None
+
+
 class AgentNotificationDeliveryResponse(BaseModel):
     """
     Slack delivery state shown with an intervention.
@@ -6585,6 +6829,94 @@ class AgentPlanCheckpoint(BaseModel):
         dict[str, list[AgentPlannerVerdictRecord]] | None,
         Field(title="Planner History"),
     ] = None
+
+
+class AgentSessionChildExecution(BaseModel):
+    """
+    A real execution one action of the session dispatched.
+    """
+
+    action_id: Annotated[str, Field(title="Action Id")]
+    sequence: Annotated[int, Field(title="Sequence")]
+    """
+    1-based dispatch order of the measurement in the session
+    """
+    attempt: Annotated[int, Field(title="Attempt")]
+    """
+    1-based count of measurements of this task on this target so far
+    """
+    task_name: Annotated[str | None, Field(title="Task Name")] = None
+    qid: Annotated[str | None, Field(title="Qid")] = None
+    in_filter: Annotated[bool, Field(title="In Filter")]
+    """
+    Whether the execution matches the list's day filter; true without one
+    """
+    execution: ExecutionResponseSummary
+
+
+class AgentSessionGroupSummary(BaseModel):
+    """
+    One agent session as a group of the Execution list.
+
+    ``status`` is the session's own state, not an execution status: a session waiting for an
+    expert, or active between measurements, holds no hardware and is not failed for it.
+    """
+
+    session_id: Annotated[str, Field(title="Session Id")]
+    project_id: Annotated[str, Field(title="Project Id")]
+    chip_id: Annotated[str, Field(title="Chip Id")]
+    created_by: Annotated[str, Field(title="Created By")]
+    created_at: Annotated[AwareDatetime, Field(title="Created At")]
+    updated_at: Annotated[AwareDatetime, Field(title="Updated At")]
+    expires_at: Annotated[AwareDatetime, Field(title="Expires At")]
+    status: AgentSessionStatus
+    """
+    The session's state; an active or paused session past its expiry reads as expired even before a write records it
+    """
+    stored_status: AgentSessionStatus
+    """
+    The status the session record holds
+    """
+    active_intervention_id: Annotated[str | None, Field(title="Active Intervention Id")] = None
+    """
+    The intervention the session waits on, when paused
+    """
+    qids: Annotated[list[str], Field(title="Qids")]
+    allowed_tasks: Annotated[list[str], Field(title="Allowed Tasks")]
+    autonomy: Annotated[str, Field(title="Autonomy")]
+    skill_name: Annotated[str, Field(title="Skill Name")] = ""
+    model_name: Annotated[str, Field(title="Model Name")] = ""
+    counts: AgentSessionGroupCounts
+    latest_activity_at: Annotated[AwareDatetime, Field(title="Latest Activity At")]
+    """
+    The session's latest measurement start, or its creation before the first
+    """
+    missing: Annotated[list[str] | None, Field(title="Missing")] = None
+    """
+    Facts the records do not hold, such as a dispatched execution not found, an execution held by another action, or a record the session has not written yet
+    """
+
+
+class AgentSessionJourneyResponse(BaseModel):
+    """
+    One agent session as an experiment journey over its real executions.
+
+    A live read of the session's records, collected one after another: statuses can move while
+    it is read, and it is not a snapshot. The full audit, with its consistency check and export,
+    stays on the session's audit endpoints.
+    """
+
+    generated_at: Annotated[AwareDatetime, Field(title="Generated At")]
+    session: AgentSessionGroupSummary
+    nodes: Annotated[list[AgentJourneyNode], Field(title="Nodes")]
+    edges: Annotated[list[AgentJourneyEdge], Field(title="Edges")]
+    total_nodes: Annotated[int, Field(title="Total Nodes")]
+    omitted_nodes: Annotated[int, Field(title="Omitted Nodes")]
+    """
+    Earliest nodes left out to bound the response; the audit holds them all
+    """
+    complete: Annotated[bool, Field(title="Complete")]
+    notes: Annotated[list[str], Field(title="Notes")]
 
 
 class AgentSessionPolicy(BaseModel):
@@ -7393,6 +7725,42 @@ class ExecutionComparisonResponse(BaseModel):
     unchanged_count: Annotated[int, Field(title="Unchanged Count")]
 
 
+class ExecutionGroupItem(BaseModel):
+    """
+    One row of the grouped Execution list: an execution, or an agent session.
+    """
+
+    kind: Annotated[Kind2, Field(title="Kind")]
+    sort_at: Annotated[AwareDatetime | None, Field(title="Sort At")] = None
+    """
+    Time the row is ordered by: the execution start, or the session's latest activity within the day filter
+    """
+    execution: ExecutionResponseSummary | None = None
+    """
+    Set for an execution row
+    """
+    agent_session: AgentSessionGroupSummary | None = None
+    """
+    Set for an agent session row
+    """
+    children: Annotated[list[AgentSessionChildExecution] | None, Field(title="Children")] = None
+    """
+    The session's latest executions in dispatch order; at most children_limit
+    """
+    children_total: Annotated[int, Field(title="Children Total")] = 0
+    """
+    Every execution the session dispatched
+    """
+    children_in_filter: Annotated[int, Field(title="Children In Filter")] = 0
+    """
+    The session's executions that match the day filter
+    """
+    children_omitted: Annotated[int, Field(title="Children Omitted")] = 0
+    """
+    Earlier executions left out of children; the journey lists all
+    """
+
+
 class ExecutionPlanRun(BaseModel):
     """
     One CalibService.run call of the entrypoint.
@@ -7765,6 +8133,40 @@ class ListEvaluationsResponse(BaseModel):
     """
 
     evaluations: Annotated[list[EvaluationItem], Field(title="Evaluations")]
+
+
+class ListExecutionGroupsResponse(BaseModel):
+    """
+    A page of the Execution list with agent sessions grouped on the server.
+
+    Grouping happens before pagination, so a session is one row on one page with all its
+    executions, and no execution appears both in a group and as its own row. ``total`` counts
+    rows; ``total_executions`` counts real executions, the number the ungrouped list reports.
+    """
+
+    items: Annotated[list[ExecutionGroupItem], Field(title="Items")]
+    total: Annotated[int, Field(title="Total")]
+    """
+    Rows: agent sessions plus executions outside a session
+    """
+    total_executions: Annotated[int, Field(title="Total Executions")]
+    """
+    Real executions that match the filter, grouped or not
+    """
+    grouped_executions: Annotated[int, Field(title="Grouped Executions")]
+    """
+    Executions that match the filter and are shown inside a session row
+    """
+    agent_sessions: Annotated[int, Field(title="Agent Sessions")]
+    """
+    Agent session rows that match the filter
+    """
+    skip: Annotated[int, Field(title="Skip")]
+    limit: Annotated[int, Field(title="Limit")]
+    children_limit: Annotated[int, Field(title="Children Limit")]
+    """
+    Most executions one session row lists
+    """
 
 
 class ListForumPostsResponse(BaseModel):
@@ -8877,6 +9279,10 @@ class ExecutionResponseDetail(BaseModel):
     pipeline: PipelineProgress | None = None
     """
     Set when this execution belongs to a pipeline run; covers every step of it
+    """
+    agent_session: ExecutionAgentSessionLink | None = None
+    """
+    The agent session whose action dispatched this execution, or the session only its tag names (linked false); null for an execution outside agent sessions
     """
 
 

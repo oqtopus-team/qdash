@@ -6,19 +6,12 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
   ArrowUpRight,
-  Ban,
   ChevronLeft,
   ChevronRight,
-  CircleCheck,
-  CircleHelp,
-  CirclePlay,
-  CircleX,
-  Clock,
   ExternalLink,
   StopCircle,
   UserRound,
   X,
-  type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -26,20 +19,31 @@ import { isExecutionCancellable } from "@/lib/executionStatus";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
 import { DEFAULT_TIMEZONE, formatDateTime } from "@/lib/utils/datetime";
 
+import { AgentSessionGroupRow } from "./AgentSessionGroupRow";
+import { pluralize } from "./agentSessionDisplay";
 import {
   type ActivityWindow,
   DEFAULT_ACTIVITY_WINDOW,
   ExecutionActivityChart,
 } from "./ExecutionActivityChart";
+import { ExecutionAgentSessionNotice } from "./ExecutionAgentSessionNotice";
+import {
+  ExecutionListCard,
+  formatActorLabel,
+  getStatusBorderStyle,
+  getStatusIcon,
+} from "./ExecutionListCard";
 
 import type { ExecutionResponseSummary } from "@/schemas";
 
 import { useListChips } from "@/client/chip/chip";
 import {
   useListExecutions,
+  useListExecutionGroups,
   useGetExecution,
   useCancelExecution,
   getListExecutionsQueryKey,
+  getListExecutionGroupsQueryKey,
   getGetExecutionQueryKey,
 } from "@/client/execution/execution";
 import { TaskFigure } from "@/components/charts/TaskFigure";
@@ -55,60 +59,9 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { ExecutionPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { TaskMessagePanel } from "@/components/ui/TaskMessagePanel";
 import { useToast } from "@/components/ui/Toast";
+import { useProject } from "@/contexts/ProjectContext";
 import { useDateNavigation } from "@/hooks/useDateNavigation";
 import { useExecutionUrlState } from "@/hooks/useUrlState";
-
-type ActorFields = {
-  user_id?: string | null;
-  username?: string;
-};
-
-function formatActorLabel(actor?: ActorFields | null) {
-  if (actor?.username) return `@${actor.username}`;
-  return actor?.user_id || "Unknown";
-}
-
-function getStatusLabel(status: string) {
-  return status.charAt(0).toUpperCase() + status.slice(1);
-}
-
-function getStatusBadgeClass(status: string) {
-  switch (status) {
-    case "running":
-      return "badge-info";
-    case "completed":
-      return "badge-success";
-    case "scheduled":
-    case "pending":
-      return "badge-warning";
-    case "failed":
-      return "badge-error";
-    default:
-      return "badge-ghost";
-  }
-}
-
-// Static icons pair each status color with a shape, so running and cancelling stay
-// recognizable without a continuous pulse and status never relies on color alone.
-function getStatusIcon(status: string): LucideIcon {
-  switch (status) {
-    case "running":
-      return CirclePlay;
-    case "completed":
-      return CircleCheck;
-    case "scheduled":
-    case "pending":
-      return Clock;
-    case "failed":
-      return CircleX;
-    case "cancelling":
-      return StopCircle;
-    case "cancelled":
-      return Ban;
-    default:
-      return CircleHelp;
-  }
-}
 
 // Task rows keep their established mapping: any status outside the known set reads as failed.
 function getTaskStatusDisplay(status?: string | null) {
@@ -174,6 +127,10 @@ export function ExecutionPageContent() {
   // Add date state for navigation
   const [selectedDate, setSelectedDate] = useState<string>("latest");
 
+  const { projectId } = useProject();
+  // Agent sessions are grouped on the server; the flat list stays available.
+  const [groupSessions, setGroupSessions] = useState(true);
+  const [expandedSessions, setExpandedSessions] = useState<ReadonlySet<string>>(new Set());
   const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [expandedTaskIndex, setExpandedTaskIndex] = useState<number | null>(null);
@@ -212,30 +169,39 @@ export function ExecutionPageContent() {
     }
   }, [isInitialized, selectedChip, sortedChips, setSelectedChip]);
 
+  const listParams = {
+    chip_id: selectedChip || "",
+    skip: (currentPage - 1) * itemsPerPage,
+    limit: itemsPerPage,
+    // A picked day is filtered on the server, so every run of that day is reachable,
+    // not only those on the first page. The day follows the UI's display time zone.
+    ...(selectedDate === "latest" ? {} : { date: selectedDate, timezone: DEFAULT_TIMEZONE }),
+  };
+
   // Fetch execution summary list by chip_id
-  const {
-    data: executionData,
-    isError,
-    isLoading,
-  } = useListExecutions(
-    {
-      chip_id: selectedChip || "",
-      skip: (currentPage - 1) * itemsPerPage,
-      limit: itemsPerPage,
-      // A picked day is filtered on the server, so every run of that day is reachable,
-      // not only those on the first page. The day follows the UI's display time zone.
-      ...(selectedDate === "latest" ? {} : { date: selectedDate, timezone: DEFAULT_TIMEZONE }),
+  const flatList = useListExecutions(listParams, {
+    query: {
+      // Refresh every 5 seconds
+      refetchInterval: 5000,
+      // Keep polling even when the window is in the background
+      refetchIntervalInBackground: true,
+      enabled: !!selectedChip && !groupSessions,
     },
-    {
-      query: {
-        // Refresh every 5 seconds
-        refetchInterval: 5000,
-        // Keep polling even when the window is in the background
-        refetchIntervalInBackground: true,
-        enabled: !!selectedChip,
-      },
+  });
+  // Rows with each agent session grouped; the key and header pin the project the page shows.
+  const groupedList = useListExecutionGroups(listParams, {
+    query: {
+      queryKey: [...getListExecutionGroupsQueryKey(listParams), projectId],
+      refetchInterval: 5000,
+      refetchIntervalInBackground: true,
+      enabled: !!selectedChip && groupSessions && projectId !== null,
     },
-  );
+    request: projectId ? { headers: { "X-Project-Id": projectId } } : undefined,
+  });
+  const activeList = groupSessions ? groupedList : flatList;
+  const { isError, isLoading } = activeList;
+  const executionData = flatList.data;
+  const groupData = groupedList.data?.data;
 
   const cancelMutation = useCancelExecution();
   const toast = useToast();
@@ -256,8 +222,17 @@ export function ExecutionPageContent() {
     },
   });
 
-  // Compute card data from execution data (filter by date)
-  const cardData = useMemo(() => executionData?.data?.executions ?? [], [executionData]);
+  // The executions on screen, in list order: the panel browses these.
+  const cardData = useMemo<ExecutionResponseSummary[]>(() => {
+    if (!groupSessions) return executionData?.data?.executions ?? [];
+    return (groupData?.items ?? []).flatMap((item) => {
+      if (item.kind === "execution") return item.execution ? [item.execution] : [];
+      const sessionId = item.agent_session?.session_id;
+      return sessionId && expandedSessions.has(sessionId)
+        ? (item.children ?? []).map((child) => child.execution)
+        : [];
+    });
+  }, [executionData, expandedSessions, groupData, groupSessions]);
 
   const selectedExecutionIndex = cardData.findIndex(
     (execution) => execution.execution_id === selectedExecutionId,
@@ -309,9 +284,39 @@ export function ExecutionPageContent() {
     return () => window.removeEventListener("keydown", handleEscape);
   }, [isSidebarOpen, showCancelConfirm, handleCloseSidebar]);
 
+  // A project switch shows another project's records: drop what this one had open.
+  const shownProject = useRef(projectId);
+  useEffect(() => {
+    if (shownProject.current === projectId) return;
+    shownProject.current = projectId;
+    pendingFocusRestore.current = null;
+    setIsSidebarOpen(false);
+    setSelectedExecutionId(null);
+    setExpandedTaskIndex(null);
+    setExpandedSessions(new Set());
+    setCurrentPage(1);
+  }, [projectId]);
+
+  const toggleSession = (sessionId: string) => {
+    setExpandedSessions((current) => {
+      const next = new Set(current);
+      if (next.has(sessionId)) next.delete(sessionId);
+      else next.add(sessionId);
+      return next;
+    });
+  };
+
+  const handleGroupingChange = (grouped: boolean) => {
+    handleCloseSidebar();
+    setGroupSessions(grouped);
+    setExpandedSessions(new Set());
+    setCurrentPage(1);
+  };
+
   // Chip selection change handler
   const handleChipChange = (chipId: string) => {
     handleCloseSidebar();
+    setExpandedSessions(new Set());
     setSelectedChip(chipId || null);
     // A day picked for one chip means nothing for another.
     setSelectedDate("latest");
@@ -321,6 +326,7 @@ export function ExecutionPageContent() {
   // Wrap date setter to reset page
   const handleDateChange = (date: string) => {
     handleCloseSidebar();
+    setExpandedSessions(new Set());
     setSelectedDate(date);
     setCurrentPage(1);
   };
@@ -341,6 +347,11 @@ export function ExecutionPageContent() {
   // Generate unique key for execution
   const getExecutionKey = (execution: ExecutionResponseSummary) => `${execution.execution_id}`;
 
+  const registerCard = (executionId: string, element: HTMLDivElement | null) => {
+    if (element) executionCards.current.set(executionId, element);
+    else executionCards.current.delete(executionId);
+  };
+
   const handleCardClick = (execution: ExecutionResponseSummary) => {
     setSelectedExecutionId(execution.execution_id);
     setIsSidebarOpen(true);
@@ -355,6 +366,7 @@ export function ExecutionPageContent() {
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListExecutionsQueryKey() });
+          queryClient.invalidateQueries({ queryKey: getListExecutionGroupsQueryKey() });
           if (selectedExecutionId) {
             queryClient.invalidateQueries({
               queryKey: getGetExecutionQueryKey(selectedExecutionId),
@@ -376,29 +388,12 @@ export function ExecutionPageContent() {
     setExpandedTaskIndex(expandedTaskIndex === index ? null : index);
   };
 
-  // Get border color based on status
-  const getStatusBorderStyle = (status: string) => {
-    switch (status) {
-      case "running":
-        return "border-l-4 border-l-info";
-      case "completed":
-        return "border-l-4 border-l-success";
-      case "scheduled":
-        return "border-l-4 border-l-warning";
-      case "failed":
-        return "border-l-4 border-l-error";
-      case "cancelled":
-      case "cancelling":
-        return "border-l-4 border-l-neutral";
-      default:
-        return "border-l-4 border-l-base-300";
-    }
-  };
+  const pageRows = groupSessions
+    ? (groupData?.items.length ?? 0)
+    : (executionData?.data?.executions.length ?? 0);
+  const hasMorePages = pageRows >= itemsPerPage;
 
-  const hasMorePages =
-    !!executionData?.data?.executions && executionData.data.executions.length >= itemsPerPage;
-
-  const total = executionData?.data?.total;
+  const total = groupSessions ? groupData?.total : executionData?.data?.total;
   const totalPages = total != null ? Math.max(1, Math.ceil(total / itemsPerPage)) : undefined;
   const shouldShowPagination = currentPage > 1 || hasMorePages || (totalPages ?? 1) > 1;
 
@@ -417,6 +412,19 @@ export function ExecutionPageContent() {
               onDateSelect={handleDateChange}
               disabled={!selectedChip}
             />
+          </PageFiltersBar.Item>
+        </PageFiltersBar.Group>
+        <PageFiltersBar.Group>
+          <PageFiltersBar.Item>
+            <label className="choice-field gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="toggle toggle-sm"
+                checked={groupSessions}
+                onChange={(event) => handleGroupingChange(event.target.checked)}
+              />
+              <span>Group agent sessions</span>
+            </label>
           </PageFiltersBar.Item>
         </PageFiltersBar.Group>
       </PageFiltersBar>
@@ -438,12 +446,16 @@ export function ExecutionPageContent() {
             Recent executions
           </h2>
           <p className="text-sm text-base-content/60">
-            {total != null
-              ? `${total} execution${total === 1 ? "" : "s"}`
-              : `${cardData.length} shown`}
+            {groupSessions && groupData
+              ? groupData.agent_sessions > 0
+                ? `${pluralize(groupData.total_executions, "execution")}, ${groupData.grouped_executions} of them in ${pluralize(groupData.agent_sessions, "agent session")}; ${pluralize(groupData.total, "row")}`
+                : pluralize(groupData.total_executions, "execution")
+              : total != null
+                ? `${total} execution${total === 1 ? "" : "s"}`
+                : `${cardData.length} shown`}
           </p>
         </div>
-        {cardData.length === 0 && (
+        {pageRows === 0 && (
           <div className="rounded-box border border-dashed border-base-300 bg-base-100 px-6 py-12 text-center">
             <h3 className="font-medium">No executions found</h3>
             <p className="mt-1 text-sm text-base-content/60">
@@ -452,66 +464,42 @@ export function ExecutionPageContent() {
           </div>
         )}
         <div className="grid grid-cols-1 gap-2">
-          {cardData.map((execution) => {
-            const executionKey = getExecutionKey(execution);
-            const isSelected = selectedExecutionId === execution.execution_id;
-            const statusBorderStyle = getStatusBorderStyle(execution.status);
-            const StatusIcon = getStatusIcon(execution.status);
-
-            return (
-              <div
-                key={executionKey}
-                ref={(element) => {
-                  if (element) executionCards.current.set(execution.execution_id, element);
-                  else executionCards.current.delete(execution.execution_id);
-                }}
-                role="button"
-                aria-expanded={isSelected && isSidebarOpen}
-                aria-controls="execution-details-panel"
-                tabIndex={0}
-                aria-label={`View ${execution.name} execution details`}
-                className={`relative flex cursor-pointer overflow-hidden rounded-box border border-base-200 bg-base-100 p-3 shadow-sm transition-colors hover:border-primary/40 hover:bg-base-200/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary sm:p-4 ${statusBorderStyle}`}
-                onClick={() => handleCardClick(execution)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    handleCardClick(execution);
-                  }
-                }}
-              >
-                {isSelected && (
-                  <div className="absolute inset-0 bg-primary opacity-10 pointer-events-none transition-opacity duration-500" />
-                )}
-                <div className="relative z-10 w-full">
-                  <div className="flex items-center justify-between gap-2">
-                    <h3 className="truncate text-sm font-medium">{execution.name}</h3>
-                    <span
-                      className={`badge badge-sm flex-shrink-0 gap-1 ${getStatusBadgeClass(execution.status)}`}
-                    >
-                      <StatusIcon className="h-4 w-4" aria-hidden="true" />
-                      {getStatusLabel(execution.status)}
-                    </span>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-x-2 sm:gap-x-3 gap-y-0.5 mt-0.5 sm:mt-1 text-sm text-base-content/60">
-                    <span>{formatDateTime(execution.start_at)}</span>
-                    {execution.elapsed_time && (
-                      <span className="hidden sm:inline">Duration: {execution.elapsed_time}</span>
-                    )}
-                    {execution.elapsed_time && (
-                      <span className="sm:hidden">{execution.elapsed_time}</span>
-                    )}
-                    <span className="inline-flex items-center gap-1 min-w-0">
-                      <UserRound className="h-3 w-3 flex-shrink-0" />
-                      <span className="truncate">{formatActorLabel(execution)}</span>
-                    </span>
-                  </div>
-                  {execution.status === "failed" && execution.message && (
-                    <p className="mt-2 line-clamp-2 text-xs text-error">{execution.message}</p>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+          {groupSessions
+            ? (groupData?.items ?? []).map((item) =>
+                item.kind === "agent_session" && item.agent_session ? (
+                  <AgentSessionGroupRow
+                    key={`session:${item.agent_session.session_id}`}
+                    item={item}
+                    projectId={projectId}
+                    isExpanded={expandedSessions.has(item.agent_session.session_id)}
+                    onToggle={toggleSession}
+                    selectedExecutionId={selectedExecutionId}
+                    isPanelOpen={isSidebarOpen}
+                    onOpenExecution={handleCardClick}
+                    registerCard={registerCard}
+                    hasDayFilter={selectedDate !== "latest"}
+                  />
+                ) : item.execution ? (
+                  <ExecutionListCard
+                    key={getExecutionKey(item.execution)}
+                    execution={item.execution}
+                    isSelected={selectedExecutionId === item.execution.execution_id}
+                    isPanelOpen={isSidebarOpen}
+                    onOpen={handleCardClick}
+                    registerCard={registerCard}
+                  />
+                ) : null,
+              )
+            : cardData.map((execution) => (
+                <ExecutionListCard
+                  key={getExecutionKey(execution)}
+                  execution={execution}
+                  isSelected={selectedExecutionId === execution.execution_id}
+                  isPanelOpen={isSidebarOpen}
+                  onOpen={handleCardClick}
+                  registerCard={registerCard}
+                />
+              ))}
         </div>
         {shouldShowPagination && (
           <PaginationControls
@@ -574,8 +562,14 @@ export function ExecutionPageContent() {
             </nav>
             <div className="p-2 sm:p-4 bg-base-100 mb-4 sm:mb-6">
               <h2 className="text-sm font-medium pr-8">
-                {cardData.find((exec) => getExecutionKey(exec) === selectedExecutionId)?.name}
+                {cardData.find((exec) => getExecutionKey(exec) === selectedExecutionId)?.name ??
+                  executionDetailData?.data?.name}
               </h2>
+              <ExecutionAgentSessionNotice
+                link={executionDetailData?.data?.agent_session}
+                chipId={executionDetailData?.data?.chip_id || selectedChip || ""}
+                className="mt-3"
+              />
               {executionDetailData?.data && (
                 <ExecutionRunSummary
                   status={executionDetailData.data.status}
@@ -599,7 +593,10 @@ export function ExecutionPageContent() {
                     | string
                     | undefined;
                   const isCancellable =
-                    !!detailFlowRunId && isExecutionCancellable(selectedExec?.status);
+                    !!detailFlowRunId &&
+                    isExecutionCancellable(
+                      selectedExec?.status ?? executionDetailData?.data?.status,
+                    );
                   return (
                     isCancellable && (
                       <button

@@ -81,3 +81,41 @@ describe("ExecutionDetailClient parameter changes", () => {
     expect(screen.queryByText("parameter changes body")).toBeNull();
   });
 });
+
+describe("ExecutionDetailClient agent session link", () => {
+  afterEach(() => cleanup());
+
+  it("links a measurement to its agent session journey", () => {
+    execution = {
+      name: "agent:CheckRabi",
+      status: "completed",
+      chip_id: "64Q",
+      task: [],
+      agent_session: { session_id: "s-1", linked: true, action_id: "a-1", status: "active" },
+    };
+    render(<ExecutionDetailClient chipId="64Q" executionId="exec-1" />);
+    expect(screen.getByRole("note").textContent).toContain("One measurement of agent session");
+    expect(screen.getByRole("link", { name: "Open journey" }).getAttribute("href")).toBe(
+      "/execution/64Q/sessions/s-1",
+    );
+  });
+
+  it("says a tag alone does not group the execution", () => {
+    execution = {
+      name: "agent:CheckRabi",
+      status: "completed",
+      chip_id: "64Q",
+      task: [],
+      agent_session: { session_id: "s-old", linked: false, action_id: null, status: null },
+    };
+    render(<ExecutionDetailClient chipId="64Q" executionId="exec-1" />);
+    expect(screen.getByRole("note").textContent).toContain("listed as its own execution");
+    expect(screen.queryByRole("link", { name: "Open journey" })).toBeNull();
+  });
+
+  it("shows nothing for an execution outside agent sessions", () => {
+    execution = { name: "Daily run", status: "completed", chip_id: "64Q", task: [] };
+    render(<ExecutionDetailClient chipId="64Q" executionId="exec-1" />);
+    expect(screen.queryByRole("note")).toBeNull();
+  });
+});

@@ -18,6 +18,7 @@ import { isExecutionCancellable } from "@/lib/executionStatus";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
 import { formatDateTime as formatDateTimeUtil } from "@/lib/utils/datetime";
 
+import { ExecutionAgentSessionNotice } from "./ExecutionAgentSessionNotice";
 import { ExecutionDAG } from "./ExecutionDAG";
 import { ExecutionParameterChanges } from "./ExecutionParameterChanges";
 import { ExecutionRunSummary } from "./ExecutionRunSummary";
@@ -273,6 +274,10 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
               <span className="truncate">{formatActorLabel(execution)}</span>
             </div>
           </div>
+          <ExecutionAgentSessionNotice
+            link={execution.agent_session}
+            chipId={execution.chip_id || chipId}
+          />
           <ExecutionRunSummary status={execution.status} tasks={execution.task ?? []} />
           {execution.status === "failed" && (
             <TaskMessagePanel

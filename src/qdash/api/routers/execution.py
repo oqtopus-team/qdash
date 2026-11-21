@@ -17,7 +17,11 @@ from fastapi.responses import FileResponse
 from starlette.background import BackgroundTask
 from starlette.exceptions import HTTPException
 
-from qdash.api.dependencies import get_execution_service, get_flow_service
+from qdash.api.dependencies import (
+    get_execution_group_service,
+    get_execution_service,
+    get_flow_service,
+)
 from qdash.api.lib.project import (
     ProjectContext,
     get_project_context,
@@ -35,7 +39,12 @@ from qdash.api.schemas.execution import (
     ExecutionResponseDetail,
     ListExecutionsResponse,
 )
+from qdash.api.schemas.execution_group import (
+    AgentSessionJourneyResponse,
+    ListExecutionGroupsResponse,
+)
 from qdash.api.services.artifact_preview_service import preview_netcdf
+from qdash.api.services.execution_group_service import ExecutionGroupService
 from qdash.api.services.execution_service import (
     MAX_SIX_HOUR_ACTIVITY_DAYS,
     ExecutionService,
@@ -302,6 +311,74 @@ def list_executions(
         skip=skip,
         limit=limit,
     )
+
+
+@router.get(
+    "/executions/groups",
+    response_model=ListExecutionGroupsResponse,
+    summary="List executions with agent sessions grouped",
+    operation_id="listExecutionGroups",
+)
+def list_execution_groups(
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    group_service: Annotated[ExecutionGroupService, Depends(get_execution_group_service)],
+    chip_id: Annotated[str, Query(description="Chip ID to list executions for")],
+    skip: Annotated[int, Query(ge=0, description="Rows to skip")] = 0,
+    limit: Annotated[int, Query(ge=1, le=100, description="Rows to return")] = 20,
+    date: Annotated[
+        str | None,
+        Query(
+            pattern=r"^\d{8}$",
+            description=(
+                "Only rows active on this day, YYYYMMDD: executions started on it, and agent "
+                "sessions created or with a measurement started on it"
+            ),
+        ),
+    ] = None,
+    timezone: Annotated[
+        str, Query(description="IANA time zone that defines the day for ``date``")
+    ] = "UTC",
+) -> ListExecutionGroupsResponse:
+    """List a chip's executions newest first, with each agent session as one row.
+
+    A session row holds the real executions the session's actions dispatched, linked through
+    the session's action records; a tag alone does not group an execution. Rows are grouped
+    before pagination, so a session is never split across pages and no execution is listed
+    twice. ``total`` counts rows and ``total_executions`` counts executions. A session row is
+    ordered by its latest activity (its latest measurement start, or its creation before the
+    first). The session's status is its own; each child keeps its execution's status.
+    """
+    return group_service.list_groups(
+        project_id=ctx.project_id,
+        chip_id=chip_id,
+        skip=skip,
+        limit=limit,
+        date=date,
+        timezone=timezone,
+    )
+
+
+@router.get(
+    "/executions/groups/agent-sessions/{session_id}",
+    response_model=AgentSessionJourneyResponse,
+    responses={404: {"model": Detail}},
+    summary="Get an agent session as a journey over its executions",
+    operation_id="getAgentSessionJourney",
+)
+def get_agent_session_journey(
+    session_id: str,
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    group_service: Annotated[ExecutionGroupService, Depends(get_execution_group_service)],
+) -> AgentSessionJourneyResponse:
+    """Return one agent session's measurements, proposals, decisions, and interventions.
+
+    Nodes are typed and carry ids of the authoritative records (actions, executions, task
+    results, decisions, interventions), not raw data. Edges are typed: ``sequence`` is the
+    order measurements were dispatched; the other kinds come from references in the records.
+    It is a live read, not a snapshot; the session audit endpoints hold the full record.
+    A session of another project is not found.
+    """
+    return group_service.journey(project_id=ctx.project_id, session_id=session_id)
 
 
 @router.get(

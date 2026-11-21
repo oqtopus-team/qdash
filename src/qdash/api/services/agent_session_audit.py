@@ -32,6 +32,7 @@ from qdash.api.schemas.agent_session import (
     ListAgentDecisionsResponse,
     RecordAgentDecisionRequest,
 )
+from qdash.api.services.agent_execution_links import resolve_chip_links, utc
 from qdash.api.services.agent_session_gate import load_agent_session
 from qdash.api.services.agent_session_service import AgentSessionService
 from qdash.common.utils.datetime import now
@@ -165,6 +166,7 @@ class _Records:
         session_id = session.session_id
         scope = {"project_id": project_id, "session_id": session_id}
         self.session = session
+        self.execution_links = resolve_chip_links(project_id, session.chip_id)
         self.actions = cast(
             "list[AgentActionDocument]",
             AgentActionDocument.find(scope, sort=[("created_at", SortDirection.ASCENDING)]).run(),
@@ -204,8 +206,17 @@ class _Records:
                     }
                 ).run(),
             )
+            # The order the Execution grouping resolves in (``agent_execution_links``): a flow
+            # run id several executions carry names the earliest, never the database's order.
+            found.sort(
+                key=lambda e: (
+                    utc(e.start_at) or datetime.min.replace(tzinfo=UTC),
+                    e.execution_id,
+                )
+            )
             for execution in found:
                 self.executions[execution.execution_id] = execution
+            for execution in found:
                 flow_run_id = (execution.note or {}).get("flow_run_id")
                 if isinstance(flow_run_id, str):
                     self.executions.setdefault(flow_run_id, execution)
@@ -251,15 +262,13 @@ class _Records:
             )
 
     def execution_of(self, action: AgentActionDocument) -> ExecutionHistoryDocument | None:
-        for key in (action.operation_id, action.execution_id):
-            if key and key in self.executions:
-                return self.executions[key]
-        return None
+        link = self.execution_links.by_action.get(action.action_id)
+        return self.executions.get(link.execution_id) if link is not None else None
 
     def execution_id_of(self, action: AgentActionDocument) -> str | None:
-        """The QDash execution of an action, from its execution record or the action's own."""
-        execution = self.execution_of(action)
-        return execution.execution_id if execution is not None else action.execution_id
+        """The execution attributed to this action by the shared ownership resolver."""
+        link = self.execution_links.by_action.get(action.action_id)
+        return link.execution_id if link is not None else None
 
 
 # ---------------------------------------------------------------------- evidence snapshots
@@ -293,6 +302,9 @@ def _measurement_facts(
     missing: list[str] = []
     execution = records.execution_of(action)
     result = records.task_results.get(action.action_id)
+    conflict = records.execution_links.unlinked.get(action.action_id)
+    if conflict is not None:
+        missing.append(f"execution_link_{conflict.reason}")
     execution_status = execution.status if execution is not None else action.execution_status
     facts: dict[str, Any] = {
         "dispatch_status": action.execution_status,

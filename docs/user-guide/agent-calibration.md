@@ -41,7 +41,8 @@ To have experts notified in Slack when the agent stops, configure
    session, and saving values to the calibration asks you separately. The approval is yours:
    the agent runs steps on its own only in a session you created, not in a colleague's.
 4. The agent measures, reads each result, its figures, and the task documentation, and chooses
-   the next measurement. Each run appears on the **Execution** page as `agent:<task>`. A
+   the next measurement. Each run appears on the **Execution** page as `agent:<task>`, inside
+   the session's row. A
    measurement never writes calibration parameters; its values wait as candidates, checked
    against the session's ranges and quality limits.
 5. Each measurement uses the saved calibration values, not waiting candidates. When the next
@@ -133,6 +134,39 @@ can read and export the audit; only the session's creator, through the agent, ad
 The audit is kept for review. Nothing turns it into skill or task-knowledge changes by itself.
 How this works: [Experiment audit](../developer-guide/copilot/agentic-calibration.md#experiment-audit).
 
+## Follow a session on the Execution page
+
+Open **Execution** and expand the session's row to see the runs the agent started, or select
+**Open journey** for the whole session. A run's details panel and its page also link to its
+session with **Open journey**. The session's own page links back with **View the measurements
+on the Execution page**.
+
+The journey page shows the session's state and how many runs, proposals, decisions, and open
+questions it has, then the steps in time order, left to right:
+
+| Step | What it shows | Selecting it |
+| --- | --- | --- |
+| **Measurement** | One run, with its own status; a repeat is a separate step with its try number | Opens the result and figures in the side panel; **Execution** opens the run |
+| **Rejected proposal** | A step the session did not allow; it never reached hardware | Shows the reason |
+| **Agent decision** | The agent's assessment of earlier results and its next step | Shows the rationale, the results it cites, and the next step, with a link to the **Audit** |
+| **Expert** | A question the agent asked and the expert's answer, if any | Shows the question, answer, and guidance, with a link to the **Intervention** |
+
+A measurement step whose run an earlier step already holds, in this or another session, or whose
+records name two different runs, shows that it was started but has no run of its own. Use
+**Policy and audit** for its records.
+
+Dashed lines only show the order in which runs were started. Solid lines are links the records
+hold: the results a decision cites, the step it chose, and the question it raised. A dotted line
+marks a declared repeat. A step is never linked to another only because it came later. The same
+steps are listed in a table below the graph. The page refreshes every five seconds. It shows at
+most the latest 1000 steps and says so when it leaves earlier ones out; the audit keeps all of
+them. Use **Policy and audit** for the session's limits and the full audit, and **Answer the
+expert request** while the session waits.
+
+A run tagged with a session that no step of the session started, such as one from an older
+version, stays in the list as its own run; its page says it is only tagged.
+How this works: [Execution grouping](../developer-guide/copilot/agentic-calibration.md#execution-grouping).
+
 ## Run a fixed plan from the command line
 
 The `qdash-agent` command of the Python client runs a plan you write, step by step, in a session
@@ -207,7 +241,7 @@ qdash-agent --profile local run-step \
 | `--apply-backend` | After the commit, have a worker update the mapped Qubex configuration files from the committed value, read them back, and push the changed files. The response records the configuration versions before and after. |
 | `--github-push` | Also version the changed files in GitHub. |
 
-The run appears on the **Execution** page as `agent:<task>`, tagged with the session, so it is
+The run appears on the **Execution** page as `agent:<task>`, inside the session's row, so it is
 told apart from a workbench quick run or a manual re-execution. The measurement itself never
 writes parameters; only the gated commit does.
 

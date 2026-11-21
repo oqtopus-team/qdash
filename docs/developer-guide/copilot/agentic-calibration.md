@@ -415,6 +415,8 @@ applies one at a time. `src/qdash/api/services/agent_session_gate.py` holds it.
 - **Counted action.** The update that counts a submitted action stores its record in
   `pending_action`; the record is inserted afterwards and by every later load, so no load
   returns a state version without the action it counted (see [Server checks](#server-checks)).
+  The read-only Execution journey does not insert it; it shows the payload and marks it pending
+  (see [Execution grouping](#execution-grouping)).
 - **Pause.** One update moves the session from `active` to `waiting_for_human`, sets
   `active_intervention_id`, and stores the intervention record (and, for `request_human`, the
   action record) in `pending_intervention`. The records are then inserted into their
@@ -575,6 +577,92 @@ The audit is an application record: QDash's API only appends decisions, and the 
 keep their existing write paths. It is not tamper-proof against a database administrator, and
 it does not freeze external artifacts such as figure files.
 
+## Execution grouping
+
+The Execution page presents a session as one experiment over its real executions without
+making the session an execution. The session stays the authority for policy, budget, and
+pauses; each measurement stays an ordinary execution whose workflow and hardware lifecycle the
+session does not own. Nothing here dispatches, locks, cancels, or writes: the grouping and the
+journey are read-only projections in `src/qdash/api/services/execution_group_service.py`.
+
+**Link authority.** An execution belongs to a session only when an authorized `run_task` action
+of that session names it: the action's `operation_id` matches the execution's
+`note.flow_run_id`, or its `operation_id` or `execution_id` matches the `execution_id`. The
+execution must be in the session's project and on its chip. `resolve_chip_links` and
+`link_for_execution` in `src/qdash/api/services/agent_execution_links.py` hold the one
+resolution used by the list, an execution's `agent_session` field, the journey, and the audit
+when attributing measurements:
+
+- An action resolves through its `operation_id` first, then its `execution_id`. A flow run id
+  that several executions carry resolves to the earliest by `start_at`, then `execution_id`,
+  never by database order.
+- An action whose `operation_id` and `execution_id` resolve to two different executions on the
+  chip is ambiguous and links neither.
+- Actions are taken by `created_at`, then `state_version_before`, then `action_id`, across all
+  sessions of the chip. The first action that resolves to an execution holds it, so no execution
+  sits in two groups or is two measurements; a later action that resolves to it is claimed.
+
+A claimed or ambiguous action is a link conflict, not an undispatched action: the list names it
+and its holder in the session's `missing`, and the journey shows it as a `measurement` node with
+status `link_claimed` or `link_ambiguous`, `missing` `execution_link_claimed` or
+`execution_link_ambiguous`, no execution, task result, or dispatch `sequence`, and its own
+`dispatch_status`. The audit also marks the link conflict as missing and excludes that action's
+execution results and evaluations, while preserving its recorded dispatch status. The `agent-session:<id>` tag is not a link: a tagged execution without such
+an action stays its own row, and its detail reports `linked: false`. No record is written to
+group, and no `upstream_id` is changed.
+
+**Pagination.** `GET /executions/groups` (`listExecutionGroups`) groups before it pages. Rows
+are the chip's sessions plus the executions no session holds, merged newest first: an execution
+by `start_at`, as `GET /executions` orders it, and a session by its latest activity, the latest
+start of its executions or its `created_at` before the first. With `date`, an execution needs
+its start on that day; a session needs its creation or an execution start on that day, is ordered
+by its latest activity of that day, and still lists every execution with `in_filter`. The
+response counts rows (`total`) apart from executions (`total_executions`, equal to the ungrouped
+list's total, and `grouped_executions`). A row carries at most `MAX_LIST_CHILDREN` (20) of its
+latest executions and `children_omitted`. Each request reads the identifiers of the chip's
+sessions, their dispatched actions, and the matching executions, then at most `skip + limit`
+ungrouped execution identifiers; the page's sessions are read with one query per collection, not
+one audit per row. `GET /executions` is unchanged.
+
+**Status boundary.** A row's `status` is the session's, with an active or paused session past
+`expires_at` reported as `expired` without a write (`stored_status` keeps the record's value);
+each child keeps its execution's status. `counts.in_flight` counts measurements being
+dispatched, queued, or whose execution is scheduled, running, or cancelling, so an active
+session with none is idle, not failed, and holding no execution lock while it waits for an
+expert is normal. The pipeline progress of `_pipeline_progress`, which infers a run's status from
+the project lock, is not used for sessions. Facts the records do not hold, such as a dispatched
+action whose execution is not found on the chip, are listed in `missing`.
+
+**Journey.** `GET /executions/groups/agent-sessions/{session_id}` (`getAgentSessionJourney`)
+reads the session in the caller's project (404 otherwise) and returns typed nodes and edges.
+It writes nothing: unlike `load_agent_session`, it does not insert a `pending_action` or
+`pending_intervention` payload or record an expiry. A session past `expires_at` is reported as
+`expired` with its `stored_status`; a record the session counted but has not written is shown
+from its payload, with `action_record` in the node's `missing` and the record named in the
+session's `missing`. The session's own load writes them on its next operation. Nodes are
+`measurement` (an authorized `run_task`, with the execution it holds by the link authority
+above, the task result of that execution only, figure count, latest evaluation, dispatch
+`sequence`, and per-target `attempt`), `proposal` (a rejected action),
+`session_action` (an authorized `request_human` or `complete_session`), `decision`, and
+`intervention` (question and answer in one node); every node has a stable `node_id` built from
+its record's id. Edges are `sequence` (the next dispatched measurement; temporal only),
+`evidence` (each `evidence_action_ids` entry, and each `evaluation_ids` entry through its task
+result), `next_action`, `retry_of` (a declared `repeat_of_action_id`), `escalation` (an
+intervention's action, a decision's intervention), and `follow_up` (an intervention's
+predecessor or follow-up). A reference outside the journey is listed in the node's `missing`
+instead of an edge. Nodes carry ids and scalars, never raw arrays. The response is a live read,
+not a snapshot, keeps at most the latest `MAX_JOURNEY_NODES` (1000) nodes with `complete` and
+`omitted_nodes`, and points to the audit above for the consistency-checked record and export.
+
+The UI lives in `ui/src/components/features/execution/`: `AgentSessionGroupRow` in the list,
+`AgentSessionJourneyPageContent` and `AgentSessionJourneyGraph` on
+`/execution/[chipId]/sessions/[sessionId]`, and `ExecutionAgentSessionNotice` on the execution
+detail and panel. The journey page pins its requests to the linked project with
+`useLinkedProject`, as the session pages do, and the list adds the project to its query key and
+request header; a project switch closes the panel and collapses the groups. Tests:
+`tests/qdash/api/services/test_execution_group_service.py`,
+`tests/qdash/api/routers/test_execution_groups.py`, and the `__tests__` of those components.
+
 ## Statuses
 
 Each layer keeps its own status, and the plan reads them from the outside in.
@@ -646,6 +734,9 @@ planner may escalate after the value is already written; only `commit_on_success
   audit timeline, pages, and export; tests in `tests/qdash/api/services/test_agent_session_audit.py`
   and `tests/qdash/api/routers/test_agent_session_audit.py`
 - `ui/src/components/features/agent-session/`: session and intervention pages
+- `src/qdash/api/services/agent_execution_links.py`,
+  `src/qdash/api/services/execution_group_service.py`: action-to-execution links, the grouped
+  Execution list, and the journey; see [Execution grouping](#execution-grouping)
 - `src/qdash/api/services/calibration_pipeline_preflight.py`: pipeline preflight
 - `clients/python/tests/test_agent_runner.py`, `clients/python/tests/test_evaluation_planner.py`,
   `tests/qdash/api/services/test_agent_session_service.py`,

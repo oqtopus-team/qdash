@@ -5,6 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { ExecutionResponseDetailAgentSession } from './executionResponseDetailAgentSession';
 import type { ExecutionResponseDetailElapsedTime } from './executionResponseDetailElapsedTime';
 import type { ExecutionResponseDetailEndAt } from './executionResponseDetailEndAt';
 import type { ExecutionResponseDetailNote } from './executionResponseDetailNote';
@@ -46,4 +47,6 @@ export interface ExecutionResponseDetail {
   chip_id?: string;
   /** Set when this execution belongs to a pipeline run; covers every step of it */
   pipeline?: ExecutionResponseDetailPipeline;
+  /** The agent session whose action dispatched this execution, or the session only its tag names (linked false); null for an execution outside agent sessions */
+  agent_session?: ExecutionResponseDetailAgentSession;
 }

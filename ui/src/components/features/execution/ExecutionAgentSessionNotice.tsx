@@ -1,0 +1,51 @@
+"use client";
+
+import Link from "next/link";
+
+import { Bot } from "lucide-react";
+
+import type { ExecutionAgentSessionLink } from "@/schemas";
+
+import { sessionStatusLabel } from "@/components/features/agent-session/interventionLabels";
+
+import { sessionJourneyHref } from "./agentSessionDisplay";
+
+/**
+ * Where an execution sits in an agent session. A linked execution points to its session's
+ * journey; one only tagged for a session says so, because the tag is no link and the execution
+ * stays an ordinary one.
+ */
+export function ExecutionAgentSessionNotice({
+  link,
+  chipId,
+  className = "",
+}: {
+  link: ExecutionAgentSessionLink | null | undefined;
+  chipId: string;
+  className?: string;
+}) {
+  if (!link) return null;
+  if (!link.linked) {
+    return (
+      <div role="note" className={`alert alert-soft text-sm ${className}`}>
+        <Bot className="h-4 w-4" aria-hidden="true" />
+        <span>
+          Tagged for agent session <span className="font-mono">{link.session_id}</span>, but no
+          action of that session dispatched it on this chip, so it is listed as its own execution
+        </span>
+      </div>
+    );
+  }
+  return (
+    <div role="note" className={`alert alert-info alert-soft text-sm ${className}`}>
+      <Bot className="h-4 w-4" aria-hidden="true" />
+      <span>
+        One measurement of agent session <span className="font-mono">{link.session_id}</span>
+        {link.status ? ` (${sessionStatusLabel(link.status)})` : ""}
+      </span>
+      <Link href={sessionJourneyHref(chipId, link.session_id)} className="link link-hover">
+        Open journey
+      </Link>
+    </div>
+  );
+}

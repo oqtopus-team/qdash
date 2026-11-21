@@ -34,6 +34,7 @@ from qdash.api.services.cryostat_service import CryostatService
 from qdash.api.services.dashboard_service import DashboardService
 from qdash.api.services.device_topology_service import DeviceTopologyService
 from qdash.api.services.evaluation_service import EvaluationService
+from qdash.api.services.execution_group_service import ExecutionGroupService
 from qdash.api.services.execution_service import ExecutionService
 from qdash.api.services.file_service import FileService
 from qdash.api.services.forum_service import ForumService
@@ -191,6 +192,12 @@ def get_execution_lock_repository() -> MongoExecutionLockRepository:
 
     """
     return MongoExecutionLockRepository()
+
+
+@cached_dependency_provider
+def get_execution_group_service() -> ExecutionGroupService:
+    """Get the service that groups executions by agent session."""
+    return ExecutionGroupService(execution_history_repository=get_execution_history_repository())
 
 
 @cached_dependency_provider

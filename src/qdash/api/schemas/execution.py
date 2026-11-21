@@ -6,6 +6,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field, field_serializer, field_validator
 
 from qdash.common.utils.datetime import format_elapsed_time, parse_elapsed_time
+from qdash.datamodel.agent_session import AgentSessionStatus
 from qdash.datamodel.task import TaskResultInputParameter, TaskResultOutputParameter
 from qdash.datamodel.task_invocation import TaskInvocation
 
@@ -173,6 +174,22 @@ class PipelineProgress(BaseModel):
     steps: list[PipelineStepProgress]
 
 
+class ExecutionAgentSessionLink(BaseModel):
+    """The agent session an execution belongs to, as its records establish it."""
+
+    session_id: str
+    linked: bool = Field(
+        description=(
+            "True when an action of the session dispatched this execution on the same chip; "
+            "false when only a tag names the session, which is no authority to group it"
+        )
+    )
+    action_id: str | None = None
+    status: AgentSessionStatus | None = Field(
+        default=None, description="The session's state, when the session is in this project"
+    )
+
+
 class ExecutionResponseDetail(BaseModel):
     """ExecutionResponseDetail is a Pydantic model that represents the detail of an execution response.
 
@@ -208,6 +225,13 @@ class ExecutionResponseDetail(BaseModel):
     pipeline: PipelineProgress | None = Field(
         default=None,
         description="Set when this execution belongs to a pipeline run; covers every step of it",
+    )
+    agent_session: ExecutionAgentSessionLink | None = Field(
+        default=None,
+        description=(
+            "The agent session whose action dispatched this execution, or the session only "
+            "its tag names (linked false); null for an execution outside agent sessions"
+        ),
     )
 
     @field_validator("elapsed_time", mode="before")

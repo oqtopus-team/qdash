@@ -30,6 +30,7 @@ from qdash.api.schemas.execution import (
     PipelineStepProgress,
     Task,
 )
+from qdash.api.services.agent_execution_links import link_for_execution
 from qdash.common.utils.datetime import now, parse_elapsed_time
 from qdash.datamodel.execution import ExecutionStatusModel
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
@@ -194,6 +195,28 @@ def by_index_ids(by_index: dict[int, ExecutionHistoryDocument]) -> set[str]:
     return {doc.execution_id for doc in by_index.values()}
 
 
+def execution_summary(execution: ExecutionHistoryDocument) -> ExecutionResponseSummary:
+    """The list row of one execution."""
+    return ExecutionResponseSummary(
+        name=f"{execution.name}-{execution.execution_id}",
+        execution_id=execution.execution_id,
+        status=execution.status,
+        message=execution.message,
+        user_id=execution.user_id,
+        username=execution.username,
+        start_at=execution.start_at,
+        end_at=execution.end_at,
+        elapsed_time=parse_elapsed_time(execution.elapsed_time),
+        tags=execution.tags,
+        note=execution.note,
+    )
+
+
+def day_window(date: str, timezone: str) -> tuple[datetime, datetime]:
+    """UTC bounds of the calendar day ``date`` (YYYYMMDD) in ``timezone``, or a 400."""
+    return _day_window(date, _resolve_zone(timezone))
+
+
 class ExecutionService:
     """Service for execution-related operations.
 
@@ -311,22 +334,7 @@ class ExecutionService:
             limit=limit,
             started_between=_day_window(date, _resolve_zone(timezone)) if date else None,
         )
-        return [
-            ExecutionResponseSummary(
-                name=f"{execution.name}-{execution.execution_id}",
-                execution_id=execution.execution_id,
-                status=execution.status,
-                message=execution.message,
-                user_id=execution.user_id,
-                username=execution.username,
-                start_at=execution.start_at,
-                end_at=execution.end_at,
-                elapsed_time=parse_elapsed_time(execution.elapsed_time),
-                tags=execution.tags,
-                note=execution.note,
-            )
-            for execution in executions
-        ]
+        return [execution_summary(execution) for execution in executions]
 
     def count_executions(
         self,
@@ -391,6 +399,7 @@ class ExecutionService:
             tags=execution.tags,
             chip_id=execution.chip_id,
             pipeline=self._pipeline_progress(project_id, execution),
+            agent_session=link_for_execution(project_id, execution),
         )
 
     def _pipeline_progress(
