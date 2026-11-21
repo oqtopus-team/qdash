@@ -341,12 +341,15 @@ function SidebarNavItem({
     <li>
       <Link
         href={item.href}
-        className={isMobileOpen ? linkClass(active) : desktopLinkClass(active)}
+        className={`${isMobileOpen ? linkClass(active) : desktopLinkClass(active)}${item.badge ? " gap-0" : ""}`}
         aria-current={active ? "page" : undefined}
         onClick={onClick}
       >
         <Icon size={18} className="shrink-0" aria-hidden="true" />
         <span className={`ml-2 truncate ${railFadeClass(showLabel)}`}>{item.label}</span>
+        {item.badge && showLabel && (
+          <span className="badge badge-xs ml-1 shrink-0 px-1">{item.badge}</span>
+        )}
       </Link>
     </li>
   );
@@ -754,7 +757,7 @@ export function Sidebar() {
       </aside>
 
       {/* Mobile menu: the header menu button opens it below `lg`. The tab bar covers
-          Dashboard, Workflow, Execution, and Agent, so the drawer lists every other
+          Overview, Workflow, Execution, and Agent, so the drawer lists every other
           destination. Radix traps focus, closes on Escape or an outside press, and
           returns focus to the button that opened it. */}
       <Dialog open={isMobileOpen} onOpenChange={setMobileSidebarOpen}>

@@ -3,7 +3,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import { MiniChatWindow } from "../MiniChatWindow";
 
 vi.mock("next/navigation", () => ({
-  usePathname: () => "/dashboard",
+  usePathname: () => "/overview",
   useRouter: () => ({ push: vi.fn() }),
 }));
 vi.mock("@/contexts/ChatDockContext", () => ({

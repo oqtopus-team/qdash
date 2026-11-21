@@ -7,7 +7,7 @@ import { FolderLock, Settings, ShieldCheck } from "lucide-react";
 
 import { Navbar } from "./Navbar";
 import { Sidebar } from "./Sidebar";
-import { ChatSidebar } from "./ChatSidebar";
+import { AGENT_TAB_WIDTH, ChatSidebar, useAgentTabShown } from "./ChatSidebar";
 import { MiniChatWindow } from "./MiniChatWindow";
 import { MobileTabBar } from "./MobileTabBar";
 
@@ -59,6 +59,27 @@ function ProjectAccessState() {
   );
 }
 
+/**
+ * The scrolling page area. While the Ask Agent tab floats over its right edge, it sets
+ * `--agent-tab-inset`, the room the tab takes plus a small gap; PageContainer keeps its right
+ * gutter at least that wide, so a control at the edge (a toolbar's Save) is not covered.
+ */
+function AppMain({ children }: { children: React.ReactNode }) {
+  const tabShown = useAgentTabShown();
+  return (
+    <main
+      className="flex-1 overflow-y-auto bg-base-100"
+      style={
+        tabShown
+          ? { ["--agent-tab-inset" as string]: `calc(${AGENT_TAB_WIDTH} + 0.25rem)` }
+          : undefined
+      }
+    >
+      {children}
+    </main>
+  );
+}
+
 export function AppLayout({ children }: AppLayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -96,13 +117,13 @@ export function AppLayout({ children }: AppLayoutProps) {
             <div className="flex-1 flex flex-col h-full w-0 min-w-0 transition-[flex] duration-300 ease-in-out">
               <Navbar />
               {!showProjectAccessState && <FirstCalibrationBanner />}
-              <main className="flex-1 overflow-y-auto bg-base-100">
+              <AppMain>
                 {/* Full height of the area under the navbar and the guide banner, so editor
                     pages can fill it with h-full; taller pages overflow and scroll in main. */}
                 <div key={pathname} className="page-transition h-full">
                   {showProjectAccessState ? <ProjectAccessState /> : children}
                 </div>
-              </main>
+              </AppMain>
               <MobileTabBar />
             </div>
             <ChatSidebar />

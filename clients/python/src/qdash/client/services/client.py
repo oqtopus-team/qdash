@@ -7,6 +7,7 @@ import time
 from datetime import UTC, datetime
 from importlib.metadata import PackageNotFoundError, version
 from typing import TYPE_CHECKING, Any, TypeVar, cast
+from urllib.parse import quote
 
 import httpx
 from pydantic import BaseModel, ValidationError
@@ -54,6 +55,9 @@ from qdash.client.services.models import (
     ChipMetricsResponse,
     ChipResponse,
     CouplingResponse,
+    DashboardCreateRequest,
+    DashboardResponse,
+    DashboardUpdateRequest,
     ExecuteFlowResponse,
     ExecutePipelineResponse,
     ExecutionActivityResponse,
@@ -67,11 +71,21 @@ from qdash.client.services.models import (
     LineageResponse,
     ListChipsResponse,
     ListCouplingsResponse,
+    ListDashboardsResponse,
     ListExecutionsResponse,
     ListFlowsResponse,
+    ListMetricScriptsResponse,
+    ListMetricScriptTemplatesResponse,
     ListQubitsResponse,
     ListTaskKnowledgeResponse,
     ListTaskResponse,
+    MetricScriptCatalogResponse,
+    MetricScriptCreateRequest,
+    MetricScriptEvaluateRequest,
+    MetricScriptEvaluateResponse,
+    MetricScriptResponse,
+    MetricScriptUpdateRequest,
+    MetricScriptValidateResponse,
     NoteModel,
     ParameterHistoryResponse,
     ParameterVersionResponse,
@@ -109,6 +123,16 @@ def _resolve_user_agent() -> str:
     except PackageNotFoundError:
         package_version = "unknown"
     return f"qdash-client/{package_version}"
+
+
+def _path_part(value: str) -> str:
+    """``value`` as one URL path segment, so an ID cannot reach another route."""
+    return quote(value, safe="")
+
+
+def _request_body(request: BaseModel) -> dict[str, Any]:
+    """A request model as JSON, keeping only the fields the caller set (explicit nulls too)."""
+    return cast("dict[str, Any]", request.model_dump(mode="json", exclude_unset=True))
 
 
 class QDashClient:
@@ -730,6 +754,80 @@ class QDashClient:
             ),
         )
         return self._validate_model_payload(ScheduleFlowResponse, response.data)
+
+    def list_metric_scripts(self) -> ListMetricScriptsResponse:
+        """Metric scripts visible to the caller (project-shared and their own), without source."""
+        response = self._request("GET", "/metric-scripts")
+        return self._validate_model_payload(ListMetricScriptsResponse, response.data)
+
+    def get_metric_script(self, script_id: str) -> MetricScriptResponse:
+        """A metric script with its latest source, active (last-good) source and revisions."""
+        response = self._request("GET", f"/metric-scripts/{_path_part(script_id)}")
+        return self._validate_model_payload(MetricScriptResponse, response.data)
+
+    def list_metric_script_templates(self) -> ListMetricScriptTemplatesResponse:
+        """Starter metric scripts, with their source."""
+        response = self._request("GET", "/metric-scripts/templates")
+        return self._validate_model_payload(ListMetricScriptTemplatesResponse, response.data)
+
+    def get_metric_script_catalog(self) -> MetricScriptCatalogResponse:
+        """The qubit and coupling metrics a script can read through ``ctx.data``."""
+        response = self._request("GET", "/metric-scripts/catalog")
+        return self._validate_model_payload(MetricScriptCatalogResponse, response.data)
+
+    def validate_metric_script(self, source: str) -> MetricScriptValidateResponse:
+        """Compile metric script source in a worker; nothing is saved."""
+        response = self._request("POST", "/metric-scripts/validate", json={"source": source})
+        return self._validate_model_payload(MetricScriptValidateResponse, response.data)
+
+    def evaluate_metric_script(
+        self, script_id: str, request: MetricScriptEvaluateRequest
+    ) -> MetricScriptEvaluateResponse:
+        """Evaluate one metric of a saved script's validated revision (the active by default)."""
+        response = self._request(
+            "POST",
+            f"/metric-scripts/{_path_part(script_id)}/evaluate",
+            json=_request_body(request),
+        )
+        return self._validate_model_payload(MetricScriptEvaluateResponse, response.data)
+
+    def create_metric_script(self, request: MetricScriptCreateRequest) -> MetricScriptResponse:
+        """Create a metric script; the server validates the source and records revision 1."""
+        response = self._request("POST", "/metric-scripts", json=_request_body(request))
+        return self._validate_model_payload(MetricScriptResponse, response.data)
+
+    def update_metric_script(
+        self, script_id: str, request: MetricScriptUpdateRequest
+    ) -> MetricScriptResponse:
+        """Update a script; new source is validated and saved as a revision."""
+        response = self._request(
+            "PATCH", f"/metric-scripts/{_path_part(script_id)}", json=_request_body(request)
+        )
+        return self._validate_model_payload(MetricScriptResponse, response.data)
+
+    def list_dashboards(self) -> ListDashboardsResponse:
+        """Dashboards visible to the caller (project-shared and their own)."""
+        response = self._request("GET", "/dashboards")
+        return self._validate_model_payload(ListDashboardsResponse, response.data)
+
+    def get_dashboard(self, dashboard_id: str) -> DashboardResponse:
+        response = self._request("GET", f"/dashboards/{_path_part(dashboard_id)}")
+        return self._validate_model_payload(DashboardResponse, response.data)
+
+    def create_dashboard(self, request: DashboardCreateRequest) -> DashboardResponse:
+        response = self._request("POST", "/dashboards", json=_request_body(request))
+        return self._validate_model_payload(DashboardResponse, response.data)
+
+    def update_dashboard(
+        self, dashboard_id: str, request: DashboardUpdateRequest
+    ) -> DashboardResponse:
+        """Update a dashboard; a provided ``panels`` list replaces the previous one."""
+        response = self._request(
+            "PATCH",
+            f"/dashboards/{_path_part(dashboard_id)}",
+            json=_request_body(request),
+        )
+        return self._validate_model_payload(DashboardResponse, response.data)
 
     def get_calibration_pipeline_catalog(
         self, *, backend_name: str | None = None

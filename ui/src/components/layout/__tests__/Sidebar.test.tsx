@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Sidebar } from "@/components/layout/Sidebar";
 
 const push = vi.fn();
-const mockPathname = vi.hoisted(() => vi.fn(() => "/dashboard"));
+const mockPathname = vi.hoisted(() => vi.fn(() => "/overview"));
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push }),
@@ -102,7 +102,7 @@ describe("Sidebar", () => {
     cleanup();
     vi.restoreAllMocks();
     vi.clearAllMocks();
-    mockPathname.mockReturnValue("/dashboard");
+    mockPathname.mockReturnValue("/overview");
     sidebarState.isOpen = true;
     sidebarState.isMobileOpen = false;
     projectState.canEdit = false;
@@ -117,6 +117,23 @@ describe("Sidebar", () => {
     expect(mobile.className).toContain("w-56");
     expect(mobile.className).not.toContain("w-72");
     expect(mobile.className).toContain("lg:hidden");
+  });
+
+  it.each([false, true])("marks Dashboards as Beta (mobile: %s)", (mobileOpen) => {
+    sidebarState.isMobileOpen = mobileOpen;
+    const { container } = render(<Sidebar />);
+    const surface = mobileOpen ? getMobileDrawer() : getAsides(container).desktop;
+    const link = surface.querySelector('a[href="/dashboards"]');
+
+    expect(link).not.toBeNull();
+    expect(within(link as HTMLElement).getByText("Beta")).toBeTruthy();
+  });
+
+  it("omits the Beta badge from the collapsed rail", () => {
+    sidebarState.isOpen = false;
+    render(<Sidebar />);
+
+    expect(screen.queryByText("Beta")).toBeNull();
   });
 
   it("mounts the mobile drawer only while it is open", () => {
@@ -149,7 +166,7 @@ describe("Sidebar", () => {
     const visible = desktop.querySelectorAll(
       '[data-testid="sidebar-active-indicator"][data-state="visible"]',
     );
-    const { link, indicator } = getSectionIndicator(desktop, "/dashboard");
+    const { link, indicator } = getSectionIndicator(desktop, "/overview");
 
     expect(link.getAttribute("aria-current")).toBe("page");
     expect(visible).toHaveLength(1);
@@ -178,7 +195,7 @@ describe("Sidebar", () => {
     rerender(<Sidebar />);
 
     const { desktop } = getAsides(container);
-    const overview = getSectionIndicator(desktop, "/dashboard").indicator;
+    const overview = getSectionIndicator(desktop, "/overview").indicator;
     const { link, indicator: operate } = getSectionIndicator(desktop, "/execution");
 
     expect(link.getAttribute("aria-current")).toBe("page");
@@ -316,7 +333,7 @@ describe("Sidebar", () => {
       const drawer = within(getMobileDrawer());
       const nav = within(drawer.getByRole("navigation", { name: "Menu navigation" }));
 
-      for (const label of ["Dashboard", "Workflow", "Execution", "Agent"]) {
+      for (const label of ["Overview", "Workflow", "Execution", "Agent"]) {
         expect(nav.queryByRole("link", { name: label })).toBeNull();
       }
       for (const label of ["Home", "Metrics", "Task Results", "Tasks", "Config", "Settings"]) {
@@ -600,11 +617,11 @@ describe("Sidebar", () => {
     it("names each section list by its heading in both rail states", () => {
       const { container, rerender } = render(<Sidebar />);
       const desktop = getDesktopAside(container);
-      const overview = within(desktop).getByRole("list", { name: "Overview" });
+      const overview = within(desktop).getByRole("list", { name: "Explore" });
 
       toggleRail(rerender);
 
-      expect(within(desktop).getByRole("list", { name: "Overview" })).toBe(overview);
+      expect(within(desktop).getByRole("list", { name: "Explore" })).toBe(overview);
       for (const heading of desktop.querySelectorAll('[data-testid="sidebar-section-header"]')) {
         expect(heading.getAttribute("aria-hidden")).toBe("true");
       }
@@ -675,7 +692,7 @@ describe("Sidebar", () => {
 
     it("pins the active pill with insets so it tracks the rail width", () => {
       const { container } = render(<Sidebar />);
-      const { indicator } = getSectionIndicator(getDesktopAside(container), "/dashboard");
+      const { indicator } = getSectionIndicator(getDesktopAside(container), "/overview");
       const style = (indicator as HTMLElement).style;
 
       expect(style.left).not.toBe("");
@@ -702,7 +719,7 @@ describe("Sidebar", () => {
       Object.defineProperty(settled, "propertyName", { value: "grid-template-rows" });
       nav.querySelector('[data-testid="sidebar-section-header"]')?.dispatchEvent(settled);
       expect(scroll).toHaveBeenCalledTimes(1);
-      expect(scroll.mock.contexts[0]).toBe(within(nav).getByRole("link", { name: "Dashboard" }));
+      expect(scroll.mock.contexts[0]).toBe(within(nav).getByRole("link", { name: "Overview" }));
     });
 
     it("still reveals the active row on navigation", () => {

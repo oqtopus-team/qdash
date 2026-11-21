@@ -10,6 +10,16 @@ from typing import Annotated, Any, Literal
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, RootModel
 
 
+class AbsolutePeriod(BaseModel):
+    """
+    A fixed ``[start, end]`` window; both bounds need a timezone.
+    """
+
+    kind: Annotated[Literal["absolute"], Field(title="Kind")] = "absolute"
+    start: Annotated[AwareDatetime, Field(title="Start")]
+    end: Annotated[AwareDatetime, Field(title="End")]
+
+
 class ActivityResponse(BaseModel):
     """
     Response model for an activity (task execution).
@@ -348,6 +358,29 @@ class CandidateGateResponse(BaseModel):
     reason: Annotated[str, Field(title="Reason")]
     minimum: Annotated[float | None, Field(title="Minimum")] = None
     maximum: Annotated[float | None, Field(title="Maximum")] = None
+
+
+class CellCheck(BaseModel):
+    """
+    One ``(label, value)`` row of a cell's details.
+    """
+
+    label: Annotated[str, Field(title="Label")]
+    value: Annotated[float | str | None, Field(title="Value")] = None
+
+
+class CellReference(BaseModel):
+    """
+    An input value a cell was computed from.
+    """
+
+    metric: Annotated[str, Field(title="Metric")]
+    target: Annotated[str, Field(title="Target")]
+    task_id: Annotated[str | None, Field(title="Task Id")] = None
+    execution_id: Annotated[str | None, Field(title="Execution Id")] = None
+    timestamp: Annotated[str | None, Field(title="Timestamp")] = None
+    value: Annotated[float | None, Field(title="Value")] = None
+    unit: Annotated[str | None, Field(title="Unit")] = None
 
 
 class Backend(StrEnum):
@@ -806,6 +839,60 @@ class CryostatUpdateRequest(BaseModel):
     status: Annotated[str | None, Field(title="Status")] = None
     commissioned_at: Annotated[AwareDatetime | None, Field(title="Commissioned At")] = None
     decommissioned_at: Annotated[AwareDatetime | None, Field(title="Decommissioned At")] = None
+
+
+class Visibility(StrEnum):
+    private = "private"
+    project = "project"
+
+
+class ChipId(RootModel[str]):
+    root: Annotated[str, Field(max_length=100, title="Chip Id")]
+
+
+class TemplateId(RootModel[str]):
+    root: Annotated[str, Field(max_length=100, title="Template Id")]
+    """
+    Template whose panels are copied into the dashboard when panels is empty
+    """
+
+
+class Type(StrEnum):
+    """
+    Panel kind
+    """
+
+    qubit_metric = "qubit_metric"
+    coupling_metric = "coupling_metric"
+    metric_script = "metric_script"
+    markdown = "markdown"
+
+
+class DashboardTemplateResponse(BaseModel):
+    """
+    A starter template; its panels are copied into a dashboard on creation.
+    """
+
+    template_id: Annotated[str, Field(title="Template Id")]
+    name: Annotated[str, Field(title="Name")]
+    description: Annotated[str, Field(title="Description")]
+    panel_count: Annotated[int, Field(title="Panel Count")]
+    panel_types: Annotated[list[str], Field(title="Panel Types")]
+
+
+class Name(RootModel[str]):
+    root: Annotated[str, Field(max_length=200, min_length=1, title="Name")]
+
+
+class Description(RootModel[str]):
+    root: Annotated[str, Field(max_length=2000, title="Description")]
+
+
+class ExpectedVersion(RootModel[int]):
+    root: Annotated[int, Field(ge=0, title="Expected Version")]
+    """
+    Reject with 409 unless the dashboard is still at this version; omit to update whatever is stored
+    """
 
 
 class DegradationTrendResponse(BaseModel):
@@ -1720,6 +1807,56 @@ class FlowTemplateWithCode(BaseModel):
     """
 
 
+class FormatSourceDiagnostic(BaseModel):
+    """
+    Why the source could not be formatted.
+    """
+
+    message: Annotated[str, Field(title="Message")]
+    line: Annotated[int | None, Field(title="Line")] = None
+    column: Annotated[int | None, Field(title="Column")] = None
+
+
+class FormatSourceRequest(BaseModel):
+    """
+    Python source to format; nothing is saved or executed.
+    """
+
+    source: Annotated[str, Field(max_length=524288, title="Source")]
+    """
+    Python source (≤ 512 KiB)
+    """
+
+
+class Status5(StrEnum):
+    """
+    formatted: source differs from the input; unchanged: the input is already formatted; syntax_error: the input cannot be parsed and is returned as given
+    """
+
+    formatted = "formatted"
+    unchanged = "unchanged"
+    syntax_error = "syntax_error"
+
+
+class FormatSourceResponse(BaseModel):
+    """
+    The source formatted with Ruff, or the input unchanged when it cannot be parsed.
+    """
+
+    status: Annotated[Status5, Field(title="Status")]
+    """
+    formatted: source differs from the input; unchanged: the input is already formatted; syntax_error: the input cannot be parsed and is returned as given
+    """
+    source: Annotated[str, Field(title="Source")]
+    """
+    Formatted source, or the input on a syntax error
+    """
+    diagnostic: FormatSourceDiagnostic | None = None
+    """
+    Location of the syntax error that prevented formatting
+    """
+
+
 class Key(RootModel[str]):
     root: Annotated[
         str,
@@ -1824,14 +1961,14 @@ class ForumCategoryResponse(BaseModel):
     """
 
 
-class Name(RootModel[str]):
+class Name1(RootModel[str]):
     root: Annotated[str, Field(max_length=80, min_length=1, title="Name")]
     """
     Display name
     """
 
 
-class Description(RootModel[str]):
+class Description1(RootModel[str]):
     root: Annotated[str, Field(max_length=200, title="Description")]
     """
     Short description
@@ -1863,11 +2000,11 @@ class ForumCategoryUpdate(BaseModel):
     Request schema for updating a forum category.
     """
 
-    name: Annotated[Name | None, Field(title="Name")] = None
+    name: Annotated[Name1 | None, Field(title="Name")] = None
     """
     Display name
     """
-    description: Annotated[Description | None, Field(title="Description")] = None
+    description: Annotated[Description1 | None, Field(title="Description")] = None
     """
     Short description
     """
@@ -1954,11 +2091,11 @@ class ForumLabelUpdate(BaseModel):
     Request schema for updating a forum label.
     """
 
-    name: Annotated[Name | None, Field(title="Name")] = None
+    name: Annotated[Name1 | None, Field(title="Name")] = None
     """
     Display name
     """
-    description: Annotated[Description | None, Field(title="Description")] = None
+    description: Annotated[Description1 | None, Field(title="Description")] = None
     """
     Short description
     """
@@ -1982,7 +2119,7 @@ class AssigneeUsername(RootModel[str]):
     """
 
 
-class Status5(StrEnum):
+class Status6(StrEnum):
     """
     Thread workflow status
     """
@@ -1993,7 +2130,7 @@ class Status5(StrEnum):
     resolved = "resolved"
 
 
-class ChipId(RootModel[str]):
+class ChipId2(RootModel[str]):
     root: Annotated[str, Field(max_length=128, title="Chip Id")]
     """
     Linked chip ID
@@ -2069,11 +2206,11 @@ class ForumPostCreate(BaseModel):
     """
     Assigned project member username
     """
-    status: Annotated[Status5, Field(title="Status")] = Status5.open
+    status: Annotated[Status6, Field(title="Status")] = Status6.open
     """
     Thread workflow status
     """
-    chip_id: Annotated[ChipId | None, Field(title="Chip Id")] = None
+    chip_id: Annotated[ChipId2 | None, Field(title="Chip Id")] = None
     """
     Linked chip ID
     """
@@ -2131,7 +2268,7 @@ class AssigneeUsername1(RootModel[str]):
     """
 
 
-class Status7(StrEnum):
+class Status8(StrEnum):
     """
     Updated thread workflow status
     """
@@ -2142,7 +2279,7 @@ class Status7(StrEnum):
     resolved = "resolved"
 
 
-class ChipId1(RootModel[str]):
+class ChipId3(RootModel[str]):
     root: Annotated[str, Field(max_length=128, title="Chip Id")]
     """
     Updated linked chip ID
@@ -2199,11 +2336,11 @@ class ForumPostUpdate(BaseModel):
     """
     Updated assigned project member username
     """
-    status: Annotated[Status7 | None, Field(title="Status")] = None
+    status: Annotated[Status8 | None, Field(title="Status")] = None
     """
     Updated thread workflow status
     """
-    chip_id: Annotated[ChipId1 | None, Field(title="Chip Id")] = None
+    chip_id: Annotated[ChipId3 | None, Field(title="Chip Id")] = None
     """
     Updated linked chip ID
     """
@@ -2341,6 +2478,24 @@ class KnowledgeFigureResponse(BaseModel):
     mime_type: Annotated[str, Field(title="Mime Type")] = ""
 
 
+class LegendItem(BaseModel):
+    """
+    Categorical legend entry.
+    """
+
+    color: Annotated[str, Field(title="Color")]
+    label: Annotated[str, Field(title="Label")]
+
+
+class LegendStop(BaseModel):
+    """
+    Continuous color-scale stop in the metric's unit.
+    """
+
+    value: Annotated[float, Field(title="Value")]
+    color: Annotated[str, Field(title="Color")]
+
+
 class LineageEdgeResponse(BaseModel):
     """
     Response model for an edge in the lineage graph.
@@ -2409,6 +2564,14 @@ class ListCopilotChatSessionsResponse(BaseModel):
     """
 
     sessions: Annotated[list[CopilotChatSessionSummary], Field(title="Sessions")]
+
+
+class ListDashboardTemplatesResponse(BaseModel):
+    """
+    Available starter templates.
+    """
+
+    templates: Annotated[list[DashboardTemplateResponse], Field(title="Templates")]
 
 
 class ListExecutionsResponse(BaseModel):
@@ -2561,6 +2724,25 @@ class MeasError(BaseModel):
     readout_assignment_error: Annotated[float, Field(title="Readout Assignment Error")]
 
 
+class MetricCatalogEntry(BaseModel):
+    """
+    A metric scripts can read with ``ctx.data[name]``.
+    """
+
+    name: Annotated[str, Field(title="Name")]
+    title: Annotated[str, Field(title="Title")]
+    unit: Annotated[str, Field(title="Unit")]
+    scale: Annotated[float, Field(title="Scale")]
+    description: Annotated[str, Field(title="Description")]
+
+
+class Status9(StrEnum):
+    ok = "ok"
+    missing = "missing"
+    empty = "empty"
+    error = "error"
+
+
 class MetricHeatmapResponse(BaseModel):
     """
     Response model for metric heatmap data.
@@ -2677,6 +2859,154 @@ class MetricHistoryItem(BaseModel):
     excluded_at: Annotated[AwareDatetime | None, Field(title="Excluded At")] = None
 
 
+class Target(StrEnum):
+    qubit = "qubit"
+    pair = "pair"
+
+
+class Kind(StrEnum):
+    categorical = "categorical"
+    continuous = "continuous"
+
+
+class MetricLegend(BaseModel):
+    """
+    Legend declared by a metric.
+    """
+
+    kind: Annotated[Kind, Field(title="Kind")]
+    items: Annotated[list[LegendItem] | None, Field(title="Items")] = None
+    stops: Annotated[list[LegendStop] | None, Field(title="Stops")] = None
+
+
+class Kind1(StrEnum):
+    integer = "integer"
+    number = "number"
+    boolean = "boolean"
+    choice = "choice"
+
+
+class MetricParameterInfo(BaseModel):
+    """
+    A ``Parameter`` declared by a metric.
+    """
+
+    default: Annotated[bool | int | float | str, Field(title="Default")]
+    label: Annotated[str, Field(title="Label")] = ""
+    kind: Annotated[Kind1, Field(title="Kind")]
+    min: Annotated[float | None, Field(title="Min")] = None
+    max: Annotated[float | None, Field(title="Max")] = None
+    step: Annotated[float | None, Field(title="Step")] = None
+    unit: Annotated[str, Field(title="Unit")] = ""
+    choices: Annotated[list[str] | None, Field(title="Choices")] = None
+
+
+class MetricScriptCatalogResponse(BaseModel):
+    """
+    The data catalog of ``ctx.data``.
+    """
+
+    qubit_metrics: Annotated[list[MetricCatalogEntry], Field(title="Qubit Metrics")]
+    coupling_metrics: Annotated[list[MetricCatalogEntry], Field(title="Coupling Metrics")]
+
+
+class Source2(RootModel[str]):
+    root: Annotated[str, Field(max_length=262144, title="Source")]
+    """
+    Python source (≤ 256 KiB)
+    """
+
+
+class TemplateId1(RootModel[str]):
+    root: Annotated[str, Field(max_length=100, title="Template Id")]
+    """
+    Template to copy when source is omitted
+    """
+
+
+class MetricScriptCreateRequest(BaseModel):
+    """
+    Body for creating a script from source text or from a template.
+    """
+
+    name: Annotated[str, Field(max_length=120, min_length=1, title="Name")]
+    description: Annotated[str, Field(max_length=2000, title="Description")] = ""
+    visibility: Annotated[Visibility, Field(title="Visibility")] = Visibility.private
+    source: Annotated[Source2 | None, Field(title="Source")] = None
+    """
+    Python source (≤ 256 KiB)
+    """
+    template_id: Annotated[TemplateId1 | None, Field(title="Template Id")] = None
+    """
+    Template to copy when source is omitted
+    """
+
+
+class Revision(RootModel[int]):
+    root: Annotated[int, Field(ge=1, title="Revision")]
+    """
+    Revision to evaluate; defaults to the active one
+    """
+
+
+class Status10(StrEnum):
+    valid = "valid"
+    invalid = "invalid"
+
+
+class MetricScriptTemplateResponse(BaseModel):
+    """
+    A starter script.
+    """
+
+    template_id: Annotated[str, Field(title="Template Id")]
+    name: Annotated[str, Field(title="Name")]
+    description: Annotated[str, Field(title="Description")]
+    source: Annotated[str, Field(title="Source")]
+
+
+class Name3(RootModel[str]):
+    root: Annotated[str, Field(max_length=120, min_length=1, title="Name")]
+
+
+class Description3(RootModel[str]):
+    root: Annotated[str, Field(max_length=2000, title="Description")]
+
+
+class Source3(RootModel[str]):
+    root: Annotated[str, Field(max_length=262144, title="Source")]
+
+
+class ExpectedRevision(RootModel[int]):
+    root: Annotated[int, Field(ge=1, title="Expected Revision")]
+    """
+    Reject with 409 unless the script is still at this revision
+    """
+
+
+class MetricScriptUpdateRequest(BaseModel):
+    """
+    Body for updating a script; a new ``source`` is validated and saved as a revision.
+    """
+
+    name: Annotated[Name3 | None, Field(title="Name")] = None
+    description: Annotated[Description3 | None, Field(title="Description")] = None
+    visibility: Annotated[Visibility | None, Field(title="Visibility")] = None
+    source: Annotated[Source3 | None, Field(title="Source")] = None
+    expected_revision: Annotated[ExpectedRevision | None, Field(title="Expected Revision")] = None
+    """
+    Reject with 409 unless the script is still at this revision
+    """
+
+
+class MetricScriptValidateRequest(BaseModel):
+    """
+    Body for validating source text without saving it.
+    """
+
+    source: Annotated[str, Field(max_length=262144, title="Source")]
+
+
 class MetricValue(BaseModel):
     """
     Single metric value with metadata.
@@ -2732,12 +3062,12 @@ class MoveFlowResponse(BaseModel):
     """
 
 
-class Source2Enum(StrEnum):
+class Source4Enum(StrEnum):
     database = "database"
 
 
-class Source2(RootModel[Source2Enum | None]):
-    root: Annotated[Source2Enum | None, Field(title="Source")] = None
+class Source4(RootModel[Source4Enum | None]):
+    root: Annotated[Source4Enum | None, Field(title="Source")] = None
 
 
 class InputParameters1(BaseModel):
@@ -2750,7 +3080,7 @@ class InputParameters1(BaseModel):
     )
     parameter_name: Annotated[str, Field(title="Parameter Name")] = ""
     qid_role: Annotated[str, Field(title="Qid Role")] = ""
-    source: Annotated[Source2 | None, Field(title="Source")] = None
+    source: Annotated[Source4 | None, Field(title="Source")] = None
     required: Annotated[bool, Field(title="Required")] = False
     value: Annotated[Any | None, Field(title="Value")] = None
     value_type: Annotated[str, Field(title="Value Type")] = ""
@@ -2764,12 +3094,12 @@ class InputParameters1(BaseModel):
     ui_group_collapsed: Annotated[bool, Field(title="Ui Group Collapsed")] = False
 
 
-class Source3Enum(StrEnum):
+class Source5Enum(StrEnum):
     database = "database"
 
 
-class Source3(RootModel[Source3Enum | None]):
-    root: Annotated[Source3Enum | None, Field(title="Source")] = None
+class Source5(RootModel[Source5Enum | None]):
+    root: Annotated[Source5Enum | None, Field(title="Source")] = None
 
 
 class OutputParameters1(BaseModel):
@@ -2782,7 +3112,7 @@ class OutputParameters1(BaseModel):
     )
     parameter_name: Annotated[str, Field(title="Parameter Name")] = ""
     qid_role: Annotated[str, Field(title="Qid Role")] = ""
-    source: Annotated[Source3 | None, Field(title="Source")] = None
+    source: Annotated[Source5 | None, Field(title="Source")] = None
     required: Annotated[bool, Field(title="Required")] = False
     value: Annotated[Any | None, Field(title="Value")] = None
     value_type: Annotated[str, Field(title="Value Type")] = ""
@@ -2981,6 +3311,29 @@ class NumericBounds(BaseModel):
     maximum: Annotated[float | None, Field(title="Maximum")] = None
 
 
+class PanelLayoutModel(BaseModel):
+    """
+    Position and size of a panel on the 12-column grid.
+    """
+
+    x: Annotated[int, Field(ge=0, lt=12, title="X")]
+    """
+    Column of the left edge
+    """
+    y: Annotated[int, Field(ge=0, title="Y")]
+    """
+    Row of the top edge
+    """
+    w: Annotated[int, Field(ge=1, le=12, title="W")]
+    """
+    Width in columns
+    """
+    h: Annotated[int, Field(ge=1, le=12, title="H")]
+    """
+    Height in rows
+    """
+
+
 class ParameterChangeResponse(BaseModel):
     """
     Response model for a parameter change (with delta from previous version).
@@ -3061,12 +3414,12 @@ class ParameterDiffResponse(BaseModel):
     delta_percent: Annotated[float | None, Field(title="Delta Percent")] = None
 
 
-class Source4Enum(StrEnum):
+class Source6Enum(StrEnum):
     database = "database"
 
 
-class Source4(RootModel[Source4Enum | None]):
-    root: Annotated[Source4Enum | None, Field(title="Source")] = None
+class Source6(RootModel[Source6Enum | None]):
+    root: Annotated[Source6Enum | None, Field(title="Source")] = None
 
 
 class ParameterModel(BaseModel):
@@ -3096,7 +3449,7 @@ class ParameterModel(BaseModel):
 
     parameter_name: Annotated[str, Field(title="Parameter Name")] = ""
     qid_role: Annotated[str, Field(title="Qid Role")] = ""
-    source: Annotated[Source4 | None, Field(title="Source")] = None
+    source: Annotated[Source6 | None, Field(title="Source")] = None
     required: Annotated[bool, Field(title="Required")] = False
     value: Annotated[float | int | None, Field(title="Value")] = 0
     value_type: Annotated[str, Field(title="Value Type")] = "float"
@@ -3249,7 +3602,7 @@ class Position(BaseModel):
     y: Annotated[float, Field(title="Y")]
 
 
-class Description2(RootModel[str]):
+class Description4(RootModel[str]):
     root: Annotated[str, Field(max_length=500, title="Description")]
     """
     Project description
@@ -3265,7 +3618,7 @@ class ProjectCreate(BaseModel):
     """
     Project display name
     """
-    description: Annotated[Description2 | None, Field(title="Description")] = None
+    description: Annotated[Description4 | None, Field(title="Description")] = None
     """
     Project description
     """
@@ -3304,7 +3657,7 @@ class ProjectRole(StrEnum):
     viewer = "viewer"
 
 
-class Name2(RootModel[str]):
+class Name4(RootModel[str]):
     root: Annotated[str, Field(max_length=100, min_length=1, title="Name")]
     """
     Project display name
@@ -3316,11 +3669,11 @@ class ProjectUpdate(BaseModel):
     Request schema for updating a project.
     """
 
-    name: Annotated[Name2 | None, Field(title="Name")] = None
+    name: Annotated[Name4 | None, Field(title="Name")] = None
     """
     Project display name
     """
-    description: Annotated[Description2 | None, Field(title="Description")] = None
+    description: Annotated[Description4 | None, Field(title="Description")] = None
     """
     Project description
     """
@@ -3696,6 +4049,15 @@ class RecommendedTaskResponse(BaseModel):
     """
 
 
+class RelativePeriod(BaseModel):
+    """
+    The last ``days`` days, resolved to ``[now - days, now]`` at evaluation.
+    """
+
+    kind: Annotated[Literal["relative"], Field(title="Kind")] = "relative"
+    days: Annotated[int, Field(ge=1, le=400, title="Days")] = 14
+
+
 class ResolvedPipelineTargets(BaseModel):
     """
     The starting targets after chip lookup.
@@ -3807,6 +4169,10 @@ class SaveFlowResponse(BaseModel):
     """
     Success message
     """
+    code: Annotated[str | None, Field(title="Code")] = None
+    """
+    The stored source: the request code formatted with Ruff, or the code as given when it could not be formatted
+    """
 
 
 class ScheduleFlowRequest(BaseModel):
@@ -3869,6 +4235,17 @@ class ScheduleFlowResponse(BaseModel):
     """
     Success message
     """
+
+
+class ScriptDiagnostic(BaseModel):
+    """
+    A validation or runtime problem, located in the script when possible.
+    """
+
+    message: Annotated[str, Field(title="Message")]
+    line: Annotated[int | None, Field(title="Line")] = None
+    column: Annotated[int | None, Field(title="Column")] = None
+    function: Annotated[str | None, Field(title="Function")] = None
 
 
 class SeedImportResultItem(BaseModel):
@@ -4061,12 +4438,12 @@ class TargetNoteEntry(BaseModel):
     metric_notes: Annotated[dict[str, NoteModel] | None, Field(title="Metric Notes")] = None
 
 
-class Source5Enum(StrEnum):
+class Source7Enum(StrEnum):
     database = "database"
 
 
-class Source5(RootModel[Source5Enum | None]):
-    root: Annotated[Source5Enum | None, Field(title="Source")] = None
+class Source7(RootModel[Source7Enum | None]):
+    root: Annotated[Source7Enum | None, Field(title="Source")] = None
 
 
 class InputParameters2(BaseModel):
@@ -4079,7 +4456,7 @@ class InputParameters2(BaseModel):
     )
     parameter_name: Annotated[str, Field(title="Parameter Name")] = ""
     qid_role: Annotated[str, Field(title="Qid Role")] = ""
-    source: Annotated[Source5 | None, Field(title="Source")] = None
+    source: Annotated[Source7 | None, Field(title="Source")] = None
     required: Annotated[bool, Field(title="Required")] = False
     value: Annotated[Any | None, Field(title="Value")] = None
     value_type: Annotated[str, Field(title="Value Type")] = ""
@@ -4093,12 +4470,12 @@ class InputParameters2(BaseModel):
     ui_group_collapsed: Annotated[bool, Field(title="Ui Group Collapsed")] = False
 
 
-class Source6Enum(StrEnum):
+class Source8Enum(StrEnum):
     database = "database"
 
 
-class Source6(RootModel[Source6Enum | None]):
-    root: Annotated[Source6Enum | None, Field(title="Source")] = None
+class Source8(RootModel[Source8Enum | None]):
+    root: Annotated[Source8Enum | None, Field(title="Source")] = None
 
 
 class OutputParameters2(BaseModel):
@@ -4111,7 +4488,7 @@ class OutputParameters2(BaseModel):
     )
     parameter_name: Annotated[str, Field(title="Parameter Name")] = ""
     qid_role: Annotated[str, Field(title="Qid Role")] = ""
-    source: Annotated[Source6 | None, Field(title="Source")] = None
+    source: Annotated[Source8 | None, Field(title="Source")] = None
     required: Annotated[bool, Field(title="Required")] = False
     value: Annotated[Any | None, Field(title="Value")] = None
     value_type: Annotated[str, Field(title="Value Type")] = ""
@@ -4317,12 +4694,12 @@ class TaskResponse(BaseModel):
     output_parameters: Annotated[dict[str, InputParameterModel], Field(title="Output Parameters")]
 
 
-class Source7Enum(StrEnum):
+class Source9Enum(StrEnum):
     database = "database"
 
 
-class Source7(RootModel[Source7Enum | None]):
-    root: Annotated[Source7Enum | None, Field(title="Source")] = None
+class Source9(RootModel[Source9Enum | None]):
+    root: Annotated[Source9Enum | None, Field(title="Source")] = None
 
 
 class InputParameters3(BaseModel):
@@ -4335,7 +4712,7 @@ class InputParameters3(BaseModel):
     )
     parameter_name: Annotated[str, Field(title="Parameter Name")] = ""
     qid_role: Annotated[str, Field(title="Qid Role")] = ""
-    source: Annotated[Source7 | None, Field(title="Source")] = None
+    source: Annotated[Source9 | None, Field(title="Source")] = None
     required: Annotated[bool, Field(title="Required")] = False
     value: Annotated[Any | None, Field(title="Value")] = None
     value_type: Annotated[str, Field(title="Value Type")] = ""
@@ -4349,12 +4726,12 @@ class InputParameters3(BaseModel):
     ui_group_collapsed: Annotated[bool, Field(title="Ui Group Collapsed")] = False
 
 
-class Source8Enum(StrEnum):
+class Source10Enum(StrEnum):
     database = "database"
 
 
-class Source8(RootModel[Source8Enum | None]):
-    root: Annotated[Source8Enum | None, Field(title="Source")] = None
+class Source10(RootModel[Source10Enum | None]):
+    root: Annotated[Source10Enum | None, Field(title="Source")] = None
 
 
 class OutputParameters3(BaseModel):
@@ -4367,7 +4744,7 @@ class OutputParameters3(BaseModel):
     )
     parameter_name: Annotated[str, Field(title="Parameter Name")] = ""
     qid_role: Annotated[str, Field(title="Qid Role")] = ""
-    source: Annotated[Source8 | None, Field(title="Source")] = None
+    source: Annotated[Source10 | None, Field(title="Source")] = None
     required: Annotated[bool, Field(title="Required")] = False
     value: Annotated[Any | None, Field(title="Value")] = None
     value_type: Annotated[str, Field(title="Value Type")] = ""
@@ -4480,12 +4857,12 @@ class TaskResultListResponse(BaseModel):
     status_counts: Annotated[dict[str, int], Field(title="Status Counts")]
 
 
-class Source9Enum(StrEnum):
+class Source11Enum(StrEnum):
     database = "database"
 
 
-class Source9(RootModel[Source9Enum | None]):
-    root: Annotated[Source9Enum | None, Field(title="Source")] = None
+class Source11(RootModel[Source11Enum | None]):
+    root: Annotated[Source11Enum | None, Field(title="Source")] = None
 
 
 class InputParameters4(BaseModel):
@@ -4498,7 +4875,7 @@ class InputParameters4(BaseModel):
     )
     parameter_name: Annotated[str, Field(title="Parameter Name")] = ""
     qid_role: Annotated[str, Field(title="Qid Role")] = ""
-    source: Annotated[Source9 | None, Field(title="Source")] = None
+    source: Annotated[Source11 | None, Field(title="Source")] = None
     required: Annotated[bool, Field(title="Required")] = False
     value: Annotated[Any | None, Field(title="Value")] = None
     value_type: Annotated[str, Field(title="Value Type")] = ""
@@ -4512,12 +4889,12 @@ class InputParameters4(BaseModel):
     ui_group_collapsed: Annotated[bool, Field(title="Ui Group Collapsed")] = False
 
 
-class Source10Enum(StrEnum):
+class Source12Enum(StrEnum):
     database = "database"
 
 
-class Source10(RootModel[Source10Enum | None]):
-    root: Annotated[Source10Enum | None, Field(title="Source")] = None
+class Source12(RootModel[Source12Enum | None]):
+    root: Annotated[Source12Enum | None, Field(title="Source")] = None
 
 
 class OutputParameters4(BaseModel):
@@ -4530,7 +4907,7 @@ class OutputParameters4(BaseModel):
     )
     parameter_name: Annotated[str, Field(title="Parameter Name")] = ""
     qid_role: Annotated[str, Field(title="Qid Role")] = ""
-    source: Annotated[Source10 | None, Field(title="Source")] = None
+    source: Annotated[Source12 | None, Field(title="Source")] = None
     required: Annotated[bool, Field(title="Required")] = False
     value: Annotated[Any | None, Field(title="Value")] = None
     value_type: Annotated[str, Field(title="Value Type")] = ""
@@ -4609,6 +4986,50 @@ class TaskResultResponse(BaseModel):
     start_at: Annotated[AwareDatetime | None, Field(title="Start At")] = None
     end_at: Annotated[AwareDatetime | None, Field(title="End At")] = None
     elapsed_time: Annotated[timedelta | None, Field(title="Elapsed Time")] = None
+
+
+class TemplatePreviewPanel(BaseModel):
+    """
+    A template panel as it would be created now.
+
+    A ``metric_script`` panel whose project script exists is pinned to it as on creation.
+    When the project has no such script yet, ``config`` has no script reference and
+    ``script_template_id`` names the starter script that creating the dashboard adds.
+    """
+
+    panel_id: Annotated[str, Field(max_length=64, min_length=1, title="Panel Id")]
+    """
+    Dashboard-unique ID
+    """
+    type: Annotated[Type, Field(title="Type")]
+    """
+    Panel kind
+    """
+    title: Annotated[str, Field(max_length=200, title="Title")] = ""
+    """
+    Panel heading
+    """
+    layout: PanelLayoutModel
+    config: Annotated[dict[str, Any] | None, Field(title="Config")] = None
+    """
+    Type-specific settings
+    """
+    script_name: Annotated[str | None, Field(title="Script Name")] = None
+    latest_revision: Annotated[int | None, Field(title="Latest Revision")] = None
+    script_template_id: Annotated[str | None, Field(title="Script Template Id")] = None
+
+
+class TemplateScriptToCreate(BaseModel):
+    """
+    A shared metric script that creating a dashboard from the template adds.
+    """
+
+    template_id: Annotated[str, Field(title="Template Id")]
+    name: Annotated[str, Field(title="Name")]
+    source: Annotated[str, Field(title="Source")]
+    """
+    The starter source, for an unsaved preview
+    """
 
 
 class TimeSeriesData(BaseModel):
@@ -4738,7 +5159,7 @@ class User(BaseModel):
     system_role: SystemRole = SystemRole.user
 
 
-class Source11(StrEnum):
+class Source13(StrEnum):
     """
     automatic (derived from the username) or custom (chosen in the picker)
     """
@@ -4752,7 +5173,7 @@ class UserAvatarResponse(BaseModel):
     The avatar the current user shows.
     """
 
-    source: Annotated[Source11, Field(title="Source")]
+    source: Annotated[Source13, Field(title="Source")]
     """
     automatic (derived from the username) or custom (chosen in the picker)
     """
@@ -5181,6 +5602,55 @@ class GenerateCRScheduleStep(BaseModel):
     """
 
 
+class View(StrEnum):
+    map = "map"
+    table = "table"
+
+
+class Direction(StrEnum):
+    """
+    Pair maps: which edge directions to draw
+    """
+
+    both = "both"
+    forward = "forward"
+    reverse = "reverse"
+
+
+class MetricScriptPanelConfig(BaseModel):
+    """
+    Config of a ``metric_script`` panel.
+
+    The panel pins ``script_revision``: saving a newer revision of the script never
+    changes what the panel shows until an editor updates the pin. The service checks the
+    script, revision, metric and parameters when the dashboard is saved.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    script_id: Annotated[str, Field(max_length=64, min_length=1, title="Script Id")]
+    script_revision: Annotated[int, Field(ge=1, le=9223372036854776000, title="Script Revision")]
+    """
+    Pinned script revision
+    """
+    metric_id: Annotated[str, Field(max_length=200, min_length=1, title="Metric Id")]
+    period: Annotated[
+        RelativePeriod | AbsolutePeriod | None,
+        Field(discriminator="kind", title="Period"),
+    ] = None
+    params: Annotated[dict[str, bool | int | float | str] | None, Field(title="Params")] = None
+    view: Annotated[View, Field(title="View")] = View.map
+    direction: Annotated[Direction, Field(title="Direction")] = Direction.both
+    """
+    Pair maps: which edge directions to draw
+    """
+    hops: Annotated[list[int] | None, Field(title="Hops")] = None
+    """
+    Pair distances shown (within declared)
+    """
+
+
 class StepId2(RootModel[str]):
     root: Annotated[str, Field(pattern="^[a-z][a-z0-9_]{0,63}$", title="Step Id")]
     """
@@ -5469,6 +5939,19 @@ class BulkUserImportResult(BaseModel):
     message: Annotated[str | None, Field(title="Message")] = None
 
 
+class CellAssessment(BaseModel):
+    """
+    Details a metric attached to a cell.
+    """
+
+    checks: Annotated[list[CellCheck] | None, Field(title="Checks")] = None
+    estimates: Annotated[list[str] | None, Field(title="Estimates")] = None
+    count: Annotated[int | None, Field(title="Count")] = None
+    """
+    Number of observations behind the value
+    """
+
+
 class ChipMetricsResponse(BaseModel):
     """
     Complete chip metrics response.
@@ -5734,6 +6217,124 @@ class CryostatResponse(BaseModel):
     commissioned_at: Annotated[AwareDatetime | None, Field(title="Commissioned At")]
     decommissioned_at: Annotated[AwareDatetime | None, Field(title="Decommissioned At")]
     note: NoteModel | None = None
+
+
+class DashboardPanelModel(BaseModel):
+    """
+    One panel of a dashboard.
+
+    ``config`` is normalized when saved; its shape depends on ``type`` and is validated
+    against the matching ``*PanelConfig`` model when the dashboard is saved.
+    """
+
+    panel_id: Annotated[str, Field(max_length=64, min_length=1, title="Panel Id")]
+    """
+    Dashboard-unique ID
+    """
+    type: Annotated[Type, Field(title="Type")]
+    """
+    Panel kind
+    """
+    title: Annotated[str, Field(max_length=200, title="Title")] = ""
+    """
+    Panel heading
+    """
+    layout: PanelLayoutModel
+    config: Annotated[dict[str, Any] | None, Field(title="Config")] = None
+    """
+    Type-specific settings
+    """
+
+
+class DashboardPanelResponse(BaseModel):
+    """
+    A panel as returned to the caller.
+
+    For ``metric_script`` panels whose script the caller can view, ``script_name`` and
+    ``latest_revision`` (the script's active, last-good revision) let the UI offer to move
+    the pinned ``config.script_revision`` forward. Both are null for other panels.
+    """
+
+    panel_id: Annotated[str, Field(max_length=64, min_length=1, title="Panel Id")]
+    """
+    Dashboard-unique ID
+    """
+    type: Annotated[Type, Field(title="Type")]
+    """
+    Panel kind
+    """
+    title: Annotated[str, Field(max_length=200, title="Title")] = ""
+    """
+    Panel heading
+    """
+    layout: PanelLayoutModel
+    config: Annotated[dict[str, Any] | None, Field(title="Config")] = None
+    """
+    Type-specific settings
+    """
+    script_name: Annotated[str | None, Field(title="Script Name")] = None
+    latest_revision: Annotated[int | None, Field(title="Latest Revision")] = None
+
+
+class DashboardResponse(BaseModel):
+    """
+    A dashboard as seen by the caller.
+    """
+
+    dashboard_id: Annotated[str, Field(title="Dashboard Id")]
+    project_id: Annotated[str, Field(title="Project Id")]
+    name: Annotated[str, Field(title="Name")]
+    description: Annotated[str, Field(title="Description")]
+    visibility: Annotated[Visibility, Field(title="Visibility")]
+    chip_id: Annotated[str | None, Field(title="Chip Id")]
+    panels: Annotated[list[DashboardPanelResponse], Field(title="Panels")]
+    owner_username: Annotated[str, Field(title="Owner Username")]
+    owner_user_id: Annotated[str | None, Field(title="Owner User Id")]
+    can_edit: Annotated[bool, Field(title="Can Edit")]
+    """
+    Whether the caller may update or delete it
+    """
+    version: Annotated[int, Field(title="Version")]
+    """
+    Write counter; send it as expected_version to guard an update
+    """
+    created_at: Annotated[AwareDatetime, Field(title="Created At")]
+    updated_at: Annotated[AwareDatetime, Field(title="Updated At")]
+
+
+class DashboardTemplatePreviewResponse(BaseModel):
+    """
+    What a dashboard created from a template now would hold. Reading it writes nothing.
+    """
+
+    template_id: Annotated[str, Field(title="Template Id")]
+    name: Annotated[str, Field(title="Name")]
+    description: Annotated[str, Field(title="Description")]
+    panels: Annotated[list[TemplatePreviewPanel], Field(title="Panels")]
+    scripts_to_create: Annotated[list[TemplateScriptToCreate], Field(title="Scripts To Create")]
+    """
+    Project-visible metric scripts creation adds because the project has no script from that starter that still defines the panels' metrics
+    """
+
+
+class Panels(RootModel[list[DashboardPanelModel]]):
+    root: Annotated[list[DashboardPanelModel], Field(max_length=50, title="Panels")]
+
+
+class DashboardUpdateRequest(BaseModel):
+    """
+    Body for updating a dashboard. ``panels`` replaces the whole list.
+    """
+
+    name: Annotated[Name | None, Field(title="Name")] = None
+    description: Annotated[Description | None, Field(title="Description")] = None
+    visibility: Annotated[Visibility | None, Field(title="Visibility")] = None
+    chip_id: Annotated[ChipId | None, Field(title="Chip Id")] = None
+    panels: Annotated[Panels | None, Field(title="Panels")] = None
+    expected_version: Annotated[ExpectedVersion | None, Field(title="Expected Version")] = None
+    """
+    Reject with 409 unless the dashboard is still at this version; omit to update whatever is stored
+    """
 
 
 class DeviceTopologyRequest(BaseModel):
@@ -6133,7 +6734,7 @@ class ForumPostResponse(BaseModel):
     """
     Assigned project member username
     """
-    status: Annotated[Status5, Field(title="Status")] = Status5.open
+    status: Annotated[Status6, Field(title="Status")] = Status6.open
     """
     Thread workflow status
     """
@@ -6353,6 +6954,15 @@ class ListCryostatsResponse(BaseModel):
     cryostats: Annotated[list[CryostatResponse], Field(title="Cryostats")]
 
 
+class ListDashboardsResponse(BaseModel):
+    """
+    Dashboards visible to the caller.
+    """
+
+    dashboards: Annotated[list[DashboardResponse], Field(title="Dashboards")]
+    total: Annotated[int, Field(title="Total")]
+
+
 class ListEvaluationRunsResponse(BaseModel):
     """
     One page of runs, newest first.
@@ -6394,6 +7004,14 @@ class ListForumPostsResponse(BaseModel):
     total: Annotated[int, Field(title="Total")]
     skip: Annotated[int, Field(title="Skip")]
     limit: Annotated[int, Field(title="Limit")]
+
+
+class ListMetricScriptTemplatesResponse(BaseModel):
+    """
+    Available starter scripts.
+    """
+
+    templates: Annotated[list[MetricScriptTemplateResponse], Field(title="Templates")]
 
 
 class ListNoteEventsResponse(BaseModel):
@@ -6544,6 +7162,166 @@ class MemberUpdate(BaseModel):
     """
     New role for the member
     """
+
+
+class MetricCell(BaseModel):
+    """
+    Result of a metric for one qubit or one directed pair.
+    """
+
+    key: Annotated[str, Field(title="Key")]
+    """
+    '5' for a qubit, '5>6' for a directed pair
+    """
+    qid: Annotated[str | None, Field(title="Qid")] = None
+    source: Annotated[str | None, Field(title="Source")] = None
+    target: Annotated[str | None, Field(title="Target")] = None
+    hops: Annotated[int | None, Field(title="Hops")] = None
+    status: Annotated[Status9, Field(title="Status")]
+    value: Annotated[float | None, Field(title="Value")] = None
+    color: Annotated[str | None, Field(title="Color")] = None
+    label: Annotated[str | None, Field(title="Label")] = None
+    message: Annotated[str | None, Field(title="Message")] = None
+    diagnostic: ScriptDiagnostic | None = None
+    assessment: CellAssessment | None = None
+    references: Annotated[list[CellReference] | None, Field(title="References")] = None
+
+
+class MetricInfo(BaseModel):
+    """
+    Catalog entry of one ``@metric`` function.
+    """
+
+    id: Annotated[str, Field(title="Id")]
+    title: Annotated[str, Field(title="Title")]
+    unit: Annotated[str, Field(title="Unit")]
+    target: Annotated[Target, Field(title="Target")]
+    hops: Annotated[list[int] | None, Field(title="Hops")] = None
+    parameters: Annotated[dict[str, MetricParameterInfo] | None, Field(title="Parameters")] = None
+    has_legend: Annotated[bool, Field(title="Has Legend")] = False
+
+
+class MetricScriptDraftEvaluateRequest(BaseModel):
+    """
+    Body for previewing unsaved source text on a chip.
+    """
+
+    source: Annotated[str, Field(max_length=262144, title="Source")]
+    metric_id: Annotated[str, Field(max_length=200, min_length=1, title="Metric Id")]
+    chip_id: Annotated[str, Field(max_length=100, min_length=1, title="Chip Id")]
+    period: Annotated[
+        RelativePeriod | AbsolutePeriod | None,
+        Field(discriminator="kind", title="Period"),
+    ] = None
+    params: Annotated[dict[str, bool | int | float | str] | None, Field(title="Params")] = None
+
+
+class MetricScriptEvaluateRequest(BaseModel):
+    """
+    Body for evaluating a saved revision on a chip.
+    """
+
+    metric_id: Annotated[str, Field(max_length=200, min_length=1, title="Metric Id")]
+    chip_id: Annotated[str, Field(max_length=100, min_length=1, title="Chip Id")]
+    period: Annotated[
+        RelativePeriod | AbsolutePeriod | None,
+        Field(discriminator="kind", title="Period"),
+    ] = None
+    params: Annotated[dict[str, bool | int | float | str] | None, Field(title="Params")] = None
+    revision: Annotated[Revision | None, Field(title="Revision")] = None
+    """
+    Revision to evaluate; defaults to the active one
+    """
+
+
+class MetricScriptEvaluateResponse(BaseModel):
+    """
+    Cells of one metric over a chip.
+    """
+
+    script_id: Annotated[str | None, Field(title="Script Id")]
+    """
+    None for a draft preview
+    """
+    revision: Annotated[int | None, Field(title="Revision")]
+    """
+    Evaluated revision; None for a draft
+    """
+    metric: MetricInfo
+    chip_id: Annotated[str, Field(title="Chip Id")]
+    start: Annotated[AwareDatetime, Field(title="Start")]
+    """
+    Resolved period start
+    """
+    end: Annotated[AwareDatetime, Field(title="End")]
+    """
+    Resolved period end
+    """
+    params: Annotated[dict[str, Any], Field(title="Params")]
+    """
+    Effective parameter values
+    """
+    legend: MetricLegend | None
+    cells: Annotated[list[MetricCell], Field(title="Cells")]
+    log: Annotated[str, Field(title="Log")] = ""
+    """
+    Script output (bounded to 16 KiB)
+    """
+    evaluated_at: Annotated[AwareDatetime, Field(title="Evaluated At")]
+    truncated: Annotated[bool, Field(title="Truncated")] = False
+    """
+    The log was truncated or a history span was clamped to the broker cap
+    """
+
+
+class MetricScriptRevision(BaseModel):
+    """
+    One saved source text of a script.
+    """
+
+    revision: Annotated[int, Field(title="Revision")]
+    source: Annotated[str, Field(title="Source")]
+    created_at: Annotated[AwareDatetime, Field(title="Created At")]
+    status: Annotated[Status10, Field(title="Status")]
+    metrics: Annotated[list[MetricInfo] | None, Field(title="Metrics")] = None
+    """
+    Catalog of this revision (valid revisions only)
+    """
+
+
+class MetricScriptSummary(BaseModel):
+    """
+    A script in the list view (no source).
+    """
+
+    script_id: Annotated[str, Field(title="Script Id")]
+    project_id: Annotated[str, Field(title="Project Id")]
+    name: Annotated[str, Field(title="Name")]
+    description: Annotated[str, Field(title="Description")]
+    visibility: Annotated[Visibility, Field(title="Visibility")]
+    status: Annotated[Status10, Field(title="Status")]
+    revision: Annotated[int, Field(title="Revision")]
+    active_revision: Annotated[int | None, Field(title="Active Revision")]
+    metrics: Annotated[list[MetricInfo], Field(title="Metrics")]
+    template_id: Annotated[str | None, Field(title="Template Id")]
+    owner_username: Annotated[str, Field(title="Owner Username")]
+    owner_user_id: Annotated[str | None, Field(title="Owner User Id")]
+    can_edit: Annotated[bool, Field(title="Can Edit")]
+    """
+    Whether the caller may update or delete it
+    """
+    created_at: Annotated[AwareDatetime, Field(title="Created At")]
+    updated_at: Annotated[AwareDatetime, Field(title="Updated At")]
+
+
+class MetricScriptValidateResponse(BaseModel):
+    """
+    Validation outcome.
+    """
+
+    ok: Annotated[bool, Field(title="Ok")]
+    metrics: Annotated[list[MetricInfo], Field(title="Metrics")]
+    diagnostics: Annotated[list[ScriptDiagnostic], Field(title="Diagnostics")]
 
 
 class MuxDetailResponse(BaseModel):
@@ -7087,6 +7865,22 @@ class CreateEvaluationRunResponse(BaseModel):
     """
 
 
+class DashboardCreateRequest(BaseModel):
+    """
+    Body for creating a dashboard.
+    """
+
+    name: Annotated[str, Field(max_length=200, min_length=1, title="Name")]
+    description: Annotated[str, Field(max_length=2000, title="Description")] = ""
+    visibility: Annotated[Visibility, Field(title="Visibility")] = Visibility.private
+    chip_id: Annotated[ChipId | None, Field(title="Chip Id")] = None
+    panels: Annotated[list[DashboardPanelModel] | None, Field(max_length=50, title="Panels")] = None
+    template_id: Annotated[TemplateId | None, Field(title="Template Id")] = None
+    """
+    Template whose panels are copied into the dashboard when panels is empty
+    """
+
+
 class Device(BaseModel):
     """
     Device information.
@@ -7197,12 +7991,50 @@ class ImpactResponse(BaseModel):
     max_depth: Annotated[int, Field(title="Max Depth")]
 
 
+class ListMetricScriptsResponse(BaseModel):
+    """
+    Scripts visible to the caller.
+    """
+
+    scripts: Annotated[list[MetricScriptSummary], Field(title="Scripts")]
+    total: Annotated[int, Field(title="Total")]
+
+
 class ListMuxResponse(BaseModel):
     """
     ListMuxResponse is a Pydantic model that represents the response for fetching the multiplexers.
     """
 
     muxes: Annotated[dict[str, MuxDetailResponse], Field(title="Muxes")]
+
+
+class MetricScriptResponse(BaseModel):
+    """
+    A script with its source, last-good source and revision list.
+    """
+
+    script_id: Annotated[str, Field(title="Script Id")]
+    project_id: Annotated[str, Field(title="Project Id")]
+    name: Annotated[str, Field(title="Name")]
+    description: Annotated[str, Field(title="Description")]
+    visibility: Annotated[Visibility, Field(title="Visibility")]
+    status: Annotated[Status10, Field(title="Status")]
+    revision: Annotated[int, Field(title="Revision")]
+    active_revision: Annotated[int | None, Field(title="Active Revision")]
+    metrics: Annotated[list[MetricInfo], Field(title="Metrics")]
+    template_id: Annotated[str | None, Field(title="Template Id")]
+    owner_username: Annotated[str, Field(title="Owner Username")]
+    owner_user_id: Annotated[str | None, Field(title="Owner User Id")]
+    can_edit: Annotated[bool, Field(title="Can Edit")]
+    """
+    Whether the caller may update or delete it
+    """
+    created_at: Annotated[AwareDatetime, Field(title="Created At")]
+    updated_at: Annotated[AwareDatetime, Field(title="Updated At")]
+    source: Annotated[str, Field(title="Source")]
+    active_source: Annotated[str | None, Field(title="Active Source")]
+    diagnostics: Annotated[list[ScriptDiagnostic], Field(title="Diagnostics")]
+    revisions: Annotated[list[MetricScriptRevision], Field(title="Revisions")]
 
 
 class PipelineCatalogResponse(BaseModel):

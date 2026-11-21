@@ -329,6 +329,56 @@ locally.
 
 How the SDK is built: [Python SDK](../../developer-guide/architecture/python-sdk.md).
 
+## Save Metric Scripts and Dashboards
+
+`qdash.scripts` and `qdash.dashboards` save [metric scripts](../../user-guide/metric-scripts.md)
+and [dashboards](../../user-guide/dashboards.md) defined in Python. This example
+saves the median ZX90 fidelity script from a file and shares a dashboard that shows it per
+directed coupling over the last 14 days:
+
+```python
+from qdash.sdk import Dashboard, QDash, Script
+
+qdash = QDash.from_env(project_id="my-project")
+script = qdash.scripts.create(Script.from_file("zx90_median.py", visibility="project"))
+zx90 = script.metric("zx90_median")
+
+board = Dashboard("ZX90 health", visibility="project", chip_id="64Qv3")
+board.add_metric(zx90, period=14, params={"min_samples": 3})
+saved = qdash.dashboards.create(board)
+print(saved.dashboard_id, saved.version)
+```
+
+A grid of frequency collision checks starts from the starter template and places panels
+explicitly:
+
+```python
+collision = qdash.scripts.create(qdash.scripts.template("collision", visibility="project"))
+grid = Dashboard("Collision checks", visibility="project")
+for index, kind in enumerate(["Type0A", "Type0B", "Type1A", "Type3A"]):
+    grid.add_metric(collision.metric(kind), period=30, layout=(6 * (index % 2), 4 * (index // 2), 6, 4))
+qdash.dashboards.create(grid)
+```
+
+| Call | Result |
+| --- | --- |
+| `Script(name, source, ...)`, `Script.from_file(path, ...)` | A local script; the file is read as text, never run |
+| `qdash.scripts.template(template_id, ...)` | A local `Script` with a starter template's source |
+| `qdash.scripts.validate(script)` | The catalog or diagnostics; nothing is saved |
+| `qdash.scripts.create(script)`, `qdash.scripts.update(target, script)` | `SavedScript` bound to the revision the save produced; unchanged source adds no revision |
+| `qdash.scripts.get(script_id, revision=None)` | `SavedScript` bound to the active revision or the one named |
+| `saved_script.metric(metric_id)` | `ScriptMetric` for a panel; `MetricScriptError` when the bound revision is invalid or lacks the metric |
+| `Dashboard(name, ...)`, `board.add_metric(metric, ...)`, `board.add_markdown(content, ...)` | A local dashboard; panels go below the existing ones with readable IDs |
+| `qdash.dashboards.create(board)` | `SavedDashboard` with `dashboard_id`, `version` and the raw response |
+| `qdash.dashboards.get(dashboard_id)`, `saved.edit()` | The stored dashboard, and a local copy to change |
+| `qdash.dashboards.update(target, board)` | Replaces settings and panels; 409 when the dashboard changed since the version it is based on |
+
+A panel pins the script revision of its `ScriptMetric`, so later script saves do not change it.
+`add_metric` defaults `hops` to the metric's declared distances and `period` to 14 days. A
+script that creates several objects keeps whatever was saved before a failure: the SDK neither
+retries nor rolls back. A 409 is raised as `QDashApiError` with `status_code` 409; read the
+dashboard again before saving.
+
 ## Agent Calibration
 
 `AgentCalibrationRunner` runs one bounded step and `AgentPlanRunner` runs an approved graph of

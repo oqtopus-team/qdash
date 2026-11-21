@@ -39,7 +39,7 @@ pi-qdash tools reuse the session's profile and chip when callers omit those para
 | Tools | Result |
 | --- | --- |
 | `qdash_investigate`, `qdash_compare_calibration` | Recent calibration correlations and repeated-output comparisons. |
-| `qdash_dashboard`, `qdash_dashboard_insights`, `qdash_recent_calibration_summary` | Dashboard and calibration summaries. |
+| `qdash_dashboard`, `qdash_dashboard_insights`, `qdash_recent_calibration_summary` | Status, insight, and calibration summaries. They do not read or change custom dashboards. |
 | `qdash_recommend_next_action`, `qdash_triage_overview`, `qdash_target_report` | Conservative next actions, triage, and target reports. |
 | `qdash_plan_calibration`, `qdash_validate_calibration` | Dry-run plan and read-only validation gates. |
 | `qdash_degradation_report` | Provenance drift, changes, locks, and downstream recommendations. |
@@ -91,6 +91,19 @@ Set `QDASH_WEB_URL` when the web UI is not at the API base URL minus `/api`.
 | `qdash_save_flow` (confirmation-gated) | Validate, format, save, and register a Prefect `@flow` workflow. |
 | `qdash_execute_flow` (confirmation-gated) | Run a saved flow with parameters and return its execution ID without waiting. The name is letters, digits and underscores. |
 
+## Metric scripts and dashboards
+
+These tools are deferred. Validation and previews execute the script on the QDash server within its time and memory limits but save nothing, so they are direct tools, not script-callable reads. The `qdash-metric-scripts` skill describes the authoring workflow and the `qdash_metrics` API.
+
+| Tool | Operation |
+| --- | --- |
+| `qdash_validate_metric_script` | Compile `source` in the worker and return its metrics (id, title, unit, target, hops, parameters) or diagnostics with line numbers. |
+| `qdash_preview_metric_script` | Evaluate one metric of draft `source`, or of a saved `scriptId` (optionally a `revision`), on a chip (default: the session chip) over a `period` (`{kind: "relative", days}` or `{kind: "absolute", start, end}`, default the last 14 days) with `params`. The text gives the metric, resolved period, status counts, legend, up to 12 sample cells with labels and counts, the first five errors with script lines, and truncation and log notices; `details.data` holds the full response. HTTP 422 details (`message`, `diagnostics`, `log`), 429 (queue full) and 503 (metric script runner not available) are returned as text. |
+| `qdash_save_metric_script` (confirmation-gated) | Create a script, or save a new revision of `scriptId` guarded by `expectedRevision` (409 on a concurrent save). Validates first and refuses source that would not validate without asking for confirmation. Reports the revision, status, active revision, diagnostics, and the editor page URL. |
+| `qdash_save_dashboard` (confirmation-gated) | Create a dashboard (optionally from a `templateId`; the confirmation and the result name any project-visible starter script that creation adds), or update `dashboardId` guarded by `expectedVersion` (409 when the dashboard changed); `panels` replaces the whole list. Local checks reject missing names, grid overflow, and `metric_script` panels without an integer `script_revision` before confirmation. Reports pins with newer active revisions and the dashboard page URL. |
+
+`qdash_query` reads them with the actions `metric_script_catalog`, `metric_script_templates` (without source), `metric_script_template` (`templateId`), `metric_scripts`, `metric_script` (`scriptId`), `dashboards`, `dashboard` (`dashboardId`), `dashboard_templates`, and `dashboard_template` (`templateId`: the panels a starter template would create now and the shared scripts creation would add, without writing). A single script or dashboard (`metric_script`, `dashboard`) carries `_links` to its web page.
+
 ## Safety
 
 | Contract | Behavior |
@@ -109,7 +122,7 @@ pi-qdash applies the tool policy QDash chat uses (`extensions/lib/tool-policy.ts
 | Activation | For a new user, pi-qdash activates pi's `tool_search` when it has deferred tools, and `codemode`, if pi registered them and neither is `hidden`. `PI_QDASH_CODEMODE=off` skips `codemode` by default. |
 | Selection | A selection the user makes is kept across reloads, new sessions, forks, and resumes, in the order below. |
 | Without `tool_search` | When no `tool_search` tool is registered or it is inactive, deferred tools are registered again as direct tools, so the model can still call them without loading. |
-| Deferred tools | Tools in `DEFERRED_TOOL_NAMES` (cryostat and wiring, forum, pipelines, agent workflow state, source code, configuration, and similar) use `exposure: "deferred"`. The model loads them with `tool_search`; the routing guide marks them with `*`. |
+| Deferred tools | Tools in `DEFERRED_TOOL_NAMES` (cryostat and wiring, forum, pipelines, agent workflow state, metric scripts and dashboards, source code, configuration, and similar) use `exposure: "deferred"`. The model loads them with `tool_search`; the routing guide marks them with `*`. |
 | Script data | In a `codemode` script, the audited reads in `NESTED_READ_TOOL_NAMES` resolve to their redacted response data as JSON. A call returning more than 512 KiB of JSON fails with a request to narrow it. |
 | Script limits | Scripts without `timeout_ms` get 120 seconds; longer deadlines are cut to 300 seconds. |
 | Namespace | Every `qdash_*` tool pi-qdash registers belongs to the `qdash` tool namespace (`QDASH_TOOL_NAMESPACE`), unless it states its own. pi's `codemode` lists it under `## qdash` with a one-line description when it lists QDash tools, `describeNamespace("qdash")` returns its instructions and the tools scripts can call, and `searchTools()` searches both. QDash chat declares the same namespace. |
@@ -167,3 +180,4 @@ The reference and examples come from one knowledge request as the configured QDa
 | `/skill:qdash-calibration-agent` | Confirmation-gated calibration workflows. |
 | `/skill:qdash-two-qubit-calibration-diagnosis` | Diagnose two-qubit calibration from read-only evidence. |
 | `/skill:qdash-timeseries-diagnosis` | Investigate multi-metric drift and local sensor series. |
+| `/skill:qdash-metric-scripts` | Write, validate, preview, and save metric scripts and put them on dashboards; `references/api.md` documents the `qdash_metrics` API. |

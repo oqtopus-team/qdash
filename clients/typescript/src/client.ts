@@ -23,6 +23,23 @@ import type {
   ListAgentCandidatesResponse,
   ListCouplingsResponse,
   ListFlowsResponse,
+  DashboardCreateRequest,
+  DashboardResponse,
+  DashboardTemplatePreviewResponse,
+  DashboardUpdateRequest,
+  ListDashboardTemplatesResponse,
+  ListDashboardsResponse,
+  ListMetricScriptTemplatesResponse,
+  ListMetricScriptsResponse,
+  MetricScriptCatalogResponse,
+  MetricScriptCreateRequest,
+  MetricScriptDraftEvaluateRequest,
+  MetricScriptEvaluateRequest,
+  MetricScriptEvaluateResponse,
+  MetricScriptResponse,
+  MetricScriptUpdateRequest,
+  MetricScriptValidateResponse,
+  SuccessResponse,
   ListForumPostsResponse,
   ListQubitsResponse,
   ListSourceRootsResponse,
@@ -422,6 +439,98 @@ export class QDashClient {
 
   async executeFlow(name: string, parameters: JsonObject = {}): Promise<ExecuteFlowResponse> {
     return this.post(`/flows/${pathPart(name)}/execute`, { parameters });
+  }
+
+  /** Metric scripts visible to the caller (project-shared and their own), without source. */
+  async listMetricScripts(): Promise<ListMetricScriptsResponse> {
+    return this.get("/metric-scripts");
+  }
+
+  /** A metric script with its latest source, active (last-good) source and revisions. */
+  async getMetricScript(scriptId: string): Promise<MetricScriptResponse> {
+    return this.get(`/metric-scripts/${pathPart(scriptId)}`);
+  }
+
+  /** Starter metric scripts, with their source. */
+  async listMetricScriptTemplates(): Promise<ListMetricScriptTemplatesResponse> {
+    return this.get("/metric-scripts/templates");
+  }
+
+  /** The qubit and coupling metrics a script can read through `ctx.data`. */
+  async getMetricScriptCatalog(): Promise<MetricScriptCatalogResponse> {
+    return this.get("/metric-scripts/catalog");
+  }
+
+  /** Compile metric script source in a worker; nothing is saved. */
+  async validateMetricScript(source: string): Promise<MetricScriptValidateResponse> {
+    return this.post("/metric-scripts/validate", { source });
+  }
+
+  /** Evaluate one metric of unsaved source on a chip; nothing is saved. */
+  async evaluateMetricScriptDraft(
+    request: MetricScriptDraftEvaluateRequest,
+  ): Promise<MetricScriptEvaluateResponse> {
+    return this.post("/metric-scripts/evaluate", request);
+  }
+
+  /** Evaluate one metric of a saved script's validated revision (the active one by default). */
+  async evaluateMetricScript(
+    scriptId: string,
+    request: MetricScriptEvaluateRequest,
+  ): Promise<MetricScriptEvaluateResponse> {
+    return this.post(`/metric-scripts/${pathPart(scriptId)}/evaluate`, request);
+  }
+
+  async createMetricScript(request: MetricScriptCreateRequest): Promise<MetricScriptResponse> {
+    return this.post("/metric-scripts", request);
+  }
+
+  /** Update settings or save new source; invalid source keeps the last good revision active. */
+  async updateMetricScript(
+    scriptId: string,
+    request: MetricScriptUpdateRequest,
+  ): Promise<MetricScriptResponse> {
+    return this.patch(`/metric-scripts/${pathPart(scriptId)}`, request);
+  }
+
+  /** Copy the active source of a visible script into a private script of the caller. */
+  async copyMetricScript(scriptId: string): Promise<MetricScriptResponse> {
+    return this.post(`/metric-scripts/${pathPart(scriptId)}/copy`);
+  }
+
+  async deleteMetricScript(scriptId: string): Promise<SuccessResponse> {
+    return this.delete(`/metric-scripts/${pathPart(scriptId)}`);
+  }
+
+  async listDashboards(): Promise<ListDashboardsResponse> {
+    return this.get("/dashboards");
+  }
+
+  async getDashboard(dashboardId: string): Promise<DashboardResponse> {
+    return this.get(`/dashboards/${pathPart(dashboardId)}`);
+  }
+
+  async listDashboardTemplates(): Promise<ListDashboardTemplatesResponse> {
+    return this.get("/dashboards/templates");
+  }
+
+  /** What a dashboard created from a template now would hold, including the shared scripts it adds. Writes nothing. */
+  async previewDashboardTemplate(templateId: string): Promise<DashboardTemplatePreviewResponse> {
+    return this.get(`/dashboards/templates/${pathPart(templateId)}/preview`);
+  }
+
+  async createDashboard(
+    request: DashboardCreateRequest,
+  ): Promise<DashboardResponse> {
+    return this.post("/dashboards", request);
+  }
+
+  /** Update a dashboard; a provided `panels` list replaces the previous one. */
+  async updateDashboard(
+    dashboardId: string,
+    request: DashboardUpdateRequest,
+  ): Promise<DashboardResponse> {
+    return this.patch(`/dashboards/${pathPart(dashboardId)}`, request);
   }
 
   /** Count a chip's executions per calendar day over the trailing window. */
@@ -876,6 +985,10 @@ export class QDashClient {
 
   private patch<T>(path: string, body?: unknown): Promise<T> {
     return this.transport.requestJson<T>("PATCH", path, { body });
+  }
+
+  private delete<T>(path: string): Promise<T> {
+    return this.transport.requestJson<T>("DELETE", path);
   }
 
   private async pollAgentAction(

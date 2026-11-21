@@ -30,6 +30,14 @@ describe("getApiErrorMessage", () => {
     );
   });
 
+  it("returns the message of an object detail", () => {
+    const detail = { message: "The metric script runner is not available", diagnostics: [] };
+
+    expect(getApiErrorMessage(apiError(detail), FALLBACK)).toBe(
+      "The metric script runner is not available",
+    );
+  });
+
   it("falls back to the error message when detail is missing or unusable", () => {
     expect(getApiErrorMessage(apiError(undefined), FALLBACK)).toBe(
       "Request failed with status code 400",

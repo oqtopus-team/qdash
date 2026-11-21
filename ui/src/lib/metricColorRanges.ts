@@ -1,5 +1,5 @@
 /**
- * Per-chip color range overrides for metric heatmaps, shared by the Dashboard
+ * Per-chip color range overrides for metric heatmaps, shared by the Overview
  * and Metrics pages and remembered per browser. A metric without an override
  * falls back to the YAML default and then to the data extent.
  */

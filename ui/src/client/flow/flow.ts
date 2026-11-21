@@ -33,6 +33,8 @@ import type {
   FlowExecutionPlanResponse,
   FlowTemplate,
   FlowTemplateWithCode,
+  FormatSourceRequest,
+  FormatSourceResponse,
   GetFlowExecutionPlanParams,
   GetFlowResponse,
   HTTPValidationError,
@@ -236,6 +238,74 @@ export function useListFlows<TData = Awaited<ReturnType<typeof listFlows>>, TErr
 
 
 /**
+ * Format Python source with the project's Ruff settings.
+ *
+ * The source is parsed by Ruff, never imported or executed, and nothing is saved. A
+ * source that cannot be parsed returns ``syntax_error`` with the input unchanged.
+ * @summary Format flow source without saving it
+ */
+export const formatFlowSource = (
+    formatSourceRequest: FormatSourceRequest,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<FormatSourceResponse>(
+      {url: `/flows/format`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: formatSourceRequest, signal
+    },
+      options);
+    }
+
+
+
+
+export const getFormatFlowSourceMutationOptions = <TError = Detail | HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof formatFlowSource>>, TError,{data: FormatSourceRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof formatFlowSource>>, TError,{data: FormatSourceRequest}, TContext> => {
+
+const mutationKey = ['formatFlowSource'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof formatFlowSource>>, {data: FormatSourceRequest}> = (props) => {
+          const {data} = props ?? {};
+
+          return  formatFlowSource(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type FormatFlowSourceMutationResult = NonNullable<Awaited<ReturnType<typeof formatFlowSource>>>
+    export type FormatFlowSourceMutationBody = FormatSourceRequest
+    export type FormatFlowSourceMutationError = Detail | HTTPValidationError
+
+    /**
+ * @summary Format flow source without saving it
+ */
+export const useFormatFlowSource = <TError = Detail | HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof formatFlowSource>>, TError,{data: FormatSourceRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof formatFlowSource>>,
+        TError,
+        {data: FormatSourceRequest},
+        TContext
+      > => {
+      return useMutation(getFormatFlowSourceMutationOptions(options), queryClient);
+    }
+    /**
  * List the flow templates, optionally filtered to one backend.
  * @summary List all flow templates
  */

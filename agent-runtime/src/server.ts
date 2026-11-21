@@ -20,6 +20,7 @@ import { encodeLine, formatSettledDetail, toNdjsonEvents, type NdjsonEvent, type
 import { hasBearerToken, readJsonBody, RequestError, runtimeToken } from "./http.ts";
 import { decisionMessage, type ApprovalRequest } from "./durable-tools.ts";
 import { EvaluationError } from "./evaluate.ts";
+import { COMPACTION_FAILED_MESSAGE, isCompactionFailure } from "./compaction.ts";
 import { ViewEventStream } from "./view-events.ts";
 import { claimStore, fenceSteer, steerFenced } from "./store-identity.ts";
 import { stopStoredConversation } from "./stored-stop.ts";
@@ -290,6 +291,13 @@ const STALE_STORE = {
   error: "This chat's runtime state belongs to an earlier chat of the same ID. Reload the chat and try again.",
   reason: "stale_store",
 } as const;
+
+/** Longest settled detail the log keeps: a provider can return a whole page. */
+const LOG_DETAIL_MAX_CHARS = 2_000;
+
+function truncateLog(text: string): string {
+  return text.length <= LOG_DETAIL_MAX_CHARS ? text : `${text.slice(0, LOG_DETAIL_MAX_CHARS)} [... truncated]`;
+}
 
 /** What a refused continue tells the user. */
 const CONTINUE_REFUSALS: Record<ContinueBlocker, string> = {
@@ -594,11 +602,14 @@ async function handleChat(req: IncomingMessage, res: ServerResponse): Promise<vo
       } else {
         // `detail` carries the provider's error text (HTTP status, vLLM message).
         const detail = formatSettledDetail(settled.detail);
-        console.error(`[agent-runtime] chat not answered: ${settled.reason}${detail}`);
-        write({
-          type: "error",
-          message: `conversation was not answered: ${settled.reason}${detail}`,
-        });
+        console.error(`[agent-runtime] chat not answered: ${settled.reason}${truncateLog(detail)}`);
+        // A failed compaction says nothing the user can act on in its own words;
+        // its detail stays in the log above.
+        write(
+          isCompactionFailure(settled.reason, settled.detail)
+            ? { type: "error", code: "compaction_failed", message: COMPACTION_FAILED_MESSAGE }
+            : { type: "error", message: `conversation was not answered: ${settled.reason}${detail}` },
+        );
       }
     } catch (error) {
       write({

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -9,6 +10,7 @@ from typing import TYPE_CHECKING, Any
 from fastapi import HTTPException
 from pymongo.errors import DuplicateKeyError
 
+from qdash.api.lib.python_format import format_source_for_save
 from qdash.api.schemas.execution import (
     ExecutionAvailabilityRequest,
     ExecutionAvailabilityResponse,
@@ -43,7 +45,6 @@ from qdash.api.services.flow_service.target_defaults import (
 )
 from qdash.api.services.flow_service.templates import TemplateCatalog
 from qdash.api.services.flow_service.validation import (
-    format_with_ruff,
     normalize_folder,
     validate_flow_code,
     validate_flow_name,
@@ -107,6 +108,10 @@ class FlowService:
         if request.flow_function_name is None:
             request.flow_function_name = request.name
 
+        # Format first, so the source validated, stored and returned is the same text. A
+        # source Ruff cannot parse stays as written and fails validation below.
+        request.code = await asyncio.to_thread(format_source_for_save, request.code)
+
         validate_flow_code(request.code, request.flow_function_name)
 
         file_path = self._sources.path_for(project_id, request.name)
@@ -145,7 +150,6 @@ class FlowService:
                 raise _flow_exists(request.name) from None
         else:
             self._sources.write(file_path, request.code)
-        format_with_ruff(file_path)
 
         deployment_name = f"{project_id}-{request.name}"
         try:
@@ -236,6 +240,7 @@ class FlowService:
             name=request.name,
             file_path=file_path_str,
             message=message,
+            code=request.code,
         )
 
     async def list_flows(self, username: str, project_id: str) -> ListFlowsResponse:

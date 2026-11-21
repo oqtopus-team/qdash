@@ -1974,3 +1974,27 @@ def test_execute_agent_action_sends_the_source_execution_only_when_given(
     assert sent[0].get("source_execution_id") == expected
     assert ("source_execution_id" in sent[0]) is (source is not None)
     assert sent[0]["update_params"] is False
+
+
+def test_metric_script_and_dashboard_writes_send_set_fields_on_a_quoted_path() -> None:
+    from qdash.client.services.models import DashboardUpdateRequest
+
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(422, json={"detail": "rejected"})
+
+    client = _build_client(httpx.MockTransport(handler), api_token="token")
+    request = DashboardUpdateRequest.model_validate({"chip_id": None, "expected_version": 2})
+
+    with pytest.raises(QDashValidationError):
+        client.update_dashboard("a/b", request)
+    with pytest.raises(QDashValidationError):
+        client.validate_metric_script("x = 1\n")
+
+    assert requests[0].method == "PATCH"
+    assert requests[0].url.raw_path == b"/dashboards/a%2Fb"
+    # An explicit null clears the chip; unset fields stay out of the body.
+    assert json.loads(requests[0].content) == {"chip_id": None, "expected_version": 2}
+    assert json.loads(requests[1].content) == {"source": "x = 1\n"}

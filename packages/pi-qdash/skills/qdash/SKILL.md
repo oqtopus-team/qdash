@@ -1,6 +1,6 @@
 ---
 name: qdash
-description: Query a running QDash instance from pi via the pi-qdash extension and @oqtopus-team/qdash-client. Use when inspecting chips, metrics, task results, tasks, projects, files, flows, executions, forum posts, provenance, or QDash profile/configuration.
+description: Query a running QDash instance from pi via the pi-qdash extension and @oqtopus-team/qdash-client. Use when inspecting chips, metrics, task results, tasks, projects, files, flows, metric scripts, dashboards, executions, forum posts, provenance, or QDash profile/configuration.
 ---
 
 <!-- Confirmation gates are implemented by the host harness. Skills should state that a gate exists, not instruct how or when to ask for confirmation. -->
@@ -23,6 +23,7 @@ Prefer the dedicated tool that matches the question. Use `qdash_query` only as a
    - `qdash_list_task_results`, `qdash_get_task_result` — find and inspect calibration results
    - `qdash_get_task_knowledge` — interpret a task's purpose, expected result, failure modes, and check questions
    - `qdash_list_flows`, `qdash_get_flow` — list or inspect calibration flows
+   - `qdash_validate_metric_script`, `qdash_preview_metric_script` — check and preview a metric script on a chip; they run the code on the server but save nothing (see the `qdash-metric-scripts` skill)
    - `qdash_get_pipeline_catalog`, `qdash_plan_pipeline` — compose and check a calibration pipeline spec before running it
    - `qdash_list_executions`, `qdash_get_execution`, `qdash_wait_execution`, `qdash_compare_executions` — inspect, await, or compare executions
    - `qdash_get_provenance_stats` — inspect provenance status
@@ -42,6 +43,7 @@ Prefer the dedicated tool that matches the question. Use `qdash_query` only as a
    - `qdash_create_forum_evidence_reply`, `qdash_create_forum_image_reply` — publish previously reviewed evidence replies
    - `qdash_run_pipeline` — run a validated pipeline spec as one execution
    - `qdash_save_flow`, `qdash_execute_flow` — save a Prefect flow you wrote as a QDash workflow, and run a saved flow (see Authoring a flow)
+   - `qdash_save_metric_script`, `qdash_save_dashboard` — save a metric script, and create or update a dashboard with its panels (see the `qdash-metric-scripts` skill)
 4. Agent workflow state tools:
    - `qdash_get_agent_session`, `qdash_get_agent_action`, `qdash_list_agent_actions`, `qdash_wait_agent_action` — inspect agent workflow state
    - `qdash_list_agent_action_candidates`, `qdash_get_agent_candidate_commit`, `qdash_wait_agent_candidate_apply` — inspect candidates and apply status
@@ -82,6 +84,17 @@ Workflow:
 2. Write the module. Name the `@flow` function like the flow unless the user wants otherwise. Task and parameter names must come from `qdash_get_pipeline_catalog` and the template; do not invent them. When a shell workspace is available, draft the file there and run `python -m py_compile` on it before showing it.
 3. Show the user the complete code and the chip it is for, then `qdash_save_flow`. QDash checks the `@flow` function, formats the file, registers a Prefect deployment, and replaces a flow of the same name. A rejection comes back as text with QDash's reason; fix the code and save again.
 4. Saving does not run anything. Run it only when the user asks: `qdash_execute_flow` with the flow's parameters (confirmation-gated, takes the project execution lock), then `qdash_wait_execution`.
+
+## Metric scripts and dashboards
+
+Dashboards show per-qubit and per-coupling values computed by metric scripts: Python
+modules written against the `qdash_metrics` API that QDash runs in a bounded worker. For any
+request to build a dashboard, a derived or aggregated metric (a median over a period, a ratio,
+a count per coupling), or a collision map, follow the `qdash-metric-scripts` skill. Its reads
+are `qdash_query` actions: `metric_script_catalog`, `metric_script_templates`,
+`metric_script_template`, `metric_scripts`, `metric_script`, `dashboards`,
+`dashboard`, `dashboard_templates`, `dashboard_template`. `qdash_dashboard` is a status
+summary, not one of these dashboards.
 
 ## Session context
 

@@ -18,11 +18,17 @@ from qdash.api.db.session import lifespan
 from qdash.api.middleware.request_id import RequestIdMiddleware
 from qdash.config import Settings, get_settings, resolve_api_cors_origins
 from qdash.datamodel.calibration_pipeline import CalibrationPipelineSpec
+from qdash.datamodel.dashboard import MetricScriptPanelConfig
 
 # Models that request bodies carry as plain JSON objects but that clients should still get as
 # typed models. Publishing them as components changes no route: ValidatePipelineRequest.spec
 # stays dict[str, Any] so the validate route keeps reporting problems instead of answering 422.
-OPENAPI_COMPONENT_MODELS: tuple[type[BaseModel], ...] = (CalibrationPipelineSpec,)
+# DashboardPanelModel.config likewise stays an object whose shape depends on the panel type; the
+# service validates it against MetricScriptPanelConfig when a dashboard is saved.
+OPENAPI_COMPONENT_MODELS: tuple[type[BaseModel], ...] = (
+    CalibrationPipelineSpec,
+    MetricScriptPanelConfig,
+)
 
 
 def custom_generate_unique_id(route: APIRoute) -> str:

@@ -37,7 +37,7 @@ def _sample_execution_model() -> ExecutionModel:
     )
 
 
-def test_task_result_document_preserves_quality_metrics() -> None:
+def test_task_result_document_preserves_quality_metrics(init_db) -> None:
     """Normalized quality metrics remain attached to authoritative task provenance."""
     task = _sample_task()
     task.quality_metrics = {"r2": 0.95}
@@ -133,3 +133,26 @@ def test_find_latest_by_chip_and_qids_coerces_null_upstream_id(init_db) -> None:
 
     assert len(results) == 1
     assert results[0].upstream_id == ""
+
+
+def test_find_accepts_a_query_time_limit_inside_a_pymongo_timeout(init_db) -> None:
+    """``max_time_ms`` and a ``pymongo.timeout`` block leave the results unchanged.
+
+    mongomock ignores both; this only checks that the metric broker's bounded query runs.
+    """
+    import pymongo
+    from bunnet import SortDirection
+
+    _insert_task_result_row(_seq=1, start_at=datetime(2026, 1, 2, tzinfo=timezone.utc))
+    _insert_task_result_row(_seq=2, start_at=datetime(2026, 1, 1, tzinfo=timezone.utc))
+
+    repo = MongoTaskResultHistoryRepository()
+    with pymongo.timeout(1.0):
+        results = repo.find(
+            {"project_id": "proj-1", "chip_id": "chip-1"},
+            sort=[("start_at", SortDirection.ASCENDING)],
+            limit=10,
+            max_time_ms=1000,
+        )
+
+    assert [r.task_id for r in results] == ["task-2", "task-1"]

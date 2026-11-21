@@ -2,6 +2,8 @@
 
 `qdash.sdk` lets a Python script define a calibration as objects and validate or start it on a
 chip through the QDash API; each one runs as a [calibration pipeline](../workflow/calibration-pipeline.md).
+It also saves [metric scripts](./metric-scripts.md) and [dashboards](./dashboards.md)
+defined in Python.
 It ships in the `qdash-sdk` distribution, which depends on `qdash-client`; the user-facing
 example is in the [Python Client reference](../../reference/clients/python.md#run-a-calibration).
 TypeScript applications use the separate `@oqtopus-team/qdash-sdk` package, described in
@@ -12,7 +14,7 @@ TypeScript applications use the separate `@oqtopus-team/qdash-sdk` package, desc
 | Layer | Owns | Leaves to others |
 | --- | --- | --- |
 | `qdash.client` (`QDashClient`) | Configuration and profiles, authentication, `X-Project-Id`, HTTP transport, retries, error mapping, one method per route, generated response models | Building request bodies from domain objects |
-| `qdash.sdk` | The `QDash` session and its client ownership, the `Chip` front door, the `Workflows` front door to registered workflows, definition objects, their serialization to spec version 2, the run handles | Transport, auth, retries, any check that needs server data |
+| `qdash.sdk` | The `QDash` session and its client ownership, the `Chip` front door, the `Workflows` front door to registered workflows, definition objects, their serialization to spec version 2, the run handles, the `Script` and `Dashboard` definitions and their saved handles | Transport, auth, retries, any check that needs server data |
 | API | Permissions, the step and task catalog, calibration data, preflight, dispatch | Anything on the author's machine |
 
 The SDK keeps no state between calls beyond the objects the author holds: no cache of the
@@ -29,6 +31,7 @@ Every operation belongs to one phase, and no phase starts the next one implicitl
 | Run | `chip.calibrate(targets, steps)`, `qdash.pipelines.execute(pipeline, chip_id=...)`, then `run.wait()` | Dispatches one execution that claims the hardware | `POST /calibration-pipelines/execute`, `GET /executions/{id}` |
 | Inspect a registered workflow | `qdash.workflows.list()`, `qdash.workflows.get(name)` | None; reads stored metadata and source | `GET /flows`, `GET /flows/{name}` |
 | Run a registered workflow | `workflow.run(parameters=...)`, `qdash.workflows.run(name, parameters=...)`, then `run.wait()` | Dispatches the saved deployment | `POST /flows/{name}/execute`, `GET /executions/{id}` |
+| Author metric scripts and dashboards | `Script(...)`, `Dashboard(...)`, then `qdash.scripts.create`/`update`, `qdash.dashboards.create`/`update` | Saves a script revision or a dashboard | `/metric-scripts`, `/dashboards` |
 
 `Chip` is a front door over `Pipelines`, not a second implementation:
 `validate_calibration` and `calibrate` build a `Pipeline` from `targets`, `steps` and the
@@ -53,6 +56,59 @@ with `save_flow`.
 
 Importing a module that builds pipelines writes nothing and measures nothing. The SDK never
 imports or executes flow source locally; a spec cannot reference code.
+
+## Metric scripts and dashboards
+
+`qdash.sdk.dashboard` defines a metric script and a dashboard locally;
+`QDash.scripts` and `QDash.dashboards` save them. Two Python APIs are involved and must not be
+confused: a metric script's source is written against `qdash_metrics`, which exists only in the
+metric worker (`src/qdash/api/metric_runtime/sdk.py`) and computes cells; `qdash.sdk` treats
+that source as text and only authors and saves it remotely. The SDK never imports, executes or
+parses the source. `Script.from_file` reads it as UTF-8, and the server's validation on save
+returns the metric catalog.
+
+```python
+from qdash.sdk import Dashboard, QDash, Script
+
+qdash = QDash.from_env(project_id="my-project")
+script = qdash.scripts.create(Script.from_file("zx90_median.py", visibility="project"))
+zx90 = script.metric("zx90_median")  # ScriptMetric pinned to script.revision
+
+board = Dashboard("ZX90 health", visibility="project", chip_id="64Qv3")
+board.add_metric(zx90, period=14, params={"min_samples": 3})
+saved = qdash.dashboards.create(board)
+print(saved.dashboard_id)
+```
+
+A save returns a `SavedScript` bound to one revision: after `create` or `update` the revision
+that save produced, or kept when the source equals the latest saved source (the server adds no
+revision then); after `get` the active revision unless `revision=` names another.
+`SavedScript.metric(id)` looks the metric up in that revision's catalog and raises
+`MetricScriptError`, naming the script ID and revision, when the revision is invalid or does not
+declare the metric. An invalid save therefore never yields a panel silently pinned to the older
+active revision. `qdash.scripts.template(id)` reads a starter template's source into a local
+`Script`; `qdash.scripts.validate` compiles source without saving it.
+
+`Dashboard.add_metric` builds a `metric_script` panel from a `ScriptMetric`, with a config of the
+generated `MetricScriptPanelConfig` model; `add_markdown` adds a note. The builder follows the
+dashboard editor's rules in `ui/src/components/features/dashboards/layout.ts`: a new
+panel goes to the left edge below every panel, 6 by 4 for a metric and 12 by 2 for a note.
+`hops` defaults to the metric's declared distances, `period` to the last 14 days. Panel IDs are
+derived from the metric ID (`zx90_median`, then `zx90_median-2`), so rerunning a script produces
+the same IDs. An explicit `layout=(x, y, w, h)` or `panel_id=` overrides the default. The server
+still validates every panel on save.
+
+Updates name their target by ID or by a saved handle, and the SDK never matches by name, keeps
+local state, retries a write or rolls back earlier steps; a failure in a multi-step script
+leaves what was saved, and the IDs are on the returned handles and in `MetricScriptError`.
+`qdash.scripts.update(saved, script)` sends `expected_revision` from the handle.
+`qdash.dashboards.update(target, board)` replaces the dashboard's settings and panels and sends
+`expected_version`: the version of a `SavedDashboard` target, or for an ID the version read just
+before saving. The server answers 409 when the dashboard changed since that version.
+`SavedDashboard.edit()` returns a `Dashboard` with the stored panels for a read-edit-save.
+Settings left as `None` (`description`, `visibility`, `chip_id`) are not sent, so the SDK cannot
+clear a dashboard's chip. These calls need no configured project: like the UI, they use the
+session's project or the user's default, and the server applies its own permissions.
 
 ## Shared models
 
@@ -199,6 +255,8 @@ results or steps outside the catalog; the SDK does not convert them.
 | `sdks/python/tests/test_sdk_distributions.py` | Builds both packages at a stable and a beta version, checks the `qdash-client` pin and disjoint wheels, and installs and uninstalls them in fresh environments |
 | `tests/qdash/api/routers/test_calibration_pipeline_sdk.py` | The calibration and pipeline examples against the real routes and server spec model, including both target kinds, preflight problems, 403 and 422, sweep parity with `qdash.datamodel.sweep`, and generated two-qubit steps serialized by `to_spec()` and by a plain dump |
 | `tests/qdash/api/routers/test_workflows_sdk.py` | `QDash.workflows` against the real `/flows` routes: project scoping, saved defaults merged with run parameters, no dispatch from `list` or `get` |
+| `sdks/python/tests/test_sdk_dashboards.py` | No requests or execution while defining, panel IDs, layouts, hops and config, revision binding and `MetricScriptError`, request bodies with only the given fields, `expected_revision` and `expected_version`, 409 propagation |
+| `tests/qdash/api/routers/test_sdk_dashboard_routes.py` | The ZX90 median and collision grid dashboards against the real routes and in-process metric runtime, stale-version 409, unchanged and invalid script saves, 403 and 422, project scope |
 | `tests/qdash/api/test_app_factory.py` | The published components, the refusal to replace a different model under a taken name, and no cached schema after a failed transformation |
 
 ## Implementation Files
@@ -210,6 +268,8 @@ results or steps outside the catalog; the SDK does not convert them.
 - `sdks/python/src/qdash/sdk/_pipelines.py`: `Pipelines`, `PipelineRun`.
 - `sdks/python/src/qdash/sdk/pipeline.py`, `sweep.py`: definition objects and sweeps.
 - `sdks/python/src/qdash/sdk/calibration.py`: the definitions `Chip` takes, re-exported.
+- `sdks/python/src/qdash/sdk/dashboard.py`: `Script`, `Dashboard`, `ScriptMetric`, `MetricScriptError`.
+- `sdks/python/src/qdash/sdk/_dashboards.py`: `Scripts`, `SavedScript`, `Dashboards`, `SavedDashboard`.
 - `sdks/python/hatch_build.py`: the `qdash-client` pin.
-- `clients/python/src/qdash/client/services/client.py`: the pipeline and flow route methods and `with_project`.
-- `src/qdash/api/app/factory.py`: `OPENAPI_COMPONENT_MODELS`.
+- `clients/python/src/qdash/client/services/client.py`: the pipeline, flow, metric script and dashboard route methods and `with_project`.
+- `src/qdash/api/app/factory.py`: `OPENAPI_COMPONENT_MODELS`, which also publishes `MetricScriptPanelConfig`.

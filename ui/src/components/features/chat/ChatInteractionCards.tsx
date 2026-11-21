@@ -128,6 +128,44 @@ function FlowSavePreview({ args }: { args: Record<string, unknown> }) {
   );
 }
 
+const METRIC_SCRIPT_PREVIEW_KEYS = new Set(["name", "source", "description", "visibility"]);
+
+/** A metric script about to be saved: its name, sharing, and the whole source to review. */
+function MetricScriptSavePreview({ args }: { args: Record<string, unknown> }) {
+  const name = stringArg(args, "name");
+  const scriptId = stringArg(args, "scriptId");
+  const visibility = stringArg(args, "visibility");
+  const description = stringArg(args, "description");
+  const source = stringArg(args, "source") ?? "";
+  return (
+    <div className="flex flex-col gap-2" data-testid="metric-script-save-preview">
+      <div className="min-w-0">
+        <p className="text-xs text-base-content/60 wrap-anywhere">
+          {scriptId ? "Update" : "New"} metric script{" "}
+          <span className="font-mono text-base-content">{name ?? "?"}</span>
+        </p>
+        {description && <p className="mt-0.5 text-xs text-base-content/60">{description}</p>}
+        {visibility && (
+          <div className="mt-1 flex flex-wrap gap-1">
+            <span className="badge badge-ghost badge-xs">
+              {visibility === "project" ? "shared with project" : visibility}
+            </span>
+          </div>
+        )}
+      </div>
+      <div className="max-h-96 overflow-auto">
+        <CodeBlock compact language="python" title={`${name ?? "script"}.py`}>
+          {source}
+        </CodeBlock>
+      </div>
+      <p className="text-xs text-base-content/60">
+        QDash validates the script before saving it. Text that fails validation is saved as a new
+        revision, but dashboards keep using the last revision that validated.
+      </p>
+    </div>
+  );
+}
+
 function ArgValue({ value }: { value: unknown }) {
   if (value !== null && typeof value === "object") {
     return (
@@ -162,10 +200,16 @@ export function ApprovalCard({
   const chipId = stringArg(approval.args, "chipId") ?? stringArg(approval.args, "chip_id");
   // A flow save shows its code as code; the remaining arguments stay in the list.
   const flowSave = approval.tool === "qdash_save_flow" && typeof approval.args.code === "string";
+  // A metric script save shows its source the same way.
+  const scriptSave =
+    approval.tool === "qdash_save_metric_script" && typeof approval.args.source === "string";
   const entries = Object.entries(approval.args).filter(
-    ([key]) => !(pipelineSpec && key === "spec") && !(flowSave && FLOW_PREVIEW_KEYS.has(key)),
+    ([key]) =>
+      !(pipelineSpec && key === "spec") &&
+      !(flowSave && FLOW_PREVIEW_KEYS.has(key)) &&
+      !(scriptSave && METRIC_SCRIPT_PREVIEW_KEYS.has(key)),
   );
-  const hasPreview = Boolean(pipelineSpec) || flowSave;
+  const hasPreview = Boolean(pipelineSpec) || flowSave || scriptSave;
 
   return (
     <div
@@ -184,6 +228,7 @@ export function ApprovalCard({
       <div className="flex flex-col gap-3 px-3.5 pt-3 pb-3.5">
         {pipelineSpec && <PipelinePreview chipId={chipId} spec={pipelineSpec} />}
         {flowSave && <FlowSavePreview args={approval.args} />}
+        {scriptSave && <MetricScriptSavePreview args={approval.args} />}
         {entries.length > 0 ? (
           <dl
             className="m-0 grid grid-cols-[fit-content(40%)_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-xs"
@@ -246,11 +291,19 @@ export function ApprovalCard({
 }
 
 /**
- * A change the assistant proposes to the flow open in the Workflow editor: the
- * diff against what the editor holds now, applied there with one click. The
- * card never saves; the editor's Save does, through QDash's validation.
+ * A change the assistant proposes to the flow open in the Workflow editor, to
+ * the metric script open in its editor, or to a dashboard's draft: the
+ * diff against what the page holds now, applied there with one click. The card
+ * never saves; the page's Save does, through QDash's validation.
  */
 export function EditProposalCard({ edit, state }: { edit: EditProposal; state: InteractionState }) {
+  const isScript = edit.target === "metric_script";
+  const isDashboard = edit.target === "dashboard";
+  const name =
+    (isScript ? edit.scriptName || edit.flowName : edit.flowName) ||
+    (isDashboard ? "new dashboard" : "script");
+  const filename = isDashboard ? "dashboard.json" : `${name}.py`;
+  const language = isDashboard ? "json" : "python";
   const [outcome, setOutcome] = useState<"applied" | "discarded" | null>(null);
   // The editor text the diff was made against. The chat does not rerender as
   // the user types in the editor, so Apply reads the text again first and, when
@@ -273,48 +326,56 @@ export function EditProposalCard({ edit, state }: { edit: EditProposal; state: I
     <div
       className="chat-interaction-card not-prose"
       role="group"
-      aria-label={`Proposed change to ${edit.flowName}`}
+      aria-label={`Proposed change to ${name}`}
       data-testid="edit-proposal"
     >
       <div className="flex items-start gap-2">
         <FileDiff className="w-4 h-4 mt-0.5 text-primary shrink-0" />
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium leading-snug">
-            Proposed change to <span className="font-mono">{edit.flowName}</span>
+            Proposed change to {isScript ? "metric script " : isDashboard ? "dashboard " : ""}
+            <span className={isDashboard ? undefined : "font-mono"}>{name}</span>
           </p>
           <p className="text-xs text-base-content/70 mt-0.5">{edit.summary}</p>
         </div>
       </div>
       <div className="mt-3 max-h-[28rem] overflow-auto rounded-lg border border-base-300/70">
         {current !== null && !unchanged ? (
-          <PierreDiffViewer
-            filename={`${edit.flowName}.py`}
-            oldContent={current}
-            newContent={edit.code}
-          />
+          <PierreDiffViewer filename={filename} oldContent={current} newContent={edit.code} />
         ) : (
-          <CodeBlock compact language="python" title={`${edit.flowName}.py`}>
+          <CodeBlock compact language={language} title={filename}>
             {edit.code}
           </CodeBlock>
         )}
       </div>
       {unchanged && (
-        <p className="mt-2 text-xs text-base-content/50">The editor already holds this code.</p>
+        <p className="mt-2 text-xs text-base-content/50">
+          {isDashboard ? "The draft already holds this." : "The editor already holds this code."}
+        </p>
       )}
       {changed && outcome === null && (
         <p className="mt-2 text-xs text-warning" role="status">
-          The editor changed since this diff was made. Review the updated diff, then apply.
+          {isDashboard
+            ? "The dashboard draft changed since this diff was made. Review the updated diff, then apply."
+            : "The editor changed since this diff was made. Review the updated diff, then apply."}
         </p>
       )}
       {(!state.applyCode || current === null) && (
         <p className="mt-2 text-xs text-base-content/50">
-          Open this flow in the Workflow editor on the same chip to apply the change there.
+          {isDashboard
+            ? "Open this dashboard, as a member who can edit it, to apply the change to its draft."
+            : isScript
+              ? "Open this metric script in its editor to apply the change there."
+              : "Open this flow in the Workflow editor on the same chip to apply the change there."}
         </p>
       )}
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {outcome === "applied" && (
           <span className="inline-flex items-center gap-1 text-xs text-success">
-            <Check className="w-3.5 h-3.5" /> Applied to the editor. Review it, then Save.
+            <Check className="w-3.5 h-3.5" />
+            {isDashboard
+              ? "Applied to the dashboard draft. Review the panels, then Save."
+              : "Applied to the editor. Review it, then Save."}
           </span>
         )}
         {outcome === "discarded" && (
@@ -325,7 +386,7 @@ export function EditProposalCard({ edit, state }: { edit: EditProposal; state: I
         {canApply && (
           <>
             <button type="button" className="btn btn-primary btn-xs" onClick={apply}>
-              Apply to editor
+              {isDashboard ? "Apply to draft" : "Apply to editor"}
             </button>
             <button
               type="button"

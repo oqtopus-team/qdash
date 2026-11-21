@@ -11074,6 +11074,91 @@
         }
       }
     },
+    "/flows/format": {
+      "post": {
+        "tags": [
+          "flow"
+        ],
+        "summary": "Format flow source without saving it",
+        "description": "Format Python source with the project's Ruff settings.\n\nThe source is parsed by Ruff, never imported or executed, and nothing is saved. A\nsource that cannot be parsed returns ``syntax_error`` with the input unchanged.",
+        "operationId": "formatFlowSource",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FormatSourceRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FormatSourceResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The source exceeds the formatting size limit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Detail"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The formatter could not run",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Detail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/flows/templates": {
       "get": {
         "tags": [
@@ -16288,6 +16373,1284 @@
         }
       }
     },
+    "/dashboards": {
+      "get": {
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "List dashboards visible to the caller",
+        "description": "Return project-shared dashboards and the caller's own, newest update first.",
+        "operationId": "listDashboards",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListDashboardsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "Create a dashboard",
+        "description": "Create a dashboard owned by the caller.",
+        "operationId": "createDashboard",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DashboardCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dashboards/templates": {
+      "get": {
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "List starter templates for dashboards",
+        "description": "Return the templates a new dashboard can copy its panels from.",
+        "operationId": "listDashboardTemplates",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListDashboardTemplatesResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dashboards/templates/{template_id}/preview": {
+      "get": {
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "Preview the panels a starter template would create",
+        "description": "Return the panels a dashboard created from the template now would hold.\n\nNothing is created: script panels point at the shared script creation would reuse, or,\nwhen the project has none yet, name the starter script creation would add.",
+        "operationId": "previewDashboardTemplate",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "template_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Template Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardTemplatePreviewResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dashboards/{dashboard_id}": {
+      "get": {
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "Get a dashboard",
+        "description": "Return a dashboard the caller owns or that is shared with the project.",
+        "operationId": "getDashboard",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "dashboard_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Dashboard Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "Update a dashboard",
+        "description": "Update a dashboard. A provided ``panels`` list replaces the previous one.",
+        "operationId": "updateDashboard",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "dashboard_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Dashboard Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DashboardUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "Delete a dashboard",
+        "description": "Delete a dashboard owned by the caller, or any dashboard as project owner.",
+        "operationId": "deleteDashboard",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "dashboard_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Dashboard Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dashboards/{dashboard_id}/duplicate": {
+      "post": {
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "Duplicate a dashboard",
+        "description": "Copy a visible dashboard into a private dashboard owned by the caller.",
+        "operationId": "duplicateDashboard",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "dashboard_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Dashboard Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/metric-scripts": {
+      "get": {
+        "tags": [
+          "metric-script"
+        ],
+        "summary": "List metric scripts visible to the caller",
+        "description": "Return project-shared scripts and the caller's own, newest update first.",
+        "operationId": "listMetricScripts",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListMetricScriptsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "metric-script"
+        ],
+        "summary": "Create a metric script",
+        "description": "Create a script owned by the caller from source text or a template.",
+        "operationId": "createMetricScript",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MetricScriptCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetricScriptResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/metric-scripts/templates": {
+      "get": {
+        "tags": [
+          "metric-script"
+        ],
+        "summary": "List starter metric scripts",
+        "description": "Return the templates a new script can start from, with their source.",
+        "operationId": "listMetricScriptTemplates",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListMetricScriptTemplatesResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/metric-scripts/catalog": {
+      "get": {
+        "tags": [
+          "metric-script"
+        ],
+        "summary": "List the metrics scripts can read",
+        "description": "Return the qubit and coupling metrics available through ``ctx.data``.",
+        "operationId": "getMetricScriptCatalog",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetricScriptCatalogResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/metric-scripts/validate": {
+      "post": {
+        "tags": [
+          "metric-script"
+        ],
+        "summary": "Validate metric script source without saving it",
+        "description": "Compile the source in a worker and return its metrics or diagnostics.",
+        "operationId": "validateMetricScript",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MetricScriptValidateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetricScriptValidateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/metric-scripts/format": {
+      "post": {
+        "tags": [
+          "metric-script"
+        ],
+        "summary": "Format metric script source without saving it",
+        "description": "Format the source with the project's Ruff settings; it is parsed, never executed.",
+        "operationId": "formatMetricScriptSource",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FormatSourceRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FormatSourceResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The source exceeds the formatting size limit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Detail"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The formatter could not run",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Detail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/metric-scripts/evaluate": {
+      "post": {
+        "tags": [
+          "metric-script"
+        ],
+        "summary": "Preview unsaved metric script source on a chip",
+        "description": "Evaluate one metric of the given source over the chip; nothing is saved.",
+        "operationId": "evaluateMetricScriptDraft",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MetricScriptDraftEvaluateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetricScriptEvaluateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/metric-scripts/{script_id}": {
+      "get": {
+        "tags": [
+          "metric-script"
+        ],
+        "summary": "Get a metric script",
+        "description": "Return a script with its source, active source and revisions.",
+        "operationId": "getMetricScript",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "script_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Script Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetricScriptResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "metric-script"
+        ],
+        "summary": "Update a metric script",
+        "description": "Update settings or save new source; invalid source keeps the last good revision active.",
+        "operationId": "updateMetricScript",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "script_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Script Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MetricScriptUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetricScriptResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "metric-script"
+        ],
+        "summary": "Delete a metric script",
+        "description": "Delete a script no dashboard references.",
+        "operationId": "deleteMetricScript",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "script_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Script Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/metric-scripts/{script_id}/copy": {
+      "post": {
+        "tags": [
+          "metric-script"
+        ],
+        "summary": "Copy a metric script",
+        "description": "Copy the active source of a visible script into a private script of the caller.",
+        "operationId": "copyMetricScript",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "script_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Script Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetricScriptResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/metric-scripts/{script_id}/evaluate": {
+      "post": {
+        "tags": [
+          "metric-script"
+        ],
+        "summary": "Evaluate a saved metric script on a chip",
+        "description": "Evaluate one metric of a validated revision (the active one by default).",
+        "operationId": "evaluateMetricScript",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "script_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Script Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MetricScriptEvaluateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetricScriptEvaluateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/topology/list": {
       "get": {
         "tags": [
@@ -17379,6 +18742,33 @@
   },
   "components": {
     "schemas": {
+      "AbsolutePeriod": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "absolute",
+            "title": "Kind",
+            "default": "absolute"
+          },
+          "start": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start"
+          },
+          "end": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start",
+          "end"
+        ],
+        "title": "AbsolutePeriod",
+        "description": "A fixed ``[start, end]`` window; both bounds need a timezone."
+      },
       "ActivityResponse": {
         "properties": {
           "activity_id": {
@@ -18838,6 +20228,141 @@
         ],
         "title": "CandidateGateResponse",
         "description": "Side-effect-free deterministic decision for one candidate value."
+      },
+      "CellAssessment": {
+        "properties": {
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/CellCheck"
+            },
+            "type": "array",
+            "title": "Checks"
+          },
+          "estimates": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Estimates"
+          },
+          "count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Count",
+            "description": "Number of observations behind the value"
+          }
+        },
+        "type": "object",
+        "title": "CellAssessment",
+        "description": "Details a metric attached to a cell."
+      },
+      "CellCheck": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label"
+        ],
+        "title": "CellCheck",
+        "description": "One ``(label, value)`` row of a cell's details."
+      },
+      "CellReference": {
+        "properties": {
+          "metric": {
+            "type": "string",
+            "title": "Metric"
+          },
+          "target": {
+            "type": "string",
+            "title": "Target"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          },
+          "execution_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Execution Id"
+          },
+          "timestamp": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timestamp"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "metric",
+          "target"
+        ],
+        "title": "CellReference",
+        "description": "An input value a cell was computed from."
       },
       "ChipConfigOptions": {
         "properties": {
@@ -20696,6 +22221,448 @@
         "type": "object",
         "title": "CryostatUpdateRequest",
         "description": "Body for updating a cryostat. All fields optional."
+      },
+      "DashboardCreateRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "Description",
+            "default": ""
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "private",
+              "project"
+            ],
+            "title": "Visibility",
+            "default": "private"
+          },
+          "chip_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chip Id"
+          },
+          "panels": {
+            "items": {
+              "$ref": "#/components/schemas/DashboardPanelModel"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "Panels"
+          },
+          "template_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Template Id",
+            "description": "Template whose panels are copied into the dashboard when panels is empty"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "DashboardCreateRequest",
+        "description": "Body for creating a dashboard."
+      },
+      "DashboardPanelModel": {
+        "properties": {
+          "panel_id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Panel Id",
+            "description": "Dashboard-unique ID"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "qubit_metric",
+              "coupling_metric",
+              "metric_script",
+              "markdown"
+            ],
+            "title": "Type",
+            "description": "Panel kind"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Title",
+            "description": "Panel heading",
+            "default": ""
+          },
+          "layout": {
+            "$ref": "#/components/schemas/PanelLayoutModel"
+          },
+          "config": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Config",
+            "description": "Type-specific settings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "panel_id",
+          "type",
+          "layout"
+        ],
+        "title": "DashboardPanelModel",
+        "description": "One panel of a dashboard.\n\n``config`` is normalized when saved; its shape depends on ``type`` and is validated\nagainst the matching ``*PanelConfig`` model when the dashboard is saved."
+      },
+      "DashboardPanelResponse": {
+        "properties": {
+          "panel_id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Panel Id",
+            "description": "Dashboard-unique ID"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "qubit_metric",
+              "coupling_metric",
+              "metric_script",
+              "markdown"
+            ],
+            "title": "Type",
+            "description": "Panel kind"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Title",
+            "description": "Panel heading",
+            "default": ""
+          },
+          "layout": {
+            "$ref": "#/components/schemas/PanelLayoutModel"
+          },
+          "config": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Config",
+            "description": "Type-specific settings"
+          },
+          "script_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Script Name"
+          },
+          "latest_revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Revision"
+          }
+        },
+        "type": "object",
+        "required": [
+          "panel_id",
+          "type",
+          "layout"
+        ],
+        "title": "DashboardPanelResponse",
+        "description": "A panel as returned to the caller.\n\nFor ``metric_script`` panels whose script the caller can view, ``script_name`` and\n``latest_revision`` (the script's active, last-good revision) let the UI offer to move\nthe pinned ``config.script_revision`` forward. Both are null for other panels."
+      },
+      "DashboardResponse": {
+        "properties": {
+          "dashboard_id": {
+            "type": "string",
+            "title": "Dashboard Id"
+          },
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "private",
+              "project"
+            ],
+            "title": "Visibility"
+          },
+          "chip_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chip Id"
+          },
+          "panels": {
+            "items": {
+              "$ref": "#/components/schemas/DashboardPanelResponse"
+            },
+            "type": "array",
+            "title": "Panels"
+          },
+          "owner_username": {
+            "type": "string",
+            "title": "Owner Username"
+          },
+          "owner_user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner User Id"
+          },
+          "can_edit": {
+            "type": "boolean",
+            "title": "Can Edit",
+            "description": "Whether the caller may update or delete it"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version",
+            "description": "Write counter; send it as expected_version to guard an update"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "dashboard_id",
+          "project_id",
+          "name",
+          "description",
+          "visibility",
+          "chip_id",
+          "panels",
+          "owner_username",
+          "owner_user_id",
+          "can_edit",
+          "version",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "DashboardResponse",
+        "description": "A dashboard as seen by the caller."
+      },
+      "DashboardTemplatePreviewResponse": {
+        "properties": {
+          "template_id": {
+            "type": "string",
+            "title": "Template Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "panels": {
+            "items": {
+              "$ref": "#/components/schemas/TemplatePreviewPanel"
+            },
+            "type": "array",
+            "title": "Panels"
+          },
+          "scripts_to_create": {
+            "items": {
+              "$ref": "#/components/schemas/TemplateScriptToCreate"
+            },
+            "type": "array",
+            "title": "Scripts To Create",
+            "description": "Project-visible metric scripts creation adds because the project has no script from that starter that still defines the panels' metrics"
+          }
+        },
+        "type": "object",
+        "required": [
+          "template_id",
+          "name",
+          "description",
+          "panels",
+          "scripts_to_create"
+        ],
+        "title": "DashboardTemplatePreviewResponse",
+        "description": "What a dashboard created from a template now would hold. Reading it writes nothing."
+      },
+      "DashboardTemplateResponse": {
+        "properties": {
+          "template_id": {
+            "type": "string",
+            "title": "Template Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "panel_count": {
+            "type": "integer",
+            "title": "Panel Count"
+          },
+          "panel_types": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Panel Types"
+          }
+        },
+        "type": "object",
+        "required": [
+          "template_id",
+          "name",
+          "description",
+          "panel_count",
+          "panel_types"
+        ],
+        "title": "DashboardTemplateResponse",
+        "description": "A starter template; its panels are copied into a dashboard on creation."
+      },
+      "DashboardUpdateRequest": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "visibility": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "private",
+                  "project"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visibility"
+          },
+          "chip_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chip Id"
+          },
+          "panels": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/DashboardPanelModel"
+                },
+                "type": "array",
+                "maxItems": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Panels"
+          },
+          "expected_version": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Version",
+            "description": "Reject with 409 unless the dashboard is still at this version; omit to update whatever is stored"
+          }
+        },
+        "type": "object",
+        "title": "DashboardUpdateRequest",
+        "description": "Body for updating a dashboard. ``panels`` replaces the whole list."
       },
       "DegradationTrendResponse": {
         "properties": {
@@ -23615,6 +25582,95 @@
         "title": "FlowTemplateWithCode",
         "description": "Flow template with code content."
       },
+      "FormatSourceDiagnostic": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "line": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Line"
+          },
+          "column": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Column"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "title": "FormatSourceDiagnostic",
+        "description": "Why the source could not be formatted."
+      },
+      "FormatSourceRequest": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "maxLength": 524288,
+            "title": "Source",
+            "description": "Python source (≤ 512 KiB)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source"
+        ],
+        "title": "FormatSourceRequest",
+        "description": "Python source to format; nothing is saved or executed."
+      },
+      "FormatSourceResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "formatted",
+              "unchanged",
+              "syntax_error"
+            ],
+            "title": "Status",
+            "description": "formatted: source differs from the input; unchanged: the input is already formatted; syntax_error: the input cannot be parsed and is returned as given"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "Formatted source, or the input on a syntax error"
+          },
+          "diagnostic": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FormatSourceDiagnostic"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Location of the syntax error that prevented formatting"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "source"
+        ],
+        "title": "FormatSourceResponse",
+        "description": "The source formatted with Ruff, or the input unchanged when it cannot be parsed."
+      },
       "ForumCategoryCreate": {
         "properties": {
           "key": {
@@ -25008,6 +27064,44 @@
         "title": "LatestTaskResultResponse",
         "description": "Response model for fetching the latest tasks grouped by qid/coupling_id."
       },
+      "LegendItem": {
+        "properties": {
+          "color": {
+            "type": "string",
+            "title": "Color"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          }
+        },
+        "type": "object",
+        "required": [
+          "color",
+          "label"
+        ],
+        "title": "LegendItem",
+        "description": "Categorical legend entry."
+      },
+      "LegendStop": {
+        "properties": {
+          "value": {
+            "type": "number",
+            "title": "Value"
+          },
+          "color": {
+            "type": "string",
+            "title": "Color"
+          }
+        },
+        "type": "object",
+        "required": [
+          "value",
+          "color"
+        ],
+        "title": "LegendStop",
+        "description": "Continuous color-scale stop in the metric's unit."
+      },
       "LineageEdgeResponse": {
         "properties": {
           "relation_type": {
@@ -25344,6 +27438,45 @@
         ],
         "title": "ListCryostatsResponse"
       },
+      "ListDashboardTemplatesResponse": {
+        "properties": {
+          "templates": {
+            "items": {
+              "$ref": "#/components/schemas/DashboardTemplateResponse"
+            },
+            "type": "array",
+            "title": "Templates"
+          }
+        },
+        "type": "object",
+        "required": [
+          "templates"
+        ],
+        "title": "ListDashboardTemplatesResponse",
+        "description": "Available starter templates."
+      },
+      "ListDashboardsResponse": {
+        "properties": {
+          "dashboards": {
+            "items": {
+              "$ref": "#/components/schemas/DashboardResponse"
+            },
+            "type": "array",
+            "title": "Dashboards"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "dashboards",
+          "total"
+        ],
+        "title": "ListDashboardsResponse",
+        "description": "Dashboards visible to the caller."
+      },
       "ListEvaluationRunsResponse": {
         "properties": {
           "runs": {
@@ -25553,6 +27686,45 @@
         ],
         "title": "ListForumPostsResponse",
         "description": "Paginated list of forum posts."
+      },
+      "ListMetricScriptTemplatesResponse": {
+        "properties": {
+          "templates": {
+            "items": {
+              "$ref": "#/components/schemas/MetricScriptTemplateResponse"
+            },
+            "type": "array",
+            "title": "Templates"
+          }
+        },
+        "type": "object",
+        "required": [
+          "templates"
+        ],
+        "title": "ListMetricScriptTemplatesResponse",
+        "description": "Available starter scripts."
+      },
+      "ListMetricScriptsResponse": {
+        "properties": {
+          "scripts": {
+            "items": {
+              "$ref": "#/components/schemas/MetricScriptSummary"
+            },
+            "type": "array",
+            "title": "Scripts"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "scripts",
+          "total"
+        ],
+        "title": "ListMetricScriptsResponse",
+        "description": "Scripts visible to the caller."
       },
       "ListMuxResponse": {
         "properties": {
@@ -26185,6 +28357,181 @@
         "title": "MemberUpdate",
         "description": "Request schema for updating a member's role."
       },
+      "MetricCatalogEntry": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          },
+          "scale": {
+            "type": "number",
+            "title": "Scale"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "title",
+          "unit",
+          "scale",
+          "description"
+        ],
+        "title": "MetricCatalogEntry",
+        "description": "A metric scripts can read with ``ctx.data[name]``."
+      },
+      "MetricCell": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "'5' for a qubit, '5>6' for a directed pair"
+          },
+          "qid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qid"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target"
+          },
+          "hops": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hops"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "missing",
+              "empty",
+              "error"
+            ],
+            "title": "Status"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "color": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Color"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "diagnostic": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ScriptDiagnostic"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "assessment": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CellAssessment"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "references": {
+            "items": {
+              "$ref": "#/components/schemas/CellReference"
+            },
+            "type": "array",
+            "title": "References"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "status"
+        ],
+        "title": "MetricCell",
+        "description": "Result of a metric for one qubit or one directed pair."
+      },
       "MetricHeatmapResponse": {
         "properties": {
           "chip_id": {
@@ -26608,6 +28955,969 @@
         ],
         "title": "MetricHistoryItem",
         "description": "Single historical metric data point."
+      },
+      "MetricInfo": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          },
+          "target": {
+            "type": "string",
+            "enum": [
+              "qubit",
+              "pair"
+            ],
+            "title": "Target"
+          },
+          "hops": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Hops"
+          },
+          "parameters": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/MetricParameterInfo"
+            },
+            "type": "object",
+            "title": "Parameters"
+          },
+          "has_legend": {
+            "type": "boolean",
+            "title": "Has Legend",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "unit",
+          "target"
+        ],
+        "title": "MetricInfo",
+        "description": "Catalog entry of one ``@metric`` function."
+      },
+      "MetricLegend": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "categorical",
+              "continuous"
+            ],
+            "title": "Kind"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/LegendItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "stops": {
+            "items": {
+              "$ref": "#/components/schemas/LegendStop"
+            },
+            "type": "array",
+            "title": "Stops"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "title": "MetricLegend",
+        "description": "Legend declared by a metric."
+      },
+      "MetricParameterInfo": {
+        "properties": {
+          "default": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Default"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label",
+            "default": ""
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "integer",
+              "number",
+              "boolean",
+              "choice"
+            ],
+            "title": "Kind"
+          },
+          "min": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min"
+          },
+          "max": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max"
+          },
+          "step": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit",
+            "default": ""
+          },
+          "choices": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Choices"
+          }
+        },
+        "type": "object",
+        "required": [
+          "default",
+          "kind"
+        ],
+        "title": "MetricParameterInfo",
+        "description": "A ``Parameter`` declared by a metric."
+      },
+      "MetricScriptCatalogResponse": {
+        "properties": {
+          "qubit_metrics": {
+            "items": {
+              "$ref": "#/components/schemas/MetricCatalogEntry"
+            },
+            "type": "array",
+            "title": "Qubit Metrics"
+          },
+          "coupling_metrics": {
+            "items": {
+              "$ref": "#/components/schemas/MetricCatalogEntry"
+            },
+            "type": "array",
+            "title": "Coupling Metrics"
+          }
+        },
+        "type": "object",
+        "required": [
+          "qubit_metrics",
+          "coupling_metrics"
+        ],
+        "title": "MetricScriptCatalogResponse",
+        "description": "The data catalog of ``ctx.data``."
+      },
+      "MetricScriptCreateRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "Description",
+            "default": ""
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "private",
+              "project"
+            ],
+            "title": "Visibility",
+            "default": "private"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 262144
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source",
+            "description": "Python source (≤ 256 KiB)"
+          },
+          "template_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Template Id",
+            "description": "Template to copy when source is omitted"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "MetricScriptCreateRequest",
+        "description": "Body for creating a script from source text or from a template."
+      },
+      "MetricScriptDraftEvaluateRequest": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "maxLength": 262144,
+            "title": "Source"
+          },
+          "metric_id": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Metric Id"
+          },
+          "chip_id": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Chip Id"
+          },
+          "period": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/RelativePeriod"
+              },
+              {
+                "$ref": "#/components/schemas/AbsolutePeriod"
+              }
+            ],
+            "title": "Period",
+            "discriminator": {
+              "propertyName": "kind",
+              "mapping": {
+                "absolute": "#/components/schemas/AbsolutePeriod",
+                "relative": "#/components/schemas/RelativePeriod"
+              }
+            }
+          },
+          "params": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "string"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Params"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source",
+          "metric_id",
+          "chip_id"
+        ],
+        "title": "MetricScriptDraftEvaluateRequest",
+        "description": "Body for previewing unsaved source text on a chip."
+      },
+      "MetricScriptEvaluateRequest": {
+        "properties": {
+          "metric_id": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Metric Id"
+          },
+          "chip_id": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Chip Id"
+          },
+          "period": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/RelativePeriod"
+              },
+              {
+                "$ref": "#/components/schemas/AbsolutePeriod"
+              }
+            ],
+            "title": "Period",
+            "discriminator": {
+              "propertyName": "kind",
+              "mapping": {
+                "absolute": "#/components/schemas/AbsolutePeriod",
+                "relative": "#/components/schemas/RelativePeriod"
+              }
+            }
+          },
+          "params": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "string"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Params"
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision",
+            "description": "Revision to evaluate; defaults to the active one"
+          }
+        },
+        "type": "object",
+        "required": [
+          "metric_id",
+          "chip_id"
+        ],
+        "title": "MetricScriptEvaluateRequest",
+        "description": "Body for evaluating a saved revision on a chip."
+      },
+      "MetricScriptEvaluateResponse": {
+        "properties": {
+          "script_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Script Id",
+            "description": "None for a draft preview"
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision",
+            "description": "Evaluated revision; None for a draft"
+          },
+          "metric": {
+            "$ref": "#/components/schemas/MetricInfo"
+          },
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id"
+          },
+          "start": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start",
+            "description": "Resolved period start"
+          },
+          "end": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End",
+            "description": "Resolved period end"
+          },
+          "params": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Params",
+            "description": "Effective parameter values"
+          },
+          "legend": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetricLegend"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cells": {
+            "items": {
+              "$ref": "#/components/schemas/MetricCell"
+            },
+            "type": "array",
+            "title": "Cells"
+          },
+          "log": {
+            "type": "string",
+            "title": "Log",
+            "description": "Script output (bounded to 16 KiB)",
+            "default": ""
+          },
+          "evaluated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Evaluated At"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated",
+            "description": "The log was truncated or a history span was clamped to the broker cap",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "script_id",
+          "revision",
+          "metric",
+          "chip_id",
+          "start",
+          "end",
+          "params",
+          "legend",
+          "cells",
+          "evaluated_at"
+        ],
+        "title": "MetricScriptEvaluateResponse",
+        "description": "Cells of one metric over a chip."
+      },
+      "MetricScriptResponse": {
+        "properties": {
+          "script_id": {
+            "type": "string",
+            "title": "Script Id"
+          },
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "private",
+              "project"
+            ],
+            "title": "Visibility"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "valid",
+              "invalid"
+            ],
+            "title": "Status"
+          },
+          "revision": {
+            "type": "integer",
+            "title": "Revision"
+          },
+          "active_revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active Revision"
+          },
+          "metrics": {
+            "items": {
+              "$ref": "#/components/schemas/MetricInfo"
+            },
+            "type": "array",
+            "title": "Metrics"
+          },
+          "template_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Template Id"
+          },
+          "owner_username": {
+            "type": "string",
+            "title": "Owner Username"
+          },
+          "owner_user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner User Id"
+          },
+          "can_edit": {
+            "type": "boolean",
+            "title": "Can Edit",
+            "description": "Whether the caller may update or delete it"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "active_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active Source"
+          },
+          "diagnostics": {
+            "items": {
+              "$ref": "#/components/schemas/ScriptDiagnostic"
+            },
+            "type": "array",
+            "title": "Diagnostics"
+          },
+          "revisions": {
+            "items": {
+              "$ref": "#/components/schemas/MetricScriptRevision"
+            },
+            "type": "array",
+            "title": "Revisions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "script_id",
+          "project_id",
+          "name",
+          "description",
+          "visibility",
+          "status",
+          "revision",
+          "active_revision",
+          "metrics",
+          "template_id",
+          "owner_username",
+          "owner_user_id",
+          "can_edit",
+          "created_at",
+          "updated_at",
+          "source",
+          "active_source",
+          "diagnostics",
+          "revisions"
+        ],
+        "title": "MetricScriptResponse",
+        "description": "A script with its source, last-good source and revision list."
+      },
+      "MetricScriptRevision": {
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "title": "Revision"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "valid",
+              "invalid"
+            ],
+            "title": "Status"
+          },
+          "metrics": {
+            "items": {
+              "$ref": "#/components/schemas/MetricInfo"
+            },
+            "type": "array",
+            "title": "Metrics",
+            "description": "Catalog of this revision (valid revisions only)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "revision",
+          "source",
+          "created_at",
+          "status"
+        ],
+        "title": "MetricScriptRevision",
+        "description": "One saved source text of a script."
+      },
+      "MetricScriptSummary": {
+        "properties": {
+          "script_id": {
+            "type": "string",
+            "title": "Script Id"
+          },
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "private",
+              "project"
+            ],
+            "title": "Visibility"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "valid",
+              "invalid"
+            ],
+            "title": "Status"
+          },
+          "revision": {
+            "type": "integer",
+            "title": "Revision"
+          },
+          "active_revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active Revision"
+          },
+          "metrics": {
+            "items": {
+              "$ref": "#/components/schemas/MetricInfo"
+            },
+            "type": "array",
+            "title": "Metrics"
+          },
+          "template_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Template Id"
+          },
+          "owner_username": {
+            "type": "string",
+            "title": "Owner Username"
+          },
+          "owner_user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner User Id"
+          },
+          "can_edit": {
+            "type": "boolean",
+            "title": "Can Edit",
+            "description": "Whether the caller may update or delete it"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "script_id",
+          "project_id",
+          "name",
+          "description",
+          "visibility",
+          "status",
+          "revision",
+          "active_revision",
+          "metrics",
+          "template_id",
+          "owner_username",
+          "owner_user_id",
+          "can_edit",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "MetricScriptSummary",
+        "description": "A script in the list view (no source)."
+      },
+      "MetricScriptTemplateResponse": {
+        "properties": {
+          "template_id": {
+            "type": "string",
+            "title": "Template Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          }
+        },
+        "type": "object",
+        "required": [
+          "template_id",
+          "name",
+          "description",
+          "source"
+        ],
+        "title": "MetricScriptTemplateResponse",
+        "description": "A starter script."
+      },
+      "MetricScriptUpdateRequest": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "visibility": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "private",
+                  "project"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visibility"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 262144
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "expected_revision": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Revision",
+            "description": "Reject with 409 unless the script is still at this revision"
+          }
+        },
+        "type": "object",
+        "title": "MetricScriptUpdateRequest",
+        "description": "Body for updating a script; a new ``source`` is validated and saved as a revision."
+      },
+      "MetricScriptValidateRequest": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "maxLength": 262144,
+            "title": "Source"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source"
+        ],
+        "title": "MetricScriptValidateRequest",
+        "description": "Body for validating source text without saving it."
+      },
+      "MetricScriptValidateResponse": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "metrics": {
+            "items": {
+              "$ref": "#/components/schemas/MetricInfo"
+            },
+            "type": "array",
+            "title": "Metrics"
+          },
+          "diagnostics": {
+            "items": {
+              "$ref": "#/components/schemas/ScriptDiagnostic"
+            },
+            "type": "array",
+            "title": "Diagnostics"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ok",
+          "metrics",
+          "diagnostics"
+        ],
+        "title": "MetricScriptValidateResponse",
+        "description": "Validation outcome."
       },
       "MetricValue": {
         "properties": {
@@ -27580,6 +30890,46 @@
         "type": "object",
         "title": "NumericBounds",
         "description": "Inclusive numeric bounds for one agent-controlled parameter."
+      },
+      "PanelLayoutModel": {
+        "properties": {
+          "x": {
+            "type": "integer",
+            "exclusiveMaximum": 12.0,
+            "minimum": 0.0,
+            "title": "X",
+            "description": "Column of the left edge"
+          },
+          "y": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Y",
+            "description": "Row of the top edge"
+          },
+          "w": {
+            "type": "integer",
+            "maximum": 12.0,
+            "minimum": 1.0,
+            "title": "W",
+            "description": "Width in columns"
+          },
+          "h": {
+            "type": "integer",
+            "maximum": 12.0,
+            "minimum": 1.0,
+            "title": "H",
+            "description": "Height in rows"
+          }
+        },
+        "type": "object",
+        "required": [
+          "x",
+          "y",
+          "w",
+          "h"
+        ],
+        "title": "PanelLayoutModel",
+        "description": "Position and size of a panel on the 12-column grid."
       },
       "ParameterChangeResponse": {
         "properties": {
@@ -29369,6 +32719,26 @@
         "title": "RecommendedTaskResponse",
         "description": "Response model for a recommended recalibration task.\n\nAttributes\n----------\ntask_name : str\n    Name of the task to re-run\npriority : int\n    Priority level (1=highest, larger=lower priority)\naffected_parameters : list[str]\n    Parameters that would be recalibrated by this task\naffected_qids : list[str]\n    Qubit/coupling IDs affected\nreason : str\n    Human-readable explanation"
       },
+      "RelativePeriod": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "relative",
+            "title": "Kind",
+            "default": "relative"
+          },
+          "days": {
+            "type": "integer",
+            "maximum": 400.0,
+            "minimum": 1.0,
+            "title": "Days",
+            "default": 14
+          }
+        },
+        "type": "object",
+        "title": "RelativePeriod",
+        "description": "The last ``days`` days, resolved to ``[now - days, now]`` at evaluation."
+      },
       "ResolvedPipelineStep": {
         "properties": {
           "index": {
@@ -29665,6 +33035,18 @@
             "type": "string",
             "title": "Message",
             "description": "Success message"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code",
+            "description": "The stored source: the request code formatted with Ruff, or the code as given when it could not be formatted"
           }
         },
         "type": "object",
@@ -29810,6 +33192,53 @@
         ],
         "title": "ScheduleFlowResponse",
         "description": "Response after scheduling a flow."
+      },
+      "ScriptDiagnostic": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "line": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Line"
+          },
+          "column": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Column"
+          },
+          "function": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Function"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "title": "ScriptDiagnostic",
+        "description": "A validation or runtime problem, located in the script when possible."
       },
       "SearchSourceResponse": {
         "properties": {
@@ -32664,6 +36093,110 @@
         "title": "TaskResultResponse",
         "description": "Response model for task result by task_id.\n\nAttributes\n----------\n    task_id (str): The task ID.\n    task_name (str): The name of the task.\n    qid (str): The qubit or coupling ID.\n    status (str): The task status.\n    execution_id (str): The execution ID.\n    user_id (str | None): Internal ID of the user who executed the task.\n    username (str): Username snapshot of the user who executed the task.\n    figure_path (list[str]): List of figure paths.\n    json_figure_path (list[str]): List of JSON figure paths.\n    raw_data_path (list[str]): List of raw data artifact paths.\n    input_parameters (dict): Input parameters.\n    output_parameters (dict): Output parameters.\n    start_at (datetime | None): Start time.\n    end_at (datetime | None): End time.\n    elapsed_time (timedelta | None): Elapsed time.\n    source_task_id (str | None): Parent task ID this was re-executed from.\n    re_executions (list[ReExecutionEntry]): Child task results from re-executions."
       },
+      "TemplatePreviewPanel": {
+        "properties": {
+          "panel_id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Panel Id",
+            "description": "Dashboard-unique ID"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "qubit_metric",
+              "coupling_metric",
+              "metric_script",
+              "markdown"
+            ],
+            "title": "Type",
+            "description": "Panel kind"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Title",
+            "description": "Panel heading",
+            "default": ""
+          },
+          "layout": {
+            "$ref": "#/components/schemas/PanelLayoutModel"
+          },
+          "config": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Config",
+            "description": "Type-specific settings"
+          },
+          "script_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Script Name"
+          },
+          "latest_revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Revision"
+          },
+          "script_template_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Script Template Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "panel_id",
+          "type",
+          "layout"
+        ],
+        "title": "TemplatePreviewPanel",
+        "description": "A template panel as it would be created now.\n\nA ``metric_script`` panel whose project script exists is pinned to it as on creation.\nWhen the project has no such script yet, ``config`` has no script reference and\n``script_template_id`` names the starter script that creating the dashboard adds."
+      },
+      "TemplateScriptToCreate": {
+        "properties": {
+          "template_id": {
+            "type": "string",
+            "title": "Template Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The starter source, for an unsaved preview"
+          }
+        },
+        "type": "object",
+        "required": [
+          "template_id",
+          "name",
+          "source"
+        ],
+        "title": "TemplateScriptToCreate",
+        "description": "A shared metric script that creating a dashboard from the template adds."
+      },
       "TimeSeriesData": {
         "properties": {
           "data": {
@@ -34430,6 +37963,104 @@
         ],
         "title": "GenerateCRScheduleStep",
         "description": "Plan parallel cross-resonance groups for the candidate qubits."
+      },
+      "MetricScriptPanelConfig": {
+        "properties": {
+          "script_id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Script Id"
+          },
+          "script_revision": {
+            "type": "integer",
+            "maximum": 9.223372036854776e+18,
+            "minimum": 1.0,
+            "title": "Script Revision",
+            "description": "Pinned script revision"
+          },
+          "metric_id": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Metric Id"
+          },
+          "period": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/RelativePeriod"
+              },
+              {
+                "$ref": "#/components/schemas/AbsolutePeriod"
+              }
+            ],
+            "title": "Period",
+            "discriminator": {
+              "propertyName": "kind",
+              "mapping": {
+                "absolute": "#/components/schemas/AbsolutePeriod",
+                "relative": "#/components/schemas/RelativePeriod"
+              }
+            }
+          },
+          "params": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "string"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Params"
+          },
+          "view": {
+            "type": "string",
+            "enum": [
+              "map",
+              "table"
+            ],
+            "title": "View",
+            "default": "map"
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "both",
+              "forward",
+              "reverse"
+            ],
+            "title": "Direction",
+            "description": "Pair maps: which edge directions to draw",
+            "default": "both"
+          },
+          "hops": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Hops",
+            "description": "Pair distances shown (within declared)"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "script_id",
+          "script_revision",
+          "metric_id"
+        ],
+        "title": "MetricScriptPanelConfig",
+        "description": "Config of a ``metric_script`` panel.\n\nThe panel pins ``script_revision``: saving a newer revision of the script never\nchanges what the panel shows until an editor updates the pin. The service checks the\nscript, revision, metric and parameters when the dashboard is saved."
       },
       "OneQubitCheckStep": {
         "properties": {

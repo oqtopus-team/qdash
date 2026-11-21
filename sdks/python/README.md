@@ -22,9 +22,22 @@ with QDash.from_env() as qdash:
     print(result.status)
 ```
 
+`qdash.scripts` and `qdash.dashboards` save metric scripts and dashboards; a session works
+without `with` too:
+
+```python
+from qdash.sdk import Dashboard, QDash, Script
+
+qdash = QDash.from_env()
+script = qdash.scripts.create(Script.from_file("zx90_median.py", visibility="project"))
+board = Dashboard("ZX90 health", visibility="project")
+board.add_metric(script.metric("zx90_median"), period=14)
+print(qdash.dashboards.create(board).dashboard_id)
+```
+
 The [Python client guide](../../docs/reference/clients/python.md) covers configuration,
 `chip.calibrate(targets, steps)`, which runs steps defined in Python on the chip you name,
-registered workflows and the pipeline API.
+registered workflows, the pipeline API, and metric scripts and dashboards.
 
 ## Develop the Package
 

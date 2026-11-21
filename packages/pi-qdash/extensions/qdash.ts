@@ -31,6 +31,7 @@ import { WAIT_AGENT_ACTION, WAIT_EXECUTION } from "./lib/waits.js";
 import { qcalContextText, recordedParameters, sweepsOf, type RecordedParameter, type Sweep } from "./lib/qcal-evidence.js";
 import { registerCalibrationPipelineTools } from "./tools/calibration-pipeline.js";
 import { registerFlowAuthoringTools } from "./tools/flow-authoring.js";
+import { isMetricScriptQueryAction, metricScriptQuery, registerMetricScriptTools, type MetricScriptQueryAction } from "./tools/metric-scripts.js";
 import { registerSourceCodeTools } from "./tools/source-code.js";
 import { notFound, registerTaskKnowledgeTool } from "./tools/task-knowledge.js";
 import { installQDashToolPolicy } from "./lib/script-policy.js";
@@ -79,6 +80,7 @@ type QDashQueryParams = {
     | "flow_template"
     | "flow_helper_files"
     | "flow_helper_file"
+    | MetricScriptQueryAction
     | "executions"
     | "execution"
     | "forum_posts"
@@ -99,6 +101,8 @@ type QDashQueryParams = {
   path?: string;
   flowName?: string;
   templateId?: string;
+  scriptId?: string;
+  dashboardId?: string;
   filename?: string;
   executionId?: string;
   entityId?: string;
@@ -318,6 +322,15 @@ const QueryAction = Type.Union([
   Type.Literal("flow_template"),
   Type.Literal("flow_helper_files"),
   Type.Literal("flow_helper_file"),
+  Type.Literal("metric_scripts"),
+  Type.Literal("metric_script"),
+  Type.Literal("metric_script_templates"),
+  Type.Literal("metric_script_template"),
+  Type.Literal("metric_script_catalog"),
+  Type.Literal("dashboards"),
+  Type.Literal("dashboard"),
+  Type.Literal("dashboard_templates"),
+  Type.Literal("dashboard_template"),
   Type.Literal("executions"),
   Type.Literal("execution"),
   Type.Literal("forum_posts"),
@@ -358,7 +371,9 @@ const querySchema = Type.Object({
   projectId: Type.Optional(Type.String()),
   path: Type.Optional(Type.String({ description: "file_content only: a file path relative to the calibration config directory. Not source code; read QDash or qubex source with qdash_read_source. files_tree takes no path." })),
   flowName: Type.Optional(Type.String()),
-  templateId: Type.Optional(Type.String()),
+  templateId: Type.Optional(Type.String({ description: "flow_template, metric_script_template or dashboard_template: the template ID." })),
+  scriptId: Type.Optional(Type.String({ description: "metric_script: the script ID (ms_…)." })),
+  dashboardId: Type.Optional(Type.String({ description: "dashboard: the dashboard ID." })),
   filename: Type.Optional(Type.String()),
   executionId: Type.Optional(Type.String()),
   entityId: Type.Optional(Type.String()),
@@ -1454,6 +1469,7 @@ async function buildForumEvidenceReply(client: QDashClient, params: ForumEvidenc
 async function executeQuery(params: QDashQueryParams) {
   params = applyQDashContext(params);
   const client = await makeClient(params);
+  if (isMetricScriptQueryAction(params.action)) return metricScriptQuery(client, params.action, params);
   switch (params.action) {
     case "chips": return client.listChips();
     case "default_chip": return client.getDefaultChip();
@@ -1560,6 +1576,11 @@ export default function qdashExtension(host: ExtensionAPI) {
     resolveChipId: (client, chipId) => defaultChipId(client as QDashClient, chipId),
     flowPageUrl: (client, name) => qdashWebUrl(client as QDashClient, `/workflow/${encodeURIComponent(name)}`),
   });
+  registerMetricScriptTools(pi, {
+    makeClient,
+    resolveChipId: (client, chipId) => defaultChipId(client as QDashClient, chipId),
+    pageUrl: (client, path) => qdashWebUrl(client as QDashClient, path),
+  });
 
   pi.registerTool({
     name: "qdash_config_info",
@@ -1583,7 +1604,7 @@ export default function qdashExtension(host: ExtensionAPI) {
     name: "qdash_query",
     label: "QDash Query",
     description: "Run common read-only QDash queries via @oqtopus-team/qdash-client.",
-    promptSnippet: "Query QDash chips, cryostats, cooldown wiring, metrics, tasks, files, flows, executions, projects, forum posts, and provenance",
+    promptSnippet: "Query QDash chips, cryostats, cooldown wiring, metrics, tasks, files, flows, metric scripts, dashboards, executions, projects, forum posts, and provenance",
     promptGuidelines: [
       "Prefer dedicated QDash tools such as qdash_list_chips, qdash_get_chip_metrics, qdash_list_task_results, qdash_list_forum_posts, qdash_list_flows, and qdash_list_executions when they match the task.",
       "Use qdash_query for read-only QDash data access not covered by a dedicated tool, instead of curl or scraping the UI.",
@@ -2888,10 +2909,10 @@ export default function qdashExtension(host: ExtensionAPI) {
   pi.registerTool({
     name: "qdash_dashboard",
     label: "QDash Dashboard",
-    description: "Build a compact read-only QDash dashboard for the current profile/chip context.",
+    description: "Build a compact read-only QDash status summary (chips, open Forum threads, recent executions, failed task results) for the current profile/chip context. It does not read or change custom dashboards; those are qdash_query dashboards/dashboard and qdash_save_dashboard.",
     promptSnippet: "Show QDash harness dashboard: chips, open Forum threads, recent executions, failed task results, and provenance stats",
     promptGuidelines: [
-      "Use qdash_dashboard when the user asks for QDash status, overview, triage, or a dashboard.",
+      "Use qdash_dashboard when the user asks for a QDash status overview or triage summary. It is not a custom dashboard: to build, change or save a dashboard of panels, follow the qdash-metric-scripts skill.",
       "Summarize dashboard data instead of dumping large raw payloads.",
     ],
     parameters: Type.Object({ ...connectionParams, ...chipScopedParams, limit: Type.Optional(Type.Number()), color: Type.Optional(Type.Boolean({ description: "Emit ANSI colors in text output for terminal display." })) }),

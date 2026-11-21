@@ -1,7 +1,7 @@
 # @oqtopus-team/qdash-sdk
 
-`@oqtopus-team/qdash-sdk` validates and starts QDash calibrations on a chip and lists and runs
-the workflows registered in a project. It is built on
+`@oqtopus-team/qdash-sdk` validates and starts QDash calibrations on a chip, lists and runs
+the workflows registered in a project, and saves metric scripts and dashboards. It is built on
 [`@oqtopus-team/qdash-client`](https://www.npmjs.com/package/@oqtopus-team/qdash-client), which
 stays the lower-level API for every other route. Installing the SDK installs the client of the
 same release:
@@ -27,7 +27,8 @@ console.log(run.executionId, result.status);
 
 `result.status` is the whole pipeline run's status. A timeout throws `QDashTimeoutError` and
 leaves the run going. `qdash.workflows.list()`, `get(name)` and `run(name, { parameters })` reach
-the project's registered workflows. The SDK sends requests through the given `QDashClient`, and
+the project's registered workflows; `qdash.scripts` and `qdash.dashboards` save metric scripts
+and dashboards built with `Script` and `Dashboard`. The SDK sends requests through the given `QDashClient`, and
 its error classes are the client's own, so `instanceof` works with either import. A session
 without a project uses the client's configuration as it is: when no project is configured
 there, QDash applies the user's default project.

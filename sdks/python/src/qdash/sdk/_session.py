@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from qdash.client.services.client import QDashClient
 from qdash.client.services.config import QDashConfig
 from qdash.sdk._calibration import Chip
+from qdash.sdk._dashboards import Dashboards, Scripts
 from qdash.sdk._pipelines import Pipelines
 from qdash.sdk._workflows import Workflows
 
@@ -31,6 +32,8 @@ class QDash:
         self._owns_client = False
         self.pipelines = Pipelines(self._client)
         self.workflows = Workflows(self._client)
+        self.scripts = Scripts(self._client)
+        self.dashboards = Dashboards(self._client)
 
     @classmethod
     def from_env(cls, *, project_id: str | None = None) -> QDash:

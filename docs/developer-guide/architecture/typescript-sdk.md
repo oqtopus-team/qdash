@@ -1,7 +1,8 @@
 # TypeScript SDK
 
-`@oqtopus-team/qdash-sdk` lets a TypeScript application validate or start a calibration on a chip
-and run the workflows registered in a project, through the QDash API. It is a separate npm
+`@oqtopus-team/qdash-sdk` lets a TypeScript application validate or start a calibration on a chip,
+run the workflows registered in a project, and save metric scripts and dashboards, through
+the QDash API. It is a separate npm
 package in `sdks/typescript/`, built on `@oqtopus-team/qdash-client`; the user-facing example is
 in the [TypeScript Client reference](../../reference/clients/typescript.md#run-a-calibration).
 Its calls are modelled on the [Python SDK](./python-sdk.md), with one difference in how a
@@ -12,7 +13,7 @@ missing project is handled, described below.
 | Layer | Owns | Leaves to others |
 | --- | --- | --- |
 | `@oqtopus-team/qdash-client` (`QDashClient`) | Configuration and profiles, authentication, `X-Project-Id`, HTTP transport, retries, error classes, one method per route, generated types, `withProject`, `waitForExecution` | Building request bodies from domain calls |
-| `@oqtopus-team/qdash-sdk` | The `QDash` session, `Chip`, `Workflows`, `Pipelines`, the target, step and sweep helpers, the run handles | Transport, auth, retries, any check that needs server data |
+| `@oqtopus-team/qdash-sdk` | The `QDash` session, `Chip`, `Workflows`, `Pipelines`, the target, step and sweep helpers, the run handles, the `Script` and `Dashboard` definitions and their saved handles | Transport, auth, retries, any check that needs server data |
 | API | Authentication, project authorization, the step and task catalog, preflight, dispatch | Anything on the caller's machine |
 
 The client does not depend on the SDK and exports no SDK entry point. The SDK depends on the
@@ -30,6 +31,8 @@ The SDK adds no transport, retries or caches; each call delegates to the client:
 | `qdash.pipelines.catalog`, `validate`, `execute` | `client.api.getCalibrationPipelineCatalog`, `validateCalibrationPipeline`, `executeCalibrationPipeline` |
 | `chip.validateCalibration`, `chip.calibrate` | `qdash.pipelines.validate`, `qdash.pipelines.execute` with the spec `calibrationSpec` builds |
 | `qdash.workflows.list`, `get`, `run` | `client.listFlows`, `getFlow`, `executeFlow` |
+| `qdash.scripts.list`, `get`, `template`, `validate`, `create`, `update` | `client.listMetricScripts`, `getMetricScript`, `listMetricScriptTemplates`, `validateMetricScript`, `createMetricScript`, `updateMetricScript` |
+| `qdash.dashboards.list`, `get`, `create`, `update` | `client.listDashboards`, `getDashboard` (also before an update by ID), `createDashboard`, `updateDashboard` |
 | `run.wait()` | `client.waitForExecution` with `wholePipeline: true` and `notFoundAsPending: true` |
 | `run.get()` | `client.getExecution` |
 | `new QDash(client, { projectId })` | `client.withProject`, a new client with the same transport options |
@@ -42,6 +45,29 @@ and `backendName`, are camelCase. A session holds nothing to close, and creating
 workflow handle sends no request. A timeout throws `QDashTimeoutError` and leaves the run going.
 `client.waitForExecution` keeps throwing `QDashNotFoundError` on a 404 unless it is called with
 `notFoundAsPending: true`, so existing client callers see no change.
+
+## Metric scripts and dashboards
+
+`Script`, `Dashboard`, `SavedScript.metric` and `Dashboard.addMetric` follow the
+[Python SDK's semantics](./python-sdk.md#metric-scripts-and-dashboards) with camelCase names:
+`Script.fromFile(path, { visibility })` reads text, a save binds a `SavedScript` to the revision
+it produced, `metric(id)` throws `MetricScriptError` for an invalid revision or unknown metric,
+and `qdash.dashboards.update(target, board)` sends `expected_version`. Panels and their
+`MetricScriptPanelConfig` are the generated types in their snake_case JSON form.
+
+```ts
+import { Dashboard, QDash, Script } from "@oqtopus-team/qdash-sdk";
+
+const qdash = QDash.fromEnv();
+const script = await qdash.scripts.create(await Script.fromFile("zx90_median.py", { visibility: "project" }));
+const board = new Dashboard({ name: "ZX90 health", visibility: "project", chipId: "64Qv3" });
+board.addMetric(script.metric("zx90_median"), { period: 14, params: { min_samples: 3 } });
+const saved = await qdash.dashboards.create(board);
+```
+
+pi-qdash's `qdash_save_metric_script` saves through `qdash.scripts`. `qdash_save_dashboard`
+keeps calling the client, because it updates only the fields given and the SDK replaces the whole
+definition; it forwards an optional `expectedVersion`.
 
 ## Project scope
 
@@ -72,6 +98,7 @@ before pi-qdash. [Pi Packages](../copilot/packages.md#distribution) describes th
 | Test | Covers |
 | --- | --- |
 | `sdks/typescript/tests/sdk.test.ts` | Request bodies and `X-Project-Id` through a recording `fetch`, dispatch without a project, no wait on dispatch, whole-run status, pending 404 and timeout, 422 propagation, name checks before any request, keys against `docs/oas/openapi.json`, error identity with the built client |
+| `sdks/typescript/tests/dashboards.test.ts` | Text-only `Script.fromFile`, panel IDs, layouts, hops and config, revision binding and `MetricScriptError`, request bodies, `expected_revision` and `expected_version`, 409 propagation |
 | `clients/typescript/tests/client.test.ts` | `waitForExecution` with and without `notFoundAsPending`, `withProject` |
 | `packages/pi-qdash/tests/qdash-sdk-package.test.mjs` | pi-qdash, the SDK and the built client resolve to one client copy; the client has no SDK subpath |
 | `.github/scripts/sdk-package-release.test.mjs` | Stable and beta manifests, the client pin, publish tags and the job order in the release pipeline |
@@ -84,5 +111,6 @@ before pi-qdash. [Pi Packages](../copilot/packages.md#distribution) describes th
 - `sdks/typescript/src/workflows.ts`: `Workflows`, `Workflow`, `WorkflowRun`.
 - `sdks/typescript/src/runs.ts`: `RunResult`, `runStatus`, the wait options.
 - `sdks/typescript/src/definitions.ts`: target, step and sweep helpers, `calibrationSpec`.
+- `sdks/typescript/src/dashboards.ts`: `Script`, `Dashboard`, `ScriptMetric`, `Scripts`, `SavedScript`, `Dashboards`, `SavedDashboard`.
 - `clients/typescript/src/client.ts`: `withProject` and `waitForExecution`.
 - `.github/scripts/sdk-package-release.mjs`: release version, client pin and publish tag.

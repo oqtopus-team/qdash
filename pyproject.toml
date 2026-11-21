@@ -78,7 +78,6 @@ lint.ignore = [
 "src/qdash/api/routers/auth.py" = ["S106"]  # "bearer" is standard token type
 "src/qdash/api/schemas/auth.py" = ["S105"]  # "bearer" is standard OAuth token type
 "clients/python/src/qdash/client/services/models.py" = ["TC003", "S105"]  # Generated file; keep source untouched
-"src/qdash/api/services/flow_service/validation.py" = ["S603", "S607"]  # ruff format subprocess call
 "src/qdash/api/lib/topology_config.py" = ["S112"]  # Skip invalid config files
 "tests/**" = [
     "ANN201",
@@ -112,7 +111,7 @@ lint.ignore = [
 [tool.mypy]
 strict = true
 ignore_missing_imports = true
-exclude = ["tools", "scripts", "user_flows"]
+exclude = ["tools", "scripts", "user_flows", "src/qdash/api/metric_runtime/templates/"]
 # Disable error codes for known issues:
 # - misc: FastAPI untyped decorator warnings
 # - override: Liskov substitution violations in calibtasks (design issue)

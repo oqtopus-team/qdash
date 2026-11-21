@@ -5,6 +5,7 @@ import {
   type QDashClientOptions,
 } from "@oqtopus-team/qdash-client";
 
+import { Dashboards, Scripts } from "./dashboards.js";
 import { Chip, Pipelines } from "./pipelines.js";
 import { Workflows } from "./workflows.js";
 
@@ -40,12 +41,16 @@ export class QDash {
   readonly client: QDashClient;
   readonly pipelines: Pipelines;
   readonly workflows: Workflows;
+  readonly scripts: Scripts;
+  readonly dashboards: Dashboards;
 
   constructor(client: QDashClient, options: QDashSessionOptions = {}) {
     const projectId = checkedProject(options.projectId);
     this.client = projectId !== undefined ? client.withProject(projectId) : client;
     this.pipelines = new Pipelines(this.client);
     this.workflows = new Workflows(this.client);
+    this.scripts = new Scripts(this.client);
+    this.dashboards = new Dashboards(this.client);
   }
 
   /** A session configured from `QDASH_*` environment variables. */

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import { DefaultResourceLoader } from "@earendil-works/pi-coding-agent";
@@ -63,9 +63,18 @@ test("bundled packages load tools and skills offline, retaining the pi-qdash all
     assert.ok(!names.includes("qdash_plot_timeseries"));
     // Every allowlisted read tool names a tool the bundled packages register.
     for (const name of ALLOWED_TOOL_NAMES) assert.ok(names.includes(name), name);
-    const skills = loader.getSkills().skills.map(({ name }) => name);
+    const loadedSkills = loader.getSkills().skills;
+    const skills = loadedSkills.map(({ name }) => name);
     assert.ok(skills.includes("qdash"));
     assert.ok(skills.includes("qcaleval"));
+    // Dashboard authoring is a model-invocable skill whose references ship beside it.
+    const metricScripts = loadedSkills.find(({ name }) => name === "qdash-metric-scripts");
+    assert.ok(metricScripts, "qdash-metric-scripts skill loads");
+    assert.ok(!metricScripts.disableModelInvocation);
+    assert.match(metricScripts.description, /dashboard/);
+    for (const reference of ["references/api.md", "references/templates.md"]) {
+      assert.ok(existsSync(join(dirname(metricScripts.filePath), reference)), reference);
+    }
     const roots = trustedCheckoutRoots(bundled, ALLOWLISTED_PACKAGES);
     assert.deepEqual(roots, [join(packagesDir, "pi-qcaleval")]);
     const adapted = buildQDashExtension(extensions, {}, dir, { toolArgs: {} }, roots);

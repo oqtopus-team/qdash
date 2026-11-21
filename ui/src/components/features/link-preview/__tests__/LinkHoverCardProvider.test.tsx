@@ -159,14 +159,14 @@ describe("link hover cards", () => {
     const onClick = vi.fn((event: React.MouseEvent) => event.defaultPrevented);
     render(
       <LinkHoverCardProvider>
-        <a href="/dashboard" onClick={onClick}>
-          Dashboard
+        <a href="/overview" onClick={onClick}>
+          Overview
         </a>
       </LinkHoverCardProvider>,
     );
-    hoverOpen(link("Dashboard"));
-    expect(card()).toHaveTextContent("Dashboard");
-    expect(fireEvent.click(link("Dashboard"))).toBe(true);
+    hoverOpen(link("Overview"));
+    expect(card()).toHaveTextContent("Overview");
+    expect(fireEvent.click(link("Overview"))).toBe(true);
     expect(onClick).toHaveReturnedWith(false);
     expect(card()).toBeNull();
   });
@@ -237,11 +237,11 @@ describe("link hover cards", () => {
         <a href="javascript:void(0)">Script</a>
         <a>No destination</a>
         <button type="button">Go to dashboard</button>
-        <a href="/dashboard" aria-disabled="true">
+        <a href="/overview" aria-disabled="true">
           Disabled
         </a>
         <div data-link-preview="off">
-          <a href="/dashboard">Opted out</a>
+          <a href="/overview">Opted out</a>
         </div>
       </LinkHoverCardProvider>,
     );
@@ -327,16 +327,16 @@ describe("link hover cards", () => {
   it("does not open on focus that a pointer press or hover caused", () => {
     render(
       <LinkHoverCardProvider>
-        <a href="/dashboard">Dashboard</a>
+        <a href="/overview">Overview</a>
         <a href="/metrics">Metrics</a>
       </LinkHoverCardProvider>,
     );
-    fireEvent.pointerDown(link("Dashboard"), { pointerType: "mouse" });
-    act(() => link("Dashboard").focus());
+    fireEvent.pointerDown(link("Overview"), { pointerType: "mouse" });
+    act(() => link("Overview").focus());
     expect(card()).toBeNull();
 
     // Back on the keyboard, focus opens at once again.
-    fireEvent.keyDown(link("Dashboard"), { key: "Tab" });
+    fireEvent.keyDown(link("Overview"), { key: "Tab" });
     act(() => link("Metrics").focus());
     expect(card()).toHaveTextContent("Metrics");
     act(() => link("Metrics").blur());
@@ -344,12 +344,12 @@ describe("link hover cards", () => {
     expect(card()).toBeNull();
 
     // A menu-style hover that moves focus waits for the hover delay.
-    hover(link("Dashboard"));
-    act(() => link("Dashboard").focus());
+    hover(link("Overview"));
+    act(() => link("Overview").focus());
     expect(card()).toBeNull();
     advance(CARD_OPEN_DELAY_MS);
-    expect(card()).toHaveTextContent("Dashboard");
-    unhover(link("Dashboard"));
+    expect(card()).toHaveTextContent("Overview");
+    unhover(link("Overview"));
     advance(CARD_CLOSE_DELAY_MS);
     expect(card()).toBeNull();
   });

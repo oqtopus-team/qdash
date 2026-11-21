@@ -1,0 +1,533 @@
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { OverviewPageContent } from "@/components/features/overview/OverviewPageContent";
+import { toIsoSeconds } from "@/lib/utils/datetime";
+
+const mockSetSelectedChip = vi.fn();
+const mockSetSelectionMode = vi.fn();
+const mockSetStartDate = vi.fn();
+const mockSetEndDate = vi.fn();
+const mockSetQuickRange = vi.fn();
+const mockHasUrlRange = vi.hoisted(() => vi.fn<() => boolean>(() => false));
+const mockForumPosts = vi.hoisted(() => vi.fn<() => unknown[]>(() => []));
+const mockCurrentCooldownId = vi.hoisted(() => vi.fn<() => string | null>(() => null));
+const mockCooldowns = vi.hoisted(() => vi.fn<() => unknown[]>(() => []));
+const mockListForumPosts = vi.hoisted(() => vi.fn());
+const mockGetChipNotesSummary = vi.hoisted(() => vi.fn());
+
+vi.mock("@/client/chip/chip", () => ({
+  useListChips: () => ({
+    data: {
+      data: {
+        chips: [{ chip_id: "chip-1", installed_at: "2026-06-01T00:00:00Z" }],
+      },
+    },
+    isLoading: false,
+  }),
+  useGetChip: () => ({
+    data: {
+      data: {
+        chip_id: "chip-1",
+        size: 1,
+        topology_id: "test-topology",
+        current_cooldown_id: mockCurrentCooldownId(),
+        note: null,
+      },
+    },
+  }),
+}));
+
+vi.mock("@/client/cooldown/cooldown", () => ({
+  useListCooldowns: () => ({
+    data: { data: { cooldowns: mockCooldowns() } },
+  }),
+}));
+
+vi.mock("@/client/forum/forum", () => ({
+  getListForumLabelsQueryKey: () => ["/forum/labels"],
+  useListForumPosts: (params: unknown, options: unknown) => {
+    mockListForumPosts(params, options);
+    return {
+      data: { data: { posts: mockForumPosts(), total: 0, skip: 0, limit: 200 } },
+    };
+  },
+  useListForumLabels: () => ({
+    data: { data: { labels: [] } },
+    isLoading: false,
+    isError: false,
+  }),
+}));
+
+vi.mock("@/client/metrics/metrics", () => ({
+  useGetChipMetrics: () => ({
+    data: {
+      data: {
+        qubit_metrics: {
+          t1: {
+            Q0: { value: null, stddev: null },
+          },
+        },
+        coupling_metrics: {
+          zx90_gate_fidelity: {
+            "0-1": { value: null, stddev: null },
+          },
+        },
+      },
+    },
+    isLoading: false,
+    isError: false,
+  }),
+}));
+
+vi.mock("@/client/note/note", () => ({
+  useGetChipNotesSummary: (chipId: unknown, params: unknown, options: unknown) => {
+    mockGetChipNotesSummary(chipId, params, options);
+    return {
+      data: {
+        data: {
+          qubits: [],
+          couplings: [],
+          task_notes: [],
+        },
+      },
+    };
+  },
+}));
+
+vi.mock("@/client/projects/projects", () => ({
+  useListProjectMembers: () => ({
+    data: {
+      data: {
+        members: [],
+      },
+    },
+  }),
+}));
+
+vi.mock("@/contexts/AuthContext", () => ({
+  useAuth: () => ({
+    user: { username: "tester" },
+  }),
+}));
+
+vi.mock("@/contexts/ProjectContext", () => ({
+  useProject: () => ({
+    projectId: "project-1",
+  }),
+}));
+
+vi.mock("@/hooks/useMetricsConfig", () => ({
+  useMetricsConfig: () => ({
+    qubitMetrics: [{ key: "t1", title: "T1", unit: "us", scale: 1 }],
+    couplingMetrics: [
+      { key: "zx90_gate_fidelity", title: "ZX90 Gate Fidelity", unit: "", scale: 1 },
+    ],
+    colorScale: { colors: ["#111111", "#222222"] },
+    isLoading: false,
+    isError: false,
+  }),
+}));
+
+vi.mock("@/hooks/useMetricsQueryParams", () => ({
+  useMetricsQueryParams: () => ({
+    queryParams: {
+      selection_mode: "latest",
+      start_at: "2026-06-01T00:00:00Z",
+      end_at: "2026-06-08T00:00:00Z",
+    },
+    canFetch: true,
+  }),
+}));
+
+vi.mock("@/hooks/useUrlState", () => ({
+  useMetricsUrlState: () => ({
+    selectedChip: "chip-1",
+    selectionMode: "latest",
+    setSelectedChip: mockSetSelectedChip,
+    setSelectionMode: mockSetSelectionMode,
+  }),
+  useRangeModeUrlState: () => ({
+    startDate: "2026-06-01T00:00",
+    endDate: "2026-06-08T00:00",
+    setStartDate: mockSetStartDate,
+    setEndDate: mockSetEndDate,
+    setQuickRange: mockSetQuickRange,
+    hasUrlRange: mockHasUrlRange(),
+  }),
+}));
+
+vi.mock("@/components/selectors/ChipSelector", () => ({
+  ChipSelector: () => <div>ChipSelector</div>,
+}));
+
+vi.mock("@/components/selectors/CooldownSelector", () => ({
+  CooldownSelector: ({
+    autoPickActive,
+    selectedCooldownId,
+  }: {
+    autoPickActive?: boolean;
+    selectedCooldownId?: string | null;
+  }) => (
+    <div
+      data-auto-pick-active={String(autoPickActive)}
+      data-selected-cooldown-id={String(selectedCooldownId)}
+    >
+      CooldownSelector
+    </div>
+  ),
+}));
+
+vi.mock("@/components/ui/Card", () => ({
+  Card: ({ children, title }: { children: React.ReactNode; title?: string }) => (
+    <section>
+      {title && <h2>{title}</h2>}
+      {children}
+    </section>
+  ),
+}));
+
+vi.mock("@/components/ui/EmptyState", () => ({
+  EmptyState: ({ title }: { title: string }) => <div>{title}</div>,
+}));
+
+vi.mock("@/components/ui/LinearGauge", () => ({
+  LinearGauge: () => <div>LinearGauge</div>,
+}));
+
+vi.mock("@/components/ui/PageContainer", () => ({
+  PageContainer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+}));
+
+vi.mock("@/components/ui/PageFiltersBar", () => ({
+  PageFiltersBar: Object.assign(
+    ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    {
+      Group: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+      Item: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    },
+  ),
+}));
+
+vi.mock("@/components/ui/PageHeader", () => ({
+  PageHeader: ({ title }: { title: string }) => <h1>{title}</h1>,
+}));
+
+vi.mock("@/components/ui/QuantumLoader", () => ({
+  QuantumLoader: () => <div>Loading...</div>,
+}));
+
+vi.mock("@/components/ui/TimeRangeSelector", () => ({
+  TimeRangeSelector: () => <div>TimeRangeSelector</div>,
+}));
+
+vi.mock("@/components/ui/Skeleton/PageSkeletons", () => ({
+  MetricsPageSkeleton: () => <div>Skeleton</div>,
+}));
+
+vi.mock("@/components/features/overview/OverviewCdfChart", () => ({
+  OverviewCdfChart: () => <div>CdfChart</div>,
+}));
+
+vi.mock("@/components/features/overview/OverviewSummaryTable", () => ({
+  OverviewSummaryTable: () => <div>SummaryTable</div>,
+}));
+
+vi.mock("@/components/features/overview/OverviewChipNoteCard", () => ({
+  OverviewChipNoteCard: () => <div data-testid="chip-note-card" />,
+}));
+
+vi.mock("@/components/features/overview/OverviewTargetNoteModal", () => ({
+  OverviewTargetNoteModal: ({ targetId }: { targetId: string }) => (
+    <div data-testid="target-note-modal">{targetId}</div>
+  ),
+}));
+
+vi.mock("@/components/features/overview/OverviewMetricModal", () => ({
+  OverviewMetricModal: ({ targetId, metricKey }: { targetId: string; metricKey: string }) => (
+    <div data-testid="metric-note-modal">{`${targetId}:${metricKey}`}</div>
+  ),
+}));
+
+vi.mock("@/components/features/overview/QubitMetricGrid", () => ({
+  QubitMetricGrid: ({
+    forumLinkedQids,
+    onQubitClick,
+  }: {
+    forumLinkedQids?: Record<string, string | null>;
+    onQubitClick?: (qid: string) => void;
+  }) => (
+    <div>
+      <span data-testid="qubit-forum-label">{String(forumLinkedQids?.["0"])}</span>
+      <button type="button" onClick={() => onQubitClick?.("0")}>
+        Open qubit
+      </button>
+    </div>
+  ),
+}));
+
+vi.mock("@/components/features/overview/CouplingMetricGrid", () => ({
+  CouplingMetricGrid: ({
+    forumLinkedTargets,
+    onCouplingClick,
+  }: {
+    forumLinkedTargets?: Record<string, string | null>;
+    onCouplingClick?: (couplingId: string) => void;
+  }) => (
+    <div>
+      <span data-testid="coupling-forum-label">{String(forumLinkedTargets?.["0-1"])}</span>
+      <button type="button" onClick={() => onCouplingClick?.("0-1")}>
+        Open coupling
+      </button>
+    </div>
+  ),
+}));
+
+describe("OverviewPageContent", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockForumPosts.mockReturnValue([]);
+    mockCurrentCooldownId.mockReturnValue(null);
+    mockCooldowns.mockReturnValue([]);
+    mockHasUrlRange.mockReturnValue(false);
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  it("filters overview forum markers by the active cool-down", async () => {
+    mockCurrentCooldownId.mockReturnValue("cd-active");
+    mockCooldowns.mockReturnValue([
+      {
+        cooldown_id: "cd-active",
+        started_at: "2026-06-01T00:00:00Z",
+        ended_at: null,
+      },
+    ]);
+
+    render(<OverviewPageContent />);
+
+    await waitFor(() => {
+      expect(mockListForumPosts).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          chip_id: "chip-1",
+          cooldown_id: "cd-active",
+          status: null,
+          limit: 200,
+        }),
+        expect.anything(),
+      );
+    });
+  });
+
+  it("keeps a URL-provided time range instead of the active cooldown's range", async () => {
+    mockHasUrlRange.mockReturnValue(true);
+    mockCurrentCooldownId.mockReturnValue("cd-active");
+    mockCooldowns.mockReturnValue([
+      {
+        cooldown_id: "cd-active",
+        started_at: "2026-06-01T00:00:00Z",
+        ended_at: null,
+      },
+    ]);
+
+    render(<OverviewPageContent />);
+
+    await waitFor(() => {
+      expect(mockListForumPosts).toHaveBeenCalled();
+    });
+
+    expect(mockSetStartDate).not.toHaveBeenCalled();
+    expect(mockSetEndDate).not.toHaveBeenCalled();
+    expect(screen.getByText("CooldownSelector").getAttribute("data-auto-pick-active")).toBe(
+      "false",
+    );
+    expect(screen.getByText("CooldownSelector").getAttribute("data-selected-cooldown-id")).toBe(
+      "null",
+    );
+  });
+
+  it("selects the active cooldown when the URL range starts at its start", async () => {
+    mockHasUrlRange.mockReturnValue(true);
+    mockCurrentCooldownId.mockReturnValue("cd-active");
+    mockCooldowns.mockReturnValue([
+      {
+        cooldown_id: "cd-active",
+        started_at: toIsoSeconds("2026-06-01T00:00"),
+        ended_at: null,
+      },
+    ]);
+
+    render(<OverviewPageContent />);
+
+    await waitFor(() => {
+      expect(screen.getByText("CooldownSelector").getAttribute("data-selected-cooldown-id")).toBe(
+        "cd-active",
+      );
+    });
+    expect(mockSetStartDate).not.toHaveBeenCalled();
+    expect(mockSetEndDate).not.toHaveBeenCalled();
+  });
+
+  it("does not select an ended cooldown when the URL start matches but the end does not", async () => {
+    mockHasUrlRange.mockReturnValue(true);
+    mockCurrentCooldownId.mockReturnValue("cd-ended");
+    mockCooldowns.mockReturnValue([
+      {
+        cooldown_id: "cd-ended",
+        started_at: toIsoSeconds("2026-06-01T00:00"),
+        ended_at: toIsoSeconds("2026-06-05T00:00"),
+      },
+    ]);
+
+    render(<OverviewPageContent />);
+
+    await waitFor(() => {
+      expect(mockGetChipNotesSummary).toHaveBeenCalled();
+    });
+
+    expect(screen.getByText("CooldownSelector").getAttribute("data-selected-cooldown-id")).toBe(
+      "null",
+    );
+    expect(mockGetChipNotesSummary).toHaveBeenLastCalledWith(
+      "chip-1",
+      expect.objectContaining({
+        start_at: "2026-06-01T00:00:00Z",
+        end_at: "2026-06-08T00:00:00Z",
+      }),
+      expect.anything(),
+    );
+    expect(mockSetStartDate).not.toHaveBeenCalled();
+    expect(mockSetEndDate).not.toHaveBeenCalled();
+  });
+
+  it("maps forum labels to overview marker labels", () => {
+    mockForumPosts.mockReturnValue([
+      {
+        id: "forum-0",
+        target_type: "qubit",
+        target_id: "0",
+        labels: ["anomaly"],
+      },
+      {
+        id: "forum-1",
+        target_type: "qubit",
+        target_id: "0",
+        labels: ["review"],
+      },
+      {
+        id: "forum-2",
+        target_type: "coupling",
+        target_id: "0-1",
+        labels: ["anomaly"],
+      },
+    ]);
+
+    render(<OverviewPageContent />);
+    fireEvent.click(screen.getByRole("button", { name: /Target Summaries/ }));
+
+    expect(screen.getAllByTestId("qubit-forum-label").map((item) => item.textContent)).toContain(
+      "anomaly",
+    );
+    expect(screen.getAllByTestId("coupling-forum-label").map((item) => item.textContent)).toContain(
+      "anomaly",
+    );
+  });
+
+  it("uses a later post's label when earlier posts for the target have none", () => {
+    mockForumPosts.mockReturnValue([
+      { id: "forum-0", target_type: "qubit", target_id: "0", labels: [] },
+      { id: "forum-1", target_type: "qubit", target_id: "0", labels: ["review"] },
+    ]);
+
+    render(<OverviewPageContent />);
+    fireEvent.click(screen.getByRole("button", { name: /Target Summaries/ }));
+
+    expect(screen.getAllByTestId("qubit-forum-label").map((item) => item.textContent)).toContain(
+      "review",
+    );
+  });
+
+  it("keeps a label-less marker for targets whose posts have no labels", () => {
+    mockForumPosts.mockReturnValue([
+      { id: "forum-0", target_type: "qubit", target_id: "0", labels: [] },
+      { id: "forum-1", target_type: "coupling", target_id: "0-1" },
+    ]);
+
+    render(<OverviewPageContent />);
+    fireEvent.click(screen.getByRole("button", { name: /Target Summaries/ }));
+
+    expect(screen.getAllByTestId("qubit-forum-label").map((item) => item.textContent)).toContain(
+      "null",
+    );
+    expect(screen.getAllByTestId("coupling-forum-label").map((item) => item.textContent)).toContain(
+      "null",
+    );
+  });
+
+  it("opens the pinned summary modal from the empty qubit topology", () => {
+    render(<OverviewPageContent />);
+
+    fireEvent.click(screen.getByRole("button", { name: /Target Summaries/ }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Open qubit" })[0]);
+
+    expect(screen.getByTestId("target-note-modal").textContent).toContain("0");
+    expect(screen.queryByTestId("metric-note-modal")).toBeNull();
+  });
+
+  it("opens the pinned summary modal from the empty coupling topology", () => {
+    render(<OverviewPageContent />);
+
+    fireEvent.click(screen.getByRole("button", { name: /Target Summaries/ }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Open coupling" })[0]);
+
+    expect(screen.getByTestId("target-note-modal").textContent).toContain("0-1");
+    expect(screen.queryByTestId("metric-note-modal")).toBeNull();
+  });
+
+  it("opens the metric history modal for a qubit metric even when the metric value is missing", () => {
+    render(<OverviewPageContent />);
+
+    fireEvent.click(screen.getByRole("button", { name: /1 qubit metric without data/ }));
+    fireEvent.click(screen.getAllByText("Show topology")[0]);
+    fireEvent.click(screen.getByRole("button", { name: "Open qubit" }));
+
+    expect(screen.getByTestId("metric-note-modal").textContent).toContain("0:t1");
+    expect(screen.queryByTestId("target-note-modal")).toBeNull();
+  });
+
+  it("opens the metric history modal for a coupling metric even when the metric value is missing", () => {
+    render(<OverviewPageContent />);
+
+    fireEvent.click(screen.getByRole("button", { name: /1 coupling metric without data/ }));
+    fireEvent.click(screen.getByText("Show topology"));
+    const couplingButtons = screen.getAllByRole("button", { name: "Open coupling" });
+    fireEvent.click(couplingButtons[couplingButtons.length - 1]);
+
+    expect(screen.getByTestId("metric-note-modal").textContent).toContain("0-1:zx90_gate_fidelity");
+    expect(screen.queryByTestId("target-note-modal")).toBeNull();
+  });
+
+  it("summarizes metric availability before expanding the full table", () => {
+    render(<OverviewPageContent />);
+
+    expect(screen.getByText("0 with data")).toBeTruthy();
+    expect(screen.getByText("2 empty")).toBeTruthy();
+
+    const summary = screen.getByText("All Metrics Summary").closest("summary");
+    expect(summary).not.toBeNull();
+    fireEvent.click(summary!);
+    expect(summary?.parentElement?.hasAttribute("open")).toBe(true);
+  });
+
+  it("keeps empty metrics grouped until requested", () => {
+    render(<OverviewPageContent />);
+
+    expect(screen.queryByText("No values in the selected range")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: /1 qubit metric without data/ }));
+
+    expect(screen.getByText("No values in the selected range")).toBeTruthy();
+  });
+});

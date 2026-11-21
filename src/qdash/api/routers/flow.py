@@ -30,8 +30,10 @@ from qdash.api.schemas.flow import (
     UpdateScheduleRequest,
     UpdateScheduleResponse,
 )
+from qdash.api.schemas.source_format import FormatSourceRequest, FormatSourceResponse
 from qdash.api.services.flow_schedule_service import FlowScheduleService
 from qdash.api.services.flow_service import FlowService
+from qdash.api.services.source_format_service import format_source
 
 router = APIRouter()
 logger = getLogger("uvicorn.app")
@@ -66,6 +68,28 @@ async def save_flow(
     without changing the stored flow.
     """
     return await service.save_flow(request, ctx.user.username, ctx.project_id)
+
+
+@router.post(
+    "/flows/format",
+    response_model=FormatSourceResponse,
+    summary="Format flow source without saving it",
+    operation_id="formatFlowSource",
+    responses={
+        413: {"model": Detail, "description": "The source exceeds the formatting size limit"},
+        503: {"model": Detail, "description": "The formatter could not run"},
+    },
+)
+def format_flow_source(
+    request: FormatSourceRequest,
+    _ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
+) -> FormatSourceResponse:
+    """Format Python source with the project's Ruff settings.
+
+    The source is parsed by Ruff, never imported or executed, and nothing is saved. A
+    source that cannot be parsed returns ``syntax_error`` with the input unchanged.
+    """
+    return format_source(request.source)
 
 
 @router.get(

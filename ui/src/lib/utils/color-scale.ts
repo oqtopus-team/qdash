@@ -1,7 +1,7 @@
 /**
  * Shared value-to-color mapping for metric heatmaps.
  *
- * Every heatmap (dashboard and Metrics page) maps a numeric value onto the same
+ * Every heatmap (Overview, dashboard panels and Metrics page) maps a numeric value onto the same
  * ordered palette. The palette itself comes from `config/domain/metrics.yaml`;
  * this module only decides where in the palette a value lands.
  */

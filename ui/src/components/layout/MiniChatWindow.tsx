@@ -96,7 +96,7 @@ const MARGIN = 16;
 // ---------------------------------------------------------------------------
 
 /**
- * Floating chat above modals, opened by "Ask AI" in result modals where the
+ * Floating chat above modals, opened by "Ask Agent" in result modals where the
  * docked sidebar would sit behind the overlay. Shows the same active chat as
  * the sidebar, so expanding it keeps a streaming answer going.
  */
