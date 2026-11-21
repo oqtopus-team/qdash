@@ -16,6 +16,10 @@ import type { MetricScriptPanelConfigView } from './metricScriptPanelConfigView'
  * The panel pins ``script_revision``: saving a newer revision of the script never
  * changes what the panel shows until an editor updates the pin. The service checks the
  * script, revision, metric and parameters when the dashboard is saved.
+ *
+ * A scalar metric is shown with ``view`` ``map`` or ``table`` and takes no ``targets``. A
+ * series metric (``result: "series"``) is shown with ``view`` ``timeseries`` for the
+ * ``targets`` it selects, which is also all the server evaluates.
  */
 export interface MetricScriptPanelConfig {
   /**
@@ -36,7 +40,13 @@ export interface MetricScriptPanelConfig {
   metric_id: string;
   period?: MetricScriptPanelConfigPeriod;
   params?: MetricScriptPanelConfigParams;
+  /** map or table for scalar metrics; timeseries for series */
   view?: MetricScriptPanelConfigView;
+  /**
+     * Series metrics: 1 to 16 qubit IDs ('5') or directed pairs ('5>6') to evaluate and draw. Empty for scalar metrics
+     * @maxItems 16
+     */
+  targets?: string[];
   /** Pair maps: which edge directions to draw */
   direction?: MetricScriptPanelConfigDirection;
   /** Pair distances shown (within declared) */

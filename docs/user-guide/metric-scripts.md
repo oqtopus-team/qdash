@@ -144,6 +144,46 @@ estimates**. Returning `CellResult(None, assessment=...)` shows the target as mi
 with the reason. Report a count for every aggregate, so a median of one observation does not
 look like a median of fifty.
 
+## Chart a Trend Over Time
+
+A metric declared with `result="series"` returns a time series for each target instead of one
+value, and a dashboard draws it as a chart. It runs only for the qubits or directed pairs a panel
+or preview selects, at most 16, never for the whole chip:
+
+```python
+import statistics
+
+from qdash_metrics import Parameter, SeriesPoint, SeriesResult, metric, time_bins
+
+
+@metric(title="T1 trend", unit="us", result="series",
+        parameters={"interval": Parameter(default="day", choices=["day", "week"])})
+def t1_trend(qubit, ctx):
+    history = ctx.data["t1"][qubit].history()
+    points = []
+    for time_bin in time_bins(ctx.start, ctx.end, ctx.params["interval"]):
+        values = [m.value.to("us").magnitude for m in time_bin.select(history)]
+        points.append(SeriesPoint(time_bin.start,
+                                  statistics.median(values) if values else None,
+                                  count=len(values), start=time_bin.start, end=time_bin.end))
+    return SeriesResult(points, label="median")
+```
+
+`time_bins` splits the period into UTC days, which start at 00:00 UTC, or weeks, which start on
+Monday 00:00 UTC. The first and last bins are cut to the period. Each `SeriesPoint` has a time
+inside the period with a timezone, a value or `None`, the number of observations behind it, and
+optionally its bin and a short `reason`. A point without a value is a gap: the chart leaves it
+out and does not join the line across it. Times must increase from point to point; QDash does
+not sort, fill in or drop points, and shows a target whose points break a rule as an error.
+
+A time series covers at most 400 days. A **Fixed range** longer than that is refused before
+the script runs, in the panel editor, the preview and the API, because older measurements are
+not read and would chart as gaps; split it into several panels.
+
+One series holds at most 1,024 points, and all selected targets together at most 8,192, enough
+for 16 targets over 400 days. A series metric cannot be shown as a map or table, and a
+one-value metric cannot be shown as a chart.
+
 ## Parameters, Colours and Legends
 
 A `Parameter` is a value each panel can change, such as a threshold:
@@ -232,6 +272,7 @@ security boundary for untrusted code.
 | --- | --- | --- |
 | **Getting started** | T2 echo / T1 per qubit, the frequency gap to the qubit one row up, and the mean dispersive shift over the period with its count | None |
 | **Median ZX90 fidelity** | The median of every ZX90 gate fidelity measurement of each directed coupling in the period, with the number of observations; couplings with too few observations are grey | **Minimum observations** (default 3) |
+| **ZX90 fidelity trend** | The daily or weekly median ZX90 gate fidelity of the directed couplings you select, with the number of observations per point; bins without observations are gaps | **Time bin (UTC)** (day or week), **Minimum observations per bin** (default 1), **Lowest valid value** and **Highest valid value** (default 0 to 100 %) |
 | **Frequency collision checks** | The qubex-compatible frequency-collision checks Type0A to Type9 and Type2C, as coloured qubits and directed edges with the terms behind each verdict | Frequency window, detuning, coherence limits, CNOT time, fallback values |
 
 The **Frequency Collision Map** dashboard template uses the collision script. The values are the
@@ -252,10 +293,31 @@ aid rather than a calibrated tolerance.
    fidelity** under the script's name in **Show**. Set **Last days** to 14, choose **Map** or
    **Table**, and **Apply**.
 
+### Daily or Weekly ZX90 Trend
+
+1. On **Scripts**, select **New script**, choose **ZX90 fidelity trend**, and create it.
+2. Under **Preview**, choose the chip and the metric **ZX90 gate fidelity trend**. Under
+   **Directed pairs**, type the couplings to chart, such as `0>1, 1>0`; each direction is its
+   own line. Set **Last days** to 28 and select **Preview**.
+3. Each point is the median of that day's measurements. Hover over a point to see its UTC bin,
+   value and number of observations; **n = 1 (one observation)** means the point is a single
+   measurement. Days without measurements are gaps, counted under the chart. Measurements
+   outside **Lowest valid value** to **Highest valid value** are left out and counted in the
+   point's note; a day whose measurements were all left out is **Too few observations**, not
+   **No data**. Gaps have no marker to hover, so open **Points as a table** under the chart to
+   read every day, gaps included, with its status, count and note; choose the pair under
+   **Target**, and select **Inputs and checks** for the measurements it read. For weekly
+   points, set **Time bin (UTC)** to **week** under **Parameters**.
+4. Select **Save**, then on a dashboard select **Add panel**, choose **ZX90 gate fidelity
+   trend** in **Show**, type the same pairs under **Directed pairs**, and **Apply**. The
+   **View** is **Chart**. The panel stores its settings, not the values, so it is recomputed
+   every time it loads.
+
 ## Write a Script with the Agent
 
 Ask the [Agent](./ai-chat.md) for the analysis you want, for example "show the median ZX90
-fidelity over the last 14 days per coupling" or "add a minimum sample count to this script". It
+fidelity over the last 14 days per coupling", "chart the daily median ZX90 fidelity of 0>1 over
+the last 4 weeks" or "add a minimum sample count to this script". It
 reads the available metric names and the templates, writes the script, validates it, previews
 it on your chip, and shows you the code and a summary of the result. Saving a script or a
 dashboard asks for your approval first.

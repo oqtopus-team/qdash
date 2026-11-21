@@ -11,7 +11,8 @@ import { toTextToolResult } from "../lib/results.js";
  *
  * A metric script is Python written against the `qdash_metrics` API; QDash runs
  * it in a bounded worker process and turns it into one value per qubit or
- * directed pair. Validation and previews execute the code on the server but
+ * directed pair, or, for a `result="series"` metric, a time series per selected
+ * target. Validation and previews execute the code on the server but
  * persist nothing, so they are direct tools rather than script-callable reads;
  * saving a script or a dashboard is a confirmation-gated write. Scripts are
  * saved through the SDK's `qdash.scripts`; dashboards keep the client's partial
@@ -71,9 +72,21 @@ export type MetricInfo = {
   title: string;
   unit: string;
   target: string;
+  /** "scalar" (default) or "series". */
+  result?: string;
   hops?: number[];
   parameters?: Record<string, ParameterInfo>;
   has_legend?: boolean;
+};
+
+type SeriesPoint = {
+  timestamp: string;
+  start?: string | null;
+  end?: string | null;
+  value?: number | null;
+  count?: number | null;
+  status: string;
+  reason?: string | null;
 };
 
 type Cell = {
@@ -84,6 +97,7 @@ type Cell = {
   message?: string | null;
   diagnostic?: Diagnostic | null;
   assessment?: { count?: number | null } | null;
+  series?: SeriesPoint[] | null;
 };
 
 export type EvaluateResponse = {
@@ -231,11 +245,16 @@ function formatParameter(name: string, info: ParameterInfo): string {
   return `${name}=${JSON.stringify(info.default)} (${info.kind}${info.unit ? `, ${info.unit}` : ""}${bounds.length ? `, ${bounds.join(", ")}` : ""})`;
 }
 
+/** "series: …" for a time series metric, empty for a scalar one. */
+function resultKind(metric: MetricInfo): string {
+  return metric.result === "series" ? ", series (a time series per selected target; panel view timeseries with 1-16 targets)" : "";
+}
+
 export function formatMetricInfo(metric: MetricInfo): string {
   const target = metric.target === "pair" ? `pair, hops ${(metric.hops ?? [1, 2]).join(",")}` : "qubit";
   const parameters = Object.entries(metric.parameters ?? {}).map(([name, info]) => formatParameter(name, info));
   return [
-    `\`${metric.id}\` — ${metric.title} [${metric.unit}], ${target}`,
+    `\`${metric.id}\` — ${metric.title} [${metric.unit}], ${target}${resultKind(metric)}`,
     parameters.length ? `; parameters: ${parameters.join("; ")}` : "",
     metric.has_legend ? "; has a legend" : "",
   ].join("");
@@ -260,6 +279,36 @@ function formatCell(cell: Cell, unit: string): string {
 const SAMPLE_CELLS = 12;
 const ERROR_CELLS = 5;
 const LOG_TAIL_CHARS = 1_500;
+const SAMPLE_POINTS = 4;
+
+function formatPoint(point: SeriesPoint, unit: string): string {
+  const value = point.status === "ok" && typeof point.value === "number" ? `${formatValue(point.value)} ${unit}` : `gap (${point.status})`;
+  const count = typeof point.count === "number" ? (point.count === 1 ? ", n=1 (one observation)" : `, n=${point.count}`) : "";
+  return `${point.start ?? point.timestamp}: ${value}${count}${point.reason ? ` — ${point.reason}` : ""}`;
+}
+
+/** One target of a series metric: point counts by status, value range, and the first and last points. */
+function formatSeriesCell(cell: Cell, unit: string): string[] {
+  const points = cell.series ?? [];
+  if (cell.status === "error" || cell.status === "empty" || !points.length) {
+    return [`- ${cell.key}: ${cell.status}${cell.message ? ` — ${cell.message}` : ""}`];
+  }
+  const byStatus: Record<string, number> = {};
+  for (const point of points) byStatus[point.status] = (byStatus[point.status] ?? 0) + 1;
+  const values = points.filter((point) => point.status === "ok" && typeof point.value === "number").map((point) => point.value as number);
+  const range = values.length ? `, range ${formatValue(Math.min(...values))}..${formatValue(Math.max(...values))} ${unit}` : "";
+  const statuses = Object.entries(byStatus).map(([status, count]) => `${status} ${count}`).join(", ");
+  const single = points.filter((point) => point.status === "ok" && point.count === 1).length;
+  const singles = single ? `; ${single} point${single === 1 ? "" : "s"} ${single === 1 ? "rests" : "rest"} on one observation (n=1)` : "";
+  const head = points.slice(0, SAMPLE_POINTS / 2);
+  const tail = points.length > SAMPLE_POINTS ? points.slice(-SAMPLE_POINTS / 2) : points.slice(head.length);
+  return [
+    `- ${cell.key}: ${cell.status}${cell.label ? ` (${cell.label})` : ""}; ${points.length} points (${statuses})${range}${singles}${cell.status !== "ok" && cell.message ? ` — ${cell.message}` : ""}`,
+    ...head.map((point) => `    ${formatPoint(point, unit)}`),
+    ...(points.length > SAMPLE_POINTS ? ["    …"] : []),
+    ...tail.map((point) => `    ${formatPoint(point, unit)}`),
+  ];
+}
 
 /** A summary of an evaluation; the full response goes to details.data. */
 export function formatEvaluation(result: EvaluateResponse): string {
@@ -277,6 +326,19 @@ export function formatEvaluation(result: EvaluateResponse): string {
   ];
   const legend = formatLegend(result.legend, unit);
   if (legend) lines.push(`Legend: ${legend}`);
+
+  if (metric.result === "series") {
+    lines[0] = lines[0]!.replace(/; (script|draft)/, ", series; $1");
+    lines.push(
+      "",
+      "Series per selected target (gaps are null points, never interpolated or joined; n is the number of observations behind a point):",
+      ...result.cells.flatMap((cell) => formatSeriesCell(cell, unit)),
+    );
+    if (result.truncated) lines.push("", "Truncated: the script log was cut, or a history() span was clamped to the broker's 400-day cap.");
+    const tailLog = (result.log ?? "").trimEnd();
+    if (tailLog) lines.push("", "Script output:", tailLog.length > LOG_TAIL_CHARS ? `…${tailLog.slice(-LOG_TAIL_CHARS)}` : tailLog);
+    return lines.join("\n");
+  }
 
   const ok = result.cells.filter((cell) => cell.status === "ok");
   const notEvaluated = result.cells.filter((cell) => cell.status === "missing" || cell.status === "empty");
@@ -388,6 +450,9 @@ export function scriptSaveProblems(params: { name: string; source: string }): st
 }
 
 const PANEL_TYPES = new Set(["qubit_metric", "coupling_metric", "metric_script", "markdown"]);
+const PANEL_VIEWS = new Set(["map", "table", "timeseries"]);
+/** Most targets a series evaluation or panel selects; the server enforces the same limit. */
+export const MAX_SERIES_TARGETS = 16;
 
 export function dashboardSaveProblems(params: {
   dashboardId?: string;
@@ -415,6 +480,15 @@ export function dashboardSaveProblems(params: {
       if (typeof config.script_id !== "string" || !config.script_id) problems.push(`${label}.config.script_id is required`);
       if (typeof config.metric_id !== "string" || !config.metric_id) problems.push(`${label}.config.metric_id is required`);
       if (!Number.isInteger(config.script_revision)) problems.push(`${label}.config.script_revision must pin a saved revision (an integer)`);
+      if (config.view !== undefined && !PANEL_VIEWS.has(config.view as string)) problems.push(`${label}.config.view must be one of ${[...PANEL_VIEWS].join(", ")}`);
+      const targets = config.targets;
+      if (targets !== undefined && (!Array.isArray(targets) || targets.length > MAX_SERIES_TARGETS || targets.some((target) => typeof target !== "string"))) {
+        problems.push(`${label}.config.targets must be at most ${MAX_SERIES_TARGETS} target strings ("5" or "5>6")`);
+      } else if (config.view === "timeseries" && !(Array.isArray(targets) && targets.length > 0)) {
+        problems.push(`${label}.config.targets must select 1 to ${MAX_SERIES_TARGETS} qubits or directed pairs for a timeseries view`);
+      } else if (config.view !== "timeseries" && Array.isArray(targets) && targets.length > 0) {
+        problems.push(`${label}.config.targets apply only to view "timeseries" (series metrics)`);
+      }
     }
   }
   return problems;
@@ -493,7 +567,10 @@ const periodSchema = Type.Union(
       end: Type.String({ description: "ISO 8601 with a timezone." }),
     }),
   ],
-  { description: "Data period. Defaults to the last 14 days." },
+  {
+    description:
+      "Data period. Defaults to the last 14 days. A series metric refuses an absolute period longer than 400 days (the history cap) with a 422; split a longer range.",
+  },
 );
 
 type Period = { kind: "relative"; days: number } | { kind: "absolute"; start: string; end: string };
@@ -535,11 +612,12 @@ export function registerMetricScriptTools(pi: Pick<ExtensionAPI, "registerTool">
     name: "qdash_preview_metric_script",
     label: "QDash Preview Metric Script",
     description:
-      "Evaluate one metric of a metric script on a chip over a period and summarize the cells: status counts, legend, sample values with sample counts, and per-cell errors with script line numbers. Pass `source` to preview a draft, or `scriptId` (optionally `revision`) to evaluate a saved script. Executes the code on the server within QDash's time and memory limits; nothing is saved. details.data holds the full response with every cell.",
+      "Evaluate one metric of a metric script on a chip over a period and summarize the cells: status counts, legend, sample values with sample counts, and per-cell errors with script line numbers. A series metric (result \"series\") needs `targets` (1-16 qubit IDs such as \"5\" or directed pairs such as \"5>6\"), evaluates only those, and is summarized per target with its points, gaps and counts. Pass `source` to preview a draft, or `scriptId` (optionally `revision`) to evaluate a saved script. Executes the code on the server within QDash's time and memory limits; nothing is saved. details.data holds the full response with every cell and point.",
     promptSnippet: "Preview a metric script's per-qubit or per-pair results on a chip",
     promptGuidelines: [
       "Preview a metric script with qdash_preview_metric_script on the user's chip and period before saving it, and report missing and error cells, not only the values.",
       "Pass the draft as source; scriptId evaluates what is already saved (the active revision unless revision is given).",
+      "For a series metric (a trend over time), pass the qubits or directed pairs the user asked about as targets, at most 16; never select every pair of the chip. Report gaps and n=1 points as such.",
     ],
     parameters: Type.Object({
       ...connectionParams,
@@ -550,6 +628,12 @@ export function registerMetricScriptTools(pi: Pick<ExtensionAPI, "registerTool">
       chipId: Type.Optional(Type.String({ description: "Chip to evaluate on. Defaults to the session/default chip." })),
       period: Type.Optional(periodSchema),
       params: Type.Optional(Type.Object({}, { additionalProperties: true, description: "Parameter overrides by name; the rest use their defaults." })),
+      targets: Type.Optional(
+        Type.Array(Type.String(), {
+          maxItems: MAX_SERIES_TARGETS,
+          description: "Series metrics only, and required for them: 1-16 qubit IDs (\"5\") or directed pairs (\"5>6\") to evaluate. Omit for scalar metrics, which cover the whole chip.",
+        }),
+      ),
     }),
     async execute(
       _toolCallId,
@@ -561,6 +645,7 @@ export function registerMetricScriptTools(pi: Pick<ExtensionAPI, "registerTool">
         chipId?: string;
         period?: Period;
         params?: ParamValues;
+        targets?: string[];
       },
     ) {
       if (Boolean(params.source) === Boolean(params.scriptId)) {
@@ -577,6 +662,7 @@ export function registerMetricScriptTools(pi: Pick<ExtensionAPI, "registerTool">
         chip_id: chipId,
         ...(params.period ? { period: params.period } : {}),
         ...(params.params ? { params: params.params } : {}),
+        ...(params.targets?.length ? { targets: params.targets } : {}),
       };
       try {
         const result = (params.source
@@ -698,8 +784,8 @@ export function registerMetricScriptTools(pi: Pick<ExtensionAPI, "registerTool">
       "Create a dashboard (no dashboardId) or update one (dashboardId). Confirmation-gated write operation.",
       "panels replaces the whole panel list on update: read the dashboard with qdash_query dashboard and send every panel.",
       "A panel is {panel_id, type, title, layout: {x, y, w, h}, config} on a 12-column grid (x + w <= 12, h 1-12).",
-      "type metric_script: config {script_id, metric_id, script_revision, period, params, view, direction, hops}. script_revision is required and pins the panel to that saved revision (use the script's active_revision); later saves of the script do not change the panel.",
-      "period is {kind: \"relative\", days} or {kind: \"absolute\", start, end} with timezones; params are the metric's Parameter values; view is \"map\" or \"table\"; direction (pair maps) is \"both\", \"forward\" or \"reverse\"; hops is a subset of [1, 2] within the metric's declared hops.",
+      "type metric_script: config {script_id, metric_id, script_revision, period, params, view, targets, direction, hops}. script_revision is required and pins the panel to that saved revision (use the script's active_revision); later saves of the script do not change the panel.",
+      "period is {kind: \"relative\", days} or {kind: \"absolute\", start, end} with timezones, at most 400 days for a series metric; params are the metric's Parameter values; view is \"map\" or \"table\" for scalar metrics and \"timeseries\" for series metrics (result \"series\"); targets (series only, required) lists 1-16 qubit IDs (\"5\") or directed pairs (\"5>6\") to draw, and is [] otherwise; direction (pair maps) is \"both\", \"forward\" or \"reverse\"; hops is a subset of [1, 2] within the metric's declared hops.",
       "Other types: qubit_metric and coupling_metric {metric: <metrics catalog key>}, markdown {content}.",
       "A project-visible dashboard cannot use private scripts. templateId (creation only) copies a starter template's panels when panels is empty; when the project has no shared script for the template's script panels, creation also adds one (qdash_query dashboard_template lists it in scripts_to_create), and the confirmation names it.",
     ].join(" "),

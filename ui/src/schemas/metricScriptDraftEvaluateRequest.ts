@@ -7,6 +7,7 @@
  */
 import type { MetricScriptDraftEvaluateRequestParams } from './metricScriptDraftEvaluateRequestParams';
 import type { MetricScriptDraftEvaluateRequestPeriod } from './metricScriptDraftEvaluateRequestPeriod';
+import type { MetricScriptDraftEvaluateRequestTargets } from './metricScriptDraftEvaluateRequestTargets';
 
 /**
  * Body for previewing unsaved source text on a chip.
@@ -26,4 +27,6 @@ export interface MetricScriptDraftEvaluateRequest {
   chip_id: string;
   period?: MetricScriptDraftEvaluateRequestPeriod;
   params?: MetricScriptDraftEvaluateRequestParams;
+  /** Series metrics only, and required for them: 1 to 16 qubit IDs ('5') or directed pairs ('5>6'); only these are evaluated. Scalar metrics take none and cover the whole chip */
+  targets?: MetricScriptDraftEvaluateRequestTargets;
 }

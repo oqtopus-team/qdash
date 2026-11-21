@@ -156,6 +156,7 @@ def test_metric_decorator_validates_declarations():
         "title": "Pair",
         "unit": "%",
         "target": "pair",
+        "result": "scalar",
         "hops": [1],
         "parameters": {},
         "has_legend": False,

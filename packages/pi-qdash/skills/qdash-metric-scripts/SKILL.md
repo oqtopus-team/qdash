@@ -8,12 +8,14 @@ description: Write, check, preview and save QDash metric scripts (Python using t
 # QDash metric scripts
 
 A metric script is a Python module that QDash runs on its own server, in a bounded worker
-process, to turn calibration data into one value per qubit or per directed qubit pair. Custom
-dashboards show those values as chip maps and tables. Scripts define the computation; a
-dashboard's `metric_script` panel says which script, metric, period and parameters to show.
+process, to turn calibration data into one value per qubit or per directed qubit pair, or, for
+a series metric, into a time series per selected qubit or pair. Custom dashboards show values
+as chip maps and tables and series as charts. Scripts define the computation; a dashboard's
+`metric_script` panel says which script, metric, period, parameters and (for a series) targets
+to show.
 
 The full `qdash_metrics` API, with its data semantics, is in
-[references/api.md](references/api.md). The three shipped templates are summarised in
+[references/api.md](references/api.md). The four shipped templates are summarised in
 [references/templates.md](references/templates.md). Read the API reference before writing
 anything beyond a one-line change: the period, pair-direction and unit rules below are where
 plausible-looking scripts go wrong.
@@ -27,9 +29,11 @@ plausible-looking scripts go wrong.
   starter template would create and the shared scripts creating it would add; writes nothing).
 - `qdash_validate_metric_script` `{source}`: compiles the script in the worker and returns its
   metrics or diagnostics with line numbers. Nothing is saved and no data is read.
-- `qdash_preview_metric_script` `{source | scriptId, metricId, chipId?, period?, params?}`:
-  evaluates one metric on a chip and summarises the cells. It runs the code on the server
-  within the time and memory limits but persists nothing; `details.data` has every cell.
+- `qdash_preview_metric_script` `{source | scriptId, metricId, chipId?, period?, params?,
+  targets?}`: evaluates one metric on a chip and summarises the cells, or for a series metric
+  the points, gaps and counts per target. A series metric needs `targets` (1 to 16 qubit IDs or
+  directed pairs such as `"0>1"`). It runs the code on the server within the time and memory
+  limits but persists nothing; `details.data` has every cell and point.
 - `qdash_save_metric_script` and `qdash_save_dashboard`: confirmation-gated writes
   (the harness asks the user). The script save validates first and refuses source that would
   not validate. `qdash_save_dashboard` is for pi CLI and other sessions without a dashboard
@@ -46,8 +50,9 @@ offered.
 2. **Start from something that works.** Prefer an existing script (`metric_scripts`, then
    `metric_script`) or a template (`metric_script_template`) over a blank file. The
    `zx90_median` template is the pattern for "aggregate raw observations over a period per
-   coupling"; `getting_started` shows latest values, topology and history; `collision` shows
-   categorical verdicts with explained cells.
+   coupling"; `zx90_daily_trend` is the pattern for "daily or weekly trend of a metric over a
+   period" (a series metric); `getting_started` shows latest values, topology and history;
+   `collision` shows categorical verdicts with explained cells.
 3. **Write the module.** One `@metric` function per value the user wants, with an honest
    `title` and the `unit` the value is in. Return `CellResult` with `assessment["count"]` for
    anything aggregated, so a median of one observation does not look like a median of fifty.
@@ -68,6 +73,13 @@ offered.
    saves. Otherwise save with `qdash_save_dashboard`: on update, read the dashboard first and
    send the complete panel list (omitted panels are removed); with a starter `templateId`,
    read `dashboard_template` first and tell the user about any `scripts_to_create`.
+
+A request for a value over time ("ZX90 daily median trend over the last month", "weekly T1 of
+Q5") is a series metric: `@metric(result="series")` returning a `SeriesResult` per target,
+with `time_bins` for UTC day or week bins. Ask which qubits or directed pairs to chart when
+the user did not say, and select at most 16; never chart every coupling of the chip. The panel
+is `view: "timeseries"` with those `targets`. A series is never shown as a map or table, and a
+scalar metric is never shown as a chart; QDash rejects both.
 
 When the user asks a one-off question ("what is the median ZX90 fidelity per coupling this
 week?"), a draft preview answers it without saving anything. Offer to save only if they want
@@ -96,7 +108,14 @@ These come from how the runtime reads data; getting them wrong produces a confid
 - **Missing is not zero.** Raise `MissingData` (or let `latest()` raise it) when an input is
   absent; return `None` for a target the metric deliberately skips; return
   `CellResult(None, assessment={...})` to show why a target has no value (for example too few
-  samples). Never return 0 as a stand-in.
+  samples). Never return 0 as a stand-in. In a series, a bin without enough data is a
+  `SeriesPoint` with `value=None`, its `count`, a `status` (`no_data` or `insufficient`) and a
+  `reason`; it is drawn as a gap, never interpolated.
+- **Series bins are UTC.** `time_bins` days start at 00:00 UTC and weeks on Monday 00:00 UTC;
+  the first and last bins are clipped to the period. Say so when the user's local day differs.
+- **Filter only with an explicit range.** If observations outside a physical range must be left
+  out, make the range `Parameter`s with units and report how many were left out, as
+  `zx90_daily_trend` does; do not hard-code a filter or change the existing scalar templates.
 
 ## Revisions: last-good and pinned
 
@@ -153,7 +172,8 @@ Scripts can import only `numpy`, `scipy`, `math`, `statistics` and `qdash_metric
 `open`, `exec`, `eval` and similar builtins are disabled, and there is no network or API
 access. A run has a wall-clock timeout (60 s by default), a memory cap and bounded output;
 history reads are capped at 5,000 records per call, 2,000 data requests per evaluation and a
-400-day span.
+400-day span. A series evaluation selects at most 16 targets, 1,024 points per series and
+8,192 points in total.
 
 - A per-cell error (`status: error` with a line number) is a bug or a cap hit for that target;
   the other cells are still valid. Fix the line, or narrow the period for a cap.

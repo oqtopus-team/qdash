@@ -2864,6 +2864,15 @@ class Target(StrEnum):
     pair = "pair"
 
 
+class Result(StrEnum):
+    """
+    scalar: one value per qubit or pair, shown as a map or table. series: a time series per selected target, shown as a chart
+    """
+
+    scalar = "scalar"
+    series = "series"
+
+
 class Kind(StrEnum):
     categorical = "categorical"
     continuous = "continuous"
@@ -2942,6 +2951,28 @@ class MetricScriptCreateRequest(BaseModel):
     """
 
 
+class Target1(RootModel[str]):
+    root: Annotated[str, Field(max_length=32, min_length=1)]
+
+
+class Targets(RootModel[list[Target1]]):
+    root: Annotated[list[Target1], Field(max_length=16, title="Targets")]
+    """
+    Series metrics only, and required for them: 1 to 16 qubit IDs ('5') or directed pairs ('5>6'); only these are evaluated. Scalar metrics take none and cover the whole chip
+    """
+
+
+class Targets1Item(RootModel[str]):
+    root: Annotated[str, Field(max_length=32, min_length=1)]
+
+
+class Targets1(RootModel[list[Targets1Item]]):
+    root: Annotated[list[Targets1Item], Field(max_length=16, title="Targets")]
+    """
+    Series metrics only, and required for them: 1 to 16 qubit IDs ('5') or directed pairs ('5>6'); only these are evaluated. Scalar metrics take none and cover the whole chip
+    """
+
+
 class Revision(RootModel[int]):
     root: Annotated[int, Field(ge=1, title="Revision")]
     """
@@ -3005,6 +3036,51 @@ class MetricScriptValidateRequest(BaseModel):
     """
 
     source: Annotated[str, Field(max_length=262144, title="Source")]
+
+
+class Status13(StrEnum):
+    """
+    ok (has a value), no_data or insufficient (a gap)
+    """
+
+    ok = "ok"
+    no_data = "no_data"
+    insufficient = "insufficient"
+
+
+class MetricSeriesPoint(BaseModel):
+    """
+    One point of a series metric's result for one target.
+    """
+
+    timestamp: Annotated[AwareDatetime, Field(title="Timestamp")]
+    """
+    Where the point is drawn, within the period
+    """
+    start: Annotated[AwareDatetime | None, Field(title="Start")] = None
+    """
+    Inclusive start of its time bin
+    """
+    end: Annotated[AwareDatetime | None, Field(title="End")] = None
+    """
+    End of its time bin
+    """
+    value: Annotated[float | None, Field(title="Value")] = None
+    """
+    Value in the metric's unit; null for a gap, never joined
+    """
+    count: Annotated[int | None, Field(title="Count")] = None
+    """
+    Observations behind the value
+    """
+    status: Annotated[Status13, Field(title="Status")]
+    """
+    ok (has a value), no_data or insufficient (a gap)
+    """
+    reason: Annotated[str | None, Field(title="Reason")] = None
+    """
+    Why the point is a gap, or a note
+    """
 
 
 class MetricValue(BaseModel):
@@ -5603,8 +5679,13 @@ class GenerateCRScheduleStep(BaseModel):
 
 
 class View(StrEnum):
+    """
+    map or table for scalar metrics; timeseries for series
+    """
+
     map = "map"
     table = "table"
+    timeseries = "timeseries"
 
 
 class Direction(StrEnum):
@@ -5624,6 +5705,10 @@ class MetricScriptPanelConfig(BaseModel):
     The panel pins ``script_revision``: saving a newer revision of the script never
     changes what the panel shows until an editor updates the pin. The service checks the
     script, revision, metric and parameters when the dashboard is saved.
+
+    A scalar metric is shown with ``view`` ``map`` or ``table`` and takes no ``targets``. A
+    series metric (``result: "series"``) is shown with ``view`` ``timeseries`` for the
+    ``targets`` it selects, which is also all the server evaluates.
     """
 
     model_config = ConfigDict(
@@ -5641,6 +5726,13 @@ class MetricScriptPanelConfig(BaseModel):
     ] = None
     params: Annotated[dict[str, bool | int | float | str] | None, Field(title="Params")] = None
     view: Annotated[View, Field(title="View")] = View.map
+    """
+    map or table for scalar metrics; timeseries for series
+    """
+    targets: Annotated[list[str] | None, Field(max_length=16, title="Targets")] = None
+    """
+    Series metrics: 1 to 16 qubit IDs ('5') or directed pairs ('5>6') to evaluate and draw. Empty for scalar metrics
+    """
     direction: Annotated[Direction, Field(title="Direction")] = Direction.both
     """
     Pair maps: which edge directions to draw
@@ -7167,6 +7259,9 @@ class MemberUpdate(BaseModel):
 class MetricCell(BaseModel):
     """
     Result of a metric for one qubit or one directed pair.
+
+    A series metric's cell has no ``value``; its ``series`` holds the points, and its status
+    is ``missing`` when no point has a value.
     """
 
     key: Annotated[str, Field(title="Key")]
@@ -7185,6 +7280,14 @@ class MetricCell(BaseModel):
     diagnostic: ScriptDiagnostic | None = None
     assessment: CellAssessment | None = None
     references: Annotated[list[CellReference] | None, Field(title="References")] = None
+    series: Annotated[list[MetricSeriesPoint] | None, Field(title="Series")] = None
+    """
+    Series metrics only: the points, oldest first
+    """
+    references_truncated: Annotated[bool, Field(title="References Truncated")] = False
+    """
+    Series metrics only: references holds the most recent inputs, not all
+    """
 
 
 class MetricInfo(BaseModel):
@@ -7196,6 +7299,10 @@ class MetricInfo(BaseModel):
     title: Annotated[str, Field(title="Title")]
     unit: Annotated[str, Field(title="Unit")]
     target: Annotated[Target, Field(title="Target")]
+    result: Annotated[Result, Field(title="Result")] = Result.scalar
+    """
+    scalar: one value per qubit or pair, shown as a map or table. series: a time series per selected target, shown as a chart
+    """
     hops: Annotated[list[int] | None, Field(title="Hops")] = None
     parameters: Annotated[dict[str, MetricParameterInfo] | None, Field(title="Parameters")] = None
     has_legend: Annotated[bool, Field(title="Has Legend")] = False
@@ -7214,6 +7321,10 @@ class MetricScriptDraftEvaluateRequest(BaseModel):
         Field(discriminator="kind", title="Period"),
     ] = None
     params: Annotated[dict[str, bool | int | float | str] | None, Field(title="Params")] = None
+    targets: Annotated[Targets | None, Field(title="Targets")] = None
+    """
+    Series metrics only, and required for them: 1 to 16 qubit IDs ('5') or directed pairs ('5>6'); only these are evaluated. Scalar metrics take none and cover the whole chip
+    """
 
 
 class MetricScriptEvaluateRequest(BaseModel):
@@ -7228,6 +7339,10 @@ class MetricScriptEvaluateRequest(BaseModel):
         Field(discriminator="kind", title="Period"),
     ] = None
     params: Annotated[dict[str, bool | int | float | str] | None, Field(title="Params")] = None
+    targets: Annotated[Targets1 | None, Field(title="Targets")] = None
+    """
+    Series metrics only, and required for them: 1 to 16 qubit IDs ('5') or directed pairs ('5>6'); only these are evaluated. Scalar metrics take none and cover the whole chip
+    """
     revision: Annotated[Revision | None, Field(title="Revision")] = None
     """
     Revision to evaluate; defaults to the active one

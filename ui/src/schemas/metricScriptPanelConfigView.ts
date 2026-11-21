@@ -6,10 +6,14 @@
  * OpenAPI spec version: 0.0.1
  */
 
+/**
+ * map or table for scalar metrics; timeseries for series
+ */
 export type MetricScriptPanelConfigView = typeof MetricScriptPanelConfigView[keyof typeof MetricScriptPanelConfigView];
 
 
 export const MetricScriptPanelConfigView = {
   map: 'map',
   table: 'table',
+  timeseries: 'timeseries',
 } as const;

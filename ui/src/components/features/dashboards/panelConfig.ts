@@ -39,6 +39,8 @@ export interface MetricScriptPanelConfig {
   period: MetricPeriod;
   params: Record<string, ParamValue>;
   view: ResultViewMode;
+  /** Series metrics: the qubit ("5") or directed pair ("5>6") keys evaluated and drawn. */
+  targets: string[];
   direction: PairDirection;
   hops: number[];
 }
@@ -106,7 +108,10 @@ export function readMetricScriptConfig(
       typeof revision === "number" && Number.isInteger(revision) && revision >= 1 ? revision : null,
     period: readPeriod(config.period),
     params,
-    view: config.view === "table" ? "table" : "map",
+    view: config.view === "table" || config.view === "timeseries" ? config.view : "map",
+    targets: Array.isArray(config.targets)
+      ? (config.targets as unknown[]).filter((key): key is string => typeof key === "string")
+      : [],
     direction:
       config.direction === "forward" || config.direction === "reverse" ? config.direction : "both",
     hops: hops.length > 0 ? hops : [...KNOWN_HOPS],
@@ -119,7 +124,11 @@ export function metricScriptConfigError(config: MetricScriptPanelConfig): string
   if (config.script_revision === null) return "The script has no valid revision to pin";
   if (!config.metric_id) return "Choose a metric";
   if (config.hops.length === 0) return "Choose at least one pair distance";
-  return periodError(config.period);
+  if (config.view === "timeseries" && config.targets.length === 0) {
+    return "Select the qubits or pairs to chart";
+  }
+  // Only series metrics are shown as a time series, and they cap a fixed range.
+  return periodError(config.period, { series: config.view === "timeseries" });
 }
 
 /**
@@ -136,6 +145,7 @@ export function writeMetricScriptConfig(
     period: config.period,
     params: config.params,
     view: config.view,
+    targets: config.targets,
     direction: config.direction,
     hops: config.hops,
   };

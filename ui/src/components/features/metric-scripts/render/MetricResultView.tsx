@@ -17,8 +17,28 @@ import { countByStatus, createCellColoring } from "./legend";
 import { matchesDirection, PairMap, type PairDirection } from "./PairMap";
 import { QubitMap } from "./QubitMap";
 import { ResultTable } from "./ResultTable";
+import { SeriesChart } from "./SeriesChart";
 
-export type ResultViewMode = "map" | "table";
+/** Map and table show scalar metrics; timeseries shows series metrics. */
+export type ResultViewMode = "map" | "table" | "timeseries";
+
+/**
+ * Why `view` cannot show `result`, or null when it can. A series is never reduced to one
+ * value for a map or table, and a scalar result has no time axis.
+ */
+function viewMismatch(
+  result: Pick<MetricScriptEvaluateResponse, "metric">,
+  view: ResultViewMode,
+): string | null {
+  const series = result.metric.result === "series";
+  if (series && view !== "timeseries") {
+    return `${result.metric.title} returns a time series per selected target. A ${view} shows one value per target, so this panel needs the Chart view.`;
+  }
+  if (!series && view === "timeseries") {
+    return `${result.metric.title} returns one value per target, which has no time axis. Show it as a map or a table.`;
+  }
+  return null;
+}
 
 /** One script location; a button that jumps there when the editor is open. */
 export function DiagnosticLocation({
@@ -196,13 +216,14 @@ export function MetricResultView({
   );
 
   const isPair = result?.metric.target === "pair";
+  const isSeries = result?.metric.result === "series";
   const shownCells = useMemo(() => {
     if (!result) return [];
-    if (!isPair) return result.cells;
+    if (!isPair || isSeries) return result.cells;
     return result.cells.filter(
       (cell) => (!hops || hops.includes(cell.hops ?? 1)) && matchesDirection(cell, direction),
     );
-  }, [direction, hops, isPair, result]);
+  }, [direction, hops, isPair, isSeries, result]);
   const statusCounts = useMemo(() => countByStatus(shownCells), [shownCells]);
 
   if (error) {
@@ -232,6 +253,7 @@ export function MetricResultView({
   }
 
   const unit = displayUnit(result.metric.unit);
+  const mismatch = viewMismatch(result, view);
   const summary = (["ok", "missing", "empty", "error"] as const)
     .filter((status) => statusCounts[status] > 0)
     .map((status) => `${STATUS_LABELS[status]} ${statusCounts[status]}`)
@@ -254,7 +276,7 @@ export function MetricResultView({
         ) : (
           <span className="truncate">{summary}</span>
         )}
-        {onViewChange && <ViewToggle view={view} onViewChange={onViewChange} />}
+        {onViewChange && !isSeries && <ViewToggle view={view} onViewChange={onViewChange} />}
       </div>
       {!compact && summary && <p className="text-xs text-base-content/60">{summary}</p>}
       {result.truncated && (
@@ -263,7 +285,14 @@ export function MetricResultView({
         </div>
       )}
       <div className="min-h-0 flex-1">
-        {view === "table" ? (
+        {mismatch ? (
+          <div role="alert" className="alert alert-warning alert-soft text-sm">
+            <CircleAlert className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <span>{mismatch}</span>
+          </div>
+        ) : isSeries ? (
+          <SeriesChart result={result} onSelectCell={setSelected} />
+        ) : view === "table" ? (
           <ResultTable result={result} cells={shownCells} onSelectCell={setSelected} />
         ) : isPair ? (
           <PairMap

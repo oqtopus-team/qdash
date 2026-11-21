@@ -76,6 +76,7 @@ def _collision(kind: str, x: int, y: int) -> TemplatePanel:
             "period": {"kind": "relative", "days": 30},
             "params": {},
             "view": "map",
+            "targets": [],
             "direction": "both",
             "hops": [1, 2],
         },

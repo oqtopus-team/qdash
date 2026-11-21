@@ -22,6 +22,12 @@ import {
 import { periodError, type MetricPeriod } from "@/components/features/metric-scripts/periods";
 import type { ResultViewMode } from "@/components/features/metric-scripts/render/MetricResultView";
 import {
+  isSeriesMetric,
+  MAX_SERIES_TARGETS,
+  parseTargets,
+  targetsText,
+} from "@/components/features/metric-scripts/targets";
+import {
   PAIR_DIRECTIONS,
   type PairDirection,
 } from "@/components/features/metric-scripts/render/PairMap";
@@ -148,6 +154,8 @@ function PanelEditorForm({ panel, dashboardShared, onCancel, onSave }: PanelEdit
   const [view, setView] = useState<ResultViewMode>(initialScript?.view ?? "map");
   const [direction, setDirection] = useState<PairDirection>(initialScript?.direction ?? "both");
   const [hops, setHops] = useState<number[]>(initialScript?.hops ?? [1, 2]);
+  // A series metric charts only the targets typed here; nothing defaults to the whole chip.
+  const [targetsInput, setTargetsInput] = useState(targetsText(initialScript?.targets ?? []));
   // Parameters and the revision sit behind a disclosure; it opens when a panel already
   // deviates from the defaults so nothing stored is out of sight.
   const [advancedOpen, setAdvancedOpen] = useState(
@@ -216,6 +224,10 @@ function PanelEditorForm({ panel, dashboardShared, onCancel, onSave }: PanelEdit
     ? catalog.find((entry) => entry.id === scriptChoice.metric_id)
     : undefined;
   const isPairMetric = scriptMetric?.target === "pair";
+  const isSeries = isSeriesMetric(scriptMetric);
+  // Only views that can show the metric's result are offered.
+  const panelView: ResultViewMode = isSeries ? "timeseries" : view === "timeseries" ? "map" : view;
+  const parsedTargets = isSeries ? parseTargets(targetsInput, scriptMetric?.target) : null;
   const hopOptions = declaredHops(scriptMetric);
   const shownHops = hops.filter((hop) => hopOptions.includes(hop));
   const hasParameters = parameterEntries(scriptMetric).length > 0;
@@ -238,14 +250,18 @@ function PanelEditorForm({ panel, dashboardShared, onCancel, onSave }: PanelEdit
     if (revision === null) return "The script has no valid revision to pin";
     if (!scriptMetric) return catalogLoading ? "Loading the script's metrics" : "Choose a metric";
     if (paramsInvalid) return "Fix the highlighted parameters";
-    if (isPairMetric && shownHops.length === 0) return "Choose at least one pair distance";
-    return periodError(period);
+    if (parsedTargets?.error) return parsedTargets.error;
+    if (isPairMetric && !isSeries && shownHops.length === 0) {
+      return "Choose at least one pair distance";
+    }
+    return periodError(period, { series: isSeries });
   })();
 
   const resetScriptMetric = (next: MetricInfo | undefined) => {
     setStoredParams({});
     setTypedParams({});
     setHops(declaredHops(next));
+    setTargetsInput("");
   };
 
   const handleChoiceChange = (value: string) => {
@@ -313,9 +329,10 @@ function PanelEditorForm({ panel, dashboardShared, onCancel, onSave }: PanelEdit
         script_revision: revision,
         period,
         params,
-        view,
+        view: panelView,
+        targets: parsedTargets?.keys ?? [],
         direction,
-        hops: isPairMetric ? shownHops : hopOptions,
+        hops: isPairMetric && !isSeries ? shownHops : hopOptions,
       });
       annotations = {
         script_name: scriptName,
@@ -444,15 +461,26 @@ function PanelEditorForm({ panel, dashboardShared, onCancel, onSave }: PanelEdit
                 </Field>
               )}
               {scriptChoice && (
-                <Field id={`${id}-view`} label="View">
+                <Field
+                  id={`${id}-view`}
+                  label="View"
+                  hint={isSeries ? "A time series is drawn as a chart" : undefined}
+                >
                   <select
                     id={`${id}-view`}
                     className="select select-sm w-full"
-                    value={view}
+                    value={panelView}
+                    disabled={isSeries}
                     onChange={(event) => setView(event.target.value as ResultViewMode)}
                   >
-                    <option value="map">Map</option>
-                    <option value="table">Table</option>
+                    {isSeries ? (
+                      <option value="timeseries">Chart</option>
+                    ) : (
+                      <>
+                        <option value="map">Map</option>
+                        <option value="table">Table</option>
+                      </>
+                    )}
                   </select>
                 </Field>
               )}
@@ -460,9 +488,35 @@ function PanelEditorForm({ panel, dashboardShared, onCancel, onSave }: PanelEdit
 
             {scriptChoice && (
               <>
-                <PeriodFields id={`${id}-period`} value={period} onChange={setPeriod} />
+                <PeriodFields
+                  id={`${id}-period`}
+                  value={period}
+                  onChange={setPeriod}
+                  series={isSeries}
+                />
 
-                {isPairMetric && (
+                {isSeries && (
+                  <Field
+                    id={`${id}-targets`}
+                    label={isPairMetric ? "Directed pairs" : "Qubits"}
+                    hint={`Up to ${MAX_SERIES_TARGETS}, separated by commas${
+                      isPairMetric
+                        ? ", such as 0>1, 1>0 (each direction is its own line)"
+                        : ", such as 0, 5"
+                    }. Only these are evaluated.`}
+                    error={targetsInput.trim() ? parsedTargets?.error : null}
+                  >
+                    <input
+                      id={`${id}-targets`}
+                      className="input input-sm w-full font-mono"
+                      value={targetsInput}
+                      placeholder={isPairMetric ? "0>1, 1>0" : "0, 5"}
+                      onChange={(event) => setTargetsInput(event.target.value)}
+                    />
+                  </Field>
+                )}
+
+                {isPairMetric && !isSeries && (
                   <div className="grid grid-cols-1 gap-x-3 sm:grid-cols-2">
                     <Field id={`${id}-direction`} label="Direction">
                       <select

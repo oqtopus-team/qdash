@@ -28522,6 +28522,27 @@
             },
             "type": "array",
             "title": "References"
+          },
+          "series": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/MetricSeriesPoint"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Series",
+            "description": "Series metrics only: the points, oldest first"
+          },
+          "references_truncated": {
+            "type": "boolean",
+            "title": "References Truncated",
+            "description": "Series metrics only: references holds the most recent inputs, not all",
+            "default": false
           }
         },
         "type": "object",
@@ -28530,7 +28551,7 @@
           "status"
         ],
         "title": "MetricCell",
-        "description": "Result of a metric for one qubit or one directed pair."
+        "description": "Result of a metric for one qubit or one directed pair.\n\nA series metric's cell has no ``value``; its ``series`` holds the points, and its status\nis ``missing`` when no point has a value."
       },
       "MetricHeatmapResponse": {
         "properties": {
@@ -28978,6 +28999,16 @@
             ],
             "title": "Target"
           },
+          "result": {
+            "type": "string",
+            "enum": [
+              "scalar",
+              "series"
+            ],
+            "title": "Result",
+            "description": "scalar: one value per qubit or pair, shown as a map or table. series: a time series per selected target, shown as a chart",
+            "default": "scalar"
+          },
           "hops": {
             "items": {
               "type": "integer"
@@ -29273,6 +29304,24 @@
             },
             "type": "object",
             "title": "Params"
+          },
+          "targets": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "maxLength": 32,
+                  "minLength": 1
+                },
+                "type": "array",
+                "maxItems": 16
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Targets",
+            "description": "Series metrics only, and required for them: 1 to 16 qubit IDs ('5') or directed pairs ('5>6'); only these are evaluated. Scalar metrics take none and cover the whole chip"
           }
         },
         "type": "object",
@@ -29335,6 +29384,24 @@
             },
             "type": "object",
             "title": "Params"
+          },
+          "targets": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "maxLength": 32,
+                  "minLength": 1
+                },
+                "type": "array",
+                "maxItems": 16
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Targets",
+            "description": "Series metrics only, and required for them: 1 to 16 qubit IDs ('5') or directed pairs ('5>6'); only these are evaluated. Scalar metrics take none and cover the whole chip"
           },
           "revision": {
             "anyOf": [
@@ -29918,6 +29985,95 @@
         ],
         "title": "MetricScriptValidateResponse",
         "description": "Validation outcome."
+      },
+      "MetricSeriesPoint": {
+        "properties": {
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp",
+            "description": "Where the point is drawn, within the period"
+          },
+          "start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start",
+            "description": "Inclusive start of its time bin"
+          },
+          "end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End",
+            "description": "End of its time bin"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value",
+            "description": "Value in the metric's unit; null for a gap, never joined"
+          },
+          "count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Count",
+            "description": "Observations behind the value"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "no_data",
+              "insufficient"
+            ],
+            "title": "Status",
+            "description": "ok (has a value), no_data or insufficient (a gap)"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Why the point is a gap, or a note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "timestamp",
+          "status"
+        ],
+        "title": "MetricSeriesPoint",
+        "description": "One point of a series metric's result for one target."
       },
       "MetricValue": {
         "properties": {
@@ -38027,10 +38183,21 @@
             "type": "string",
             "enum": [
               "map",
-              "table"
+              "table",
+              "timeseries"
             ],
             "title": "View",
+            "description": "map or table for scalar metrics; timeseries for series",
             "default": "map"
+          },
+          "targets": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 16,
+            "title": "Targets",
+            "description": "Series metrics: 1 to 16 qubit IDs ('5') or directed pairs ('5>6') to evaluate and draw. Empty for scalar metrics"
           },
           "direction": {
             "type": "string",
@@ -38060,7 +38227,7 @@
           "metric_id"
         ],
         "title": "MetricScriptPanelConfig",
-        "description": "Config of a ``metric_script`` panel.\n\nThe panel pins ``script_revision``: saving a newer revision of the script never\nchanges what the panel shows until an editor updates the pin. The service checks the\nscript, revision, metric and parameters when the dashboard is saved."
+        "description": "Config of a ``metric_script`` panel.\n\nThe panel pins ``script_revision``: saving a newer revision of the script never\nchanges what the panel shows until an editor updates the pin. The service checks the\nscript, revision, metric and parameters when the dashboard is saved.\n\nA scalar metric is shown with ``view`` ``map`` or ``table`` and takes no ``targets``. A\nseries metric (``result: \"series\"``) is shown with ``view`` ``timeseries`` for the\n``targets`` it selects, which is also all the server evaluates."
       },
       "OneQubitCheckStep": {
         "properties": {

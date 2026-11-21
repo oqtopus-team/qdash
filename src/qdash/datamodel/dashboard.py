@@ -6,7 +6,13 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from qdash.datamodel.metric_script import MetricPeriod, StrictRevision, default_period
+from qdash.datamodel.metric_script import (
+    MAX_SERIES_TARGETS,
+    MetricPeriod,
+    StrictRevision,
+    default_period,
+    normalize_target_key,
+)
 
 GRID_COLUMNS = 12
 """Width of the dashboard grid in columns."""
@@ -62,6 +68,10 @@ class MetricScriptPanelConfig(BaseModel):
     The panel pins ``script_revision``: saving a newer revision of the script never
     changes what the panel shows until an editor updates the pin. The service checks the
     script, revision, metric and parameters when the dashboard is saved.
+
+    A scalar metric is shown with ``view`` ``map`` or ``table`` and takes no ``targets``. A
+    series metric (``result: "series"``) is shown with ``view`` ``timeseries`` for the
+    ``targets`` it selects, which is also all the server evaluates.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -71,7 +81,17 @@ class MetricScriptPanelConfig(BaseModel):
     metric_id: str = Field(..., min_length=1, max_length=200)
     period: MetricPeriod = Field(default_factory=default_period)
     params: dict[str, bool | int | float | str] = Field(default_factory=dict)
-    view: Literal["map", "table"] = "map"
+    view: Literal["map", "table", "timeseries"] = Field(
+        default="map", description="map or table for scalar metrics; timeseries for series"
+    )
+    targets: list[str] = Field(
+        default_factory=list,
+        max_length=MAX_SERIES_TARGETS,
+        description=(
+            "Series metrics: 1 to 16 qubit IDs ('5') or directed pairs ('5>6') to evaluate "
+            "and draw. Empty for scalar metrics"
+        ),
+    )
     direction: Literal["both", "forward", "reverse"] = Field(
         default="both", description="Pair maps: which edge directions to draw"
     )
@@ -87,6 +107,14 @@ class MetricScriptPanelConfig(BaseModel):
         if not set(value) <= {1, 2}:
             raise ValueError("hops must be a subset of [1, 2]")
         return sorted(set(value))
+
+    @field_validator("targets")
+    @classmethod
+    def _valid_targets(cls, value: list[str]) -> list[str]:
+        keys = [normalize_target_key(item) for item in value]
+        if len(set(keys)) != len(keys):
+            raise ValueError("targets must not repeat a qubit or pair")
+        return keys
 
 
 class MarkdownPanelConfig(BaseModel):

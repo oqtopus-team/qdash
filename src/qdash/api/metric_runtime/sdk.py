@@ -8,6 +8,9 @@ differences:
 - The module is named ``qdash_metrics``.
 - ``@metric`` accepts ``hops``: the pair distances a pair metric is evaluated for.
 - ``CellResult.assessment`` may carry ``count`` (the sample count behind the value).
+- ``@metric(result="series")`` declares a time series metric: it returns a
+  :class:`SeriesResult` of :class:`SeriesPoint` values for each selected target instead of one
+  value, and :func:`time_bins` builds UTC day or week bins over the period.
 - Coupling metrics are read through ``ctx.data[name][pair]`` with a directed coupling ID
   (``"0-1"`` or a :class:`QubitPair`); there is no reverse-direction fallback.
   ``ctx.coupling_strength`` is the one deliberate undirected lookup.
@@ -27,7 +30,7 @@ import math
 import re
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from types import MappingProxyType
 from typing import Any, Literal
 
@@ -43,7 +46,28 @@ BrokerFunction = Callable[[str, dict[str, Any]], Any]
 """``broker(op, args)`` returns the answer data or raises :class:`BrokerError`."""
 
 MetricTarget = Literal["qubit", "pair"]
+MetricResultKind = Literal["scalar", "series"]
 ALLOWED_HOPS = frozenset({1, 2})
+
+MAX_SERIES_TARGETS = 16
+"""Most qubits or directed pairs one series evaluation may select."""
+MAX_SERIES_POINTS = 1024
+"""Most points one series may hold; 400 daily bins fit with room to spare."""
+MAX_TOTAL_SERIES_POINTS = 8192
+"""Most points of all selected targets together: 16 targets of 400 daily bins fit, and the
+largest response stays about half of the worker's 8 MiB output bound."""
+MAX_SERIES_RESULT_BYTES = 6 * 1024 * 1024
+"""Most bytes the cells of one series evaluation may take as protocol JSON, every field
+included (points, labels, assessment, references, messages). The worker escapes non-ASCII
+text, so a character costs 6 bytes (``\\uXXXX``) or 12 (an emoji's surrogate pair); the
+remaining 2 MiB of the 8 MiB output bound is left for the log, metadata and data requests."""
+MAX_SERIES_PERIOD_DAYS = 400
+"""Longest period a series metric is evaluated over; the data broker's history span cap.
+A longer period is refused before the metric runs instead of charting the clamped-away bins
+as gaps."""
+SERIES_STATUSES = ("ok", "no_data", "insufficient")
+"""``ok`` carries a value; ``no_data`` and ``insufficient`` are gaps."""
+TIME_BIN_UNITS = ("day", "week")
 
 
 class MissingData(ValueError):
@@ -302,6 +326,133 @@ class CellResult:
     value: Any
     color: str | None = None
     assessment: dict[str, Any] | None = None
+
+
+@dataclass(frozen=True)
+class SeriesPoint:
+    """One point of a time series metric.
+
+    Attributes:
+        timestamp: Where the point is drawn: an ISO 8601 string or datetime with a timezone,
+            within ``[ctx.start, ctx.end]``.
+        value: A number in the declared unit, a pint Quantity, or ``None`` for a gap. Gaps
+            are never joined to their neighbours when drawn.
+        count: Number of observations behind the value, or ``None`` when unknown.
+        status: ``ok`` (has a value), ``no_data`` or ``insufficient`` (no value). When
+            omitted it is ``ok`` for a value, ``no_data`` for no value with no observations
+            and ``insufficient`` for no value with observations.
+        reason: Short explanation shown with the point, for example why it is a gap.
+        start: Inclusive start of the time bin the point summarizes, or ``None``.
+        end: End of that bin, or ``None``. Give both bounds or neither.
+
+    The worker checks every field when the metric returns; see :class:`SeriesResult`.
+    """
+
+    timestamp: str | datetime
+    value: Any = None
+    count: int | None = None
+    status: str | None = None
+    reason: str | None = None
+    start: str | datetime | None = None
+    end: str | datetime | None = None
+
+
+@dataclass(frozen=True)
+class SeriesResult:
+    """What a ``result="series"`` metric returns for one target.
+
+    Attributes:
+        points: :class:`SeriesPoint` values with strictly increasing timestamps inside the
+            period, at most :data:`MAX_SERIES_POINTS`. Points are never resampled, sorted,
+            interpolated or dropped: a series that breaks a rule makes its target an error.
+        label: Short description shown with the series, such as ``"daily median"``.
+        assessment: Details in the shape of ``CellResult.assessment``.
+    """
+
+    points: Any
+    label: str | None = None
+    assessment: dict[str, Any] | None = None
+
+
+@dataclass(frozen=True)
+class TimeBin:
+    """One UTC time bin of :func:`time_bins`, clipped to the period.
+
+    Attributes:
+        start: Inclusive start: the bin's nominal start, or the period start for the first bin.
+        end: Exclusive end: the next bin's nominal start, or the period end for the last bin,
+            which is inclusive so that an observation at the period end is counted.
+        nominal_start: Start of the whole day or week (00:00 UTC; weeks start on Monday).
+        nominal_end: End of the whole day or week.
+        last: Whether this is the last bin of the period.
+    """
+
+    start: datetime
+    end: datetime
+    nominal_start: datetime
+    nominal_end: datetime
+    last: bool = False
+
+    @property
+    def partial(self) -> bool:
+        """Whether the period cuts this bin short."""
+        return self.start > self.nominal_start or self.end < self.nominal_end
+
+    def contains(self, moment: str | datetime) -> bool:
+        """Whether ``moment`` falls in the bin (``start <= moment < end``; last bin inclusive)."""
+        value = timestamp(moment)
+        return self.start <= value < self.end or (self.last and value == self.end)
+
+    def select(self, measurements: Iterable[Measurement]) -> list[Measurement]:
+        """The measurements whose timestamp falls in the bin, in their original order."""
+        return [item for item in measurements if self.contains(item.timestamp)]
+
+
+def time_bins(start: str | datetime, end: str | datetime, every: str = "day") -> list[TimeBin]:
+    """Split ``[start, end]`` into UTC day or week bins, oldest first.
+
+    Days start at 00:00 UTC; weeks start on Monday 00:00 UTC (ISO weeks). The first and last
+    bins are clipped to the period and report ``partial``. Every instant of the period falls
+    in exactly one bin.
+
+    Args:
+        start: Period start with a timezone, usually ``ctx.start``.
+        end: Period end with a timezone, usually ``ctx.end``.
+        every: ``"day"`` or ``"week"``.
+
+    Raises:
+        ValueError: On a missing timezone, ``start`` after ``end``, an unknown ``every``, or
+            more than :data:`MAX_SERIES_POINTS` bins.
+    """
+    lower, upper = timestamp(start), timestamp(end)
+    if lower > upper:
+        raise ValueError("Start must be before end")
+    if every not in TIME_BIN_UNITS:
+        raise ValueError(f"every must be one of {', '.join(TIME_BIN_UNITS)}")
+    step = timedelta(days=1 if every == "day" else 7)
+    nominal = lower.replace(hour=0, minute=0, second=0, microsecond=0)
+    if every == "week":
+        nominal -= timedelta(days=nominal.weekday())
+    bins: list[TimeBin] = []
+    while True:
+        nominal_end = nominal + step
+        last = nominal_end >= upper
+        bins.append(
+            TimeBin(
+                start=max(nominal, lower),
+                end=upper if last else nominal_end,
+                nominal_start=nominal,
+                nominal_end=nominal_end,
+                last=last,
+            )
+        )
+        if len(bins) > MAX_SERIES_POINTS:
+            raise ValueError(
+                f"The period holds more than MAX_SERIES_POINTS = {MAX_SERIES_POINTS} {every} bins"
+            )
+        if last:
+            return bins
+        nominal = nominal_end
 
 
 @dataclass(frozen=True)
@@ -781,6 +932,7 @@ class Metric:
     hops: tuple[int, ...] = (1, 2)
     parameters: dict[str, Parameter] = field(default_factory=dict)
     legend: LegendSpec = None
+    result: MetricResultKind = "scalar"
 
     def metadata(self) -> dict[str, Any]:
         """Catalog entry stored with a script revision."""
@@ -789,6 +941,7 @@ class Metric:
             "title": self.title,
             "unit": self.unit,
             "target": self.target,
+            "result": self.result,
             "hops": list(self.hops),
             "parameters": {key: value.metadata() for key, value in self.parameters.items()},
             "has_legend": self.legend is not None,
@@ -803,11 +956,13 @@ def metric(
     hops: Iterable[int] = (1, 2),
     parameters: dict[str, Parameter] | None = None,
     legend: LegendSpec = None,
+    result: str = "scalar",
 ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """Expose a function ``(target, ctx)`` as a metric.
 
-    ``target`` is a normalized qubit ID, or a :class:`QubitPair` for pair metrics. Return a
-    number in ``unit``, a Quantity, ``None`` (not evaluated) or a :class:`CellResult`.
+    ``target`` is a normalized qubit ID, or a :class:`QubitPair` for pair metrics. A scalar
+    metric returns a number in ``unit``, a Quantity, ``None`` (not evaluated) or a
+    :class:`CellResult`. A series metric returns a :class:`SeriesResult` or ``None``.
 
     Args:
         title: Display name; must not be empty.
@@ -816,10 +971,14 @@ def metric(
             whose distance is in ``hops``, over the whole chip.
         hops: Pair distances the metric is meaningful for, a non-empty subset of ``(1, 2)``.
         parameters: Name → :class:`Parameter`; read effective values from ``ctx.params``.
-        legend: A :class:`Legend`, or a function ``legend(ctx) -> Legend``.
+        legend: A :class:`Legend`, or a function ``legend(ctx) -> Legend``. Scalar metrics only.
+        result: ``scalar`` (default): one value per target, for maps and tables. ``series``:
+            a time series per target, evaluated only for the qubits or directed pairs a
+            panel selects (at most :data:`MAX_SERIES_TARGETS`) and drawn as a chart.
 
     Raises:
-        ValueError: If ``target`` or ``hops`` is invalid.
+        ValueError: If ``target``, ``hops`` or ``result`` is invalid, or a series metric
+            declares a legend.
         pint.errors.UndefinedUnitError: If ``unit`` is unknown.
     """
     if target not in ("qubit", "pair"):
@@ -827,8 +986,13 @@ def metric(
     hop_values = tuple(sorted(set(hops)))
     if not hop_values or not set(hop_values) <= ALLOWED_HOPS:
         raise ValueError("hops must be a non-empty subset of (1, 2)")
+    if result not in ("scalar", "series"):
+        raise ValueError("result must be 'scalar' or 'series'")
+    if result == "series" and legend is not None:
+        raise ValueError("Series metrics have no legend; series colors identify targets")
     units.Unit(unit_name(unit))
     declared_target: MetricTarget = "qubit" if target == "qubit" else "pair"
+    declared_result: MetricResultKind = "series" if result == "series" else "scalar"
 
     def decorate(function: Callable[..., Any]) -> Callable[..., Any]:
         function.__qdash_metric__ = Metric(  # type: ignore[attr-defined]
@@ -840,6 +1004,7 @@ def metric(
             hop_values,
             dict(parameters or {}),
             legend,
+            declared_result,
         )
         return function
 
@@ -898,7 +1063,11 @@ PUBLIC_NAMES = (
     "Parameter",
     "Quantity",
     "QubitPair",
+    "SeriesPoint",
+    "SeriesResult",
+    "TimeBin",
     "metric",
+    "time_bins",
     "unit_name",
     "units",
 )

@@ -13,6 +13,7 @@ import type { MetricCellHops } from './metricCellHops';
 import type { MetricCellLabel } from './metricCellLabel';
 import type { MetricCellMessage } from './metricCellMessage';
 import type { MetricCellQid } from './metricCellQid';
+import type { MetricCellSeries } from './metricCellSeries';
 import type { MetricCellSource } from './metricCellSource';
 import type { MetricCellStatus } from './metricCellStatus';
 import type { MetricCellTarget } from './metricCellTarget';
@@ -20,6 +21,9 @@ import type { MetricCellValue } from './metricCellValue';
 
 /**
  * Result of a metric for one qubit or one directed pair.
+ *
+ * A series metric's cell has no ``value``; its ``series`` holds the points, and its status
+ * is ``missing`` when no point has a value.
  */
 export interface MetricCell {
   /** '5' for a qubit, '5>6' for a directed pair */
@@ -36,4 +40,8 @@ export interface MetricCell {
   diagnostic?: MetricCellDiagnostic;
   assessment?: MetricCellAssessment;
   references?: CellReference[];
+  /** Series metrics only: the points, oldest first */
+  series?: MetricCellSeries;
+  /** Series metrics only: references holds the most recent inputs, not all */
+  references_truncated?: boolean;
 }

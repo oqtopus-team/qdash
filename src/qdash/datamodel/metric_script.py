@@ -10,7 +10,16 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 MetricScriptVisibility = Literal["private", "project"]
 MetricScriptStatus = Literal["valid", "invalid"]
 MetricTarget = Literal["qubit", "pair"]
+MetricResultKind = Literal["scalar", "series"]
 CellStatus = Literal["ok", "missing", "empty", "error"]
+SeriesPointStatus = Literal["ok", "no_data", "insufficient"]
+
+MAX_SERIES_TARGETS = 16
+"""Most targets of one series evaluation; equals ``MAX_SERIES_TARGETS`` in the worker's SDK."""
+MAX_SERIES_POINTS = 1024
+"""Most points per series; equals ``MAX_SERIES_POINTS`` in the worker's SDK."""
+MAX_TOTAL_SERIES_POINTS = 8192
+"""Most points of one series evaluation; equals ``MAX_TOTAL_SERIES_POINTS`` in the SDK."""
 
 MAX_PERIOD_DAYS = 400
 """Longest relative period; matches the broker's history span cap."""
@@ -94,6 +103,13 @@ class MetricInfo(BaseModel):
     title: str
     unit: str
     target: MetricTarget
+    result: MetricResultKind = Field(
+        default="scalar",
+        description=(
+            "scalar: one value per qubit or pair, shown as a map or table. series: a time "
+            "series per selected target, shown as a chart"
+        ),
+    )
     hops: list[int] = Field(default_factory=lambda: [1, 2])
     parameters: dict[str, MetricParameterInfo] = Field(default_factory=dict)
     has_legend: bool = False
@@ -152,8 +168,28 @@ class CellAssessment(BaseModel):
     count: int | None = Field(default=None, description="Number of observations behind the value")
 
 
+class MetricSeriesPoint(BaseModel):
+    """One point of a series metric's result for one target."""
+
+    timestamp: datetime = Field(..., description="Where the point is drawn, within the period")
+    start: datetime | None = Field(default=None, description="Inclusive start of its time bin")
+    end: datetime | None = Field(default=None, description="End of its time bin")
+    value: float | None = Field(
+        default=None, description="Value in the metric's unit; null for a gap, never joined"
+    )
+    count: int | None = Field(default=None, description="Observations behind the value")
+    status: SeriesPointStatus = Field(
+        ..., description="ok (has a value), no_data or insufficient (a gap)"
+    )
+    reason: str | None = Field(default=None, description="Why the point is a gap, or a note")
+
+
 class MetricCell(BaseModel):
-    """Result of a metric for one qubit or one directed pair."""
+    """Result of a metric for one qubit or one directed pair.
+
+    A series metric's cell has no ``value``; its ``series`` holds the points, and its status
+    is ``missing`` when no point has a value.
+    """
 
     key: str = Field(..., description="'5' for a qubit, '5>6' for a directed pair")
     qid: str | None = None
@@ -168,6 +204,13 @@ class MetricCell(BaseModel):
     diagnostic: ScriptDiagnostic | None = None
     assessment: CellAssessment | None = None
     references: list[CellReference] = Field(default_factory=list)
+    series: list[MetricSeriesPoint] | None = Field(
+        default=None, description="Series metrics only: the points, oldest first"
+    )
+    references_truncated: bool = Field(
+        default=False,
+        description="Series metrics only: references holds the most recent inputs, not all",
+    )
 
 
 class LegendItem(BaseModel):
@@ -197,3 +240,33 @@ def parameter_values(params: dict[str, Any]) -> dict[str, bool | int | float | s
     return {
         key: value for key, value in params.items() if isinstance(value, (bool, int, float, str))
     }
+
+
+def normalize_target_key(value: str, target: MetricTarget | None = None) -> str:
+    """Normalize a selected target to its cell key: ``"5"`` for a qubit, ``"5>6"`` for a pair.
+
+    Qubits accept ``"Q05"``, ``"05"`` and ``"5"``; pairs accept ``"0>1"`` and ``"0-1"`` and keep
+    their direction. ``target`` restricts the kind; ``None`` accepts either.
+
+    Raises:
+        ValueError: If the value is not a qubit ID or directed pair of the requested kind.
+    """
+
+    def qubit(text: str) -> str:
+        digits = text.strip().removeprefix("Q")
+        if not digits.isdecimal():
+            raise ValueError(f"Invalid target {value!r}")
+        return str(int(digits))
+
+    if not isinstance(value, str):
+        raise ValueError(f"Invalid target {value!r}")
+    ends = value.replace(">", "-").split("-")
+    if len(ends) == 2:
+        if target == "qubit":
+            raise ValueError(f"Target {value!r} is a pair; this metric takes qubit IDs")
+        return f"{qubit(ends[0])}>{qubit(ends[1])}"
+    if len(ends) == 1:
+        if target == "pair":
+            raise ValueError(f"Target {value!r} is a qubit; write a directed pair such as '0>1'")
+        return qubit(ends[0])
+    raise ValueError(f"Invalid target {value!r}")

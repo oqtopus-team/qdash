@@ -25,14 +25,22 @@ interface PeriodFieldsProps {
   value: MetricPeriod;
   onChange: (period: MetricPeriod) => void;
   disabled?: boolean;
+  /** The metric returns a time series, whose fixed range is capped at `MAX_PERIOD_DAYS`. */
+  series?: boolean;
 }
 
 /**
  * Period editor: the last N days, or a fixed start and end in the UI time zone. The kind
  * and its values share one row at the small control size.
  */
-export function PeriodFields({ id, value, onChange, disabled = false }: PeriodFieldsProps) {
-  const error = periodError(value);
+export function PeriodFields({
+  id,
+  value,
+  onChange,
+  disabled = false,
+  series = false,
+}: PeriodFieldsProps) {
+  const error = periodError(value, { series });
   const isAbsolute = value.kind === "absolute";
   const errorId = `${id}-error`;
 
@@ -78,7 +86,7 @@ export function PeriodFields({ id, value, onChange, disabled = false }: PeriodFi
               <input
                 id={`${id}-start`}
                 type="datetime-local"
-                className="input input-sm w-full"
+                className={`input input-sm w-full ${error ? "input-error" : ""}`}
                 value={isoToLocalInput(value.start)}
                 aria-invalid={Boolean(error)}
                 aria-describedby={error ? errorId : undefined}
@@ -94,7 +102,7 @@ export function PeriodFields({ id, value, onChange, disabled = false }: PeriodFi
               <input
                 id={`${id}-end`}
                 type="datetime-local"
-                className="input input-sm w-full"
+                className={`input input-sm w-full ${error ? "input-error" : ""}`}
                 value={isoToLocalInput(value.end)}
                 aria-invalid={Boolean(error)}
                 aria-describedby={error ? errorId : undefined}

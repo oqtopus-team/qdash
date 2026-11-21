@@ -11,6 +11,7 @@ import {
   REQUEST_MAX_BYTES,
   resultMessage,
   SOURCE_MAX_BYTES,
+  TARGETS_MAX,
 } from "../metric-runner/protocol.ts";
 import {
   memoryBudget,
@@ -55,6 +56,17 @@ test("an evaluate request carries the metric, chip, period and parameters", () =
     end: evaluate.end,
     params: { min_samples: 3 },
   });
+});
+
+test("a series evaluate request forwards its selected targets", () => {
+  const { request } = parseMetricRequest(JSON.stringify({ ...evaluate, targets: ["0>1", "1>0"] }), limits);
+  assert.deepEqual(request.targets, ["0>1", "1>0"]);
+  // Scalar requests carry no targets field at all.
+  assert.equal("targets" in parseMetricRequest(JSON.stringify(evaluate), limits).request, false);
+  const tooMany = Array.from({ length: TARGETS_MAX + 1 }, (_, index) => String(index));
+  for (const targets of [tooMany, "0>1", [1], [""], ["x".repeat(33)]]) {
+    assert.ok("error" in parseMetricRequest(JSON.stringify({ ...evaluate, targets }), limits), JSON.stringify(targets));
+  }
 });
 
 test("limits are clamped to the runner's bounds", () => {

@@ -11,9 +11,10 @@ Protocol (line-delimited UTF-8 JSON over the worker's stdin and stdout):
 
        {"mode": "catalog" | "evaluate", "source": "...", "memory_mb": 1024,
         "timeout_seconds": 60, "metric_id": "...", "chip_id": "...",
-        "start": iso, "end": iso, "params": {...}}
+        "start": iso, "end": iso, "params": {...}, "targets": ["0>1", ...]}
 
-   (``metric_id`` … ``params`` only for ``evaluate``.)
+   (``metric_id`` … ``targets`` only for ``evaluate``; ``targets`` only for series
+   metrics, which evaluate the listed qubits or directed pairs and nothing else.)
 2. While running, the worker may send data requests as lines on stdout::
 
        CALL {"op": "metrics_config" | "topology" | "latest" | "history", "args": {...}}
@@ -37,7 +38,12 @@ to bias victim selection toward it (:func:`apply_limits`).
 
 Evaluation follows qdash-playground ``worker.execute`` (Apache License 2.0): one metric
 over every target, each cell evaluated in its own ``try`` so one failure never hides the
-other cells.
+other cells. A ``result="series"`` metric is evaluated only for the selected targets
+(:data:`~qdash.api.metric_runtime.sdk.MAX_SERIES_TARGETS` at most), and each target's
+:class:`~qdash.api.metric_runtime.sdk.SeriesResult` is checked by :func:`serialize_series`.
+The cells of all selected targets together must fit
+:data:`~qdash.api.metric_runtime.sdk.MAX_SERIES_RESULT_BYTES` as protocol JSON; the evaluation
+fails with an error that says so instead of dropping points or text.
 """
 
 from __future__ import annotations
@@ -48,6 +54,7 @@ import math
 import os
 import sys
 import types
+from datetime import datetime, timedelta
 from typing import IO, Any
 
 from qdash.api.metric_runtime import sdk
@@ -58,6 +65,9 @@ FILE_SIZE_LIMIT = 1024 * 1024
 MAX_CHECKS = 200
 MAX_ESTIMATES = 200
 MAX_TEXT = 4000
+MAX_REASON = 200
+MAX_SERIES_REFERENCES = 100
+"""Input references kept per series cell (the most recent); the rest are counted as cut."""
 OOM_SCORE_ADJ = 1000
 OOM_SCORE_ADJ_PATH = "/proc/self/oom_score_adj"
 
@@ -261,6 +271,259 @@ def _cell_base(target: str | sdk.QubitPair) -> dict[str, Any]:
     return {"key": target, "qid": target, "source": None, "target": None, "hops": None}
 
 
+def _number_in_unit(value: Any, unit: str) -> float:
+    """``value`` (a number or Quantity) in ``unit``, finite; raises on anything else."""
+    if isinstance(value, bool):
+        raise TypeError("Metric functions must return a number, not a bool")
+    quantity = (
+        value if isinstance(value, sdk.Quantity) else sdk.Quantity(value, sdk.unit_name(unit))
+    )
+    number = float(quantity.to(sdk.unit_name(unit)).magnitude)
+    if not math.isfinite(number):
+        raise ValueError("Result is not finite")
+    return number
+
+
+def _series_time(value: Any, what: str, ctx: sdk.AnalysisContext) -> datetime:
+    if not isinstance(value, (str, datetime)):
+        raise TypeError(f"{what} must be an ISO 8601 string or a datetime")
+    moment = sdk.timestamp(value)
+    if not ctx.start <= moment <= ctx.end:
+        raise ValueError(
+            f"{what} {moment.isoformat()} is outside the period "
+            f"{ctx.start.isoformat()} .. {ctx.end.isoformat()}"
+        )
+    return moment
+
+
+def serialize_series(points: Any, unit: str, ctx: sdk.AnalysisContext) -> list[dict[str, Any]]:
+    """Check the points of a :class:`~sdk.SeriesResult` and return them as JSON objects.
+
+    Nothing is sorted, resampled, clipped or dropped: a point that breaks a rule raises, and
+    the target becomes an error cell that names the point.
+
+    Raises:
+        TypeError, ValueError: If the points do not follow the ``SeriesPoint`` rules.
+    """
+    if not isinstance(points, (list, tuple)):
+        raise TypeError("SeriesResult.points must be a list of SeriesPoint")
+    if len(points) > sdk.MAX_SERIES_POINTS:
+        raise ValueError(
+            f"The series has {len(points)} points, more than MAX_SERIES_POINTS = "
+            f"{sdk.MAX_SERIES_POINTS}; use a coarser time bin or a shorter period"
+        )
+    serialized: list[dict[str, Any]] = []
+    previous = None
+    for index, point in enumerate(points):
+        where = f"points[{index}]"
+        if not isinstance(point, sdk.SeriesPoint):
+            raise TypeError(f"{where} must be a SeriesPoint")
+        moment = _series_time(point.timestamp, f"{where}.timestamp", ctx)
+        if previous is not None and moment <= previous:
+            raise ValueError(f"{where}.timestamp must be later than the previous point's")
+        previous = moment
+        if (point.start is None) != (point.end is None):
+            raise ValueError(f"{where}: give both start and end, or neither")
+        start = end = None
+        if point.start is not None:
+            start = _series_time(point.start, f"{where}.start", ctx)
+            end = _series_time(point.end, f"{where}.end", ctx)
+            if not start <= moment <= end:
+                raise ValueError(f"{where}: start <= timestamp <= end must hold")
+        value = None if point.value is None else _number_in_unit(point.value, unit)
+        count = point.count
+        if count is not None and (isinstance(count, bool) or not isinstance(count, int)):
+            raise ValueError(f"{where}.count must be an int or None")
+        if count is not None and count < 0:
+            raise ValueError(f"{where}.count must not be negative")
+        status = point.status
+        if status is None:
+            status = "ok" if value is not None else ("insufficient" if count else "no_data")
+        if status not in sdk.SERIES_STATUSES:
+            raise ValueError(f"{where}.status must be one of {', '.join(sdk.SERIES_STATUSES)}")
+        if (status == "ok") != (value is not None):
+            raise ValueError(f"{where}: status 'ok' needs a value, and a gap must have none")
+        if value is not None and count == 0:
+            raise ValueError(f"{where}: a value cannot rest on count 0")
+        if point.reason is not None and not isinstance(point.reason, str):
+            raise ValueError(f"{where}.reason must be a string")
+        serialized.append(
+            {
+                "timestamp": moment.isoformat(),
+                "start": start.isoformat() if start is not None else None,
+                "end": end.isoformat() if end is not None else None,
+                "value": value,
+                "count": count,
+                "status": status,
+                "reason": point.reason[:MAX_REASON] if point.reason is not None else None,
+            }
+        )
+    return serialized
+
+
+def evaluate_series_cell(
+    definition: sdk.Metric, target: str | sdk.QubitPair, ctx: sdk.AnalysisContext
+) -> dict[str, Any]:
+    """Evaluate one selected target of a series metric; never raises for script errors."""
+    cell: dict[str, Any] = {
+        **_cell_base(target),
+        "status": "ok",
+        "value": None,
+        "color": None,
+        "label": None,
+        "message": None,
+        "diagnostic": None,
+        "assessment": None,
+        "series": None,
+    }
+    ctx.references = []
+    try:
+        result = definition.function(target, ctx)
+        if result is None:
+            cell.update(status="empty", message="Function returned None")
+        elif not isinstance(result, sdk.SeriesResult):
+            raise TypeError(
+                f"Series metrics must return a SeriesResult (or None), not {type(result).__name__}"
+            )
+        else:
+            label = result.label
+            if label is not None and not isinstance(label, str):
+                raise ValueError("SeriesResult.label must be a string")
+            _ignored, assessment = serialize_assessment(result.assessment)
+            series = serialize_series(result.points, definition.unit, ctx)
+            cell["label"] = label[:MAX_TEXT] if label is not None else None
+            cell["assessment"] = assessment
+            cell["series"] = series
+            if not any(point["status"] == "ok" for point in series):
+                gaps = dict.fromkeys(sdk.SERIES_STATUSES[1:], 0)
+                for point in series:
+                    gaps[point["status"]] += 1
+                cell["status"] = "missing"
+                cell["message"] = (
+                    "The series has no points"
+                    if not series
+                    else "No point has a value: "
+                    + ", ".join(f"{count} {name}" for name, count in gaps.items() if count)
+                )
+    except sdk.MissingData as exc:
+        cell.update(status="missing", series=None, message=str(exc)[:MAX_TEXT])
+    except Exception as exc:
+        cell.update(
+            status="error",
+            series=None,
+            message=error_message(exc)[:MAX_TEXT],
+            diagnostic=diagnostic(exc),
+        )
+    references = [_reference(ref) for ref in ctx.references]
+    cell["references_truncated"] = len(references) > MAX_SERIES_REFERENCES
+    cell["references"] = references[-MAX_SERIES_REFERENCES:]
+    return cell
+
+
+def series_period_message(start: datetime, end: datetime) -> str | None:
+    """Why ``[start, end]`` is too long for a series metric, or ``None`` when it fits."""
+    span = end - start
+    if span <= timedelta(days=sdk.MAX_SERIES_PERIOD_DAYS):
+        return None
+    days = span / timedelta(days=1)
+    return (
+        f"The period {start.isoformat()} .. {end.isoformat()} spans {days:.1f} days; a series "
+        f"metric covers at most MAX_SERIES_PERIOD_DAYS = {sdk.MAX_SERIES_PERIOD_DAYS} days, "
+        "the longest history the data broker reads. Shorten the period or split it into "
+        "several panels"
+    )
+
+
+def check_series_period(start: datetime, end: datetime) -> None:
+    """Refuse a series period longer than :data:`~sdk.MAX_SERIES_PERIOD_DAYS` before any read.
+
+    Raises:
+        ValueError: If the period is too long.
+    """
+    message = series_period_message(start, end)
+    if message is not None:
+        raise ValueError(message)
+
+
+def encoded_size(value: Any) -> int:
+    """Bytes ``value`` takes on the protocol stream, encoded exactly as :meth:`Channel.send`.
+
+    The protocol JSON escapes non-ASCII text, so the encoded string is ASCII and its length
+    is its size in bytes.
+    """
+    return len(json.dumps(value, allow_nan=False)) + 2
+
+
+def series_size_message(size: int, key: str) -> str:
+    """The error for series cells that outgrow :data:`~sdk.MAX_SERIES_RESULT_BYTES`."""
+    limit = sdk.MAX_SERIES_RESULT_BYTES // (1024 * 1024)
+    return (
+        f"The series results reach {size / (1024 * 1024):.1f} MiB of JSON by target {key}, "
+        f"more than MAX_SERIES_RESULT_BYTES = {limit} MiB for all selected targets together. "
+        "Every field counts (point reasons, labels, assessment checks and estimates, "
+        "references), and a non-ASCII character takes 6 to 12 bytes. Shorten that text, "
+        "or select fewer targets, a coarser time bin or a shorter period"
+    )
+
+
+def select_targets(
+    definition: sdk.Metric, topology: sdk.Topology, requested: Any
+) -> list[str | sdk.QubitPair]:
+    """The selected targets of a series metric, checked against the chip and declared hops.
+
+    Raises:
+        ValueError: On no, too many, duplicate, malformed or unknown targets, a pair that
+            is not coupled at the metric's hops, or a qubit ID for a pair metric.
+    """
+    if not isinstance(requested, list) or not requested:
+        raise ValueError(
+            f"Series metric '{definition.id}' needs targets: select 1 to "
+            f"{sdk.MAX_SERIES_TARGETS} {'qubits' if definition.target == 'qubit' else 'directed pairs'}"
+        )
+    if len(requested) > sdk.MAX_SERIES_TARGETS:
+        raise ValueError(
+            f"{len(requested)} targets selected; a series metric evaluates at most "
+            f"MAX_SERIES_TARGETS = {sdk.MAX_SERIES_TARGETS}"
+        )
+    selected: list[str | sdk.QubitPair] = []
+    seen: set[str] = set()
+    if definition.target == "qubit":
+        on_chip = set(topology.qubits)
+        for raw in requested:
+            if not isinstance(raw, str) or ">" in raw or "-" in raw:
+                raise ValueError(f"Target {raw!r} is not a qubit ID; this is a qubit metric")
+            key = sdk.qid(raw)
+            if key not in on_chip:
+                raise ValueError(f"Qubit {key} is not on this chip")
+            if key in seen:
+                raise ValueError(f"Target {key} is selected twice")
+            seen.add(key)
+            selected.append(key)
+        return selected
+    declared = {(pair.source, pair.target): pair for pair in topology.pairs(definition.hops)}
+    every = {(pair.source, pair.target): pair for pair in topology.pairs((1, 2))}
+    for raw in requested:
+        ends = raw.replace(">", "-").split("-") if isinstance(raw, str) else []
+        if len(ends) != 2:
+            raise ValueError(
+                f"Target {raw!r} is not a directed pair; write 'source>target' such as '0>1'"
+            )
+        pair_key = (sdk.qid(ends[0]), sdk.qid(ends[1]))
+        label = f"{pair_key[0]}>{pair_key[1]}"
+        if pair_key not in declared:
+            if pair_key in every:
+                raise ValueError(
+                    f"Pair {label} is {every[pair_key].hops} hops apart; metric "
+                    f"'{definition.id}' declares hops {list(definition.hops)}"
+                )
+            raise ValueError(f"Pair {label} is not within 2 hops on this chip")
+        if label in seen:
+            raise ValueError(f"Target {label} is selected twice")
+        seen.add(label)
+        selected.append(declared[pair_key])
+    return selected
+
+
 def evaluate_cell(
     definition: sdk.Metric, target: str | sdk.QubitPair, ctx: sdk.AnalysisContext
 ) -> dict[str, Any]:
@@ -279,6 +542,10 @@ def evaluate_cell(
     try:
         result = definition.function(target, ctx)
         assessment: Any = None
+        if isinstance(result, sdk.SeriesResult):
+            raise TypeError(
+                "This metric returned a SeriesResult; declare it with @metric(result='series')"
+            )
         if isinstance(result, sdk.CellResult):
             assessment = result.assessment
             cell["color"] = sdk.color(result.color) if result.color is not None else None
@@ -289,17 +556,7 @@ def evaluate_cell(
             if assessment is None:
                 cell["message"] = "Function returned None"
         else:
-            if isinstance(result, bool):
-                raise TypeError("Metric functions must return a number, not a bool")
-            quantity = (
-                result
-                if isinstance(result, sdk.Quantity)
-                else sdk.Quantity(result, sdk.unit_name(definition.unit))
-            )
-            number = float(quantity.to(sdk.unit_name(definition.unit)).magnitude)
-            if not math.isfinite(number):
-                raise ValueError("Result is not finite")
-            cell["value"] = number
+            cell["value"] = _number_in_unit(result, definition.unit)
     except sdk.MissingData as exc:
         cell.update(status="missing", value=None, message=str(exc)[:MAX_TEXT])
     except Exception as exc:
@@ -341,8 +598,41 @@ def evaluate(request: dict[str, Any], channel: Channel) -> dict[str, Any]:
         sdk.timestamp(request["end"]),
         effective,
     )
+    if definition.result == "series":
+        check_series_period(ctx.start, ctx.end)
     topology = ctx.topology
     targets: list[str | sdk.QubitPair]
+    requested = request.get("targets")
+    if definition.result == "series":
+        targets = select_targets(definition, topology, requested)
+        series_cells = []
+        total = 0
+        size = 0
+        for target in targets:
+            cell = evaluate_series_cell(definition, target, ctx)
+            total += len(cell["series"] or [])
+            if total > sdk.MAX_TOTAL_SERIES_POINTS:
+                raise ValueError(
+                    f"The selected targets return more than MAX_TOTAL_SERIES_POINTS = "
+                    f"{sdk.MAX_TOTAL_SERIES_POINTS} points together; select fewer targets, "
+                    "a coarser time bin or a shorter period"
+                )
+            size += encoded_size(cell)
+            if size > sdk.MAX_SERIES_RESULT_BYTES:
+                raise ValueError(series_size_message(size, cell["key"]))
+            series_cells.append(cell)
+        return {
+            "metric": definition.metadata(),
+            "params": effective,
+            "legend": None,
+            "cells": series_cells,
+            "notices": list(ctx.notices),
+        }
+    if requested:
+        raise ValueError(
+            f"targets apply only to series metrics; '{definition.id}' is evaluated for every "
+            "qubit or pair of the chip"
+        )
     if definition.target == "pair":
         targets = list(topology.pairs(definition.hops))
     else:

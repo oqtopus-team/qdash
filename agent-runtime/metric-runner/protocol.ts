@@ -62,6 +62,8 @@ export interface MetricWorkerRequest {
   start?: string;
   end?: string;
   params?: Record<string, unknown>;
+  /** Series metrics only: the selected qubits or directed pairs ("0>1"). */
+  targets?: string[];
 }
 
 export interface MetricRequestLimits {
@@ -92,8 +94,11 @@ export type WorkerAnswer = { ok: true; data: unknown } | { ok: false; error: str
 
 const COMMON_FIELDS = new Set(["v", "mode", "source", "timeout_seconds", "memory_mb"]);
 const EVALUATE_FIELDS = ["metric_id", "chip_id", "start", "end"] as const;
-const KNOWN_FIELDS = new Set([...COMMON_FIELDS, ...EVALUATE_FIELDS, "params"]);
+const KNOWN_FIELDS = new Set([...COMMON_FIELDS, ...EVALUATE_FIELDS, "params", "targets"]);
 const ID_MAX_LENGTH = 256;
+/** Most targets of one series evaluation; matches `MAX_SERIES_TARGETS` in sdk.py. */
+export const TARGETS_MAX = 16;
+const TARGET_MAX_LENGTH = 32;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -153,6 +158,16 @@ export function parseMetricRequest(
     }
   }
   if (!isRecord(parsed.params)) return { error: "params must be a JSON object" };
+  const { targets } = parsed;
+  if (targets !== undefined) {
+    if (
+      !Array.isArray(targets) ||
+      targets.length > TARGETS_MAX ||
+      targets.some((target) => typeof target !== "string" || target.length === 0 || target.length > TARGET_MAX_LENGTH)
+    ) {
+      return { error: `targets must be at most ${TARGETS_MAX} non-empty strings of at most ${TARGET_MAX_LENGTH} characters` };
+    }
+  }
   return {
     request: {
       ...request,
@@ -161,6 +176,7 @@ export function parseMetricRequest(
       start: parsed.start as string,
       end: parsed.end as string,
       params: parsed.params,
+      ...(targets !== undefined ? { targets: [...(targets as string[])] } : {}),
     },
   };
 }

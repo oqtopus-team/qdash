@@ -90,7 +90,9 @@ Workflow:
 Dashboards show per-qubit and per-coupling values computed by metric scripts: Python
 modules written against the `qdash_metrics` API that QDash runs in a bounded worker. For any
 request to build a dashboard, a derived or aggregated metric (a median over a period, a ratio,
-a count per coupling), or a collision map, follow the `qdash-metric-scripts` skill. Its reads
+a count per coupling), a dashboard chart of a daily or weekly trend for selected qubits or
+couplings, or a collision map, follow the `qdash-metric-scripts` skill. `qdash_get_timeseries`
+answers a trend question in chat; only a metric script puts the trend on a dashboard. Its reads
 are `qdash_query` actions: `metric_script_catalog`, `metric_script_templates`,
 `metric_script_template`, `metric_scripts`, `metric_script`, `dashboards`,
 `dashboard`, `dashboard_templates`, `dashboard_template`. `qdash_dashboard` is a status
