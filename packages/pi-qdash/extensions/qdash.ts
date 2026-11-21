@@ -29,6 +29,7 @@ import { errorStatus, fileContentSourceGuidance, filesTreeSourceGuidance, looksL
 import { withAbort } from "./lib/abort.js";
 import { WAIT_AGENT_ACTION, WAIT_EXECUTION } from "./lib/waits.js";
 import { qcalContextText, recordedParameters, sweepsOf, type RecordedParameter, type Sweep } from "./lib/qcal-evidence.js";
+import { registerAgentLoopTools } from "./tools/agent-loop.js";
 import { registerCalibrationPipelineTools } from "./tools/calibration-pipeline.js";
 import { registerFlowAuthoringTools } from "./tools/flow-authoring.js";
 import { isMetricScriptQueryAction, metricScriptQuery, registerMetricScriptTools, type MetricScriptQueryAction } from "./tools/metric-scripts.js";
@@ -1567,6 +1568,7 @@ export default function qdashExtension(host: ExtensionAPI) {
   installQcalHydration(pi, { loadTaskKnowledge });
   registerTaskKnowledgeTool(pi, { makeClient });
   registerSourceCodeTools(pi, { makeClient });
+  registerAgentLoopTools(pi, { makeClient });
   registerCalibrationPipelineTools(pi, {
     makeClient,
     resolveChipId: (client, chipId) => defaultChipId(client as QDashClient, chipId),

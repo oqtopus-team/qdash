@@ -62,6 +62,21 @@ export const agentSessionPolicy = Type.Object(
     max_actions: Type.Optional(
       Type.Integer({ minimum: 1, maximum: 10_000, description: "Typically 3-6." }),
     ),
+    autonomy: Type.Optional(
+      Type.Unsafe<string>({
+        type: "string",
+        enum: ["confirm_each", "auto"],
+        description:
+          "confirm_each (default): every action is approved separately. auto: the user approves this scope, budget, and expiry once, and the session's own steps then run without asking again.",
+      }),
+    ),
+    max_rounds_per_target: Type.Optional(
+      Type.Integer({
+        minimum: 1,
+        maximum: 20,
+        description: "How many times one task may run on one qubit in the session (default 3).",
+      }),
+    ),
   },
   { additionalProperties: false },
 );

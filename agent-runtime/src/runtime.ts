@@ -31,6 +31,7 @@ import {
   ALLOWLISTED_PACKAGES,
   isDeferredTool,
   REVIEWED_WRITE_TOOL_NAMES,
+  SESSION_GRANTED_WRITE_TOOL_NAMES,
   TRUSTED_EXTENSION_PACKAGES,
 } from "./allowed-tools.ts";
 import { compactionBudget, type CompactionBudget } from "./budget.ts";
@@ -336,6 +337,7 @@ export class SharedRuntime {
     const allowed = new Set<string>([
       ...ALLOWED_TOOL_NAMES,
       ...REVIEWED_WRITE_TOOL_NAMES,
+      ...SESSION_GRANTED_WRITE_TOOL_NAMES,
       ...localTools,
     ]);
     const qdashToolNames = [

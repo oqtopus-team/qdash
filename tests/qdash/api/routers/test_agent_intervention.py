@@ -206,3 +206,71 @@ def test_other_projects_cannot_see_or_answer(test_client, slack: FakeSlack) -> N
         json={"idempotency_key": "r-1", "expected_state_version": 1, "decision": "stop"},
     )
     assert answered.status_code == 404
+
+
+def _create_session(test_client, token: str, project_id: str = "lab-a") -> str:
+    created = test_client.post(
+        "/agent-sessions",
+        headers=_headers(token, project_id),
+        json={
+            "chip_id": "chip-001",
+            "policy": {"qids": ["Q00"], "allowed_tasks": ["CheckRabi"], "autonomy": "auto"},
+        },
+    )
+    assert created.status_code == 201, created.text
+    return str(created.json()["session_id"])
+
+
+def test_list_sessions_filters_settles_and_keeps_projects_apart(
+    test_client, slack: FakeSlack
+) -> None:
+    from qdash.dbmodel.agent_session import AgentSessionDocument
+    from qdash.dbmodel.project_membership import ProjectMembershipDocument
+
+    paused, _ = _open_intervention(test_client)
+    active = _create_session(test_client, "owner-token")
+    lapsed = _create_session(test_client, "owner-token")
+    other_project = _create_session(test_client, "owner-token", "lab-b")
+    # An editor in the same project creates a session of their own.
+    membership = ProjectMembershipDocument.find_one(
+        {"project_id": "lab-a", "username": "viewer"}
+    ).run()
+    assert membership is not None
+    membership.set({"role": ProjectRole.EDITOR.value})
+    theirs = _create_session(test_client, "viewer-token")
+    # Stored as active, but past its expiry: the list settles it the way a read does.
+    from datetime import timedelta
+
+    from qdash.common.utils.datetime import now
+
+    lapsed_doc = AgentSessionDocument.find_one({"session_id": lapsed}).run()
+    assert lapsed_doc is not None
+    lapsed_doc.set({"expires_at": now() - timedelta(seconds=1)})
+
+    def listed(**params: Any) -> list[str]:
+        response = test_client.get(
+            "/agent-sessions", headers=_headers("owner-token"), params=params
+        )
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert body["total"] == len(body["items"])
+        return [item["session_id"] for item in body["items"]]
+
+    # Newest first, this project only.
+    assert listed() == [theirs, lapsed, active, paused]
+    assert other_project not in listed()
+    assert listed(mine="true") == [lapsed, active, paused]
+    assert listed(mine="true", status=["active", "waiting_for_human"]) == [active, paused]
+    assert listed(status="expired") == [lapsed]
+    assert listed(chip_id="chip-unknown") == []
+    assert listed(limit=1) == [theirs]
+    stored = AgentSessionDocument.find_one({"session_id": lapsed}).run()
+    assert stored is not None
+    assert stored.status.value == "expired"
+
+    outsider = test_client.get("/agent-sessions", headers=_headers("outsider-token", "lab-a"))
+    assert outsider.status_code == 403
+    bad_status = test_client.get(
+        "/agent-sessions", headers=_headers("owner-token"), params={"status": "running"}
+    )
+    assert bad_status.status_code == 422

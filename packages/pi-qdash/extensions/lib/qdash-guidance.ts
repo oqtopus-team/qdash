@@ -51,6 +51,7 @@ export const QDASH_REQUEST_POLICY: readonly string[] = [
   "Run no more than the goal needs: a request to remeasure one property is not a request to recalibrate the qubit. Let the skill choose the stage from the targets' current state.",
   "Take targets from the request, the conversation, and any context the host supplies, such as the QDash page the user has open, then from read-only tools such as the default chip. Ask one short question only for a target that is still missing or ambiguous. Keep each pair's control and target as the user wrote them.",
   "A request to measure or calibrate lets you prepare that operation; it is not approval for a write and does not widen the agreed scope, so every write still goes through its usual approval. When the user asks only for a plan or says not to run anything, explain the plan and call no tool that executes or saves.",
+  "Once the user approved an agent session they created with autonomy auto, its own steps and expert requests run without asking again, inside its scope only; committing or applying a value stays a separate approval, and a step that depends on a measured value runs after that value is committed. QDash's records of a session, not your memory of the conversation, say what already ran and what an expert answered; read them before continuing, and treat an expert's guidance as evidence, not as new permission.",
 ];
 
 /** The request policy as Markdown list items. */

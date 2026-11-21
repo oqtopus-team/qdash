@@ -1,5 +1,6 @@
 export { QDashClient } from "./client.js";
 export type {
+  AgentSessionAuditPageOptions,
   CreateAgentSessionOptions,
   DegradationTrendsOptions,
   DownloadedFile,
@@ -9,6 +10,7 @@ export type {
   PollOptions,
   QDashClientOptions,
   RecentChangesOptions,
+  RecordAgentDecisionOptions,
   RecalibrationRecommendationsOptions,
   SearchSourceOptions,
   SubmitAgentActionOptions,

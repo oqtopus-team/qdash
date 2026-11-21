@@ -203,6 +203,16 @@ every task result is judged by the same gates as a saved workflow. The execution
 **Execution** page tagged `pipeline`. See
 [Calibration Pipeline Spec](../developer-guide/workflow/calibration-pipeline.md) for the spec format.
 
+## Calibrate Qubits Step by Step
+
+Ask for a supervised calibration of named qubits, for example "calibrate Q00 step by step and
+ask an expert if it gets stuck". The assistant proposes a bounded session on an approval card;
+once you approve it, it chooses each measurement from the last result without further cards,
+keeps the values as candidates until you approve a commit (it asks before a measurement that
+needs a new value), and asks an expert in QDash when it
+cannot tell what to do next. To continue after the expert answers, tell it to continue, in the
+same chat or a new one. See [Agent Calibration](./agent-calibration.md).
+
 ## Ask Agent About a Task Result {#ask-ai-about-a-task-result}
 
 **Ask Agent** appears on a task result and in a metric's history on **Metrics**. It offers two routes

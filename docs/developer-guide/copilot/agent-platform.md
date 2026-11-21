@@ -30,10 +30,15 @@ A request for a person records an intervention and pauses the session until an e
 in QDash; see [Human interventions](./agentic-calibration.md#human-interventions).
 
 The immutable policy also records `autonomy`: `confirm_each` (default) requires per-measurement
-confirmation; `auto` grants the approved plan its bounds and budget once. In `auto`,
-`max_rounds_per_target` limits node visits. The client
-[evaluation planner](./agentic-calibration.md#the-evaluation-planner) requires this grant;
-server-side action checks remain unchanged.
+confirmation; `auto` grants the approved scope, bounds, and budget once. In pi and the web
+Agent, `auto` lets the model run the session's own steps and expert requests without asking
+again ([The model-driven loop](./agentic-calibration.md#the-model-driven-loop)), and
+`max_rounds_per_target` limits how often one task runs on one qubit. In the Python client, the
+[evaluation planner](./agentic-calibration.md#the-evaluation-planner) requires this grant and
+`max_rounds_per_target` limits node visits. Server-side action checks are the same for both,
+except that a request marked `autonomous` (pi's session-granted tools) also needs the signed-in
+creator of an `auto` session and passes QDash's own checks of running measurements, rounds, and
+repeats; see [Server checks](./agentic-calibration.md#server-checks).
 
 ## Operation dispatch
 
@@ -72,7 +77,9 @@ key, and a timeout after that point is returned to the operator. Revisited nodes
 deterministic idempotency key; transport retries before dispatch reuse the same one.
 
 The client package carries the runners and the `qdash-agent` command
-([Python client](../../reference/clients/python.md#agent-calibration)).
+([Python client](../../reference/clients/python.md#agent-calibration)). The runner is the
+deterministic path; the primary path lets the model choose each step in pi or the web Agent, as
+[The model-driven loop](./agentic-calibration.md#the-model-driven-loop) describes.
 
 ## Safety invariants
 
@@ -91,6 +98,8 @@ The client package carries the runners and the `qdash-agent` command
   resulting operation.
 - Decision-graph references are validated before dispatch, every node visit is audited, and the
   maximum visits must fit within the session's remaining budget.
+- An expert's guidance is stored text: it changes no scope, bound, budget, or expiry, and the
+  model-driven loop treats it as evidence, not permission.
 - A dynamic planner cannot grow the graph or the budget. Invalid choices, planner failures, and
   completion after a rollback escalate to a human.
 - Plan finalisation re-resolves every referenced task result and validates the whole set

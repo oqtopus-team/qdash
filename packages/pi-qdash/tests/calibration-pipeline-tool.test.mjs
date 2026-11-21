@@ -49,9 +49,11 @@ const VALID = {
   task_run_count: 12,
 };
 
-function registeredTools(api, chipId = "64Qv3", projectId = "project-1") {
+function registeredTools(api, chipId = "64Qv3", projectId = "project-1", pausedSessions = []) {
   const tools = new Map();
   const client = {
+    // The pause guard: the user's agent sessions waiting for an expert.
+    async listAgentSessions() { return pausedSessions; },
     api,
     // null stands for a profile without a project.
     config: { projectId: projectId ?? undefined },
@@ -310,4 +312,33 @@ test("formatting helpers cover the edge cases", () => {
   assert.equal(problemsFromError({ payload: { detail: "plain string" } }), null);
   assert.deepEqual(problemsFromError({ payload: { detail: { problems: [{ path: "a", message: "b" }, { bogus: true }] } } }), [{ path: "a", message: "b" }]);
   assert.match(formatPipelineCatalog({ backend_name: "f", step_types: [], one_qubit_execution_modes: [], tasks: {}, spec_schema: {} }), /Step types:/);
+});
+
+test("a pipeline does not run on qubits of the user's agent session paused for an expert", async () => {
+  const paused = [{ session_id: "s-1", chip_id: "64Qv3", status: "waiting_for_human", active_intervention_id: "int-1", policy: { qids: ["1"] } }];
+  const api = { async executeCalibrationPipeline() { throw new Error("must not run"); } };
+  const tools = registeredTools(api, "64Qv3", "project-1", paused);
+  const result = await tools.get("qdash_run_pipeline").execute("t", { chipId: "64Qv3", spec: SPEC, confirmWrite: true });
+  assert.equal(result.details.started, false);
+  assert.equal(result.details.blockedByPausedSession, true);
+  assert.match(result.content[0].text, /paused for an expert on chip 64Qv3 and covers these targets/);
+  // A MUX target names no qubits, so it counts as overlapping.
+  const mux = await tools.get("qdash_run_pipeline").execute("t", { chipId: "64Qv3", spec: { ...SPEC, targets: { mux_ids: [0] } }, confirmWrite: true });
+  assert.equal(mux.details.blockedByPausedSession, true);
+  // A server that cannot list sessions blocks, including one that predates the list.
+  for (const [status, message] of [[500, /could not tell whether/], [503, /could not tell whether/], [404, /cannot list agent sessions \(HTTP 404; it predates GET \/agent-sessions\)/], [405, /cannot list agent sessions \(HTTP 405/]]) {
+    let dispatched = 0;
+    const errorClient = {
+      api: { async executeCalibrationPipeline() { dispatched += 1; return { execution_id: "e-1", flow_run_id: "f", message: "" }; } },
+      config: { projectId: "project-1" },
+      async listAgentSessions() { const error = new Error(`HTTP ${status}`); error.statusCode = status; throw error; },
+    };
+    const own = new Map();
+    registerCalibrationPipelineTools({ registerTool(tool) { own.set(tool.name, tool); } }, { async makeClient() { return errorClient; }, async resolveChipId() { return "64Qv3"; } });
+    const outcome = await own.get("qdash_run_pipeline").execute("t", { chipId: "64Qv3", spec: SPEC, confirmWrite: true });
+    assert.match(outcome.content[0].text, message, String(status));
+    assert.equal(outcome.details.started, false, String(status));
+    assert.equal(outcome.details.blockedByPausedSession, true, String(status));
+    assert.equal(dispatched, 0, String(status));
+  }
 });

@@ -187,13 +187,15 @@ runtime's own layer passes a park through unchanged: `modelOnly` and the Code Mo
 tool's `execute()` result and `cancel`, and the policy hook works for parked callers as described
 above.
 
-The pinned `qdash_wait_execution` and `qdash_wait_agent_action` park between polls instead of
-running the client's polling loop (`agent-runtime/src/durable-waits.ts`). pi-qdash's
-`extensions/lib/waits.ts` (`WAIT_SPECS`) splits each tool into one poll, `check`, and its result,
-`result`. `check` stops on the same value as the client's loop: the whole pipeline's terminal
-status for an execution, and the requested `operation_id` or `execution_id`, or a failed
-`execution_status`, for an action. The pi CLI keeps the client's loop and builds the same result
-with `result`. In chat, each run of the tool polls once with a client built from the chat's
+The pinned `qdash_wait_execution`, `qdash_wait_agent_action`, and `qdash_wait_agent_intervention`
+park between polls instead of running a polling loop (`agent-runtime/src/durable-waits.ts`).
+pi-qdash's `extensions/lib/waits.ts` (`WAIT_SPECS`) splits each tool into one poll, `check`, and
+its result, `result`. `check` stops on the same value as the client's loop: the whole pipeline's
+terminal status for an execution, and the requested `operation_id` or `execution_id`, or a failed
+`execution_status`, for an action. For an intervention it stops when the session leaves
+`waiting_for_human` or its intervention leaves `open` and `responding`, and returns the session's
+loop context. The pi CLI keeps the client's loop for the first two, runs `pollUntilSettled` for
+the third, and builds the same result with `result`. In chat, each run of the tool polls once with a client built from the chat's
 connection, then returns the result, throws the client's timeout error once the deadline passed,
 or parks with `{ sleep: { until } }` for one poll interval. The tool's inputs, defaults, results,
 and errors are those of the pi CLI tool. A parked wait differs from the loop in these ways:
@@ -210,11 +212,15 @@ and errors are those of the pi CLI tool. A parked wait differs from the loop in 
   holds only the deadline.
 
 Polls keep the requested interval, 0.5 seconds by default, so each poll also commits a park to
-the chat store. A trusted checkout that replaces either tool runs its own code. Both tools stay
-model-only, so a script cannot long-poll.
+the chat store. The intervention wait polls every 15 seconds by default, never more often than
+every 5 seconds, and caps its timeout at one hour: it is a bounded wait inside a turn the user
+started, not a background watcher, and nothing continues a chat after it ends. A trusted
+checkout that replaces a waiting tool runs its own code. The waiting tools stay model-only, so a
+script cannot long-poll.
 
-Write tools therefore still run only after the user approves the model's own call on the
-approval card, never from a script. In a script, a listed read resolves to its redacted response
+Reviewed write tools therefore still run only after the user approves the model's own call on
+the approval card, and session-granted writes only from the model's own call; neither runs from
+a script. In a script, a listed read resolves to its redacted response
 data (`details.data` of the pi-qdash result) as JSON rather than its truncated text answer. A failed call rejects with
 the tool's error text. Pi journals nested results until the script ends and does not bound
 structured output, so the policy hook drops a nested result's `details` and fails a call whose
@@ -436,7 +442,9 @@ in `agent-runtime/src/allowed-tools.ts`. The bundled pi-qcaleval package is trus
 as a whole. Additional checkouts are trusted by path, with these limits:
 
 - Reviewed write names (`REVIEWED_WRITE_TOOL_NAMES`) still require approval of
-  their arguments and execute with the requesting user's credentials.
+  their arguments and execute with the requesting user's credentials. Session-granted
+  write names (`SESSION_GRANTED_WRITE_TOOL_NAMES`) run without a card; see
+  [Supported hosts](./extensions.md#supported-hosts).
 - A checkout tool is replayed after interruption only when its
   `annotations.readOnlyHint` is `true`.
 - A trusted checkout that reuses a bundled tool's name replaces it, with a

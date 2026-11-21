@@ -88,6 +88,28 @@ class AgentActionDecision(str, Enum):
     REJECTED = "rejected"
 
 
+class AgentDecisionAssessment(str, Enum):
+    """How the agent judged the evidence a decision cites; reported by the agent."""
+
+    PASS = "pass"  # noqa: S105 - an assessment, not a credential; meets the criteria
+    FAIL = "fail"  # the result or the measurement failed the criteria
+    INCONCLUSIVE = "inconclusive"  # the evidence does not settle it
+
+
+class AgentDecisionNextAction(str, Enum):
+    """What the agent decided to do next; a stated intent, not an execution."""
+
+    NEXT_TASK = "next_task"  # move on to the next task of the goal
+    REPEAT = "repeat"  # measure again with identical settings
+    ADJUST_AND_RETRY = "adjust_and_retry"  # measure again with changed inputs
+    ROLLBACK = "rollback"  # return to an earlier task
+    PROPOSE_COMMIT = "propose_commit"  # propose committing an accepted candidate
+    REQUEST_HUMAN = "request_human"  # stop and ask an expert
+    SKIP_TARGET = "skip_target"  # leave the qubit out of later steps
+    COMPLETE = "complete"  # the goal is reached
+    STOP = "stop"  # end without reaching the goal
+
+
 class NumericBounds(BaseModel):
     """Inclusive numeric bounds for one agent-controlled parameter."""
 

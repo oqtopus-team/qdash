@@ -10,6 +10,12 @@ the session document, which MongoDB applies one at a time:
   payload. The separate records are written from that payload afterwards. Any load of the
   session writes a payload that a crash left behind, so a pause never exists without its
   record, and a record never exists without its pause.
+- A submitted action is counted (state version and budget) by one update that also stores
+  the action record as a pending payload; the record is written from it afterwards, and any
+  load of the session writes a payload a crash left behind. A load therefore never returns
+  a state version whose action is missing from the action collection, and the checks a
+  submission makes on the session's history and its state-version compare-and-set are one
+  decision.
 - Every operation that reaches hardware, the backend, or calibration state first marks its
   own record as reserved, then passes a gate update on the session that matches only an
   ``active`` session, then confirms its reservation. An operation that passed the gate before
@@ -37,6 +43,7 @@ from qdash.common.utils.datetime import ensure_timezone, now
 from qdash.datamodel.agent_session import (
     AgentActionDecision,
     AgentActionType,
+    AgentAutonomy,
     AgentSessionStatus,
 )
 from qdash.dbmodel.agent_session import (
@@ -161,17 +168,83 @@ def _clear_pending(doc: AgentSessionDocument, intervention_id: str) -> None:
     doc.pending_intervention = None
 
 
+def materialize_pending_action(doc: AgentSessionDocument) -> None:
+    """Write the action record the counting update stored, then clear the payload.
+
+    Idempotent: the record is inserted only if it does not exist yet, and the payload is
+    cleared only while it still names the same action. A record that conflicts with an
+    existing one keeps the payload, and ``AgentSessionService.submit_action`` refuses new
+    submissions until it is resolved.
+    """
+    pending = doc.pending_action
+    if not pending:
+        return
+    action_id = pending.get("action_id")
+    if not action_id:
+        logger.error("Agent session %s has a pending action without an id", doc.session_id)
+        return
+    try:
+        AgentActionDocument.get_motor_collection().update_one(
+            {"action_id": action_id},
+            {"$setOnInsert": pending},
+            upsert=True,
+        )
+    except DuplicateKeyError:
+        logger.exception(
+            "Agent session %s: pending action %s conflicts with an existing record",
+            doc.session_id,
+            action_id,
+        )
+        return
+    AgentSessionDocument.get_motor_collection().update_one(
+        {
+            "project_id": doc.project_id,
+            "session_id": doc.session_id,
+            "pending_action.action_id": action_id,
+        },
+        {"$set": {"pending_action": None}},
+    )
+    doc.pending_action = None
+
+
 def load_agent_session(project_id: str, session_id: str) -> AgentSessionDocument:
-    """Load a session, finish a pause a crash left half written, and apply its expiry."""
+    """Load a session, finish records a crash left half written, and apply its expiry."""
     doc = AgentSessionDocument.find_one({"project_id": project_id, "session_id": session_id}).run()
     if doc is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Agent session '{session_id}' not found",
         )
+    materialize_pending_action(doc)
     materialize_pending_intervention(doc)
     expire_session_if_due(doc)
     return doc
+
+
+def autonomous_session_refusal(session: AgentSessionDocument, username: str) -> None:
+    """Refuse an autonomous request unless the signed-in user approved this ``auto`` session.
+
+    An autonomous request runs without a per-call approval, so it relies on the approval the
+    session's creator gave once. ``username`` is the authenticated user of the request, never
+    a value the agent supplies; an empty one is refused.
+    """
+    if not username or username != session.created_by:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                "Autonomous steps run only in an agent session the signed-in user created; "
+                f"this session belongs to {session.created_by}. Use the reviewed tools, "
+                "approved per call, or a session you approve."
+            ),
+        )
+    if session.policy.autonomy != AgentAutonomy.AUTO:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "The session was approved with autonomy "
+                f"{session.policy.autonomy.value}; autonomous steps need autonomy auto"
+            ),
+        )
 
 
 def pass_execution_gate(project_id: str, session_id: str) -> bool:

@@ -54,6 +54,7 @@ from qdash.api.schemas.agent_session import (
 )
 from qdash.api.services.agent_intervention_slack import AgentInterventionSlackNotifier
 from qdash.api.services.agent_session_gate import (
+    autonomous_session_refusal,
     in_flight_blockers,
     load_agent_session,
     materialize_pending_intervention,
@@ -127,7 +128,12 @@ def _short_error(exc: BaseException) -> str:
 
 
 def _request_hash(body: CreateAgentInterventionRequest) -> str:
-    payload = json.dumps(body.model_dump(mode="json"), sort_keys=True, separators=(",", ":"))
+    # A request without the autonomous flag hashes as it did before the flag existed, so a
+    # retry of an older request still matches its record.
+    exclude = set() if body.autonomous else {"autonomous"}
+    payload = json.dumps(
+        body.model_dump(mode="json", exclude=exclude), sort_keys=True, separators=(",", ":")
+    )
     return hashlib.sha256(payload.encode()).hexdigest()
 
 
@@ -888,6 +894,8 @@ class AgentInterventionService:
         existing = self._find_by_key(project_id, session_id, body.idempotency_key)
         if existing is not None:
             return self._replay(existing, session, request_hash)
+        if body.autonomous:
+            autonomous_session_refusal(session, username)
         for _ in range(MAX_PAUSE_ATTEMPTS):
             # Validated against each session state the pause is attempted on, so actions
             # recorded since an earlier attempt are reconciled too.

@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, BackgroundTasks, Depends, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, Response, status
 
 from qdash.api.dependencies import (
     get_agent_intervention_service,
+    get_agent_session_audit_service,
     get_agent_session_service,
     get_flow_service,
     get_task_file_service,
@@ -21,7 +22,9 @@ from qdash.api.schemas.agent_session import (
     AgentActionResponse,
     AgentCandidateCommitResponse,
     AgentCandidateSetCommitResponse,
+    AgentDecisionResponse,
     AgentInterventionResponse,
+    AgentSessionAuditResponse,
     AgentSessionResponse,
     ApplyAgentCandidateRequest,
     CandidateGateResponse,
@@ -34,15 +37,24 @@ from qdash.api.schemas.agent_session import (
     ExecuteAgentActionRequest,
     ListAgentActionsResponse,
     ListAgentCandidatesResponse,
+    ListAgentDecisionsResponse,
     ListAgentInterventionsResponse,
+    ListAgentSessionsResponse,
+    RecordAgentDecisionRequest,
     RecordAgentResumeOutcomeRequest,
     RespondAgentInterventionRequest,
     SubmitAgentActionRequest,
 )
 from qdash.api.services.agent_intervention_service import AgentInterventionService
+from qdash.api.services.agent_session_audit import (
+    DEFAULT_PAGE_SIZE,
+    MAX_PAGE_SIZE,
+    AgentSessionAuditService,
+)
 from qdash.api.services.agent_session_service import AgentSessionService
 from qdash.api.services.flow_service import FlowService
 from qdash.api.services.task_file_service import TaskFileService
+from qdash.datamodel.agent_session import AgentSessionStatus
 
 router = APIRouter(prefix="/agent-sessions")
 
@@ -64,6 +76,33 @@ def create_agent_session(
         project_id=ctx.project_id,
         username=ctx.user.username,
         body=body,
+    )
+
+
+@router.get(
+    "",
+    response_model=ListAgentSessionsResponse,
+    summary="List agent sessions",
+    operation_id="listAgentSessions",
+)
+def list_agent_sessions(
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    service: Annotated[AgentSessionService, Depends(get_agent_session_service)],
+    chip_id: Annotated[str | None, Query(max_length=200)] = None,
+    status_filter: Annotated[
+        list[AgentSessionStatus] | None,
+        Query(alias="status", description="Only sessions in these statuses"),
+    ] = None,
+    mine: Annotated[bool, Query(description="Only sessions the signed-in user created")] = False,
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+) -> ListAgentSessionsResponse:
+    """List the project's agent sessions, newest first, with their settled status."""
+    return service.list_sessions(
+        project_id=ctx.project_id,
+        chip_id=chip_id,
+        created_by=ctx.user.username if mine else None,
+        statuses=status_filter,
+        limit=limit,
     )
 
 
@@ -324,6 +363,7 @@ async def execute_agent_action(
         body=body,
         flow_service=flow_service,
         task_file_service=task_file_service,
+        username=ctx.user.username,
     )
 
 
@@ -505,3 +545,86 @@ def retry_agent_intervention_notification(
         intervention_id=intervention_id,
         username=ctx.user.username,
     )
+
+
+AuditService = Annotated[AgentSessionAuditService, Depends(get_agent_session_audit_service)]
+
+
+@router.post(
+    "/{session_id}/decisions",
+    response_model=AgentDecisionResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Record an agent decision",
+    operation_id="recordAgentDecision",
+)
+def record_agent_decision(
+    session_id: str,
+    body: RecordAgentDecisionRequest,
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
+    service: AuditService,
+) -> AgentDecisionResponse:
+    """Append the agent's reading of a result and its next step to the session's audit.
+
+    Only the session's creator records decisions. Recording changes no session state, so it
+    is allowed in every session status; it never dispatches, commits, or applies anything.
+    """
+    return service.record_decision(
+        project_id=ctx.project_id,
+        session_id=session_id,
+        username=ctx.user.username,
+        body=body,
+    )
+
+
+@router.get(
+    "/{session_id}/decisions",
+    response_model=ListAgentDecisionsResponse,
+    summary="List agent decisions",
+    operation_id="listAgentDecisions",
+)
+def list_agent_decisions(
+    session_id: str,
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    service: AuditService,
+) -> ListAgentDecisionsResponse:
+    """List a session's recorded decisions, oldest first."""
+    return service.list_decisions(project_id=ctx.project_id, session_id=session_id)
+
+
+@router.get(
+    "/{session_id}/audit",
+    response_model=AgentSessionAuditResponse,
+    summary="Read an agent session's audit timeline",
+    operation_id="getAgentSessionAudit",
+)
+def get_agent_session_audit(
+    session_id: str,
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    service: AuditService,
+    cursor: Annotated[str | None, Query(max_length=1000)] = None,
+    limit: Annotated[int, Query(ge=1, le=MAX_PAGE_SIZE)] = DEFAULT_PAGE_SIZE,
+) -> AgentSessionAuditResponse:
+    """Read the session's chronological experiment audit, a page at a time, oldest first."""
+    return service.read_audit(
+        project_id=ctx.project_id, session_id=session_id, cursor=cursor, limit=limit
+    )
+
+
+@router.get(
+    "/{session_id}/audit/export",
+    response_model=AgentSessionAuditResponse,
+    summary="Export an agent session's audit timeline",
+    operation_id="exportAgentSessionAudit",
+)
+def export_agent_session_audit(
+    session_id: str,
+    response: Response,
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    service: AuditService,
+) -> AgentSessionAuditResponse:
+    """Export the whole audit as versioned JSON; refused rather than cut short when too long."""
+    audit = service.export_audit(project_id=ctx.project_id, session_id=session_id)
+    response.headers["Content-Disposition"] = (
+        f'attachment; filename="agent-session-{session_id}-audit.json"'
+    )
+    return audit

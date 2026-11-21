@@ -45,4 +45,6 @@ export interface CreateAgentInterventionRequest {
   /** Where the plan stopped; required for a runner to resume it */
   checkpoint?: CreateAgentInterventionRequestCheckpoint;
   previous_intervention_id?: CreateAgentInterventionRequestPreviousInterventionId;
+  /** The request comes from an autonomous agent without a per-call approval. QDash then also requires that the signed-in user created the session and that its autonomy is auto. Who may answer the intervention does not change. */
+  autonomous?: boolean;
 }

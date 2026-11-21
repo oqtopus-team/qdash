@@ -6,14 +6,23 @@ import { QDashConfig } from "./config.js";
 import { QDashNotFoundError, QDashTimeoutError } from "./errors.js";
 import type {
   AgentActionResponse,
+  AgentDecisionAssessment,
+  AgentDecisionNextAction,
+  AgentDecisionResponse,
+  AgentSessionAuditResponse,
+  ListAgentDecisionsResponse,
   AgentCandidateSetCommitResponse,
   AgentCandidateCommitResponse,
   AgentCandidateResponse,
   AgentSessionPolicy,
   AgentActionType,
   AgentCandidateReference,
+  AgentInterventionAttempt,
+  AgentInterventionReason,
   AgentInterventionResponse,
+  AgentSessionStatus,
   ListAgentInterventionsResponse,
+  ListAgentSessionsResponse,
   FileTreeNode,
   ForumImageUploadResponse,
   ForumPostCreate,
@@ -77,6 +86,7 @@ import type {
   TaskResultListResponse,
   TaskResultResponse,
   TimeSeriesData,
+  User,
 } from "./models.js";
 import { QDashTransport, type QueryValue, type TransportOptions } from "./transport.js";
 
@@ -143,6 +153,56 @@ export interface SubmitAgentActionOptions {
   qids?: string[];
   parameterOverrides?: Record<string, number>;
   diagnosis?: string;
+  /**
+   * An autonomous step, without a per-call approval. QDash then also requires that the
+   * signed-in user created the `auto` session, and checks the running measurement, the
+   * round budget, and repeats against its own records; a refused step is not recorded.
+   */
+  autonomous?: boolean;
+  /** The finished identical action an autonomous step measures again on purpose. */
+  repeatOfActionId?: string;
+}
+
+export interface ListAgentSessionsOptions {
+  chipId?: string;
+  /** Only sessions in these statuses, settled for expiry. */
+  statuses?: AgentSessionStatus[];
+  /** Only sessions the signed-in user created. */
+  mine?: boolean;
+  limit?: number;
+}
+
+export interface CreateAgentInterventionOptions {
+  idempotencyKey: string;
+  reason: AgentInterventionReason;
+  summary: string;
+  question: string;
+  taskName?: string;
+  qids?: string[];
+  attempts?: AgentInterventionAttempt[];
+  previousInterventionId?: string;
+  /** Recorded by an autonomous agent: QDash requires the signed-in creator of an `auto` session. */
+  autonomous?: boolean;
+}
+
+export interface RecordAgentDecisionOptions {
+  idempotencyKey: string;
+  /** How the agent judged the evidence; omit when it did not judge it. */
+  assessment?: AgentDecisionAssessment;
+  /** The agent's concise reasoning, citing the evidence (at most 2000 characters). */
+  interpretation: string;
+  nextAction: AgentDecisionNextAction;
+  nextDetail?: string;
+  evidenceActionIds?: string[];
+  evaluationIds?: string[];
+  nextActionId?: string;
+  interventionId?: string;
+  supersedesDecisionId?: string;
+}
+
+export interface AgentSessionAuditPageOptions {
+  cursor?: string;
+  limit?: number;
 }
 
 export interface PollOptions {
@@ -253,6 +313,11 @@ export class QDashClient {
    */
   withProject(projectId: string): QDashClient {
     return new QDashClient(new QDashConfig({ ...this.config, projectId }), this.options);
+  }
+
+  /** The user QDash authenticated for this client's credentials. */
+  async getCurrentUser(): Promise<User> {
+    return this.get("/auth/me");
   }
 
   async listChips(): Promise<ListChipsResponse> {
@@ -663,6 +728,20 @@ export class QDashClient {
     });
   }
 
+  /** The project's agent sessions, newest first, with expiry applied before filtering. */
+  async listAgentSessions(options: ListAgentSessionsOptions = {}): Promise<AgentSessionResponse[]> {
+    const payload = await this.get<ListAgentSessionsResponse>(
+      "/agent-sessions",
+      query({
+        chip_id: options.chipId,
+        status: options.statuses,
+        mine: options.mine,
+        limit: options.limit,
+      }),
+    );
+    return payload.items;
+  }
+
   async getAgentSession(sessionId: string): Promise<AgentSessionResponse> {
     return this.get(`/agent-sessions/${pathPart(sessionId)}`);
   }
@@ -690,6 +769,8 @@ export class QDashClient {
       qids: options.qids ?? [],
       parameter_overrides: options.parameterOverrides ?? {},
       diagnosis: options.diagnosis ?? "",
+      ...(options.autonomous ? { autonomous: true } : {}),
+      ...(options.repeatOfActionId ? { repeat_of_action_id: options.repeatOfActionId } : {}),
     });
   }
 
@@ -700,7 +781,13 @@ export class QDashClient {
   async executeAgentAction(
     sessionId: string,
     actionId: string,
-    options: { sourceExecutionId?: string; updateParams?: boolean; reconfigure?: boolean } = {},
+    options: {
+      sourceExecutionId?: string;
+      updateParams?: boolean;
+      reconfigure?: boolean;
+      /** An autonomous dispatch: the signed-in creator of an `auto` session, nothing else running. */
+      autonomous?: boolean;
+    } = {},
   ): Promise<AgentActionResponse> {
     return this.post(
       `/agent-sessions/${pathPart(sessionId)}/actions/${pathPart(actionId)}/execute`,
@@ -708,6 +795,7 @@ export class QDashClient {
         ...(options.sourceExecutionId ? { source_execution_id: options.sourceExecutionId } : {}),
         update_params: options.updateParams ?? false,
         reconfigure: options.reconfigure ?? false,
+        ...(options.autonomous ? { autonomous: true } : {}),
       },
     );
   }
@@ -724,6 +812,30 @@ export class QDashClient {
     return payload.items;
   }
 
+  /**
+   * Record that the agent stopped and needs a person. An active session pauses until an
+   * expert answers in QDash; a repeated idempotency key returns the same record. The
+   * request carries no plan checkpoint, so the expert's resume reactivates the session.
+   */
+  async createAgentIntervention(
+    sessionId: string,
+    options: CreateAgentInterventionOptions,
+  ): Promise<AgentInterventionResponse> {
+    return this.post(`/agent-sessions/${pathPart(sessionId)}/interventions`, {
+      idempotency_key: options.idempotencyKey,
+      reason: options.reason,
+      summary: options.summary,
+      question: options.question,
+      ...(options.taskName ? { task_name: options.taskName } : {}),
+      qids: options.qids ?? [],
+      attempts: options.attempts ?? [],
+      ...(options.previousInterventionId
+        ? { previous_intervention_id: options.previousInterventionId }
+        : {}),
+      ...(options.autonomous ? { autonomous: true } : {}),
+    });
+  }
+
   async getAgentIntervention(
     sessionId: string,
     interventionId: string,
@@ -731,6 +843,55 @@ export class QDashClient {
     return this.get(
       `/agent-sessions/${pathPart(sessionId)}/interventions/${pathPart(interventionId)}`,
     );
+  }
+
+  /**
+   * Append the agent's reading of a result and its next step to the session's audit. Only
+   * the session's creator records decisions; recording changes no session state, so it works
+   * in a paused or ended session too. A repeated idempotency key returns the same record.
+   */
+  async recordAgentDecision(
+    sessionId: string,
+    options: RecordAgentDecisionOptions,
+  ): Promise<AgentDecisionResponse> {
+    return this.post(`/agent-sessions/${pathPart(sessionId)}/decisions`, {
+      idempotency_key: options.idempotencyKey,
+      ...(options.assessment ? { assessment: options.assessment } : {}),
+      interpretation: options.interpretation,
+      next_action: options.nextAction,
+      next_detail: options.nextDetail ?? "",
+      evidence_action_ids: options.evidenceActionIds ?? [],
+      evaluation_ids: options.evaluationIds ?? [],
+      ...(options.nextActionId ? { next_action_id: options.nextActionId } : {}),
+      ...(options.interventionId ? { intervention_id: options.interventionId } : {}),
+      ...(options.supersedesDecisionId
+        ? { supersedes_decision_id: options.supersedesDecisionId }
+        : {}),
+    });
+  }
+
+  /** A session's recorded decisions, oldest first. */
+  async listAgentDecisions(sessionId: string): Promise<AgentDecisionResponse[]> {
+    const payload = await this.get<ListAgentDecisionsResponse>(
+      `/agent-sessions/${pathPart(sessionId)}/decisions`,
+    );
+    return payload.items;
+  }
+
+  /** One page of a session's chronological audit; follow `next_cursor` until `complete`. */
+  async getAgentSessionAudit(
+    sessionId: string,
+    options: AgentSessionAuditPageOptions = {},
+  ): Promise<AgentSessionAuditResponse> {
+    return this.get(
+      `/agent-sessions/${pathPart(sessionId)}/audit`,
+      query({ cursor: options.cursor, limit: options.limit }),
+    );
+  }
+
+  /** The whole audit as versioned JSON; QDash refuses (413) rather than truncates it. */
+  async exportAgentSessionAudit(sessionId: string): Promise<AgentSessionAuditResponse> {
+    return this.get(`/agent-sessions/${pathPart(sessionId)}/audit/export`);
   }
 
   async listAgentActions(sessionId: string): Promise<AgentActionResponse[]> {

@@ -91,7 +91,9 @@ Saved flows run with `qdash_execute_flow`; a template the user has not saved can
 `qdash_save_flow` or reproduced as a pipeline, as the `qdash` skill describes. Both paths are
 confirmation-gated, take the project execution lock, and write the results of completed tasks to
 QDash directly. Before running `characterization` or `ef_calibration` on qubits calibrated for
-other work, tell the user which parameters the run will replace.
+other work, tell the user which parameters the run will replace. To remeasure a property of one
+or a few named qubits with the results staged as candidates rather than written, run the task
+through an agent session with the `qdash-agent-calibration` skill.
 
 Use a pipeline in place of a template only after checking that it preserves the template's
 configuration, session boundaries, target selection, failure filtering, and coupling schedule

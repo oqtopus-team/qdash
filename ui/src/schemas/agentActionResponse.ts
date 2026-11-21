@@ -35,4 +35,6 @@ export interface AgentActionResponse {
   created_at: string;
   /** Intervention recorded for an authorized request_human */
   intervention_id?: AgentActionResponseInterventionId;
+  /** Whether QDash authorized the action as an autonomous step */
+  autonomous?: boolean;
 }

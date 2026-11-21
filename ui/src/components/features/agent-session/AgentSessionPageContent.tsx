@@ -22,6 +22,7 @@ import {
   interventionStatusStyle,
   sessionStatusLabel,
 } from "./interventionLabels";
+import { AgentSessionAuditTimeline } from "./AgentSessionAuditTimeline";
 import { projectRequest, useLinkedProject } from "./useLinkedProject";
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
@@ -177,6 +178,10 @@ export function AgentSessionPageContent({ sessionId }: { sessionId: string }) {
             )}
           </div>
         </section>
+
+        {projectId ? (
+          <AgentSessionAuditTimeline sessionId={sessionId} projectId={projectId} />
+        ) : null}
       </div>
     </PageContainer>
   );

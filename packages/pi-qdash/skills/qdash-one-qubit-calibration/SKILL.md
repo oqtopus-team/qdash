@@ -81,9 +81,10 @@ key outputs (for example `x90_fidelity`) and execution links.
 Saved flows run with `qdash_execute_flow`; a template the user has not saved can be saved with
 `qdash_save_flow` or reproduced as a pipeline with the template's step and task lists, as the
 `qdash` skill describes. Both paths are confirmation-gated and write the results of completed
-tasks to QDash directly. A bounded, candidate-gated recovery of one qubit uses an agent
-calibration session instead; see the `qdash` skill. Do not use a flow or pipeline to repeat what
-an agent session refused, rejected, or stopped on.
+tasks to QDash directly. To calibrate or recover one or a few named qubits step by step, with
+results staged as candidates and an expert asked when the next step is unclear, run this skill's
+tasks through an agent session with the `qdash-agent-calibration` skill instead. Do not use a
+flow or pipeline to repeat what an agent session refused, rejected, or stopped on.
 
 Use a pipeline in place of a template only after checking that it preserves the template's
 configuration, session boundaries, target selection, failure filtering, and coupling schedule

@@ -28,7 +28,9 @@ import type {
   AgentActionResponse,
   AgentCandidateCommitResponse,
   AgentCandidateSetCommitResponse,
+  AgentDecisionResponse,
   AgentInterventionResponse,
+  AgentSessionAuditResponse,
   AgentSessionResponse,
   ApplyAgentCandidateRequest,
   CandidateGateResponse,
@@ -39,10 +41,15 @@ import type {
   CreateAgentSessionRequest,
   EvaluateCandidateGateRequest,
   ExecuteAgentActionRequest,
+  GetAgentSessionAuditParams,
   HTTPValidationError,
   ListAgentActionsResponse,
   ListAgentCandidatesResponse,
+  ListAgentDecisionsResponse,
   ListAgentInterventionsResponse,
+  ListAgentSessionsParams,
+  ListAgentSessionsResponse,
+  RecordAgentDecisionRequest,
   RecordAgentResumeOutcomeRequest,
   RespondAgentInterventionRequest,
   SubmitAgentActionRequest
@@ -136,6 +143,100 @@ export const useCreateAgentSession = <TError = HTTPValidationError,
       return useMutation(getCreateAgentSessionMutationOptions(options), queryClient);
     }
     /**
+ * List the project's agent sessions, newest first, with their settled status.
+ * @summary List agent sessions
+ */
+export const listAgentSessions = (
+    params?: ListAgentSessionsParams,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<ListAgentSessionsResponse>(
+      {url: `/agent-sessions`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+
+
+
+
+export const getListAgentSessionsQueryKey = (params?: ListAgentSessionsParams,) => {
+    return [
+    `/agent-sessions`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListAgentSessionsQueryOptions = <TData = Awaited<ReturnType<typeof listAgentSessions>>, TError = HTTPValidationError>(params?: ListAgentSessionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAgentSessions>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListAgentSessionsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAgentSessions>>> = ({ signal }) => listAgentSessions(params, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAgentSessions>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListAgentSessionsQueryResult = NonNullable<Awaited<ReturnType<typeof listAgentSessions>>>
+export type ListAgentSessionsQueryError = HTTPValidationError
+
+
+export function useListAgentSessions<TData = Awaited<ReturnType<typeof listAgentSessions>>, TError = HTTPValidationError>(
+ params: undefined |  ListAgentSessionsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAgentSessions>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listAgentSessions>>,
+          TError,
+          Awaited<ReturnType<typeof listAgentSessions>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListAgentSessions<TData = Awaited<ReturnType<typeof listAgentSessions>>, TError = HTTPValidationError>(
+ params?: ListAgentSessionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAgentSessions>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listAgentSessions>>,
+          TError,
+          Awaited<ReturnType<typeof listAgentSessions>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListAgentSessions<TData = Awaited<ReturnType<typeof listAgentSessions>>, TError = HTTPValidationError>(
+ params?: ListAgentSessionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAgentSessions>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List agent sessions
+ */
+
+export function useListAgentSessions<TData = Awaited<ReturnType<typeof listAgentSessions>>, TError = HTTPValidationError>(
+ params?: ListAgentSessionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAgentSessions>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListAgentSessionsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
  * Get authoritative state for an agent session.
  * @summary Get an agent session
  */
@@ -1653,3 +1754,353 @@ export const useRetryAgentInterventionNotification = <TError = HTTPValidationErr
       > => {
       return useMutation(getRetryAgentInterventionNotificationMutationOptions(options), queryClient);
     }
+    /**
+ * Append the agent's reading of a result and its next step to the session's audit.
+ *
+ * Only the session's creator records decisions. Recording changes no session state, so it
+ * is allowed in every session status; it never dispatches, commits, or applies anything.
+ * @summary Record an agent decision
+ */
+export const recordAgentDecision = (
+    sessionId: string,
+    recordAgentDecisionRequest: RecordAgentDecisionRequest,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<AgentDecisionResponse>(
+      {url: `/agent-sessions/${sessionId}/decisions`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: recordAgentDecisionRequest, signal
+    },
+      options);
+    }
+
+
+
+
+export const getRecordAgentDecisionMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof recordAgentDecision>>, TError,{sessionId: string;data: RecordAgentDecisionRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof recordAgentDecision>>, TError,{sessionId: string;data: RecordAgentDecisionRequest}, TContext> => {
+
+const mutationKey = ['recordAgentDecision'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof recordAgentDecision>>, {sessionId: string;data: RecordAgentDecisionRequest}> = (props) => {
+          const {sessionId,data} = props ?? {};
+
+          return  recordAgentDecision(sessionId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RecordAgentDecisionMutationResult = NonNullable<Awaited<ReturnType<typeof recordAgentDecision>>>
+    export type RecordAgentDecisionMutationBody = RecordAgentDecisionRequest
+    export type RecordAgentDecisionMutationError = HTTPValidationError
+
+    /**
+ * @summary Record an agent decision
+ */
+export const useRecordAgentDecision = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof recordAgentDecision>>, TError,{sessionId: string;data: RecordAgentDecisionRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof recordAgentDecision>>,
+        TError,
+        {sessionId: string;data: RecordAgentDecisionRequest},
+        TContext
+      > => {
+      return useMutation(getRecordAgentDecisionMutationOptions(options), queryClient);
+    }
+    /**
+ * List a session's recorded decisions, oldest first.
+ * @summary List agent decisions
+ */
+export const listAgentDecisions = (
+    sessionId: string,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<ListAgentDecisionsResponse>(
+      {url: `/agent-sessions/${sessionId}/decisions`, method: 'GET', signal
+    },
+      options);
+    }
+
+
+
+
+export const getListAgentDecisionsQueryKey = (sessionId: string,) => {
+    return [
+    `/agent-sessions/${sessionId}/decisions`
+    ] as const;
+    }
+
+
+export const getListAgentDecisionsQueryOptions = <TData = Awaited<ReturnType<typeof listAgentDecisions>>, TError = HTTPValidationError>(sessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAgentDecisions>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListAgentDecisionsQueryKey(sessionId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAgentDecisions>>> = ({ signal }) => listAgentDecisions(sessionId, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: sessionId !== null && sessionId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAgentDecisions>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListAgentDecisionsQueryResult = NonNullable<Awaited<ReturnType<typeof listAgentDecisions>>>
+export type ListAgentDecisionsQueryError = HTTPValidationError
+
+
+export function useListAgentDecisions<TData = Awaited<ReturnType<typeof listAgentDecisions>>, TError = HTTPValidationError>(
+ sessionId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAgentDecisions>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listAgentDecisions>>,
+          TError,
+          Awaited<ReturnType<typeof listAgentDecisions>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListAgentDecisions<TData = Awaited<ReturnType<typeof listAgentDecisions>>, TError = HTTPValidationError>(
+ sessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAgentDecisions>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listAgentDecisions>>,
+          TError,
+          Awaited<ReturnType<typeof listAgentDecisions>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListAgentDecisions<TData = Awaited<ReturnType<typeof listAgentDecisions>>, TError = HTTPValidationError>(
+ sessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAgentDecisions>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List agent decisions
+ */
+
+export function useListAgentDecisions<TData = Awaited<ReturnType<typeof listAgentDecisions>>, TError = HTTPValidationError>(
+ sessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAgentDecisions>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListAgentDecisionsQueryOptions(sessionId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
+ * Read the session's chronological experiment audit, a page at a time, oldest first.
+ * @summary Read an agent session's audit timeline
+ */
+export const getAgentSessionAudit = (
+    sessionId: string,
+    params?: GetAgentSessionAuditParams,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<AgentSessionAuditResponse>(
+      {url: `/agent-sessions/${sessionId}/audit`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+
+
+
+
+export const getGetAgentSessionAuditQueryKey = (sessionId: string,
+    params?: GetAgentSessionAuditParams,) => {
+    return [
+    `/agent-sessions/${sessionId}/audit`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetAgentSessionAuditQueryOptions = <TData = Awaited<ReturnType<typeof getAgentSessionAudit>>, TError = HTTPValidationError>(sessionId: string,
+    params?: GetAgentSessionAuditParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAgentSessionAudit>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAgentSessionAuditQueryKey(sessionId,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAgentSessionAudit>>> = ({ signal }) => getAgentSessionAudit(sessionId,params, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: sessionId !== null && sessionId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAgentSessionAudit>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetAgentSessionAuditQueryResult = NonNullable<Awaited<ReturnType<typeof getAgentSessionAudit>>>
+export type GetAgentSessionAuditQueryError = HTTPValidationError
+
+
+export function useGetAgentSessionAudit<TData = Awaited<ReturnType<typeof getAgentSessionAudit>>, TError = HTTPValidationError>(
+ sessionId: string,
+    params: undefined |  GetAgentSessionAuditParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAgentSessionAudit>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAgentSessionAudit>>,
+          TError,
+          Awaited<ReturnType<typeof getAgentSessionAudit>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAgentSessionAudit<TData = Awaited<ReturnType<typeof getAgentSessionAudit>>, TError = HTTPValidationError>(
+ sessionId: string,
+    params?: GetAgentSessionAuditParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAgentSessionAudit>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAgentSessionAudit>>,
+          TError,
+          Awaited<ReturnType<typeof getAgentSessionAudit>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAgentSessionAudit<TData = Awaited<ReturnType<typeof getAgentSessionAudit>>, TError = HTTPValidationError>(
+ sessionId: string,
+    params?: GetAgentSessionAuditParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAgentSessionAudit>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Read an agent session's audit timeline
+ */
+
+export function useGetAgentSessionAudit<TData = Awaited<ReturnType<typeof getAgentSessionAudit>>, TError = HTTPValidationError>(
+ sessionId: string,
+    params?: GetAgentSessionAuditParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAgentSessionAudit>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetAgentSessionAuditQueryOptions(sessionId,params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
+ * Export the whole audit as versioned JSON; refused rather than cut short when too long.
+ * @summary Export an agent session's audit timeline
+ */
+export const exportAgentSessionAudit = (
+    sessionId: string,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<AgentSessionAuditResponse>(
+      {url: `/agent-sessions/${sessionId}/audit/export`, method: 'GET', signal
+    },
+      options);
+    }
+
+
+
+
+export const getExportAgentSessionAuditQueryKey = (sessionId: string,) => {
+    return [
+    `/agent-sessions/${sessionId}/audit/export`
+    ] as const;
+    }
+
+
+export const getExportAgentSessionAuditQueryOptions = <TData = Awaited<ReturnType<typeof exportAgentSessionAudit>>, TError = HTTPValidationError>(sessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof exportAgentSessionAudit>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getExportAgentSessionAuditQueryKey(sessionId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof exportAgentSessionAudit>>> = ({ signal }) => exportAgentSessionAudit(sessionId, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: sessionId !== null && sessionId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof exportAgentSessionAudit>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ExportAgentSessionAuditQueryResult = NonNullable<Awaited<ReturnType<typeof exportAgentSessionAudit>>>
+export type ExportAgentSessionAuditQueryError = HTTPValidationError
+
+
+export function useExportAgentSessionAudit<TData = Awaited<ReturnType<typeof exportAgentSessionAudit>>, TError = HTTPValidationError>(
+ sessionId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof exportAgentSessionAudit>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof exportAgentSessionAudit>>,
+          TError,
+          Awaited<ReturnType<typeof exportAgentSessionAudit>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useExportAgentSessionAudit<TData = Awaited<ReturnType<typeof exportAgentSessionAudit>>, TError = HTTPValidationError>(
+ sessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof exportAgentSessionAudit>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof exportAgentSessionAudit>>,
+          TError,
+          Awaited<ReturnType<typeof exportAgentSessionAudit>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useExportAgentSessionAudit<TData = Awaited<ReturnType<typeof exportAgentSessionAudit>>, TError = HTTPValidationError>(
+ sessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof exportAgentSessionAudit>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Export an agent session's audit timeline
+ */
+
+export function useExportAgentSessionAudit<TData = Awaited<ReturnType<typeof exportAgentSessionAudit>>, TError = HTTPValidationError>(
+ sessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof exportAgentSessionAudit>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getExportAgentSessionAuditQueryOptions(sessionId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}

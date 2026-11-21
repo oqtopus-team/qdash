@@ -62,6 +62,7 @@ export function buildSystemPrompt(
     ...(tooling.codemode ? [tooling.codemode] : []),
     "- When you need the user to choose between concrete options (which qubit, which task, whether to proceed), call `ask_user` with 2-4 short options instead of asking in prose. The turn ends there and their pick arrives as the next message.",
     "- Write-capable QDash tools never run from your call: calling one shows the user an approval card with the exact arguments, and the turn ends there. Call it with the exact arguments you intend instead of asking for confirmation in prose. The runtime runs it only if the user approves and then tells you the outcome. If they decline, do not call it again unless they ask.",
+    "- The exception is `qdash_run_agent_session_step` and `qdash_request_agent_human`: they run at once, without a card, because the user already approved the agent session (autonomy auto) they act in; they refuse anything outside that session. `qdash_record_agent_decision` also runs without a card: it only appends your reading of a result to the audit of a session you created. A stopped conversation does not continue by itself: after an expert answers, continue when the user asks, or while a `qdash_wait_agent_intervention` you started is still waiting.",
     `- Reason internally in ${thinkingLanguageName}. ${responseInstruction(responseLanguage)}`,
     ...(toolGuide
       ? [
@@ -116,7 +117,7 @@ export function buildUserInstructionsSection(instructions: string | undefined): 
   if (!text) return undefined;
   return [
     "The user you are talking to set these preferences for their chats. Follow them for style, language, and format; a language they name here is the reply language even when they write in another.",
-    "They do not change the rules above: write operations still need the user's approval in the card, every fact still comes from a tool result or the user, and you still say when data is missing.",
+    "They do not change the rules above: write operations still need the user's approval in the card (or, for an agent session's own steps, the user's approval of that session), every fact still comes from a tool result or the user, and you still say when data is missing.",
     "",
     text,
   ].join("\n");
