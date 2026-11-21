@@ -11,6 +11,7 @@ import {
   DEFERRED_TOOL_NAMES,
   NESTED_READ_TOOL_NAMES,
   REVIEWED_WRITE_TOOL_NAMES,
+  SESSION_GRANTED_WRITE_TOOL_NAMES,
 } from "../src/allowed-tools.ts";
 import { buildQDashExtension } from "../src/durable-tools.ts";
 import {
@@ -63,6 +64,7 @@ test("bundled packages load tools and skills offline, retaining the pi-qdash all
     assert.ok(!names.includes("qdash_plot_timeseries"));
     // Every allowlisted read tool names a tool the bundled packages register.
     for (const name of ALLOWED_TOOL_NAMES) assert.ok(names.includes(name), name);
+    for (const name of SESSION_GRANTED_WRITE_TOOL_NAMES) assert.ok(names.includes(name), name);
     const loadedSkills = loader.getSkills().skills;
     const skills = loadedSkills.map(({ name }) => name);
     assert.ok(skills.includes("qdash"));
@@ -82,7 +84,14 @@ test("bundled packages load tools and skills offline, retaining the pi-qdash all
     assert.ok(toolNames.includes("qcal_evaluate"));
     assert.ok(toolNames.includes("qdash_build_qcal_evidence"));
     assert.ok(toolNames.includes("qdash_create_forum_post"));
-    const extra = names.find((name) => name.startsWith("qdash_") && !ALLOWED_TOOL_NAMES.includes(name) && !REVIEWED_WRITE_TOOL_NAMES.includes(name));
+    // Session-granted writes are offered, model-only, and replayed (their keys come from the call id).
+    for (const name of SESSION_GRANTED_WRITE_TOOL_NAMES) {
+      const tool = adapted.extension.tools.find((entry) => entry.name === name);
+      assert.ok(tool, name);
+      assert.deepEqual(tool.callers, ["model"], name);
+      assert.doesNotMatch(tool.description, /must approve before it runs/, name);
+    }
+    const extra = names.find((name) => name.startsWith("qdash_") && !ALLOWED_TOOL_NAMES.includes(name) && !REVIEWED_WRITE_TOOL_NAMES.includes(name) && !SESSION_GRANTED_WRITE_TOOL_NAMES.includes(name));
     assert.ok(extra);
     assert.ok(!toolNames.includes(extra));
     // Code Mode and deferred loading name real pi-qdash tools; scripts reach only the audited reads.
@@ -113,7 +122,7 @@ test("experiment-flow skills load in both hosts and name only tools the runtime 
     });
     await loader.reload();
     const tools = new Set(loader.getExtensions().extensions.flatMap(({ tools }) => [...tools.keys()]));
-    const offered = new Set([...ALLOWED_TOOL_NAMES, ...REVIEWED_WRITE_TOOL_NAMES]);
+    const offered = new Set([...ALLOWED_TOOL_NAMES, ...REVIEWED_WRITE_TOOL_NAMES, ...SESSION_GRANTED_WRITE_TOOL_NAMES]);
     const skills = loader.getSkills().skills;
     const names = new Set(skills.map(({ name }) => name));
     // The flow skills replace the retired calibration-agent and two-qubit diagnosis skills.
@@ -125,6 +134,8 @@ test("experiment-flow skills load in both hosts and name only tools the runtime 
       "qdash-one-qubit-calibration",
       "qdash-two-qubit-calibration",
       "qdash-characterization",
+      // The model-driven loop that runs those skills' tasks inside an agent session.
+      "qdash-agent-calibration",
     ];
     for (const name of [...flowSkills, "qdash"]) {
       const skill = skills.find((entry) => entry.name === name);

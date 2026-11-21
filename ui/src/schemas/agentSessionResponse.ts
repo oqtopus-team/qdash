@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { AgentSessionPolicy } from './agentSessionPolicy';
+import type { AgentSessionResponseActiveInterventionId } from './agentSessionResponseActiveInterventionId';
 import type { AgentSessionStatus } from './agentSessionStatus';
 
 /**
@@ -27,4 +28,6 @@ export interface AgentSessionResponse {
   created_at: string;
   updated_at: string;
   expires_at: string;
+  /** The intervention the session waits on, if any */
+  active_intervention_id?: AgentSessionResponseActiveInterventionId;
 }

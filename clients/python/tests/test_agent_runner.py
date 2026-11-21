@@ -7,23 +7,31 @@ from unittest.mock import MagicMock
 import pytest
 
 from qdash.client.services.agent_runner import (
+    PLAN_COMPLETE,
     PLAN_DEFAULT,
     PLAN_ESCALATE,
     AgentCalibrationRunner,
+    AgentInterventionReason,
     AgentPlannerDecision,
     AgentPlanNode,
+    AgentPlanOutcome,
+    AgentPlanResumeState,
     AgentPlanRunner,
     AgentSkillTransition,
     AgentStepOutcome,
+    resume_state_from_intervention,
 )
 from qdash.client.services.client_models import (
     AgentActionResponse,
     AgentCandidateCommitResponse,
     AgentCandidateResponse,
     AgentCandidateSetCommitResponse,
+    AgentInterventionResponse,
     AgentSessionResponse,
 )
 from qdash.client.services.errors import (
+    QDashApiError,
+    QDashAuthError,
     QDashTransportError,
     QDashValidationError,
 )
@@ -1075,3 +1083,375 @@ def test_plan_max_node_visits_must_be_positive() -> None:
             nodes=[AgentPlanNode(task_name="CheckT1", candidate_parameter="t1")],
             max_node_visits=0,
         )
+
+
+def _intervention(**overrides: object) -> AgentInterventionResponse:
+    data: dict[str, object] = {
+        "intervention_id": "intervention-1",
+        "project_id": "project-1",
+        "session_id": "session-1",
+        "chip_id": "chip-1",
+        "reason": "unknown_outcome",
+        "summary": "stopped",
+        "question": "resume?",
+        "status": "open",
+        "session_status": "waiting_for_human",
+        "page_path": "/agent-sessions/session-1/interventions/intervention-1",
+        "notification": {"status": "pending"},
+        "created_at": "2026-07-13T00:00:05Z",
+        "updated_at": "2026-07-13T00:00:05Z",
+    }
+    data.update(overrides)
+    return AgentInterventionResponse.model_validate(data)
+
+
+_TWO_NODES = [
+    AgentPlanNode(node_id="calibrate", task_name="CheckT1", candidate_parameter="t1"),
+    AgentPlanNode(node_id="verify", task_name="CheckT2", candidate_parameter="t2"),
+]
+
+
+def test_plan_escalation_records_an_intervention_with_checkpoint_and_evidence() -> None:
+    client = MagicMock()
+    client.get_agent_session.return_value = _plan_session(max_actions=4)
+    client.create_agent_intervention.return_value = _intervention()
+    step_runner = MagicMock()
+    step_runner.run_step.side_effect = [_plan_step("t1", 95.0)]
+    planner = MagicMock()
+    planner.choose_next.return_value = AgentPlannerDecision(
+        target_node_id=PLAN_ESCALATE,
+        reason="CheckT1 evaluation reported LOW_SNR, which has no next action",
+        escalation_reason="unknown_outcome",
+        evidence={"evaluation_id": "ev-1", "evaluation_run_id": "run-1", "status": "LOW_SNR"},
+    )
+    planner.export_history.return_value = {"calibrate": [{"status": "LOW_SNR"}]}
+    runner = AgentPlanRunner(client, step_runner=step_runner)
+
+    outcome = runner.run_plan(
+        session_id="session-1",
+        qid="Q00",
+        nodes=_TWO_NODES,
+        planner=planner,
+        max_node_visits=2,
+        idempotency_prefix="plan-key",
+        record_interventions=True,
+        planner_name="evaluation",
+    )
+
+    assert outcome.transition == AgentSkillTransition.HUMAN_ESCALATION
+    assert outcome.escalation_reason == AgentInterventionReason.UNKNOWN_OUTCOME
+    assert outcome.intervention is not None
+    assert outcome.intervention.intervention_id == "intervention-1"
+    kwargs = client.create_agent_intervention.call_args.kwargs
+    assert kwargs["reason"] == "unknown_outcome"
+    assert kwargs["idempotency_key"] == "plan-key-i-1-1"
+    assert kwargs["node_id"] == "calibrate"
+    assert kwargs["task_name"] == "CheckT1"
+    attempt = kwargs["attempts"][0]
+    assert attempt["evaluation_id"] == "ev-1"
+    assert attempt["status"] == "LOW_SNR"
+    assert attempt["task_id"] == "task-1"
+    checkpoint = kwargs["checkpoint"]
+    assert checkpoint["idempotency_prefix"] == "plan-key"
+    assert checkpoint["node_path"] == ["calibrate"]
+    assert checkpoint["visit_counts"] == {"calibrate": 1}
+    assert checkpoint["stopped_node_id"] == "calibrate"
+    assert checkpoint["accepted_candidates"] == [
+        {"action_id": "action-1", "parameter_name": "t1", "task_id": "task-1"}
+    ]
+    assert checkpoint["planner"] == "evaluation"
+    assert checkpoint["planner_history"] == {"calibrate": [{"status": "LOW_SNR"}]}
+
+
+def test_plan_reports_a_failed_intervention_record_without_raising() -> None:
+    client = MagicMock()
+    client.get_agent_session.return_value = _plan_session(max_actions=4)
+    client.create_agent_intervention.side_effect = QDashTransportError(
+        "unreachable", status_code=503
+    )
+    step_runner = MagicMock()
+    step_runner.run_step.side_effect = [
+        _plan_step("t1", 900.0, transition=AgentSkillTransition.ROLLBACK)
+    ]
+    runner = AgentPlanRunner(client, step_runner=step_runner)
+
+    outcome = runner.run_plan(
+        session_id="session-1", qid="Q00", nodes=_TWO_NODES, record_interventions=True
+    )
+
+    assert outcome.transition == AgentSkillTransition.ROLLBACK
+    assert outcome.escalation_reason == AgentInterventionReason.RECOVERY_EXHAUSTED
+    assert outcome.intervention is None
+    assert outcome.intervention_error is not None
+    assert "unreachable" in outcome.intervention_error
+
+
+def _rejected_checkpoint() -> QDashValidationError:
+    return QDashValidationError(
+        "422 rejected",
+        status_code=422,
+        payload={
+            "detail": {
+                "code": "checkpoint_rejected",
+                "message": "The session ran actions that are not part of this plan",
+            }
+        },
+    )
+
+
+def _stopped_plan(client: MagicMock) -> AgentPlanOutcome:
+    client.get_agent_session.return_value = _plan_session(max_actions=4)
+    step_runner = MagicMock()
+    step_runner.run_step.side_effect = [
+        _plan_step("t1", 900.0, transition=AgentSkillTransition.ROLLBACK)
+    ]
+    runner = AgentPlanRunner(client, step_runner=step_runner)
+    return runner.run_plan(
+        session_id="session-1",
+        qid="Q00",
+        nodes=_TWO_NODES,
+        idempotency_prefix="plan-key",
+        record_interventions=True,
+    )
+
+
+def test_rejected_checkpoint_is_recorded_once_without_a_checkpoint() -> None:
+    client = MagicMock()
+    client.create_agent_intervention.side_effect = [
+        _rejected_checkpoint(),
+        _intervention(checkpoint=None),
+    ]
+
+    outcome = _stopped_plan(client)
+
+    assert outcome.intervention is not None
+    assert outcome.intervention_error is None
+    assert outcome.checkpoint_rejection == "The session ran actions that are not part of this plan"
+    first, fallback = (call.kwargs for call in client.create_agent_intervention.call_args_list)
+    assert first["checkpoint"] is not None
+    assert fallback["checkpoint"] is None
+    assert fallback["idempotency_key"] == f"{first['idempotency_key']}-nocp"
+    assert fallback["summary"].startswith(first["summary"])
+    assert fallback["summary"].endswith("this intervention cannot resume the plan.")
+    # The server's rejection detail stays local; the durable record gets a fixed note.
+    assert "not part of this plan" not in fallback["summary"]
+    for name in ("reason", "question", "node_id", "task_name", "qids", "attempts"):
+        assert fallback[name] == first[name]
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        QDashValidationError("422 scope", status_code=422, payload={"detail": "outside scope"}),
+        QDashValidationError(
+            "422 malformed",
+            status_code=422,
+            payload={"detail": [{"type": "missing", "loc": ["body", "checkpoint"]}]},
+        ),
+        QDashValidationError(
+            "422 other code", status_code=422, payload={"detail": {"code": "something_else"}}
+        ),
+        QDashValidationError("422 no payload", status_code=422),
+        QDashAuthError("401 unauthorized", status_code=401),
+        QDashTransportError("403 forbidden", status_code=403),
+        QDashTransportError(
+            "409 conflict",
+            status_code=409,
+            payload={"detail": {"code": "checkpoint_rejected", "message": "x"}},
+        ),
+        QDashTransportError("timed out"),
+    ],
+)
+def test_only_a_checkpoint_rejection_falls_back(error: QDashApiError) -> None:
+    client = MagicMock()
+    client.create_agent_intervention.side_effect = error
+
+    outcome = _stopped_plan(client)
+
+    assert client.create_agent_intervention.call_count == 1
+    assert outcome.intervention is None
+    assert outcome.checkpoint_rejection is None
+    assert outcome.intervention_error is not None
+    assert str(error) in outcome.intervention_error
+
+
+def test_failed_fallback_reports_the_rejection_and_the_failure() -> None:
+    client = MagicMock()
+    client.create_agent_intervention.side_effect = [
+        _rejected_checkpoint(),
+        QDashTransportError("409 already waits", status_code=409),
+    ]
+
+    outcome = _stopped_plan(client)
+
+    assert outcome.intervention is None
+    assert outcome.checkpoint_rejection is not None
+    assert outcome.intervention_error is not None
+    assert "not part of this plan" in outcome.intervention_error
+    assert "409 already waits" in outcome.intervention_error
+
+
+def test_plan_known_recovery_stays_in_the_loop_without_an_intervention() -> None:
+    client = MagicMock()
+    client.get_agent_session.return_value = _plan_session(max_actions=4)
+    step_runner = MagicMock()
+    step_runner.run_step.side_effect = [_plan_step("t1", 95.0), _plan_step("t1", 96.0)]
+    planner = MagicMock()
+    planner.choose_next.side_effect = [
+        AgentPlannerDecision(target_node_id="calibrate", reason="SUBOPTIMAL: retry"),
+        AgentPlannerDecision(target_node_id=PLAN_COMPLETE, reason="SUCCESS"),
+    ]
+    runner = AgentPlanRunner(client, step_runner=step_runner)
+
+    outcome = runner.run_plan(
+        session_id="session-1",
+        qid="Q00",
+        nodes=_TWO_NODES,
+        planner=planner,
+        max_node_visits=3,
+        max_node_executions=4,
+        record_interventions=True,
+    )
+
+    assert outcome.transition == AgentSkillTransition.PASS
+    client.create_agent_intervention.assert_not_called()
+    assert outcome.checkpoint is None
+
+
+def test_resumed_plan_restores_counters_and_never_reuses_an_earlier_key() -> None:
+    client = MagicMock()
+    client.get_agent_session.return_value = _plan_session(max_actions=4)
+    client.list_agent_action_candidates.return_value = [_candidate(accepted=True)]
+    step_runner = MagicMock()
+    step_runner.run_step.side_effect = [_plan_step("t2", 130.0)]
+    runner = AgentPlanRunner(client, step_runner=step_runner)
+    state = AgentPlanResumeState(
+        intervention_id="intervention-1",
+        start_node_id="verify",
+        node_path=("calibrate",),
+        visit_counts={"calibrate": 1},
+        accepted_candidates=(
+            {"action_id": "action-1", "parameter_name": "t1", "task_id": "task-1"},
+        ),
+        planner_history={},
+    )
+
+    outcome = runner.run_plan(
+        session_id="session-1",
+        qid="Q00",
+        nodes=_TWO_NODES,
+        max_node_executions=3,
+        idempotency_prefix="plan-key",
+        resume=state,
+        record_interventions=True,
+    )
+
+    assert outcome.transition == AgentSkillTransition.PASS
+    assert outcome.node_path == ("calibrate", "verify")
+    # The accepted T1 was re-read from QDash and carried into the resumed node.
+    client.list_agent_action_candidates.assert_called_once_with("session-1", "action-1")
+    call = step_runner.run_step.call_args.kwargs
+    assert call["parameter_overrides"] == {"t1": 95.0}
+    assert call["action_idempotency_key"] == "plan-key-node-1-action"
+    assert outcome.carried_overrides == {"t1": 95.0, "t2": 130.0}
+    assert outcome.completed_nodes == 2
+
+
+def test_resumed_plan_keeps_the_visit_budget_and_the_execution_budget() -> None:
+    client = MagicMock()
+    client.get_agent_session.return_value = _plan_session(max_actions=4)
+    client.list_agent_action_candidates.return_value = []
+    step_runner = MagicMock()
+    runner = AgentPlanRunner(client, step_runner=step_runner)
+    state = AgentPlanResumeState(
+        intervention_id="intervention-1",
+        start_node_id="calibrate",
+        node_path=("calibrate", "calibrate"),
+        visit_counts={"calibrate": 2},
+        accepted_candidates=(),
+        planner_history={},
+    )
+
+    over_visits = runner.run_plan(
+        session_id="session-1",
+        qid="Q00",
+        nodes=_TWO_NODES,
+        max_node_visits=2,
+        max_node_executions=4,
+        idempotency_prefix="plan-key",
+        resume=state,
+    )
+    over_executions = runner.run_plan(
+        session_id="session-1",
+        qid="Q00",
+        nodes=_TWO_NODES,
+        max_node_executions=2,
+        idempotency_prefix="plan-key",
+        resume=state,
+    )
+
+    assert over_visits.transition == AgentSkillTransition.HUMAN_ESCALATION
+    assert "already ran 2 times" in over_visits.reason
+    assert over_executions.escalation_reason == AgentInterventionReason.RECOVERY_EXHAUSTED
+    step_runner.run_step.assert_not_called()
+
+
+def test_resumed_plan_stops_when_a_carried_candidate_is_no_longer_accepted() -> None:
+    client = MagicMock()
+    client.get_agent_session.return_value = _plan_session(max_actions=4)
+    client.list_agent_action_candidates.return_value = [_candidate(accepted=False)]
+    step_runner = MagicMock()
+    runner = AgentPlanRunner(client, step_runner=step_runner)
+    state = AgentPlanResumeState(
+        intervention_id="intervention-1",
+        start_node_id="verify",
+        node_path=("calibrate",),
+        visit_counts={"calibrate": 1},
+        accepted_candidates=(
+            {"action_id": "action-1", "parameter_name": "t1", "task_id": "task-1"},
+        ),
+        planner_history={},
+    )
+
+    outcome = runner.run_plan(
+        session_id="session-1",
+        qid="Q00",
+        nodes=_TWO_NODES,
+        max_node_executions=3,
+        idempotency_prefix="plan-key",
+        resume=state,
+    )
+
+    assert outcome.transition == AgentSkillTransition.HUMAN_ESCALATION
+    assert "no longer accepted" in outcome.reason
+    step_runner.run_step.assert_not_called()
+
+
+def test_resume_state_comes_from_the_claimed_checkpoint() -> None:
+    claimed = _intervention(
+        status="resumed",
+        response={"decision": "resume", "resume_node_id": "verify", "guidance": "T1 is fine"},
+        checkpoint={
+            "qid": "Q00",
+            "nodes": [
+                {"id": "calibrate", "task_name": "CheckT1", "candidate_parameter": "t1"},
+                {"id": "verify", "task_name": "CheckT2", "candidate_parameter": "t2"},
+            ],
+            "idempotency_prefix": "plan-key",
+            "node_path": ["calibrate"],
+            "visit_counts": {"calibrate": 1},
+            "stopped_node_id": "calibrate",
+            "max_node_executions": 3,
+            "max_node_visits": 2,
+            "planner": "evaluation",
+        },
+    )
+
+    nodes, state, settings = resume_state_from_intervention(claimed)
+
+    assert [node.node_id for node in nodes] == ["calibrate", "verify"]
+    assert state.start_node_id == "verify"
+    assert state.guidance == "T1 is fine"
+    assert settings["idempotency_prefix"] == "plan-key"
+    assert settings["max_node_visits"] == 2
+    assert settings["planner"] == "evaluation"

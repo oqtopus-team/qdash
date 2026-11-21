@@ -4,17 +4,25 @@ from __future__ import annotations
 
 import argparse
 import json
-from typing import Any
+import sys
+from typing import TYPE_CHECKING, Any
+from uuid import uuid4
 
 from qdash.client.services.agent_runner import (
     AgentCalibrationRunner,
     AgentPlanNode,
     AgentPlanOutcome,
     AgentPlanRunner,
+    AgentSkillTransition,
     AgentStepOutcome,
+    resume_state_from_intervention,
 )
 from qdash.client.services.client import QDashClient as QDashClient  # noqa: PLC0414
+from qdash.client.services.errors import QDashApiError
 from qdash.client.services.evaluation_planner import EvaluationPlanner
+
+if TYPE_CHECKING:
+    from qdash.client.services.client_models import AgentInterventionResponse
 
 
 def _json_object(value: str) -> dict[str, Any]:
@@ -238,6 +246,54 @@ def _build_parser() -> argparse.ArgumentParser:
         default=300.0,
         help="How long to wait for one evaluation with --planner evaluation",
     )
+    plan_cmd.add_argument(
+        "--no-record-intervention",
+        action="store_false",
+        dest="record_intervention",
+        help=(
+            "Do not record a non-pass ending in QDash. By default the ending is recorded as an "
+            "intervention, which pauses the session until an expert answers"
+        ),
+    )
+
+    resume_cmd = commands.add_parser(
+        "resume-plan",
+        help="Continue a plan after an expert authorized its resume in QDash",
+    )
+    resume_cmd.add_argument("--session-id", required=True)
+    resume_cmd.add_argument("--intervention-id", required=True)
+    resume_cmd.add_argument(
+        "--claim-key",
+        help=(
+            "Claim key of an earlier resume-plan run of this intervention, to continue after "
+            "that run was interrupted; a new key is generated otherwise"
+        ),
+    )
+    resume_cmd.add_argument("--action-timeout-seconds", type=float, default=120.0)
+    resume_cmd.add_argument("--execution-timeout-seconds", type=float, default=600.0)
+    resume_cmd.add_argument("--backend-apply-timeout-seconds", type=float, default=300.0)
+    resume_cmd.add_argument("--poll-interval-seconds", type=float, default=1.0)
+    resume_cmd.add_argument("--evaluation-timeout-seconds", type=float, default=300.0)
+    resume_cmd.add_argument(
+        "--no-record-intervention",
+        action="store_false",
+        dest="record_intervention",
+        help="Do not record a non-pass ending of the resumed plan in QDash",
+    )
+    resume_cmd.add_argument(
+        "--record-outcome",
+        metavar="TRANSITION",
+        choices=[transition.value for transition in AgentSkillTransition],
+        help=(
+            "Only record how an earlier run with --claim-key ended (the transition it "
+            "printed), without running anything; for when that run could not record it"
+        ),
+    )
+    resume_cmd.add_argument("--outcome-reason", default="", help="Reason for --record-outcome")
+    resume_cmd.add_argument(
+        "--follow-up-intervention-id",
+        help="Intervention the earlier run recorded when it stopped, for --record-outcome",
+    )
 
     return parser
 
@@ -300,8 +356,28 @@ def _planner_trace_payload(planner: EvaluationPlanner) -> list[dict[str, Any]]:
     ]
 
 
+def _intervention_payload(outcome: AgentPlanOutcome) -> dict[str, Any] | None:
+    intervention = outcome.intervention
+    if intervention is None:
+        return None
+    return {
+        "intervention_id": intervention.intervention_id,
+        "status": intervention.status,
+        "reason": intervention.reason,
+        "session_status": intervention.session_status,
+        "page_path": intervention.page_path,
+        "notification_status": intervention.notification.get("status"),
+    }
+
+
 def _plan_outcome_payload(outcome: AgentPlanOutcome) -> dict[str, Any]:
     return {
+        "escalation_reason": (
+            outcome.escalation_reason.value if outcome.escalation_reason else None
+        ),
+        "intervention": _intervention_payload(outcome),
+        "intervention_error": outcome.intervention_error,
+        "checkpoint_rejection": outcome.checkpoint_rejection,
         "transition": outcome.transition.value,
         "reason": outcome.reason,
         "session_id": outcome.session_id,
@@ -406,12 +482,17 @@ def run(argv: list[str] | None = None) -> int:
                 planner=planner,
                 max_node_visits=max_node_visits,
                 idempotency_prefix=args.idempotency_prefix,
+                record_interventions=args.record_intervention,
+                planner_name=args.planner,
             )
             payload = _plan_outcome_payload(plan_outcome)
             if planner is not None:
                 payload["evaluations"] = _planner_trace_payload(planner)
             print(json.dumps(payload, sort_keys=True))
             return 0 if plan_outcome.transition.value == "pass" else 2
+
+        if args.command == "resume-plan":
+            return _resume_plan(client, args)
 
         runner = AgentCalibrationRunner(
             client,
@@ -442,6 +523,210 @@ def run(argv: list[str] | None = None) -> int:
         return 0 if outcome.transition.value == "pass" else 2
     finally:
         client.close()
+
+
+def _resume_plan(client: QDashClient, args: argparse.Namespace) -> int:
+    """Claim an authorized resume, continue the plan from its checkpoint, report the outcome."""
+    try:
+        intervention = client.get_agent_intervention(args.session_id, args.intervention_id)
+    except QDashApiError as exc:
+        print(json.dumps({"transition": "human_escalation", "reason": str(exc)}, sort_keys=True))
+        return 2
+    if intervention.status == "resumed":
+        if not args.claim_key or args.claim_key != intervention.resume_claim_key:
+            print(
+                json.dumps(
+                    {
+                        "transition": "human_escalation",
+                        "reason": (
+                            "A runner already resumed this intervention; only its claim key "
+                            "can continue it"
+                        ),
+                        "intervention_status": intervention.status,
+                        "session_id": args.session_id,
+                    },
+                    sort_keys=True,
+                )
+            )
+            return 2
+        if intervention.resume_outcome is not None:
+            # The resumed run already ended and its outcome is recorded: never run it again.
+            recorded = intervention.resume_outcome
+            print(
+                json.dumps(
+                    {
+                        "transition": recorded.get("transition"),
+                        "reason": recorded.get("reason", ""),
+                        "already_recorded": True,
+                        "follow_up_intervention_id": recorded.get("follow_up_intervention_id"),
+                        "resumed_intervention_id": args.intervention_id,
+                        "claim_key": args.claim_key,
+                        "session_id": args.session_id,
+                    },
+                    sort_keys=True,
+                )
+            )
+            return 0 if recorded.get("transition") == "pass" else 2
+    if args.record_outcome is not None:
+        return _record_outcome_only(client, args, intervention)
+    if intervention.status not in {"resume_authorized", "resumed"}:
+        print(
+            json.dumps(
+                {
+                    "transition": "human_escalation",
+                    "reason": (
+                        f"The intervention is {intervention.status}; an expert must authorize "
+                        "a resume in QDash first"
+                    ),
+                    "intervention_status": intervention.status,
+                    "resume_blockers": intervention.resume_blockers,
+                    "session_id": args.session_id,
+                },
+                sort_keys=True,
+            )
+        )
+        return 2
+    claim_key = args.claim_key or f"resume-{uuid4()}"
+    print(
+        f"qdash-agent: resuming with claim key {claim_key}; pass --claim-key {claim_key} "
+        "to continue this resume if the run is interrupted",
+        file=sys.stderr,
+    )
+    try:
+        claimed = client.claim_agent_resume(
+            args.session_id, args.intervention_id, claim_key=claim_key
+        )
+        nodes, state, settings = resume_state_from_intervention(claimed)
+    except (QDashApiError, ValueError) as exc:
+        print(
+            json.dumps(
+                {"transition": "human_escalation", "reason": f"Resume refused: {exc}"},
+                sort_keys=True,
+            )
+        )
+        return 2
+
+    planner = None
+    if settings["planner"] == "evaluation":
+        planner, refusal = _evaluation_planner(client, args)
+        if refusal is not None:
+            print(json.dumps(refusal, sort_keys=True))
+            return 2
+    plan_runner = AgentPlanRunner(
+        client,
+        action_timeout_seconds=args.action_timeout_seconds,
+        execution_timeout_seconds=args.execution_timeout_seconds,
+        backend_apply_timeout_seconds=args.backend_apply_timeout_seconds,
+        poll_interval_seconds=args.poll_interval_seconds,
+    )
+    outcome = plan_runner.run_plan(
+        session_id=args.session_id,
+        qid=settings["qid"],
+        source_execution_id=settings["source_execution_id"],
+        nodes=nodes,
+        max_pre_dispatch_retries=settings["max_pre_dispatch_retries"],
+        max_node_executions=settings["max_node_executions"],
+        commit_on_success=settings["commit_on_success"],
+        planner=planner,
+        max_node_visits=settings["max_node_visits"],
+        idempotency_prefix=settings["idempotency_prefix"],
+        record_interventions=args.record_intervention,
+        resume=state,
+        planner_name=settings["planner"],
+    )
+    payload = _plan_outcome_payload(outcome)
+    payload["resumed_intervention_id"] = args.intervention_id
+    payload["resumed_from_node_id"] = state.start_node_id
+    payload["expert_guidance"] = state.guidance
+    payload["claim_key"] = claim_key
+    if planner is not None:
+        payload["evaluations"] = _planner_trace_payload(planner)
+    follow_up = outcome.intervention.intervention_id if outcome.intervention else None
+    try:
+        client.record_agent_resume_outcome(
+            args.session_id,
+            args.intervention_id,
+            claim_key=claim_key,
+            transition=outcome.transition.value,
+            reason=outcome.reason,
+            follow_up_intervention_id=follow_up,
+        )
+    except QDashApiError as exc:
+        # The run ended but QDash does not know how, so the resume is not complete. Rerunning
+        # resume-plan would run the plan again; recording the outcome alone does not.
+        payload["resume_outcome_error"] = str(exc)
+        print(json.dumps(payload, sort_keys=True))
+        connection = "--from-env" if args.from_env else f"--profile {args.profile or 'default'}"
+        command = (
+            f"qdash-agent {connection} resume-plan --session-id {args.session_id} "
+            f"--intervention-id {args.intervention_id} --claim-key {claim_key} "
+            f"--record-outcome {outcome.transition.value}"
+        )
+        if follow_up:
+            command += f" --follow-up-intervention-id {follow_up}"
+        print(
+            "qdash-agent: the resumed run ended but QDash did not record its outcome "
+            f"({exc}). Do not run resume-plan again to fix this; record the outcome "
+            f"without running anything: {command} --outcome-reason '...'",
+            file=sys.stderr,
+        )
+        return 3
+    print(json.dumps(payload, sort_keys=True))
+    return 0 if outcome.transition.value == "pass" else 2
+
+
+def _record_outcome_only(
+    client: QDashClient, args: argparse.Namespace, intervention: AgentInterventionResponse
+) -> int:
+    """Record how an earlier resumed run ended, without claiming or running anything."""
+    if intervention.status != "resumed" or not args.claim_key:
+        print(
+            json.dumps(
+                {
+                    "transition": "human_escalation",
+                    "reason": (
+                        "--record-outcome needs the --claim-key of the run that resumed this "
+                        f"intervention; the intervention is {intervention.status}"
+                    ),
+                    "intervention_status": intervention.status,
+                    "session_id": args.session_id,
+                },
+                sort_keys=True,
+            )
+        )
+        return 2
+    try:
+        recorded = client.record_agent_resume_outcome(
+            args.session_id,
+            args.intervention_id,
+            claim_key=args.claim_key,
+            transition=args.record_outcome,
+            reason=args.outcome_reason,
+            follow_up_intervention_id=args.follow_up_intervention_id,
+        )
+    except QDashApiError as exc:
+        print(
+            json.dumps(
+                {"transition": args.record_outcome, "resume_outcome_error": str(exc)},
+                sort_keys=True,
+            )
+        )
+        return 3
+    print(
+        json.dumps(
+            {
+                "transition": args.record_outcome,
+                "reason": args.outcome_reason,
+                "recorded": True,
+                "intervention_status": recorded.status,
+                "resumed_intervention_id": args.intervention_id,
+                "claim_key": args.claim_key,
+                "session_id": args.session_id,
+            },
+            sort_keys=True,
+        )
+    )
+    return 0
 
 
 def main() -> None:

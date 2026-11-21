@@ -17,6 +17,16 @@ test("the agent session policy requires qids and allowed_tasks", () => {
   assert.equal(Value.Check(agentSessionPolicy, { qids: [], allowed_tasks: ["CheckRabi"] }), false);
 });
 
+test("the policy carries the autonomy grant and its round budget", () => {
+  assert.equal(
+    Value.Check(agentSessionPolicy, { qids: ["32"], allowed_tasks: ["CheckRabi"], autonomy: "auto", max_rounds_per_target: 2 }),
+    true,
+  );
+  assert.equal(Value.Check(agentSessionPolicy, { qids: ["32"], allowed_tasks: ["CheckRabi"], autonomy: "always" }), false);
+  assert.equal(Value.Check(agentSessionPolicy, { qids: ["32"], allowed_tasks: ["CheckRabi"], max_rounds_per_target: 0 }), false);
+  assert.deepEqual(agentSessionPolicy.properties.autonomy.enum, ["confirm_each", "auto"]);
+});
+
 test("action types are a plain string enum", () => {
   const items = agentSessionPolicy.properties.allowed_actions.items;
   assert.deepEqual(items, { type: "string", enum: ["run_task", "request_human", "complete_session"] });

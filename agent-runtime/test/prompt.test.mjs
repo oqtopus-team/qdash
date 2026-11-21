@@ -19,6 +19,12 @@ test("write tools always require approval by the user, not the model", () => {
   assert.doesNotMatch(prompt, /confirmWrite/);
 });
 
+test("only the steps of an approved auto agent session run without a card, and nothing continues by itself", () => {
+  const prompt = buildSystemPrompt("auto", "en");
+  assert.match(prompt, /`qdash_run_agent_session_step` and `qdash_request_agent_human`: they run at once, without a card, because the user already approved the agent session \(autonomy auto\)/);
+  assert.match(prompt, /A stopped conversation does not continue by itself/);
+});
+
 test("choices go through ask_user", () => {
   assert.match(buildSystemPrompt("auto", "en"), /call `ask_user` with 2-4 short options/);
 });
@@ -89,6 +95,11 @@ test("the investigation policy shared with pi CLI sits beside the runtime's own 
   for (const bullet of investigationPolicyBullets()) {
     assert.ok(guidelines.includes(`${bullet}\n`), `missing shared rule: ${bullet}`);
     assert.equal(prompt.split(bullet).length, 2, `shared rule appears more than once: ${bullet}`);
+  }
+  const { requestPolicyBullets } = await import("@oqtopus-team/pi-qdash/extensions/lib/qdash-guidance.ts");
+  for (const bullet of requestPolicyBullets()) {
+    assert.ok(guidelines.includes(`${bullet}\n`), `missing request rule: ${bullet}`);
+    assert.equal(prompt.split(bullet).length, 2, `request rule appears more than once: ${bullet}`);
   }
   // Host-specific rules stay in the runtime prompt.
   assert.match(prompt, /`render_ui`/);

@@ -44,6 +44,8 @@ import { NESTED_READ_TOOL_NAMES } from "@oqtopus-team/pi-qdash/extensions/lib/to
 
 import { ALLOWLISTED_PACKAGES } from "../src/allowed-tools.ts";
 import { buildChatRegistry, buildCopilotExtension } from "../src/chat-registry.ts";
+import { buildSystemPrompt } from "../src/prompt.ts";
+import { buildSkillTool } from "../src/skill-tool.ts";
 import { bundledExtensionCheckouts, trustedCheckoutRoots } from "../src/local-extensions.ts";
 
 const context = BACKGROUND_CONTEXT;
@@ -239,7 +241,7 @@ async function openCli(steps, { capture, before = [] } = {}) {
 }
 
 /** The production chat registry on a durable harness, with the same packages. */
-async function openChat(steps, { capture } = {}) {
+async function openChat(steps, { capture, systemPrompt = "QDash parity test prompt", copilotTools = [] } = {}) {
   const { faux, offered } = scriptedModel(steps);
   const paths = bundledPaths();
   const loader = new DefaultResourceLoader({ cwd: workDir, agentDir: join(workDir, "runtime-agent"), additionalExtensionPaths: paths });
@@ -279,7 +281,7 @@ async function openChat(steps, { capture } = {}) {
       workDir,
       extensionPaths: trustedCheckoutRoots(bundledExtensionCheckouts(packagesDir), ALLOWLISTED_PACKAGES),
       trustedPackages: [],
-      copilot: buildCopilotExtension("QDash parity test prompt", []),
+      copilot: buildCopilotExtension(systemPrompt, copilotTools),
       internalCalls: {},
       codingTools: false,
     },
@@ -377,6 +379,87 @@ test("a script aggregates several chips the same way in the pi CLI and in chat, 
   });
   assert.deepEqual(outcomes.cli, outcomes.chat);
   assert.deepEqual(outcomes.cli.refused, { write: "refused", figure: "refused", evaluate: "refused", shell: "refused" });
+});
+
+/** The system prompt of a request: its own text, and the content and named sections of system messages. */
+function systemText(ctx) {
+  const sections = {};
+  const parts = ctx.systemPrompt ? [ctx.systemPrompt] : [];
+  for (const message of ctx.messages ?? []) {
+    if (message.role !== "system") continue;
+    if (typeof message.content === "string" && message.content) parts.push(message.content);
+    for (const [name, text] of Object.entries(message.sections ?? {})) {
+      if (text === null) delete sections[name];
+      else sections[name] = text;
+    }
+  }
+  return [...parts, ...Object.values(sections)].join("\n");
+}
+
+// The skills a plain-language experiment request should be able to reach.
+const EXPERIMENT_SKILLS = [
+  "qdash-characterization",
+  "qdash-one-qubit-calibration",
+  "qdash-two-qubit-calibration",
+  "qdash-chip-bringup",
+  "qdash-agent-calibration",
+];
+
+test("a plain-language request reaches the experiment skills and the shared request policy in the pi CLI and in chat", async () => {
+  // This checks what each host sends the model and that the scripted skill read works. Whether
+  // a real model picks the right skill from a plain request is not something a faux model shows.
+  const { requestPolicyBullets } = await import("@oqtopus-team/pi-qdash/extensions/lib/qdash-guidance.ts");
+  const loader = new DefaultResourceLoader({ cwd: workDir, agentDir: join(workDir, "skills-agent"), additionalExtensionPaths: bundledPaths() });
+  await loader.reload();
+  const skills = loader.getSkills().skills.filter((skill) => !skill.disableModelInvocation);
+  const characterization = skills.find((skill) => skill.name === "qdash-characterization");
+  assert.ok(characterization);
+
+  const prompts = {};
+  const record = (host) => (ctx) => {
+    prompts[host] = systemText(ctx);
+    return host === "cli"
+      ? fauxAssistantMessage([fauxToolCall("read", { path: characterization.filePath })], { stopReason: "toolUse" })
+      : fauxAssistantMessage([fauxToolCall("read_skill", { name: "qdash-characterization" })], { stopReason: "toolUse" });
+  };
+  const hosts = [
+    ["cli", () => openCli([record("cli"), fauxAssistantMessage([fauxText("done")])])],
+    ["chat", () => openChat([record("chat"), fauxAssistantMessage([fauxText("done")])], {
+      // As runtime.ts builds them from the same loader.
+      systemPrompt: buildSystemPrompt("auto", "en", skills),
+      copilotTools: [buildSkillTool(skills)],
+    })],
+  ];
+  for (const [host, open] of hosts) {
+    const run = await open();
+    try {
+      await run.ask("Q0のT1を測り直したい");
+      const prompt = prompts[host];
+      assert.ok(prompt, `${host}: no model request`);
+      for (const bullet of requestPolicyBullets()) {
+        assert.equal(prompt.split(bullet).length, 2, `${host}: request rule missing or repeated: ${bullet}`);
+      }
+      for (const name of EXPERIMENT_SKILLS) {
+        const { description } = skills.find((skill) => skill.name === name);
+        assert.ok(prompt.includes(name), `${host}: ${name} is not listed`);
+        // pi escapes the description as XML in the CLI listing.
+        const listed = host === "cli" ? description.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&apos;") : description;
+        assert.ok(prompt.includes(listed), `${host}: ${name} description is not listed`);
+      }
+      // The CLI loads skills with its own file reader; read_skill is the hosted Agent's.
+      if (host === "cli") {
+        assert.match(prompt, /Use the read tool to load a skill's file/);
+        assert.doesNotMatch(prompt, /read_skill/);
+      } else {
+        assert.match(prompt, /call `read_skill` with its name/);
+      }
+      const read = (await run.results()).find((result) => result.name === (host === "cli" ? "read" : "read_skill"));
+      assert.ok(read && !read.isError, `${host}: the skill could not be read`);
+      assert.match(read.text, /# QDash Characterization/);
+    } finally {
+      await run.close();
+    }
+  }
 });
 
 test("a deferred tool is offered only after tool_search loads it, in the pi CLI and in chat", async () => {

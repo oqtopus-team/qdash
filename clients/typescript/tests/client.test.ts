@@ -250,6 +250,167 @@ describe("QDashClient", () => {
     });
   });
 
+  it("sends autonomous steps only when asked and reads the authenticated user", async () => {
+    const requests: Array<{ method: string; path: string; body: unknown }> = [];
+    const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const request = new Request(input, init);
+      requests.push({
+        method: request.method,
+        path: new URL(request.url).pathname,
+        body: request.method === "POST" ? await request.json() : undefined,
+      });
+      return jsonResponse(request.method === "GET" ? { username: "alice" } : { action_id: "a-1" });
+    });
+    const client = new QDashClient(
+      new QDashConfig({ baseUrl: "https://qdash.example/api", apiToken: "token" }),
+      { fetch },
+    );
+
+    expect((await client.getCurrentUser()).username).toBe("alice");
+    const step = { idempotencyKey: "k", expectedStateVersion: 2, actionType: "run_task" as const, taskName: "CheckRabi", qids: ["Q00"] };
+    await client.submitAgentAction("s-1", step);
+    await client.submitAgentAction("s-1", { ...step, autonomous: true, repeatOfActionId: "a-0" });
+    await client.executeAgentAction("s-1", "a-1", { autonomous: true });
+    await client.createAgentIntervention("s-1", { idempotencyKey: "h", reason: "agent_request", summary: "s", question: "q", autonomous: true });
+
+    expect(requests[0]).toMatchObject({ method: "GET", path: "/api/auth/me" });
+    // Without the flag the request is what an older server already accepts.
+    expect(requests[1]!.body).not.toHaveProperty("autonomous");
+    expect(requests[1]!.body).not.toHaveProperty("repeat_of_action_id");
+    expect(requests[2]!.body).toMatchObject({ autonomous: true, repeat_of_action_id: "a-0" });
+    expect(requests[3]!.body).toEqual({ update_params: false, reconfigure: false, autonomous: true });
+    expect(requests[4]!.body).toMatchObject({ idempotency_key: "h", autonomous: true });
+  });
+
+  it("reads a session's interventions without changing them", async () => {
+    const requests: Request[] = [];
+    const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const request = new Request(input, init);
+      requests.push(request);
+      return request.url.endsWith("/interventions")
+        ? jsonResponse({ items: [{ intervention_id: "int-1" }], total: 1 })
+        : jsonResponse({ intervention_id: "int-1" });
+    });
+    const client = new QDashClient(
+      new QDashConfig({ baseUrl: "https://qdash.example/api", apiToken: "token" }),
+      { fetch },
+    );
+
+    const items = await client.listAgentInterventions("session 1");
+    const one = await client.getAgentIntervention("session 1", "int-1");
+
+    expect(items.map((item) => item.intervention_id)).toEqual(["int-1"]);
+    expect(one.intervention_id).toBe("int-1");
+    expect(requests.map((request) => `${request.method} ${new URL(request.url).pathname}`)).toEqual([
+      "GET /api/agent-sessions/session%201/interventions",
+      "GET /api/agent-sessions/session%201/interventions/int-1",
+    ]);
+  });
+
+  it("records decisions and reads the audit in pages and as an export", async () => {
+    const requests: Array<{ method: string; url: URL; body: unknown }> = [];
+    const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const request = new Request(input, init);
+      requests.push({
+        method: request.method,
+        url: new URL(request.url),
+        body: request.method === "POST" ? await request.json() : undefined,
+      });
+      if (request.method === "POST") return jsonResponse({ decision_id: "d-1" });
+      if (request.url.endsWith("/decisions")) return jsonResponse({ items: [{ decision_id: "d-1" }], total: 1 });
+      return jsonResponse({ events: [], complete: true, total_events: 0 });
+    });
+    const client = new QDashClient(
+      new QDashConfig({ baseUrl: "https://qdash.example/api", apiToken: "token" }),
+      { fetch },
+    );
+
+    await client.recordAgentDecision("s 1", {
+      idempotencyKey: "k",
+      interpretation: "R2 0.4 fails the criterion",
+      nextAction: "request_human",
+      evidenceActionIds: ["a-1"],
+    });
+    await client.recordAgentDecision("s 1", {
+      idempotencyKey: "k2",
+      assessment: "pass",
+      interpretation: "ok",
+      nextAction: "next_task",
+      nextActionId: "a-2",
+      supersedesDecisionId: "d-0",
+    });
+    expect((await client.listAgentDecisions("s 1")).map((item) => item.decision_id)).toEqual(["d-1"]);
+    await client.getAgentSessionAudit("s 1", { cursor: "c-1", limit: 50 });
+    await client.exportAgentSessionAudit("s 1");
+
+    expect(requests[0]!.url.pathname).toBe("/api/agent-sessions/s%201/decisions");
+    expect(requests[0]!.body).toEqual({
+      idempotency_key: "k",
+      interpretation: "R2 0.4 fails the criterion",
+      next_action: "request_human",
+      next_detail: "",
+      evidence_action_ids: ["a-1"],
+      evaluation_ids: [],
+    });
+    expect(requests[1]!.body).toMatchObject({ assessment: "pass", next_action_id: "a-2", supersedes_decision_id: "d-0" });
+    expect(requests[3]!.url.pathname).toBe("/api/agent-sessions/s%201/audit");
+    expect(requests[3]!.url.searchParams.get("cursor")).toBe("c-1");
+    expect(requests[3]!.url.searchParams.get("limit")).toBe("50");
+    expect(requests[4]!.url.pathname).toBe("/api/agent-sessions/s%201/audit/export");
+  });
+
+  it("lists sessions with repeated status filters and records an intervention", async () => {
+    const requests: Request[] = [];
+    const bodies: unknown[] = [];
+    const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const request = new Request(input, init);
+      requests.push(request);
+      if (request.method === "POST") {
+        bodies.push(await request.json());
+        return jsonResponse({ intervention_id: "int-2" });
+      }
+      return jsonResponse({ items: [{ session_id: "s-1" }], total: 1 });
+    });
+    const client = new QDashClient(
+      new QDashConfig({ baseUrl: "https://qdash.example/api", apiToken: "token" }),
+      { fetch },
+    );
+
+    const sessions = await client.listAgentSessions({
+      chipId: "chip-001",
+      statuses: ["active", "waiting_for_human"],
+      mine: true,
+    });
+    const created = await client.createAgentIntervention("s-1", {
+      idempotencyKey: "k-1",
+      reason: "unknown_outcome",
+      summary: "CheckRabi showed no oscillation",
+      question: "Is the drive line connected?",
+      taskName: "CheckRabi",
+      qids: ["Q00"],
+      attempts: [{ action_id: "a-1", task_name: "CheckRabi", qid: "Q00" }],
+    });
+
+    expect(sessions.map((item) => item.session_id)).toEqual(["s-1"]);
+    expect(created.intervention_id).toBe("int-2");
+    const listUrl = new URL(requests[0]!.url);
+    expect(listUrl.pathname).toBe("/api/agent-sessions");
+    expect(listUrl.searchParams.getAll("status")).toEqual(["active", "waiting_for_human"]);
+    expect(listUrl.searchParams.get("chip_id")).toBe("chip-001");
+    expect(listUrl.searchParams.get("mine")).toBe("true");
+    expect(listUrl.searchParams.has("limit")).toBe(false);
+    expect(new URL(requests[1]!.url).pathname).toBe("/api/agent-sessions/s-1/interventions");
+    expect(bodies[0]).toEqual({
+      idempotency_key: "k-1",
+      reason: "unknown_outcome",
+      summary: "CheckRabi showed no oscillation",
+      question: "Is the drive line connected?",
+      task_name: "CheckRabi",
+      qids: ["Q00"],
+      attempts: [{ action_id: "a-1", task_name: "CheckRabi", qid: "Q00" }],
+    });
+  });
+
   it("downloads execution figures as binary files", async () => {
     let request: Request | undefined;
     const bytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);

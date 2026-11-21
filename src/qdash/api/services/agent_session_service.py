@@ -1,4 +1,9 @@
-"""Application service for policy-governed local agent sessions."""
+"""Application service for policy-governed local agent sessions.
+
+Every operation that changes hardware, backend, or calibration state honors the session's
+execution barrier (``agent_session_gate``): it reserves its own record, passes a gate update
+that matches only an active session, then confirms the reservation before it starts.
+"""
 
 from __future__ import annotations
 
@@ -13,6 +18,7 @@ from uuid import uuid4
 from bunnet import SortDirection
 from fastapi import HTTPException, status
 from pymongo import ReturnDocument
+from pymongo.errors import DuplicateKeyError
 
 from qdash.api.schemas.agent_session import (
     AgentActionResponse,
@@ -29,11 +35,23 @@ from qdash.api.schemas.agent_session import (
     ExecuteAgentActionRequest,
     ListAgentActionsResponse,
     ListAgentCandidatesResponse,
+    ListAgentSessionsResponse,
     SubmitAgentActionRequest,
+)
+from qdash.api.services.agent_intervention_service import AgentInterventionService
+from qdash.api.services.agent_session_gate import (
+    autonomous_session_refusal,
+    expire_session_if_due,
+    load_agent_session,
+    materialize_pending_action,
+    materialize_pending_intervention,
+    pass_execution_gate,
+    raw_document,
+    release_abandoned_reservations,
 )
 from qdash.api.services.catalog_task_run import resolve_catalog_task, run_catalog_task
 from qdash.common.agent_gate import evaluate_numeric_candidate
-from qdash.common.utils.datetime import ensure_timezone, now
+from qdash.common.utils.datetime import now
 from qdash.datamodel.agent_session import (
     AgentActionDecision,
     AgentActionType,
@@ -56,6 +74,21 @@ if TYPE_CHECKING:
     from qdash.api.services.task_file_service import TaskFileService
 
 
+# Most sessions one list request reads before filtering by settled status.
+LIST_SESSIONS_SCAN_LIMIT = 200
+# Run statuses after which a measurement no longer runs.
+FINISHED_RUN_STATUSES = frozenset(
+    {"completed", "failed", "cancelled", "canceled", "crashed", "skipped"}
+)
+
+
+def _measurement_key(
+    task_name: str | None, qid: str | None, overrides: dict[str, float]
+) -> tuple[str, str, tuple[tuple[str, float], ...]]:
+    """Same task, target, and overrides measure the same thing."""
+    return (task_name or "", qid or "", tuple(sorted(overrides.items())))
+
+
 def _typed_overrides(task: TaskInfo, overrides: dict[str, float]) -> dict[str, Any]:
     """Agent overrides arrive as floats; give whole numbers to integer inputs as ints."""
     typed: dict[str, Any] = {}
@@ -68,13 +101,30 @@ def _typed_overrides(task: TaskInfo, overrides: dict[str, float]) -> dict[str, A
 class AgentSessionService:
     """Authorize and audit actions proposed by user-operated local agents."""
 
+    def __init__(self, intervention_service: AgentInterventionService | None = None) -> None:
+        """Initialize with the service that records human interventions."""
+        self._interventions = intervention_service
+
+    @property
+    def interventions(self) -> AgentInterventionService:
+        """The intervention service, created on first use."""
+        if self._interventions is None:
+            self._interventions = AgentInterventionService()
+        return self._interventions
+
     @staticmethod
     def _session_response(doc: AgentSessionDocument) -> AgentSessionResponse:
         return AgentSessionResponse.model_validate(doc.model_dump())
 
     @staticmethod
     def _action_response(doc: AgentActionDocument) -> AgentActionResponse:
-        return AgentActionResponse.model_validate(doc.model_dump())
+        return AgentActionResponse.model_validate(
+            {
+                **doc.model_dump(),
+                "intervention_id": doc.metadata.get("intervention_id"),
+                "autonomous": bool(doc.metadata.get("autonomous", False)),
+            }
+        )
 
     @staticmethod
     def _candidate_commit_response(
@@ -129,13 +179,29 @@ class AgentSessionService:
         if doc.execution_id != execution.execution_id or doc.execution_status != execution.status:
             doc.execution_id = execution.execution_id
             doc.execution_status = execution.status
-            doc.save()
+            # A targeted update, so it never overwrites a concurrent dispatch reservation.
+            AgentActionDocument.get_motor_collection().update_one(
+                {"action_id": doc.action_id},
+                {
+                    "$set": {
+                        "execution_id": execution.execution_id,
+                        "execution_status": execution.status,
+                    }
+                },
+            )
         return doc
 
     @staticmethod
     def _request_hash(body: SubmitAgentActionRequest) -> str:
+        # Fields at their defaults hash as they did before they existed, so a retry of an
+        # older request still matches its record.
+        exclude = {
+            name
+            for name, default in (("autonomous", False), ("repeat_of_action_id", None))
+            if getattr(body, name) == default
+        }
         payload = json.dumps(
-            body.model_dump(mode="json"),
+            body.model_dump(mode="json", exclude=exclude),
             sort_keys=True,
             separators=(",", ":"),
         )
@@ -179,24 +245,7 @@ class AgentSessionService:
 
     @staticmethod
     def _get_session_document(project_id: str, session_id: str) -> AgentSessionDocument:
-        doc = AgentSessionDocument.find_one(
-            {"project_id": project_id, "session_id": session_id}
-        ).run()
-        if doc is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Agent session '{session_id}' not found",
-            )
-        expires_at = ensure_timezone(doc.expires_at)
-        if (
-            doc.status == AgentSessionStatus.ACTIVE
-            and expires_at is not None
-            and expires_at <= now()
-        ):
-            doc.status = AgentSessionStatus.EXPIRED
-            doc.updated_at = now()
-            doc.save()
-        return doc
+        return load_agent_session(project_id, session_id)
 
     def create_session(
         self,
@@ -241,6 +290,54 @@ class AgentSessionService:
     def get_session(self, *, project_id: str, session_id: str) -> AgentSessionResponse:
         """Get the authoritative state for an agent session."""
         return self._session_response(self._get_session_document(project_id, session_id))
+
+    def list_sessions(
+        self,
+        *,
+        project_id: str,
+        chip_id: str | None = None,
+        created_by: str | None = None,
+        statuses: list[AgentSessionStatus] | None = None,
+        limit: int = 20,
+    ) -> ListAgentSessionsResponse:
+        """List a project's sessions, newest first, with expiry and pending pauses applied.
+
+        Each listed session is settled the way a single read settles it, so a session past
+        its expiry is reported as ``expired`` and a pause a crash left half written is
+        finished before its status is filtered.
+        """
+        query: dict[str, Any] = {"project_id": project_id}
+        if chip_id:
+            query["chip_id"] = chip_id
+        if created_by:
+            query["created_by"] = created_by
+        wanted = set(statuses or [])
+        if wanted:
+            stored = {status.value for status in wanted}
+            if AgentSessionStatus.EXPIRED in wanted:
+                # A stored active or paused session may be past its expiry.
+                stored |= {
+                    AgentSessionStatus.ACTIVE.value,
+                    AgentSessionStatus.WAITING_FOR_HUMAN.value,
+                }
+            query["status"] = {"$in": sorted(stored)}
+        docs = (
+            AgentSessionDocument.find(query)
+            .sort([("created_at", SortDirection.DESCENDING)])
+            .limit(LIST_SESSIONS_SCAN_LIMIT)
+            .run()
+        )
+        items: list[AgentSessionResponse] = []
+        for doc in docs:
+            materialize_pending_action(doc)
+            materialize_pending_intervention(doc)
+            expire_session_if_due(doc)
+            if wanted and doc.status not in wanted:
+                continue
+            items.append(self._session_response(doc))
+            if len(items) >= limit:
+                break
+        return ListAgentSessionsResponse(items=items, total=len(items))
 
     def evaluate_candidate_gate(
         self,
@@ -289,6 +386,9 @@ class AgentSessionService:
     ) -> str | None:
         if body.action_type not in session.policy.allowed_actions:
             return f"Action '{body.action_type.value}' is not allowed by the session policy"
+        if body.action_type == AgentActionType.REQUEST_HUMAN:
+            # Asking for a person never needs measurement budget.
+            return None
         if session.action_count >= session.policy.max_actions:
             return "Session action limit has been reached"
         if body.action_type != AgentActionType.RUN_TASK:
@@ -308,12 +408,108 @@ class AgentSessionService:
                 return f"Parameter override '{name}' is outside the allowed bounds"
         return None
 
+    def _session_run_tasks(self, project_id: str, session_id: str) -> list[AgentActionDocument]:
+        """The session's authorized run_task actions, oldest first, with fresh run status."""
+        docs = cast(
+            "list[AgentActionDocument]",
+            AgentActionDocument.find(
+                {
+                    "project_id": project_id,
+                    "session_id": session_id,
+                    "action_type": AgentActionType.RUN_TASK.value,
+                    "decision": AgentActionDecision.AUTHORIZED.value,
+                },
+                sort=[("created_at", SortDirection.ASCENDING)],
+            ).run(),
+        )
+        return [self._refresh_action_execution(doc) for doc in docs]
+
+    def _autonomous_step_refusal(
+        self,
+        project_id: str,
+        session: AgentSessionDocument,
+        body: SubmitAgentActionRequest,
+    ) -> None:
+        """Refuse an autonomous run_task the session's history does not allow now.
+
+        The caller loaded ``session`` (which writes a pending action record first) and
+        authorizes only with a compare-and-set on its state version, so the history read
+        here holds every action counted up to that version, and a submission that lands in
+        between makes the compare-and-set fail. Dispatch progress does not change the state
+        version; ``execute_action`` checks the running measurements again when it dispatches.
+        """
+        actions = self._session_run_tasks(project_id, session.session_id)
+        qid = body.qids[0] if body.qids else None
+        key = _measurement_key(body.task_name, qid, body.parameter_overrides)
+        running = [
+            action.action_id
+            for action in actions
+            if action.execution_status != "not_started"
+            and action.execution_status not in FINISHED_RUN_STATUSES
+        ]
+        if running:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    f"Action {', '.join(running)} of the session is still running; wait for "
+                    "its result before an autonomous step"
+                ),
+            )
+        same = [
+            action
+            for action in actions
+            if _measurement_key(
+                action.task_name,
+                action.qids[0] if action.qids else None,
+                action.parameter_overrides,
+            )
+            == key
+        ]
+        unstarted = [action for action in same if action.execution_status == "not_started"]
+        if unstarted:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    f"Action {unstarted[0].action_id} already proposes this measurement and "
+                    "was never dispatched; dispatch it instead of proposing it again"
+                ),
+            )
+        rounds = sum(
+            1 for action in actions if action.task_name == body.task_name and qid in action.qids
+        )
+        if rounds >= session.policy.max_rounds_per_target:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    f"{body.task_name} on {qid} already ran {rounds} times, the session's "
+                    "max_rounds_per_target"
+                ),
+            )
+        finished = [action for action in same if action.execution_status in FINISHED_RUN_STATUSES]
+        if finished and body.repeat_of_action_id not in {action.action_id for action in finished}:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    f"Action {finished[-1].action_id} already ran this exact measurement; "
+                    "repeat it only with repeat_of_action_id naming a finished identical action"
+                ),
+            )
+        if body.repeat_of_action_id is not None and not finished:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    f"repeat_of_action_id {body.repeat_of_action_id} is not a finished "
+                    "identical measurement of this session"
+                ),
+            )
+
     def submit_action(
         self,
         *,
         project_id: str,
         session_id: str,
         body: SubmitAgentActionRequest,
+        username: str = "",
     ) -> AgentActionResponse:
         """Validate, serialize, and audit an action proposal without executing it."""
         request_hash = self._request_hash(body)
@@ -333,6 +529,29 @@ class AgentSessionService:
             return self._action_response(existing)
 
         session = self._get_session_document(project_id, session_id)
+        # Loading the session writes the action of a request_human that crashed after it
+        # paused the session, so a retry finds it here.
+        recovered = AgentActionDocument.find_one(
+            {
+                "project_id": project_id,
+                "session_id": session_id,
+                "idempotency_key": body.idempotency_key,
+            }
+        ).run()
+        if recovered is not None:
+            if recovered.request_hash != request_hash:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Idempotency key was already used for a different action",
+                )
+            return self._action_response(recovered)
+        if body.autonomous:
+            autonomous_session_refusal(session, username)
+        if session.pending_action is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="The session's previous action record is still being written; retry",
+            )
         if session.status != AgentSessionStatus.ACTIVE:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -346,6 +565,8 @@ class AgentSessionService:
                     f"expected {body.expected_state_version}, current {session.state_version}"
                 ),
             )
+        if body.autonomous:
+            self._autonomous_step_refusal(project_id, session, body)
 
         rejection = self._policy_rejection(session, body)
         decision = AgentActionDecision.REJECTED if rejection else AgentActionDecision.AUTHORIZED
@@ -358,28 +579,22 @@ class AgentSessionService:
                 next_status = AgentSessionStatus.COMPLETED
 
         timestamp = now()
-        updated = AgentSessionDocument.get_motor_collection().find_one_and_update(
-            {
-                "project_id": project_id,
-                "session_id": session_id,
-                "status": AgentSessionStatus.ACTIVE.value,
-                "state_version": session.state_version,
-            },
-            {
-                "$set": {"status": next_status.value, "updated_at": timestamp},
-                "$inc": {"state_version": 1, "action_count": 1},
-            },
-            return_document=ReturnDocument.AFTER,
-        )
-        if updated is None:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Agent session changed while the action was being authorized",
+        action_id = str(uuid4())
+        session_update: dict[str, Any] = {"status": next_status.value, "updated_at": timestamp}
+        increments = {"state_version": 1, "action_count": 1}
+        intervention = None
+        if next_status == AgentSessionStatus.WAITING_FOR_HUMAN:
+            # A request for a person does not use the measurement budget.
+            intervention = self.interventions.build_request_human(
+                session=session,
+                action_id=action_id,
+                username=username or session.created_by,
+                diagnosis=body.diagnosis,
             )
-
-        state_version_after = int(updated["state_version"])
+            increments = {"state_version": 1}
+        state_version_after = session.state_version + 1
         action = AgentActionDocument(
-            action_id=str(uuid4()),
+            action_id=action_id,
             session_id=session_id,
             project_id=project_id,
             idempotency_key=body.idempotency_key,
@@ -394,9 +609,45 @@ class AgentSessionService:
             state_version_before=session.state_version,
             state_version_after=state_version_after,
             created_at=timestamp,
+            metadata={"intervention_id": intervention.intervention_id} if intervention else {},
         )
-        action.insert()
-        return self._action_response(action)
+        if username:
+            # The authenticated account that proposed the action, for the audit timeline.
+            action.metadata["submitted_by"] = username
+        if body.autonomous:
+            action.metadata["autonomous"] = True
+            if body.repeat_of_action_id is not None:
+                action.metadata["repeat_of_action_id"] = body.repeat_of_action_id
+        if intervention is not None:
+            # The pause and both records are one session update; the records are written
+            # from it below, or by the next load of the session after a crash.
+            session_update |= self.interventions.pause_update(intervention, action=action)
+        else:
+            # The count and the record are one session update; the record is written from
+            # it below, or by the next load of the session after a crash.
+            session_update["pending_action"] = raw_document(action)
+        updated = AgentSessionDocument.get_motor_collection().find_one_and_update(
+            {
+                "project_id": project_id,
+                "session_id": session_id,
+                "status": AgentSessionStatus.ACTIVE.value,
+                "state_version": session.state_version,
+                "pending_action": None,
+            },
+            {"$set": session_update, "$inc": increments},
+            return_document=ReturnDocument.AFTER,
+        )
+        if updated is None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Agent session changed while the action was being authorized",
+            )
+        # Loading the session writes the stored records.
+        self._get_session_document(project_id, session_id)
+        written = AgentActionDocument.find_one({"action_id": action_id}).run()
+        if written is None:
+            raise HTTPException(status_code=500, detail="Agent action record was not written")
+        return self._action_response(written)
 
     @staticmethod
     def _candidate_parameter(
@@ -424,6 +675,86 @@ class AgentSessionService:
         if not math.isfinite(numeric_value):
             return None
         return parameter_name, numeric_value, error, unit, value_type
+
+    @classmethod
+    def gate_task_result(
+        cls,
+        session: AgentSessionDocument,
+        action_id: str,
+        task_result: TaskResultHistoryDocument,
+    ) -> list[AgentCandidateResponse]:
+        """Gate each numeric output of a task result against the session's immutable policy.
+
+        The result is a function of the task result and the session policy only, so the audit
+        timeline recomputes it without storing a second copy.
+        """
+        session_id = session.session_id
+        items: list[AgentCandidateResponse] = []
+        for source_name, raw in sorted(task_result.output_parameters.items()):
+            candidate = cls._candidate_parameter(source_name, raw)
+            if candidate is None:
+                continue
+            parameter_name, value, error, unit, value_type = candidate
+            bounds = session.policy.allowed_overrides.get(parameter_name)
+            if bounds is None:
+                accepted = False
+                reason = f"Parameter '{parameter_name}' is not allowed by the session policy"
+                minimum = None
+                maximum = None
+            else:
+                decision = evaluate_numeric_candidate(
+                    value,
+                    minimum=bounds.minimum,
+                    maximum=bounds.maximum,
+                )
+                accepted = decision.accepted
+                reason = decision.reason
+                minimum = bounds.minimum
+                maximum = bounds.maximum
+
+            if accepted:
+                for metric_name, metric_bounds in session.policy.quality_gates.items():
+                    metric_value = task_result.quality_metrics.get(metric_name)
+                    if metric_value is None:
+                        accepted = False
+                        reason = f"Required quality metric '{metric_name}' is missing"
+                        break
+                    quality_decision = evaluate_numeric_candidate(
+                        metric_value,
+                        minimum=metric_bounds.minimum,
+                        maximum=metric_bounds.maximum,
+                    )
+                    if not quality_decision.accepted:
+                        accepted = False
+                        reason = f"Quality metric '{metric_name}' {quality_decision.reason}"
+                        break
+                else:
+                    if session.policy.quality_gates:
+                        reason = "candidate passed deterministic bounds and quality gates"
+
+            items.append(
+                AgentCandidateResponse(
+                    session_id=session_id,
+                    action_id=action_id,
+                    execution_id=task_result.execution_id,
+                    task_id=task_result.task_id,
+                    task_name=task_result.name,
+                    qid=task_result.qid,
+                    source_parameter_name=source_name,
+                    parameter_name=parameter_name,
+                    value=value,
+                    error=error,
+                    unit=unit,
+                    value_type=value_type,
+                    quality_metrics=dict(task_result.quality_metrics),
+                    accepted=accepted,
+                    reason=reason,
+                    minimum=minimum,
+                    maximum=maximum,
+                )
+            )
+
+        return items
 
     def list_action_candidates(
         self,
@@ -487,72 +818,74 @@ class AgentSessionService:
                 detail="Task result chip does not match the agent session",
             )
 
-        items: list[AgentCandidateResponse] = []
-        for source_name, raw in sorted(task_result.output_parameters.items()):
-            candidate = self._candidate_parameter(source_name, raw)
-            if candidate is None:
-                continue
-            parameter_name, value, error, unit, value_type = candidate
-            bounds = session.policy.allowed_overrides.get(parameter_name)
-            if bounds is None:
-                accepted = False
-                reason = f"Parameter '{parameter_name}' is not allowed by the session policy"
-                minimum = None
-                maximum = None
-            else:
-                decision = evaluate_numeric_candidate(
-                    value,
-                    minimum=bounds.minimum,
-                    maximum=bounds.maximum,
-                )
-                accepted = decision.accepted
-                reason = decision.reason
-                minimum = bounds.minimum
-                maximum = bounds.maximum
-
-            if accepted:
-                for metric_name, metric_bounds in session.policy.quality_gates.items():
-                    metric_value = task_result.quality_metrics.get(metric_name)
-                    if metric_value is None:
-                        accepted = False
-                        reason = f"Required quality metric '{metric_name}' is missing"
-                        break
-                    quality_decision = evaluate_numeric_candidate(
-                        metric_value,
-                        minimum=metric_bounds.minimum,
-                        maximum=metric_bounds.maximum,
-                    )
-                    if not quality_decision.accepted:
-                        accepted = False
-                        reason = f"Quality metric '{metric_name}' {quality_decision.reason}"
-                        break
-                else:
-                    if session.policy.quality_gates:
-                        reason = "candidate passed deterministic bounds and quality gates"
-
-            items.append(
-                AgentCandidateResponse(
-                    session_id=session_id,
-                    action_id=action_id,
-                    execution_id=task_result.execution_id,
-                    task_id=task_result.task_id,
-                    task_name=task_result.name,
-                    qid=task_result.qid,
-                    source_parameter_name=source_name,
-                    parameter_name=parameter_name,
-                    value=value,
-                    error=error,
-                    unit=unit,
-                    value_type=value_type,
-                    quality_metrics=dict(task_result.quality_metrics),
-                    accepted=accepted,
-                    reason=reason,
-                    minimum=minimum,
-                    maximum=maximum,
-                )
-            )
-
+        items = self.gate_task_result(session, action_id, task_result)
         return ListAgentCandidatesResponse(items=items, total=len(items))
+
+    @staticmethod
+    def _reserve_commit(
+        commit: AgentCandidateCommitDocument | AgentCandidateSetCommitDocument,
+        session: AgentSessionDocument,
+        request_hash: str,
+        *,
+        gone: str,
+    ) -> AgentCandidateCommitDocument | AgentCandidateSetCommitDocument | None:
+        """Reserve a commit against the session barrier before anything is persisted.
+
+        The commit record is inserted as ``reserving`` first, so a resume check that runs
+        after a later pause sees it. The session update then advances the state version only
+        while the session is active, and the record is confirmed as ``committing``. Returns
+        the existing record when a concurrent request with the same key won the insert.
+        """
+        model = type(commit)
+        try:
+            commit.insert()
+        except DuplicateKeyError:
+            existing = model.find_one(
+                {
+                    "project_id": commit.project_id,
+                    "session_id": commit.session_id,
+                    "idempotency_key": commit.idempotency_key,
+                }
+            ).run()
+            if existing is None:
+                raise
+            if existing.request_hash != request_hash:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Idempotency key was already used for a different candidate commit",
+                ) from None
+            return existing
+        updated_session = AgentSessionDocument.get_motor_collection().find_one_and_update(
+            {
+                "project_id": session.project_id,
+                "session_id": session.session_id,
+                "status": AgentSessionStatus.ACTIVE.value,
+                "state_version": session.state_version,
+            },
+            {"$set": {"updated_at": now()}, "$inc": {"state_version": 1}},
+            return_document=ReturnDocument.AFTER,
+        )
+        if updated_session is None:
+            # Nothing was persisted; the key stays free for a retry.
+            model.get_motor_collection().delete_one(
+                {"commit_id": commit.commit_id, "status": "reserving"}
+            )
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Agent session changed while the {gone}",
+            )
+        confirmed = model.get_motor_collection().find_one_and_update(
+            {"commit_id": commit.commit_id, "status": "reserving"},
+            {"$set": {"status": "committing"}},
+            return_document=ReturnDocument.AFTER,
+        )
+        if confirmed is None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="The commit reservation was released as abandoned; nothing was persisted",
+            )
+        commit.status = "committing"
+        return None
 
     def commit_action_candidate(
         self,
@@ -570,6 +903,7 @@ class AgentSessionService:
             parameter_name=parameter_name,
             body=body,
         )
+        release_abandoned_reservations(project_id, session_id)
         existing = AgentCandidateCommitDocument.find_one(
             {
                 "project_id": project_id,
@@ -622,25 +956,6 @@ class AgentSessionService:
             )
 
         timestamp = now()
-        updated_session = AgentSessionDocument.get_motor_collection().find_one_and_update(
-            {
-                "project_id": project_id,
-                "session_id": session_id,
-                "status": AgentSessionStatus.ACTIVE.value,
-                "state_version": session.state_version,
-            },
-            {
-                "$set": {"updated_at": timestamp},
-                "$inc": {"state_version": 1},
-            },
-            return_document=ReturnDocument.AFTER,
-        )
-        if updated_session is None:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Agent session changed while the candidate commit was being reserved",
-            )
-
         commit = AgentCandidateCommitDocument(
             commit_id=str(uuid4()),
             session_id=session_id,
@@ -655,14 +970,19 @@ class AgentSessionService:
             qid=candidate.qid,
             parameter_name=candidate.parameter_name,
             value=candidate.value,
-            status="committing",
-            reason="Candidate passed deterministic gate; persistence reserved",
+            status="reserving",
+            reason="Candidate passed deterministic gate; waiting for the session gate",
             committed_by=username,
             state_version_before=session.state_version,
-            state_version_after=int(updated_session["state_version"]),
+            state_version_after=session.state_version + 1,
             created_at=timestamp,
         )
-        commit.insert()
+        replay = self._reserve_commit(
+            commit, session, request_hash, gone="candidate commit was being reserved"
+        )
+        if replay is not None:
+            return self._candidate_commit_response(cast("AgentCandidateCommitDocument", replay))
+        commit.reason = "Candidate passed deterministic gate; persistence reserved"
 
         try:
             qubit = QubitDocument.find_one(
@@ -728,6 +1048,7 @@ class AgentSessionService:
     ) -> AgentCandidateSetCommitResponse:
         """Commit one revalidated same-qubit candidate set in a single Qubit save."""
         request_hash = self._candidate_set_commit_request_hash(body)
+        release_abandoned_reservations(project_id, session_id)
         existing = AgentCandidateSetCommitDocument.find_one(
             {
                 "project_id": project_id,
@@ -810,22 +1131,6 @@ class AgentSessionService:
             )
 
         timestamp = now()
-        updated_session = AgentSessionDocument.get_motor_collection().find_one_and_update(
-            {
-                "project_id": project_id,
-                "session_id": session_id,
-                "status": AgentSessionStatus.ACTIVE.value,
-                "state_version": session.state_version,
-            },
-            {"$set": {"updated_at": timestamp}, "$inc": {"state_version": 1}},
-            return_document=ReturnDocument.AFTER,
-        )
-        if updated_session is None:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Agent session changed while the candidate set commit was being reserved",
-            )
-
         commit = AgentCandidateSetCommitDocument(
             commit_id=str(uuid4()),
             session_id=session_id,
@@ -835,14 +1140,21 @@ class AgentSessionService:
             chip_id=session.chip_id,
             qid=qid,
             candidates=[candidate.model_dump(mode="json") for candidate in resolved],
-            status="committing",
-            reason="Candidate set passed deterministic gates; persistence reserved",
+            status="reserving",
+            reason="Candidate set passed deterministic gates; waiting for the session gate",
             committed_by=username,
             state_version_before=session.state_version,
-            state_version_after=int(updated_session["state_version"]),
+            state_version_after=session.state_version + 1,
             created_at=timestamp,
         )
-        commit.insert()
+        set_replay = self._reserve_commit(
+            commit, session, request_hash, gone="candidate set commit was being reserved"
+        )
+        if set_replay is not None:
+            return self._candidate_set_commit_response(
+                cast("AgentCandidateSetCommitDocument", set_replay)
+            )
+        commit.reason = "Candidate set passed deterministic gates; persistence reserved"
 
         try:
             qubit = QubitDocument.find_one(
@@ -954,6 +1266,7 @@ class AgentSessionService:
         """Dispatch a committed candidate to the worker-side backend apply flow."""
         request_hash = self._backend_apply_request_hash(body)
         session = self._get_session_document(project_id, session_id)
+        release_abandoned_reservations(project_id, session_id)
         if session.status != AgentSessionStatus.ACTIVE:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -998,7 +1311,8 @@ class AgentSessionService:
                 )
 
         timestamp = now()
-        reserved = AgentCandidateCommitDocument.get_motor_collection().find_one_and_update(
+        token = str(uuid4())
+        previous = AgentCandidateCommitDocument.get_motor_collection().find_one_and_update(
             {
                 "project_id": project_id,
                 "session_id": session_id,
@@ -1015,11 +1329,13 @@ class AgentSessionService:
                     "backend_requested_at": timestamp,
                     "backend_operation_id": None,
                     "backend_error": "",
+                    "backend_dispatch_token": token,
+                    "backend_dispatch_confirmed": False,
                 }
             },
-            return_document=ReturnDocument.AFTER,
+            return_document=ReturnDocument.BEFORE,
         )
-        if reserved is None:
+        if previous is None:
             latest = AgentCandidateCommitDocument.find_one(
                 {
                     "project_id": project_id,
@@ -1039,6 +1355,44 @@ class AgentSessionService:
                 detail="Candidate backend apply is already in progress",
             )
 
+        reservation = {"commit_id": commit_id, "backend_dispatch_token": token}
+        commits = AgentCandidateCommitDocument.get_motor_collection()
+        if not pass_execution_gate(project_id, session_id):
+            # Paused or ended after the reservation: restore the previous apply state.
+            commits.update_one(
+                {**reservation, "backend_dispatch_confirmed": False},
+                {
+                    "$set": {
+                        field: previous.get(field)
+                        for field in (
+                            "backend_status",
+                            "backend_apply_idempotency_key",
+                            "backend_apply_request_hash",
+                            "backend_push_to_github",
+                            "backend_requested_at",
+                            "backend_operation_id",
+                            "backend_error",
+                        )
+                    }
+                    | {"backend_dispatch_token": None, "backend_dispatch_confirmed": None},
+                },
+            )
+            current = self._get_session_document(project_id, session_id)
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Agent session is not active: {current.status.value}",
+            )
+        confirmed = commits.find_one_and_update(
+            {**reservation, "backend_status": "dispatching", "backend_dispatch_confirmed": False},
+            {"$set": {"backend_dispatch_confirmed": True}},
+            return_document=ReturnDocument.AFTER,
+        )
+        if confirmed is None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="The backend apply reservation was released as abandoned; retry",
+            )
+
         try:
             operation = await flow_service.execute_agent_candidate_apply(
                 project_id=project_id,
@@ -1047,22 +1401,18 @@ class AgentSessionService:
                 push_to_github=body.push_to_github,
             )
         except Exception as exc:
-            AgentCandidateCommitDocument.get_motor_collection().update_one(
-                {"project_id": project_id, "commit_id": commit_id},
+            commits.update_one(
+                {**reservation, "project_id": project_id},
                 {"$set": {"backend_status": "failed", "backend_error": str(exc)}},
             )
             raise
 
-        AgentCandidateCommitDocument.get_motor_collection().update_one(
-            {"project_id": project_id, "commit_id": commit_id},
+        commits.update_one(
+            {**reservation, "project_id": project_id},
             {"$set": {"backend_operation_id": operation.execution_id}},
         )
-        AgentCandidateCommitDocument.get_motor_collection().update_one(
-            {
-                "project_id": project_id,
-                "commit_id": commit_id,
-                "backend_status": "dispatching",
-            },
+        commits.update_one(
+            {**reservation, "project_id": project_id, "backend_status": "dispatching"},
             {"$set": {"backend_status": "queued"}},
         )
         queued = AgentCandidateCommitDocument.find_one(
@@ -1107,13 +1457,24 @@ class AgentSessionService:
         body: ExecuteAgentActionRequest,
         flow_service: FlowService,
         task_file_service: TaskFileService,
+        username: str = "",
     ) -> AgentActionResponse:
         """Dispatch one authorized run-task action to the system workflow.
 
         The action runs the way the Task Workbench runs a task: inputs from the
         current calibration state, the session's readout_duration from the task,
         and the same override checks. Outputs stay staged for the candidate gate.
+
+        The action is reserved (``dispatching``, unconfirmed), then the session gate is
+        passed, then the reservation is confirmed and the run is dispatched. A pause that
+        wins the session first makes the gate refuse, and the reservation is released.
+
+        An autonomous dispatch (``body.autonomous``) also needs the signed-in user to have
+        created the ``auto`` session, and no other measurement of the session may be
+        dispatching or running. That check reads the other actions after this one is
+        reserved, so of two concurrent dispatches at least one sees the other and is refused.
         """
+        release_abandoned_reservations(project_id, session_id)
         action = AgentActionDocument.find_one(
             {"project_id": project_id, "session_id": session_id, "action_id": action_id}
         ).run()
@@ -1140,6 +1501,8 @@ class AgentSessionService:
             )
 
         session = self._get_session_document(project_id, session_id)
+        if body.autonomous:
+            autonomous_session_refusal(session, username)
         if session.status != AgentSessionStatus.ACTIVE:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -1154,14 +1517,23 @@ class AgentSessionService:
         task, backend_name = resolve_catalog_task(task_file_service, action.task_name, None)
         input_overrides = _typed_overrides(task, action.parameter_overrides)
 
-        reserved = AgentActionDocument.get_motor_collection().find_one_and_update(
+        token = str(uuid4())
+        actions = AgentActionDocument.get_motor_collection()
+        reserved = actions.find_one_and_update(
             {
                 "project_id": project_id,
                 "session_id": session_id,
                 "action_id": action_id,
                 "execution_status": "not_started",
             },
-            {"$set": {"execution_status": "dispatching"}},
+            {
+                "$set": {
+                    "execution_status": "dispatching",
+                    "dispatch_token": token,
+                    "dispatch_confirmed": False,
+                    "dispatch_reserved_at": now(),
+                }
+            },
             return_document=ReturnDocument.AFTER,
         )
         if reserved is None:
@@ -1173,6 +1545,58 @@ class AgentSessionService:
                     status_code=status.HTTP_404_NOT_FOUND, detail="Agent action not found"
                 )
             return self._action_response(latest)
+
+        reservation = {"action_id": action_id, "dispatch_token": token}
+
+        def release() -> None:
+            # Nothing was dispatched; the action stays authorized for a later dispatch.
+            actions.update_one(
+                {**reservation, "dispatch_confirmed": False},
+                {
+                    "$set": {
+                        "execution_status": "not_started",
+                        "dispatch_token": None,
+                        "dispatch_confirmed": None,
+                        "dispatch_reserved_at": None,
+                    }
+                },
+            )
+
+        if not pass_execution_gate(project_id, session_id):
+            # Paused or ended after the reservation.
+            release()
+            current = self._get_session_document(project_id, session_id)
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Agent session is not active: {current.status.value}",
+            )
+        if body.autonomous:
+            running = [
+                other.action_id
+                for other in self._session_run_tasks(project_id, session_id)
+                if other.action_id != action_id
+                and other.execution_status != "not_started"
+                and other.execution_status not in FINISHED_RUN_STATUSES
+            ]
+            if running:
+                release()
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=(
+                        f"Action {', '.join(running)} of the session is being dispatched or "
+                        "is still running; an autonomous step waits for its result"
+                    ),
+                )
+        confirmed = actions.find_one_and_update(
+            {**reservation, "execution_status": "dispatching", "dispatch_confirmed": False},
+            {"$set": {"dispatch_confirmed": True}},
+            return_document=ReturnDocument.AFTER,
+        )
+        if confirmed is None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="The dispatch reservation was released as abandoned; retry the action",
+            )
 
         try:
             operation = await run_catalog_task(
@@ -1192,15 +1616,26 @@ class AgentSessionService:
                 tags=[f"agent-session:{session_id}"],
             )
         except Exception as exc:
-            action.execution_status = "failed"
-            action.metadata = {**action.metadata, "execution_error": str(exc)}
-            action.save()
+            actions.update_one(
+                reservation,
+                {
+                    "$set": {
+                        "execution_status": "failed",
+                        "metadata.execution_error": str(exc),
+                    }
+                },
+            )
             raise
 
-        action.execution_status = "queued"
-        action.operation_id = operation.flow_run_id
+        queued: dict[str, Any] = {
+            "execution_status": "queued",
+            "operation_id": operation.flow_run_id,
+        }
         if body.source_execution_id:
             # Provenance only: the run reads the current calibration state.
-            action.metadata = {**action.metadata, "source_execution_id": body.source_execution_id}
-        action.save()
-        return self._action_response(self._refresh_action_execution(action))
+            queued["metadata.source_execution_id"] = body.source_execution_id
+        actions.update_one(reservation, {"$set": queued})
+        dispatched = AgentActionDocument.find_one({"action_id": action_id}).run()
+        if dispatched is None:
+            raise HTTPException(status_code=500, detail="Agent action record disappeared")
+        return self._action_response(self._refresh_action_execution(dispatched))

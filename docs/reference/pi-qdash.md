@@ -50,12 +50,29 @@ pi-qdash tools reuse the session's profile and chip when callers omit those para
 | `qdash_target_report` | One target's recent results, failures, Forum posts, and a conservative next action; read-only. |
 | `qdash_plan_calibration` | Dry-run runbook with safety gates. `color: true` adds ANSI colors for terminal output. |
 
+## Agent calibration loop tools
+
+These tools carry the model-driven loop of the `qdash-agent-calibration` skill. All are deferred.
+
+| Tool | Result or limit |
+| --- | --- |
+| `qdash_list_agent_sessions` | Sessions of the current project, newest first: status, chip, qubits, tasks, autonomy, actions used, expiry, and the intervention a paused session waits on. Defaults to your own `active` and `waiting_for_human` sessions; `chipId`, `statuses`, `mine`, and `limit` (default 10, at most 100) narrow it. Read-only. |
+| `qdash_get_agent_session_context` | One session's state from QDash: scope, budget, expiry, `state` (`ready`, `in_flight`, `waiting_for_expert`, `resume_needs_plan_runner`, `confirm_each`, `budget_exhausted`, `expired`, `ended`), `may_run_step`, `next`, every action with its execution and the candidates of up to 10 recent completed runs, and the newest intervention with its question, attempts, the expert's decision and guidance, and the actions since the answer. Read-only. |
+| `qdash_run_agent_session_step` (session-granted) | Propose one `run_task` on one qubit with optional overrides and dispatch it; the rationale is recorded as the action's diagnosis. Runs only in an `active` session with `autonomy: auto` that the signed-in user created (`GET /auth/me`), with budget left and nothing in flight; another user's session, or a user QDash cannot confirm, is refused before any write. It refuses before QDash a task, qubit, override, or reconfiguration outside the session, a task and qubit at `max_rounds_per_target`, and an exact repeat of a finished measurement unless `repeatOfActionId` names it. The proposal and dispatch are sent with `autonomous: true`, so QDash repeats those checks against its own records; a QDash refusal (403 or 409) is returned as `Not run:` text, and a server whose action has no `autonomous` field gets no dispatch. An authorized action that was never dispatched is dispatched instead of proposing a new one. Before the dispatch it records a decision with the optional `assessment` (`pass`, `fail`, `inconclusive`) and `interpretation` (default: the rationale) on `evidenceActionIds` (default: the finished results no decision cites yet), linked to the proposed action; the first step, with no evidence and no interpretation, records none. It dispatches only after QDash confirms the decision: a refused decision (including a full audit), no answer, or a 5xx returns `Not dispatched:` text, leaves the action authorized, and a later call with the same task, qubit, and overrides reuses the action without recording the decision twice. Without the session's decision list, a step that follows a finished result is refused before it proposes anything. Commits nothing. |
+| `qdash_request_agent_human` (session-granted) | Record an intervention with `reason`, `summary`, `question`, and the actions in `attemptActionIds` (at most 20, with their executions). QDash pauses the session and notifies Slack when configured. Runs only in an `auto` session the signed-in user created that is active and idle or out of budget, and is sent with `autonomous: true`; uses no action budget. Then records a `request_human` decision with the summary, the optional `assessment`, and the attempts, linked to the intervention; a decision QDash does not store is reported as not recorded (`decisionRecorded: false`) and does not undo the pause or the notification. |
+| `qdash_record_agent_decision` (session-granted) | Append a decision to the session's audit: optional `assessment`, `interpretation` (2000 characters), `nextAction` (`next_task`, `repeat`, `adjust_and_retry`, `rollback`, `propose_commit`, `request_human`, `skip_target`, `complete`, `stop`), and optional `nextDetail`, `evidenceActionIds`, `evaluationIds`, `nextActionId`, `interventionId`, `supersedesDecisionId`. Runs only for the session's creator, in any session status and autonomy; changes no session state. A replayed call returns the same record. |
+| `qdash_get_agent_session_audit` | One page of a snapshot of the session's chronological audit (default 50 events, at most 200), with each event's source and missing facts, the `snapshot_id`, and the cursor of the next page until the snapshot is complete. When the records changed since the first page, it tells the model to discard the pages and start again without a cursor. Read-only. |
+| `qdash_wait_agent_intervention` | Wait until the session leaves `waiting_for_human` or its intervention is answered, then return the same result as `qdash_get_agent_session_context`. Timeout defaults to 900 seconds and is capped at 3600; the poll interval defaults to 15 seconds and is at least 5. Each poll is bounded by the remaining time (at least one second) and by cancellation, and a poll's late answer is dropped. A timeout is an error that says the session stays paused. Read-only. |
+
+A session-granted tool runs without a per-call confirmation in both pi CLI and QDash chat, because the user who created the `auto` session approved it; its idempotency key derives from the tool call id, so a replayed call reuses the action or intervention it created. Neither tool answers, resumes, or reactivates an intervention, and no pi-qdash tool does.
+
 ## Agent calibration workflow tools
 
 | Tools | Result or limit |
 | --- | --- |
 | `qdash_create_agent_session`, `qdash_get_agent_session` | Create or inspect a session. The `policy` object passes through to QDash; `autonomy: auto` and `max_rounds_per_target` allow an approved plan to run without per-step confirmation. |
-| `qdash_submit_agent_action`, `qdash_get_agent_action`, `qdash_list_agent_actions`, `qdash_wait_agent_action` | Submit, inspect, list, and wait for actions. |
+| `qdash_submit_agent_action`, `qdash_get_agent_action`, `qdash_list_agent_actions`, `qdash_wait_agent_action` | Submit, inspect, list, and wait for actions. An authorized `request_human` action records an intervention and pauses the session until an expert answers in QDash. |
+| `qdash_list_agent_interventions` | List a session's interventions: the reason, question, expert decision and guidance, and resume blockers; read-only. |
 | `qdash_list_agent_action_candidates` | List candidates produced by an action. |
 | `qdash_execute_agent_action` | Run an action using current calibration inputs; outputs stay staged until commit. `sourceExecutionId` records the source of a decision. |
 | `qdash_commit_agent_candidate`, `qdash_commit_agent_candidate_set` | Commit one candidate or a set. |
@@ -87,9 +104,9 @@ Set `QDASH_WEB_URL` when the web UI is not at the API base URL minus `/api`.
 | --- | --- |
 | `qdash_get_pipeline_catalog` | List supported pipeline steps, dependencies, default task calls, step metrics, backend tasks, the accepted spec version, and the first sentence of each documented task's description. `taskNames` adds the full description, when to use, and prerequisites for the named tasks and lists named tasks without declared documentation. |
 | `qdash_plan_pipeline` | Validate a version 2 pipeline spec and return problems with paths, warnings, and the calls each step will run with their call ids and effective settings; for a version 1 spec it points to the converted spec. Does not execute. |
-| `qdash_run_pipeline` (confirmation-gated) | Start a validated spec as one QDash execution and return its execution ID without waiting. A 422 with problems is returned as text. Completed tasks persist parameters directly, without an agent candidate gate. |
+| `qdash_run_pipeline` (confirmation-gated) | Start a validated spec as one QDash execution and return its execution ID without waiting. A 422 with problems is returned as text. Completed tasks persist parameters directly, without an agent candidate gate. Nothing starts while one of your agent sessions on the chip waits for an expert and covers a target of the spec; MUX targets count as overlapping. Nothing starts either when QDash cannot list the sessions, including a release without `GET /agent-sessions` (404 or 405). |
 | `qdash_save_flow` (confirmation-gated) | Validate, format, save, and register a Prefect `@flow` workflow. |
-| `qdash_execute_flow` (confirmation-gated) | Run a saved flow with parameters and return its execution ID without waiting. The name is letters, digits and underscores. |
+| `qdash_execute_flow` (confirmation-gated) | Run a saved flow with parameters and return its execution ID without waiting. The name is letters, digits and underscores. Nothing starts while one of your agent sessions waits for an expert on the flow's `chip_id` and `qids` parameters; when they are absent, any such session blocks. Nothing starts either when QDash cannot list the sessions, including a release without `GET /agent-sessions` (404 or 405). |
 
 ## Metric scripts and dashboards
 
@@ -109,9 +126,9 @@ These tools are deferred. Validation and previews execute the script on the QDas
 | Contract | Behavior |
 | --- | --- |
 | Secret output | API tokens, passwords, and Cloudflare Access secrets are redacted. |
-| Write tools | Interactive pi asks for confirmation; non-interactive calls require `confirmWrite: true`. |
+| Write tools | Interactive pi asks for confirmation; non-interactive calls require `confirmWrite: true`. The session-granted tools `qdash_run_agent_session_step` and `qdash_request_agent_human` (`SESSION_GRANTED_WRITE_TOOL_NAMES`) ask nothing and act only inside an `auto` session the signed-in user created and approved; `qdash_record_agent_decision` asks nothing and only appends to the audit of a session the signed-in user created. |
 | Saved profile and chip | The profile and chip selection outside a session is saved in `qdash-context.json` in pi's agent directory: `PI_CODING_AGENT_DIR` when set, otherwise `~/.pi/agent`. |
-| Investigation guidance | While a `qdash_*` tool is selected, the system prompt has a `qdash_guidance` section with evidence rules and the `qdash` skill's tool routing for the tools the model can call directly or load with `tool_search`. While `codemode` or `tool_search` is active, the section also gives QDash chat's script and deferred-tool rules. |
+| Investigation guidance | While a `qdash_*` tool is selected, the system prompt has a `qdash_guidance` section with evidence rules, rules for plain-language requests, and the `qdash` skill's tool routing for the tools the model can call directly or load with `tool_search`. While `codemode` or `tool_search` is active, the section also gives QDash chat's script and deferred-tool rules. |
 
 ## Scripts and deferred tools
 
@@ -180,6 +197,6 @@ The reference and examples come from one knowledge request as the configured QDa
 | `/skill:qdash-chip-bringup` | Run first-time bring-up from capture delay correction through resonator and qubit spectroscopy with the `box_setup`, `bringup`, and `check_waveform` flow templates. |
 | `/skill:qdash-one-qubit-calibration` | Choose, run, and recover single-qubit calibration with the `coarse_one`, `fine_one`, `one_qubit`, full calibration, and `simple` flow templates. |
 | `/skill:qdash-two-qubit-calibration` | Choose a two-qubit template by pair selection, run the CR and ZX90 chain, and diagnose poor two-qubit quality. |
-| `/skill:qdash-characterization` | Measure coherence, EF transitions, noise, coupling, and gate coherence limits with the `coherence_check`, `characterization`, `ef_calibration`, and `coherence_limit` flow templates. |
+| `/skill:qdash-characterization` | Measure or remeasure coherence, EF transitions, noise, coupling, and gate coherence limits with the `coherence_check`, `characterization`, `ef_calibration`, and `coherence_limit` flow templates. |
 | `/skill:qdash-timeseries-diagnosis` | Investigate multi-metric drift and local sensor series. |
 | `/skill:qdash-metric-scripts` | Write, validate, preview, and save metric scripts and put them on dashboards; `references/api.md` documents the `qdash_metrics` API. |

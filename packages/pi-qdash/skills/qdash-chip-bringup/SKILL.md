@@ -1,6 +1,6 @@
 ---
 name: qdash-chip-bringup
-description: Plan and run first-time QDash bring-up of MUXes with the box_setup, bringup, and check_waveform flow templates, from capture delay correction through resonator and qubit spectroscopy to a first qubit frequency. Use for a new chip, a new cooldown, or MUXes whose readout or qubit frequencies are not yet known. Not for chips that already have calibrated pulses; use qdash-one-qubit-calibration for those.
+description: Plan and run first-time QDash bring-up of MUXes with the box_setup, bringup, and check_waveform flow templates, from capture delay correction through resonator and qubit spectroscopy to a first qubit frequency. Use when the user wants a new chip, a new cooldown, or MUXes brought up ("bring up MUX0"), or their readout or qubit frequencies are not yet known; the skill checks the current state first. Not for chips that already have calibrated pulses; use qdash-one-qubit-calibration for those.
 license: Apache-2.0
 ---
 

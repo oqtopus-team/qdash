@@ -12,9 +12,10 @@ const CODE = [
   "",
 ].join("\n");
 
-function registeredTools(saveFlow, chipId = "64Qv3", executeFlow = async () => { throw new Error("must not be called"); }, projectId = "project-1") {
+function registeredTools(saveFlow, chipId = "64Qv3", executeFlow = async () => { throw new Error("must not be called"); }, projectId = "project-1", pausedSessions = []) {
   const tools = new Map();
   const calls = [];
+  const sessionQueries = [];
   registerFlowAuthoringTools({ registerTool(tool) { tools.set(tool.name, tool); } }, {
     async makeClient() {
       return {
@@ -22,6 +23,8 @@ function registeredTools(saveFlow, chipId = "64Qv3", executeFlow = async () => {
         config: { projectId: projectId ?? undefined },
         async saveFlow(request) { calls.push(request); return saveFlow(request); },
         async executeFlow(name, parameters) { calls.push({ execute: name, parameters }); return executeFlow(name, parameters); },
+        // The pause guard: the user's agent sessions waiting for an expert.
+        async listAgentSessions(options) { sessionQueries.push(options); return typeof pausedSessions === "function" ? pausedSessions() : pausedSessions; },
         // A tool that starts a run must not follow it.
         async getExecution() { calls.push("getExecution"); throw new Error("must not wait"); },
         async waitForExecution() { calls.push("waitForExecution"); throw new Error("must not wait"); },
@@ -30,7 +33,7 @@ function registeredTools(saveFlow, chipId = "64Qv3", executeFlow = async () => {
     async resolveChipId(_client, explicit) { return explicit ?? chipId; },
     flowPageUrl: (_client, name) => `https://qdash.example/workflow/${name}`,
   });
-  return { tools, tool: tools.get("qdash_save_flow"), run: tools.get("qdash_execute_flow"), calls };
+  return { tools, tool: tools.get("qdash_save_flow"), run: tools.get("qdash_execute_flow"), calls, sessionQueries };
 }
 
 const uiContext = (answer) => ({ hasUI: true, ui: { async confirm() { return answer; } } });
@@ -140,4 +143,49 @@ test("local problems return without a confirmation prompt", async () => {
   assert.equal(calls.length, 0);
   assert.equal(result.details.saved, false);
   assert.match(result.content[0].text, /cannot be saved as it is \(3 problems\)/);
+});
+
+test("a flow does not run around the user's agent session paused for an expert", async () => {
+  const paused = [{ session_id: "s-1", chip_id: "64Qv3", status: "waiting_for_human", active_intervention_id: "int-1", policy: { qids: ["Q00"] } }];
+  const execute = async () => { throw new Error("must not run"); };
+  const blocked = registeredTools(async () => ({}), "64Qv3", execute, "project-1", paused);
+  const result = await blocked.run.execute("t", { name: "my_check", parameters: { chip_id: "64Qv3", qids: ["Q00", "Q01"] }, confirmWrite: true });
+  assert.equal(result.details.started, false);
+  assert.equal(result.details.blockedByPausedSession, true);
+  assert.match(result.content[0].text, /s-1 .*paused for an expert on chip 64Qv3/);
+  assert.deepEqual(blocked.calls, []);
+  assert.deepEqual(blocked.sessionQueries, [{ chipId: "64Qv3", statuses: ["waiting_for_human"], mine: true, limit: 100 }]);
+
+  // Unknown targets count as overlapping; other qubits on the chip do not.
+  const unknown = registeredTools(async () => ({}), "64Qv3", execute, "project-1", paused);
+  const any = await unknown.run.execute("t", { name: "my_check", confirmWrite: true });
+  assert.equal(any.details.blockedByPausedSession, true);
+  assert.deepEqual(unknown.sessionQueries, [{ chipId: undefined, statuses: ["waiting_for_human"], mine: true, limit: 100 }]);
+  const started = registeredTools(async () => ({}), "64Qv3", async () => ({ execution_id: "e-1", flow_run_id: "f", flow_run_url: "", qdash_ui_url: "", message: "ok" }), "project-1", paused);
+  const other = await started.run.execute("t", { name: "my_check", parameters: { chip_id: "64Qv3", qids: ["Q02"] }, confirmWrite: true });
+  assert.equal(other.details.started, true);
+});
+
+test("a flow does not run when QDash cannot show that no agent session is paused", async () => {
+  const cases = [
+    [404, /cannot list agent sessions \(HTTP 404; it predates GET \/agent-sessions\)/],
+    [405, /cannot list agent sessions \(HTTP 405/],
+    [500, /could not tell whether one of your agent sessions on chip 64Qv3 is paused/],
+    [undefined, /could not tell whether/],
+  ];
+  for (const [status, message] of cases) {
+    const failing = () => {
+      const error = new Error(status ? `HTTP ${status}` : "socket hang up");
+      if (status) error.statusCode = status;
+      throw error;
+    };
+    const execute = async () => { throw new Error("must not run"); };
+    const { run, calls } = registeredTools(async () => ({}), "64Qv3", execute, "project-1", failing);
+    const result = await run.execute("t", { name: "my_check", parameters: { chip_id: "64Qv3", qids: ["Q00"] }, confirmWrite: true });
+    assert.equal(result.details.started, false, String(status));
+    assert.equal(result.details.blockedByPausedSession, true, String(status));
+    assert.match(result.content[0].text, message, String(status));
+    assert.doesNotMatch(result.content[0].text, /flag|skip the guard|--force/i);
+    assert.deepEqual(calls, [], String(status));
+  }
 });

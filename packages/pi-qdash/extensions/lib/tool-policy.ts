@@ -40,6 +40,30 @@ export const REVIEWED_WRITE_TOOL_NAMES = [
 ] as const;
 
 /**
+ * pi-qdash tools that write to QDash without a per-call approval, because the
+ * user already approved the bounded agent session they act in.
+ *
+ * A session created with `autonomy: "auto"` records that a person approved its
+ * qubits, tasks, override bounds, action budget, and expiry once (creating it
+ * is a reviewed write). These tools act only inside such a session: each call
+ * re-reads it from QDash and refuses when it is not active, not `auto`, out
+ * of budget, busy, or the step leaves its scope, and QDash checks the scope
+ * again. They never commit or apply a candidate, which stay reviewed writes.
+ * Like reviewed writes, no code mode script may call them; each call's
+ * idempotency key derives from its tool call id, so a replayed call reuses
+ * what it created instead of measuring again.
+ *
+ * `qdash_record_agent_decision` only appends the agent's own reading of a
+ * result to the audit of a session the signed-in user created; it changes no
+ * session state, so it needs neither autonomy `auto` nor an active session.
+ */
+export const SESSION_GRANTED_WRITE_TOOL_NAMES = [
+  "qdash_run_agent_session_step",
+  "qdash_request_agent_human",
+  "qdash_record_agent_decision",
+] as const;
+
+/**
  * Read-only pi-qdash tools that code mode scripts may call.
  *
  * Each was audited to only read the QDash API as the signed-in user: no
@@ -59,6 +83,8 @@ export const NESTED_READ_TOOL_NAMES = [
   "qdash_get_agent_action",
   "qdash_get_agent_candidate_commit",
   "qdash_get_agent_session",
+  "qdash_get_agent_session_audit",
+  "qdash_get_agent_session_context",
   "qdash_get_chip_metrics",
   "qdash_get_cooldown_wiring",
   "qdash_get_default_chip",
@@ -73,6 +99,8 @@ export const NESTED_READ_TOOL_NAMES = [
   "qdash_investigate",
   "qdash_list_agent_action_candidates",
   "qdash_list_agent_actions",
+  "qdash_list_agent_interventions",
+  "qdash_list_agent_sessions",
   "qdash_list_chip_couplings",
   "qdash_list_chip_qubits",
   "qdash_list_chips",
@@ -144,6 +172,14 @@ export const DEFERRED_TOOL_NAMES = [
   "qdash_execute_agent_action",
   "qdash_get_agent_action",
   "qdash_list_agent_actions",
+  "qdash_list_agent_interventions",
+  "qdash_list_agent_sessions",
+  "qdash_get_agent_session_context",
+  "qdash_run_agent_session_step",
+  "qdash_request_agent_human",
+  "qdash_record_agent_decision",
+  "qdash_get_agent_session_audit",
+  "qdash_wait_agent_intervention",
   "qdash_wait_agent_action",
   "qdash_list_agent_action_candidates",
   "qdash_commit_agent_candidate",
@@ -167,12 +203,17 @@ export const DEFERRED_TOOL_NAMES = [
 export const EVALUATION_TOOL_NAMES = ["qcal_evaluate"] as const;
 
 const WRITE_TOOLS = new Set<string>(REVIEWED_WRITE_TOOL_NAMES);
+const SESSION_GRANTED_WRITE_TOOLS = new Set<string>(SESSION_GRANTED_WRITE_TOOL_NAMES);
 const NESTED_READ_TOOLS = new Set<string>(NESTED_READ_TOOL_NAMES);
 const DEFERRED_TOOLS = new Set<string>(DEFERRED_TOOL_NAMES);
 const EVALUATION_TOOLS = new Set<string>(EVALUATION_TOOL_NAMES);
 
 export function isReviewedWriteTool(name: string): boolean {
   return WRITE_TOOLS.has(name);
+}
+
+export function isSessionGrantedWriteTool(name: string): boolean {
+  return SESSION_GRANTED_WRITE_TOOLS.has(name);
 }
 
 export function isNestedReadTool(name: string): boolean {

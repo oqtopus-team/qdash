@@ -1,6 +1,6 @@
 ---
 name: qdash-one-qubit-calibration
-description: Plan, run, and recover single-qubit QDash calibration with the coarse_one, fine_one, one_qubit, fast_full_calibration, full_calibration, and simple flow templates, from readout search and pulse calibration through randomized benchmarking. Use when the user wants qubits calibrated or recalibrated, wants a failed single-qubit stage recovered, or asks which single-qubit flow fits the chip's state. Not for first-time spectroscopy (qdash-chip-bringup) or two-qubit gates (qdash-two-qubit-calibration).
+description: Plan, run, and recover single-qubit QDash calibration with the coarse_one, fine_one, one_qubit, fast_full_calibration, full_calibration, and simple flow templates, from readout search and pulse calibration through randomized benchmarking. Use when the user wants qubits or MUXes calibrated or recalibrated ("calibrate Q0"), wants a failed single-qubit stage recovered, or asks which single-qubit flow fits the chip's state. Not for first-time spectroscopy (qdash-chip-bringup), two-qubit gates (qdash-two-qubit-calibration), or remeasuring one property such as T1 (qdash-characterization).
 license: Apache-2.0
 ---
 
@@ -81,9 +81,10 @@ key outputs (for example `x90_fidelity`) and execution links.
 Saved flows run with `qdash_execute_flow`; a template the user has not saved can be saved with
 `qdash_save_flow` or reproduced as a pipeline with the template's step and task lists, as the
 `qdash` skill describes. Both paths are confirmation-gated and write the results of completed
-tasks to QDash directly. A bounded, candidate-gated recovery of one qubit uses an agent
-calibration session instead; see the `qdash` skill. Do not use a flow or pipeline to repeat what
-an agent session refused, rejected, or stopped on.
+tasks to QDash directly. To calibrate or recover one or a few named qubits step by step, with
+results staged as candidates and an expert asked when the next step is unclear, run this skill's
+tasks through an agent session with the `qdash-agent-calibration` skill instead. Do not use a
+flow or pipeline to repeat what an agent session refused, rejected, or stopped on.
 
 Use a pipeline in place of a template only after checking that it preserves the template's
 configuration, session boundaries, target selection, failure filtering, and coupling schedule

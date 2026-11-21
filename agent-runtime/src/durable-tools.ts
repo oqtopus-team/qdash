@@ -18,6 +18,7 @@ import type { TSchema } from "typebox";
 import {
   ALLOWED_TOOL_NAMES,
   REVIEWED_WRITE_TOOL_NAMES,
+  SESSION_GRANTED_WRITE_TOOL_NAMES,
   TRUSTED_EXTENSION_PACKAGES,
   isDeferredTool,
   isNestedReadTool,
@@ -285,7 +286,8 @@ export function adaptCodingAgentTool(
         // A poll in flight when the turn is stopped is dropped, not awaited.
         const spec: WaitSpec<object, unknown> = {
           ...wait,
-          check: (client, params) => untilAborted(wait.check(client, params), context.abortSignal, tool.name),
+          check: (client, params) =>
+            untilAborted(wait.check(client, params, context.abortSignal), context.abortSignal, tool.name),
         };
         const step = await parkingWait(spec, approvalArgs(args), api, context, connection);
         if (!("content" in step)) return step;
@@ -486,9 +488,15 @@ export function buildQDashExtension(
   /** Tools offered only once loaded. */
   deferredTools: string[];
 } {
+  // Session-granted writes run without an approval card, but only inside an
+  // agent session the user approved with `autonomy: "auto"`; the tools re-read
+  // the session and refuse anything outside it, and QDash checks it again.
+  // Their idempotency keys derive from the call id, so a replay after an
+  // interruption reuses the action or intervention it created.
   const allowed = new Set<string>([
     ...ALLOWED_TOOL_NAMES,
     ...REVIEWED_WRITE_TOOL_NAMES,
+    ...SESSION_GRANTED_WRITE_TOOL_NAMES,
   ]);
   const tools = new Map<string, ToolRegistration>();
   const writes = new Map<string, CodingAgentTool>();

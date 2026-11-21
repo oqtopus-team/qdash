@@ -182,11 +182,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     """
     from qdash.api.logging_config import setup_logging
+    from qdash.api.services.agent_intervention_service import run_notification_sweeper
 
     setup_logging()
     init_db()
     create_initial_admin()
+    sweeper = run_notification_sweeper()
     try:
         yield
     finally:
+        if sweeper is not None:
+            sweeper.cancel()
         close_db()

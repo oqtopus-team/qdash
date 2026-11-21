@@ -3,6 +3,7 @@ import type { QDashClient } from "@oqtopus-team/qdash-client";
 import { QDash } from "@oqtopus-team/qdash-sdk";
 import { Type } from "typebox";
 
+import { pausedSessionConflict } from "../lib/agent-loop.js";
 import { toTextToolResult } from "../lib/results.js";
 
 /**
@@ -217,7 +218,17 @@ export function registerFlowAuthoringTools(pi: Pick<ExtensionAPI, "registerTool"
           throw new Error("qdash_execute_flow requires explicit confirmation");
         }
       }
-      const qdash = new QDash(await deps.makeClient(params));
+      const client = await deps.makeClient(params);
+      // A paused agent session's targets must not be measured around its pause.
+      const flowChip = typeof params.parameters?.chip_id === "string" ? params.parameters.chip_id : undefined;
+      const flowQids = Array.isArray(params.parameters?.qids) && params.parameters.qids.length > 0 && params.parameters.qids.every((qid) => typeof qid === "string")
+        ? (params.parameters.qids as string[])
+        : undefined;
+      const conflict = await pausedSessionConflict(client, flowChip, flowQids);
+      if (conflict) {
+        return toTextToolResult(conflict, { blocked: true }, { tool: "qdash_execute_flow", flowName: params.name, started: false, blockedByPausedSession: true });
+      }
+      const qdash = new QDash(client);
       const run = await qdash.workflows.run(params.name, { parameters: params.parameters });
       const result = run.response as FlowExecution;
       return toTextToolResult(formatFlowExecution(result, params.name), result, {

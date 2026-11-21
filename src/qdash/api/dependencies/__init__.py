@@ -19,6 +19,8 @@ from qdash.api.dependencies.cache import (
     clear_dependency_caches as _clear_dependency_caches,
 )
 from qdash.api.services.admin_service import AdminService
+from qdash.api.services.agent_intervention_service import AgentInterventionService
+from qdash.api.services.agent_session_audit import AgentSessionAuditService
 from qdash.api.services.agent_session_service import AgentSessionService
 from qdash.api.services.auth_service import AuthService
 from qdash.api.services.calibration_service import CalibrationService
@@ -83,9 +85,21 @@ from qdash.repository.user_avatar import MongoUserAvatarRepository
 
 
 @cached_dependency_provider
+def get_agent_intervention_service() -> AgentInterventionService:
+    """Get the agent intervention service instance."""
+    return AgentInterventionService()
+
+
+@cached_dependency_provider
 def get_agent_session_service() -> AgentSessionService:
     """Get the agent session service instance."""
-    return AgentSessionService()
+    return AgentSessionService(intervention_service=get_agent_intervention_service())
+
+
+@cached_dependency_provider
+def get_agent_session_audit_service() -> AgentSessionAuditService:
+    """Get the agent session audit service instance."""
+    return AgentSessionAuditService()
 
 
 @cached_dependency_provider

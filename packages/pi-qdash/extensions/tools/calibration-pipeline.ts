@@ -3,6 +3,7 @@ import type { QDashClient } from "@oqtopus-team/qdash-client";
 import { QDash } from "@oqtopus-team/qdash-sdk";
 import { Type } from "typebox";
 
+import { pausedSessionConflict } from "../lib/agent-loop.js";
 import { toTextToolResult } from "../lib/results.js";
 
 /**
@@ -23,6 +24,14 @@ import { toTextToolResult } from "../lib/results.js";
  */
 
 type ConnectionParams = { profile?: string; configPath?: string; useEnv?: boolean };
+
+/** The qubits a spec names, or undefined when it targets MUXes or names none. */
+export function specQids(spec: Record<string, unknown>): string[] | undefined {
+  const targets = spec.targets as { qids?: unknown; mux_ids?: unknown } | undefined;
+  if (!targets || targets.mux_ids != null) return undefined;
+  const qids = targets.qids;
+  return Array.isArray(qids) && qids.length > 0 && qids.every((qid) => typeof qid === "string") ? (qids as string[]) : undefined;
+}
 
 export type PipelineProblem = { path: string; message: string };
 
@@ -369,7 +378,13 @@ export function registerCalibrationPipelineTools(pi: Pick<ExtensionAPI, "registe
           throw new Error("qdash_run_pipeline requires explicit confirmation");
         }
       }
-      const qdash = new QDash(await deps.makeClient(params));
+      const client = await deps.makeClient(params);
+      // A paused agent session's targets must not be measured around its pause.
+      const conflict = await pausedSessionConflict(client, params.chipId, specQids(params.spec));
+      if (conflict) {
+        return toTextToolResult(conflict, { blocked: true }, { tool: "qdash_run_pipeline", chipId: params.chipId, started: false, blockedByPausedSession: true });
+      }
+      const qdash = new QDash(client);
       try {
         // Dispatch only: the run handle's wait() is deliberately not called here.
         const run = await qdash.pipelines.execute(params.spec, { chipId: params.chipId, backendName: params.backendName });
