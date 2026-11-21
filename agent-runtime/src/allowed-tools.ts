@@ -48,7 +48,6 @@ export const ALLOWED_TOOL_NAMES = [
   "qdash_list_task_results",
   "qdash_plan_calibration",
   "qdash_plan_pipeline",
-  "qdash_plot_timeseries",
   "qdash_preview_forum_evidence_reply",
   "qdash_preview_forum_image_reply",
   "qdash_query",

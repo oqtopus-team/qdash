@@ -22,7 +22,6 @@ import { executionPagePath, forumPostPagePath, qdashObjectLinks, qdashWebBaseUrl
 import { arrayFromPayload, compactItems, firstNumber, firstString, formatItem, payloadTotal, statusIcon } from "./lib/payload.js";
 import { toFigureToolResult, toTextToolResult, toToolResult } from "./lib/results.js";
 import { ansi, boxLinesToWidth, boxed, formatNumber, textComponent } from "./lib/render.js";
-import { plotSeriesLines, timeseriesPlotComponent, timeseriesPoints } from "./lib/timeseries-plot.js";
 import { installQDashWriteGate } from "./lib/write-gate.js";
 import { installQDashGuidance } from "./lib/guidance-hook.js";
 import { qdashContextPath } from "./lib/context-path.js";
@@ -1794,42 +1793,6 @@ export default function qdashExtension(host: ExtensionAPI) {
       qid: Type.Optional(Type.String()),
       tag: Type.Optional(Type.String()),
     }),
-  });
-
-  pi.registerTool({
-    name: "qdash_plot_timeseries",
-    label: "QDash Plot Timeseries",
-    description: "Render a compact TUI sparkline/plot for a task-result parameter timeseries.",
-    promptSnippet: "Plot QDash task-result timeseries in the TUI",
-    promptGuidelines: ["Use qdash_plot_timeseries when the user wants to visualize history, drift, trends, or analysis timeseries in the TUI."],
-    parameters: Type.Object({
-      ...connectionParams,
-      ...chipScopedParams,
-      parameter: Type.String(),
-      startAt: Type.Optional(Type.String({ description: "Start timestamp, preferably UTC ISO with Z. Defaults to withinHours ago." })),
-      endAt: Type.Optional(Type.String({ description: "End timestamp, preferably UTC ISO with Z. Defaults to now." })),
-      withinHours: Type.Optional(Type.Number({ description: "Lookback window when startAt is omitted. Defaults to 168 hours." })),
-      qid: Type.Optional(Type.String()),
-      tag: Type.Optional(Type.String()),
-      height: Type.Optional(Type.Number()),
-      width: Type.Optional(Type.Number()),
-      color: Type.Optional(Type.Boolean({ description: "Emit ANSI colors in text output for terminal display." })),
-    }),
-    async execute(_toolCallId, params: { profile?: string; configPath?: string; useEnv?: boolean; chipId?: string; parameter: string; startAt?: string; endAt?: string; withinHours?: number; qid?: string; tag?: string; height?: number; width?: number; color?: boolean }) {
-      const client = await makeClient(params);
-      const endAt = params.endAt ?? new Date().toISOString();
-      const startAt = params.startAt ?? new Date(Date.parse(endAt) - (params.withinHours ?? 168) * 3600_000).toISOString();
-      const chipId = await defaultChipId(client, params.chipId);
-      const data = await client.getTaskResultsTimeseries({ chipId, parameter: params.parameter, tag: params.tag, qid: params.qid, startAt, endAt });
-      const title = `QDash Timeseries: ${params.parameter}${params.qid ? ` q${params.qid}` : ""}`;
-      const text = plotSeriesLines(timeseriesPoints(data), { title, height: params.height, width: params.width, color: params.color }).join("\n");
-      return toTextToolResult(text, data, { tool: "qdash_plot_timeseries", parameter: params.parameter, qid: params.qid, chipId, startAt, endAt });
-    },
-    renderResult(result, _options, theme) {
-      const details = result.details as { data?: unknown; parameter?: string; qid?: string } | undefined;
-      const title = `QDash Timeseries: ${details?.parameter ?? "parameter"}${details?.qid ? ` q${details.qid}` : ""}`;
-      return timeseriesPlotComponent(details?.data, title, theme);
-    },
   });
 
   registerTimeseriesComparisonTool(pi, {

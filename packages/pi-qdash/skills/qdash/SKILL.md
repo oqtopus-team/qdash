@@ -18,7 +18,7 @@ Prefer the dedicated tool that matches the question. Use `qdash_query` only as a
    - `qdash_get_chip_metrics`, `qdash_list_chip_qubits`, `qdash_list_chip_couplings` — inspect chip metrics and topology targets
    - `qdash_list_cryostats`, `qdash_list_cooldowns` — establish cryostat and cooldown context
    - `qdash_get_cooldown_wiring`, `qdash_wiring_insights`, `qdash_list_cooldown_wiring_events` — inspect current wiring, attenuation, and changes
-   - `qdash_get_timeseries`, `qdash_plot_timeseries` — inspect one target metric over time
+   - `qdash_get_timeseries` — inspect one target metric over time
    - `qdash_inspect_timeseries_csv`, `qdash_compare_timeseries` — validate and compare multiple QDash or CSV timeseries
    - `qdash_list_task_results`, `qdash_get_task_result` — find and inspect calibration results
    - `qdash_get_task_knowledge` — interpret a task's purpose, expected result, failure modes, and check questions
