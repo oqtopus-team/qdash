@@ -130,6 +130,8 @@ test("experiment-flow skills load in both hosts and name only tools the runtime 
       "qdash-chip-bringup",
       "qdash-one-qubit-calibration",
       "qdash-two-qubit-calibration",
+      // The budgeted ZX90 search that composes the two-qubit chain with ordinary pipelines.
+      "qdash-zx90-optimization",
       "qdash-characterization",
       // The ordering check those skills defer to after Configure or ConfigureAll.
       "qdash-rabi-after-configure",

@@ -68,6 +68,7 @@ calibrate or characterize hardware:
 - `qdash-chip-bringup` — capture delay, resonator and qubit spectroscopy for a new chip, cooldown, or MUX
 - `qdash-one-qubit-calibration` — coarse and fine single-qubit calibration and its recovery
 - `qdash-two-qubit-calibration` — CR and ZX90 calibration of couplings, and diagnosis of poor two-qubit quality
+- `qdash-zx90-optimization` — a budgeted, agent-guided search for a shorter high-fidelity ZX90 on one directed coupling
 - `qdash-characterization` — coherence checks, EF calibration, noise and coupling characterization, gate coherence limits
 - `qdash-rabi-after-configure` — a fresh `CheckRabi` after `Configure` or `ConfigureAll` before T1, T2 echo, Ramsey, and other Rabi-normalized tasks, and diagnosis of results measured on stale normalization
 

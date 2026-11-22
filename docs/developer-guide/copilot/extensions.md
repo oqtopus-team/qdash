@@ -84,7 +84,9 @@ For example, `extensions/lib/figure-analysis.ts` summarizes Plotly JSON;
 `skills/qdash-two-qubit-calibration/` decides from that evidence which two-qubit step to rerun.
 The experiment-flow skills (`qdash-chip-bringup`, `qdash-one-qubit-calibration`,
 `qdash-two-qubit-calibration`, and `qdash-characterization`) compose the flow templates toward a
-goal and leave task physics to task knowledge. The runtime's `read_skill` returns only a skill's
+goal and leave task physics to task knowledge. `qdash-zx90-optimization` composes ordinary
+pipelines into an adaptive search that the model drives only within active chat turns; no
+QDash service runs or resumes it. The runtime's `read_skill` returns only a skill's
 `SKILL.md`, so these skills keep their instructions in that file and retrieve templates and task
 documentation through tools. Both hosts list each skill's description before the model loads it,
 so a description states the goal it serves in the user's terms and the requests it does not
