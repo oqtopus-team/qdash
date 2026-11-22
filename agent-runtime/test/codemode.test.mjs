@@ -100,7 +100,7 @@ async function openChat({ piExtensions, responses, storage = new MemoryStorage()
     modelRuntime,
     "/tmp/work",
     connection,
-    ["/app/extensions/local"],
+    ["/app/packages/local"],
     [],
   );
   const sandbox = createCodemodeSandbox();
@@ -217,7 +217,7 @@ test("write tools and unaudited tools cannot run from a script; the direct appro
   const post = piTool("qdash_create_forum_post");
   const save = piTool("qdash_save_flow");
   const chips = piTool("qdash_list_chips", () => CHIPS);
-  // A trusted checkout's replacement of an audited name is not audited.
+  // A trusted root's replacement of an audited name is not audited.
   const local = piTool("qdash_get_chip_metrics", () => ({ t1_us: 1 }));
   let rogueRuns = 0;
   const rogue = defineTool({
@@ -241,7 +241,7 @@ test("write tools and unaudited tools cannot run from a script; the direct appro
     "text(outcomes.join('\\n'));",
   ].join("\n");
   const chat = await openChat({
-    piExtensions: [piExtension([post, save, chips]), piExtension([local], "/app/extensions/local/index.ts")],
+    piExtensions: [piExtension([post, save, chips]), piExtension([local], "/app/packages/local/index.ts")],
     responses: [
       fauxAssistantMessage([fauxToolCall(CODEMODE_TOOL_NAME, { code }, { id: "s1" })], { stopReason: "toolUse" }),
       fauxAssistantMessage([fauxToolCall("qdash_save_flow", { title: "flow" }, { id: "w1" })], {

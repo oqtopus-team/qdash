@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import { existsSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import { DefaultResourceLoader } from "@earendil-works/pi-coding-agent";
+import { parse } from "yaml";
 import {
   ALLOWED_TOOL_NAMES,
   ALLOWLISTED_PACKAGES,
@@ -15,9 +16,9 @@ import {
 } from "../src/allowed-tools.ts";
 import { buildQDashExtension } from "../src/durable-tools.ts";
 import {
-  bundledExtensionCheckouts, bundledSourceVersion, extensionPackage,
-  trustedCheckoutRoots, withExtensionOverrides,
-} from "../src/local-extensions.ts";
+  bundledExtensions, bundledSourceVersion, createBundledResourceLoader, extensionPackage,
+  trustedBundleRoots,
+} from "../src/bundled-extensions.ts";
 
 const packagesDir = fileURLToPath(new URL("../../packages/", import.meta.url));
 
@@ -48,11 +49,9 @@ test("pi-qdash resolves the SDK built from this checkout, on the same client", (
 test("bundled packages load tools and skills offline, retaining the pi-qdash allowlist", async () => {
   const dir = mkdtempSync(join(tmpdir(), "qdash-bundled-"));
   try {
-    const bundled = bundledExtensionCheckouts(packagesDir);
+    const bundled = bundledExtensions(packagesDir);
     const paths = bundled.map(({ path }) => path);
-    const loader = new DefaultResourceLoader({
-      cwd: dir, agentDir: join(dir, "agent"), additionalExtensionPaths: paths,
-    });
+    const loader = createBundledResourceLoader({ cwd: dir, agentDir: join(dir, "agent"), bundled });
     await loader.reload();
     assert.deepEqual(loader.getExtensions().errors, []);
     const extensions = loader.getExtensions().extensions;
@@ -77,7 +76,7 @@ test("bundled packages load tools and skills offline, retaining the pi-qdash all
     for (const reference of ["references/api.md", "references/templates.md"]) {
       assert.ok(existsSync(join(dirname(metricScripts.filePath), reference)), reference);
     }
-    const roots = trustedCheckoutRoots(bundled, ALLOWLISTED_PACKAGES);
+    const roots = trustedBundleRoots(bundled, ALLOWLISTED_PACKAGES);
     assert.deepEqual(roots, [join(packagesDir, "pi-qcaleval")]);
     const adapted = buildQDashExtension(extensions, {}, dir, { toolArgs: {} }, roots);
     const toolNames = adapted.extension.tools.map(({ name }) => name);
@@ -104,7 +103,7 @@ test("bundled packages load tools and skills offline, retaining the pi-qdash all
       assert.equal(tool.deferred === true, DEFERRED_TOOL_NAMES.includes(tool.name), tool.name);
     }
     const evaluator = extensions.find(({ tools }) => tools.has("qcal_evaluate"));
-    const info = extensionPackage(evaluator.path, paths, paths);
+    const info = extensionPackage(evaluator.path, paths);
     assert.equal(info.source, "package");
     assert.equal(info.name, "@oqtopus-team/pi-qcaleval");
     assert.match(info.version, /^\d+\.\d+\.\d+\+source\.[0-9a-f]{16}$/);
@@ -116,10 +115,8 @@ test("bundled packages load tools and skills offline, retaining the pi-qdash all
 test("experiment-flow skills load in both hosts and name only tools the runtime offers", async () => {
   const dir = mkdtempSync(join(tmpdir(), "qdash-flow-skills-"));
   try {
-    const bundled = bundledExtensionCheckouts(packagesDir);
-    const loader = new DefaultResourceLoader({
-      cwd: dir, agentDir: join(dir, "agent"), additionalExtensionPaths: bundled.map(({ path }) => path),
-    });
+    const bundled = bundledExtensions(packagesDir);
+    const loader = createBundledResourceLoader({ cwd: dir, agentDir: join(dir, "agent"), bundled });
     await loader.reload();
     const tools = new Set(loader.getExtensions().extensions.flatMap(({ tools }) => [...tools.keys()]));
     const offered = new Set([...ALLOWED_TOOL_NAMES, ...REVIEWED_WRITE_TOOL_NAMES, ...SESSION_GRANTED_WRITE_TOOL_NAMES]);
@@ -160,12 +157,116 @@ test("experiment-flow skills load in both hosts and name only tools the runtime 
   }
 });
 
-test("a mounted override replaces only its matching bundled package and skills", () => {
-  const bundled = bundledExtensionCheckouts(packagesDir);
-  const override = { name: "@oqtopus-team/pi-qdash", path: "/app/extensions/pi-qdash" };
-  const selected = withExtensionOverrides(bundled, [override]);
-  assert.deepEqual(selected, [override, bundled[1]]);
-  assert.deepEqual(trustedCheckoutRoots(selected, ALLOWLISTED_PACKAGES), [bundled[1].path]);
+/**
+ * A stale pi package: a copy of pi-qdash with an extra tool and skill, as an
+ * old development checkout or installed package would carry.
+ */
+function writeStalePackage(root, name) {
+  mkdirSync(join(root, "extensions"), { recursive: true });
+  mkdirSync(join(root, "skills", "stale-skill"), { recursive: true });
+  writeFileSync(join(root, "package.json"), JSON.stringify({
+    name, version: "0.0.1", type: "module",
+    pi: { extensions: ["./extensions/stale.ts"], skills: ["./skills"] },
+  }));
+  writeFileSync(join(root, "extensions", "stale.ts"), staleExtension("stale_injected_tool"));
+  writeFileSync(join(root, "skills", "stale-skill", "SKILL.md"), staleSkill("stale-skill"));
+}
+
+const staleExtension = (tool) => `export default function (pi) {
+  pi.registerTool({
+    name: ${JSON.stringify(tool)}, label: "Stale", description: "Stale tool",
+    parameters: { type: "object", properties: {} },
+    execute: async () => ({ content: [{ type: "text", text: "stale" }], details: {} }),
+  });
+}
+`;
+
+const staleSkill = (name) => `---\nname: ${name}\ndescription: Stale ${name} skill.\n---\n\nStale instructions.\n`;
+
+/**
+ * Every place pi would look for packages, extensions, and skills on its own:
+ * the settings packages of the agent and working directories, and their
+ * auto-discovered extensions/ and skills/ directories. The legacy
+ * agent-runtime/extensions/ mount held such packages under /app/extensions.
+ */
+function writeStaleSources(dir) {
+  const legacy = join(dir, "legacy-extensions", "pi-qdash");
+  writeStalePackage(legacy, "@oqtopus-team/pi-qdash");
+  const agentDir = join(dir, "agent");
+  const cwd = join(dir, "workspace");
+  for (const [base, label] of [[agentDir, "agent"], [join(cwd, ".pi"), "project"]]) {
+    mkdirSync(join(base, "extensions"), { recursive: true });
+    mkdirSync(join(base, "skills", `${label}-skill`), { recursive: true });
+    writeFileSync(join(base, "settings.json"), JSON.stringify({ packages: [legacy] }));
+    writeFileSync(join(base, "extensions", `${label}.ts`), staleExtension(`${label}_dir_tool`));
+    writeFileSync(join(base, "skills", `${label}-skill`, "SKILL.md"), staleSkill(`${label}-skill`));
+  }
+  return { agentDir, cwd };
+}
+
+const STALE_TOOLS = ["stale_injected_tool", "agent_dir_tool", "project_dir_tool"];
+const STALE_SKILLS = ["stale-skill", "agent-skill", "project-skill"];
+
+test("stale packages, settings, and discovered resources cannot replace or extend the bundled set", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "qdash-stale-"));
+  try {
+    const { agentDir, cwd } = writeStaleSources(dir);
+    const bundled = bundledExtensions(packagesDir);
+
+    // Control: pi's default loader does pick these up, so the fixture is a real threat.
+    const plain = new DefaultResourceLoader({ cwd, agentDir, additionalExtensionPaths: bundled.map(({ path }) => path) });
+    await plain.reload();
+    const plainTools = plain.getExtensions().extensions.flatMap(({ tools }) => [...tools.keys()]);
+    const plainSkills = plain.getSkills().skills.map(({ name }) => name);
+    assert.ok(plainTools.includes("stale_injected_tool") && plainTools.includes("agent_dir_tool"), plainTools.join());
+    assert.ok(plainSkills.includes("stale-skill") && plainSkills.includes("agent-skill"), plainSkills.join());
+
+    const loader = createBundledResourceLoader({ cwd, agentDir, bundled });
+    await loader.reload();
+    assert.deepEqual(loader.getExtensions().errors, []);
+    const extensions = loader.getExtensions().extensions;
+    // Every extension file comes from a bundled package of this checkout.
+    for (const { path } of extensions) {
+      assert.ok(bundled.some((pkg) => path.startsWith(pkg.path + sep)), path);
+    }
+    const tools = extensions.flatMap(({ tools }) => [...tools.keys()]);
+    for (const name of STALE_TOOLS) assert.ok(!tools.includes(name), name);
+    for (const name of [...ALLOWED_TOOL_NAMES, "qcal_evaluate"]) assert.ok(tools.includes(name), name);
+    const skills = loader.getSkills().skills;
+    for (const { name, filePath } of skills) {
+      assert.ok(!STALE_SKILLS.includes(name), name);
+      assert.ok(bundled.some((pkg) => filePath.startsWith(pkg.path + sep)), filePath);
+    }
+    for (const name of ["qdash", "qcaleval", "qdash-metric-scripts"]) {
+      assert.ok(skills.some((skill) => skill.name === name), name);
+    }
+    // The trust boundary is unchanged: only pi-qcaleval is trusted as a whole,
+    // and pi-qdash's unreviewed tools stay out of the adapted extension.
+    const roots = trustedBundleRoots(bundled, ALLOWLISTED_PACKAGES);
+    assert.deepEqual(roots, [join(packagesDir, "pi-qcaleval")]);
+    const adapted = buildQDashExtension(extensions, {}, cwd, { toolArgs: {} }, roots);
+    const offered = adapted.extension.tools.map(({ name }) => name);
+    for (const name of STALE_TOOLS) assert.ok(!offered.includes(name), name);
+    assert.deepEqual(adapted.nestedTools.sort(), [...NESTED_READ_TOOL_NAMES].sort());
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("the runtime builds its loader from the bundled packages only", () => {
+  const source = readFileSync(new URL("../src/runtime.ts", import.meta.url), "utf8");
+  assert.match(source, /createBundledResourceLoader\(\{ cwd: WORK_DIR, agentDir: AGENT_DIR, bundled: BUNDLED \}\)/);
+  assert.doesNotMatch(source, /new DefaultResourceLoader|\/app\/extensions/);
+});
+
+test("compose mounts no extension directory into the Agent Runtime", () => {
+  const compose = parse(readFileSync(new URL("../../compose.yaml", import.meta.url), "utf8"));
+  const volumes = compose.services["agent-runtime"].volumes;
+  assert.ok(volumes.length > 0);
+  for (const volume of volumes) {
+    const target = typeof volume === "string" ? volume.split(":")[1] : volume.target;
+    assert.ok(!/^\/app\/(extensions|packages)(\/|$)/.test(target), volume);
+  }
 });
 
 test("source identity changes for code, skills, and locked dependencies without git", () => {

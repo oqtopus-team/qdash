@@ -19,7 +19,7 @@ import { createAgentSession, DefaultResourceLoader, ModelRuntime, SessionManager
 
 import { startFakeAgentQDash } from "../../packages/pi-qdash/tests/helpers/fake-agent-qdash.mjs";
 import { inZone } from "../../packages/pi-qdash/tests/helpers/time-zone.mjs";
-import { bundledExtensionCheckouts } from "../src/local-extensions.ts";
+import { bundledExtensions } from "../src/bundled-extensions.ts";
 import { decideApproval } from "../validation/fake-loop/approval.ts";
 import { evaluateScenario, numberForms } from "../validation/fake-loop/evaluate.ts";
 import { GUARD_MESSAGES, guardToolCall } from "../validation/fake-loop/guard-extension.ts";
@@ -141,7 +141,7 @@ test("in a guarded pi session every reviewed write reaches the approval dialog, 
   const loader = new DefaultResourceLoader({
     cwd: workDir,
     agentDir,
-    additionalExtensionPaths: [guardPath, ...bundledExtensionCheckouts(packagesDir).map(({ path }) => path)],
+    additionalExtensionPaths: [guardPath, ...bundledExtensions(packagesDir).map(({ path }) => path)],
     extensionFactories: [
       (pi) => {
         pi.registerProvider(model.provider, {

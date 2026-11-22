@@ -295,9 +295,6 @@ services:
       - ./agent-runtime/exec:/app/agent-runtime/exec # Hello protocol shared with agent-exec
       - ./ui/src/lib/copilotUiSpec.ts:/app/ui/src/lib/copilotUiSpec.ts:ro # render_ui catalog shared with the chat
       - ./config:/app/config # Read for copilot language and model settings only
-      # Local pi extension checkouts for development (gitignored, empty in
-      # production); the runtime trusts whatever package directories it finds.
-      - ./agent-runtime/extensions:/app/extensions:ro
       - agent-runtime-state:/app/state
       - agent-runtime-auth:/run/agent-runtime-auth:ro
       - agent-exec-socket:/run/agent-exec:ro

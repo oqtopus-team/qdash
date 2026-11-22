@@ -58,8 +58,8 @@ test("only explicitly reviewed pi-qdash tools enter the durable registry", () =>
   );
 });
 
-test("local extension checkouts are trusted by path, not by tool name", async () => {
-  const roots = ["/app/extensions/pi-qcaleval"];
+test("bundled roots outside the allowlist are trusted by path, not by tool name", async () => {
+  const roots = ["/app/packages/pi-qcaleval"];
   const readOnly = registered("qcal_evaluate");
   readOnly.definition.annotations = { readOnlyHint: true };
   const pinned = {
@@ -70,11 +70,11 @@ test("local extension checkouts are trusted by path, not by tool name", async ()
     ]),
   };
   const local = {
-    path: "/app/extensions/pi-qcaleval/extensions/qcaleval.ts",
+    path: "/app/packages/pi-qcaleval/extensions/qcaleval.ts",
     tools: new Map([
       ["qcal_evaluate", readOnly],
       ["qcal_store_result", registered("qcal_store_result")],
-      // Reviewed write names remain subject to approval even from a checkout.
+      // Reviewed write names remain subject to approval even from a trusted root.
       ["qdash_create_forum_post", registered("qdash_create_forum_post")],
     ]),
   };
@@ -102,18 +102,18 @@ test("local extension checkouts are trusted by path, not by tool name", async ()
   assert.equal(local.tools.get("qdash_create_forum_post").calls(), 0);
 });
 
-test("a checkout tool with a pinned name replaces the pinned implementation", async () => {
+test("a trusted tool with a pinned name replaces the pinned implementation", async () => {
   const pinnedTool = registered("qdash_get_default_chip");
   const localTool = registered("qdash_get_default_chip");
   const { extension } = buildQDashExtension(
     [
       { path: "/app/.pi-agent/packages/pi-qdash/extensions/qdash.ts", tools: new Map([["qdash_get_default_chip", pinnedTool]]) },
-      { path: "/app/extensions/dev/extensions/dev.ts", tools: new Map([["qdash_get_default_chip", localTool]]) },
+      { path: "/app/packages/dev/extensions/dev.ts", tools: new Map([["qdash_get_default_chip", localTool]]) },
     ],
     {},
     "/tmp/work",
     connection,
-    ["/app/extensions/dev"],
+    ["/app/packages/dev"],
   );
 
   assert.equal(extension.tools.length, 1);
@@ -123,7 +123,7 @@ test("a checkout tool with a pinned name replaces the pinned implementation", as
   assert.equal(pinnedTool.calls(), 0);
 });
 
-test("a checkout tool with an `images` parameter gets the newest transcript figure", async () => {
+test("a trusted tool with an `images` parameter gets the newest transcript figure", async () => {
   const seen = [];
   const evaluate = {
     definition: {
@@ -142,11 +142,11 @@ test("a checkout tool with an `images` parameter gets the newest transcript figu
   };
   const qwen = { provider: "openai-compatible", id: "qwen3.8-flash-next", input: ["text", "image"] };
   const { extension } = buildQDashExtension(
-    [{ path: "/app/extensions/pi-qcaleval/extensions/qcaleval.ts", tools: new Map([["qcal_evaluate", evaluate]]) }],
+    [{ path: "/app/packages/pi-qcaleval/extensions/qcaleval.ts", tools: new Map([["qcal_evaluate", evaluate]]) }],
     { getModel: (provider, id) => (provider === qwen.provider && id === qwen.id ? qwen : undefined) },
     "/tmp/work",
     connection,
-    ["/app/extensions/pi-qcaleval"],
+    ["/app/packages/pi-qcaleval"],
   );
   const scans = [];
   const api = {
@@ -387,7 +387,7 @@ test("decision messages tell the model what happened", () => {
   assert.match(decisionMessage(approval, { approved: true, error: "409" }), /failed:\n409/);
 });
 
-test("a trusted installed package gets the checkout treatment", () => {
+test("an installed package is not trusted by its name", () => {
   const readOnly = registered("qcal_evaluate");
   readOnly.definition.annotations = { readOnlyHint: true };
   const { extension } = buildQDashExtension(
@@ -405,14 +405,9 @@ test("a trusted installed package gets the checkout treatment", () => {
     "/tmp/work",
     connection,
     [],
-    ["@oqtopus-team/pi-qcaleval"],
   );
-  // The listed package is offered; an unlisted installed package still needs the allowlist.
-  assert.deepEqual(
-    extension.tools.map((tool) => tool.name),
-    ["qcal_evaluate"],
-  );
-  assert.equal(extension.tools[0].replay, "safe");
+  // Outside a trusted bundled root, only allowlisted names pass, whatever the package.
+  assert.deepEqual(extension.tools.map((tool) => tool.name), []);
 });
 
 test("a tool's text reaches the model without inline images and within the budget", async () => {

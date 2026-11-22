@@ -221,7 +221,7 @@ Polls keep the requested interval, 0.5 seconds by default, so each poll also com
 the chat store. The intervention wait polls every 15 seconds by default, never more often than
 every 5 seconds, and caps its timeout at one hour: it is a bounded wait inside a turn the user
 started, not a background watcher, and nothing continues a chat after it ends. A trusted
-checkout that replaces a waiting tool runs its own code. The waiting tools stay model-only, so a
+tool that replaces a waiting tool runs its own code. The waiting tools stay model-only, so a
 script cannot long-poll.
 
 Reviewed write tools therefore still run only after the user approves the model's own call on
@@ -436,29 +436,31 @@ The runtime loads their tools and skills directly; npm publication is not needed
 for QDash development or deployment. [Pi packages](./packages.md) describes
 independent distribution and release validation.
 
-`compose.yaml` also mounts `agent-runtime/extensions/` at `/app/extensions`
-(read-only) for additional development extensions. At startup, each subdirectory
-with a `pi` manifest is loaded. A checkout whose package name matches a bundled
-package replaces that package's tools and skills. Install any extra dependencies
-inside the checkout before starting the container, and restart the runtime after
-editing it. The image does not copy this gitignored directory.
+The runtime loads only these two packages and the skills their manifests declare
+(`createBundledResourceLoader` in `agent-runtime/src/bundled-extensions.ts`). It
+reads no packages from a pi `settings.json` and no extensions or skills that pi
+would discover under `PI_CODING_AGENT_DIR` or the working directory, so an
+installed or stale copy of a package cannot replace or extend the bundled tools
+and skills. A standalone pi installation keeps its own settings. The runtime
+neither mounts nor reads a leftover `agent-runtime/extensions/` directory from the
+retired development mount.
 
-The bundled pi-qdash package and overrides of it retain the per-name allowlist
-in `agent-runtime/src/allowed-tools.ts`. The bundled pi-qcaleval package is trusted
-as a whole. Additional checkouts are trusted by path, with these limits:
+The bundled pi-qdash package retains the per-name allowlist in
+`agent-runtime/src/allowed-tools.ts`. The bundled pi-qcaleval package is trusted
+as a whole by its package root, with these limits:
 
 - Reviewed write names (`REVIEWED_WRITE_TOOL_NAMES`) still require approval of
   their arguments and execute with the requesting user's credentials. Session-granted
   write names (`SESSION_GRANTED_WRITE_TOOL_NAMES`) run without a card; see
   [Supported hosts](./extensions.md#supported-hosts).
-- A checkout tool is replayed after interruption only when its
+- A trusted tool is replayed after interruption only when its
   `annotations.readOnlyHint` is `true`.
-- A trusted checkout that reuses a bundled tool's name replaces it, with a
+- A trusted tool that reuses a pi-qdash tool's name replaces it, with a
   replacement message in the startup log.
-- Checkout tools are callable only by the model, never from a `codemode` script,
+- Trusted tools are callable only by the model, never from a `codemode` script,
   including a replacement of a tool in `NESTED_READ_TOOL_NAMES`.
 
-Checkout tools receive `modelRegistry` and the same context as pi-qdash tools. Their
+Trusted tools receive `modelRegistry` and the same context as pi-qdash tools. Their
 `promptSnippet` and `promptGuidelines` appear under "Additional tools" in the system prompt.
 
 For tools declaring `images`, the runtime supplies the newest durable conversation figure,
@@ -473,9 +475,13 @@ for derivation. `details.prompt` records the text sent to the evaluation model.
 
 The runtime's `/chat` body carries two image lists: `initial_images` (the
 task chat's opening figures, attached only when the conversation is new)
-and `images` (attachments of the current turn, attached every time). The startup log lists loaded
-extension paths and tools. Anything placed under `agent-runtime/extensions/` on the host is trusted
-the same way, so keep that directory empty on production hosts.
+and `images` (attachments of the current turn, attached every time).
+
+At startup, the runtime logs one `skills:` line listing all loaded skills, then
+one `bundled extension` line per package with its name, `+source.<hash>` version,
+path, trust (`allowlisted` or `trusted`), tool count, and skills. Compare the
+version with an evaluation record's evaluator version to confirm which build a
+running runtime serves.
 
 ## Evaluation runs
 

@@ -35,7 +35,7 @@ import { Harness, MemoryStorage, ToolResultEntry } from "@earendil-works/pi-dura
 import { startFakeAgentQDash } from "../../packages/pi-qdash/tests/helpers/fake-agent-qdash.mjs";
 import { ALLOWLISTED_PACKAGES } from "../src/allowed-tools.ts";
 import { buildChatRegistry, buildCopilotExtension } from "../src/chat-registry.ts";
-import { bundledExtensionCheckouts, trustedCheckoutRoots } from "../src/local-extensions.ts";
+import { bundledExtensions, createBundledResourceLoader, trustedBundleRoots } from "../src/bundled-extensions.ts";
 
 const context = BACKGROUND_CONTEXT;
 const packagesDir = fileURLToPath(new URL("../../packages/", import.meta.url));
@@ -77,7 +77,7 @@ after(async () => {
 });
 
 function bundledPaths() {
-  return bundledExtensionCheckouts(packagesDir).map(({ path }) => path);
+  return bundledExtensions(packagesDir).map(({ path }) => path);
 }
 
 function textOf(content) {
@@ -143,7 +143,7 @@ async function openCli(steps, { ui } = {}) {
 /** The production chat registry on a durable harness, as the QDash web Agent runs it. */
 async function openChat(steps) {
   const faux = scripted(steps);
-  const loader = new DefaultResourceLoader({ cwd: workDir, agentDir: join(workDir, "runtime-agent"), additionalExtensionPaths: bundledPaths() });
+  const loader = createBundledResourceLoader({ cwd: workDir, agentDir: join(workDir, "runtime-agent"), bundled: bundledExtensions(packagesDir) });
   await loader.reload();
   assert.deepEqual(loader.getExtensions().errors, []);
   const models = createModels();
@@ -156,8 +156,7 @@ async function openChat(steps) {
       extensions: loader.getExtensions().extensions,
       modelRuntime,
       workDir,
-      extensionPaths: trustedCheckoutRoots(bundledExtensionCheckouts(packagesDir), ALLOWLISTED_PACKAGES),
-      trustedPackages: [],
+      extensionPaths: trustedBundleRoots(bundledExtensions(packagesDir), ALLOWLISTED_PACKAGES),
       copilot: buildCopilotExtension("QDash agent loop test prompt", []),
       internalCalls: {},
       codingTools: false,

@@ -19,7 +19,6 @@ import {
   ALLOWED_TOOL_NAMES,
   REVIEWED_WRITE_TOOL_NAMES,
   SESSION_GRANTED_WRITE_TOOL_NAMES,
-  TRUSTED_EXTENSION_PACKAGES,
   isDeferredTool,
   isNestedReadTool,
   isReviewedWriteTool,
@@ -37,20 +36,16 @@ import {
 } from "@oqtopus-team/pi-qdash/extensions/lib/write-approval.ts";
 import { isWaitToolName, WAIT_SPECS, type WaitSpec } from "@oqtopus-team/pi-qdash/extensions/lib/waits.ts";
 import { HOST_MODEL_KEY, HOST_NAME_KEY } from "@oqtopus-team/pi-qdash/extensions/lib/host-model.ts";
-import { isTrustedExtension } from "./local-extensions.ts";
+import { isTrustedExtension } from "./bundled-extensions.ts";
 import { withParameterOverrides } from "./tool-schemas.ts";
 import { parkingWait } from "./durable-waits.ts";
 
 /** Newest transcript entries searched for a figure when a tool asks for one. */
 const FIGURE_SCAN_LIMIT = 50;
 
-/** Whether an extension is a mounted development checkout or a trusted installed package. */
-function isTrusted(
-  extension: { path?: string },
-  roots: readonly string[],
-  packages: readonly string[],
-): boolean {
-  return extension.path !== undefined && isTrustedExtension(extension.path, roots, packages);
+/** Whether an extension lies under one of the bundled roots trusted as a whole. */
+function isTrusted(extension: { path?: string }, roots: readonly string[]): boolean {
+  return extension.path !== undefined && isTrustedExtension(extension.path, roots);
 }
 
 /** The provider and model ID the conversation's agent runs with, from the durable agent record. */
@@ -532,9 +527,8 @@ export class QDashWriteTools {
  *
  * Tools of the pinned pi-qdash package pass the reviewed allowlist by name.
  * An extension trusted as a whole, because its file lies under one of
- * `localExtensionRoots` (`AGENT_RUNTIME_EXTENSION_PATHS`, development only)
- * or it belongs to one of `trustedPackages` (installed at a pinned version),
- * offers every tool it defines. Reviewed write names still require approval,
+ * `localExtensionRoots` (the bundled roots outside the allowlisted packages,
+ * see bundled-extensions.ts), offers every tool it defines. Reviewed write names still require approval,
  * and a tool is replayed on recovery only when its
  * annotations say it is read-only. A trusted tool that reuses a pinned name
  * replaces the pinned implementation.
@@ -555,7 +549,6 @@ export function buildQDashExtension(
   cwd: string,
   connection: QDashConnection,
   localExtensionRoots: readonly string[] = [],
-  trustedPackages: readonly string[] = TRUSTED_EXTENSION_PACKAGES,
 ): {
   extension: Extension;
   writeTools: QDashWriteTools;
@@ -579,7 +572,7 @@ export function buildQDashExtension(
   const nested = new Set<string>();
   const deferred = new Set<string>();
   const trusted = (extension: { path?: string }) =>
-    isTrusted(extension, localExtensionRoots, trustedPackages);
+    isTrusted(extension, localExtensionRoots);
   // Pinned extensions first, so a trusted definition is the one that replaces.
   const ordered = [...extensions].sort((a, b) => Number(trusted(a)) - Number(trusted(b)));
   for (const extension of ordered) {
@@ -595,7 +588,7 @@ export function buildQDashExtension(
       const fillImages = local && acceptsImages(registered.definition.parameters);
       const fillKnowledge = local && acceptsKnowledge(registered.definition.parameters);
       // Only the pinned, audited implementation of a read tool may run from a
-      // script; a trusted checkout's replacement is model-only.
+      // script; a trusted replacement is model-only.
       const nestedRead = !local && !writeName && isNestedReadTool(name);
       const deferredTool = isDeferredTool(name);
       // The pinned waiting tools park between polls; a trusted replacement runs its own code.

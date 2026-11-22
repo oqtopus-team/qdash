@@ -26,5 +26,5 @@ postgres_data/
 # containers write files there that the building user may not be able to read.
 config/qubex-config/
 config/quelware-client/
-# Local pi extension checkouts (see compose.extensions.yaml).
+# Leftover checkouts of the retired agent-runtime/extensions/ mount; never loaded.
 agent-runtime/extensions/

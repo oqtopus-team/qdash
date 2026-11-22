@@ -40,8 +40,8 @@ the client and SDK first; run `task build-client-ts` before using pi CLI directl
 
 Rebuild the runtime with `docker compose up -d --build agent-runtime` after changing
 an extension or its skills. The [runtime extension loader](./architecture.md#developing-a-pi-extension-against-the-runtime)
-loads both packages and retains pi-qdash's tool allowlist and write approvals.
-Additional checkouts under `agent-runtime/extensions/` can override a bundled package.
+loads only these two packages and their skills, and retains pi-qdash's tool
+allowlist and write approvals.
 
 Evaluation records identify a bundled evaluator by its package name and version,
 with a `+source.<hash>` suffix. The hash covers its manifest, extension code, skills,

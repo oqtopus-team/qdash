@@ -112,15 +112,9 @@ void _nestedAreAllowed;
 void _deferredAreReviewed;
 
 /**
- * Installed pi packages trusted as a whole, like a local checkout: every tool
- * they define is offered without a per-name entry above (reviewed write names
- * still require user approval). Reviewed per package; the bundled source is reviewed with QDash.
- */
-export const TRUSTED_EXTENSION_PACKAGES = ["@oqtopus-team/pi-qcaleval"] as const;
-
-/**
- * Packages whose tools go through the per-name allowlist above even when a
- * local checkout of them is mounted for development: the checkout replaces
- * the bundled copy, but does not widen what the model may call.
+ * Bundled packages whose tools go through the per-name allowlist above. Every
+ * other bundled package (pi-qcaleval) is trusted as a whole by its root: each
+ * tool it defines is offered, and reviewed write names still require user
+ * approval (see bundled-extensions.ts).
  */
 export const ALLOWLISTED_PACKAGES = ["@oqtopus-team/pi-qdash"] as const;

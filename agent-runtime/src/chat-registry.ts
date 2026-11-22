@@ -45,9 +45,8 @@ export interface ChatRegistryParts {
   extensions: ReadonlyArray<{ path?: string; tools?: Map<string, { definition: CodingAgentTool }> }>;
   modelRuntime: ModelRuntime;
   workDir: string;
-  /** Trusted local checkouts and packages, as `buildQDashExtension` takes them. */
+  /** Bundled roots trusted as a whole, as `buildQDashExtension` takes them. */
   extensionPaths: readonly string[];
-  trustedPackages: readonly string[];
   /** From `buildCopilotExtension`. */
   copilot: Extension;
   /** Internal tools of `copilot` with the tools that may call them. */
@@ -79,7 +78,6 @@ export function buildChatRegistry(
     parts.workDir,
     connection,
     parts.extensionPaths,
-    parts.trustedPackages,
   );
   registry.install(qdash.extension);
   registry.install(parts.copilot);

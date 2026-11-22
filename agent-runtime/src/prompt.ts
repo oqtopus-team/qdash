@@ -23,7 +23,7 @@ export function buildSystemPrompt(
   skills: ReadonlyArray<{ name: string; description: string }> = [],
   /** Routing guide from the pi-qdash `qdash` skill; see tool-guide.ts. */
   toolGuide: string | null = null,
-  /** Guidelines of tools from local extension checkouts; see local-extensions.ts. */
+  /** Guidelines of tools from trusted bundled extensions; see bundled-extensions.ts. */
   localToolGuide: string | null = null,
   /** Whether the workspace tools (`bash`, `read`, `write`, `edit`) are offered; see exec-env.ts. */
   workspaceTools = false,

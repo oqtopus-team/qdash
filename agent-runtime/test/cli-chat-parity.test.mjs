@@ -46,7 +46,7 @@ import { ALLOWLISTED_PACKAGES } from "../src/allowed-tools.ts";
 import { buildChatRegistry, buildCopilotExtension } from "../src/chat-registry.ts";
 import { buildSystemPrompt } from "../src/prompt.ts";
 import { buildSkillTool } from "../src/skill-tool.ts";
-import { bundledExtensionCheckouts, trustedCheckoutRoots } from "../src/local-extensions.ts";
+import { bundledExtensions, createBundledResourceLoader, trustedBundleRoots } from "../src/bundled-extensions.ts";
 
 const context = BACKGROUND_CONTEXT;
 const packagesDir = fileURLToPath(new URL("../../packages/", import.meta.url));
@@ -216,9 +216,9 @@ after(() => {
   rmSync(workDir, { recursive: true, force: true });
 });
 
-/** The bundled pi-qdash and pi-qcaleval checkouts, as both hosts load them. */
+/** The bundled pi-qdash and pi-qcaleval packages, as both hosts load them. */
 function bundledPaths() {
-  return bundledExtensionCheckouts(packagesDir).map(({ path }) => path);
+  return bundledExtensions(packagesDir).map(({ path }) => path);
 }
 
 /** Tools offered in a request: the transcript's tool additions and removals, plus any request-level tools. */
@@ -308,8 +308,7 @@ async function openCli(steps, { capture, before = [] } = {}) {
 /** The production chat registry on a durable harness, with the same packages. */
 async function openChat(steps, { capture, systemPrompt = "QDash parity test prompt", copilotTools = [] } = {}) {
   const { faux, offered } = scriptedModel(steps);
-  const paths = bundledPaths();
-  const loader = new DefaultResourceLoader({ cwd: workDir, agentDir: join(workDir, "runtime-agent"), additionalExtensionPaths: paths });
+  const loader = createBundledResourceLoader({ cwd: workDir, agentDir: join(workDir, "runtime-agent"), bundled: bundledExtensions(packagesDir) });
   await loader.reload();
   assert.deepEqual(loader.getExtensions().errors, []);
   let extensions = loader.getExtensions().extensions;
@@ -344,8 +343,7 @@ async function openChat(steps, { capture, systemPrompt = "QDash parity test prom
       extensions,
       modelRuntime,
       workDir,
-      extensionPaths: trustedCheckoutRoots(bundledExtensionCheckouts(packagesDir), ALLOWLISTED_PACKAGES),
-      trustedPackages: [],
+      extensionPaths: trustedBundleRoots(bundledExtensions(packagesDir), ALLOWLISTED_PACKAGES),
       copilot: buildCopilotExtension(systemPrompt, copilotTools),
       internalCalls: {},
       codingTools: false,
@@ -615,7 +613,7 @@ test("a plain-language request reaches the experiment skills and the shared requ
   // This checks what each host sends the model and that the scripted skill read works. Whether
   // a real model picks the right skill from a plain request is not something a faux model shows.
   const { requestPolicyBullets } = await import("@oqtopus-team/pi-qdash/extensions/lib/qdash-guidance.ts");
-  const loader = new DefaultResourceLoader({ cwd: workDir, agentDir: join(workDir, "skills-agent"), additionalExtensionPaths: bundledPaths() });
+  const loader = createBundledResourceLoader({ cwd: workDir, agentDir: join(workDir, "skills-agent"), bundled: bundledExtensions(packagesDir) });
   await loader.reload();
   const skills = loader.getSkills().skills.filter((skill) => !skill.disableModelInvocation);
   const characterization = skills.find((skill) => skill.name === "qdash-characterization");
