@@ -309,6 +309,7 @@ def _gate_rows(
             "unit": row.unit,
             "accepted": row.accepted,
             "acceptance_basis": row.acceptance_basis.value if row.acceptance_basis else None,
+            "rejection": row.rejection.value if row.rejection else None,
             "reason": _text(row.reason, 300),
             "minimum": row.minimum,
             "maximum": row.maximum,

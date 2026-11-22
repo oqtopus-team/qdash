@@ -131,6 +131,8 @@ test("experiment-flow skills load in both hosts and name only tools the runtime 
       "qdash-one-qubit-calibration",
       "qdash-two-qubit-calibration",
       "qdash-characterization",
+      // The ordering check those skills defer to after Configure or ConfigureAll.
+      "qdash-rabi-after-configure",
       // The model-driven loop that runs those skills' tasks inside an agent session.
       "qdash-agent-calibration",
     ];

@@ -31,6 +31,7 @@ from qdash.datamodel.agent_session import (
     AgentActionType,
     AgentAutonomy,
     AgentCandidateAcceptanceBasis,
+    AgentCandidateRejection,
     AgentDecisionAssessment,
     AgentDecisionNextAction,
     AgentEvaluationMode,
@@ -145,6 +146,7 @@ def _measure(
     key: str | None = None,
     repeat_of: str | None = None,
     quality: dict[str, float] | None = None,
+    extra_outputs: dict[str, dict[str, Any]] | None = None,
 ) -> str:
     action = service.submit_action(
         project_id=PROJECT,
@@ -169,6 +171,7 @@ def _measure(
     doc.execution_status = status
     doc.save()
     outputs = {} if value is None else {"qubit_frequency": {"value": value, "unit": "GHz"}}
+    outputs.update(extra_outputs or {})
     TaskResultHistoryDocument(
         project_id=PROJECT,
         username=OWNER,
@@ -243,12 +246,13 @@ def _commit(
     key: str = "commit-1",
     version: int | None = None,
     autonomous: bool = True,
+    parameter: str = "qubit_frequency",
 ) -> Any:
     return service.commit_action_candidate(
         project_id=PROJECT,
         session_id=session_id,
         action_id=action_id,
-        parameter_name="qubit_frequency",
+        parameter_name=parameter,
         username=user,
         body=CommitAgentCandidateRequest(
             idempotency_key=key,
@@ -583,6 +587,114 @@ def test_a_grant_without_bounds_commits_on_the_task_checks_and_nothing_else(
     ).items
     assert [(c.accepted, c.acceptance_basis) for c in from_rabi] == [(False, None)]
     assert "not allowed by the session policy" in from_rabi[0].reason
+
+
+INCIDENTAL_AMPLITUDE = {"control_amplitude": {"value": 0.00706107, "unit": "a.u."}}
+
+
+def test_an_ungranted_incidental_output_neither_blocks_nor_widens_the_granted_update(
+    service: AgentSessionService,
+) -> None:
+    # As reported: CheckChevron granted for qubit_frequency only, no numeric bounds, and its
+    # control_amplitude estimate outside the session's scope.
+    session_id = _session(service, overrides={})
+    chevron = _measure(
+        service,
+        session_id,
+        "CheckChevron",
+        value=8.269908677,
+        extra_outputs=INCIDENTAL_AMPLITUDE,
+    )
+    candidates = {
+        c.parameter_name: c
+        for c in service.list_action_candidates(
+            project_id=PROJECT, session_id=session_id, action_id=chevron
+        ).items
+    }
+    frequency, amplitude = candidates["qubit_frequency"], candidates["control_amplitude"]
+    assert (frequency.accepted, frequency.acceptance_basis, frequency.rejection) == (
+        True,
+        AgentCandidateAcceptanceBasis.TASK_CHECKS,
+        None,
+    )
+    assert (amplitude.accepted, amplitude.rejection) == (
+        False,
+        AgentCandidateRejection.NOT_IN_SCOPE,
+    )
+    assert "not granted from CheckChevron and no approved bounds" in amplitude.reason
+    assert "not evidence against this result" in amplitude.reason
+
+    # The amplitude is never committed under the grant, and asking does not widen it.
+    _refused(
+        lambda: _commit(
+            service,
+            session_id,
+            chevron,
+            _decide(session_id, chevron),
+            parameter="control_amplitude",
+            key="amplitude",
+        ),
+        409,
+        "Parameter 'control_amplitude' is not allowed by the session policy",
+    )
+    committed = _commit(service, session_id, chevron, _decide(session_id, chevron))
+    assert committed.status == "committed"
+    assert _stored_frequency()["value"] == 8.269908677
+    assert _measure(service, session_id, "CheckRabi")
+    stored = AgentSessionDocument.find_one({"session_id": session_id}).run()
+    assert stored is not None
+    assert stored.policy.parameter_updates is not None
+    assert stored.policy.parameter_updates.parameters == ["qubit_frequency"]
+    assert stored.policy.allowed_overrides == {}
+
+
+def test_a_rejected_granted_output_still_stops_beside_an_incidental_one(
+    service: AgentSessionService,
+) -> None:
+    # Bounds approved with a stored session keep applying, and keep their reason code.
+    bounded = _session(service)
+    outside = _measure(
+        service, bounded, "CheckChevron", value=9.5, extra_outputs=INCIDENTAL_AMPLITUDE
+    )
+    rejections = {
+        c.parameter_name: c.rejection
+        for c in service.list_action_candidates(
+            project_id=PROJECT, session_id=bounded, action_id=outside
+        ).items
+    }
+    assert rejections == {
+        "qubit_frequency": AgentCandidateRejection.OUTSIDE_BOUNDS,
+        "control_amplitude": AgentCandidateRejection.NOT_IN_SCOPE,
+    }
+    _refused(lambda: _measure(service, bounded, "CheckRabi"), 409, "was rejected")
+    _refused(
+        lambda: _commit(service, bounded, outside, _decide(bounded, outside)),
+        409,
+        "Candidate gate rejected",
+    )
+
+    gated = _session(
+        service,
+        overrides={},
+        task_quality_gates={"CheckChevron": {"r2": NumericBounds(minimum=0.9)}},
+    )
+    low = _measure(
+        service,
+        gated,
+        "CheckChevron",
+        value=8.27,
+        quality={"r2": 0.5},
+        extra_outputs=INCIDENTAL_AMPLITUDE,
+    )
+    rejections = {
+        c.parameter_name: c.rejection
+        for c in service.list_action_candidates(
+            project_id=PROJECT, session_id=gated, action_id=low
+        ).items
+    }
+    assert rejections["qubit_frequency"] == AgentCandidateRejection.QUALITY_GATE
+    _refused(lambda: _measure(service, gated, "CheckRabi"), 409, "was rejected")
+    assert _stored_frequency() is None
 
 
 def test_a_grant_without_bounds_still_fails_closed_on_its_task_gate(

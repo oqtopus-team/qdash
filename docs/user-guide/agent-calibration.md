@@ -33,28 +33,35 @@ To have experts notified in Slack when the agent stops, configure
    documentation and chooses the tasks; you do not name tasks or commands. If you ask only
    "calibrate Q00", the agent first asks whether to calibrate step by step or to run a reviewed
    workflow; see [Choose How a Calibration Runs](./ai-chat.md#choose-how-a-calibration-runs).
-2. The agent proposes a session: the chip, the qubits, the tasks it may run, the range of each
-   input it may change, the number of measurements, how often one task may run on one qubit,
+2. The agent proposes a session: the chip, the qubits, the tasks it may run, the number of
+   measurements, how often one task may run on one qubit,
    how long the session lasts, and that it may run them on its own. When the goal needs a
    measured value saved, for example a new frequency that Rabi then uses, the proposal also lists
    **Parameter updates**: which values the agent may save to the calibration, from which tasks,
    and whether it may also write them to the backend configuration. Otherwise it reads **not
-   granted**. The web Agent shows it on an
+   granted**. The proposal holds no numeric ranges or quality limits: the agent cannot set
+   them, even ones you state, so each measurement runs on the saved calibration values and task
+   defaults, and a granted value is judged by its task's own checks. To work within ranges you
+   choose, create the session yourself ([Create a bounded session](#create-a-bounded-session)).
+   The web Agent shows it on an
    approval card. pi shows it in a review with every argument: scroll to the end, then press
    `y` to approve or `n` to decline. A non-interactive `pi -p` run cannot ask, so it does not
    create the session.
 3. Approve it. The approval covers every measurement inside that scope: the agent does not ask
-   again per step. It never covers a qubit, task, range, or number of measurements beyond the
+   again per step. It never covers a qubit, task, or number of measurements beyond the
    session. With parameter updates granted, it also covers saving those values: after a result
-   the agent assesses as a pass, and only within the value's approved range, the agent saves it
+   the agent assesses as a pass, and only when its task completed with its own checks passing,
+   the agent saves it
    (and writes it to the backend if that was granted) without asking again. Without them, saving
    a value asks you separately. The approval is yours: the agent runs steps on its own only in a
    session you created, not in a colleague's.
 4. The agent measures, reads each result, its figures, and the task documentation, and chooses
    the next measurement. Each run appears on the **Execution** page as `agent:<task>`, inside
    the session's row. A
-   measurement never writes calibration parameters; its values wait as candidates, checked
-   against the session's ranges and quality limits.
+   measurement never writes calibration parameters; its values wait as candidates. A value the
+   session does not grant, such as the control amplitude a frequency measurement also estimates,
+   is shown as not in the session's scope: it is kept for reference only, is not a sign that the
+   measurement failed, and does not hold up the granted value.
 5. Each measurement uses the saved calibration values, not waiting candidates. When the next
    measurement needs a value just measured, for example Rabi after a new frequency, the agent
    saves that value first. Under granted parameter updates it saves it on its own once it
@@ -63,7 +70,8 @@ To have experts notified in Slack when the agent stops, configure
    uncertain, or unexplained result is never saved: the agent stops for an expert before
    anything changes (see [When the agent stops for an expert](#when-the-agent-stops-for-an-expert)).
 6. When the goal is reached, the agent reports each qubit's runs and candidates and which values
-   were saved. To keep a value the session did not grant, approve the commit it proposes.
+   were saved. A value the session did not grant cannot be saved from it; saving it needs a new
+   session that grants it.
 
 The agent refuses, without measuring, a step outside the session, a measurement that is still
 running, and an exact repeat of a finished measurement it does not justify. QDash checks the same
@@ -150,8 +158,9 @@ already completed or expired changes nothing.
 Open the session page (the agent gives its link) to review a calibration step by step. The
 **Experiment audit** section lists, oldest first, the session approval, each step the agent
 proposed and why, each measurement with its requested settings, fitted values, quality metrics,
-and gate result, the agent's decision on each result and its next step, commits and their
-previous and new values, backend applies, and every expert question and answer. Each entry is
+and gate result (**accepted**, **rejected: outside bounds**, **rejected: quality gate**, or
+**not in session scope (reference only)** for a value the session does not grant), the agent's
+decision on each result and its next step, commits and their previous and new values, backend applies, and every expert question and answer. Each entry is
 labeled **QDash record**, **Agent statement**, **Expert statement**, or **Evaluator output**,
 so you can tell what QDash recorded from what the agent or a person said. **Not recorded** marks a
 fact the records do not hold, for example a decision the agent never recorded in an older

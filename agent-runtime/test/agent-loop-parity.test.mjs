@@ -304,7 +304,7 @@ test("in both hosts the model runs a step, stops for an expert on an unknown res
     assert.match(step.text, /Dispatched action .*: CheckRabi on Q00; execution completed/, `${host}: ${step.text}`);
     assert.ok(!step.isError, host);
     const observed = byName(firstResults, "qdash_get_agent_session_context")[1];
-    assert.match(observed.text, /candidate control_amplitude = 0\.2: rejected/, host);
+    assert.match(observed.text, /candidate control_amplitude = 0\.2: not in the session's scope, staged for reference only/, host);
     const [asked] = byName(firstResults, "qdash_request_agent_human");
     assert.match(asked.text, /The session is paused until an expert answers in QDash/, host);
     const refused = byName(firstResults, "qdash_run_agent_session_step")[1];
@@ -663,7 +663,7 @@ test("in both hosts update authority is approved once with the session, then pas
   const outcomes = {};
   for (const [host, open] of HOSTS) {
     // The grant is part of the one session approval the user sees.
-    const policy = { qids: ["Q00"], allowed_tasks: ["CheckChevron", "CheckRabi"], allowed_overrides: { qubit_frequency: { minimum: 7.4, maximum: 7.6 } }, autonomy: "auto", max_actions: 4, parameter_updates: grant };
+    const policy = { qids: ["Q00"], allowed_tasks: ["CheckChevron", "CheckRabi"], autonomy: "auto", max_actions: 4, parameter_updates: grant };
     const asking = await open([load(), call("qdash_create_agent_session", { chipId: "chip-001", policy, expiresInSeconds: 3600 }), done()]);
     try {
       await asking.ask("Q00 の周波数を校正して Rabi まで確認して");

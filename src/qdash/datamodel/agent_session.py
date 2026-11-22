@@ -195,6 +195,20 @@ class AgentCandidateAcceptanceBasis(str, Enum):
     TASK_CHECKS = "task_checks"  # a granted parameter without bounds: the task's own checks
 
 
+class AgentCandidateRejection(str, Enum):
+    """Why a candidate was not accepted.
+
+    ``not_in_scope`` is not a verdict on the measurement: the output is neither granted from
+    this task nor bounded by the session, so it is staged for reference only. It cannot be
+    committed from the session, and it is never evidence against the result or the result's
+    other candidates. The other two are deterministic checks the value or its result failed.
+    """
+
+    NOT_IN_SCOPE = "not_in_scope"  # not granted from this task and no approved bounds
+    OUTSIDE_BOUNDS = "outside_bounds"  # outside numeric bounds approved with the session
+    QUALITY_GATE = "quality_gate"  # a quality gate of its task (or session-wide) failed
+
+
 class AgentQualityGateScope(str, Enum):
     """Which results a quality gate checks."""
 

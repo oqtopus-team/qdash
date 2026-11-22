@@ -106,14 +106,56 @@ export function grantBoundsText(grant: AgentParameterUpdateGrant | null, overrid
   return `Update criteria: ${parts.join("; ")}. Bounds shown are values approved with this session; QDash does not verify where they came from.`;
 }
 
+/**
+ * Where a candidate stands, as QDash's gate decided it:
+ * - `accepted`: inside the session's scope and its checks.
+ * - `not_in_scope`: an output the session neither grants from this task nor bounds, such as an
+ *   incidental estimate. Staged for reference only: it cannot be committed from this session
+ *   and is no evidence against the result or its other candidates.
+ * - `outside_bounds`, `quality_gate`: a deterministic check failed. For a parameter the
+ *   session's update grant names from this task, QDash treats it as unresolved evidence.
+ */
+export type AgentCandidateStanding = "accepted" | "not_in_scope" | "outside_bounds" | "quality_gate";
+
 export interface AgentLoopCandidate {
   parameter_name: string;
   value: number;
   unit: string;
   accepted: boolean;
+  standing: AgentCandidateStanding;
+  /** True when this candidate is one the session's update grant names from its task. */
+  granted: boolean;
   reason: string;
   task_id: string;
 }
+
+/**
+ * The standing QDash reported, or for a QDash that predates `rejection`, the same rule
+ * derived from the candidate and the policy (gate_task_result in agent_session_service.py).
+ */
+export function candidateStanding(candidate: AgentCandidateResponse, policy: unknown): AgentCandidateStanding {
+  if (candidate.accepted) return "accepted";
+  const reported = (candidate as { rejection?: unknown }).rejection;
+  if (reported === "not_in_scope" || reported === "outside_bounds" || reported === "quality_gate") return reported;
+  const bounds = ((policy as { allowed_overrides?: Record<string, unknown> } | null)?.allowed_overrides ?? {})[candidate.parameter_name];
+  if (bounds) {
+    const inside = (candidate.minimum == null || candidate.value >= candidate.minimum) && (candidate.maximum == null || candidate.value <= candidate.maximum);
+    return inside ? "quality_gate" : "outside_bounds";
+  }
+  return isGranted(candidate, policy) ? "quality_gate" : "not_in_scope";
+}
+
+function isGranted(candidate: Pick<AgentCandidateResponse, "parameter_name" | "task_name">, policy: unknown): boolean {
+  const grant = parameterUpdateGrant(policy);
+  return grant !== null && grant.tasks.includes(candidate.task_name) && grant.parameters.includes(candidate.parameter_name);
+}
+
+const STANDING_TEXT: Record<AgentCandidateStanding, string> = {
+  accepted: "accepted",
+  not_in_scope: "not in the session's scope, staged for reference only (cannot be committed here; not evidence against this result or its other candidates)",
+  outside_bounds: "rejected: outside the session's approved bounds",
+  quality_gate: "rejected: a quality gate of its task failed",
+};
 
 export interface AgentLoopAttempt {
   action_id: string;
@@ -248,7 +290,7 @@ export const FAILED_RUN_HINT = (actionIds: readonly string[]): string =>
 
 /** What a session with update authority expects after each result, stated mechanically. */
 export const UPDATE_GRANT_HINT = (grant: AgentParameterUpdateGrant): string =>
-  `The user approved parameter updates for ${grant.parameters.join(", ")} from ${grant.tasks.join(", ")}${grant.apply_backend ? " with backend apply" : ""}: after a result you assess as pass, commit its accepted candidate with qdash_commit_agent_session_update (no per-call approval) before any step that depends on it. For a failed, uncertain, rejected, or unexplained result, or an evaluation that failed or is not a reliable SUCCESS, commit nothing and call qdash_request_agent_human citing it; QDash refuses every further step, commit, and apply of the session, a repeat included, until an expert answers that intervention.`;
+  `The user approved parameter updates for ${grant.parameters.join(", ")} from ${grant.tasks.join(", ")}${grant.apply_backend ? " with backend apply" : ""}: after a result you assess as pass, commit its accepted candidate with qdash_commit_agent_session_update (no per-call approval) before any step that depends on it. Judge the result by its granted outputs: another output of the task that is not in the session's scope (standing not_in_scope) is staged for reference only, is no evidence against the result, is never committed, and needs no expert, and the grant does not widen to it. For a failed, uncertain, or unexplained result, a granted output rejected by the gate, or an evaluation that failed or is not a reliable SUCCESS, commit nothing and call qdash_request_agent_human citing it; QDash refuses every further step, commit, and apply of the session, a repeat included, until an expert answers that intervention.`;
 
 /** The session's evaluator use as the user approved it; null for a session approved before it. */
 export type AgentEvaluationMode = "off" | "required" | null;
@@ -319,7 +361,7 @@ function isExpired(session: AgentSessionResponse, now: Date): boolean {
   return !Number.isFinite(expiresAt) || expiresAt <= now.getTime();
 }
 
-function attemptOf(action: AgentActionResponse, candidates?: AgentCandidateResponse[] | { error: string }): AgentLoopAttempt {
+function attemptOf(action: AgentActionResponse, policy: unknown, candidates?: AgentCandidateResponse[] | { error: string }): AgentLoopAttempt {
   const attempt: AgentLoopAttempt = {
     action_id: action.action_id,
     action_type: action.action_type,
@@ -341,6 +383,8 @@ function attemptOf(action: AgentActionResponse, candidates?: AgentCandidateRespo
       value: candidate.value,
       unit: candidate.unit ?? "",
       accepted: candidate.accepted,
+      standing: candidateStanding(candidate, policy),
+      granted: isGranted(candidate, policy),
       reason: candidate.reason,
       task_id: candidate.task_id,
     }));
@@ -525,7 +569,7 @@ export function buildAgentLoopContext(input: {
     may_run_step: state === "ready" && snapshotConsistent,
     may_request_human: autonomy === "auto" && ["ready", "budget_exhausted"].includes(state),
     next,
-    attempts: actions.map((action) => attemptOf(action, input.candidates?.get(action.action_id))),
+    attempts: actions.map((action) => attemptOf(action, policy, input.candidates?.get(action.action_id))),
     in_flight: inFlight,
     unstarted,
     runs_per_target: runsPerTarget,
@@ -698,7 +742,8 @@ export function formatAgentLoopContext(context: AgentLoopContext, links: { sessi
       `- ${attempt.action_id}: ${attempt.action_type}${target}; ${attempt.decision}; execution ${attempt.execution_status}${attempt.execution_id ? ` ${attempt.execution_id}` : ""}`,
     );
     for (const candidate of attempt.candidates ?? []) {
-      lines.push(`  candidate ${candidate.parameter_name} = ${candidate.value}${candidate.unit ? ` ${candidate.unit}` : ""}: ${candidate.accepted ? "accepted" : "rejected"} (${candidate.reason}); task ${candidate.task_id}`);
+      const blocking = candidate.granted && !candidate.accepted ? "; granted output rejected, so QDash holds this result as unresolved evidence" : "";
+      lines.push(`  candidate ${candidate.parameter_name} = ${candidate.value}${candidate.unit ? ` ${candidate.unit}` : ""}: ${STANDING_TEXT[candidate.standing]}${blocking} (${candidate.reason}); task ${candidate.task_id}`);
     }
     if (attempt.candidates_error) lines.push(`  candidates unavailable: ${attempt.candidates_error}`);
   }
@@ -793,11 +838,15 @@ export function agentSessionApprovalText(chipId: string, policy: unknown, expire
     `Create an agent session on chip ${chipId}:`,
     `- qubits: ${list(p.qids)}`,
     `- tasks: ${list(p.allowed_tasks)}`,
-    `- bounds (overrides and candidate gate): ${bounds(p.allowed_overrides)}`,
-    `- quality gates (each checks only its task's results): ${taskGates(p.task_quality_gates)}`,
+    // The tool refuses numeric bounds and gates, so a policy that still holds one is shown.
+    ...(Object.keys((p.allowed_overrides ?? {}) as object).length ? [`- bounds (overrides and candidate gate): ${bounds(p.allowed_overrides)}`] : []),
+    ...(Object.keys((p.task_quality_gates ?? {}) as object).length ? [`- quality gates (each checks only its task's results): ${taskGates(p.task_quality_gates)}`] : []),
     ...(Object.keys((p.quality_gates ?? {}) as object).length
       ? [`- session-wide quality gates (check every task): ${bounds(p.quality_gates)}`]
       : []),
+    ...(Object.keys((p.allowed_overrides ?? {}) as object).length || Object.keys((p.task_quality_gates ?? {}) as object).length
+      ? []
+      : ["- numeric bounds and quality gates: none; no task input is overridden"]),
     `- steps: ${auto ? "run without asking" : "each action asks"}, up to ${typeof p.max_actions === "number" ? p.max_actions : 100} actions, ${typeof p.max_rounds_per_target === "number" ? p.max_rounds_per_target : 3} runs per task and qubit`,
     `- expires in: ${typeof expiresInSeconds === "number" ? `${expiresInSeconds} s` : "QDash default (6 h)"}`,
     `- ${evaluationApprovalText(evaluationModeOf(p))}`,

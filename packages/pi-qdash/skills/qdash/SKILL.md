@@ -69,6 +69,7 @@ calibrate or characterize hardware:
 - `qdash-one-qubit-calibration` — coarse and fine single-qubit calibration and its recovery
 - `qdash-two-qubit-calibration` — CR and ZX90 calibration of couplings, and diagnosis of poor two-qubit quality
 - `qdash-characterization` — coherence checks, EF calibration, noise and coupling characterization, gate coherence limits
+- `qdash-rabi-after-configure` — a fresh `CheckRabi` after `Configure` or `ConfigureAll` before T1, T2 echo, Ramsey, and other Rabi-normalized tasks, and diagnosis of results measured on stale normalization
 
 Calibration runs take one of two paths, and they differ in how results reach QDash:
 

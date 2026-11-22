@@ -30,7 +30,9 @@ To measure one property again, such as the T1 of named qubits, a run of only tha
 usually smaller than any of these templates: the `simple` template with `qids` and that task.
 Read the task's prerequisites with `qdash_get_pipeline_catalog` and the qubits' latest results
 in the current cooldown first; the run must apply the configuration the task needs, and a qubit
-without current pulses needs `qdash-one-qubit-calibration` before its coherence means much.
+without current pulses needs `qdash-one-qubit-calibration` before its coherence means much. A run
+that applies `Configure` needs a fresh `CheckRabi` before T1, T2 echo, or Ramsey; follow the
+`qdash-rabi-after-configure` skill.
 
 - `coherence_check` runs `Configure`, a `CheckChevron` that does not update parameters,
   `CheckRabi`, `CheckT1`, `CheckT2Echo`, and a short `CheckRamsey`, then reconfigures and runs a

@@ -22,6 +22,15 @@ import { projectRequest } from "./useLinkedProject";
 
 const AUDIT_PAGE_SIZE = 50;
 
+/** Gate outcome of one candidate; an out-of-scope output is not a failed check. */
+export function gateOutcomeLabel(row: { accepted?: unknown; rejection?: unknown }): string {
+  if (row.accepted) return "accepted";
+  if (row.rejection === "not_in_scope") return "not in session scope (reference only)";
+  if (row.rejection === "outside_bounds") return "rejected: outside bounds";
+  if (row.rejection === "quality_gate") return "rejected: quality gate";
+  return "rejected";
+}
+
 const KIND_LABELS: Record<string, string> = {
   session_created: "Session approved",
   action_proposed: "Action proposed",
@@ -116,7 +125,7 @@ function EventDetail({ event }: { event: AgentAuditEvent }) {
       rows.push({
         label: "Gate",
         value: gate
-          .map((row) => `${String(row.parameter_name)} ${row.accepted ? "accepted" : "rejected"}`)
+          .map((row) => `${String(row.parameter_name)} ${gateOutcomeLabel(row)}`)
           .join(", "),
       });
     }

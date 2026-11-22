@@ -248,7 +248,6 @@ test("the gate approves the arguments its dialog showed, never ones changed whil
 const GRANT_POLICY = {
   qids: ["Q00"],
   allowed_tasks: ["CheckChevron", "CheckRabi"],
-  allowed_overrides: { qubit_frequency: { minimum: 7.4, maximum: 7.6 } },
   autonomy: "auto",
   max_actions: 4,
   parameter_updates: { parameters: ["qubit_frequency"], tasks: ["CheckChevron"], apply_backend: false },
@@ -262,8 +261,10 @@ test("the session dialog shows the update grant, and the approved policy reaches
   const ctx = { ...noUi(), hasUI: true, ui: { async confirm(_title, message) { shown.push(message); return true; } } };
   assert.equal(await toolCall({ toolName: name, toolCallId: "grant", input }, ctx), undefined);
   assert.match(shown[0], /- Parameter updates: granted for qubit_frequency from CheckChevron after a pass assessment and QDash's gates; backend apply not granted/);
-  assert.match(shown[0], /- bounds \(overrides and candidate gate\): qubit_frequency \[7\.4, 7\.6\]/);
-  assert.match(shown[0], /- Update criteria: qubit_frequency \[7\.4, 7\.6\]\. Bounds shown are values approved with this session; QDash does not verify where they came from\./);
+  assert.match(shown[0], /- numeric bounds and quality gates: none; no task input is overridden/);
+  assert.doesNotMatch(shown[0], /- bounds \(overrides and candidate gate\)|- quality gates/);
+  // A grant without bounds says the task's own checks decide; no number is shown for it.
+  assert.match(shown[0], /- Update criteria: qubit_frequency no numeric bounds \(its task's own checks decide\)/);
   const before = fake.state.requests.length;
   await tools.get(name).execute("grant", input, undefined, undefined, ctx);
   const posted = fake.state.requests.slice(before).find((request) => request.method === "POST" && request.path.endsWith("/agent-sessions"));
@@ -293,39 +294,36 @@ test("a malformed session policy fails before any dialog or QDash call", async (
   }
 });
 
-test("a quality gate QDash would refuse is blocked before the dialog, and a task gate is shown with its task", async () => {
+test("numeric bounds and quality gates the model sends are refused before the dialog or any QDash call, whatever source they claim", async () => {
   const name = "qdash_create_agent_session";
   const { tools, toolCall } = loadPi();
-  for (const [gates, problem] of [
-    [{ quality_gates: { average_gate_fidelity: { minimum: 0.99 } } }, /policy\.quality_gates: a session-wide gate would check results of every task/],
-    [{ task_quality_gates: { CheckRabi: { average_gate_fidelity: { minimum: 0.99 } } } }, /policy\.task_quality_gates\.CheckRabi/],
-    [{ task_quality_gates: { RandomizedBenchmarking: { r2: { minimum: 0.9 } } } }, /RandomizedBenchmarking must also be in allowed_tasks/],
-  ]) {
-    const input = { chipId: "chip-001", policy: { ...structuredClone(GRANT_POLICY), ...gates } };
+  const forged = [
+    // What the reported session needed to commit the incidental amplitude: a model-written window.
+    [{ allowed_overrides: { control_amplitude: { minimum: 0.005, maximum: 0.01 } } }, /- policy\.allowed_overrides: not accepted from this tool/],
+    [{ allowed_overrides: { qubit_frequency: { minimum: 8.22, maximum: 8.32 } } }, /- policy\.allowed_overrides: not accepted from this tool/],
+    // An empty field and a claimed source are refused too: no argument proves who wrote a number.
+    [{ allowed_overrides: {} }, /- policy\.allowed_overrides: not accepted from this tool/],
+    [{ allowed_overrides: { control_amplitude: { minimum: 0.005, source: "user" } } }, /- policy\.allowed_overrides: not accepted from this tool/],
+    [{ bounds_source: "user_stated", allowed_overrides: { qubit_frequency: { maximum: 8.3 } } }, /- policy\.allowed_overrides: not accepted from this tool/],
+    [{ bounds_source: "user_stated" }, /- policy: must not have additional properties/],
+    [{ task_quality_gates: { CheckChevron: { r2: { minimum: 0.9 } } } }, /- policy\.task_quality_gates: not accepted from this tool/],
+    [{ quality_gates: { r2: { minimum: 0.9 } } }, /- policy\.quality_gates: not accepted from this tool/],
+    [{ parameter_updates: { parameters: ["qubit_frequency"], tasks: ["CheckRamsey"] } }, /- policy\.parameter_updates\.tasks: CheckRamsey must also be in allowed_tasks/],
+  ];
+  for (const [fields, problem] of forged) {
+    const input = { chipId: "chip-001", policy: { ...structuredClone(GRANT_POLICY), ...fields } };
     const asked = [];
     const before = fake.state.requests.length;
-    const blocked = await toolCall({ toolName: name, toolCallId: "gate", input }, withUi(true, asked));
-    assert.equal(blocked?.block, true, JSON.stringify(gates));
+    const blocked = await toolCall({ toolName: name, toolCallId: "forged", input }, withUi(true, asked));
+    assert.equal(blocked?.block, true, JSON.stringify(fields));
     assert.match(blocked.reason, /Invalid agent session policy; no session was created/);
     assert.match(blocked.reason, problem);
-    await assert.rejects(tools.get(name).execute("gate", input, undefined, undefined, withUi(true, asked)), problem);
-    assert.deepEqual(asked, []);
-    assert.equal(fake.state.requests.length, before);
+    await assert.rejects(tools.get(name).execute("forged", input, undefined, undefined, withUi(true, asked)), problem);
+    assert.deepEqual(asked, [], JSON.stringify(fields));
+    assert.equal(fake.state.requests.length, before, JSON.stringify(fields));
   }
-
-  const { allowed_overrides: _bounds, ...unbounded } = structuredClone(GRANT_POLICY);
-  const gated = { ...unbounded, task_quality_gates: { CheckRabi: { r2: { minimum: 0.9 } } } };
-  const shown = [];
-  const ctx = { ...noUi(), hasUI: true, ui: { async confirm(_title, message) { shown.push(message); return true; } } };
-  assert.equal(await toolCall({ toolName: name, toolCallId: "gated", input: { chipId: "chip-001", policy: gated } }, ctx), undefined);
-  assert.match(shown[0], /- quality gates \(each checks only its task's results\): CheckRabi: r2 \[0\.9, inf\]/);
-  assert.doesNotMatch(shown[0], /session-wide quality gates/);
-  // A grant without bounds says the task's own checks decide; no number is shown for it.
-  assert.match(shown[0], /- Update criteria: qubit_frequency no numeric bounds \(its task's own checks decide\)/);
-  const before = fake.state.requests.length;
-  await tools.get(name).execute("gated", { chipId: "chip-001", policy: gated }, undefined, undefined, ctx);
-  const posted = fake.state.requests.slice(before).find((request) => request.method === "POST" && request.path.endsWith("/agent-sessions"));
-  assert.deepEqual(posted.body.policy.task_quality_gates, { CheckRabi: { r2: { minimum: 0.9 } } });
+  const offered = tools.get(name).parameters.properties.policy.properties;
+  for (const field of ["allowed_overrides", "task_quality_gates", "quality_gates"]) assert.equal(offered[field], undefined, field);
 });
 
 test("session creation refuses missing or changed evaluation authority from the server", async () => {

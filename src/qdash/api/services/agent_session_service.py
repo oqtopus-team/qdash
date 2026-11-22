@@ -76,6 +76,7 @@ from qdash.datamodel.agent_session import (
     AgentActionType,
     AgentAutonomy,
     AgentCandidateAcceptanceBasis,
+    AgentCandidateRejection,
     AgentSessionLifecycleEvent,
     AgentSessionStatus,
     AgentSessionStopRecord,
@@ -933,6 +934,7 @@ class AgentSessionService:
             parameter_name, value, error, unit, value_type = candidate
             bounds = session.policy.allowed_overrides.get(parameter_name)
             basis: AgentCandidateAcceptanceBasis | None = None
+            rejection: AgentCandidateRejection | None = None
             minimum = None
             maximum = None
             if bounds is None and parameter_name in granted:
@@ -942,8 +944,16 @@ class AgentSessionService:
                 basis = AgentCandidateAcceptanceBasis.TASK_CHECKS
                 reason = "candidate passed its task's completion checks; no numeric bounds"
             elif bounds is None:
+                # An output outside the session's scope, such as an incidental estimate of a
+                # task whose granted output is another parameter. It says nothing about the
+                # result or its other candidates.
                 accepted = False
-                reason = f"Parameter '{parameter_name}' is not allowed by the session policy"
+                rejection = AgentCandidateRejection.NOT_IN_SCOPE
+                reason = (
+                    f"Parameter '{parameter_name}' is not allowed by the session policy: not "
+                    f"granted from {task_result.name} and no approved bounds. Staged for "
+                    "reference only; not evidence against this result or its other candidates"
+                )
             else:
                 decision = evaluate_numeric_candidate(
                     value,
@@ -956,6 +966,8 @@ class AgentSessionService:
                 maximum = bounds.maximum
                 if accepted:
                     basis = AgentCandidateAcceptanceBasis.SESSION_BOUNDS
+                else:
+                    rejection = AgentCandidateRejection.OUTSIDE_BOUNDS
 
             if accepted:
                 for gate in gates:
@@ -990,6 +1002,7 @@ class AgentSessionService:
                         )
                 if not accepted:
                     basis = None
+                    rejection = AgentCandidateRejection.QUALITY_GATE
 
             items.append(
                 AgentCandidateResponse(
@@ -1009,6 +1022,7 @@ class AgentSessionService:
                     applied_quality_gates=[gate.model_copy() for gate in gates],
                     acceptance_basis=basis,
                     accepted=accepted,
+                    rejection=rejection,
                     reason=reason,
                     minimum=minimum,
                     maximum=maximum,

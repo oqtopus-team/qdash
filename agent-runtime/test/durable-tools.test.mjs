@@ -324,14 +324,18 @@ test("a session policy QDash would refuse fails before an approval card is reque
   const writeTool = extension.tools.find((tool) => tool.name === name);
   const context = { abortSignal: new AbortController().signal };
   const policy = { qids: ["Q6"], allowed_tasks: ["CheckRabi"] };
-  for (const [gates, problem] of [
-    [{ quality_gates: { average_gate_fidelity: { minimum: 0.99 } } }, /policy\.quality_gates: a session-wide gate/],
-    [{ task_quality_gates: { RandomizedBenchmarking: { r2: { minimum: 0.9 } } } }, /RandomizedBenchmarking must also be in allowed_tasks/],
+  // Raw arguments reach execute without Pi's schema validation; numeric criteria still fail here.
+  for (const [fields, problem] of [
+    [{ quality_gates: { average_gate_fidelity: { minimum: 0.99 } } }, /policy\.quality_gates: not accepted from this tool/],
+    [{ task_quality_gates: { CheckRabi: { r2: { minimum: 0.9 } } } }, /policy\.task_quality_gates: not accepted from this tool/],
+    [{ allowed_overrides: { control_amplitude: { minimum: 0.005, maximum: 0.01 } } }, /policy\.allowed_overrides: not accepted from this tool/],
+    [{ allowed_overrides: { qubit_frequency: { minimum: 8.22, maximum: 8.32, source: "user" } }, bounds_source: "user_stated" }, /policy\.allowed_overrides: not accepted from this tool/],
+    [{ autonomy: "auto", parameter_updates: { parameters: ["qubit_frequency"], tasks: ["CheckChevron"] } }, /CheckChevron must also be in allowed_tasks/],
   ]) {
-    await assert.rejects(writeTool.execute({ chipId: "64Qv3", policy: { ...policy, ...gates } }, { callId: "call-g" }, context), problem);
+    await assert.rejects(writeTool.execute({ chipId: "64Qv3", policy: { ...policy, ...fields } }, { callId: "call-g" }, context), problem);
   }
   const requested = await writeTool.execute(
-    { chipId: "64Qv3", policy: { ...policy, task_quality_gates: { CheckRabi: { r2: { minimum: 0.9 } } } } },
+    { chipId: "64Qv3", policy: { ...policy, autonomy: "auto", parameter_updates: { parameters: ["qubit_frequency"], tasks: ["CheckRabi"] } } },
     { callId: "call-ok" },
     context,
   );

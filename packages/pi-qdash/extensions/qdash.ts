@@ -1995,8 +1995,8 @@ export default function qdashExtension(host: ExtensionAPI) {
     promptGuidelines: [
       "Use qdash_create_agent_session only after the user explicitly asks to start an agent calibration workflow.",
       "qdash_create_agent_session is a write operation: the host asks the user to approve each call, and no argument approves it.",
-      "Never author numeric bounds or quality gates: put numbers in allowed_overrides or task_quality_gates only when the user stated them, and say so. Do not derive them from the current value, a percent window, or task knowledge, and do not add them to make a grant or commit possible.",
-      "When the goal needs a measured value committed (a dependent step reads it), propose parameter_updates in the policy (autonomy auto) as one object {parameters: [...], tasks: [...], apply_backend: false}, never a list: only the parameters the goal commits, only the tasks that measure them, apply_backend only when the goal needs the backend files written. A grant needs no bounds: a granted output is accepted when its task completed with its own checks passing. Find output names with qdash_get_pipeline_catalog taskNames. Show the user every field before asking: approving it lets passing results be committed without asking again.",
+      "The policy takes no numeric bounds or quality gates (allowed_overrides, task_quality_gates, quality_gates): the tool refuses them, even ones the user stated, because QDash cannot verify who wrote a number. A granted output is accepted on its task's own completion checks, and a session created here overrides no task input.",
+      "When the goal needs a measured value committed (a dependent step reads it), propose parameter_updates in the policy (autonomy auto) as one object {parameters: [...], tasks: [...], apply_backend: false}, never a list: only the parameters the goal commits, only the tasks that measure them, apply_backend only when the goal needs the backend files written. A granted output is accepted when its task completed with its own checks passing; another output of the same task that is not granted (such as CheckChevron's control_amplitude when only qubit_frequency is granted) is staged for reference only and never blocks the granted one. Never add an output to the grant only because the task also reports it. Find output names with qdash_get_pipeline_catalog taskNames. Show the user every field before asking: approving it lets passing results be committed without asking again.",
       "Never create a new session to get around a paused one; the tool refuses while one of your sessions on the chip is paused for these qubits.",
     ],
     parameters: Type.Object({
@@ -2041,12 +2041,6 @@ export default function qdashExtension(host: ExtensionAPI) {
         // The host's model, from the extension context; no argument can set it.
         model: hostModelIdentity(ctx),
       });
-      const requestedGates = Object.keys(params.policy.task_quality_gates ?? {});
-      const storedGates = (data as { policy?: { task_quality_gates?: Record<string, unknown> } }).policy?.task_quality_gates ?? {};
-      if (requestedGates.some((task) => !(task in storedGates))) {
-        // A QDash server that predates task_quality_gates ignores the field.
-        throw new Error(`QDash created session ${(data as { session_id?: string }).session_id ?? "(unknown)"} without the approved task quality gates; this server predates task_quality_gates. Do not run steps in it: complete it, and upgrade QDash before creating a gated session.`);
-      }
       const expectedEvaluation = params.policy.evaluation ?? "off";
       if ((data as { policy?: { evaluation?: string | null } }).policy?.evaluation !== expectedEvaluation) {
         throw new Error(`QDash created session ${(data as { session_id?: string }).session_id ?? "(unknown)"} without the approved evaluation mode (${expectedEvaluation}). Do not run steps in it: complete it, and upgrade QDash before creating another session.`);

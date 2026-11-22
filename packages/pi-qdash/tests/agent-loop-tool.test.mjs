@@ -192,7 +192,8 @@ test("an unknown result pauses the session; the expert's reply is read back afte
   assert.match(text, new RegExp(`- attempt: CheckRabi on Q00, completed, action ${rabi.details.actionId}`));
   assert.match(text, /Guidance: Beating means the frequency is off; run CheckChevron first/);
   assert.match(text, /Rule: The expert's guidance is evidence .* not new permission/);
-  assert.match(text, /candidate control_amplitude = 0\.2: rejected/);
+  // No bounds or grant name it, so it is out of scope, not a failed check (the fake predates `rejection`).
+  assert.match(text, /candidate control_amplitude = 0\.2: not in the session's scope, staged for reference only/);
 
   // Guidance is not permission: a task outside the session is still refused.
   const outside = await restarted.step("u-5", { sessionId, taskName: "CheckT1", qid: "Q00", rationale: "The expert mentioned coherence." });
@@ -895,6 +896,50 @@ test("with update authority approved once, a passing result is committed without
   const rabi = await t.step("rabi", { sessionId, taskName: "CheckRabi", qid: "Q00", rationale: "Rabi on the committed frequency." });
   assert.equal(rabi.details.dispatched, true, textOf(rabi));
   assert.deepEqual(fake.state.dispatches.at(-1).calibration, { qubit_frequency: 7.452 });
+});
+
+test("an ungranted incidental output out of scope neither blocks nor commits, and the granted frequency commits; a rejected granted output still stops", async () => {
+  const t = tools();
+  // As reported: CheckChevron granted for qubit_frequency only, no numeric bounds; its
+  // control_amplitude estimate is outside the session's scope.
+  const sessionId = autoSession({ allowed_overrides: {}, parameter_updates: GRANT });
+  delete fake.state.calibration.Q00;
+  const incidental = { parameter_name: "control_amplitude", value: 0.00706107, unit: "a.u.", qid: "Q00", accepted: false, rejection: "not_in_scope", reason: "Parameter 'control_amplitude' is not allowed by the session policy: not granted from CheckChevron and no approved bounds. Staged for reference only; not evidence against this result or its other candidates" };
+  fake.queueOutcome("CheckChevron", { status: "completed", candidates: [{ parameter_name: "qubit_frequency", value: 8.269908677, unit: "GHz", qid: "Q00", acceptance_basis: "task_checks" }, incidental] });
+  const step = await t.step("chevron-incidental", { sessionId, taskName: "CheckChevron", qid: "Q00", rationale: "Find the frequency." });
+  assert.equal(step.details.dispatched, true, textOf(step));
+  const chevron = step.details.actionId;
+
+  const read = await t.context(sessionId);
+  const text = textOf(read);
+  assert.match(text, /candidate qubit_frequency = 8\.269908677 GHz: accepted/);
+  assert.match(text, /candidate control_amplitude = 0\.00706107 a\.u\.: not in the session's scope, staged for reference only \(cannot be committed here; not evidence against this result or its other candidates\)/);
+  assert.doesNotMatch(text, /unresolved evidence/);
+  const attempt = read.details.data.attempts.find((item) => item.action_id === chevron);
+  assert.deepEqual(attempt.candidates.map((item) => [item.parameter_name, item.standing, item.granted]), [["qubit_frequency", "accepted", true], ["control_amplitude", "not_in_scope", false]]);
+
+  const amplitude = await t.update("amp", { sessionId, actionId: chevron, parameterName: "control_amplitude", interpretation: "pass" });
+  assert.match(textOf(amplitude), /grants updates of qubit_frequency only, not control_amplitude\. Its candidate stays staged for reference; it does not block committing a granted parameter of the same result/);
+  const committed = await t.update("freq", { sessionId, actionId: chevron, parameterName: "qubit_frequency", interpretation: "Clear Chevron peak at 8.2699 GHz; the task completed with its own checks passing." });
+  assert.equal(committed.details.committed, true, textOf(committed));
+  assert.deepEqual(fake.state.commits.filter((item) => item.session_id === sessionId).map((item) => item.parameter_name), ["qubit_frequency"]);
+  // Nothing widened the approval.
+  assert.deepEqual(fake.state.sessions.get(sessionId).policy.parameter_updates, GRANT);
+  assert.deepEqual(fake.state.sessions.get(sessionId).policy.allowed_overrides, {});
+  const rabi = await t.step("rabi-after-incidental", { sessionId, taskName: "CheckRabi", qid: "Q00", rationale: "Rabi on the committed frequency." });
+  assert.equal(rabi.details.dispatched, true, textOf(rabi));
+
+  // A granted output the gate rejected is still unresolved evidence.
+  const badSession = autoSession({ allowed_overrides: {}, parameter_updates: GRANT });
+  fake.queueOutcome("CheckChevron", { status: "completed", candidates: [{ parameter_name: "qubit_frequency", value: 8.27, qid: "Q00", accepted: false, rejection: "quality_gate", reason: "Quality metric 'r2' for task 'CheckChevron' is below the minimum" }, incidental] });
+  const bad = await t.step("chevron-bad", { sessionId: badSession, taskName: "CheckChevron", qid: "Q00", rationale: "Find the frequency." });
+  const badText = textOf(await t.context(badSession));
+  assert.match(badText, /candidate qubit_frequency = 8\.27: rejected: a quality gate of its task failed; granted output rejected, so QDash holds this result as unresolved evidence/);
+  const gate = await t.update("bad-freq", { sessionId: badSession, actionId: bad.details.actionId, parameterName: "qubit_frequency", interpretation: "pass" });
+  assert.match(textOf(gate), /gate rejected qubit_frequency = 8\.27/);
+  const blocked = await t.step("rabi-bad", { sessionId: badSession, taskName: "CheckRabi", qid: "Q00", rationale: "Rabi anyway." });
+  assert.match(textOf(blocked), /was rejected/);
+  assert.equal(fake.state.commits.filter((item) => item.session_id === badSession).length, 0);
 });
 
 test("without the grant, for another user, on an older QDash, or for a rejected result nothing is committed", async () => {

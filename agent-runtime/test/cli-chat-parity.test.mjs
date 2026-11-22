@@ -607,6 +607,7 @@ const EXPERIMENT_SKILLS = [
   "qdash-two-qubit-calibration",
   "qdash-chip-bringup",
   "qdash-agent-calibration",
+  "qdash-rabi-after-configure",
 ];
 
 test("a plain-language request reaches the experiment skills and the shared request policy in the pi CLI and in chat", async () => {

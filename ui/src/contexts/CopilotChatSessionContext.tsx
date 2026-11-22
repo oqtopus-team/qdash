@@ -1274,7 +1274,17 @@ export function CopilotChatSessionProvider({
           chatTitle: sessionsRef.current.find((s) => s.id === sessionId)?.title ?? "Chat",
           ...(detail ? { detail } : {}),
         };
-        for (const listener of [...chatEventListeners.current]) listener(event);
+        // Listeners run inside this stream's loop. A notification is a side channel: one that
+        // throws (a toast renderer, a sound) must not end the turn it reports on, or replace
+        // its answer with an error. Only listeners such as ChatNotifier act while the chat is
+        // hidden, so without this a hidden chat alone would fail on it.
+        for (const listener of [...chatEventListeners.current]) {
+          try {
+            listener(event);
+          } catch (error) {
+            console.error("A chat event listener failed", error);
+          }
+        }
       };
       const setConnection = (patch: Partial<TurnConnection>) => {
         connection = { ...connection, ...patch };

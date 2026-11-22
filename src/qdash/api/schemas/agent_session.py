@@ -12,6 +12,7 @@ from qdash.datamodel.agent_session import (
     AgentActionType,
     AgentAppliedQualityGate,
     AgentCandidateAcceptanceBasis,
+    AgentCandidateRejection,
     AgentDecisionAssessment,
     AgentDecisionNextAction,
     AgentEvaluationMode,
@@ -332,6 +333,17 @@ class AgentCandidateResponse(BaseModel):
         ),
     )
     accepted: bool
+    rejection: AgentCandidateRejection | None = Field(
+        default=None,
+        description=(
+            "Why the candidate was not accepted; null when accepted. not_in_scope: the output "
+            "is neither granted from this task nor bounded by the session, so it is staged for "
+            "reference only; it cannot be committed from this session and is not evidence "
+            "against the result or its other candidates. outside_bounds: the value is outside "
+            "the session's approved bounds. quality_gate: a quality gate of the result's task "
+            "failed or its metric is missing"
+        ),
+    )
     reason: str
     minimum: float | None = None
     maximum: float | None = None

@@ -20935,6 +20935,16 @@
         "title": "AgentCandidateReference",
         "description": "Identify one authoritative accepted candidate for plan finalization."
       },
+      "AgentCandidateRejection": {
+        "type": "string",
+        "enum": [
+          "not_in_scope",
+          "outside_bounds",
+          "quality_gate"
+        ],
+        "title": "AgentCandidateRejection",
+        "description": "Why a candidate was not accepted.\n\n``not_in_scope`` is not a verdict on the measurement: the output is neither granted from\nthis task nor bounded by the session, so it is staged for reference only. It cannot be\ncommitted from the session, and it is never evidence against the result or the result's\nother candidates. The other two are deterministic checks the value or its result failed."
+      },
       "AgentCandidateResponse": {
         "properties": {
           "session_id": {
@@ -21017,6 +21027,17 @@
           "accepted": {
             "type": "boolean",
             "title": "Accepted"
+          },
+          "rejection": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentCandidateRejection"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why the candidate was not accepted; null when accepted. not_in_scope: the output is neither granted from this task nor bounded by the session, so it is staged for reference only; it cannot be committed from this session and is not evidence against the result or its other candidates. outside_bounds: the value is outside the session's approved bounds. quality_gate: a quality gate of the result's task failed or its metric is missing"
           },
           "reason": {
             "type": "string",

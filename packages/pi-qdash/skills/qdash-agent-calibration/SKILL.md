@@ -47,32 +47,34 @@ it.
    configuration files rather than from QDash. The grant says which parameters may change; it
    needs no numeric bounds. A granted output from a granted task is accepted when its task
    completed, so the task's own checks (such as its fit R² threshold) passed; a session's policy
-   cannot change after approval, so name every output the goal commits. Without
-   `parameter_updates` an output is a candidate only inside bounds in `allowed_overrides`, and
-   every commit and apply is a separate approval.
-4. Never author a scientific threshold. Do not derive bounds from the current value, a percent
-   window, a round number, or your own reading of the task knowledge, and do not add bounds
-   only to make a grant or a commit possible. Put numbers in `allowed_overrides` or
-   `task_quality_gates` only when the user stated them in this conversation, and say they are
-   the user's values; QDash records them as approved with the session and cannot verify where
-   they came from. `allowed_overrides` also bounds the task inputs a step may override (such as
-   `shots`); list an input only with bounds the user gave or the catalog's own input limits,
-   which QDash enforces anyway. `task_quality_gates` names a task and a metric QDash records on
-   that task's results (currently only `r2`); a gate never applies to another task, and an
-   output such as `average_gate_fidelity` is not a quality metric. Without user-stated numbers,
-   the task's own completion checks are the criterion. When the user wants reviewed commits in
-   a `confirm_each` session but gave no bounds, ask them for the accepted window; measurement
-   can proceed in the approved scope without it, but nothing can be committed.
+   cannot change after approval, so name every output the goal commits, and only those: a task
+   often reports more than the goal needs (CheckChevron also estimates `control_amplitude`), and
+   an output you leave out is staged for reference without affecting the granted one. Without
+   `parameter_updates`, a session you create accepts no output, because it holds no bounds
+   (step 4), so nothing in it can be committed.
+4. The session policy holds no numbers that accept or reject a result. `qdash_create_agent_session`
+   refuses `allowed_overrides`, `task_quality_gates`, and `quality_gates`, even when the user
+   stated the values and even when empty, because QDash cannot verify who wrote a number, and a
+   model-written window would silently decide which results count. A granted output is accepted
+   on its task's own completion checks (such as the fit R² threshold that fails the task), and
+   you judge the result from the task knowledge. Because `allowed_overrides` is also what lets a
+   step override a task input, a session you create runs every step on the stored calibration
+   values and the task defaults. A measurement's sweep window (such as CheckChevron's
+   `detuning_range`) is a run parameter the step never changes; a frequency outside it was not
+   measured, so do not call it checked. If the user wants approved bounds, gates, or input
+   overrides, tell them to create the session in QDash themselves (the qdash-agent CLI or the
+   API); a session they created keeps its bounds, and you can reuse it (step 2).
 5. Propose the session with `qdash_create_agent_session`: the qubits, the tasks the goal
-   needs, any `allowed_overrides` and `task_quality_gates` the user stated (step 4),
-   `allow_reconfigure` only when a task needs `Configure`, a small `max_actions`
+   needs, `allow_reconfigure` only when a task needs `Configure` (then follow the
+   `qdash-rabi-after-configure` skill so a fresh `CheckRabi` precedes Rabi-normalized steps), a
+   small `max_actions`
    (the planned steps plus a few recovery rounds), `max_rounds_per_target`,
    `autonomy: "auto"`, `parameter_updates` from step 3 when the goal commits values,
    `evaluation: "required"` only when the user asked for the calibration evaluator (otherwise
    `off`, the default; it cannot change during the session), and the
    expiry the user asked for or a few hours. Say in a few sentences what approving it allows:
-   each committable output, its bounds if the user gave any (otherwise that its task's own
-   checks decide), the tasks that may supply it, whether backend apply
+   each committable output and that its task's own checks decide it, the tasks that may supply
+   it, whether backend apply
    is included, whether the evaluator is required, and that a failed, uncertain, or
    unexplained result stops for a person instead
    of being committed. The call is a reviewed write: the user's approval of it is the approval
@@ -89,30 +91,36 @@ it.
 2. Choose the next step from the evidence: the latest results and candidates, the task
    knowledge's documented outcomes, and the experiment skill's order. Write that evidence into
    `rationale`; it is recorded with the action for the expert and the audit trail.
-3. Run it with `qdash_run_agent_session_step`: one task on one qubit, overrides only within the
-   session's bounds. The tool refuses anything outside the session and an exact repeat of a
-   finished measurement; repeat one only when the evidence calls for it, with
-   `repeatOfActionId`. QDash checks the same again with its own records (the creator, a
-   running measurement, the round budget, repeats), so a "QDash refused" answer means the
-   session changed under you: read the context again rather than retrying the same call.
+3. Run it with `qdash_run_agent_session_step`: one task on one qubit, with overrides only in a
+   session whose approved policy bounds them (none, in a session you created). The tool refuses
+   anything outside the session and an exact repeat of a finished measurement; repeat one only when
+   the evidence calls for it, with `repeatOfActionId`. QDash checks the same again with its own
+   records (the creator, a running measurement, the round budget, repeats), so a "QDash refused"
+   answer means the session changed under you: read the context again rather than retrying the same
+   call.
 4. Wait with `qdash_wait_agent_action` (`waitForExecution: true`), then `qdash_wait_execution`
    with the execution id.
 5. Observe: the candidates in `qdash_get_agent_session_context`, the result with
    `qdash_get_task_result`, the figures with `qdash_get_task_figures`, and the task knowledge.
-   Follow the session's `evaluation` mode, which the context reports: with `required`,
-   evaluate each result's figure with `qcal_evaluate` before you commit it; with `off`, do not
-   call `qcal_evaluate` and do not report an evaluator verdict; for an older session without a
-   mode, evaluate with `qcal_evaluate` when the host offers it. `completed` is an
-   execution status, not a verdict; a rejected candidate means the session's bounds or quality
-   gates refused the value.
-6. Decide: a result the task knowledge accepts is a pass and moves on to the next task of the
-   goal; a failed, uncertain, rejected, or unexplained result, or an evaluation that failed or
-   is not a reliable `SUCCESS`, goes to an expert. QDash refuses every further step of the
-   session, a repeat included, until the expert answers an intervention that cites that
-   action, so there is no retry on your own. Take thresholds from the task knowledge and the
-   skills, never from memory. Judge a pass only from evidence you read: the
-   fit values, quality metrics, figures, and evaluation. A completed execution or an accepted
-   candidate alone is not a pass.
+   Follow the session's `evaluation` mode, which the context reports: with `required`, evaluate each
+   result's figure with `qcal_evaluate` before you commit it; with `off`, do not call
+   `qcal_evaluate` and do not report an evaluator verdict; for an older session without a mode,
+   evaluate with `qcal_evaluate` when the host offers it. `completed` is an execution status, not a
+   verdict. Each candidate's standing (the context's `standing`, and QDash's `rejection`) says what
+   QDash decided: `accepted`; `not_in_scope` ("not in the session's scope" in the context text), an
+   output the session neither grants from this task nor bounds, staged for reference only; or
+   `outside_bounds` or `quality_gate`, a check the session holds that the value or its result
+   failed.
+6. Decide: a result the task knowledge accepts is a pass and moves on to the next task of the goal;
+   a failed, uncertain, or unexplained result, a granted output rejected by the gate, or an
+   evaluation that failed or is not a reliable `SUCCESS`, goes to an expert. A `not_in_scope`
+   candidate is not a rejection of the result: it says nothing about the measurement, does not block
+   the granted output, and needs no expert. Report it as an uncommitted estimate. QDash refuses
+   every further step of the session, a repeat included, until the expert answers an intervention
+   that cites that action, so there is no retry on your own. Take thresholds from the task knowledge
+   and the skills, never from memory. Judge a pass only from evidence you read: the fit values,
+   quality metrics, figures, and evaluation. A completed execution or an accepted candidate alone is
+   not a pass.
 7. Record the decision with the step that carries it out. Pass `assessment` (`pass`, `fail`, or
    `inconclusive`) and `interpretation` to `qdash_run_agent_session_step`: a few sentences
    naming the fit values, quality metrics, evaluation status, and the task-knowledge criterion
@@ -142,22 +150,27 @@ it.
      Read `qdash_get_agent_session_context` again, then run the dependent step. QDash refuses
      a dependent step while the earlier value is not yet committed (or applied), and refuses
      every step, commit, and apply while any result of the session is unresolved: failed,
-     assessed `fail` or `inconclusive`, rejected by the gate, missing the granted value, or
-     with an evaluation that failed, has no diagnosis, or is not a reliable `SUCCESS`.
-   - Never commit a failed, uncertain, rejected, or unexplained result, and never record a
-     pass you do not hold to get past a refusal: call `qdash_request_agent_human` instead.
+     assessed `fail` or `inconclusive`, with a granted output rejected by the gate, missing the
+     granted value, or with an evaluation that failed, has no diagnosis, or is not a reliable
+     `SUCCESS`. A `not_in_scope` output of the same result never makes it unresolved.
+   - Never commit a failed, uncertain, or unexplained result or a rejected granted output, and
+     never record a pass you do not hold to get past a refusal: call `qdash_request_agent_human`
+     instead.
      QDash never commits a measurement any decision assessed `fail` or `inconclusive` under
      the session's authority, even after an expert answers; when the expert's answer calls
      for it, measure again within the session.
-   - Without a grant for the value, show the accepted candidate and propose
+   - Without a grant for the value, in a session a person created whose approved bounds
+     accepted it, show the accepted candidate and propose
      `qdash_commit_agent_candidate` (or `qdash_commit_agent_candidate_set` for several values
      of one qubit), which the user approves per call; backend files likewise go through
      `qdash_apply_agent_candidate_commit`. If the user declines, do not run the dependent step
      as if the value had changed: report the staged value and stop or ask.
-   - A candidate rejected as "not allowed by the session policy" cannot be committed from this
-     session: say so, and propose a new session that names that output (see Establish the
-     session) instead of running the dependent step on the old value. A hardware change also
-     needs a session that allows `Configure`.
+   - A `not_in_scope` candidate (reason "not allowed by the session policy") cannot be
+     committed from this session, and the grant never widens to it. When no later step of the
+     goal reads it, report it and carry on. Only when a dependent step needs that value, say so
+     and propose a new session that names it (see Establish the session) instead of running
+     the dependent step on the old value. A hardware change also needs a session that allows
+     `Configure`.
 
 ## Ask an expert
 

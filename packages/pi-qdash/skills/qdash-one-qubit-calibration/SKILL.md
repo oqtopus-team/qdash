@@ -55,7 +55,9 @@ List templates with `qdash_query` action `flow_templates` and read one with acti
 `flow_template`. Check `qdash_list_flows` for a flow the user saved from the template. Before
 editing a task list or recovering a failure, read the tasks with `qdash_get_pipeline_catalog` and
 `taskNames` for their purpose and prerequisites, and with `qdash_get_task_knowledge` for expected
-results and failure modes.
+results and failure modes. When an edited task list or a recovery runs `Configure` or
+`ConfigureAll` before a task that reads the Rabi normalization (such as `CheckT1`), check its
+order with the `qdash-rabi-after-configure` skill.
 
 ## Move on, recover, or stop
 

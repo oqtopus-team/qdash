@@ -59,10 +59,11 @@ twice. If the assistant never received the message, the chat says so and asks yo
 again. After about 10 minutes without a connection, the chat stops trying and says that the
 assistant may still be working. **Stop** works throughout and stops only that answer.
 
-Moving to another page, closing and reopening the sidebar or the floating window, or reloading
-the page in the same browser tab does not stop an answer. The chat reconnects to it and shows it
-from its start, without sending your message again; until then it shows **Reconnecting to the
-running answer** with what it last saw the assistant do and **last known update … ago**. An answer
+Moving to another page, closing the sidebar or the floating window with its close button, or
+reloading the page in the same browser tab does not stop an answer; only **Stop** does. Closing
+only hides the chat: the answer goes on, and reopening the chat shows its progress or how it
+ended. After a reload, the chat reconnects to the answer and shows it from its start, without
+sending your message again; until then it shows **Reconnecting to the running answer** with what it last saw the assistant do and **last known update … ago**. An answer
 that ended meanwhile is shown as it ended. If the chat cannot reconnect, it says so above the
 message box and leaves the conversation as it was. An answer you started in another project keeps
 running when you switch projects; the chat shows **Running in another project** and follows it
@@ -274,9 +275,13 @@ every task result is judged by the same gates as a saved workflow. The execution
 
 Ask for a supervised calibration of named qubits, for example "calibrate Q00 step by step and
 ask an expert if it gets stuck". The assistant proposes a bounded session on an approval card,
-which shows each quality gate with the task it checks, whether the calibration evaluator is
-used (**Evaluation** off or required), and for each value it may update without asking either
-the bounds you gave or that the task's own checks decide;
+which shows whether the calibration evaluator is used (**Evaluation** off or required) and each
+value it may update without asking, decided by that task's own checks. The assistant cannot add
+numeric bounds or quality gates to a session, even ones you state; to calibrate within bounds you
+choose, create the session yourself with the qdash-agent CLI
+([Create a bounded session](./agent-calibration.md#create-a-bounded-session)). Another value the
+same task estimates, which the session does not grant, is kept for reference and does not hold up
+the granted one;
 once you approve it, it chooses each measurement from the last result without further cards,
 keeps the values as candidates until you approve a commit (it asks before a measurement that
 needs a new value), and asks an expert in QDash when it

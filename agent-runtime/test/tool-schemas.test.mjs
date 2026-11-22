@@ -79,7 +79,6 @@ function validateWith(tool, policy) {
 const GRANT_POLICY = {
   qids: ["0"],
   allowed_tasks: ["CheckChevron", "CheckRabi"],
-  allowed_overrides: { qubit_frequency: { minimum: 7.9, maximum: 8.1 } },
   autonomy: "auto",
   max_actions: 4,
   parameter_updates: { parameters: ["qubit_frequency"], tasks: ["CheckChevron"], apply_backend: false },
@@ -98,21 +97,16 @@ test("both hosts offer the model the same nested policy schema", () => {
   assert.equal(updates.properties.tasks.type, "array");
   assert.equal(updates.properties.apply_backend.type, "boolean");
   assert.equal(updates.additionalProperties, false);
-  assert.equal(cli.properties.allowed_overrides.type, "object");
+  // No numeric acceptance field is offered to the model in either host.
+  for (const field of ["allowed_overrides", "task_quality_gates", "quality_gates"]) assert.equal(cli.properties[field], undefined, field);
   assert.deepEqual(cli.required, ["qids", "allowed_tasks"]);
 });
 
 for (const [host, tool] of HOSTS) {
   test(`${host}: Pi accepts a valid policy with an update grant and coerces loose scalars`, () => {
     assert.deepEqual(validateWith(tool, GRANT_POLICY).policy, GRANT_POLICY);
-    const args = validateWith(tool, {
-      qids: ["32"],
-      allowed_tasks: ["CheckRabi"],
-      allowed_overrides: { drive_amplitude: { maximum: "0.5" } },
-      max_actions: "4",
-    });
+    const args = validateWith(tool, { qids: ["32"], allowed_tasks: ["CheckRabi"], max_actions: "4" });
     assert.equal(args.policy.max_actions, 4);
-    assert.equal(args.policy.allowed_overrides.drive_amplitude.maximum, 0.5);
   });
 
   test(`${host}: Pi rejects parameter_updates sent as a list, never coercing it into a grant`, () => {
@@ -136,10 +130,10 @@ for (const [host, tool] of HOSTS) {
       () => validateWith(tool, { qids: ["32"], allowed_tasks: ["CheckRabi"], allowed_actions: ["delete_chip"] }),
       /- policy\.allowed_actions\.0: expected one of/,
     );
-    assert.throws(
-      () => validateWith(tool, { qids: ["32"], allowed_tasks: ["CheckRabi"], allowed_overrides: { drive_amplitude: { max: 0.5 } } }),
-      /- policy\.allowed_overrides\.drive_amplitude\.max: unknown field/,
-    );
+    // Bounds and gates are not part of the schema, so Pi's own validation refuses them too.
+    for (const field of ["allowed_overrides", "task_quality_gates", "quality_gates"]) {
+      assert.throws(() => validateWith(tool, { qids: ["32"], allowed_tasks: ["CheckRabi"], [field]: {} }), new RegExp(`- policy\\.${field}: unknown field`));
+    }
     assert.throws(() => validateWith(tool, { qids: ["32"], allowed_tasks: ["CheckRabi"], max_actions: 0 }), /policy\.max_actions/);
   });
 }

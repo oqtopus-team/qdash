@@ -7,7 +7,8 @@
  * the confirmation dialog or any API call. The pi CLI registers it on the tool
  * and the web runtime uses the same registered schema, so both hosts offer the
  * model one contract. QDash re-validates every policy; this schema only makes
- * the call precise and never grants anything by itself.
+ * the call precise and never grants anything by itself. It deliberately leaves out
+ * the policy's numeric acceptance fields (see MODEL_FORBIDDEN_POLICY_FIELDS).
  */
 
 import { Type, type Static } from "typebox";
@@ -20,33 +21,17 @@ const actionType = Type.Unsafe<"run_task" | "request_human" | "complete_session"
   enum: ["run_task", "request_human", "complete_session"],
 });
 
-const numericBounds = Type.Object(
-  {
-    minimum: Type.Optional(Type.Number()),
-    maximum: Type.Optional(Type.Number()),
-  },
-  {
-    additionalProperties: false,
-    minProperties: 1,
-    description:
-      "Inclusive bounds in the parameter's own unit. Give at least one of minimum or maximum; minimum must not exceed maximum.",
-  },
-);
-
 /**
- * The quality metrics QDash records on a task result, mirroring
- * RECORDED_QUALITY_METRICS in src/qdash/datamodel/quality_metrics.py.
+ * Fields of QDash's `AgentSessionPolicy` that hold numbers which accept or reject a result:
+ * `allowed_overrides` (bounds on task inputs and on the output of the same name),
+ * `task_quality_gates`, and the legacy session-wide `quality_gates`. The model-facing schema
+ * omits them and `agentSessionPolicyProblems` refuses them, so no session this tool creates
+ * carries a number the model wrote: QDash cannot tell who wrote a number, and an argument
+ * claiming the user stated it cannot be verified either. A granted output is accepted on
+ * its task's own completion checks. Bounds a person approved through QDash itself (the
+ * qdash-agent CLI or the API) keep applying in their sessions.
  */
-export const RECORDED_QUALITY_METRICS = ["r2"] as const;
-
-const qualityMetricGates = Type.Object(
-  { r2: Type.Optional(numericBounds) },
-  {
-    additionalProperties: false,
-    minProperties: 1,
-    description: "Quality metric -> bounds for this task's results. Only metrics QDash records: r2.",
-  },
-);
+export const MODEL_FORBIDDEN_POLICY_FIELDS = ["allowed_overrides", "task_quality_gates", "quality_gates"] as const;
 
 export const agentParameterUpdatesSchema = Type.Object(
   {
@@ -54,7 +39,7 @@ export const agentParameterUpdatesSchema = Type.Object(
       minItems: 1,
       maxItems: 50,
       description:
-        "Parameters the agent may commit, as the catalog names the task outputs. No bounds are needed: a granted output is accepted when its task completed with its own checks passing, and bounds in allowed_overrides apply only if the user gave them.",
+        "Parameters the agent may commit, as the catalog names the task outputs. A granted output is accepted when its task completed with its own checks passing; this tool sets no numeric bounds. Name only the outputs the goal commits; another output of the same task (such as an incidental control_amplitude of CheckChevron) is staged for reference only and does not block the granted one.",
     }),
     tasks: Type.Array(Type.String(), {
       minItems: 1,
@@ -71,7 +56,7 @@ export const agentParameterUpdatesSchema = Type.Object(
   {
     additionalProperties: false,
     description:
-      'An object, not a list, e.g. {"parameters": ["qubit_frequency"], "tasks": ["CheckChevron"], "apply_backend": false}. autonomy auto only. The user\'s one-time approval, given with the session, to commit (and with apply_backend to apply) a candidate of these parameters from these tasks after a result the agent assesses as pass, its task completed with its own checks passing, and any bounds or gates the user gave hold, without asking per update. No bounds are needed to grant it. Omit it and every commit and apply is approved per call.',
+      'An object, not a list, e.g. {"parameters": ["qubit_frequency"], "tasks": ["CheckChevron"], "apply_backend": false}. autonomy auto only. The user\'s one-time approval, given with the session, to commit (and with apply_backend to apply) a candidate of these parameters from these tasks after a result the agent assesses as pass and its task completed with its own checks passing, without asking per update. Omit it and every commit and apply is approved per call.',
   },
 );
 
@@ -90,18 +75,6 @@ export const agentSessionPolicySchema = Type.Object(
       Type.Array(actionType, {
         minItems: 1,
         description: "Defaults to run_task, request_human and complete_session.",
-      }),
-    ),
-    allowed_overrides: Type.Optional(
-      Type.Record(Type.String(), numericBounds, {
-        description:
-          "Parameter name -> bounds the user stated; never derive them yourself (not from the current value, a percent window, or task knowledge). A step may override a task input of that name within the bounds, and a task output of that name becomes an accepted candidate only inside them. An output that is neither a key nor granted in parameter_updates is staged as rejected. QDash records the bounds as approved with the session and cannot verify their source; they are not a quality verdict.",
-      }),
-    ),
-    task_quality_gates: Type.Optional(
-      Type.Record(Type.String(), qualityMetricGates, {
-        description:
-          'Task name -> quality metric bounds, e.g. {"CheckRabi": {"r2": {"minimum": 0.9}}}. A candidate from a result of that task is accepted only when the result records the metric inside the bounds; results of other tasks are not checked. Each key must be in allowed_tasks. Only metrics QDash records on task results can be gated (currently r2, the fit R²); an output such as average_gate_fidelity is bounded in allowed_overrides, and a value of another task is never evidence for this one. Only with bounds the user stated; never author one.',
       }),
     ),
     allow_reconfigure: Type.Optional(
@@ -138,7 +111,7 @@ export const agentSessionPolicySchema = Type.Object(
   {
     additionalProperties: false,
     description:
-      "Agent session policy QDash accepts. Only qids and allowed_tasks are required; omitted fields take QDash's defaults.",
+      "Agent session policy QDash accepts. Only qids and allowed_tasks are required; omitted fields take QDash's defaults. It holds no numeric bounds or quality gates: a session created here overrides no task input, and each granted output is accepted on its task's own completion checks.",
   },
 );
 
@@ -150,9 +123,8 @@ export type AgentSessionPolicyInput = Static<typeof agentSessionPolicySchema>;
  * tool without Pi's own argument validation still fails closed.
  */
 export function agentSessionPolicyProblems(policy: unknown): string | null {
-  if (policy !== null && typeof policy === "object" && "quality_gates" in policy) {
-    return 'Invalid agent session policy; no session was created:\n- policy.quality_gates: a session-wide gate would check results of every task, so a metric only one task reports rejects the others. Name each gate\'s task in task_quality_gates instead, e.g. {"CheckRabi": {"r2": {"minimum": ...}}}.';
-  }
+  const forbidden = numericCriteriaProblem(policy);
+  if (forbidden) return forbidden;
   if (Value.Check(agentSessionPolicySchema, policy)) return scopeProblems(policy);
   const lines = [...Value.Errors(agentSessionPolicySchema, policy)]
     .filter((error) => error.keyword !== "boolean")
@@ -162,14 +134,27 @@ export function agentSessionPolicyProblems(policy: unknown): string | null {
 }
 
 /**
+ * Refuses any numeric acceptance field, even an empty one or one with a note that the user
+ * stated it: no argument can prove who wrote a number.
+ */
+function numericCriteriaProblem(policy: unknown): string | null {
+  if (policy === null || typeof policy !== "object") return null;
+  const present = MODEL_FORBIDDEN_POLICY_FIELDS.filter((field) => Object.hasOwn(policy, field));
+  if (present.length === 0) return null;
+  return `Invalid agent session policy; no session was created:\n${present
+    .map((field) => `- policy.${field}: not accepted from this tool`)
+    .join("\n")}\nNumeric bounds and quality gates cannot be set through qdash_create_agent_session, whoever stated them, because QDash cannot verify where a number came from. Remove the field. A granted output is accepted when its task completed with its own checks passing; another output of the same task that is not granted is staged for reference only and does not block it. A session created here overrides no task input. If the user wants approved bounds, tell them to create the session in QDash themselves (the qdash-agent CLI or the API).`;
+}
+
+/**
  * Cross-field checks the schema cannot express, made before the approval so the user is
- * never asked to approve a gate QDash would refuse.
+ * never asked to approve a policy QDash would refuse.
  */
 function scopeProblems(policy: AgentSessionPolicyInput): string | null {
   const allowed = new Set(policy.allowed_tasks);
-  const outside = Object.keys(policy.task_quality_gates ?? {}).filter((task) => !allowed.has(task));
+  const outside = (policy.parameter_updates?.tasks ?? []).filter((task) => !allowed.has(task));
   if (outside.length === 0) return null;
-  return `Invalid agent session policy; no session was created:\n- policy.task_quality_gates: ${outside.join(", ")} must also be in allowed_tasks; a gate checks only results of its own task.`;
+  return `Invalid agent session policy; no session was created:\n- policy.parameter_updates.tasks: ${outside.join(", ")} must also be in allowed_tasks.`;
 }
 
 /**

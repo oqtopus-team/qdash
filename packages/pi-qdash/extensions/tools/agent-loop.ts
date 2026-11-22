@@ -418,7 +418,7 @@ export function registerAgentLoopTools(pi: ExtensionAPI, deps: AgentLoopDependen
       sessionId: Type.String(),
       taskName: Type.String({ description: "A task the session allows." }),
       qid: Type.String({ description: "One qubit the session allows." }),
-      parameterOverrides: Type.Optional(Type.Record(Type.String(), Type.Number(), { description: "Inputs within the session's override bounds." })),
+      parameterOverrides: Type.Optional(Type.Record(Type.String(), Type.Number(), { description: "Task inputs within the override bounds the session holds. A session qdash_create_agent_session created holds none, so leave this out there." })),
       rationale: Type.String({ description: "Why this step, citing the evidence (results, evaluation, task knowledge, expert guidance)." }),
       reconfigure: Type.Optional(Type.Boolean({ description: "Reconfigure the hardware before measuring; only when the session allows it." })),
       sourceExecutionId: Type.Optional(Type.String({ description: "Execution the step was decided from, recorded for provenance." })),
@@ -940,7 +940,7 @@ export function registerAgentLoopTools(pi: ExtensionAPI, deps: AgentLoopDependen
       const action = actions.find((item) => item.action_id === params.actionId);
       if (!action) return refuse(`${params.actionId} is not an action of session ${params.sessionId}.`);
       if (!grant.parameters.includes(params.parameterName)) {
-        return refuse(`the approval grants updates of ${grant.parameters.join(", ")} only, not ${params.parameterName}.`);
+        return refuse(`the approval grants updates of ${grant.parameters.join(", ")} only, not ${params.parameterName}. Its candidate stays staged for reference; it does not block committing a granted parameter of the same result, and the grant cannot be widened in this session.`);
       }
       if (!action.task_name || !grant.tasks.includes(action.task_name)) {
         return refuse(`the approval grants updates from ${grant.tasks.join(", ")} only, not ${action.task_name ?? "this action"}.`);

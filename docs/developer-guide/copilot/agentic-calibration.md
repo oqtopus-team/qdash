@@ -64,18 +64,23 @@ of `qdash_create_agent_session` is one schema, `agentSessionPolicySchema` in
 both expose. It spells out `AgentSessionPolicy` with its nested types, including `autonomy`,
 `max_rounds_per_target`, and `parameter_updates` as an object, so Pi rejects a malformed policy,
 such as `parameter_updates` sent as a list, before the approval and before any QDash call; the
-tool checks the policy again before it asks. `preApprovalProblems` adds the checks a schema
-cannot express, such as a quality gate on a task outside `allowed_tasks` or a session-wide
-`quality_gates`, and both hosts run it before they show an approval (the pi write gate and the
-runtime's approval card). QDash still validates every policy itself. A client that sends
-`task_quality_gates` refuses a created session whose response lacks them, because a QDash
-release that predates the field ignores it.
+tool checks the policy again before it asks. The schema leaves out the policy's numeric
+acceptance fields, `allowed_overrides`, `task_quality_gates`, and `quality_gates`
+(`MODEL_FORBIDDEN_POLICY_FIELDS`), and `agentSessionPolicyProblems` refuses any of them, even
+empty or with a claimed source, so no session the model proposes carries a number the model
+wrote (see [Dependent steps](#dependent-steps)). `preApprovalProblems` runs that check and the
+cross-field checks a schema cannot express, such as `parameter_updates.tasks` outside
+`allowed_tasks`, and both hosts run it before they show an approval (the pi write gate and the
+runtime's approval card). The tool's `execute` runs the same check first, and a write is never
+callable from a script, so arguments that skip Pi's schema validation are refused the same way.
+QDash still validates every policy itself.
 
 Commits and backend applies are reviewed writes unless the same approval also granted
 `parameter_updates` ([Update authority](#update-authority)). The approval card
 (`AgentSessionPolicyPreview` in `ui/src/components/features/chat/`) and the pi confirmation
-(`agentSessionApprovalText`) list the qubits, tasks, bounds, each quality gate with the task
-it checks, budget, expiry, the evaluation mode, whether parameter updates and backend applies
+(`agentSessionApprovalText`) list the qubits, tasks, bounds and each quality gate with the
+task it checks when a policy holds them (the pi confirmation otherwise says it holds none and
+overrides no input), budget, expiry, the evaluation mode, whether parameter updates and backend applies
 are granted, and for each granted parameter its bounds or that its task's own checks decide,
 above the exact policy. An `auto`
 session cannot replace a paused one: QDash refuses to create one for qubits that one of the same
@@ -194,19 +199,34 @@ Only an accepted candidate can be committed (`gate_task_result` in
   completion checks decide, which passed because only a completed task result yields
   candidates.
 
-Any other output is staged with `accepted: false` and the reason "not allowed by the session
-policy", and the policy cannot change after approval. Bounds that exist always apply, so a
-session approved with bounds keeps them.
+A candidate that is not accepted reports why in `rejection`:
+
+| `rejection` | Meaning | Effect |
+| --- | --- | --- |
+| `not_in_scope` | The output is neither granted from this task nor a key of `allowed_overrides`; reason "not allowed by the session policy" | Staged for reference only. It cannot be committed from the session and is not evidence against the result or its other candidates |
+| `outside_bounds` | The value is outside the session's bounds | Not committable; for a granted parameter, [unresolved evidence](#unresolved-evidence) |
+| `quality_gate` | A quality gate of the result's task (or a legacy session-wide gate) failed, or its metric is missing | Not committable; for a granted parameter, unresolved evidence |
+
+A task often reports more outputs than a session grants: CheckChevron estimates both
+`qubit_frequency` and `control_amplitude`. In a session granted `qubit_frequency` from
+CheckChevron, the amplitude is `not_in_scope`, and the frequency is committed or refused on its
+own gate. QDash never widens the grant to the other output. The policy cannot change after
+approval. Bounds that exist always apply, so a session approved with bounds keeps them. The
+audit's measurement facts carry `rejection` per candidate, and the session page shows an
+out-of-scope output as **not in session scope (reference only)** rather than as rejected.
 
 QDash cannot tell who wrote a number in a policy: it records bounds and gates as approved with
 the session. No managed configuration of output bounds exists. The task catalog's input limits
 (`greater_than_or_equal`, `less_than_or_equal`) apply to inputs, and the thresholds in
-`config/domain/metrics.yaml` are display metadata, so neither is a candidate bound. The
-`policy` parameter of `qdash_create_agent_session`, its prompt guidelines, and the
-`qdash-agent-calibration` skill therefore tell the model never to author a bound or gate: it
-puts numbers in the policy only when the user stated them, and without them the task's own
-checks are the criterion. This is guidance; the server cannot verify where a number came from.
-A bound is a deterministic check, not a quality verdict.
+`config/domain/metrics.yaml` are display metadata, so neither is a candidate bound. An argument
+that claims the user stated a number cannot be verified either, so `qdash_create_agent_session`
+accepts no bounds or gates at all, from any host, and each granted output is accepted on its
+task's own completion checks. Because `allowed_overrides` bounds both a task input and the
+output of the same name (CheckChevron reads and estimates `control_amplitude`), a session the
+model creates also overrides no task input; its steps run on the stored values and the task
+defaults. A sweep window such as `detuning_range` is a run parameter that a step never changes.
+Bounds and gates remain part of the API for sessions a person creates through QDash itself,
+such as with the qdash-agent CLI. A bound is a deterministic check, not a quality verdict.
 
 ### Quality gates
 
@@ -236,8 +256,8 @@ audit's measurement facts and the update evidence.
 `AgentSessionPolicy.parameter_updates` is an opt-in part of the session approval:
 `parameters` (the outputs that may change), `tasks` (a subset of `allowed_tasks` whose results
 may supply them), and `apply_backend` (default `false`). It requires `autonomy: auto`. The
-grant needs no numeric bounds; bounds in `allowed_overrides`, when the user gave them, apply on
-top. A session without it, including every session created before the field existed, grants
+grant needs no numeric bounds; bounds in `allowed_overrides`, in a session a person created
+with them, apply on top. A session without it, including every session created before the field existed, grants
 nothing, and its commits and applies stay reviewed.
 
 `qdash_commit_agent_session_update` is session-granted. It reads the grant from the session
@@ -337,8 +357,9 @@ unresolved evidence when it did not complete, any decision on it was `fail` or `
 an evaluation of its result ended `failed`, `cancelled`, or `interrupted`, has no diagnosis,
 judged the fit unreliable, reported a status other than `SUCCESS`, completed without both a
 `fit_reliability` and a `calibration_diagnosis` answer, or a reviewer disputed it, or, for a
-granted task, its candidates cannot be read, carry no granted parameter, or were rejected. Any
-such run refuses every autonomous step, commit, and apply of the session. An evaluation still
+granted task, its candidates cannot be read, carry no granted parameter, or a granted
+parameter's candidate was rejected. A `not_in_scope` candidate of another output never makes a
+run unresolved. Any such run refuses every autonomous step, commit, and apply of the session. An evaluation still
 pending or running makes them wait instead.
 
 Only an expert clears it: an intervention answered with `resume` whose attempts cite exactly

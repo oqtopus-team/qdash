@@ -337,6 +337,11 @@ steps or text as they stream raise nothing, nor does history loaded from the ser
 raised once per turn: the kinds raised are kept in the turn's pointer (`notified`) and seed the
 next stream of the turn, so a reattach or a restore that replays the turn raises only what it had
 not. A detached stream is not read, so a turn of another project raises nothing there.
+Listeners run inside the stream's read loop, each in its own `try`: one that throws is logged and
+skipped, so a failing notification never ends the turn or replaces its answer with an error.
+Closing the sidebar or the floating window only unmounts that surface; the turn's stream belongs
+to `CopilotChatSessionProvider` in `AppLayout`, and that is also when `ChatNotifier` starts
+showing toasts for it.
 
 `ChatNotifier` (mounted in `AppLayout` inside `ChatDockProvider`) turns an event into a Ding
 toast (`@yusufceng1z/ding-react`, pinned in `ui/package.json`) with the ID

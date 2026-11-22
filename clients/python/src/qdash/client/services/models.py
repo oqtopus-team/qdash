@@ -207,6 +207,21 @@ class AgentCandidateReference(BaseModel):
     task_id: Annotated[str, Field(max_length=200, min_length=1, title="Task Id")]
 
 
+class AgentCandidateRejection(StrEnum):
+    """
+    Why a candidate was not accepted.
+
+    ``not_in_scope`` is not a verdict on the measurement: the output is neither granted from
+    this task nor bounded by the session, so it is staged for reference only. It cannot be
+    committed from the session, and it is never evidence against the result or the result's
+    other candidates. The other two are deterministic checks the value or its result failed.
+    """
+
+    not_in_scope = "not_in_scope"
+    outside_bounds = "outside_bounds"
+    quality_gate = "quality_gate"
+
+
 class AgentCheckpointCandidate(BaseModel):
     """
     An accepted candidate the plan carries; the runner re-reads its value from QDash.
@@ -6997,6 +7012,10 @@ class AgentCandidateResponse(BaseModel):
     What accepted the candidate: session_bounds (inside numeric bounds approved with the session) or task_checks (a parameter the session's update grant names, without bounds, accepted on its task's completion checks); null when rejected
     """
     accepted: Annotated[bool, Field(title="Accepted")]
+    rejection: AgentCandidateRejection | None = None
+    """
+    Why the candidate was not accepted; null when accepted. not_in_scope: the output is neither granted from this task nor bounded by the session, so it is staged for reference only; it cannot be committed from this session and is not evidence against the result or its other candidates. outside_bounds: the value is outside the session's approved bounds. quality_gate: a quality gate of the result's task failed or its metric is missing
+    """
     reason: Annotated[str, Field(title="Reason")]
     minimum: Annotated[float | None, Field(title="Minimum")] = None
     maximum: Annotated[float | None, Field(title="Maximum")] = None
