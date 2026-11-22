@@ -46,6 +46,7 @@ vi.mock("@/contexts/ProjectContext", () => ({
 vi.mock("@/client/copilot/copilot", () => ({
   useGetCopilotConfig: () => ({ data: undefined }),
   useGetCopilotPreferences: () => ({ data: undefined }),
+  useListCopilotSkills: () => ({ data: undefined }),
 }));
 vi.mock("@/hooks/useChatSuggestions", () => ({ useChatSuggestions: () => [] }));
 vi.mock("@yusufceng1z/ding-react", () => {

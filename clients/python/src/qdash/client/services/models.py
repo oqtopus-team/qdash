@@ -1395,6 +1395,29 @@ class CopilotPreferencesUpdate(BaseModel):
     instructions: Annotated[str, Field(max_length=2000, title="Instructions")] = ""
 
 
+class CopilotSkill(BaseModel):
+    """
+    A skill the chat can run; the user invokes it with ``/skill:<name>``.
+    """
+
+    name: Annotated[str, Field(title="Name")]
+    """
+    Skill name, as typed after /skill:
+    """
+    description: Annotated[str, Field(title="Description")] = ""
+    """
+    What the skill is for
+    """
+
+
+class CopilotSkillList(BaseModel):
+    """
+    The skills the Copilot runtime has loaded, for the chat composer's / menu.
+    """
+
+    skills: Annotated[list[CopilotSkill] | None, Field(title="Skills")] = None
+
+
 class CopilotSystemPrompt(BaseModel):
     """
     What QDash tells the chat model, read-only: its system prompt and this user's part.

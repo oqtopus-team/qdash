@@ -41,6 +41,7 @@ from qdash.api.schemas.copilot_chat_session import (
 from qdash.api.schemas.copilot_preferences import (
     CopilotPreferences,
     CopilotPreferencesUpdate,
+    CopilotSkillList,
     CopilotSystemPrompt,
 )
 from qdash.api.schemas.copilot_source import (
@@ -739,3 +740,21 @@ async def get_copilot_system_prompt(
         logger.warning("system prompt unavailable: %s", exc)
         raise HTTPException(status_code=503, detail="The Copilot runtime is not reachable") from exc
     return CopilotSystemPrompt(**result)
+
+
+@router.get(
+    "/skills",
+    response_model=CopilotSkillList,
+    summary="List the skills a chat message can invoke",
+    operation_id="listCopilotSkills",
+)
+async def list_copilot_skills(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+) -> CopilotSkillList:
+    """Skills loaded by the Copilot runtime; a message starting ``/skill:<name>`` runs one."""
+    try:
+        result = await pi_chat_service.skills()
+    except Exception as exc:
+        logger.warning("skills unavailable: %s", exc)
+        raise HTTPException(status_code=503, detail="The Copilot runtime is not reachable") from exc
+    return CopilotSkillList(**result)

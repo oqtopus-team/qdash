@@ -332,6 +332,8 @@ export * from './copilotChatSteerSchemaEntryId';
 export * from './copilotChatSteerSchemaPlacement';
 export * from './copilotPreferences';
 export * from './copilotPreferencesUpdate';
+export * from './copilotSkill';
+export * from './copilotSkillList';
 export * from './copilotSystemPrompt';
 export * from './copilotSystemPromptUserPreferences';
 export * from './coupling';

@@ -18,6 +18,7 @@ const { chat, dock } = vi.hoisted(() => ({
 
 vi.mock("@/client/copilot/copilot", () => ({
   useGetCopilotPreferences: () => ({ data: undefined }),
+  useListCopilotSkills: () => ({ data: undefined }),
 }));
 vi.mock("@/contexts/ChatDockContext", () => ({
   useChatPageSummary: () => (dock.present ? dock.page : null),

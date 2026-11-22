@@ -14,6 +14,7 @@ vi.mock("@/contexts/CopilotChatSessionContext", () => ({
 }));
 vi.mock("@/client/copilot/copilot", () => ({
   useGetCopilotPreferences: () => ({ data: undefined }),
+  useListCopilotSkills: () => ({ data: undefined }),
 }));
 vi.mock("@/hooks/useCopilotChat", () => ({
   useCopilotChat: () => ({

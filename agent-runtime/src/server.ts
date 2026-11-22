@@ -88,7 +88,13 @@ interface ChatBody extends StoreFields {
   conversation_id?: string;
   request_id?: string;
   message?: string;
+  /** Replaces `message` when the conversation is new: an opening QDash wrote in full (an investigation). */
   initial_message?: string;
+  /**
+   * Goes before `message` when the conversation is new: a task result's context. The runtime
+   * appends the user's message itself, after expanding a `/skill:name` command it starts with.
+   */
+  initial_context?: string;
   model?: { provider?: string; name?: string };
   thinking_level?: SessionRequest["thinkingLevel"];
   /** Figures attached to this turn's message. */
@@ -781,7 +787,8 @@ async function submitInput(
 ): Promise<Submission> {
   const view = await conversation.context(BACKGROUND_CONTEXT);
   const isNew = !view.entries.some((entry) => UserEntry.is(entry));
-  let message = isNew && body.initial_message ? body.initial_message : (body.message ?? "");
+  const opening = isNew && body.initial_message ? body.initial_message : undefined;
+  let message = opening ?? body.message ?? "";
   if (approval) {
     // The runtime, not the model, runs the call the user approved, with the
     // exact arguments the user saw. The model only learns the outcome.
@@ -813,6 +820,12 @@ async function submitInput(
     } else {
       message = decisionMessage(approval, { approved: false });
     }
+  } else if (opening === undefined) {
+    // `/skill:name args` typed by the user runs that skill (see expandSkillCommand).
+    // Expand the user's own text before any opening context goes in front of it,
+    // so the command still starts the text the expansion reads.
+    message = runtime.expandSkillCommand(message);
+    if (isNew && body.initial_context) message = `${body.initial_context}${message}`;
   }
   // Opening figures go with the first turn only; attachments go with every turn.
   const images = [
@@ -1289,6 +1302,14 @@ const server = createServer((req, res) => {
         ),
       )
       .catch((error: unknown) => handleRouteError(res, error, "system prompt"));
+    return;
+  }
+  if (req.method === "GET" && req.url === "/skills") {
+    if (!authorized(req)) {
+      sendJson(res, 401, { error: "unauthorized" });
+      return;
+    }
+    sendJson(res, 200, { skills: runtime.chatSkills() });
     return;
   }
   if (req.method === "POST" && req.url === "/chat/steer/status") {

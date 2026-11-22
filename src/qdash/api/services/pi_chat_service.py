@@ -470,6 +470,15 @@ async def system_prompt(username: str) -> dict[str, Any]:
         return result
 
 
+async def skills() -> dict[str, Any]:
+    """The skills the runtime has loaded, which a chat message invokes as ``/skill:<name>``."""
+    async with httpx.AsyncClient(timeout=10, trust_env=False) as client:
+        response = await client.get(f"{RUNTIME_URL}/skills", headers=_runtime_headers())
+        response.raise_for_status()
+        result: dict[str, Any] = response.json()
+        return result
+
+
 def user_instructions(username: str) -> str | None:
     """The user's own Copilot instructions, when they set any (chat only)."""
     from qdash.dbmodel.user import UserDocument
@@ -555,18 +564,19 @@ def collect_task_figures(bundle: TaskContextBundle) -> list[dict[str, str]]:
     ]
 
 
-def task_opening_message(
+def task_opening_context(
     *,
     bundle: TaskContextBundle,
     config: CopilotConfig,
-    user_message: str,
     language_instruction: str,
 ) -> str:
-    """The first message of a chat about one task result, carrying its whole context.
+    """The context that opens a chat about one task result, up to the user's message.
 
-    The system prompt body and the language instruction are folded into this
+    The system prompt body and the language instruction are folded into the
     first message, because the Pi runtime has no separate system-prompt
-    channel for it.
+    channel for it. The text ends where the user's message goes: the runtime
+    appends that message itself, after expanding a ``/skill:<name>`` command
+    the user typed, so the command still starts the text it reads.
     """
     expected_count = len(bundle.expected_images)
     experiment_count = len(collect_task_figures(bundle)) - expected_count
@@ -587,7 +597,26 @@ def task_opening_message(
         if expected_count or experiment_count
         else ""
     )
-    return f"{body}{image_note}\n\n{_ANSWERING_GUIDANCE}\n\n## Your task\n\n{user_message}"
+    return f"{body}{image_note}\n\n{_ANSWERING_GUIDANCE}\n\n## Your task\n\n"
+
+
+def task_opening_message(
+    *,
+    bundle: TaskContextBundle,
+    config: CopilotConfig,
+    user_message: str,
+    language_instruction: str,
+) -> str:
+    """The first message of a chat about one task result, carrying its whole context.
+
+    The model receives this text when the user's message is not a skill
+    command; the runtime assembles it from :func:`task_opening_context` and
+    the message.
+    """
+    context = task_opening_context(
+        bundle=bundle, config=config, language_instruction=language_instruction
+    )
+    return f"{context}{user_message}"
 
 
 async def stream(
@@ -606,10 +635,11 @@ async def stream(
 
     With ``task``, the turn belongs to a chat about one task result: a new
     conversation opens with the result's context and figures (the runtime
-    attaches them only when the conversation is new), and the final result
-    reports which figures were sent. ``opening_message`` (an investigation's
-    logs and instructions) likewise replaces the first message of a new
-    conversation only; later turns are sent as typed.
+    attaches them only when the conversation is new, ahead of the user's
+    message), and the final result reports which figures were sent.
+    ``opening_message`` (an investigation's logs and instructions) likewise
+    replaces the first message of a new conversation only; later turns are
+    sent as typed.
     """
     if not request.session_id:
         yield sse_event(
@@ -644,10 +674,11 @@ async def stream(
                 {"step": "init", "detail": "Could not persist the chat session"},
             )
             return
-        payload["initial_message"] = task_opening_message(
+        # The runtime puts this before the user's message on a new conversation,
+        # once it has expanded a `/skill:<name>` command the message starts with.
+        payload["initial_context"] = task_opening_context(
             bundle=task,
             config=config,
-            user_message=request.message,
             language_instruction=build_language_instruction(config),
         )
         payload["initial_images"] = collect_task_figures(task)
