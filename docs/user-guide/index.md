@@ -58,7 +58,7 @@ passwords.
 | --- | --- |
 | Ask questions about project data, or investigate a failure | [Agent](./ai-chat.md) |
 | Judge task-result figures and compare evaluation settings | [AI Evaluations](./ai-evaluations.md) |
-| Let an agent you operate run bounded, gated single-qubit steps (experimental) | [Agent Calibration](./agent-calibration.md) |
+| Have the agent calibrate named qubits step by step in a session you approve, with an expert asked when it gets stuck (experimental) | [Agent Calibration](./agent-calibration.md) |
 
 AI output is supporting evidence; confirm it against the underlying results before changing
 calibration state.

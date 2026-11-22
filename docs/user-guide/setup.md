@@ -192,6 +192,31 @@ Scripts are written by project editors and owners. Each run has its own user in
 [Metric Scripts architecture](../developer-guide/architecture/metric-scripts.md#isolation-and-threat-model)
 before opening editing to people you would not give shell access.
 
+### Notify Experts of Agent Interventions in Slack
+
+When an [agent calibration](./agent-calibration.md#when-the-agent-stops-for-an-expert) stops
+for an expert, QDash can post the request to a Slack channel with a link to its page. The same
+channel also gets a message when an approved agent session starts and when it ends (completed,
+stopped, or expired), with links to the session and its graph; a pause for an
+expert is not an end. It uses the
+bot token of the forum notifications and a channel of its own; the forum channel is unaffected.
+
+| Variable | Meaning | Default |
+| --- | --- | --- |
+| `SLACK_BOT_TOKEN` | Bot token shared with the forum notifications; the bot must be a member of the agent channel | Empty |
+| `SLACK_AGENT_NOTIFICATION` | `true` to post interventions and session start and end messages | `false` |
+| `SLACK_AGENT_CHANNEL_ID` | ID of the channel for these messages | Empty |
+
+Messages are posted only when all three are set; apply a change with `docker compose up -d api`.
+Set `CLIENT_URL` so the message links to the deployment's public address. One channel serves
+every project of the deployment, and each message shows the project, chip, targets, task, and
+the agent's question, so invite only people who may see all projects. Opening the link still
+requires a QDash account in the project. QDash records the intervention or the session whether or not the
+message is sent; a failed post is retried automatically, and an intervention's message can also
+be retried from the intervention page. A post that timed out after Slack accepted it can be
+posted again, so a message can occasionally appear twice. Sessions created while these
+variables were unset are not announced later.
+
 ### Run Several Deployments on One Host
 
 Give each deployment its own checkout and `.env`, with a different `ENV` and `UI_PORT`. Leave the

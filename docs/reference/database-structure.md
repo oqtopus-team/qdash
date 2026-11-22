@@ -80,6 +80,7 @@ runtime lifecycle, reservations, and terminal state handling.
 | `slack_forum_thread` | `SlackForumThreadDocument` | `slack_forum_thread.py` |
 | `notification` | `NotificationDocument` | `notification.py` |
 | `copilot_chat_session` | `CopilotChatSessionDocument` | `copilot_chat_session.py` |
+| `copilot_chat_turn` | `CopilotChatTurnDocument` (insert-once, one per user, session, and request ID) | `copilot_chat_turn.py` |
 | `dashboard` | `DashboardDocument` | `dashboard.py` |
 | `metric_script` | `MetricScriptDocument` | `metric_script.py` |
 | `copilot_store_teardown` | None (raw collection, one lease per owner and store) | `api/services/copilot_chat_session_service.py` |
@@ -100,6 +101,9 @@ revisions each dashboard pins (`pins`, keyed by `dashboard_id`) and a `version` 
 | `agent_actions` | `AgentActionDocument` | `agent_session.py` |
 | `agent_candidate_commits` | `AgentCandidateCommitDocument` | `agent_session.py` |
 | `agent_candidate_set_commits` | `AgentCandidateSetCommitDocument` | `agent_session.py` |
+| `agent_backend_apply_locks` | `AgentBackendApplyLockDocument` | `agent_session.py` |
+| `agent_interventions` | `AgentInterventionDocument` | `agent_session.py` |
+| `agent_decisions` | `AgentDecisionDocument` | `agent_session.py` |
 | `parameter_versions` | `ParameterVersionDocument` | `provenance.py` |
 | `provenance_relations` | `ProvenanceRelationDocument` | `provenance.py` |
 | `provenance_activities` | `ActivityDocument` | `provenance.py` |

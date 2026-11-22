@@ -46,6 +46,7 @@ vi.mock("@/components/layout/ChatSidebar", () => ({
   useAgentTabShown: () => mockAgentTabShown(),
 }));
 vi.mock("@/components/layout/MiniChatWindow", () => ({ MiniChatWindow: () => null }));
+vi.mock("@/components/features/chat/ChatNotifier", () => ({ ChatNotifier: () => null }));
 vi.mock("@/components/layout/GlobalCommandPalette", () => ({ GlobalCommandPalette: () => null }));
 vi.mock("@/components/layout/GlobalExecutionIndicator", () => ({
   GlobalExecutionIndicator: () => null,

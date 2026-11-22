@@ -258,6 +258,16 @@ analysis and figures rather than copying the task or analysis.
 `tests/qdash/workflow/calibtasks/test_fake_backend_sync.py` checks task availability, prevents
 fake classes from shadowing Qubex tasks, and verifies the template's required-input chain.
 
+`TaskExecutor._run_task` calls the backend's `before_task_run(task_name, qid)` just before a task
+measures. `BaseBackend` implements it as a no-op, so hardware runs are unchanged; `FakeBackend`
+uses it for the opt-in validation fault of `engine/backend/fake_faults.py`. The fault fails one
+run only when the worker runs with `QDASH_FAKE_FAULT_INJECTION=1` and
+`<chip>/validation/fake-fault.json` in the Qubex configuration tree names that chip, qubit, and
+task with an `expires_at` at most one hour ahead; any invalid file disables it. The failure
+message names the fault id and says it was injected. The
+[agent loop validation](../copilot/agent-validation.md) harness writes and removes the file;
+`tests/qdash/workflow/engine/backend/test_fake_faults.py` covers the rules.
+
 ### Add persistence behavior
 
 Depend on repository protocols and inject an in-memory implementation in tests. State-transition

@@ -10,6 +10,7 @@ import {
   investigationPolicyBullets,
   markDeferredTools,
   QDASH_SCRIPT_GUIDELINE,
+  requestPolicyBullets,
   TOOL_SEARCH_TOOL_NAME,
   toolRoutingNames,
 } from "./qdash-guidance.js";
@@ -82,6 +83,9 @@ export function buildQDashGuidanceSection(
     "",
     "Investigation and evidence:",
     ...investigationPolicyBullets(),
+    "",
+    "Plain-language requests:",
+    ...requestPolicyBullets(),
     ...(routing ? ["", "QDash tool routing:", routing] : []),
     ...(orchestrationRules.length ? ["", "QDash scripts and tool loading:", ...orchestrationRules] : []),
   ].join("\n");

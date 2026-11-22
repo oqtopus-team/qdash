@@ -1,7 +1,9 @@
 import type { Context } from "@earendil-works/chord/context";
 import type { ToolExecutionApi, ToolPark } from "@earendil-works/pi-durable";
 import {
+  boundedCheck,
   connectionClient,
+  MIN_CHECK_MS,
   type WaitSpec,
   type WaitToolResult,
 } from "@oqtopus-team/pi-qdash/extensions/lib/waits.ts";
@@ -35,6 +37,10 @@ const DEADLINE_MEMO = "qdash.wait.deadline";
  *   reports the result or the timeout.
  * - **Stop:** aborting a parked call ends it at once; an abort during a poll
  *   drops the poll (the caller passes a `check` that settles on abort).
+ * - **Hung read:** a poll is bounded by the time left to the deadline (at
+ *   least `MIN_CHECK_MS`), as in the pi CLI's `pollUntilSettled`; one that is
+ *   still running then ends the call with the tool's timeout error, and its
+ *   late answer or failure is dropped.
  *   Neither touches the execution or action: waiting only reads, so there is
  *   no `cancel` work.
  * - **Replay:** the tool is replay-safe and every run only reads QDash, so a
@@ -57,7 +63,11 @@ export async function parkingWait<P extends object, T>(
       ? parked.deadline
       : await api.memo(DEADLINE_MEMO, api.now() + timing.timeoutSeconds * 1_000, context);
   const client = await connectionClient(connection.toolArgs);
-  const value = await spec.check(client, params);
+  const outcome = await boundedCheck(spec, client, params, {
+    timeoutMs: Math.max(MIN_CHECK_MS, deadline - api.now()),
+  });
+  if (outcome.kind === "timeout") throw spec.timeoutError(params, timing);
+  const value = outcome.value;
   if (value !== undefined) return spec.result(client, params, value);
   const now = api.now();
   if (now >= deadline) throw spec.timeoutError(params, timing);

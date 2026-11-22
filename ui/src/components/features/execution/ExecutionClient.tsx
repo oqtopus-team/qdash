@@ -18,6 +18,7 @@ import { isExecutionCancellable } from "@/lib/executionStatus";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
 import { formatDateTime as formatDateTimeUtil } from "@/lib/utils/datetime";
 
+import { ExecutionAgentSessionNotice } from "./ExecutionAgentSessionNotice";
 import { ExecutionDAG } from "./ExecutionDAG";
 import { ExecutionParameterChanges } from "./ExecutionParameterChanges";
 import { ExecutionRunSummary } from "./ExecutionRunSummary";
@@ -28,6 +29,11 @@ import { useGetExecution, useCancelExecution } from "@/client/execution/executio
 import { InvestigateWithAiButton } from "@/components/features/chat/InvestigateWithAiButton";
 import { CancelExecutionModal } from "@/components/features/execution/CancelExecutionModal";
 import { ExecutionTopologyView } from "@/components/features/execution/ExecutionTopologyView";
+import {
+  ExecutionActor,
+  isAgentDispatched,
+  recordedUserLabel,
+} from "@/components/features/execution/ExecutionAttribution";
 import { distinctCallId } from "@/components/features/execution/executionTopologyTasks";
 import { gridFullscreenPanelClass } from "@/components/ui/GridFullscreenButton";
 import { ExecutionDetailPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
@@ -44,19 +50,9 @@ type FilterOption = {
 
 type TopologyMode = "1q" | "2q";
 
-type ActorFields = {
-  user_id?: string | null;
-  username?: string;
-};
-
 interface ExecutionDetailClientProps {
   chipId: string;
   executionId: string;
-}
-
-function formatActorLabel(actor?: ActorFields | null) {
-  if (actor?.username) return `@${actor.username}`;
-  return actor?.user_id || "Unknown";
 }
 
 export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailClientProps) {
@@ -268,11 +264,24 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
               </TooltipContent>
             </Tooltip>
             <div className="flex items-center text-base-content/70 min-w-0">
-              <UserRound className="mr-2 text-info/70 flex-shrink-0" size={14} />
-              <span className="font-medium mr-1">User:</span>
-              <span className="truncate">{formatActorLabel(execution)}</span>
+              {isAgentDispatched(execution.agent_session) ? (
+                <>
+                  <span className="font-medium mr-1">Run by:</span>
+                  <ExecutionActor actor={execution} link={execution.agent_session} />
+                </>
+              ) : (
+                <>
+                  <UserRound className="mr-2 text-info/70 flex-shrink-0" size={14} />
+                  <span className="font-medium mr-1">User:</span>
+                  <span className="truncate">{recordedUserLabel(execution)}</span>
+                </>
+              )}
             </div>
           </div>
+          <ExecutionAgentSessionNotice
+            link={execution.agent_session}
+            chipId={execution.chip_id || chipId}
+          />
           <ExecutionRunSummary status={execution.status} tasks={execution.task ?? []} />
           {execution.status === "failed" && (
             <TaskMessagePanel

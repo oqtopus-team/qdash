@@ -238,7 +238,11 @@ export class ViewEventTranslator {
       // Only a tool-calling answer starts a tool round; its slots arrive in the same commit.
       if ((message as { stopReason?: unknown }).stopReason === "toolUse") {
         for (const block of blocksOf(message)) {
-          if (block.type === "toolCall" && typeof block.id === "string" && !this.#ended.has(block.id)) {
+          if (block.type === "toolCall" && typeof block.id === "string") {
+            // A new call, also when the model reused the ID of a call that already ended
+            // (local models may give every call the same ID): it starts and ends again.
+            this.#started.delete(block.id);
+            this.#ended.delete(block.id);
             this.#open.set(block.id, typeof block.name === "string" ? block.name : "unknown");
           }
         }
@@ -287,6 +291,8 @@ export class ViewEventTranslator {
         toolCallId: id,
         isError: message.isError === true,
         entry: entry as SessionEventLike["entry"],
+        // The result's durable entry names the call the same way in every stream of the turn.
+        entryId: String(entry.id),
       });
       return out;
     }
@@ -395,6 +401,7 @@ export class ViewEventStream {
   readonly #context: Context;
   readonly #steerBeforeTurn: ((entryId: number) => Promise<boolean>) | undefined;
   readonly #ownMessage: ((entryId: number) => Promise<boolean>) | undefined;
+  readonly #through: number | undefined;
   #queue: Promise<void> = Promise.resolve();
   #closed = false;
 
@@ -404,8 +411,9 @@ export class ViewEventStream {
     emit: (event: SessionEventLike) => void,
     context: Context,
     /**
-     * Whether a steer placed as `entryId` landed before the turn's own message. Asked for each placed steer, in
-     * stream order; its answer is reported as `beforeTurn`.
+     * Whether an entry committed as `entryId` landed before the turn's own message. Asked for each placed steer and
+     * each tool result entry, in stream order; its answer is reported as `beforeTurn`, so what a run recovered from an
+     * earlier request streamed is never taken for this turn's.
      */
     steerBeforeTurn?: (entryId: number) => Promise<boolean>,
     /**
@@ -413,6 +421,12 @@ export class ViewEventStream {
      * that what streamed before it (an answer a recovered run gave a steer of an earlier turn) ends there.
      */
     ownMessage?: (entryId: number) => Promise<boolean>,
+    /**
+     * The last entry of the turn being streamed, when a later turn follows it in the store (see `storedTurn()` in
+     * chat-control.ts): no entry after it is translated, and the live state, which belongs to whatever runs now, is
+     * ignored.
+     */
+    through?: number,
   ) {
     this.#conversation = conversation;
     this.#translator = new ViewEventTranslator(initial);
@@ -420,6 +434,7 @@ export class ViewEventStream {
     this.#context = context;
     this.#steerBeforeTurn = steerBeforeTurn;
     this.#ownMessage = ownMessage;
+    this.#through = through;
   }
 
   /**
@@ -459,7 +474,8 @@ export class ViewEventStream {
     return next;
   }
 
-  async #translate(view: ViewRevision): Promise<void> {
+  async #translate(revision: ViewRevision): Promise<void> {
+    const view = this.#clip(revision);
     const gap = this.#translator.gap(view);
     const missing: EntryRecord[] = [];
     if (gap !== undefined) {
@@ -476,7 +492,12 @@ export class ViewEventStream {
       } while (cursor !== undefined);
     }
     for (const event of this.#translator.advance(view, missing)) {
-      if (event.type === "steer_placed" && this.#steerBeforeTurn && event.entryId !== undefined) {
+      // A steer, or a tool result, committed before the turn's own message belongs to an earlier turn.
+      if (
+        (event.type === "steer_placed" || event.type === "tool_execution_end") &&
+        this.#steerBeforeTurn &&
+        event.entryId !== undefined
+      ) {
         if (await this.#steerBeforeTurn(Number(event.entryId))) event.beforeTurn = true;
       }
       if (event.type === "user_placed") {
@@ -487,5 +508,17 @@ export class ViewEventStream {
       }
       this.#emit(event);
     }
+  }
+
+  /** `view` without the entries after `through` and without live state, when the stream is bounded. */
+  #clip(view: ViewRevision): ViewRevision {
+    const through = this.#through;
+    if (through === undefined) return view;
+    const before = view.before !== undefined && Number(view.before) > through ? (through as EntryId) : view.before;
+    return {
+      entries: view.entries.filter((entry) => Number(entry.id) <= through),
+      docs: {},
+      ...(before !== undefined ? { before } : {}),
+    };
   }
 }

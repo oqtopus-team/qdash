@@ -7,4 +7,7 @@
  */
 import type { NumericBounds } from './numericBounds';
 
+/**
+ * Parameter name -> bounds. A step may override a task input of that name within the bounds, and a task output of that name is an accepted candidate only inside them. Output parameters are bounded here, never in quality gates. Give only bounds a person stated; QDash records them as approved with the session and cannot verify where they came from
+ */
 export type AgentSessionPolicyAllowedOverrides = {[key: string]: NumericBounds};

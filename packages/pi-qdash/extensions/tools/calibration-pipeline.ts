@@ -3,7 +3,9 @@ import type { QDashClient } from "@oqtopus-team/qdash-client";
 import { QDash } from "@oqtopus-team/qdash-sdk";
 import { Type } from "typebox";
 
+import { pausedSessionConflict } from "../lib/agent-loop.js";
 import { toTextToolResult } from "../lib/results.js";
+import { requireWriteApproval } from "../lib/write-approval.js";
 
 /**
  * Declarative calibration pipelines.
@@ -23,6 +25,14 @@ import { toTextToolResult } from "../lib/results.js";
  */
 
 type ConnectionParams = { profile?: string; configPath?: string; useEnv?: boolean };
+
+/** The qubits a spec names, or undefined when it targets MUXes or names none. */
+export function specQids(spec: Record<string, unknown>): string[] | undefined {
+  const targets = spec.targets as { qids?: unknown; mux_ids?: unknown } | undefined;
+  if (!targets || targets.mux_ids != null) return undefined;
+  const qids = targets.qids;
+  return Array.isArray(qids) && qids.length > 0 && qids.every((qid) => typeof qid === "string") ? (qids as string[]) : undefined;
+}
 
 export type PipelineProblem = { path: string; message: string };
 
@@ -228,6 +238,38 @@ function formatTaskDocumentation(documentation: Record<string, TaskDocumentation
   return lines;
 }
 
+/** The declared parameters of one task, as `GET /tasks` lists them. */
+export type TaskParameters = {
+  name: string;
+  input_parameters?: Record<string, { unit?: string }>;
+  output_parameters?: Record<string, { unit?: string }>;
+};
+
+function parameterList(parameters: Record<string, { unit?: string }> | undefined): string {
+  const names = Object.keys(parameters ?? {}).sort();
+  return names.length ? names.map((name) => (parameters?.[name]?.unit ? `${name} (${parameters[name].unit})` : name)).join(", ") : "none";
+}
+
+/**
+ * The declared inputs and outputs of the requested tasks, with their units, or
+ * why they could not be listed. Output names are what a session's
+ * allowed_overrides must name for a result to become a committable candidate.
+ */
+export function formatTaskParameters(tasks: readonly TaskParameters[] | string, names: readonly string[]): string[] {
+  if (!names.length) return [];
+  if (typeof tasks === "string") return ["", `Declared task parameters unavailable: ${tasks}`];
+  const lines = ["", "Declared task parameters (names and units as QDash stores them):"];
+  for (const name of names) {
+    const task = tasks.find((item) => item.name === name);
+    if (!task) {
+      lines.push(`- ${name}: not in this backend's task list`);
+      continue;
+    }
+    lines.push(`- ${name}`, `  Inputs: ${parameterList(task.input_parameters)}`, `  Outputs: ${parameterList(task.output_parameters)}`);
+  }
+  return lines;
+}
+
 export function formatPipelineCatalog(catalog: PipelineCatalog, expandTasks: string[] = []): string {
   const lines = [`Calibration pipeline catalog (backend ${catalog.backend_name})`, "", "Step types:"];
   for (const step of catalog.step_types) {
@@ -295,7 +337,7 @@ export function registerCalibrationPipelineTools(pi: Pick<ExtensionAPI, "registe
   pi.registerTool({
     name: "qdash_get_pipeline_catalog",
     label: "QDash Pipeline Catalog",
-    description: "List the step types, task names, declared task documentation, and spec schema for composing a calibration pipeline. Read-only. Call this before writing a pipeline spec, or with taskNames to read what a task does, when to use it, and its prerequisites.",
+    description: "List the step types, task names, declared task documentation, and spec schema for composing a calibration pipeline. Read-only. Call this before writing a pipeline spec, or with taskNames to read what a task does, when to use it, its prerequisites, and its declared input and output parameters with units.",
     promptSnippet: "Look up the step types, tasks, and task documentation available for a QDash calibration pipeline",
     promptGuidelines: [
       "Use qdash_get_pipeline_catalog before composing a pipeline spec; use only the step types and task names it lists.",
@@ -307,9 +349,20 @@ export function registerCalibrationPipelineTools(pi: Pick<ExtensionAPI, "registe
       taskNames: Type.Optional(Type.Array(Type.String(), { description: "Task names whose full documentation (when to use, prerequisites) to include." })),
     }),
     async execute(_toolCallId, params: ConnectionParams & { backendName?: string; taskNames?: string[] }) {
-      const qdash = new QDash(await deps.makeClient(params));
+      const client = await deps.makeClient(params);
+      const qdash = new QDash(client);
       const catalog = (await qdash.pipelines.catalog({ backendName: params.backendName })) as PipelineCatalog;
-      return toTextToolResult(formatPipelineCatalog(catalog, params.taskNames ?? []), catalog, { tool: "qdash_get_pipeline_catalog", backendName: catalog.backend_name });
+      const taskNames = params.taskNames ?? [];
+      let declared: TaskParameters[] | string = [];
+      if (taskNames.length) {
+        try {
+          declared = ((await client.listTasks(catalog.backend_name)) as { tasks?: TaskParameters[] }).tasks ?? [];
+        } catch (error) {
+          declared = error instanceof Error ? error.message : String(error);
+        }
+      }
+      const text = [formatPipelineCatalog(catalog, taskNames), ...formatTaskParameters(declared, taskNames)].join("\n");
+      return toTextToolResult(text, catalog, { tool: "qdash_get_pipeline_catalog", backendName: catalog.backend_name });
     },
   });
 
@@ -361,15 +414,16 @@ export function registerCalibrationPipelineTools(pi: Pick<ExtensionAPI, "registe
       chipId: Type.String({ description: "Chip to run on." }),
       spec: specParam,
       backendName: Type.Optional(Type.String({ description: "Defaults to the configured backend." })),
-      confirmWrite: Type.Optional(Type.Boolean({ description: "Required for non-interactive execution. Set true only after explicit user confirmation." })),
     }),
-    async execute(_toolCallId, params: ConnectionParams & { chipId: string; spec: Record<string, unknown>; backendName?: string; confirmWrite?: boolean }, _signal, _onUpdate, ctx) {
-      if (!params.confirmWrite) {
-        if (!ctx.hasUI || !(await ctx.ui.confirm("Run QDash calibration pipeline?", `This starts a calibration execution on chip ${params.chipId}. Completed tasks update calibrated parameters in QDash directly.`))) {
-          throw new Error("qdash_run_pipeline requires explicit confirmation");
-        }
+    async execute(toolCallId, params: ConnectionParams & { chipId: string; spec: Record<string, unknown>; backendName?: string }, _signal, _onUpdate, ctx) {
+      await requireWriteApproval("qdash_run_pipeline", toolCallId, params, ctx, { title: "Run QDash calibration pipeline?", message: `This starts a calibration execution on chip ${params.chipId}. Completed tasks update calibrated parameters in QDash directly.` });
+      const client = await deps.makeClient(params);
+      // A paused agent session's targets must not be measured around its pause.
+      const conflict = await pausedSessionConflict(client, params.chipId, specQids(params.spec));
+      if (conflict) {
+        return toTextToolResult(conflict, { blocked: true }, { tool: "qdash_run_pipeline", chipId: params.chipId, started: false, blockedByPausedSession: true });
       }
-      const qdash = new QDash(await deps.makeClient(params));
+      const qdash = new QDash(client);
       try {
         // Dispatch only: the run handle's wait() is deliberately not called here.
         const run = await qdash.pipelines.execute(params.spec, { chipId: params.chipId, backendName: params.backendName });

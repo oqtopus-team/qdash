@@ -1992,6 +1992,204 @@
         }
       }
     },
+    "/executions/groups": {
+      "get": {
+        "tags": [
+          "execution"
+        ],
+        "summary": "List executions with agent sessions grouped",
+        "description": "List a chip's executions newest first, with each agent session as one row.\n\nA session row holds the real executions the session's actions dispatched, linked through\nthe session's action records; a tag alone does not group an execution. Rows are grouped\nbefore pagination, so a session is never split across pages and no execution is listed\ntwice. ``total`` counts rows and ``total_executions`` counts executions. A session row is\nordered by its latest activity (its latest measurement start, or its creation before the\nfirst). The session's status is its own; each child keeps its execution's status.",
+        "operationId": "listExecutionGroups",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Chip ID to list executions for",
+              "title": "Chip Id"
+            },
+            "description": "Chip ID to list executions for"
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Rows to skip",
+              "default": 0,
+              "title": "Skip"
+            },
+            "description": "Rows to skip"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Rows to return",
+              "default": 20,
+              "title": "Limit"
+            },
+            "description": "Rows to return"
+          },
+          {
+            "name": "date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{8}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only rows active on this day, YYYYMMDD: executions started on it, and agent sessions created or with a measurement started on it",
+              "title": "Date"
+            },
+            "description": "Only rows active on this day, YYYYMMDD: executions started on it, and agent sessions created or with a measurement started on it"
+          },
+          {
+            "name": "timezone",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "IANA time zone that defines the day for ``date``",
+              "default": "UTC",
+              "title": "Timezone"
+            },
+            "description": "IANA time zone that defines the day for ``date``"
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListExecutionGroupsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/executions/groups/agent-sessions/{session_id}": {
+      "get": {
+        "tags": [
+          "execution"
+        ],
+        "summary": "Get an agent session as a graph over its executions",
+        "description": "Return one agent session's measurements, proposals, decisions, and interventions.\n\nNodes are typed and carry ids of the authoritative records (actions, executions, task\nresults, decisions, interventions), not raw data. Edges are typed: ``sequence`` is the\norder measurements were dispatched; the other kinds come from references in the records.\nIt is a live read, not a snapshot; the session audit endpoints hold the full record.\nA session of another project is not found.",
+        "operationId": "getAgentSessionGraph",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentSessionGraphResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Detail"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/executions/activity": {
       "get": {
         "tags": [
@@ -2650,7 +2848,7 @@
           "agent-session"
         ],
         "summary": "Create an agent session",
-        "description": "Create a bounded authorization scope for a user-operated local agent.",
+        "description": "Create a bounded authorization scope for a user-operated local agent.\n\nThe new session's Slack start message, when agent notifications are on, is sent after\nthe response; the notification sweeper retries it.",
         "operationId": "createAgentSession",
         "security": [
           {
@@ -2692,6 +2890,121 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AgentSessionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "agent-session"
+        ],
+        "summary": "List agent sessions",
+        "description": "List the project's agent sessions, newest first, with their settled status.",
+        "operationId": "listAgentSessions",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AgentSessionStatus"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only sessions in these statuses",
+              "title": "Status"
+            },
+            "description": "Only sessions in these statuses"
+          },
+          {
+            "name": "mine",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Only sessions the signed-in user created",
+              "default": false,
+              "title": "Mine"
+            },
+            "description": "Only sessions the signed-in user created"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListAgentSessionsResponse"
                 }
               }
             }
@@ -2853,7 +3166,7 @@
           "agent-session"
         ],
         "summary": "Submit an agent action",
-        "description": "Authorize and audit an action proposal without executing it.",
+        "description": "Authorize and audit an action proposal without executing it.\n\nAn authorized ``request_human`` also records an intervention, pauses the session on it,\nand queues its Slack message.",
         "operationId": "submitAgentAction",
         "security": [
           {
@@ -2966,6 +3279,80 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ListAgentActionsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent-sessions/{session_id}/stop": {
+      "post": {
+        "tags": [
+          "agent-session"
+        ],
+        "summary": "Stop an agent session",
+        "description": "End an active or paused session's authority on a person's request.\n\nAny editor of the project may stop it, as an expert may stop it from an intervention.\nThe session becomes ``cancelled`` and nothing new is dispatched, committed, applied, or\nresumed in it. A measurement, commit, or backend apply that passed the session gate\nbefore the stop is not cancelled; ``in_flight`` lists those still unsettled. A session\nthat already ended is returned unchanged (``already_ended``).",
+        "operationId": "stopAgentSession",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StopAgentSessionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StopAgentSessionResponse"
                 }
               }
             }
@@ -3590,6 +3977,830 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AgentActionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent-sessions/{session_id}/interventions": {
+      "post": {
+        "tags": [
+          "agent-session"
+        ],
+        "summary": "Record an agent intervention",
+        "description": "Record that the agent needs a person and pause the session if it is active.\n\nThe record is saved before any Slack message is attempted, and it is saved even when the\nsession has no actions left or has expired.",
+        "operationId": "createAgentIntervention",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAgentInterventionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentInterventionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "agent-session"
+        ],
+        "summary": "List agent interventions",
+        "description": "List a session's interventions, newest first.",
+        "operationId": "listAgentInterventions",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListAgentInterventionsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent-sessions/{session_id}/interventions/{intervention_id}": {
+      "get": {
+        "tags": [
+          "agent-session"
+        ],
+        "summary": "Get an agent intervention",
+        "description": "Get an intervention with the session state needed to answer it.",
+        "operationId": "getAgentIntervention",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "intervention_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Intervention Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentInterventionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent-sessions/{session_id}/interventions/{intervention_id}/respond": {
+      "post": {
+        "tags": [
+          "agent-session"
+        ],
+        "summary": "Respond to an agent intervention",
+        "description": "Record an expert's guidance and either stop the session or authorize a resume.\n\nA plan with a checkpoint stays paused until its runner claims the resume.",
+        "operationId": "respondAgentIntervention",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "intervention_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Intervention Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RespondAgentInterventionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentInterventionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent-sessions/{session_id}/interventions/{intervention_id}/claim-resume": {
+      "post": {
+        "tags": [
+          "agent-session"
+        ],
+        "summary": "Claim an authorized agent resume",
+        "description": "Reactivate the paused session for the one runner that holds the claim key.",
+        "operationId": "claimAgentInterventionResume",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "intervention_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Intervention Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClaimAgentResumeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentInterventionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent-sessions/{session_id}/interventions/{intervention_id}/resume-outcome": {
+      "post": {
+        "tags": [
+          "agent-session"
+        ],
+        "summary": "Record the outcome of a resumed agent plan",
+        "description": "Record how the resumed run ended.",
+        "operationId": "recordAgentResumeOutcome",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "intervention_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Intervention Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordAgentResumeOutcomeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentInterventionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent-sessions/{session_id}/interventions/{intervention_id}/notification/retry": {
+      "post": {
+        "tags": [
+          "agent-session"
+        ],
+        "summary": "Retry an agent intervention Slack message",
+        "description": "Try once more to send an unsent Slack message; a sent message is never posted again.",
+        "operationId": "retryAgentInterventionNotification",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "intervention_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Intervention Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentInterventionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent-sessions/{session_id}/decisions": {
+      "post": {
+        "tags": [
+          "agent-session"
+        ],
+        "summary": "Record an agent decision",
+        "description": "Append the agent's reading of a result and its next step to the session's audit.\n\nOnly the session's creator records decisions. Recording changes no session state, so it\nis allowed in every session status; it never dispatches, commits, or applies anything.",
+        "operationId": "recordAgentDecision",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordAgentDecisionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentDecisionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "agent-session"
+        ],
+        "summary": "List agent decisions",
+        "description": "List a session's recorded decisions, oldest first.",
+        "operationId": "listAgentDecisions",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListAgentDecisionsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent-sessions/{session_id}/audit": {
+      "get": {
+        "tags": [
+          "agent-session"
+        ],
+        "summary": "Read an agent session's audit timeline",
+        "description": "Read the session's chronological experiment audit, a page at a time, oldest first.",
+        "operationId": "getAgentSessionAudit",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 1000
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentSessionAuditResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent-sessions/{session_id}/audit/export": {
+      "get": {
+        "tags": [
+          "agent-session"
+        ],
+        "summary": "Export an agent session's audit timeline",
+        "description": "Export the whole audit as versioned JSON; refused rather than cut short when too long.",
+        "operationId": "exportAgentSessionAudit",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentSessionAuditResponse"
                 }
               }
             }
@@ -18966,6 +20177,35 @@
             "type": "string",
             "format": "date-time",
             "title": "Created At"
+          },
+          "intervention_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Intervention Id",
+            "description": "Intervention recorded for an authorized request_human"
+          },
+          "autonomous": {
+            "type": "boolean",
+            "title": "Autonomous",
+            "description": "Whether QDash authorized the action as an autonomous step",
+            "default": false
+          },
+          "model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentModelIdentity"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The model the client host reported for this record; null when none was reported. Client reported, not verified by QDash."
           }
         },
         "type": "object",
@@ -18998,6 +20238,382 @@
         "title": "AgentActionType",
         "description": "Actions that a local agent may propose to QDash."
       },
+      "AgentAppliedQualityGate": {
+        "properties": {
+          "metric_name": {
+            "type": "string",
+            "title": "Metric Name"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/AgentQualityGateScope"
+          },
+          "task_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Name",
+            "description": "The gate's task; null for a legacy session-wide gate"
+          },
+          "minimum": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum"
+          },
+          "maximum": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maximum"
+          }
+        },
+        "type": "object",
+        "required": [
+          "metric_name",
+          "scope"
+        ],
+        "title": "AgentAppliedQualityGate",
+        "description": "One quality gate a specific task result was checked against."
+      },
+      "AgentAuditEvent": {
+        "properties": {
+          "event_id": {
+            "type": "string",
+            "title": "Event Id",
+            "description": "Stable identifier: <kind>:<source record id>"
+          },
+          "sequence": {
+            "type": "integer",
+            "title": "Sequence",
+            "description": "Position in the session's full timeline, from 0"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "At",
+            "description": "When the event happened, as its source record says"
+          },
+          "state_version": {
+            "type": "integer",
+            "title": "State Version",
+            "description": "Session state version the event belongs to: recorded by its source record, or inherited from its action or commit. Orders events that share a timestamp."
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind",
+            "description": "session_created, action_proposed, measurement, evaluation, decision, candidate_commit, candidate_set_commit, backend_apply, intervention_opened, intervention_response, intervention_resumed, resume_outcome, or session_stopped"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary",
+            "description": "One readable line about the event"
+          },
+          "actor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor",
+            "description": "Who acted, when a record names them"
+          },
+          "actor_kind": {
+            "type": "string",
+            "enum": [
+              "agent",
+              "human",
+              "server",
+              "worker",
+              "unknown"
+            ],
+            "title": "Actor Kind",
+            "default": "unknown"
+          },
+          "provenance": {
+            "type": "string",
+            "enum": [
+              "server_record",
+              "server_computed",
+              "agent_reported",
+              "human_reported",
+              "evaluator_reported"
+            ],
+            "title": "Provenance",
+            "description": "server_record: QDash recorded it; server_computed: derived at read time from immutable records; agent_reported, human_reported, evaluator_reported: text that party supplied, recorded as given"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status",
+            "description": "Status of the source record"
+          },
+          "status_is_current": {
+            "type": "boolean",
+            "title": "Status Is Current",
+            "description": "Whether status is the source record's live status rather than frozen",
+            "default": false
+          },
+          "action_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action Id"
+          },
+          "execution_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Execution Id"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          },
+          "task_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Name"
+          },
+          "qid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qid"
+          },
+          "commit_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Commit Id"
+          },
+          "evaluation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evaluation Id"
+          },
+          "intervention_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Intervention Id"
+          },
+          "decision_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision Id"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentModelIdentity"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The model the client host reported for the record behind an agent event: the session's creation, an action proposal, a decision, an agent's intervention request, or a commit made under session authority (the model of the decision it rests on). Client reported, not verified by QDash; null when none was reported, and then named in missing"
+          },
+          "missing": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing",
+            "description": "Facts the records do not hold for this event; never filled in"
+          },
+          "data": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Data",
+            "description": "Kind-specific details; see the developer guide"
+          }
+        },
+        "type": "object",
+        "required": [
+          "event_id",
+          "sequence",
+          "at",
+          "state_version",
+          "kind",
+          "summary",
+          "provenance"
+        ],
+        "title": "AgentAuditEvent",
+        "description": "One entry of a session's experiment audit timeline, built from QDash's own records."
+      },
+      "AgentAuditSessionHeader": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          },
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id"
+          },
+          "created_by": {
+            "type": "string",
+            "title": "Created By"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AgentSessionStatus"
+          },
+          "state_version": {
+            "type": "integer",
+            "title": "State Version"
+          },
+          "action_count": {
+            "type": "integer",
+            "title": "Action Count"
+          },
+          "policy": {
+            "$ref": "#/components/schemas/AgentSessionPolicy"
+          },
+          "skill_name": {
+            "type": "string",
+            "title": "Skill Name"
+          },
+          "skill_version": {
+            "type": "string",
+            "title": "Skill Version"
+          },
+          "skill_hash": {
+            "type": "string",
+            "title": "Skill Hash"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentModelIdentity"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The model the creating host reported; later events carry their own model. Client reported, not verified by QDash"
+          },
+          "model_name": {
+            "type": "string",
+            "title": "Model Name",
+            "description": "provider/model_id of model; empty when none was reported",
+            "default": ""
+          },
+          "missing": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing",
+            "description": "Identity fields the session did not record (for example model)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "project_id",
+          "chip_id",
+          "created_by",
+          "created_at",
+          "expires_at",
+          "status",
+          "state_version",
+          "action_count",
+          "policy",
+          "skill_name",
+          "skill_version",
+          "skill_hash"
+        ],
+        "title": "AgentAuditSessionHeader",
+        "description": "Who and what a session's audit belongs to."
+      },
       "AgentAutonomy": {
         "type": "string",
         "enum": [
@@ -19006,6 +20622,15 @@
         ],
         "title": "AgentAutonomy",
         "description": "How much of a plan the agent may run without a person confirming each step."
+      },
+      "AgentCandidateAcceptanceBasis": {
+        "type": "string",
+        "enum": [
+          "session_bounds",
+          "task_checks"
+        ],
+        "title": "AgentCandidateAcceptanceBasis",
+        "description": "What accepted a candidate."
       },
       "AgentCandidateCommitResponse": {
         "properties": {
@@ -19200,6 +20825,62 @@
               }
             ],
             "title": "Backend Applied At"
+          },
+          "authority": {
+            "type": "string",
+            "enum": [
+              "reviewed",
+              "session_policy"
+            ],
+            "title": "Authority",
+            "description": "reviewed: a per-call approved commit; session_policy: committed under the session's parameter_updates authority",
+            "default": "reviewed"
+          },
+          "decision_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision Id",
+            "description": "The pass decision a session_policy commit rests on"
+          },
+          "assessment_evidence": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Assessment Evidence",
+            "description": "What QDash checked for a session_policy commit, frozen when it was reserved: the agent-reported assessment, the mechanical gates, and cited evaluations"
+          },
+          "backend_authority": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "reviewed",
+                  "session_policy"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backend Authority",
+            "description": "Authority of the backend apply request, once requested"
+          },
+          "backend_requested_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backend Requested By",
+            "description": "Who requested the backend apply, once requested"
           }
         },
         "type": "object",
@@ -19253,6 +20934,16 @@
         ],
         "title": "AgentCandidateReference",
         "description": "Identify one authoritative accepted candidate for plan finalization."
+      },
+      "AgentCandidateRejection": {
+        "type": "string",
+        "enum": [
+          "not_in_scope",
+          "outside_bounds",
+          "quality_gate"
+        ],
+        "title": "AgentCandidateRejection",
+        "description": "Why a candidate was not accepted.\n\n``not_in_scope`` is not a verdict on the measurement: the output is neither granted from\nthis task nor bounded by the session, so it is staged for reference only. It cannot be\ncommitted from the session, and it is never evidence against the result or the result's\nother candidates. The other two are deterministic checks the value or its result failed."
       },
       "AgentCandidateResponse": {
         "properties": {
@@ -19314,9 +21005,39 @@
             "type": "object",
             "title": "Quality Metrics"
           },
+          "applied_quality_gates": {
+            "items": {
+              "$ref": "#/components/schemas/AgentAppliedQualityGate"
+            },
+            "type": "array",
+            "title": "Applied Quality Gates",
+            "description": "The session's quality gates this result was checked against: its task's gates and any legacy session-wide gate. Gates of other tasks are not listed."
+          },
+          "acceptance_basis": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentCandidateAcceptanceBasis"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What accepted the candidate: session_bounds (inside numeric bounds approved with the session) or task_checks (a parameter the session's update grant names, without bounds, accepted on its task's completion checks); null when rejected"
+          },
           "accepted": {
             "type": "boolean",
             "title": "Accepted"
+          },
+          "rejection": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentCandidateRejection"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why the candidate was not accepted; null when accepted. not_in_scope: the output is neither granted from this task nor bounded by the session, so it is staged for reference only; it cannot be committed from this session and is not evidence against the result or its other candidates. outside_bounds: the value is outside the session's approved bounds. quality_gate: a quality gate of the result's task failed or its metric is missing"
           },
           "reason": {
             "type": "string",
@@ -19457,6 +21178,2364 @@
         "title": "AgentCandidateSetCommitResponse",
         "description": "Audited all-at-once QDash commit of the final candidate set."
       },
+      "AgentCheckpointCandidate": {
+        "properties": {
+          "action_id": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Action Id"
+          },
+          "parameter_name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Parameter Name"
+          },
+          "task_id": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Task Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "action_id",
+          "parameter_name",
+          "task_id"
+        ],
+        "title": "AgentCheckpointCandidate",
+        "description": "An accepted candidate the plan carries; the runner re-reads its value from QDash."
+      },
+      "AgentDecisionAssessment": {
+        "type": "string",
+        "enum": [
+          "pass",
+          "fail",
+          "inconclusive"
+        ],
+        "title": "AgentDecisionAssessment",
+        "description": "How the agent judged the evidence a decision cites; reported by the agent."
+      },
+      "AgentDecisionNextAction": {
+        "type": "string",
+        "enum": [
+          "next_task",
+          "repeat",
+          "adjust_and_retry",
+          "rollback",
+          "propose_commit",
+          "request_human",
+          "skip_target",
+          "complete",
+          "stop"
+        ],
+        "title": "AgentDecisionNextAction",
+        "description": "What the agent decided to do next; a stated intent, not an execution."
+      },
+      "AgentDecisionResponse": {
+        "properties": {
+          "decision_id": {
+            "type": "string",
+            "title": "Decision Id"
+          },
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          },
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id"
+          },
+          "idempotency_key": {
+            "type": "string",
+            "title": "Idempotency Key"
+          },
+          "recorded_by": {
+            "type": "string",
+            "title": "Recorded By"
+          },
+          "recorded_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Recorded At"
+          },
+          "session_status_at_record": {
+            "type": "string",
+            "title": "Session Status At Record"
+          },
+          "session_state_version_at_record": {
+            "type": "integer",
+            "title": "Session State Version At Record"
+          },
+          "assessment": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentDecisionAssessment"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "interpretation": {
+            "type": "string",
+            "title": "Interpretation"
+          },
+          "next_action": {
+            "$ref": "#/components/schemas/AgentDecisionNextAction"
+          },
+          "next_detail": {
+            "type": "string",
+            "title": "Next Detail"
+          },
+          "evidence_action_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Evidence Action Ids"
+          },
+          "evaluation_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Evaluation Ids"
+          },
+          "next_action_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Action Id"
+          },
+          "intervention_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Intervention Id"
+          },
+          "supersedes_decision_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supersedes Decision Id"
+          },
+          "evidence_snapshot": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Evidence Snapshot",
+            "description": "What QDash's records said about the cited evidence when it was recorded"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentModelIdentity"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The model the client host reported for this record; null when none was reported. Client reported, not verified by QDash."
+          }
+        },
+        "type": "object",
+        "required": [
+          "decision_id",
+          "session_id",
+          "project_id",
+          "chip_id",
+          "idempotency_key",
+          "recorded_by",
+          "recorded_at",
+          "session_status_at_record",
+          "session_state_version_at_record",
+          "interpretation",
+          "next_action",
+          "next_detail",
+          "evidence_action_ids",
+          "evaluation_ids"
+        ],
+        "title": "AgentDecisionResponse",
+        "description": "One recorded agent decision with QDash's frozen reading of its evidence."
+      },
+      "AgentEvaluationMode": {
+        "type": "string",
+        "enum": [
+          "off",
+          "required"
+        ],
+        "title": "AgentEvaluationMode",
+        "description": "Whether the session's results are evaluated with the calibration evaluator.\n\nThe evaluator (qcal_evaluate from pi-qcaleval) is optional and separate from the task's\nown completion checks and any numeric gates. In every mode an evaluation that exists for\na result must support an update: a failed, pending, disputed, or negative one blocks it."
+      },
+      "AgentInterventionAttempt": {
+        "properties": {
+          "node_id": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Node Id",
+            "default": ""
+          },
+          "task_name": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Task Name",
+            "default": ""
+          },
+          "qid": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Qid",
+            "default": ""
+          },
+          "transition": {
+            "type": "string",
+            "maxLength": 64,
+            "title": "Transition",
+            "description": "Reported by the client",
+            "default": ""
+          },
+          "status": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Status",
+            "description": "Evaluation or execution status, as reported by the client",
+            "default": ""
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 1000,
+            "title": "Reason",
+            "description": "Reported by the client",
+            "default": ""
+          },
+          "action_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action Id"
+          },
+          "execution_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Execution Id"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          },
+          "evaluation_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evaluation Id"
+          },
+          "evaluation_run_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evaluation Run Id"
+          }
+        },
+        "type": "object",
+        "title": "AgentInterventionAttempt",
+        "description": "One recent attempt shown to the expert, as references rather than log output.\n\n``transition``, ``status``, and ``reason`` are what the client reported; QDash stores\nthem as given. The ids are evidence: QDash checks that they form one chain of this\nsession's action, execution, task result, and evaluation before it records them."
+      },
+      "AgentInterventionDecision": {
+        "type": "string",
+        "enum": [
+          "resume",
+          "stop"
+        ],
+        "title": "AgentInterventionDecision",
+        "description": "What the expert decided for the paused session."
+      },
+      "AgentInterventionEvent": {
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "At"
+          },
+          "actor": {
+            "type": "string",
+            "title": "Actor"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "at",
+          "actor",
+          "kind"
+        ],
+        "title": "AgentInterventionEvent",
+        "description": "One audit entry: who did what to the intervention, and when."
+      },
+      "AgentInterventionReason": {
+        "type": "string",
+        "enum": [
+          "unknown_outcome",
+          "recovery_exhausted",
+          "evaluation_failed",
+          "platform_error",
+          "policy_limit",
+          "agent_request"
+        ],
+        "title": "AgentInterventionReason",
+        "description": "Why an agent stopped and asked a person for help."
+      },
+      "AgentInterventionResponse": {
+        "properties": {
+          "intervention_id": {
+            "type": "string",
+            "title": "Intervention Id"
+          },
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          },
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id"
+          },
+          "idempotency_key": {
+            "type": "string",
+            "title": "Idempotency Key"
+          },
+          "created_by": {
+            "type": "string",
+            "title": "Created By"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/AgentInterventionReason"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "question": {
+            "type": "string",
+            "title": "Question"
+          },
+          "node_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Node Id"
+          },
+          "task_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Name"
+          },
+          "qids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Qids"
+          },
+          "attempts": {
+            "items": {
+              "$ref": "#/components/schemas/AgentInterventionAttempt"
+            },
+            "type": "array",
+            "title": "Attempts"
+          },
+          "action_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action Id"
+          },
+          "previous_intervention_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Intervention Id"
+          },
+          "checkpoint": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentPlanCheckpoint"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "plan_hash": {
+            "type": "string",
+            "title": "Plan Hash"
+          },
+          "pauses_session": {
+            "type": "boolean",
+            "title": "Pauses Session"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AgentInterventionStatus"
+          },
+          "response": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentInterventionResponseRecord"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "resume_claim_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resume Claim Key"
+          },
+          "resumed_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resumed By"
+          },
+          "resumed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resumed At"
+          },
+          "resume_outcome": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentResumeOutcomeRecord"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "notification": {
+            "$ref": "#/components/schemas/AgentNotificationDeliveryResponse"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/AgentInterventionEvent"
+            },
+            "type": "array",
+            "title": "Events"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentModelIdentity"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The model the client host reported for this record; null when none was reported. Client reported, not verified by QDash."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "session_status": {
+            "$ref": "#/components/schemas/AgentSessionStatus"
+          },
+          "session_state_version": {
+            "type": "integer",
+            "title": "Session State Version"
+          },
+          "session_expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Session Expires At"
+          },
+          "actions_used": {
+            "type": "integer",
+            "title": "Actions Used"
+          },
+          "max_actions": {
+            "type": "integer",
+            "title": "Max Actions"
+          },
+          "can_resume": {
+            "type": "boolean",
+            "title": "Can Resume",
+            "description": "Whether an expert can authorize a resume now"
+          },
+          "resume_blockers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Resume Blockers",
+            "description": "Why a resume is not possible, in plain words"
+          },
+          "resume_options": {
+            "items": {
+              "$ref": "#/components/schemas/AgentResumeOption"
+            },
+            "type": "array",
+            "title": "Resume Options"
+          },
+          "resume_command": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resume Command",
+            "description": "The client command that continues an authorized plan"
+          },
+          "page_path": {
+            "type": "string",
+            "title": "Page Path"
+          }
+        },
+        "type": "object",
+        "required": [
+          "intervention_id",
+          "project_id",
+          "session_id",
+          "chip_id",
+          "idempotency_key",
+          "created_by",
+          "reason",
+          "summary",
+          "question",
+          "qids",
+          "attempts",
+          "plan_hash",
+          "pauses_session",
+          "status",
+          "notification",
+          "events",
+          "created_at",
+          "updated_at",
+          "session_status",
+          "session_state_version",
+          "session_expires_at",
+          "actions_used",
+          "max_actions",
+          "can_resume",
+          "page_path"
+        ],
+        "title": "AgentInterventionResponse",
+        "description": "An intervention with the session state an expert needs to decide."
+      },
+      "AgentInterventionResponseRecord": {
+        "properties": {
+          "response_id": {
+            "type": "string",
+            "title": "Response Id"
+          },
+          "idempotency_key": {
+            "type": "string",
+            "title": "Idempotency Key",
+            "default": ""
+          },
+          "decision": {
+            "$ref": "#/components/schemas/AgentInterventionDecision"
+          },
+          "guidance": {
+            "type": "string",
+            "maxLength": 5000,
+            "title": "Guidance",
+            "default": ""
+          },
+          "resume_node_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resume Node Id"
+          },
+          "responded_by": {
+            "type": "string",
+            "title": "Responded By"
+          },
+          "responded_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Responded At"
+          },
+          "expected_state_version": {
+            "type": "integer",
+            "title": "Expected State Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "response_id",
+          "decision",
+          "responded_by",
+          "responded_at",
+          "expected_state_version"
+        ],
+        "title": "AgentInterventionResponseRecord",
+        "description": "The expert's recorded answer. Guidance is evidence for the agent, never a command."
+      },
+      "AgentInterventionStatus": {
+        "type": "string",
+        "enum": [
+          "open",
+          "responding",
+          "resume_authorized",
+          "resumed",
+          "stopped",
+          "discarded"
+        ],
+        "title": "AgentInterventionStatus",
+        "description": "Lifecycle of one human intervention.\n\n``open`` waits for an expert. ``responding`` is the short window while a response is\nbeing applied to the session. ``resume_authorized`` means an expert allowed the runner to\ncontinue but no runner has claimed it yet; ``resumed`` means a runner claimed it and the\nsession is active again. ``stopped`` means the expert ended the session. ``discarded``\nmarks a request that never paused its session."
+      },
+      "AgentModelIdentity": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@+\\-]*$",
+            "title": "Provider"
+          },
+          "model_id": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@+\\-]*$",
+            "title": "Model Id"
+          },
+          "host": {
+            "type": "string",
+            "maxLength": 64,
+            "pattern": "^([a-z0-9][a-z0-9._-]*)?$",
+            "title": "Host",
+            "description": "The client host that reported the identity, such as pi or qdash-web-agent",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "provider",
+          "model_id"
+        ],
+        "title": "AgentModelIdentity",
+        "description": "The provider and model a client host reports it ran the agent with.\n\nThe host (pi CLI, the QDash web Agent, or another API client) reads it from its own\nruntime and sends it with the request; the agent's tool arguments never supply it. QDash\nrecords it as reported and cannot verify it. A model ID is only unique within its\nprovider, so the two are always recorded together. Only identifiers are accepted: no\nendpoint URLs, credentials, or free text."
+      },
+      "AgentNotificationDeliveryResponse": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/AgentNotificationStatus"
+          },
+          "attempts": {
+            "type": "integer",
+            "title": "Attempts"
+          },
+          "last_error": {
+            "type": "string",
+            "title": "Last Error"
+          },
+          "last_attempt_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Attempt At"
+          },
+          "next_attempt_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Attempt At"
+          },
+          "channel_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Channel Id"
+          },
+          "message_ts": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message Ts"
+          },
+          "sent_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sent At"
+          },
+          "last_reply_error": {
+            "type": "string",
+            "title": "Last Reply Error",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "attempts",
+          "last_error"
+        ],
+        "title": "AgentNotificationDeliveryResponse",
+        "description": "Slack delivery state shown with an intervention."
+      },
+      "AgentNotificationStatus": {
+        "type": "string",
+        "enum": [
+          "disabled",
+          "pending",
+          "sending",
+          "sent",
+          "failed"
+        ],
+        "title": "AgentNotificationStatus",
+        "description": "Delivery state of the Slack root message for one intervention."
+      },
+      "AgentParameterUpdatePolicy": {
+        "properties": {
+          "parameters": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Parameters",
+            "description": "Calibration parameters the agent may commit. Numeric bounds are optional: bounds in allowed_overrides, when the session has them, still apply; without them a candidate is accepted on its task's own completion checks"
+          },
+          "tasks": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Tasks",
+            "description": "Tasks whose completed results may supply an update; a subset of allowed_tasks"
+          },
+          "apply_backend": {
+            "type": "boolean",
+            "title": "Apply Backend",
+            "description": "Also write a value committed under this authority to the backend configuration (never pushed to GitHub)",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "parameters",
+          "tasks"
+        ],
+        "title": "AgentParameterUpdatePolicy",
+        "description": "Opt-in authority, approved once with the session, to commit passing results.\n\nWithout it (the default, and every session created before it existed) a candidate is\ncommitted or applied only through the reviewed calls a person approves each time. With\nit, the session's creator may let the agent commit a candidate of one of ``parameters``\nfrom a completed measurement of one of ``tasks`` on a session qubit, and with\n``apply_backend`` also write that committed value to the backend, without a per-update\napproval. QDash still requires, for every such update, an explicit ``pass`` assessment\nthe agent recorded for that measurement, the task's own completion checks (a completed\ntask result, so its fit and validation checks passed), the current session and\ncalibration state, and any numeric bounds or task quality gates the session holds for\nthe parameter and task. The grant names which parameters may change; it does not need\nnumeric bounds, so none has to be made up to authorize it. A failed, uncertain, or\nunexplained result is never committed this way."
+      },
+      "AgentPlanCheckpoint": {
+        "properties": {
+          "version": {
+            "type": "integer",
+            "maximum": 1.0,
+            "minimum": 1.0,
+            "title": "Version",
+            "default": 1
+          },
+          "qid": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Qid"
+          },
+          "source_execution_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Execution Id"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/AgentPlanCheckpointNode"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Nodes"
+          },
+          "idempotency_prefix": {
+            "type": "string",
+            "maxLength": 96,
+            "minLength": 1,
+            "title": "Idempotency Prefix"
+          },
+          "node_path": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "title": "Node Path"
+          },
+          "visit_counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Visit Counts"
+          },
+          "stopped_node_id": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Stopped Node Id"
+          },
+          "accepted_candidates": {
+            "items": {
+              "$ref": "#/components/schemas/AgentCheckpointCandidate"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Accepted Candidates"
+          },
+          "max_pre_dispatch_retries": {
+            "type": "integer",
+            "maximum": 10.0,
+            "minimum": 0.0,
+            "title": "Max Pre Dispatch Retries",
+            "default": 1
+          },
+          "max_node_executions": {
+            "type": "integer",
+            "maximum": 10000.0,
+            "minimum": 1.0,
+            "title": "Max Node Executions"
+          },
+          "max_node_visits": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 10000.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Node Visits"
+          },
+          "commit_on_success": {
+            "type": "boolean",
+            "title": "Commit On Success",
+            "default": false
+          },
+          "planner": {
+            "type": "string",
+            "pattern": "^(none|evaluation)$",
+            "title": "Planner",
+            "default": "none"
+          },
+          "planner_history": {
+            "additionalProperties": {
+              "items": {
+                "$ref": "#/components/schemas/AgentPlannerVerdictRecord"
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "Planner History"
+          }
+        },
+        "type": "object",
+        "required": [
+          "qid",
+          "nodes",
+          "idempotency_prefix",
+          "stopped_node_id",
+          "max_node_executions"
+        ],
+        "title": "AgentPlanCheckpoint",
+        "description": "Where a stopped plan was, so a runner can continue it without repeating work.\n\nThe checkpoint holds the approved plan, the idempotency prefix, and every counter the\nplan's bounds use. QDash does not take the counters on trust: it binds a session to the\nplan of its first checkpoint and rejects a checkpoint that changes the plan, its prefix,\nor its bounds, shortens the recorded path, or reports fewer node visits than the\nsession's run_task actions show."
+      },
+      "AgentPlanCheckpointNode": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Id"
+          },
+          "task_name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Task Name"
+          },
+          "candidate_parameter": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Candidate Parameter"
+          },
+          "on_pass": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "On Pass"
+          },
+          "on_rollback": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "On Rollback"
+          },
+          "parameter_overrides": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Parameter Overrides"
+          },
+          "diagnosis": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "Diagnosis",
+            "default": ""
+          },
+          "reconfigure_before_task": {
+            "type": "boolean",
+            "title": "Reconfigure Before Task",
+            "default": false
+          },
+          "commit_candidate": {
+            "type": "boolean",
+            "title": "Commit Candidate",
+            "default": false
+          },
+          "apply_backend": {
+            "type": "boolean",
+            "title": "Apply Backend",
+            "default": false
+          },
+          "push_to_github": {
+            "type": "boolean",
+            "title": "Push To Github",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "task_name",
+          "candidate_parameter"
+        ],
+        "title": "AgentPlanCheckpointNode",
+        "description": "One node of the approved plan, as the runner received it."
+      },
+      "AgentPlannerVerdictRecord": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Status"
+          },
+          "fit_reliability": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fit Reliability"
+          },
+          "evaluation_id": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Evaluation Id",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "AgentPlannerVerdictRecord",
+        "description": "One evaluation verdict the planner remembers for its stop rules."
+      },
+      "AgentQualityGateScope": {
+        "type": "string",
+        "enum": [
+          "task",
+          "all_tasks"
+        ],
+        "title": "AgentQualityGateScope",
+        "description": "Which results a quality gate checks."
+      },
+      "AgentResumeOption": {
+        "properties": {
+          "node_id": {
+            "type": "string",
+            "title": "Node Id"
+          },
+          "task_name": {
+            "type": "string",
+            "title": "Task Name"
+          },
+          "visits": {
+            "type": "integer",
+            "title": "Visits"
+          },
+          "max_visits": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Visits"
+          },
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "node_id",
+          "task_name",
+          "visits",
+          "available"
+        ],
+        "title": "AgentResumeOption",
+        "description": "A plan node the expert may resume from, with its remaining visit budget."
+      },
+      "AgentResumeOutcomeRecord": {
+        "properties": {
+          "transition": {
+            "type": "string",
+            "maxLength": 64,
+            "title": "Transition"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "Reason",
+            "default": ""
+          },
+          "follow_up_intervention_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Follow Up Intervention Id"
+          },
+          "recorded_by": {
+            "type": "string",
+            "title": "Recorded By"
+          },
+          "recorded_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Recorded At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "transition",
+          "recorded_by",
+          "recorded_at"
+        ],
+        "title": "AgentResumeOutcomeRecord",
+        "description": "What the resumed runner reported when its run ended."
+      },
+      "AgentSessionAuditResponse": {
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "const": "qdash.agent-session-audit.v1",
+            "title": "Schema Version",
+            "default": "qdash.agent-session-audit.v1"
+          },
+          "generated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Generated At"
+          },
+          "snapshot_id": {
+            "type": "string",
+            "title": "Snapshot Id",
+            "description": "Fingerprint of the snapshot this response belongs to; every page of one cursor chain carries the same value"
+          },
+          "session": {
+            "$ref": "#/components/schemas/AgentAuditSessionHeader"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/AgentAuditEvent"
+            },
+            "type": "array",
+            "title": "Events"
+          },
+          "total_events": {
+            "type": "integer",
+            "title": "Total Events",
+            "description": "Events in the snapshot"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor",
+            "description": "Pass as cursor to read the next page of the same snapshot. The read is refused with 409 when the records changed since the snapshot; then start again without a cursor"
+          },
+          "complete": {
+            "type": "boolean",
+            "title": "Complete",
+            "description": "Whether this response ends the snapshot: with the earlier pages of the same snapshot_id it holds every event of the snapshot"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes",
+            "description": "What the audit does and does not contain"
+          }
+        },
+        "type": "object",
+        "required": [
+          "generated_at",
+          "snapshot_id",
+          "session",
+          "events",
+          "total_events",
+          "complete"
+        ],
+        "title": "AgentSessionAuditResponse",
+        "description": "A page of one snapshot of a session's chronological experiment audit, or all of it.\n\nA snapshot contains two matching projected reads, not an atomic point-in-time database\nview. Changes that revert between reads can go undetected. Pagination is bound to the\nfingerprint of that projected content. Read a new first page or export for later records."
+      },
+      "AgentSessionChildExecution": {
+        "properties": {
+          "action_id": {
+            "type": "string",
+            "title": "Action Id"
+          },
+          "sequence": {
+            "type": "integer",
+            "title": "Sequence",
+            "description": "1-based dispatch order of the measurement in the session"
+          },
+          "attempt": {
+            "type": "integer",
+            "title": "Attempt",
+            "description": "1-based count of measurements of this task on this target so far"
+          },
+          "task_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Name"
+          },
+          "qid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qid"
+          },
+          "in_filter": {
+            "type": "boolean",
+            "title": "In Filter",
+            "description": "Whether the execution matches the list's day filter; true without one"
+          },
+          "execution": {
+            "$ref": "#/components/schemas/ExecutionResponseSummary"
+          }
+        },
+        "type": "object",
+        "required": [
+          "action_id",
+          "sequence",
+          "attempt",
+          "in_filter",
+          "execution"
+        ],
+        "title": "AgentSessionChildExecution",
+        "description": "A real execution one action of the session dispatched."
+      },
+      "AgentSessionGraphDecision": {
+        "properties": {
+          "decision_id": {
+            "type": "string",
+            "title": "Decision Id"
+          },
+          "assessment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assessment"
+          },
+          "interpretation": {
+            "type": "string",
+            "title": "Interpretation"
+          },
+          "next_action": {
+            "type": "string",
+            "title": "Next Action"
+          },
+          "next_detail": {
+            "type": "string",
+            "title": "Next Detail",
+            "default": ""
+          },
+          "evidence_action_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Evidence Action Ids"
+          },
+          "evaluation_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Evaluation Ids"
+          },
+          "next_action_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Action Id"
+          },
+          "superseded_by_decision_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Superseded By Decision Id"
+          },
+          "supersedes_decision_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supersedes Decision Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "decision_id",
+          "interpretation",
+          "next_action"
+        ],
+        "title": "AgentSessionGraphDecision",
+        "description": "The agent's reading of earlier results and the step it chose; agent reported."
+      },
+      "AgentSessionGraphEdge": {
+        "properties": {
+          "edge_id": {
+            "type": "string",
+            "title": "Edge Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "sequence",
+              "evidence",
+              "next_action",
+              "retry_of",
+              "escalation",
+              "follow_up"
+            ],
+            "title": "Kind"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "target": {
+            "type": "string",
+            "title": "Target"
+          }
+        },
+        "type": "object",
+        "required": [
+          "edge_id",
+          "kind",
+          "source",
+          "target"
+        ],
+        "title": "AgentSessionGraphEdge",
+        "description": "A typed link between two nodes.\n\n``sequence`` is temporal only: the next measurement dispatched. Every other kind comes from\nan explicit reference in a record (a decision's evidence or next action, a declared repeat,\nan intervention's action or predecessor); no scientific dependency is inferred from time."
+      },
+      "AgentSessionGraphIntervention": {
+        "properties": {
+          "intervention_id": {
+            "type": "string",
+            "title": "Intervention Id"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "question": {
+            "type": "string",
+            "title": "Question"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary",
+            "default": ""
+          },
+          "pauses_session": {
+            "type": "boolean",
+            "title": "Pauses Session",
+            "default": false
+          },
+          "response_decision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Response Decision"
+          },
+          "response_guidance": {
+            "type": "string",
+            "title": "Response Guidance",
+            "default": ""
+          },
+          "responded_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Responded By"
+          },
+          "responded_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Responded At"
+          },
+          "resumed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resumed At"
+          },
+          "resume_outcome": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resume Outcome"
+          }
+        },
+        "type": "object",
+        "required": [
+          "intervention_id",
+          "reason",
+          "status",
+          "question"
+        ],
+        "title": "AgentSessionGraphIntervention",
+        "description": "A stop for an expert and the expert's answer."
+      },
+      "AgentSessionGraphMeasurement": {
+        "properties": {
+          "action_id": {
+            "type": "string",
+            "title": "Action Id"
+          },
+          "task_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Name"
+          },
+          "qid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qid"
+          },
+          "sequence": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sequence",
+            "description": "1-based dispatch order among the session's measurements; null before dispatch"
+          },
+          "attempt": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempt",
+            "description": "1-based count of dispatched measurements of this task on this target"
+          },
+          "repeat_of_action_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repeat Of Action Id",
+            "description": "The measurement this one repeats, as the agent declared it"
+          },
+          "dispatch_status": {
+            "type": "string",
+            "title": "Dispatch Status",
+            "description": "The action's own dispatch state"
+          },
+          "execution_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Execution Id"
+          },
+          "execution_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Execution Status",
+            "description": "The real execution's status; null before it exists"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          },
+          "task_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Status"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "figure_count": {
+            "type": "integer",
+            "title": "Figure Count",
+            "default": 0
+          },
+          "evaluation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evaluation Id",
+            "description": "The latest evaluation of the task"
+          },
+          "evaluation_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evaluation Status"
+          },
+          "intent": {
+            "type": "string",
+            "title": "Intent",
+            "description": "The agent's stated intent; agent reported",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "action_id",
+          "dispatch_status"
+        ],
+        "title": "AgentSessionGraphMeasurement",
+        "description": "A measurement the session authorized, and what its real execution reports."
+      },
+      "AgentSessionGraphNode": {
+        "properties": {
+          "node_id": {
+            "type": "string",
+            "title": "Node Id",
+            "description": "Stable id: the kind and the id of its record"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "measurement",
+              "proposal",
+              "session_action",
+              "decision",
+              "intervention"
+            ],
+            "title": "Kind"
+          },
+          "order": {
+            "type": "integer",
+            "title": "Order",
+            "description": "0-based position in time among all nodes of the graph"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "At"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "Measurement: the execution status, or the dispatch state before one exists; link_claimed or link_ambiguous when the action was dispatched but no execution can be attributed to it. Proposal: rejected. Decision: recorded or superseded. Intervention: its status"
+          },
+          "status_is_current": {
+            "type": "boolean",
+            "title": "Status Is Current",
+            "description": "The status is read live from a record that can still change",
+            "default": false
+          },
+          "model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentModelIdentity"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The model the client host reported for the action, decision, or intervention record; client reported, not verified by QDash. Null when none was reported"
+          },
+          "missing": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing",
+            "description": "Facts the records do not hold, such as execution, execution_on_session_chip, execution_link_claimed, execution_link_ambiguous, task_result, or action_record (shown from the session's pending payload, not written yet)"
+          },
+          "measurement": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentSessionGraphMeasurement"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "proposal": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentSessionGraphProposal"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "session_action": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentSessionGraphSessionAction"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "decision": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentSessionGraphDecision"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "intervention": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentSessionGraphIntervention"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "node_id",
+          "kind",
+          "order",
+          "at",
+          "label",
+          "status"
+        ],
+        "title": "AgentSessionGraphNode",
+        "description": "One step of the graph. Exactly the field named by ``kind`` is set."
+      },
+      "AgentSessionGraphProposal": {
+        "properties": {
+          "action_id": {
+            "type": "string",
+            "title": "Action Id"
+          },
+          "action_type": {
+            "type": "string",
+            "title": "Action Type"
+          },
+          "task_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Name"
+          },
+          "qids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Qids"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "description": "Why the policy rejected it",
+            "default": ""
+          },
+          "intent": {
+            "type": "string",
+            "title": "Intent",
+            "description": "The agent's stated intent; agent reported",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "action_id",
+          "action_type"
+        ],
+        "title": "AgentSessionGraphProposal",
+        "description": "An action that did not reach hardware: rejected by the policy."
+      },
+      "AgentSessionGraphResponse": {
+        "properties": {
+          "generated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Generated At"
+          },
+          "session": {
+            "$ref": "#/components/schemas/AgentSessionGroupSummary"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/AgentSessionGraphNode"
+            },
+            "type": "array",
+            "title": "Nodes"
+          },
+          "edges": {
+            "items": {
+              "$ref": "#/components/schemas/AgentSessionGraphEdge"
+            },
+            "type": "array",
+            "title": "Edges"
+          },
+          "total_nodes": {
+            "type": "integer",
+            "title": "Total Nodes"
+          },
+          "omitted_nodes": {
+            "type": "integer",
+            "title": "Omitted Nodes",
+            "description": "Earliest nodes left out to bound the response; the audit holds them all"
+          },
+          "complete": {
+            "type": "boolean",
+            "title": "Complete"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "generated_at",
+          "session",
+          "nodes",
+          "edges",
+          "total_nodes",
+          "omitted_nodes",
+          "complete",
+          "notes"
+        ],
+        "title": "AgentSessionGraphResponse",
+        "description": "One agent session as an experiment graph over its real executions.\n\nA live read of the session's records, collected one after another: statuses can move while\nit is read, and it is not a snapshot. The full audit, with its consistency check and export,\nstays on the session's audit endpoints."
+      },
+      "AgentSessionGraphSessionAction": {
+        "properties": {
+          "action_id": {
+            "type": "string",
+            "title": "Action Id"
+          },
+          "action_type": {
+            "type": "string",
+            "title": "Action Type"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "action_id",
+          "action_type"
+        ],
+        "title": "AgentSessionGraphSessionAction",
+        "description": "An authorized action other than a measurement: asking for an expert, or completing."
+      },
+      "AgentSessionGroupCounts": {
+        "properties": {
+          "actions": {
+            "type": "integer",
+            "title": "Actions",
+            "description": "Actions the session counted against its budget"
+          },
+          "max_actions": {
+            "type": "integer",
+            "title": "Max Actions",
+            "description": "The session's action budget"
+          },
+          "measurements": {
+            "type": "integer",
+            "title": "Measurements",
+            "description": "Dispatched measurements linked to a real execution on the session's chip"
+          },
+          "pending_dispatch": {
+            "type": "integer",
+            "title": "Pending Dispatch",
+            "description": "Authorized measurements without an execution yet: not dispatched, being dispatched, queued, or whose execution record was not found"
+          },
+          "dispatch_failed": {
+            "type": "integer",
+            "title": "Dispatch Failed",
+            "description": "Authorized measurements whose dispatch failed before an execution",
+            "default": 0
+          },
+          "in_flight": {
+            "type": "integer",
+            "title": "In Flight",
+            "description": "Measurements being dispatched or queued, or whose execution is scheduled, running, or cancelling"
+          },
+          "rejected_proposals": {
+            "type": "integer",
+            "title": "Rejected Proposals",
+            "description": "Proposals the session policy rejected; they never reached hardware"
+          },
+          "open_interventions": {
+            "type": "integer",
+            "title": "Open Interventions",
+            "description": "Requests for an expert not answered yet"
+          },
+          "decisions": {
+            "type": "integer",
+            "title": "Decisions",
+            "description": "Agent decisions recorded in the session"
+          }
+        },
+        "type": "object",
+        "required": [
+          "actions",
+          "max_actions",
+          "measurements",
+          "pending_dispatch",
+          "in_flight",
+          "rejected_proposals",
+          "open_interventions",
+          "decisions"
+        ],
+        "title": "AgentSessionGroupCounts",
+        "description": "What one agent session has done, counted from its own records."
+      },
+      "AgentSessionGroupSummary": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          },
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id"
+          },
+          "created_by": {
+            "type": "string",
+            "title": "Created By"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AgentSessionStatus",
+            "description": "The session's state; an active or paused session past its expiry reads as expired even before a write records it"
+          },
+          "stored_status": {
+            "$ref": "#/components/schemas/AgentSessionStatus",
+            "description": "The status the session record holds"
+          },
+          "active_intervention_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active Intervention Id",
+            "description": "The intervention the session waits on, when paused"
+          },
+          "qids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Qids"
+          },
+          "allowed_tasks": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Allowed Tasks"
+          },
+          "autonomy": {
+            "type": "string",
+            "title": "Autonomy"
+          },
+          "skill_name": {
+            "type": "string",
+            "title": "Skill Name",
+            "default": ""
+          },
+          "model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentModelIdentity"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The model the creating host reported; later steps carry their own. Client reported, not verified by QDash"
+          },
+          "model_name": {
+            "type": "string",
+            "title": "Model Name",
+            "description": "provider/model_id of model; empty when none was reported",
+            "default": ""
+          },
+          "counts": {
+            "$ref": "#/components/schemas/AgentSessionGroupCounts"
+          },
+          "latest_activity_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Latest Activity At",
+            "description": "The session's latest measurement start, or its creation before the first"
+          },
+          "missing": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing",
+            "description": "Facts the records do not hold, such as a dispatched execution not found, an execution held by another action, or a record the session has not written yet"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "project_id",
+          "chip_id",
+          "created_by",
+          "created_at",
+          "updated_at",
+          "expires_at",
+          "status",
+          "stored_status",
+          "qids",
+          "allowed_tasks",
+          "autonomy",
+          "counts",
+          "latest_activity_at"
+        ],
+        "title": "AgentSessionGroupSummary",
+        "description": "One agent session as a group of the Execution list.\n\n``status`` is the session's own state, not an execution status: a session waiting for an\nexpert, or active between measurements, holds no hardware and is not failed for it."
+      },
+      "AgentSessionInFlightOperation": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "measurement",
+              "candidate_commit",
+              "candidate_set_commit",
+              "backend_apply"
+            ],
+            "title": "Kind"
+          },
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "The action, commit, or candidate set commit ID"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "Its status as QDash records it now"
+          },
+          "execution_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Execution Id",
+            "description": "The measurement's execution, once QDash knows it"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "id",
+          "status"
+        ],
+        "title": "AgentSessionInFlightOperation",
+        "description": "An operation that passed the session gate before the session ended and has not settled.\n\nQDash does not cancel it: a measurement keeps running on the hardware and its result\nis recorded; a commit or backend apply finishes or fails on its own."
+      },
+      "AgentSessionLifecycleEvent": {
+        "type": "string",
+        "enum": [
+          "started",
+          "completed",
+          "cancelled",
+          "expired"
+        ],
+        "title": "AgentSessionLifecycleEvent",
+        "description": "A session lifecycle event announced in the agent Slack channel."
+      },
+      "AgentSessionNotificationResponse": {
+        "properties": {
+          "event": {
+            "$ref": "#/components/schemas/AgentSessionLifecycleEvent"
+          },
+          "actor": {
+            "type": "string",
+            "title": "Actor",
+            "default": ""
+          },
+          "status": {
+            "$ref": "#/components/schemas/AgentNotificationStatus"
+          },
+          "attempts": {
+            "type": "integer",
+            "title": "Attempts"
+          },
+          "last_error": {
+            "type": "string",
+            "title": "Last Error"
+          },
+          "last_attempt_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Attempt At"
+          },
+          "next_attempt_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Attempt At"
+          },
+          "sent_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sent At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "event",
+          "status",
+          "attempts",
+          "last_error"
+        ],
+        "title": "AgentSessionNotificationResponse",
+        "description": "Slack delivery state of one session lifecycle message."
+      },
       "AgentSessionPolicy": {
         "properties": {
           "qids": {
@@ -19488,14 +23567,27 @@
               "$ref": "#/components/schemas/NumericBounds"
             },
             "type": "object",
-            "title": "Allowed Overrides"
+            "title": "Allowed Overrides",
+            "description": "Parameter name -> bounds. A step may override a task input of that name within the bounds, and a task output of that name is an accepted candidate only inside them. Output parameters are bounded here, never in quality gates. Give only bounds a person stated; QDash records them as approved with the session and cannot verify where they came from"
           },
           "quality_gates": {
             "additionalProperties": {
               "$ref": "#/components/schemas/NumericBounds"
             },
             "type": "object",
-            "title": "Quality Gates"
+            "title": "Quality Gates",
+            "description": "Legacy session-wide quality gates: metric name -> bounds checked on every candidate of every task. Kept so sessions approved before task_quality_gates keep their exact meaning; a new session must leave it empty and use task_quality_gates."
+          },
+          "task_quality_gates": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "$ref": "#/components/schemas/NumericBounds"
+              },
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Task Quality Gates",
+            "description": "Task name -> quality metric name -> bounds. A candidate from a result of that task is accepted only when the result records each named metric inside its bounds; a missing metric rejects it. Results of other tasks are not checked against these gates. Each task must be an allowed task, and each metric a quality metric QDash records on task results (currently only r2)."
           },
           "allow_reconfigure": {
             "type": "boolean",
@@ -19521,6 +23613,28 @@
             "title": "Max Rounds Per Target",
             "description": "How many times an autonomous plan may run the same node on one target",
             "default": 3
+          },
+          "parameter_updates": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentParameterUpdatePolicy"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Opt-in authority to commit (and optionally apply) passing candidates without a per-update approval; absent means every commit and apply is reviewed"
+          },
+          "evaluation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentEvaluationMode"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Calibration evaluator use, fixed at approval: off (the agent does not call qcal_evaluate) or required (every autonomous update needs a completed evaluation of its result with a reliable fit and a SUCCESS diagnosis). New sessions record off unless they ask for required; null marks a session approved before this field, which keeps its earlier meaning. In every mode an existing evaluation that is pending, failed, disputed, or negative blocks an update"
           }
         },
         "type": "object",
@@ -19564,9 +23678,22 @@
             "type": "string",
             "title": "Skill Hash"
           },
+          "model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentModelIdentity"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The model the client host reported for this record; null when none was reported. Client reported, not verified by QDash."
+          },
           "model_name": {
             "type": "string",
-            "title": "Model Name"
+            "title": "Model Name",
+            "description": "provider/model_id of model, for display; empty when none was reported",
+            "default": ""
           },
           "status": {
             "$ref": "#/components/schemas/AgentSessionStatus"
@@ -19593,6 +23720,51 @@
             "type": "string",
             "format": "date-time",
             "title": "Expires At"
+          },
+          "active_intervention_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active Intervention Id",
+            "description": "The intervention the session waits on, if any"
+          },
+          "start_notification": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentSessionNotificationResponse"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Slack delivery of the session's start message; null for a session created before lifecycle messages existed"
+          },
+          "end_notification": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentSessionNotificationResponse"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Slack delivery of the session's end message, stored by the update that ended it; null while the session is open"
+          },
+          "stop": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentSessionStopRecord"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who stopped the session with a stop request, why, and when; null unless a stop request ended it (an expert's stop answer is recorded on its intervention)"
           }
         },
         "type": "object",
@@ -19605,7 +23777,6 @@
           "skill_name",
           "skill_version",
           "skill_hash",
-          "model_name",
           "status",
           "state_version",
           "action_count",
@@ -19627,6 +23798,50 @@
         ],
         "title": "AgentSessionStatus",
         "description": "Lifecycle state of an agent session."
+      },
+      "AgentSessionStopRecord": {
+        "properties": {
+          "stopped_by": {
+            "type": "string",
+            "title": "Stopped By",
+            "description": "The signed-in account that sent the stop"
+          },
+          "stopped_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Stopped At"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "description": "Why, as the person gave it"
+          },
+          "idempotency_key": {
+            "type": "string",
+            "title": "Idempotency Key",
+            "description": "The stop request's key, so a retry is a no-op"
+          },
+          "status_before": {
+            "$ref": "#/components/schemas/AgentSessionStatus",
+            "description": "active or waiting_for_human, the status the stop ended"
+          },
+          "state_version": {
+            "type": "integer",
+            "title": "State Version",
+            "description": "The session state version the stop created"
+          }
+        },
+        "type": "object",
+        "required": [
+          "stopped_by",
+          "stopped_at",
+          "reason",
+          "idempotency_key",
+          "status_before",
+          "state_version"
+        ],
+        "title": "AgentSessionStopRecord",
+        "description": "Who stopped a session with a stop request, why, and when.\n\nStored by the one update that moves the session to ``cancelled``. A stop ends the\nsession's authority to start, commit, or apply anything; it does not cancel a\nmeasurement, commit, or backend apply that passed the session gate before it."
       },
       "AllConfigResponse": {
         "properties": {
@@ -19664,6 +23879,12 @@
           "push_to_github": {
             "type": "boolean",
             "title": "Push To Github",
+            "default": false
+          },
+          "autonomous": {
+            "type": "boolean",
+            "title": "Autonomous",
+            "description": "Apply under the session's parameter_updates authority instead of a per-call approval. QDash then also requires that the signed-in user created the auto session, that its approval granted apply_backend, that the commit was made under that authority in this session and is still the stored value, and that no earlier apply of it was requested. push_to_github must stay false.",
             "default": false
           }
         },
@@ -20754,6 +24975,22 @@
         "title": "ChipResponse",
         "description": "Chip response model.\n\nQubit and coupling data are stored in separate collections for scalability\nand should be fetched via dedicated endpoints (/chips/{chip_id}/qubits, etc.).\n\nAttributes\n----------\n    chip_id (str): The ID of the chip.\n    size (int): The size of the chip.\n    topology_id (str | None): Topology template ID.\n    qubit_count (int): Number of qubits in the chip.\n    coupling_count (int): Number of couplings in the chip.\n    installed_at (datetime | None): Installation timestamp."
       },
+      "ClaimAgentResumeRequest": {
+        "properties": {
+          "claim_key": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Claim Key"
+          }
+        },
+        "type": "object",
+        "required": [
+          "claim_key"
+        ],
+        "title": "ClaimAgentResumeRequest",
+        "description": "A runner claims an authorized resume; one claim key owns the resumed run."
+      },
       "CommitAgentCandidateRequest": {
         "properties": {
           "idempotency_key": {
@@ -20772,6 +25009,26 @@
             "maxLength": 200,
             "minLength": 1,
             "title": "Task Id"
+          },
+          "autonomous": {
+            "type": "boolean",
+            "title": "Autonomous",
+            "description": "Commit under the session's parameter_updates authority instead of a per-call approval. QDash then also requires that the signed-in user created the auto session, that its approval granted updates of this parameter from this task, that decision_id is the agent's latest pass assessment of exactly this measurement, that the measurement is the newest finished one of its task and qubit and nothing else of the session is running, that no assessment of it was fail or inconclusive, and that the stored value did not change since it was measured.",
+            "default": false
+          },
+          "decision_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision Id",
+            "description": "The recorded pass decision an autonomous commit rests on"
           }
         },
         "type": "object",
@@ -21620,6 +25877,123 @@
         "title": "CouplingResponse",
         "description": "Response model for a single coupling."
       },
+      "CreateAgentInterventionRequest": {
+        "properties": {
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Idempotency Key"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/AgentInterventionReason"
+          },
+          "summary": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Summary"
+          },
+          "question": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Question"
+          },
+          "node_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Node Id"
+          },
+          "task_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Name"
+          },
+          "qids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 64,
+            "title": "Qids"
+          },
+          "attempts": {
+            "items": {
+              "$ref": "#/components/schemas/AgentInterventionAttempt"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Attempts"
+          },
+          "checkpoint": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentPlanCheckpoint"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Where the plan stopped; required for a runner to resume it"
+          },
+          "previous_intervention_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Intervention Id"
+          },
+          "autonomous": {
+            "type": "boolean",
+            "title": "Autonomous",
+            "description": "The request comes from an autonomous agent without a per-call approval. QDash then also requires that the signed-in user created the session and that its autonomy is auto. Who may answer the intervention does not change.",
+            "default": false
+          },
+          "model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentModelIdentity"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The provider and model the client host reports it ran the agent with, read from the host's own runtime, never from the agent's tool arguments. Recorded as reported; QDash does not verify it, and it changes no scope or approval. Omitted when the host does not know it."
+          }
+        },
+        "type": "object",
+        "required": [
+          "idempotency_key",
+          "reason",
+          "summary",
+          "question"
+        ],
+        "title": "CreateAgentInterventionRequest",
+        "description": "Record that an agent stopped and needs a person, with evidence references.\n\nQDash records the request even when the session has no actions left or has expired; it\nthen pauses the session if it was active. Attempts reference actions, executions, task\nresults, and evaluations that QDash checks; free text stays short and human-facing."
+      },
       "CreateAgentSessionRequest": {
         "properties": {
           "chip_id": {
@@ -21656,11 +26030,16 @@
             "title": "Skill Hash",
             "default": ""
           },
-          "model_name": {
-            "type": "string",
-            "maxLength": 300,
-            "title": "Model Name",
-            "default": ""
+          "model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentModelIdentity"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The provider and model the client host reports it ran the agent with, read from the host's own runtime, never from the agent's tool arguments. Recorded as reported; QDash does not verify it, and it changes no scope or approval. Omitted when the host does not know it."
           }
         },
         "type": "object",
@@ -24141,6 +28520,12 @@
             "type": "boolean",
             "title": "Reconfigure",
             "default": false
+          },
+          "autonomous": {
+            "type": "boolean",
+            "title": "Autonomous",
+            "description": "The dispatch is an autonomous step. QDash then also requires that the signed-in user created the session, that its autonomy is auto, and that no other measurement of the session is being dispatched or running.",
+            "default": false
           }
         },
         "type": "object",
@@ -24512,6 +28897,66 @@
         "title": "ExecutionActivityResponse",
         "description": "Execution counts for a chip, or a whole project, over a trailing window of days."
       },
+      "ExecutionAgentSessionLink": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
+          "linked": {
+            "type": "boolean",
+            "title": "Linked",
+            "description": "True when an action of the session dispatched this execution on the same chip; false when only a tag names the session, which is no authority to group it"
+          },
+          "action_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action Id"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentSessionStatus"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The session's state, when the session is in this project"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By",
+            "description": "The user who created the session and is responsible for it; set only when linked. Answers, resumes, and commit authorizations are recorded separately in the audit"
+          },
+          "model_name": {
+            "type": "string",
+            "title": "Model Name",
+            "description": "provider/model_id the creating host reported for the session (client reported, not verified); empty when none was reported",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "linked"
+        ],
+        "title": "ExecutionAgentSessionLink",
+        "description": "The agent session an execution belongs to, as its records establish it."
+      },
       "ExecutionAvailabilityRequest": {
         "properties": {
           "flow_name": {
@@ -24607,6 +29052,85 @@
         ],
         "title": "ExecutionComparisonResponse",
         "description": "Response model for execution comparison.\n\nAttributes\n----------\nexecution_id_before : str\n    First execution ID\nexecution_id_after : str\n    Second execution ID\nadded_parameters : list[ParameterDiffResponse]\n    Parameters added in the second execution\nremoved_parameters : list[ParameterDiffResponse]\n    Parameters removed in the second execution\nchanged_parameters : list[ParameterDiffResponse]\n    Parameters with different values\nunchanged_count : int\n    Count of unchanged parameters"
+      },
+      "ExecutionGroupItem": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "execution",
+              "agent_session"
+            ],
+            "title": "Kind"
+          },
+          "sort_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sort At",
+            "description": "Time the row is ordered by: the execution start, or the session's latest activity within the day filter"
+          },
+          "execution": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExecutionResponseSummary"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Set for an execution row"
+          },
+          "agent_session": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentSessionGroupSummary"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Set for an agent session row"
+          },
+          "children": {
+            "items": {
+              "$ref": "#/components/schemas/AgentSessionChildExecution"
+            },
+            "type": "array",
+            "title": "Children",
+            "description": "The session's latest executions in dispatch order; at most children_limit"
+          },
+          "children_total": {
+            "type": "integer",
+            "title": "Children Total",
+            "description": "Every execution the session dispatched",
+            "default": 0
+          },
+          "children_in_filter": {
+            "type": "integer",
+            "title": "Children In Filter",
+            "description": "The session's executions that match the day filter",
+            "default": 0
+          },
+          "children_omitted": {
+            "type": "integer",
+            "title": "Children Omitted",
+            "description": "Earlier executions left out of children; the graph lists all",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "title": "ExecutionGroupItem",
+        "description": "One row of the grouped Execution list: an execution, or an agent session."
       },
       "ExecutionIdResponse": {
         "properties": {
@@ -24990,6 +29514,17 @@
               }
             ],
             "description": "Set when this execution belongs to a pipeline run; covers every step of it"
+          },
+          "agent_session": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExecutionAgentSessionLink"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The agent session whose action dispatched this execution, or the session only its tag names (linked false); null for an execution outside agent sessions"
           }
         },
         "type": "object",
@@ -25084,6 +29619,17 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Note"
+          },
+          "agent_session": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExecutionAgentSessionLink"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Set only when an action of an agent session dispatched this execution; a tag alone never sets it"
           }
         },
         "type": "object",
@@ -27259,6 +31805,73 @@
         "title": "ListAgentCandidatesResponse",
         "description": "Task-result candidates and their deterministic gate decisions."
       },
+      "ListAgentDecisionsResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AgentDecisionResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "ListAgentDecisionsResponse",
+        "description": "Decisions of one session, oldest first."
+      },
+      "ListAgentInterventionsResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AgentInterventionResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "ListAgentInterventionsResponse",
+        "description": "Interventions of one session, newest first."
+      },
+      "ListAgentSessionsResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AgentSessionResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Number of sessions returned, after filters and the limit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "ListAgentSessionsResponse",
+        "description": "Agent sessions of the current project, newest first."
+      },
       "ListBackendsResponse": {
         "properties": {
           "backends": {
@@ -27534,6 +32147,63 @@
         ],
         "title": "ListEvaluationsResponse",
         "description": "Evaluations of one task result, newest first."
+      },
+      "ListExecutionGroupsResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ExecutionGroupItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Rows: agent sessions plus executions outside a session"
+          },
+          "total_executions": {
+            "type": "integer",
+            "title": "Total Executions",
+            "description": "Real executions that match the filter, grouped or not"
+          },
+          "grouped_executions": {
+            "type": "integer",
+            "title": "Grouped Executions",
+            "description": "Executions that match the filter and are shown inside a session row"
+          },
+          "agent_sessions": {
+            "type": "integer",
+            "title": "Agent Sessions",
+            "description": "Agent session rows that match the filter"
+          },
+          "skip": {
+            "type": "integer",
+            "title": "Skip"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "children_limit": {
+            "type": "integer",
+            "title": "Children Limit",
+            "description": "Most executions one session row lists"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "total_executions",
+          "grouped_executions",
+          "agent_sessions",
+          "skip",
+          "limit",
+          "children_limit"
+        ],
+        "title": "ListExecutionGroupsResponse",
+        "description": "A page of the Execution list with agent sessions grouped on the server.\n\nGrouping happens before pagination, so a session is one row on one page with all its\nexecutions, and no execution appears both in a group and as its own row. ``total`` counts\nrows; ``total_executions`` counts real executions, the number the ungrouped list reports."
       },
       "ListExecutionsResponse": {
         "properties": {
@@ -32883,6 +37553,173 @@
         "title": "RecommendedTaskResponse",
         "description": "Response model for a recommended recalibration task.\n\nAttributes\n----------\ntask_name : str\n    Name of the task to re-run\npriority : int\n    Priority level (1=highest, larger=lower priority)\naffected_parameters : list[str]\n    Parameters that would be recalibrated by this task\naffected_qids : list[str]\n    Qubit/coupling IDs affected\nreason : str\n    Human-readable explanation"
       },
+      "RecordAgentDecisionRequest": {
+        "properties": {
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Idempotency Key"
+          },
+          "assessment": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentDecisionAssessment"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How the agent judged the evidence; omitted when not stated"
+          },
+          "interpretation": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Interpretation",
+            "description": "Concise reasoning the agent states for the decision, citing the evidence"
+          },
+          "next_action": {
+            "$ref": "#/components/schemas/AgentDecisionNextAction"
+          },
+          "next_detail": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Next Detail",
+            "description": "The chosen next step",
+            "default": ""
+          },
+          "evidence_action_ids": {
+            "items": {
+              "type": "string",
+              "maxLength": 200,
+              "minLength": 1
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Evidence Action Ids",
+            "description": "Actions of this session whose results the decision reads"
+          },
+          "evaluation_ids": {
+            "items": {
+              "type": "string",
+              "maxLength": 200,
+              "minLength": 1
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Evaluation Ids",
+            "description": "Evaluations of those actions' task results"
+          },
+          "next_action_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Action Id",
+            "description": "The action of this session that carries out the next step, when one exists"
+          },
+          "intervention_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Intervention Id",
+            "description": "The intervention of this session the decision opened or acts on"
+          },
+          "supersedes_decision_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supersedes Decision Id",
+            "description": "An earlier decision of this session that this record corrects"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentModelIdentity"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The provider and model the client host reports it ran the agent with, read from the host's own runtime, never from the agent's tool arguments. Recorded as reported; QDash does not verify it, and it changes no scope or approval. Omitted when the host does not know it."
+          }
+        },
+        "type": "object",
+        "required": [
+          "idempotency_key",
+          "interpretation",
+          "next_action"
+        ],
+        "title": "RecordAgentDecisionRequest",
+        "description": "Record the agent's reading of a result and the step it chose next.\n\nThe text fields are the agent's own concise statements, recorded as reported. QDash checks\nthat every referenced action, evaluation, intervention, and decision belongs to the session\nand freezes what its records say about the cited evidence."
+      },
+      "RecordAgentResumeOutcomeRequest": {
+        "properties": {
+          "claim_key": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Claim Key"
+          },
+          "transition": {
+            "type": "string",
+            "enum": [
+              "pass",
+              "retry",
+              "rollback",
+              "human_escalation"
+            ],
+            "title": "Transition"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "Reason",
+            "default": ""
+          },
+          "follow_up_intervention_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Follow Up Intervention Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "claim_key",
+          "transition"
+        ],
+        "title": "RecordAgentResumeOutcomeRequest",
+        "description": "The resumed runner reports how its run ended."
+      },
       "RelativePeriod": {
         "properties": {
           "kind": {
@@ -33042,6 +37879,52 @@
         ],
         "title": "ResolvedTaskCall",
         "description": "One call as it will run: identity and settings after per-task defaults."
+      },
+      "RespondAgentInterventionRequest": {
+        "properties": {
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Idempotency Key"
+          },
+          "expected_state_version": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Expected State Version"
+          },
+          "decision": {
+            "$ref": "#/components/schemas/AgentInterventionDecision"
+          },
+          "guidance": {
+            "type": "string",
+            "maxLength": 5000,
+            "title": "Guidance",
+            "default": ""
+          },
+          "resume_node_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resume Node Id",
+            "description": "Plan node to continue from; defaults to the node where the plan stopped"
+          }
+        },
+        "type": "object",
+        "required": [
+          "idempotency_key",
+          "expected_state_version",
+          "decision"
+        ],
+        "title": "RespondAgentInterventionRequest",
+        "description": "An expert's answer: resume within the approved plan, or stop the session.\n\nGuidance is recorded for the agent and the audit trail; it does not change the plan,\nthe scope, or any parameter."
       },
       "RetryEvaluationRunResponse": {
         "properties": {
@@ -33949,6 +38832,71 @@
         "title": "SourceSearchMatch",
         "description": "One search hit; ``line`` and ``text`` are null for a path search."
       },
+      "StopAgentSessionRequest": {
+        "properties": {
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Idempotency Key",
+            "description": "Key of this stop; repeating it returns the same outcome"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Reason",
+            "description": "Why the session is stopped, for the audit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "idempotency_key",
+          "reason"
+        ],
+        "title": "StopAgentSessionRequest",
+        "description": "A person's request to end an agent session's authority now."
+      },
+      "StopAgentSessionResponse": {
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "stopped",
+              "already_stopped",
+              "already_ended"
+            ],
+            "title": "Outcome",
+            "description": "stopped: this request ended the session. already_stopped: an earlier request with this key stopped it. already_ended: it had already ended another way (completed, cancelled, or expired), and this request changed nothing"
+          },
+          "session": {
+            "$ref": "#/components/schemas/AgentSessionResponse"
+          },
+          "in_flight": {
+            "items": {
+              "$ref": "#/components/schemas/AgentSessionInFlightOperation"
+            },
+            "type": "array",
+            "title": "In Flight",
+            "description": "Operations that passed the session gate before it ended and have not settled; QDash does not cancel them"
+          },
+          "closed_intervention_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Closed Intervention Ids",
+            "description": "Open or resume-authorized interventions this stop closed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "outcome",
+          "session"
+        ],
+        "title": "StopAgentSessionResponse",
+        "description": "What a stop request did, read back from QDash's records."
+      },
       "SubmitAgentActionRequest": {
         "properties": {
           "idempotency_key": {
@@ -33996,6 +38944,37 @@
             "maxLength": 5000,
             "title": "Diagnosis",
             "default": ""
+          },
+          "autonomous": {
+            "type": "boolean",
+            "title": "Autonomous",
+            "description": "The proposal is an autonomous step that runs without a per-call approval. QDash then also requires that the signed-in user created the session, that its autonomy is auto, that no measurement of the session is running, that an undispatched identical action is dispatched instead, that the task and qubit stay within max_rounds_per_target, and that a finished identical measurement is repeated only with repeat_of_action_id. A refused step is not recorded and uses no action budget. Only valid for run_task.",
+            "default": false
+          },
+          "repeat_of_action_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repeat Of Action Id",
+            "description": "The finished identical action an autonomous step measures again on purpose"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentModelIdentity"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The provider and model the client host reports it ran the agent with, read from the host's own runtime, never from the agent's tool arguments. Recorded as reported; QDash does not verify it, and it changes no scope or approval. Omitted when the host does not know it."
           }
         },
         "type": "object",

@@ -1,6 +1,6 @@
 ---
 name: qdash
-description: Query a running QDash instance from pi via the pi-qdash extension and @oqtopus-team/qdash-client. Use when inspecting chips, metrics, task results, tasks, projects, files, flows, metric scripts, dashboards, executions, forum posts, provenance, or QDash profile/configuration.
+description: Query a running QDash instance from pi via the pi-qdash extension and @oqtopus-team/qdash-client. Use when inspecting chips, metrics, task results, tasks, projects, files, flows, metric scripts, dashboards, executions, forum posts, provenance, or QDash profile/configuration, including the latest stored value or status of a qubit or coupling ("what is the T1 of Q0?"). Also holds the execution paths and approval scope that the calibration and characterization skills load.
 ---
 
 <!-- Confirmation gates are implemented by the host harness. Skills should state that a gate exists, not instruct how or when to ask for confirmation. -->
@@ -36,7 +36,8 @@ Prefer the dedicated tool that matches the question. Use `qdash_query` only as a
    - `qdash_recent_calibration_summary`, `qdash_recommend_next_action` — summarize outcomes and recommend a safe next action
    - `qdash_degradation_report`, `qdash_plan_calibration`, `qdash_validate_calibration` — inspect drift, plan work, and validate results
 3. Confirmation-gated write tools (the harness asks the user before running them):
-   - `qdash_create_agent_session`, `qdash_submit_agent_action`, `qdash_execute_agent_action` — create or execute a scoped agent workflow
+   - `qdash_create_agent_session` — propose a bounded agent session; approving it approves every step inside it when its autonomy is `auto`
+   - `qdash_submit_agent_action`, `qdash_execute_agent_action` — propose or run one action of a `confirm_each` session
    - `qdash_commit_agent_candidate`, `qdash_commit_agent_candidate_set` — commit reviewed candidate parameters
    - `qdash_apply_agent_candidate_commit` — apply a reviewed candidate commit
    - `qdash_create_forum_post`, `qdash_update_forum_post` — create or update Forum content
@@ -44,8 +45,16 @@ Prefer the dedicated tool that matches the question. Use `qdash_query` only as a
    - `qdash_run_pipeline` — run a validated pipeline spec as one execution
    - `qdash_save_flow`, `qdash_execute_flow` — save a Prefect flow you wrote as a QDash workflow, and run a saved flow (see Authoring a flow)
    - `qdash_save_metric_script`, `qdash_save_dashboard` — save a metric script, and create or update a dashboard with its panels (see the `qdash-metric-scripts` skill)
-4. Agent workflow state tools:
+4. Agent session tools (see the `qdash-agent-calibration` skill):
+   - `qdash_list_agent_sessions`, `qdash_get_agent_session_context` — find your sessions and read what one allows now, what ran, and the expert's answer, from QDash
+   - `qdash_run_agent_session_step`, `qdash_request_agent_human` — run one measurement or ask an expert inside an approved `auto` session; they need no further approval and refuse anything outside the session
+   - `qdash_record_agent_decision` — append your reading of a result and your next step to the audit of a session you created; it changes no session state and needs no approval
+   - `qdash_end_agent_session` — stop (`stopped`) or complete (`completed`) a session when the user asks; a write the user approves, the only tool that ends a session, and it reports the status QDash reads back and what still runs (a measurement already sent is not cancelled)
+   - `qdash_commit_agent_session_update` — commit (and, when granted, apply) a candidate of a result you assess as pass, only in a session whose approval granted `parameter_updates` for it; it needs no further approval and QDash refuses anything outside the grant
+   - `qdash_get_agent_session_audit` — read a session's chronological experiment audit (read-only)
+   - `qdash_wait_agent_intervention` — wait, bounded, for an expert's answer
    - `qdash_get_agent_session`, `qdash_get_agent_action`, `qdash_list_agent_actions`, `qdash_wait_agent_action` — inspect agent workflow state
+   - `qdash_list_agent_interventions` — read why a session stopped for a person and the expert's decision and guidance
    - `qdash_list_agent_action_candidates`, `qdash_get_agent_candidate_commit`, `qdash_wait_agent_candidate_apply` — inspect candidates and apply status
 5. `qdash_query` — fallback for read-only operations without a dedicated tool.
 6. `qdash_raw_get` — last-resort read-only GET for an uncovered endpoint.
@@ -60,6 +69,7 @@ calibrate or characterize hardware:
 - `qdash-one-qubit-calibration` — coarse and fine single-qubit calibration and its recovery
 - `qdash-two-qubit-calibration` — CR and ZX90 calibration of couplings, and diagnosis of poor two-qubit quality
 - `qdash-characterization` — coherence checks, EF calibration, noise and coupling characterization, gate coherence limits
+- `qdash-rabi-after-configure` — a fresh `CheckRabi` after `Configure` or `ConfigureAll` before T1, T2 echo, Ramsey, and other Rabi-normalized tasks, and diagnosis of results measured on stale normalization
 
 Calibration runs take one of two paths, and they differ in how results reach QDash:
 
@@ -68,17 +78,33 @@ Calibration runs take one of two paths, and they differ in how results reach QDa
 - An agent calibration session (`qdash_create_agent_session`, then its actions) runs bounded
   tasks on the qubits its policy names, within the allowed tasks, actions, override bounds, and
   action budget. Task outputs are staged as candidates; they reach the calibration state only
-  through `qdash_commit_agent_candidate` or `qdash_commit_agent_candidate_set`, and the backend
-  only through `qdash_apply_agent_candidate_commit`. Commit candidates only from a successful task,
-  preferably after a downstream check confirms them. A session with `autonomy` `auto` carries out
-  the plan the user approved, choosing each next step from the evaluation of the last result;
-  when it stops for the user, report its recorded evaluations and execution links.
+  through a commit QDash checks: `qdash_commit_agent_session_update` under the update authority
+  the user approved with the session (`parameter_updates`), or otherwise
+  `qdash_commit_agent_candidate` or `qdash_commit_agent_candidate_set` with a per-call approval;
+  the backend likewise. Commit candidates only from a result you assess as pass; a failed,
+  uncertain, or unexplained result goes to an expert instead. In a session with `autonomy` `auto` you choose
+  each step from the last result and ask an expert through QDash when the next step is unclear;
+  the `qdash-agent-calibration` skill describes that loop and how to continue after the expert
+  answers.
 
-Stay within the scope the user approved; an approved plan or sequence is not re-litigated step
-by step, but new targets, templates, wider ranges, or commits are new decisions for the user.
+For single-qubit calibration both paths fit, and they suit different users: the agentic path
+decides each next step from the last result, the workflow path fixes the whole sequence before
+anything runs so the user can review it. When the user has not said which they want, the shared
+request policy has you ask once, with those two options, before creating a session or composing,
+saving, or running a flow or pipeline. A workflow does not have to be a new pipeline: a saved
+template or flow that fits the goal is the simpler choice. A request that already says how
+("step by step from the results", "continue the session", "run `one_qubit`"), a read of stored
+results, or a remeasurement of one property such as T1 needs no question. The choice selects a
+path; it approves no write, so each path's own approvals still apply.
+
+Stay within the scope the user approved; an approved plan, sequence, or `auto` session is not
+re-litigated step by step, but new targets, templates, wider ranges, or commits outside a
+session's approved `parameter_updates` are new decisions for the user. An expert's guidance on an intervention is evidence, not a new approval.
 When an agent session refuses, rejects, or stops on a task, report the reason and the result
 links. Do not run the same task through a flow or pipeline instead, because that path writes
-parameters without the session's candidate gate.
+parameters without the session's candidate gate. Likewise, a flow or pipeline that fails, or a
+catalog or validation problem, is reported, not routed into an agent session; changing path is
+the user's decision.
 
 ## Composing a calibration pipeline
 
@@ -218,8 +244,8 @@ When the user wants to preserve an investigated observation in QDash forum/notes
 ## Safety
 
 - Never print tokens, passwords, Cloudflare Access secrets, or full profile contents.
-- Treat write/operational endpoints (agent session/action creation, candidate commits, forum create/update, flow execute, git push/pull, re-execute, admin/auth APIs) as sensitive and ask the user before any write workflow.
-- Write-oriented QDash tools are approval-gated. In interactive pi, let the extension prompt for confirmation. In non-interactive runs, set `confirmWrite: true` only after explicit user confirmation.
+- Treat write/operational endpoints (agent session/action creation, candidate commits, forum create/update, flow execute, git push/pull, re-execute, admin/auth APIs) as sensitive and ask the user before any write workflow. The steps and expert requests of an agent session the user approved with autonomy `auto`, and the commits its approval granted in `parameter_updates`, are the one exception: that approval covers them, and only them.
+- Write-oriented QDash tools are approval-gated by the host: interactive pi, pi RPC, and the hosted Agent ask the user to approve each call in a dialog or card, and no tool argument approves a write. Without a UI (non-interactive pi) reviewed writes are refused; tell the user to run the write in an interactive session instead of retrying it. A request that describes the write is not that approval.
 - Use `qdash_investigate` for natural-language requests to investigate, compare, or understand a target or recent calibration; it is read-only and combines recent results with target, Forum, and recommendation context.
 - Use `qdash_compare_calibration` when the user asks what changed between recent calibration experiments; treat differences as evidence, not automatic approval to commit/apply parameters.
 - Use `qdash_recent_calibration_figure` when the user asks to see recent experiment images without a task ID.

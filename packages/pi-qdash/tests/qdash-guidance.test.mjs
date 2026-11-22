@@ -13,6 +13,8 @@ import {
   extractToolRouting,
   investigationPolicyBullets,
   QDASH_INVESTIGATION_POLICY,
+  QDASH_REQUEST_POLICY,
+  requestPolicyBullets,
   toolRoutingNames,
 } from "../.test-dist/lib/qdash-guidance.js";
 import qdashExtension from "../.test-dist/qdash.js";
@@ -64,6 +66,59 @@ test("the policy is host-neutral", () => {
   assert.deepEqual(investigationPolicyBullets(), QDASH_INVESTIGATION_POLICY.map((rule) => `- ${rule}`));
   for (const rule of QDASH_INVESTIGATION_POLICY) assert.doesNotMatch(rule, RUNTIME_ONLY);
   assert.match(QDASH_INVESTIGATION_POLICY.join("\n"), /tool result or from the user/);
+  assert.match(QDASH_INVESTIGATION_POLICY.join("\n"), /call `qdash_current_time` each time.*answer in UTC; never infer their time zone from their language or the host's setting/);
+});
+
+test("the request policy is host-neutral and grants no write", () => {
+  assert.ok(QDASH_REQUEST_POLICY.length > 0);
+  assert.deepEqual(requestPolicyBullets(), QDASH_REQUEST_POLICY.map((rule) => `- ${rule}`));
+  for (const rule of QDASH_REQUEST_POLICY) {
+    assert.doesNotMatch(rule, RUNTIME_ONLY);
+    // Skills own flows and tasks; the shared rules name none.
+    assert.doesNotMatch(rule, /`|\bCheck[A-Z]|qdash-|_calibration\b/);
+  }
+  const text = QDASH_REQUEST_POLICY.join("\n");
+  assert.match(text, /not approval for a write/);
+  assert.match(text, /call no tool that executes or saves/);
+  // Targets come from the open page and read-only tools before a question.
+  assert.match(text, /page the user has open, then from read-only tools/);
+});
+
+test("a broad calibration asks agentic or workflow once, and the answer approves nothing", () => {
+  // These check the guidance both hosts send; whether a live model asks at the right moment is
+  // not something a scripted test shows.
+  const rule = QDASH_REQUEST_POLICY.find((item) => /can run two ways/.test(item));
+  assert.ok(rule, "no execution-mode rule");
+  // Two options, asked before anything is created or run, only when nothing settles it.
+  assert.match(rule, /agentic, where you choose each next measurement from the results inside the scope the user approves/);
+  assert.match(rule, /as a workflow, where the whole sequence \(a saved template or flow, or a composed pipeline\) is set out for review first/);
+  assert.match(rule, /When neither the request, the conversation, nor the host's context settles which one/);
+  assert.match(rule, /ask one short question with those two options before you create an agent session or compose, save, or run a flow or pipeline/);
+  // Explicit wording and an earlier answer are reused, not asked again.
+  assert.match(rule, /keep the answer for the rest of the conversation/);
+  assert.match(rule, /"Step by step based on the results" or continuing a session means agentic; "run this flow" or a named template means a workflow; do not ask again/);
+  // Reads and single remeasurements never get the question.
+  assert.match(rule, /A question about stored values or a remeasurement of one property needs no such question/);
+  // A preference only: approvals, session scope, and stops stay; no switching past a stop.
+  assert.match(rule, /The answer is a preference, not an approval: every write keeps its own approval/);
+  assert.match(rule, /keeps its approved scope, update authority, and stops for a human/);
+  assert.match(rule, /do not switch to the other way to get past the stop/);
+  // The rule that forbids procedural questions names this one exception.
+  assert.match(QDASH_REQUEST_POLICY[0], /the one question you may need is how a broad calibration should run/);
+  assert.match(QDASH_REQUEST_POLICY.join("\n"), /not approval for a write/);
+});
+
+test("the calibration skills carry the same execution-mode choice", () => {
+  assert.match(SKILL, /For single-qubit calibration both paths fit/);
+  assert.match(SKILL, /ask once, with those two options, before creating a session or composing,\nsaving, or running a flow or pipeline/);
+  assert.match(SKILL, /A workflow does not have to be a new pipeline: a saved\ntemplate or flow that fits the goal is the simpler choice/);
+  assert.match(SKILL, /a read of stored\nresults, or a remeasurement of one property such as T1 needs no question/);
+  assert.match(SKILL, /it approves no write, so each path's own approvals still apply/);
+  // Neither path is a fallback for the other.
+  assert.match(SKILL, /Do not run the same task through a flow or pipeline instead/);
+  assert.match(SKILL, /is reported, not routed into an agent session; changing path is\nthe user's decision/);
+  const oneQubit = readFileSync(new URL("../skills/qdash-one-qubit-calibration/SKILL.md", import.meta.url), "utf8");
+  assert.match(oneQubit, /ask once as the `qdash` skill describes; once they\nchoose the agentic path, follow `qdash-agent-calibration`/);
 });
 
 test("the bundled skill has a routing guide that names real pi-qdash tools", () => {
@@ -91,6 +146,8 @@ test("the CLI section carries the policy and routing without runtime-only instru
   const { tools } = loadExtension();
   const section = buildQDashGuidanceSection(["read", "bash", ...tools], SKILL);
   for (const bullet of investigationPolicyBullets()) assert.ok(section.includes(bullet));
+  assert.match(section, /Plain-language requests:\n/);
+  for (const bullet of requestPolicyBullets()) assert.equal(section.split(bullet).length, 2, bullet);
   assert.match(section, /QDash tool routing:\nPrefer the dedicated tool/);
   assert.doesNotMatch(section, RUNTIME_ONLY);
   // Deferred tools are marked only by the runtime.
@@ -101,6 +158,7 @@ test("the section needs a QDash tool, and keeps the policy without the skill", (
   assert.equal(buildQDashGuidanceSection(["read", "bash"], SKILL), null);
   const policyOnly = buildQDashGuidanceSection(["qdash_list_chips"], null);
   assert.match(policyOnly, /Investigation and evidence:/);
+  assert.match(policyOnly, /Plain-language requests:/);
   assert.doesNotMatch(policyOnly, /QDash tool routing/);
 });
 
@@ -197,4 +255,13 @@ test("chat and the pi CLI give the same script and deferred-tool rules", async (
   const section = buildQDashGuidanceSection(["codemode", "tool_search", "qdash_list_chips"], null, { deferredTools: ["qdash_list_cryostats"] });
   assert.ok(section.includes(QDASH_SCRIPT_GUIDELINE));
   assert.ok(section.includes(deferredToolsGuideline(["qdash_list_cryostats"])));
+});
+
+test("an unexpected tool failure may be reported by the user; ordinary refusals are not bugs", () => {
+  const rule = QDASH_INVESTIGATION_POLICY.find((item) => item.includes("GitHub bug form"));
+  assert.ok(rule);
+  assert.match(rule, /an HTTP 5xx, or a response the tool could not read/);
+  assert.match(rule, /A refused step, a failed measurement, a rejected candidate or quality gate, a declined approval, or input to correct is not a bug/);
+  assert.match(rule, /Never say an issue was filed\./);
+  assert.match(rule, /without credentials, prompts, or full results/);
 });

@@ -7,6 +7,7 @@ import logging
 import math
 import os
 import tempfile
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
 
@@ -94,12 +95,61 @@ def _load_mux_file_names() -> frozenset[str]:
     return frozenset(_validate_yaml_file_name(name) for name in value)
 
 
+@dataclass
+class _FieldUndo:
+    """One YAML key an apply wrote, read under the same lock as the write."""
+
+    had_value: bool
+    previous: Any
+    written: Any
+
+
+@dataclass
+class _FileUndo:
+    """What an apply changed in one params file."""
+
+    existed: bool
+    previous_data: dict[Any, Any]
+    added_unit: str | None = None
+    fields: dict[str | int, _FieldUndo] = field(default_factory=dict)
+
+
+@dataclass
+class ParamsApplyRecord:
+    """Undo information for the YAML keys one apply wrote.
+
+    ``YamlParamsUpdater.apply`` fills the record as each write lands, so a
+    caller still holds what was written when the apply fails part way.
+    """
+
+    files: dict[str, _FileUndo] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class ParamsRollbackResult:
+    """Outcome of a field-aware rollback.
+
+    ``conflicts`` lists the keys and units left in place because another
+    writer changed them after the apply wrote them.
+    """
+
+    restored: tuple[str, ...] = ()
+    removed_files: tuple[str, ...] = ()
+    conflicts: tuple[str, ...] = ()
+
+
 class ParamsUpdater(Protocol):
     """Protocol for backend-specific parameter updaters."""
 
     def snapshot(self, qid: str, output_parameters: dict[str, Any]) -> dict[str, bytes | None]: ...
 
     def update(self, qid: str, output_parameters: dict[str, Any]) -> set[str]: ...
+
+    def apply(
+        self, qid: str, output_parameters: dict[str, Any], record: ParamsApplyRecord
+    ) -> set[str]: ...
+
+    def rollback(self, record: ParamsApplyRecord) -> ParamsRollbackResult: ...
 
     def verify(self, qid: str, output_parameters: dict[str, Any]) -> set[str]: ...
 
@@ -212,6 +262,26 @@ class YamlParamsUpdater:
         return snapshots
 
     def update(self, qid: str, output_parameters: dict[str, Any]) -> set[str]:
+        """Write mapped values; the ordinary path used by workflow tasks."""
+        return self._write(qid, output_parameters, None)
+
+    def apply(
+        self, qid: str, output_parameters: dict[str, Any], record: ParamsApplyRecord
+    ) -> set[str]:
+        """Write mapped values and record, per key, what each write replaced.
+
+        The previous value is read under the same file lock as the write, so
+        ``rollback`` can undo exactly this apply's keys later without holding
+        the lock in between.
+        """
+        return self._write(qid, output_parameters, record)
+
+    def _write(
+        self,
+        qid: str,
+        output_parameters: dict[str, Any],
+        record: ParamsApplyRecord | None,
+    ) -> set[str]:
         updated_files: set[str] = set()
         params_dir = self._resolve_params_dir()
         if params_dir is None:
@@ -231,6 +301,7 @@ class YamlParamsUpdater:
                     self._yaml_key(file_name, label),
                     self._yaml_value(file_name, value),
                     unit=self._yaml_unit(file_name, param),
+                    record=record,
                 ):
                     updated_files.add(file_name)
 
@@ -305,6 +376,98 @@ class YamlParamsUpdater:
                     with contextlib.suppress(FileNotFoundError):
                         tmp_path.unlink()
 
+    def rollback(self, record: ParamsApplyRecord) -> ParamsRollbackResult:
+        """Undo the keys an apply wrote, keeping changes made after it.
+
+        Under each file's lock, a key is restored only while it still holds the
+        value the apply wrote. A key another writer changed since is left in
+        place and reported as a conflict. A ``meta.unit`` the apply added is
+        removed only when the data section is back to its state before the
+        apply, and a file the apply created is removed only when nothing else
+        remains in it.
+        """
+        params_dir = self._resolve_params_dir()
+        if params_dir is None:
+            raise ValueError("Qubex params directory is not available")
+
+        restored: list[str] = []
+        removed: list[str] = []
+        conflicts: list[str] = []
+        for file_name, undo in sorted(record.files.items()):
+            file_path = params_dir / file_name
+            lock_path = file_path.with_suffix(file_path.suffix + ".lock")
+            lock_path.touch(exist_ok=True)
+            with self._file_lock(lock_path):
+                try:
+                    with file_path.open("r") as fp:
+                        data = self._yaml.load(fp)
+                except FileNotFoundError:
+                    conflicts.append(f"{file_name}: removed after the apply wrote it")
+                    continue
+                section = data.get("data") if isinstance(data, dict) else None
+                if not isinstance(section, dict):
+                    conflicts.append(f"{file_name}: data section replaced after the apply")
+                    continue
+
+                changed = False
+                for key, change in undo.fields.items():
+                    current = section.get(key)
+                    if key not in section or current != change.written:
+                        conflicts.append(
+                            f"{file_name}:{key} changed after the apply "
+                            f"(wrote {change.written!r}, now {current!r}); left in place"
+                        )
+                        continue
+                    if change.had_value:
+                        section[key] = change.previous
+                    else:
+                        del section[key]
+                    restored.append(f"{file_name}:{key}")
+                    changed = True
+
+                if undo.added_unit is not None:
+                    meta = data.get("meta")
+                    if isinstance(meta, dict) and meta.get("unit") == undo.added_unit:
+                        if dict(section) == undo.previous_data:
+                            del meta["unit"]
+                            if not meta:
+                                del data["meta"]
+                            changed = True
+                        else:
+                            conflicts.append(
+                                f"{file_name}: meta.unit {undo.added_unit!r} kept because "
+                                "the data changed after the apply"
+                            )
+
+                if not undo.existed and not section and set(data) <= {"data"}:
+                    file_path.unlink(missing_ok=True)
+                    removed.append(file_name)
+                    continue
+                if changed:
+                    self._atomic_dump(file_path, data)
+        return ParamsRollbackResult(
+            restored=tuple(restored),
+            removed_files=tuple(removed),
+            conflicts=tuple(conflicts),
+        )
+
+    def _atomic_dump(self, file_path: Path, data: Any) -> None:
+        tmp_path: Path | None = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                dir=file_path.parent,
+                suffix=".tmp",
+                delete=False,
+            ) as tmp_fp:
+                tmp_path = Path(tmp_fp.name)
+                self._yaml.dump(data, tmp_fp)
+            os.replace(tmp_path, file_path)
+        finally:
+            if tmp_path is not None:
+                with contextlib.suppress(FileNotFoundError):
+                    tmp_path.unlink()
+
     def _resolve_file_names(self, output_parameters: dict[str, Any]) -> set[str]:
         file_names: set[str] = set()
         for parameter_name in output_parameters:
@@ -378,20 +541,24 @@ class YamlParamsUpdater:
         value: float | int | str,
         *,
         unit: str | None = None,
+        record: ParamsApplyRecord | None = None,
     ) -> bool:
         """Create or update a mapped YAML file under a lock with an atomic write.
 
-        A file without ``meta.unit`` gets ``unit`` when one is given.
+        A file without ``meta.unit`` gets ``unit`` when one is given. With a
+        ``record``, the replaced value is recorded after the write lands.
         """
         lock_path = file_path.with_suffix(file_path.suffix + ".lock")
         lock_path.touch(exist_ok=True)
 
         with self._file_lock(lock_path):
             # Read current data under lock
+            existed = True
             try:
                 with file_path.open("r") as fp:
                     data = self._yaml.load(fp) or CommentedMap()
             except FileNotFoundError:
+                existed = False
                 data = CommentedMap()
 
             if not isinstance(data, CommentedMap):
@@ -424,6 +591,8 @@ class YamlParamsUpdater:
             ):
                 return False
 
+            previous_data = dict(section)
+            had_value = qubit_label in section
             if missing_unit:
                 if not isinstance(meta, dict):
                     meta = CommentedMap()
@@ -435,19 +604,23 @@ class YamlParamsUpdater:
             else:
                 section[qubit_label] = value
 
-            # Atomic write: write to temp file then rename
-            dir_path = file_path.parent
-            with tempfile.NamedTemporaryFile(
-                mode="w",
-                dir=dir_path,
-                suffix=".tmp",
-                delete=False,
-            ) as tmp_fp:
-                tmp_path = Path(tmp_fp.name)
-                self._yaml.dump(data, tmp_fp)
-
-            # Atomic rename (overwrites target)
-            os.replace(tmp_path, file_path)
+            self._atomic_dump(file_path, data)
+            if record is not None:
+                undo = record.files.get(file_path.name)
+                if undo is None:
+                    undo = _FileUndo(existed=existed, previous_data=previous_data)
+                    record.files[file_path.name] = undo
+                if missing_unit and undo.added_unit is None:
+                    undo.added_unit = unit
+                # A unit-only write leaves the value as it was, so it has no key to undo.
+                value_changed = needs_scalar_rewrite or not self._values_equal(current_value, value)
+                prior = undo.fields.get(qubit_label)
+                if prior is not None:
+                    prior.written = value
+                elif value_changed:
+                    undo.fields[qubit_label] = _FieldUndo(
+                        had_value=had_value, previous=current_value, written=value
+                    )
 
         lock_path.touch(exist_ok=True)
         return True

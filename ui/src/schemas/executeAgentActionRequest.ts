@@ -15,4 +15,6 @@ export interface ExecuteAgentActionRequest {
   source_execution_id?: ExecuteAgentActionRequestSourceExecutionId;
   update_params?: boolean;
   reconfigure?: boolean;
+  /** The dispatch is an autonomous step. QDash then also requires that the signed-in user created the session, that its autonomy is auto, and that no other measurement of the session is being dispatched or running. */
+  autonomous?: boolean;
 }

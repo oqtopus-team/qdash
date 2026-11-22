@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -196,6 +196,107 @@ describe("ApprovalCard", () => {
     expect(screen.getByText("overwrite", { selector: "dt" })).toBeTruthy();
     expect(screen.getByText("true")).toBeTruthy();
     expect(screen.getByTestId("flow-save-preview").textContent).toContain("on the session's chip");
+  });
+});
+
+describe("ApprovalCard for agent sessions", () => {
+  const policy = {
+    qids: ["Q00"],
+    allowed_tasks: ["CheckChevron", "CheckRabi"],
+    allowed_overrides: { qubit_frequency: { minimum: 7.0, maximum: 8.0 } },
+    autonomy: "auto",
+    max_actions: 4,
+  };
+
+  it("states granted parameter updates before the exact policy", () => {
+    render(
+      <ApprovalCard
+        approval={{
+          id: "call-s",
+          tool: "qdash_create_agent_session",
+          label: "QDash Create Agent Session",
+          args: {
+            chipId: "64Q",
+            expiresInSeconds: 3600,
+            policy: {
+              ...policy,
+              parameter_updates: {
+                parameters: ["qubit_frequency"],
+                tasks: ["CheckChevron"],
+                apply_backend: false,
+              },
+            },
+          },
+        }}
+        state={state()}
+      />,
+    );
+
+    const preview = screen.getByTestId("agent-session-policy-preview");
+    expect(preview.textContent).toContain("granted");
+    expect(preview.textContent).toContain("qubit_frequency [7, 8]");
+    expect(preview.textContent).toContain("no backend apply");
+    expect(preview.textContent).toContain("up to 4 actions");
+    expect(preview.textContent).toContain("60 min");
+    const criteria = within(screen.getByTestId("agent-session-update-criteria"));
+    expect(
+      criteria.getByText("qubit_frequency", { selector: "dt" }).nextElementSibling?.textContent,
+    ).toBe("[7, 8]");
+    // The exact policy stays reviewable as an argument.
+    expect(screen.getByText("policy")).toBeTruthy();
+  });
+
+  it("says that commits still ask when no updates are granted", () => {
+    render(
+      <ApprovalCard
+        approval={{
+          id: "call-t",
+          tool: "qdash_create_agent_session",
+          label: "QDash Create Agent Session",
+          args: { chipId: "64Q", policy },
+        }}
+        state={state()}
+      />,
+    );
+
+    const preview = screen.getByTestId("agent-session-policy-preview");
+    expect(preview.textContent).toContain("not granted: each commit asks you");
+    expect(preview.textContent).toContain("QDash default (6 h)");
+    expect(
+      within(preview).getByText("Evaluation", { selector: "dt" }).nextElementSibling?.textContent,
+    ).toBe("off: qcal_evaluate is not called");
+  });
+
+  it("shows each quality gate with the only task whose results it checks", () => {
+    render(
+      <ApprovalCard
+        approval={{
+          id: "call-g",
+          tool: "qdash_create_agent_session",
+          label: "QDash Create Agent Session",
+          args: {
+            chipId: "64Q",
+            policy: {
+              ...policy,
+              allowed_overrides: {},
+              task_quality_gates: { CheckRabi: { r2: { minimum: 0.9 } } },
+              parameter_updates: { parameters: ["qubit_frequency"], tasks: ["CheckChevron"] },
+            },
+          },
+        }}
+        state={state()}
+      />,
+    );
+
+    const preview = screen.getByTestId("agent-session-policy-preview");
+    const gates = within(preview).getByText("Quality gates", { selector: "dt" });
+    expect(gates.nextElementSibling?.textContent).toBe("r2 [0.9, inf] only on CheckRabi results");
+    expect(preview.textContent).not.toContain("Session-wide gates");
+    // A granted parameter without bounds says the task's own checks decide.
+    const criteria = within(screen.getByTestId("agent-session-update-criteria"));
+    expect(
+      criteria.getByText("qubit_frequency", { selector: "dt" }).nextElementSibling?.textContent,
+    ).toBe("no numeric bounds: its task's own checks decide");
   });
 });
 

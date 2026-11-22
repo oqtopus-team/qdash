@@ -42,6 +42,17 @@ describe("copilotChatStream", () => {
     expect(tool(steps)).toMatchObject({ status: "done", output: "Wrote 19 bytes", exitCode: 0 });
   });
 
+  it("ends the running call when the model reused an id that already ended", () => {
+    // A local model gives every call of the turn the same id.
+    let steps = startTool([], { id: "call_0", tool: "qcal_evaluate", label: "Evaluate" });
+    steps = endTool(steps, { id: "call_0", tool: "qcal_evaluate", is_error: false });
+    steps = startTool(steps, { id: "call_0", tool: "qcal_evaluate", label: "Evaluate" });
+    expect(steps).toHaveLength(2);
+    steps = endTool(steps, { id: "call_0", tool: "qcal_evaluate", is_error: true });
+    expect(tool(steps, 0)).toMatchObject({ status: "done" });
+    expect(tool(steps, 1)).toMatchObject({ status: "error" });
+  });
+
   it("keeps a classify decision on its step through a reload", () => {
     const classification = {
       classifier: "system-one-classifier/Open-Jev",

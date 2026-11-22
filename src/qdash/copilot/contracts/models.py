@@ -135,6 +135,15 @@ class ChatStopRequest(BaseModel):
     """Request body for POST /copilot/chat/stop."""
 
     session_id: str = Field(description="Chat session whose running turn should stop")
+    turn_request_id: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=200,
+        description=(
+            "Request ID of the turn to stop. When set, a newer turn of the chat is left "
+            "running: a stop that arrives late never stops another turn."
+        ),
+    )
 
 
 class ChatStopResponse(BaseModel):
@@ -334,6 +343,15 @@ class ChatRequest(ImageAttachmentsRequest):
             "error), instead of sending ``message``: no user message is added. Refused "
             "after an answer, while a run is going, or while a question, an approval or a "
             "proposed edit waits for the user."
+        ),
+    )
+    reattach: bool = Field(
+        default=False,
+        description=(
+            "Reattach to the turn ``request_id`` started after its stream dropped, instead "
+            "of sending ``message``: nothing is submitted. A running turn streams its events "
+            "again from its start; an ended one returns its answer from the store; a request "
+            "ID the runtime has never seen is reported as ``turn_not_found``."
         ),
     )
 

@@ -245,6 +245,7 @@ export default withMermaid(
                 { text: "Pi Extension Design", link: "/developer-guide/copilot/extensions" },
                 { text: "Agent Platform", link: "/developer-guide/copilot/agent-platform" },
                 { text: "Agentic Calibration", link: "/developer-guide/copilot/agentic-calibration" },
+                { text: "Agent Loop Validation", link: "/developer-guide/copilot/agent-validation" },
                 { text: "Knowledge Layout", link: "/developer-guide/copilot/knowledge-layout" },
                 { text: "Calibration Evaluation", link: "/developer-guide/copilot/evaluation" },
                 { text: "Workspace", link: "/developer-guide/copilot/workspace" },

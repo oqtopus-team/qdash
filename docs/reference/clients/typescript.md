@@ -54,6 +54,22 @@ console.log(metrics.qubit_metrics);
 
 The client provides polling helpers for QDash executions, agent action dispatch, execution linkage, and candidate application.
 
+### Read Task Results in Pages
+
+`listTaskResults` returns one page, newest first, as `{ items, total, skip, limit, status_counts }`. `limit` is an integer from 1 to 100 and `skip` an integer of 0 or more; other values throw `QDashValidationError` before any request instead of returning a smaller page. Filters use the API's names: `startFrom` and `startTo` bound the task start time, and `qid` matches one stored qubit or coupling ID exactly (`"6"`, `"6-7"`).
+
+`collectTaskResults` reads up to `maxItems` rows (at most 10,000) in pages of `pageSize` (default and maximum 100), with the same filters on every page:
+
+```ts
+const { items, total, truncated } = await client.collectTaskResults({
+  chipId: chip.chip_id,
+  qid: "6",
+  maxItems: 200,
+});
+```
+
+It reads at most `Math.ceil(maxItems / pageSize)` pages and stops earlier at `maxItems`, at the last matching row, or at a short page. It sets `truncated` when the last response reports remaining rows or when duplicates prevent confirming a complete read. Duplicate rows can leave fewer than `maxItems` results even when more rows exist. A failed page, a malformed response, or an aborted `signal` rejects the whole call. Pages are offsets, not a snapshot, so rows are deduplicated by `task_id`. The SDK's `qdash.client` is the same client.
+
 ## Run a Calibration
 
 The separate `@oqtopus-team/qdash-sdk` package validates and starts calibrations and registered

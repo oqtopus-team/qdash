@@ -9,6 +9,7 @@ import { ChatSidebar, RenameInput, SessionMenu } from "@/components/features/cha
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { ChatThread, type ChatThreadHandle } from "@/components/features/chat/ChatThread";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
+import { ChatStatusLine, useChatStatus } from "@/components/features/chat/ChatTurnStatus";
 
 const MOBILE_BREAKPOINT_PX = 768;
 
@@ -45,12 +46,15 @@ export function CopilotChatPage() {
     activeSessionId,
     isLoadingSessions,
     runs,
+    detachedTurns,
     switchSession,
     deleteSession,
     renameSession,
   } = useCopilotChatSessionContext();
   const endInvestigation = useOptionalChatDock()?.endInvestigation;
-  const runningSessionIds = Object.keys(runs);
+  // Chats with an answer going, streamed here or not (being restored, another project).
+  const runningSessionIds = [...Object.keys(runs), ...Object.keys(detachedTurns ?? {})];
+  const status = useChatStatus();
 
   const [showSidebar, setShowSidebar] = useState(true);
   const [renaming, setRenaming] = useState(false);
@@ -172,6 +176,7 @@ export function CopilotChatPage() {
                   onDelete={() => setConfirmDelete(true)}
                   className="opacity-60 hover:opacity-100"
                 />
+                <ChatStatusLine status={status} className="ml-2" />
               </div>
             )
           ) : (

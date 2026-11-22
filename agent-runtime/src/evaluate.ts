@@ -17,7 +17,7 @@ import { createHash } from "node:crypto";
 
 import { compactCriteria, examplesOf, referenceIdentity, renderReference, toolExample } from "./knowledge-context.ts";
 import type { LabeledExample, Reference, TaskKnowledgeLike } from "./knowledge-context.ts";
-import type { ExtensionPackage } from "./local-extensions.ts";
+import type { ExtensionPackage } from "./bundled-extensions.ts";
 
 /** The pi-qdash tool that turns a task result into evidence text plus its figure. */
 export const EVIDENCE_TOOL = "qdash_build_qcal_evidence";

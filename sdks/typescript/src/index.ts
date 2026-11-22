@@ -9,7 +9,9 @@
  * (`calibrate`) a calibration; `qdash.workflows` lists, reads and runs the
  * project's registered workflows; `qdash.pipelines` works with whole specs.
  * `qdash.scripts` and `qdash.dashboards` save metric scripts and custom
- * dashboards defined with `Script` and `Dashboard`.
+ * dashboards defined with `Script` and `Dashboard`. `qdash.client` reads
+ * QDash data, such as `collectTaskResults({ maxItems })` for task results in
+ * bounded pages.
  */
 export { QDash } from "./session.js";
 export type { QDashFactoryOptions, QDashSessionOptions } from "./session.js";
@@ -49,9 +51,11 @@ export {
   QDashTransportError,
   QDashValidationError,
 } from "@oqtopus-team/qdash-client";
+export type { CollectedTaskResults, CollectTaskResultsOptions, ListTaskResultsOptions } from "@oqtopus-team/qdash-client";
 export type {
   CalibrationPipelineSpec,
   CalibrationPipelineSpecStepsItem,
+  ChipMetricsResponse,
   DashboardResponse,
   CustomOneQubitStep,
   DashboardPanelModel,
@@ -65,9 +69,14 @@ export type {
   MetricScriptResponse,
   MetricScriptSummary,
   MetricScriptValidateResponse,
+  MetricValue,
+  ParameterModel,
   PipelineCatalogResponse,
   PipelineProblem,
   PipelineTargets,
   TaskCall,
+  TaskResultListItem,
+  TaskResultListResponse,
+  TimeSeriesData,
   ValidatePipelineResponse,
 } from "@oqtopus-team/qdash-client/models";

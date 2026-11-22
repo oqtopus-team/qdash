@@ -19,6 +19,8 @@ from qdash.api.dependencies.cache import (
     clear_dependency_caches as _clear_dependency_caches,
 )
 from qdash.api.services.admin_service import AdminService
+from qdash.api.services.agent_intervention_service import AgentInterventionService
+from qdash.api.services.agent_session_audit import AgentSessionAuditService
 from qdash.api.services.agent_session_service import AgentSessionService
 from qdash.api.services.auth_service import AuthService
 from qdash.api.services.calibration_service import CalibrationService
@@ -32,6 +34,7 @@ from qdash.api.services.cryostat_service import CryostatService
 from qdash.api.services.dashboard_service import DashboardService
 from qdash.api.services.device_topology_service import DeviceTopologyService
 from qdash.api.services.evaluation_service import EvaluationService
+from qdash.api.services.execution_group_service import ExecutionGroupService
 from qdash.api.services.execution_service import ExecutionService
 from qdash.api.services.file_service import FileService
 from qdash.api.services.forum_service import ForumService
@@ -83,9 +86,21 @@ from qdash.repository.user_avatar import MongoUserAvatarRepository
 
 
 @cached_dependency_provider
+def get_agent_intervention_service() -> AgentInterventionService:
+    """Get the agent intervention service instance."""
+    return AgentInterventionService()
+
+
+@cached_dependency_provider
 def get_agent_session_service() -> AgentSessionService:
     """Get the agent session service instance."""
-    return AgentSessionService()
+    return AgentSessionService(intervention_service=get_agent_intervention_service())
+
+
+@cached_dependency_provider
+def get_agent_session_audit_service() -> AgentSessionAuditService:
+    """Get the agent session audit service instance."""
+    return AgentSessionAuditService()
 
 
 @cached_dependency_provider
@@ -177,6 +192,12 @@ def get_execution_lock_repository() -> MongoExecutionLockRepository:
 
     """
     return MongoExecutionLockRepository()
+
+
+@cached_dependency_provider
+def get_execution_group_service() -> ExecutionGroupService:
+    """Get the service that groups executions by agent session."""
+    return ExecutionGroupService(execution_history_repository=get_execution_history_repository())
 
 
 @cached_dependency_provider

@@ -3,15 +3,27 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { getQDashAPI } from "./generated/api.js";
 
 import { QDashConfig } from "./config.js";
-import { QDashNotFoundError, QDashTimeoutError } from "./errors.js";
+import { QDashApiError, QDashNotFoundError, QDashTimeoutError, QDashValidationError } from "./errors.js";
 import type {
   AgentActionResponse,
+  AgentDecisionAssessment,
+  AgentDecisionNextAction,
+  AgentDecisionResponse,
+  AgentSessionAuditResponse,
+  ListAgentDecisionsResponse,
   AgentCandidateSetCommitResponse,
   AgentCandidateCommitResponse,
   AgentCandidateResponse,
+  AgentModelIdentity,
   AgentSessionPolicy,
   AgentActionType,
   AgentCandidateReference,
+  AgentInterventionAttempt,
+  AgentInterventionReason,
+  AgentInterventionResponse,
+  AgentSessionStatus,
+  ListAgentInterventionsResponse,
+  ListAgentSessionsResponse,
   FileTreeNode,
   ForumImageUploadResponse,
   ForumPostCreate,
@@ -50,6 +62,7 @@ import type {
   SaveFlowRequest,
   SaveFlowResponse,
   AgentSessionResponse,
+  StopAgentSessionResponse,
   CandidateGateResponse,
   ChipMetricsResponse,
   ChipResponse,
@@ -72,9 +85,11 @@ import type {
   ProjectResponse,
   QubitResponse,
   TaskKnowledgeResponse,
+  TaskResultListItem,
   TaskResultListResponse,
   TaskResultResponse,
   TimeSeriesData,
+  User,
 } from "./models.js";
 import { QDashTransport, type QueryValue, type TransportOptions } from "./transport.js";
 
@@ -111,16 +126,62 @@ export interface GetSourceFileOptions {
   endLine?: number;
 }
 
+/** Most rows one `GET /task-results` request returns; the API rejects a larger `limit`. */
+export const TASK_RESULTS_MAX_PAGE_SIZE = 100;
+/** Most rows one `collectTaskResults` call reads across all its pages. */
+export const TASK_RESULTS_MAX_COLLECT = 10_000;
+
+/**
+ * Filters and one page of `GET /task-results`. Rows come newest first
+ * (`start_at` descending, then `task_id`).
+ */
 export interface ListTaskResultsOptions {
   chipId?: string;
   taskName?: string;
+  /** Exact qubit (`"6"`) or coupling (`"6-7"`) ID as QDash stores it; not normalized. */
   qid?: string;
-  couplingId?: string;
+  executionId?: string;
+  username?: string;
   status?: string;
-  startAt?: string;
-  endAt?: string;
+  /** Inclusive lower bound on the task start time (ISO 8601). */
+  startFrom?: string;
+  /** Inclusive upper bound on the task start time (ISO 8601). */
+  startTo?: string;
+  /** Case-insensitive substring of the result message. */
+  messageContains?: string;
+  /** Planned step id (`invocation.step_id`). */
+  stepId?: string;
+  /** Planned call id (`invocation.call_id`). */
+  callId?: string;
+  /** Rows in this page: an integer from 1 to 100. The server default is 50. */
   limit?: number;
+  /** Rows to skip before this page: an integer of 0 or more. */
   skip?: number;
+  /** Cancels the request. */
+  signal?: AbortSignal;
+}
+
+/** Options of `collectTaskResults`: the list filters, a required row cap, and a page size. */
+export interface CollectTaskResultsOptions extends Omit<ListTaskResultsOptions, "limit"> {
+  /** Most rows to return, an integer from 1 to 10000. Reading stops once this many are collected. */
+  maxItems: number;
+  /** Rows per request, an integer from 1 to 100. Defaults to 100. */
+  pageSize?: number;
+}
+
+/** Rows `collectTaskResults` read, newest first. */
+export interface CollectedTaskResults {
+  items: TaskResultListItem[];
+  /** Rows matching the filters, as the last page reported. */
+  total: number;
+  /** Offset of the first returned row (the `skip` option). */
+  skip: number;
+  /** Requests made. */
+  pages: number;
+  /** True when matching rows remain or duplicate rows prevent confirming a complete read. */
+  truncated: boolean;
+  /** Rows per status over all rows matching the filters, as the last page reported. */
+  status_counts: TaskResultListResponse["status_counts"];
 }
 
 export interface CreateAgentSessionOptions {
@@ -130,7 +191,12 @@ export interface CreateAgentSessionOptions {
   skillName?: string;
   skillVersion?: string;
   skillHash?: string;
-  modelName?: string;
+  /**
+   * The provider and model the calling host ran the agent with, read from the host's own
+   * runtime (never from the agent's tool arguments). QDash records it as client reported and
+   * does not verify it; omit it when the host does not know it.
+   */
+  model?: AgentModelIdentity;
 }
 
 export interface SubmitAgentActionOptions {
@@ -141,6 +207,81 @@ export interface SubmitAgentActionOptions {
   qids?: string[];
   parameterOverrides?: Record<string, number>;
   diagnosis?: string;
+  /**
+   * An autonomous step, without a per-call approval. QDash then also requires that the
+   * signed-in user created the `auto` session, and checks the running measurement, the
+   * round budget, and repeats against its own records; a refused step is not recorded.
+   */
+  autonomous?: boolean;
+  /** The finished identical action an autonomous step measures again on purpose. */
+  repeatOfActionId?: string;
+  /**
+   * The provider and model the calling host ran the agent with, read from the host's own
+   * runtime (never from the agent's tool arguments). QDash records it as client reported and
+   * does not verify it; omit it when the host does not know it.
+   */
+  model?: AgentModelIdentity;
+}
+
+export interface ListAgentSessionsOptions {
+  chipId?: string;
+  /** Only sessions in these statuses, settled for expiry. */
+  statuses?: AgentSessionStatus[];
+  /** Only sessions the signed-in user created. */
+  mine?: boolean;
+  limit?: number;
+}
+
+export interface CreateAgentInterventionOptions {
+  idempotencyKey: string;
+  reason: AgentInterventionReason;
+  summary: string;
+  question: string;
+  taskName?: string;
+  qids?: string[];
+  attempts?: AgentInterventionAttempt[];
+  previousInterventionId?: string;
+  /** Recorded by an autonomous agent: QDash requires the signed-in creator of an `auto` session. */
+  autonomous?: boolean;
+  /**
+   * The provider and model the calling host ran the agent with, read from the host's own
+   * runtime (never from the agent's tool arguments). QDash records it as client reported and
+   * does not verify it; omit it when the host does not know it.
+   */
+  model?: AgentModelIdentity;
+}
+
+export interface StopAgentSessionOptions {
+  /** Key of this stop; repeating it returns the same outcome. */
+  idempotencyKey: string;
+  /** Why the session is stopped, for the audit (at most 2000 characters). */
+  reason: string;
+}
+
+export interface RecordAgentDecisionOptions {
+  idempotencyKey: string;
+  /** How the agent judged the evidence; omit when it did not judge it. */
+  assessment?: AgentDecisionAssessment;
+  /** The agent's concise reasoning, citing the evidence (at most 2000 characters). */
+  interpretation: string;
+  nextAction: AgentDecisionNextAction;
+  nextDetail?: string;
+  evidenceActionIds?: string[];
+  evaluationIds?: string[];
+  nextActionId?: string;
+  interventionId?: string;
+  supersedesDecisionId?: string;
+  /**
+   * The provider and model the calling host ran the agent with, read from the host's own
+   * runtime (never from the agent's tool arguments). QDash records it as client reported and
+   * does not verify it; omit it when the host does not know it.
+   */
+  model?: AgentModelIdentity;
+}
+
+export interface AgentSessionAuditPageOptions {
+  cursor?: string;
+  limit?: number;
 }
 
 export interface PollOptions {
@@ -197,6 +338,60 @@ function query(values: Record<string, QueryValue>): Query {
   return Object.fromEntries(Object.entries(values).filter(([, value]) => value != null));
 }
 
+const TASK_RESULTS_PAGE_HINT =
+  "QDash returns at most 100 task results per request; use collectTaskResults({ maxItems }) or request further pages with skip";
+
+/** Throw before any request when an optional option is not an integer within bounds. */
+function checkInteger(
+  name: string,
+  value: number | undefined,
+  minimum: number,
+  maximum: number | undefined,
+  hint?: string,
+): void {
+  if (value === undefined) return;
+  if (Number.isInteger(value) && value >= minimum && (maximum === undefined || value <= maximum)) return;
+  const range = maximum === undefined ? `${minimum} or more` : `from ${minimum} to ${maximum}`;
+  throw new QDashValidationError(
+    `${name} must be an integer ${range} (got ${String(value)})${hint ? `. ${hint}.` : "."}`,
+    { payload: { field: name, value } },
+  );
+}
+
+function taskResultQuery(options: ListTaskResultsOptions): Query {
+  return query({
+    chip_id: options.chipId,
+    task_name: options.taskName,
+    qid: options.qid,
+    execution_id: options.executionId,
+    username: options.username,
+    status: options.status,
+    start_from: options.startFrom,
+    start_to: options.startTo,
+    message_contains: options.messageContains,
+    step_id: options.stepId,
+    call_id: options.callId,
+    limit: options.limit,
+    skip: options.skip,
+  });
+}
+
+/** The page, or an error naming what is missing; never an empty page in place of a malformed one. */
+function checkTaskResultPage(payload: unknown): TaskResultListResponse {
+  const page = payload as Partial<TaskResultListResponse> | null;
+  const problems: string[] = [];
+  if (!page || typeof page !== "object") problems.push("the body is not an object");
+  else {
+    if (!Array.isArray(page.items)) problems.push("items is not an array");
+    else if (page.items.some((item) => !item || typeof item.task_id !== "string")) problems.push("an item has no task_id");
+    if (!Number.isInteger(page.total)) problems.push("total is not an integer");
+  }
+  if (problems.length > 0) {
+    throw new QDashApiError(`Unexpected GET /task-results response: ${problems.join("; ")}`, { payload });
+  }
+  return page as TaskResultListResponse;
+}
+
 function filenameFromPath(path: string): string | undefined {
   return path.split("/").filter(Boolean).at(-1);
 }
@@ -251,6 +446,11 @@ export class QDashClient {
    */
   withProject(projectId: string): QDashClient {
     return new QDashClient(new QDashConfig({ ...this.config, projectId }), this.options);
+  }
+
+  /** The user QDash authenticated for this client's credentials. */
+  async getCurrentUser(): Promise<User> {
+    return this.get("/auth/me");
   }
 
   async listChips(): Promise<ListChipsResponse> {
@@ -319,21 +519,72 @@ export class QDashClient {
     );
   }
 
+  /**
+   * One page of task results. `limit` must be an integer from 1 to 100 and
+   * `skip` an integer of 0 or more; other values throw `QDashValidationError`
+   * before any request, never a silently smaller page. Use
+   * `collectTaskResults` to read more than 100 rows.
+   */
   async listTaskResults(options: ListTaskResultsOptions = {}): Promise<TaskResultListResponse> {
-    return this.get(
-      "/task-results",
-      query({
-        chip_id: options.chipId,
-        task_name: options.taskName,
-        qid: options.qid,
-        coupling_id: options.couplingId,
-        status: options.status,
-        start_at: options.startAt,
-        end_at: options.endAt,
-        limit: options.limit,
-        skip: options.skip,
-      }),
-    );
+    checkInteger("limit", options.limit, 1, TASK_RESULTS_MAX_PAGE_SIZE, TASK_RESULTS_PAGE_HINT);
+    checkInteger("skip", options.skip, 0, undefined);
+    const payload = await this.transport.requestJson<unknown>("GET", "/task-results", {
+      query: taskResultQuery(options),
+      ...(options.signal ? { signal: options.signal } : {}),
+    });
+    return checkTaskResultPage(payload);
+  }
+
+  /**
+   * Up to `maxItems` task results matching the filters, read in pages of at
+   * most 100 from `skip` (default 0), newest first, with every filter on each
+   * page. Reading stops at `maxItems`, at the last matching row, or at a short
+   * page, with at most `ceil(maxItems / pageSize)` page reads. Duplicates can
+   * therefore leave fewer than `maxItems` rows and set `truncated`.
+   * A failed or cancelled page rejects the whole call; no partial result
+   * is returned as complete. Pages are offsets, not a snapshot: a result
+   * written while reading can shift rows, so rows are deduplicated by
+   * `task_id`.
+   */
+  async collectTaskResults(options: CollectTaskResultsOptions): Promise<CollectedTaskResults> {
+    const { maxItems, pageSize = TASK_RESULTS_MAX_PAGE_SIZE, ...filters } = options;
+    checkInteger("maxItems", maxItems, 1, TASK_RESULTS_MAX_COLLECT);
+    checkInteger("pageSize", pageSize, 1, TASK_RESULTS_MAX_PAGE_SIZE, TASK_RESULTS_PAGE_HINT);
+    checkInteger("skip", filters.skip, 0, undefined);
+    const start = filters.skip ?? 0;
+    const items: TaskResultListItem[] = [];
+    const seen = new Set<string>();
+    let offset = start;
+    let pages = 0;
+    let last: TaskResultListResponse | undefined;
+    const maxPages = Math.ceil(maxItems / pageSize);
+    let duplicates = false;
+    while (items.length < maxItems && pages < maxPages) {
+      filters.signal?.throwIfAborted();
+      const limit = Math.min(pageSize, maxItems - items.length);
+      const page = await this.listTaskResults({ ...filters, skip: offset, limit });
+      pages += 1;
+      last = page;
+      for (const item of page.items) {
+        if (seen.has(item.task_id)) {
+          duplicates = true;
+          continue;
+        }
+        seen.add(item.task_id);
+        items.push(item);
+      }
+      offset += page.items.length;
+      if (page.items.length < limit || offset >= page.total) break;
+    }
+    const total = last?.total ?? 0;
+    return {
+      items,
+      total,
+      skip: start,
+      pages,
+      truncated: duplicates || offset < total,
+      status_counts: last?.status_counts ?? {},
+    };
   }
 
   async getTaskResult(taskId: string): Promise<TaskResultResponse> {
@@ -657,12 +908,39 @@ export class QDashClient {
       skill_name: options.skillName ?? "",
       skill_version: options.skillVersion ?? "",
       skill_hash: options.skillHash ?? "",
-      model_name: options.modelName ?? "",
+      ...(options.model ? { model: options.model } : {}),
     });
+  }
+
+  /** The project's agent sessions, newest first, with expiry applied before filtering. */
+  async listAgentSessions(options: ListAgentSessionsOptions = {}): Promise<AgentSessionResponse[]> {
+    const payload = await this.get<ListAgentSessionsResponse>(
+      "/agent-sessions",
+      query({
+        chip_id: options.chipId,
+        status: options.statuses,
+        mine: options.mine,
+        limit: options.limit,
+      }),
+    );
+    return payload.items;
   }
 
   async getAgentSession(sessionId: string): Promise<AgentSessionResponse> {
     return this.get(`/agent-sessions/${pathPart(sessionId)}`);
+  }
+
+  /**
+   * End an active or paused session's authority on a person's request (`POST
+   * /agent-sessions/{id}/stop`). The response is QDash's own account: whether this request
+   * stopped it, and the operations that passed the session gate before and still run;
+   * QDash does not cancel those.
+   */
+  async stopAgentSession(sessionId: string, options: StopAgentSessionOptions): Promise<StopAgentSessionResponse> {
+    return this.post(`/agent-sessions/${pathPart(sessionId)}/stop`, {
+      idempotency_key: options.idempotencyKey,
+      reason: options.reason,
+    });
   }
 
   async evaluateAgentCandidateGate(
@@ -688,6 +966,9 @@ export class QDashClient {
       qids: options.qids ?? [],
       parameter_overrides: options.parameterOverrides ?? {},
       diagnosis: options.diagnosis ?? "",
+      ...(options.autonomous ? { autonomous: true } : {}),
+      ...(options.repeatOfActionId ? { repeat_of_action_id: options.repeatOfActionId } : {}),
+      ...(options.model ? { model: options.model } : {}),
     });
   }
 
@@ -698,7 +979,13 @@ export class QDashClient {
   async executeAgentAction(
     sessionId: string,
     actionId: string,
-    options: { sourceExecutionId?: string; updateParams?: boolean; reconfigure?: boolean } = {},
+    options: {
+      sourceExecutionId?: string;
+      updateParams?: boolean;
+      reconfigure?: boolean;
+      /** An autonomous dispatch: the signed-in creator of an `auto` session, nothing else running. */
+      autonomous?: boolean;
+    } = {},
   ): Promise<AgentActionResponse> {
     return this.post(
       `/agent-sessions/${pathPart(sessionId)}/actions/${pathPart(actionId)}/execute`,
@@ -706,12 +993,105 @@ export class QDashClient {
         ...(options.sourceExecutionId ? { source_execution_id: options.sourceExecutionId } : {}),
         update_params: options.updateParams ?? false,
         reconfigure: options.reconfigure ?? false,
+        ...(options.autonomous ? { autonomous: true } : {}),
       },
     );
   }
 
   async getAgentAction(sessionId: string, actionId: string): Promise<AgentActionResponse> {
     return this.get(`/agent-sessions/${pathPart(sessionId)}/actions/${pathPart(actionId)}`);
+  }
+
+  /** A session's interventions, newest first: why the agent stopped and the expert's answer. */
+  async listAgentInterventions(sessionId: string): Promise<AgentInterventionResponse[]> {
+    const payload = await this.get<ListAgentInterventionsResponse>(
+      `/agent-sessions/${pathPart(sessionId)}/interventions`,
+    );
+    return payload.items;
+  }
+
+  /**
+   * Record that the agent stopped and needs a person. An active session pauses until an
+   * expert answers in QDash; a repeated idempotency key returns the same record. The
+   * request carries no plan checkpoint, so the expert's resume reactivates the session.
+   */
+  async createAgentIntervention(
+    sessionId: string,
+    options: CreateAgentInterventionOptions,
+  ): Promise<AgentInterventionResponse> {
+    return this.post(`/agent-sessions/${pathPart(sessionId)}/interventions`, {
+      idempotency_key: options.idempotencyKey,
+      reason: options.reason,
+      summary: options.summary,
+      question: options.question,
+      ...(options.taskName ? { task_name: options.taskName } : {}),
+      qids: options.qids ?? [],
+      attempts: options.attempts ?? [],
+      ...(options.previousInterventionId
+        ? { previous_intervention_id: options.previousInterventionId }
+        : {}),
+      ...(options.autonomous ? { autonomous: true } : {}),
+      ...(options.model ? { model: options.model } : {}),
+    });
+  }
+
+  async getAgentIntervention(
+    sessionId: string,
+    interventionId: string,
+  ): Promise<AgentInterventionResponse> {
+    return this.get(
+      `/agent-sessions/${pathPart(sessionId)}/interventions/${pathPart(interventionId)}`,
+    );
+  }
+
+  /**
+   * Append the agent's reading of a result and its next step to the session's audit. Only
+   * the session's creator records decisions; recording changes no session state, so it works
+   * in a paused or ended session too. A repeated idempotency key returns the same record.
+   */
+  async recordAgentDecision(
+    sessionId: string,
+    options: RecordAgentDecisionOptions,
+  ): Promise<AgentDecisionResponse> {
+    return this.post(`/agent-sessions/${pathPart(sessionId)}/decisions`, {
+      idempotency_key: options.idempotencyKey,
+      ...(options.assessment ? { assessment: options.assessment } : {}),
+      interpretation: options.interpretation,
+      next_action: options.nextAction,
+      next_detail: options.nextDetail ?? "",
+      evidence_action_ids: options.evidenceActionIds ?? [],
+      evaluation_ids: options.evaluationIds ?? [],
+      ...(options.nextActionId ? { next_action_id: options.nextActionId } : {}),
+      ...(options.interventionId ? { intervention_id: options.interventionId } : {}),
+      ...(options.supersedesDecisionId
+        ? { supersedes_decision_id: options.supersedesDecisionId }
+        : {}),
+      ...(options.model ? { model: options.model } : {}),
+    });
+  }
+
+  /** A session's recorded decisions, oldest first. */
+  async listAgentDecisions(sessionId: string): Promise<AgentDecisionResponse[]> {
+    const payload = await this.get<ListAgentDecisionsResponse>(
+      `/agent-sessions/${pathPart(sessionId)}/decisions`,
+    );
+    return payload.items;
+  }
+
+  /** One page of a session's chronological audit; follow `next_cursor` until `complete`. */
+  async getAgentSessionAudit(
+    sessionId: string,
+    options: AgentSessionAuditPageOptions = {},
+  ): Promise<AgentSessionAuditResponse> {
+    return this.get(
+      `/agent-sessions/${pathPart(sessionId)}/audit`,
+      query({ cursor: options.cursor, limit: options.limit }),
+    );
+  }
+
+  /** The whole audit as versioned JSON; QDash refuses (413) rather than truncates it. */
+  async exportAgentSessionAudit(sessionId: string): Promise<AgentSessionAuditResponse> {
+    return this.get(`/agent-sessions/${pathPart(sessionId)}/audit/export`);
   }
 
   async listAgentActions(sessionId: string): Promise<AgentActionResponse[]> {
@@ -756,7 +1136,15 @@ export class QDashClient {
     sessionId: string,
     actionId: string,
     parameterName: string,
-    options: { idempotencyKey: string; expectedStateVersion: number; taskId: string },
+    options: {
+      idempotencyKey: string;
+      expectedStateVersion: number;
+      taskId: string;
+      /** Commit under the session's approved parameter_updates authority; needs decisionId. */
+      autonomous?: boolean;
+      /** The recorded pass decision an autonomous commit rests on. */
+      decisionId?: string;
+    },
   ): Promise<AgentCandidateCommitResponse> {
     return this.post(
       `/agent-sessions/${pathPart(sessionId)}/actions/${pathPart(actionId)}/candidates/${pathPart(parameterName)}/commit`,
@@ -764,6 +1152,8 @@ export class QDashClient {
         idempotency_key: options.idempotencyKey,
         expected_state_version: options.expectedStateVersion,
         task_id: options.taskId,
+        // Sent only when set, so a reviewed request keeps its earlier shape.
+        ...(options.autonomous ? { autonomous: true, decision_id: options.decisionId } : {}),
       },
     );
   }
@@ -803,6 +1193,8 @@ export class QDashClient {
       idempotencyKey: string;
       expectedStateVersion: number;
       pushToGithub?: boolean;
+      /** Apply under the session's approved apply_backend authority; never pushes. */
+      autonomous?: boolean;
     },
   ): Promise<AgentCandidateCommitResponse> {
     return this.post(
@@ -811,6 +1203,7 @@ export class QDashClient {
         idempotency_key: options.idempotencyKey,
         expected_state_version: options.expectedStateVersion,
         push_to_github: options.pushToGithub ?? false,
+        ...(options.autonomous ? { autonomous: true } : {}),
       },
     );
   }

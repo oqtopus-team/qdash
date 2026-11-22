@@ -13,20 +13,33 @@ described instead of implying parity.
 
 | Concern | Owner |
 | --- | --- |
-| QDash tools, skills, investigation policy, tool routing guide, and tool policy lists | pi-qdash, for both hosts |
+| QDash tools, skills, investigation and request policies, tool routing guide, and tool policy lists | pi-qdash, for both hosts |
 | Presentation, sessions, the context a turn carries, orchestration, and which tools are exposed | Each host |
 
 - **Permissions.** Both hosts apply the same rule: reads run directly, and a reviewed write
-  runs only after the user approves that call. Each host keeps its own gate. pi CLI asks in
-  its UI, or requires `confirmWrite: true` without one (`extensions/lib/write-gate.ts`); the
-  runtime shows an approval card and runs the approved call with the arguments the user saw
-  (`QDashWriteTools.runApproved` in `agent-runtime/src/durable-tools.ts`).
+  runs only after the user approves that call in the host's own UI; no tool argument approves a
+  write (`extensions/lib/write-approval.ts`). pi CLI asks in its dialog and refuses the write
+  when it has no UI, as with `pi -p` (`extensions/lib/write-gate.ts`); the runtime shows an
+  approval card and runs the approved call on a frozen copy of the arguments the user saw,
+  passing the approval for that call id and tool in the extension context
+  (`QDashWriteTools.runApproved` in `agent-runtime/src/durable-tools.ts`). The one exception is
+  the session-granted writes `qdash_run_agent_session_step`, `qdash_request_agent_human`,
+  `qdash_record_agent_decision`, and `qdash_commit_agent_session_update`
+  (`SESSION_GRANTED_WRITE_TOOL_NAMES`): neither host asks. The step and request tools act in an
+  agent session the user approved with `autonomy: auto` when it was created, a reviewed write;
+  the update tool acts only when that approval also granted `parameter_updates`; the decision
+  tool only appends to the audit of a session the user created. Each call re-reads the
+  session and refuses anything outside it before QDash checks it again; see
+  [The model-driven loop](./agentic-calibration.md#the-model-driven-loop).
 - **Results.** A tool returns readable text in `content` and reusable structured data in
   `details` (`extensions/lib/results.ts`), so a host without a renderer for a result still
   shows its text.
 - **Host context.** Context such as the open page or a task result comes from the host,
   not from pi-qdash; see [Page context and editor edits](./architecture.md#page-context-and-editor-edits)
-  for the web application.
+  for the web application. The model each QDash agent record names also comes from the host,
+  never from a tool argument: `ctx.model` in pi CLI and the conversation's model reference in
+  the runtime (`extensions/lib/host-model.ts`); see
+  [Experiment audit](./agentic-calibration.md#experiment-audit).
 - **Verification.** A change to shared behavior is checked in both hosts, as described in
   [Verify a change](#verify-a-change). A feature or limit specific to one host, such as pi
   CLI slash commands or the web application's approval cards, is stated as such.
@@ -37,14 +50,19 @@ described instead of implying parity.
 TUI renderers. Shared helpers live under `extensions/lib/`; domain tool registration
 lives under `extensions/tools/`, including `timeseries.ts`.
 
-The investigation policy and tool routing guide that every host gives the model live in
-`extensions/lib/qdash-guidance.ts`. The routing guide is the "Preferred tools" section of
+The investigation policy, request policy, and tool routing guide that every host gives the
+model live in `extensions/lib/qdash-guidance.ts`. The request policy lets a plain request such as
+"remeasure the T1 of Q0" select a skill by its description: it separates questions about stored
+values from requests to measure, takes targets from context before asking, keeps plan-only
+requests free of writes, and has a broad calibration ask once whether to run agentically or as a
+reviewed workflow unless the request or conversation already says. That answer is a preference:
+it neither approves a write nor lets a stopped path fall back to the other. It names no flows, tasks, or thresholds, and grants no write permission. The routing guide is the "Preferred tools" section of
 `skills/qdash/SKILL.md`, limited to the tools the host offers. In pi CLI,
 `extensions/lib/guidance-hook.ts` sets them as the `qdash_guidance` system prompt section before
 each run, from the tools selected for that run. pi keeps its own prompt, `--system-prompt`,
 `--append-system-prompt`, and context files around the section, and the section is replaced
 rather than appended on later runs. The QDash runtime does not run this hook; it composes the
-same policy and guide with its own chat rules in `agent-runtime/src/prompt.ts`. Keep display,
+same policies and guide with its own chat rules in `agent-runtime/src/prompt.ts`. Keep display,
 approval, and orchestration rules for one host out of `qdash-guidance.ts`.
 
 `extensions/tools/metric-scripts.ts` adds the metric script and dashboard tools: the
@@ -68,21 +86,55 @@ The experiment-flow skills (`qdash-chip-bringup`, `qdash-one-qubit-calibration`,
 `qdash-two-qubit-calibration`, and `qdash-characterization`) compose the flow templates toward a
 goal and leave task physics to task knowledge. The runtime's `read_skill` returns only a skill's
 `SKILL.md`, so these skills keep their instructions in that file and retrieve templates and task
-documentation through tools; `agent-runtime/test/bundled-extensions.test.mjs` checks that they
+documentation through tools. Both hosts list each skill's description before the model loads it,
+so a description states the goal it serves in the user's terms and the requests it does not
+serve; `agent-runtime/test/bundled-extensions.test.mjs` checks that they
 load and name only tools the runtime offers.
 
-New tools are read-only by default. Writes and operational calls must use the
-existing approval gates, including explicit `confirmWrite: true` in non-interactive
-runs. Shared gate logic lives in `extensions/lib/write-gate.ts`; output redaction
-lives in `extensions/lib/results.ts`. Keep credentials out of fixtures and examples.
+New tools are read-only by default. A write or operational call is added to
+`REVIEWED_WRITE_TOOL_NAMES` and calls `requireWriteApproval` before it writes; it takes no
+argument that approves it, so a model cannot approve its own write, and it is refused in a
+session without a UI. The approval logic lives in `extensions/lib/write-approval.ts`, the pi
+CLI gate in `extensions/lib/write-gate.ts`, and the review the user approves in
+`extensions/lib/write-review.ts`; output redaction lives in `extensions/lib/results.ts`.
+
+Every review shows the complete canonical arguments after a summary of the write
+(`approvalReviewText`), and nothing in it is shortened. pi's `ctx.ui.confirm()` draws its message
+in the input dock, which pi clips to the terminal without scrolling, so in the pi terminal UI
+(`ctx.mode === "tui"`) `reviewWrite` opens a full-height overlay through `ctx.ui.custom()`
+instead. The overlay sizes itself to the terminal's rows and scrolls with the arrow, Page Up, Page
+Down, Home, and End keys. It accepts `y` only after its last line has been on screen, and `n`,
+Escape, or pi's abort signal declines. A terminal too small to show the review refuses approval.
+In pi RPC mode, which has no custom UI, the RPC client receives the complete text through
+`confirm()` and is responsible for showing it. The QDash web Agent uses neither: it shows its
+own approval card.
+
+An approval covers one call's value, not an object reference. The pi CLI gate's `tool_call`
+hook takes a canonical snapshot of the arguments (`canonicalArgs`: plain JSON data with sorted
+keys), shows the session grant for `qdash_create_agent_session` and every argument of that
+snapshot in the review, and waits with pi's abort signal. It records the snapshot for the call id and tool name only when the user
+accepted, the turn was not aborted, and the arguments did not change while the dialog was open.
+The tool's `requireWriteApproval` consumes the record once and runs only when its arguments
+still equal it, so a later `tool_call` hook that changes nested arguments in place stops the
+call. The gate forgets a record at `tool_execution_end`, which pi emits for a call that a later
+hook blocked or an abort skipped, and forgets all of its records at `turn_end`, `agent_end`, and
+`session_shutdown`. A tool's own dialog, used when neither the gate nor a host approved the
+call, likewise refuses a call whose arguments changed or whose turn was aborted while it was
+open. Arguments that are not plain
+JSON data, such as a cycle, a class instance, or an accessor, are refused without a dialog.
+`packages/pi-qdash/tests/write-approval.test.mjs`,
+`packages/pi-qdash/tests/write-review.test.mjs`, which runs the review in pi-tui's
+`TuiMainScreen`, and `agent-runtime/test/write-gate-lifecycle.test.mjs`, which drives a real pi
+session in RPC and terminal modes, cover the lifecycle. Keep credentials out of fixtures and examples.
 The runtime additionally controls which tools it exposes, as described in
 [Copilot Architecture](./architecture.md#developing-a-pi-extension-against-the-runtime).
 To expose a new pi-qdash tool in Copilot, add its reviewed read name to
 `ALLOWED_TOOL_NAMES` in `agent-runtime/src/allowed-tools.ts` and update the runtime
-allowlist checks in `agent-runtime/test/bundled-extensions.test.mjs`. The write list
-(`REVIEWED_WRITE_TOOL_NAMES`), the reads `codemode` scripts may call
-(`NESTED_READ_TOOL_NAMES`), and the tools the model loads on demand
-(`DEFERRED_TOOL_NAMES`) live in `extensions/lib/tool-policy.ts`, which both hosts enforce;
+allowlist checks in `agent-runtime/test/bundled-extensions.test.mjs`. The write lists
+(`REVIEWED_WRITE_TOOL_NAMES`, and `SESSION_GRANTED_WRITE_TOOL_NAMES` for writes an approved
+agent session covers), the reads `codemode` scripts may call (`NESTED_READ_TOOL_NAMES`), and
+the tools the model loads on demand (`DEFERRED_TOOL_NAMES`) live in
+`extensions/lib/tool-policy.ts`, which both hosts enforce;
 see [Code Mode and deferred tools](./architecture.md#code-mode-and-deferred-tools).
 In pi CLI, `extensions/lib/script-policy.ts` applies them through pi's tool exposure and
 `tool_call` and `tool_result` hooks. It trusts a QDash name in a script only while pi runs
@@ -106,7 +158,15 @@ results do not establish causality.
 Pipeline execution is separate from agent candidate approval. A valid
 `qdash_plan_pipeline` result precedes confirmation-gated `qdash_run_pipeline`;
 the latter persists completed task parameters directly. Do not use it to retry
-a failed agent action because that would bypass the candidate gate.
+a failed agent action because that would bypass the candidate gate. For the same
+reason `qdash_run_pipeline` and `qdash_execute_flow` start nothing while one of the
+user's own agent sessions waits for an expert on the same chip and targets
+(`pausedSessionConflict` in `extensions/lib/agent-loop.ts`). When the session list cannot be
+read, including a 404 or 405 from a QDash release without `GET /agent-sessions`, they start
+nothing either: such a server can still hold paused sessions, and there is no flag to skip the
+check. The guard reads one page of at most 100 paused sessions, newest first, so a full page
+without an overlap also starts nothing: an older paused session could cover the targets. The check is in pi-qdash, not in QDash: a person running a flow from the web application
+is not blocked.
 
 The pipeline tools and `qdash_execute_flow` reach QDash through the
 [TypeScript SDK](../architecture/typescript-sdk.md) package `@oqtopus-team/qdash-sdk`

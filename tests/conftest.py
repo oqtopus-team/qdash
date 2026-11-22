@@ -66,6 +66,8 @@ os.environ["SLACK_BOT_TOKEN"] = "test-token"  # noqa: S105
 os.environ["SLACK_CHANNEL_ID"] = "test-channel"
 os.environ["SLACK_FORUM_NOTIFICATION"] = "false"
 os.environ["SLACK_FORUM_CHANNEL_ID"] = ""
+os.environ["SLACK_AGENT_NOTIFICATION"] = "false"
+os.environ["SLACK_AGENT_CHANNEL_ID"] = ""
 os.environ.setdefault("POSTGRES_DATA_PATH", "/tmp/postgres")
 os.environ.setdefault("MONGO_DATA_PATH", "/tmp/mongo")
 os.environ.setdefault("CALIB_DATA_PATH", "/tmp/calib")

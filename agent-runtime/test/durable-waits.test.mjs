@@ -366,6 +366,88 @@ test("a wait recovered before its deadline picks up a completion that happened w
   }
 });
 
+function agentSession(status, activeInterventionId = null) {
+  return {
+    session_id: "s1", project_id: "alice-project", chip_id: "A", created_by: "alice", status,
+    state_version: 4, action_count: 1, created_at: "2026-11-21T00:00:00Z", updated_at: "2026-11-21T00:00:00Z",
+    expires_at: "2999-01-01T00:00:00Z", active_intervention_id: activeInterventionId,
+    policy: { qids: ["Q00"], allowed_tasks: ["CheckRabi"], autonomy: "auto", max_actions: 5, max_rounds_per_target: 3, allowed_overrides: {} },
+  };
+}
+
+function agentIntervention(status, response = null) {
+  return {
+    intervention_id: "i1", session_id: "s1", status, reason: "unknown_outcome", summary: "Beating in Rabi.",
+    question: "Rerun Chevron first?", task_name: "CheckRabi", qids: ["Q00"], attempts: [], checkpoint: null,
+    created_at: "2026-11-21T00:01:00Z", page_path: "/agent-sessions/s1/interventions/i1", notification: { status: "sent" },
+    idempotency_key: "k", response,
+  };
+}
+
+function servePausedSession() {
+  serve("/agent-sessions/s1", agentSession("waiting_for_human", "i1"));
+  serve("/agent-sessions/s1/interventions/i1", agentIntervention("open"));
+}
+
+test("an intervention wait parks at its five-second floor, keeps a one-hour cap across a restart, and returns the expert's answer", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "qdash-wait-"));
+  let clock = 9_000_000;
+  const now = () => clock;
+  try {
+    requests.length = 0;
+    servePausedSession();
+    const first = await open({ storage: await openNodeSqliteStorage(join(dir, "chat.db")), now });
+    await call(first, "qdash_wait_agent_intervention", { sessionId: "s1", timeoutSeconds: 86_400, pollIntervalSeconds: 0.01 });
+    await until(async () => (await callState(first.harness))?.kind === "sleeping", "the park");
+    assert.equal((await callState(first.harness)).until, clock + 5_000);
+    await first.harness.close(context);
+
+    // The expert answered while the runtime was down; the recovered wait reads it.
+    const answer = { decision: "resume", guidance: "Yes: Chevron first, same bounds.", responded_by: "expert", responded_at: "2026-11-21T00:05:00Z" };
+    serve("/agent-sessions/s1", agentSession("active"));
+    serve("/agent-sessions/s1/actions", { items: [], total: 0 });
+    serve("/agent-sessions/s1/interventions", { items: [agentIntervention("resumed", answer)], total: 1 });
+    clock += 10_000;
+    const second = await open({ storage: await openNodeSqliteStorage(join(dir, "chat.db")), now });
+    try {
+      second.faux.setResponses([fauxAssistantMessage(fauxText("continuing"))]);
+      second.harness.resume();
+      await until(async () => (await second.conversation.context(context)).entries.some((entry) => ToolResultEntry.is(entry)), "the answer");
+      const message = await result(second.conversation);
+      assert.equal(message.isError, false, text(message));
+      assert.match(text(message), /Guidance: Yes: Chevron first, same bounds\./);
+      assert.match(text(message), /Question asked: Rerun Chevron first\?/);
+      assert.equal(message.details.state, "ready");
+      // Waiting only read QDash.
+      assert.ok(requests.every((request) => request.method === "GET"));
+    } finally {
+      await second.harness.close(context);
+    }
+
+    // Unanswered past the hour cap, the recovered wait times out and says the session stays paused.
+    servePausedSession();
+    clock = 20_000_000;
+    const third = await open({ storage: await openNodeSqliteStorage(join(dir, "other.db")), now });
+    await call(third, "qdash_wait_agent_intervention", { sessionId: "s1", timeoutSeconds: 86_400, pollIntervalSeconds: 60 });
+    await until(async () => (await callState(third.harness))?.kind === "sleeping", "the park");
+    await third.harness.close(context);
+    clock += 3_700_000;
+    const fourth = await open({ storage: await openNodeSqliteStorage(join(dir, "other.db")), now });
+    try {
+      fourth.faux.setResponses([fauxAssistantMessage(fauxText("still waiting"))]);
+      fourth.harness.resume();
+      await until(async () => (await fourth.conversation.context(context)).entries.some((entry) => ToolResultEntry.is(entry)), "the timeout");
+      const message = await result(fourth.conversation);
+      assert.equal(message.isError, true);
+      assert.match(text(message), /within 3600 seconds\. The session stays paused/);
+    } finally {
+      await fourth.harness.close(context);
+    }
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("waiting tools stay model-only, so scripts cannot long-poll", () => {
   const qdash = buildQDashExtension(extensions, {}, "/tmp", connection);
   assert.ok(qdash.extension.tools.some((tool) => tool.name === "qdash_wait_execution"));
@@ -428,6 +510,32 @@ test("stopping a wait while its poll is in flight drops the poll at once", async
     assert.equal((await result(chat.conversation)).isError, true);
   } finally {
     delays.delete("/executions/slow");
+    await chat.harness.close(context);
+  }
+});
+
+test("a poll still hanging at the deadline ends the wait with the same timeout error as the pi CLI", async () => {
+  servePausedSession();
+  delays.set("/agent-sessions/s1", 4_000);
+  const chat = await open();
+  try {
+    const args = { sessionId: "s1", timeoutSeconds: 0, pollIntervalSeconds: 5 };
+    const started = Date.now();
+    assert.equal((await (await call(chat, "qdash_wait_agent_intervention", args)).wait(context)).status, "done");
+    const took = Date.now() - started;
+    // The read gets the minimum poll time, not the four seconds it would hang.
+    assert.ok(took < 3_000, `took ${took} ms`);
+    const message = await result(chat.conversation);
+    assert.equal(message.isError, true);
+    assert.match(text(message), /No expert answered the intervention of agent session 's1' within 0 seconds/);
+    const cliStarted = Date.now();
+    await assert.rejects(cliResult("qdash_wait_agent_intervention", args), (error) => {
+      assert.ok(text(message).includes(error.message), `${text(message)} vs ${error.message}`);
+      return true;
+    });
+    assert.ok(Date.now() - cliStarted < 3_000);
+  } finally {
+    delays.delete("/agent-sessions/s1");
     await chat.harness.close(context);
   }
 });

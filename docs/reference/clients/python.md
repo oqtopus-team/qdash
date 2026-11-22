@@ -151,7 +151,7 @@ The high-level client groups operations by domain:
 | Flows and executions | Flow templates, save, execute, schedule, wait, and cancel operations |
 | Calibration pipelines | `get_calibration_pipeline_catalog`, `validate_calibration_pipeline`, `execute_calibration_pipeline` |
 | Provenance | Entity, lineage, impact, history, statistics, and recent-change operations |
-| Agent calibration | Sessions, actions, candidate gates, commits, apply operations, and polling helpers |
+| Agent calibration | Sessions, actions, candidate gates, commits, apply operations, polling helpers, and interventions (`create_agent_intervention`, `get_agent_intervention`, `list_agent_interventions`, `claim_agent_resume`, `record_agent_resume_outcome`) |
 
 Methods return Pydantic models exported from `qdash.client`. Configuration failures raise
 `QDashConfigError`; API and transport failures raise subclasses of `QDashApiError`:
@@ -404,7 +404,14 @@ finally:
 
 The runner does not create the approved scope implicitly. Create and review the session first, then
 handle `pass`, `retry`, `rollback`, and `human_escalation` as described in
-[Agent Calibration](../../user-guide/agent-calibration.md).
+[Agent Calibration](../../user-guide/agent-calibration.md). With `record_interventions=True`,
+`run_plan` records a non-pass ending as an intervention and returns it in `outcome.intervention`
+(or the failure in `outcome.intervention_error`). When QDash rejects only the checkpoint
+(`checkpoint_rejected`), the stop is recorded without one, QDash's reason is in
+`outcome.checkpoint_rejection`, and that intervention cannot resume the plan.
+`resume_state_from_intervention` turns a claimed
+intervention into the nodes, `AgentPlanResumeState`, and settings that `run_plan(resume=...)`
+continues from.
 
 ## Use the Low-Level Client
 

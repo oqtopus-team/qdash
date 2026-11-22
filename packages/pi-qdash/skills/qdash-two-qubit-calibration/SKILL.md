@@ -1,6 +1,6 @@
 ---
 name: qdash-two-qubit-calibration
-description: Plan, run, and diagnose QDash two-qubit (cross-resonance ZX90) calibration with the two_qubit, two_qubit_pairs, two_qubit_manual_rounds, full_calibration, and fast_full_calibration flow templates, from CR calibration through Bell-state checks and interleaved randomized benchmarking. Use when the user wants couplings calibrated, needs exact directed pairs run, or asks why a completed coupling calibration has poor gate or Bell fidelity.
+description: Plan, run, and diagnose QDash two-qubit (cross-resonance ZX90) calibration with the two_qubit, two_qubit_pairs, two_qubit_manual_rounds, full_calibration, and fast_full_calibration flow templates, from CR calibration through Bell-state checks and interleaved randomized benchmarking. Use when the user wants couplings or qubit pairs calibrated ("calibrate Q0 -> Q1", "calibrate this pair"), needs exact directed pairs run in the direction written, or asks why a completed coupling calibration has poor gate or Bell fidelity.
 license: Apache-2.0
 ---
 

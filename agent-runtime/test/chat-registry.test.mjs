@@ -29,7 +29,7 @@ import { uiTool } from "../src/ui-tool.ts";
 const context = BACKGROUND_CONTEXT;
 const connection = { toolArgs: { profile: "runtime", configPath: "/private/config.ini", useEnv: false } };
 const modelRuntime = { getModel: () => undefined };
-const LOCAL = "/app/extensions/local";
+const LOCAL = "/app/packages/local";
 
 const presentationConfig = {
   provider: "test-classifier",
@@ -144,7 +144,6 @@ function productionRegistry(piExtensions) {
       modelRuntime,
       workDir: "/tmp/work",
       extensionPaths: [LOCAL],
-      trustedPackages: [],
       copilot: buildCopilotExtension("QDash test prompt", [
         chartTool,
         uiTool,
@@ -164,7 +163,7 @@ test("the production chat registry: present_results reaches its classifier; scri
   const chips = piTool("qdash_list_chips", () => [{ chip_id: "A" }]);
   const save = piTool("qdash_save_flow");
   const metrics = piTool("qdash_get_chip_metrics", () => ({ t1_us: 30 }));
-  // A trusted checkout's replacement of an audited read is model-only.
+  // A trusted root's replacement of an audited read is model-only.
   const localMetrics = piTool("qdash_get_chip_metrics", () => ({ t1_us: 1 }));
   const chat = productionRegistry([piExtension([chips, save, metrics]), piExtension([localMetrics], `${LOCAL}/index.ts`)]);
 
@@ -237,7 +236,7 @@ test("the production chat registry: present_results reaches its classifier; scri
 
     // The model's write call still asks the user for approval and does not run.
     assert.equal(write.toolName, "qdash_save_flow");
-    assert.deepEqual(write.details.approval, { id: "w1", tool: "qdash_save_flow", label: "qdash_save_flow", args: { title: "flow" } });
+    assert.deepEqual(write.details.approval, { id: "w1", tool: "qdash_save_flow", label: "qdash_save_flow", args: { title: "flow" }, model: { provider: "faux", modelId: "faux-1" } });
     assert.equal(save.calls.length, 0);
 
     // Neither the model's tools nor the prompt's list of script tools names the internal classifier.
@@ -259,7 +258,6 @@ test("the edit tool comes with an editor or an editable dashboard and is model-o
     modelRuntime,
     workDir: "/tmp/work",
     extensionPaths: [LOCAL],
-    trustedPackages: [],
     copilot: buildCopilotExtension("QDash test prompt", []),
     internalCalls: PRESENTATION_INTERNAL_CALLS,
   };

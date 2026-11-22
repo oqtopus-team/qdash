@@ -3,7 +3,9 @@ import type { QDashClient } from "@oqtopus-team/qdash-client";
 import { QDash } from "@oqtopus-team/qdash-sdk";
 import { Type } from "typebox";
 
+import { pausedSessionConflict } from "../lib/agent-loop.js";
 import { toTextToolResult } from "../lib/results.js";
+import { requireWriteApproval } from "../lib/write-approval.js";
 
 /**
  * Flow authoring: saving a Prefect flow the agent wrote.
@@ -128,10 +130,9 @@ export function registerFlowAuthoringTools(pi: Pick<ExtensionAPI, "registerTool"
       defaultParameters: Type.Optional(Type.Object({}, { additionalProperties: true, description: "Default values of the flow function's parameters." })),
       defaultRunParameters: Type.Optional(Type.Object({}, { additionalProperties: true, description: "Run parameters applied to every task, such as shots or interval." })),
       tags: Type.Optional(Type.Array(Type.String())),
-      confirmWrite: Type.Optional(Type.Boolean({ description: "Required for non-interactive execution. Set true only after explicit user confirmation." })),
     }),
     async execute(
-      _toolCallId,
+      toolCallId,
       params: ConnectionParams & {
         name: string;
         code: string;
@@ -141,7 +142,6 @@ export function registerFlowAuthoringTools(pi: Pick<ExtensionAPI, "registerTool"
         defaultParameters?: Record<string, unknown>;
         defaultRunParameters?: Record<string, unknown>;
         tags?: string[];
-        confirmWrite?: boolean;
       },
       _signal,
       _onUpdate,
@@ -156,11 +156,7 @@ export function registerFlowAuthoringTools(pi: Pick<ExtensionAPI, "registerTool"
         ].join("\n");
         return toTextToolResult(text, { problems }, { tool: "qdash_save_flow", saved: false, problemCount: problems.length });
       }
-      if (!params.confirmWrite) {
-        if (!ctx.hasUI || !(await ctx.ui.confirm("Save QDash flow?", `This writes flow '${params.name}' to the project and registers its deployment.`))) {
-          throw new Error("qdash_save_flow requires explicit confirmation");
-        }
-      }
+      await requireWriteApproval("qdash_save_flow", toolCallId, params, ctx, { title: "Save QDash flow?", message: `This writes flow '${params.name}' to the project and registers its deployment.` });
       const client = await deps.makeClient(params);
       const chipId = await deps.resolveChipId(client, params.chipId);
       try {
@@ -209,15 +205,20 @@ export function registerFlowAuthoringTools(pi: Pick<ExtensionAPI, "registerTool"
       // The names a flow can be saved under; pi rejects others before confirmation.
       name: Type.String({ pattern: "^[A-Za-z0-9_]+$", description: "The saved flow's name: letters, digits and underscores." }),
       parameters: Type.Optional(Type.Object({}, { additionalProperties: true, description: "Flow function parameters; override the flow's default_parameters." })),
-      confirmWrite: Type.Optional(Type.Boolean({ description: "Required for non-interactive execution. Set true only after explicit user confirmation." })),
     }),
-    async execute(_toolCallId, params: ConnectionParams & { name: string; parameters?: Record<string, unknown>; confirmWrite?: boolean }, _signal, _onUpdate, ctx) {
-      if (!params.confirmWrite) {
-        if (!ctx.hasUI || !(await ctx.ui.confirm("Run QDash flow?", `This starts flow '${params.name}' on the workflow worker. Completed tasks update calibrated parameters in QDash directly.`))) {
-          throw new Error("qdash_execute_flow requires explicit confirmation");
-        }
+    async execute(toolCallId, params: ConnectionParams & { name: string; parameters?: Record<string, unknown> }, _signal, _onUpdate, ctx) {
+      await requireWriteApproval("qdash_execute_flow", toolCallId, params, ctx, { title: "Run QDash flow?", message: `This starts flow '${params.name}' on the workflow worker. Completed tasks update calibrated parameters in QDash directly.` });
+      const client = await deps.makeClient(params);
+      // A paused agent session's targets must not be measured around its pause.
+      const flowChip = typeof params.parameters?.chip_id === "string" ? params.parameters.chip_id : undefined;
+      const flowQids = Array.isArray(params.parameters?.qids) && params.parameters.qids.length > 0 && params.parameters.qids.every((qid) => typeof qid === "string")
+        ? (params.parameters.qids as string[])
+        : undefined;
+      const conflict = await pausedSessionConflict(client, flowChip, flowQids);
+      if (conflict) {
+        return toTextToolResult(conflict, { blocked: true }, { tool: "qdash_execute_flow", flowName: params.name, started: false, blockedByPausedSession: true });
       }
-      const qdash = new QDash(await deps.makeClient(params));
+      const qdash = new QDash(client);
       const run = await qdash.workflows.run(params.name, { parameters: params.parameters });
       const result = run.response as FlowExecution;
       return toTextToolResult(formatFlowExecution(result, params.name), result, {

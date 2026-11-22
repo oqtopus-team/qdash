@@ -43,6 +43,48 @@ chat with **New chat** on the **Agent** page instead. In the sidebar and the flo
 **New chat** keeps the result the current chat is about. The chat does not send a time range;
 name one in your message when it matters.
 
+### Follow an Answer in Progress
+
+While an answer is written, the chat shows what the assistant is doing now, such as a tool it
+runs or **Waiting for the expert's answer** while it waits on QDash. When the assistant has sent
+nothing for 30 seconds, the line under the answer says **Connected · last update 4m 10s ago**: the
+connection is fine, and the assistant is waiting or working without a new step to show. It does
+not mean the assistant is stuck, and a session or execution page that shows progress does not by
+itself mean the chat's answer is still running.
+
+If the connection drops, the line says **Connection lost, reconnecting** with the time of the last
+update, and the chat reconnects to the same answer by itself, without sending your message again.
+Once back, it shows the answer from its start and goes on with it; nothing the assistant did runs
+twice. If the assistant never received the message, the chat says so and asks you to send it
+again. After about 10 minutes without a connection, the chat stops trying and says that the
+assistant may still be working. **Stop** works throughout and stops only that answer.
+
+Moving to another page, closing the sidebar or the floating window with its close button, or
+reloading the page in the same browser tab does not stop an answer; only **Stop** does. Closing
+only hides the chat: the answer goes on, and reopening the chat shows its progress or how it
+ended. After a reload, the chat reconnects to the answer and shows it from its start, without
+sending your message again; until then it shows **Reconnecting to the running answer** with what it last saw the assistant do and **last known update … ago**. An answer
+that ended meanwhile is shown as it ended. If the chat cannot reconnect, it says so above the
+message box and leaves the conversation as it was. An answer you started in another project keeps
+running when you switch projects; the chat shows **Running in another project** and follows it
+again when you switch back. Signing out forgets what the tab kept about running answers.
+
+The chat's header says what its answer is doing: what the assistant runs, **Waiting for the
+expert's answer**, **Reconnecting**, or, once the answer ended, **Answered**, **Waiting for your
+approval**, **Waiting for your answer**, **Stopped**, or **Failed**. While the sidebar is closed,
+a dot on **Ask Agent** shows that an answer is running, and **Ask Agent** opens that chat rather
+than a new one.
+
+A notification at the top of the page tells you when an answer is ready, needs your approval or
+your answer, proposed a change, waits for an expert, or failed, unless that chat is already on
+screen in a visible tab. Each happens once per answer, also after a reconnect or a reload, and
+only for the project you have open. **Open chat** shows that chat; nothing is sent for you.
+Notifications that need your input stay until you dismiss them or open the chat; press Escape to
+dismiss one, or Alt+T to move to it. The notification goes, but the chat's header keeps saying
+where the answer stands. Notifications play no sound unless you turn on **Settings → Copilot →
+Chat notifications → Play a sound**; set its **Volume** and try it with **Preview**. The setting
+applies to this browser only.
+
 ### Add to an Answer in Progress, or Continue One
 
 You can type while an answer is still being written. Press Enter or the arrow button beside
@@ -81,6 +123,17 @@ your last message again. If the answer read a message you sent just before you s
 Continue also answers that message. Continue is not offered after a complete answer, while a message you
 sent during the answer is still being checked, and it is refused while a question, an approval
 card, or a proposed edit waits for you; answer those instead.
+
+When the latest answer ended with a server error, a connection that closed before the answer
+was complete, or another error reported by the chat, **Report this error** shows a bug-report
+draft that you can copy. The draft records the error category, the HTTP status, a known page
+category with private path segments removed, and the time the draft was generated (not the
+error occurrence time). Unrecognized errors have an unclassified source. The draft leaves
+out the error text, which can contain private details, and has places for your steps and hypotheses. Review it, remove anything private, and
+post it yourself with **Open the GitHub bug form**; QDash does not file issues. A refused
+request (an HTTP 4xx answer, such as a sign-in, permission, or input problem) offers no report,
+and neither does a failed measurement, a rejected value, or a declined approval inside an
+answer. The assistant follows the same rule when a tool fails unexpectedly.
 
 ### Branch from an Answer
 
@@ -159,7 +212,9 @@ return to the window. If your chosen model is no longer offered, chats use the d
 
 The **Thinking** menu next to the model picker sets how much the model reasons before it answers:
 **Auto** (the model's configured default), **Off**, **Low**, **Medium**, or **High**. The choice
-applies from the next message and is remembered in your browser.
+applies from the next message and is remembered in your browser. A model that always reasons,
+such as Claude Opus 5.5, cannot turn it off: its menu omits **Off**. A previously saved
+**Off** choice displays and runs as **Low** for that model.
 
 **Settings → Copilot → Your instructions** holds instructions added to every chat you start, after
 QDash's own rules: language, tone, and formats such as "answer in Japanese, conclusion first" or
@@ -189,6 +244,19 @@ Selecting the button again for the same failure reopens that chat instead of sta
 To run the investigation again from the start, select **New chat** while the investigation chat is
 open, then select **Investigate with AI**. The earlier chat stays in your chat history.
 
+## Choose How a Calibration Runs
+
+A single-qubit calibration can run two ways: step by step, where the assistant picks each next
+measurement from the last result inside a session you approve, or as a workflow, where it sets
+out the whole sequence (a saved workflow, a template, or a pipeline) for you to review before it
+runs. When you ask only "calibrate Q06", the assistant asks which you want before it proposes
+anything. Say it in the request, for example "calibrate Q06 step by step from the results" or
+"run the one_qubit workflow on Q06", and it does not ask; it keeps your answer for the rest of
+the chat. Questions about stored results and remeasuring one property such as T1 never get this
+question. Your answer only picks the way: every session, run, and saved value still needs its
+own approval, and when the chosen way stops or fails, the assistant reports it and asks instead of
+switching to the other way.
+
 ## Run a Calibration Pipeline from Chat
 
 The assistant can compose a calibration from QDash's step catalog and run it as one execution
@@ -202,6 +270,23 @@ The plan can only use the step types and task names QDash exposes; it cannot con
 every task result is judged by the same gates as a saved workflow. The execution appears on the
 **Execution** page tagged `pipeline`. See
 [Calibration Pipeline Spec](../developer-guide/workflow/calibration-pipeline.md) for the spec format.
+
+## Calibrate Qubits Step by Step
+
+Ask for a supervised calibration of named qubits, for example "calibrate Q00 step by step and
+ask an expert if it gets stuck". The assistant proposes a bounded session on an approval card,
+which shows whether the calibration evaluator is used (**Evaluation** off or required) and each
+value it may update without asking, decided by that task's own checks. The assistant cannot add
+numeric bounds or quality gates to a session, even ones you state; to calibrate within bounds you
+choose, create the session yourself with the qdash-agent CLI
+([Create a bounded session](./agent-calibration.md#create-a-bounded-session)). Another value the
+same task estimates, which the session does not grant, is kept for reference and does not hold up
+the granted one;
+once you approve it, it chooses each measurement from the last result without further cards,
+keeps the values as candidates until you approve a commit (it asks before a measurement that
+needs a new value), and asks an expert in QDash when it
+cannot tell what to do next. To continue after the expert answers, tell it to continue, in the
+same chat or a new one. See [Agent Calibration](./agent-calibration.md).
 
 ## Ask Agent About a Task Result {#ask-ai-about-a-task-result}
 

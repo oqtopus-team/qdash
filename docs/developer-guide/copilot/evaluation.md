@@ -168,6 +168,11 @@ A chat is recorded the same way: when the planner calls `qcal_evaluate`, the dur
 wrapper stamps a `host` record (the figure and reference the runtime filled in) on the result,
 the runtime's `tool_end` event carries it, and the API files it as a run of one with the
 planner's final answer. A figure no tool fetched, such as a user attachment, is not recorded.
+A call is filed under the project, planner model, and task its turn was first sent with. A
+reattached stream that replays the turn stores no second copy of a call another stream of the
+turn already filed; a call no stream of the turn reports, or one without a durable result entry,
+is not filed. See
+[Reattaching to a Turn](./chat-streaming.md#reattaching-to-a-turn).
 The wrapper fills the call's figure from the newest figure in the conversation that belongs to
 `task_name`: pi-qdash figure tools record the task, so a newer figure of another task is never
 evaluated in its place. The reference and examples come from one knowledge request. pi CLI fills
@@ -221,7 +226,7 @@ their project and are not deleted.
 | --- | --- |
 | `input` | The context, the exact prompt (`[figure]` marks an image) and system prompt, the run's question, whether a reference and examples were requested and actually used, the reference's size and hash, the figures by hash, and the examples by id and figure hash |
 | `output` | The model (`provider/modelId`, `fallback` when no calibration VLM was configured), the parsed diagnosis, the raw answer, every answer as returned, the questions asked, `attempts`, `stop_reason`, each call's duration and input and output tokens, the total duration and token usage, and the judging model's `context_window` |
-| `evaluator` | The extension that judged: package name, version, `checkout` or `package`, the checkout commit |
+| `evaluator` | The extension that judged: package name, version (with `+source.<hash>` for the bundled package), and `package`; records from the retired checkout mount carry `checkout` and its commit |
 | `planner` | In planner mode: the planner's model, answer, tool calls and duration |
 | `verdict`, `verdicts`, `verdict_history` | The latest verdict for compatibility, each reviewer's current verdict, and every immutable review change; a disagreement can classify the affected diagnosis area |
 

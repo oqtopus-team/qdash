@@ -24,6 +24,9 @@ import { ChatComposer, type ChatComposerHandle } from "@/components/features/cha
 import { ChatContextBar } from "@/components/features/chat/ChatContextBar";
 import { ChatLinkPreviewProvider } from "@/components/features/chat/ChatLinkPreview";
 import { ChatNotice, ChatPendingSteers } from "@/components/features/chat/ChatPendingSteers";
+import { DetachedTurnRow } from "@/components/features/chat/ChatTurnStatus";
+import { ChatAgentSessionStatus } from "@/components/features/chat/ChatAgentSessionStatus";
+import { linkedAgentSessions } from "@/lib/chatAgentSession";
 import { QdashBotAvatar } from "@/components/ui/UserAvatar";
 import {
   AssistantMessage,
@@ -188,6 +191,8 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
     isStreaming,
     liveTurn,
     statusMessage,
+    connection,
+    detachedTurn,
     model,
     thinking,
     send,
@@ -234,7 +239,14 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
         : generalSuggestions,
     [context, generalSuggestions, pageSuggestions],
   );
-  const isEmpty = messages.length === 0 && !liveTurn && steers.length === 0;
+  const isEmpty = messages.length === 0 && !liveTurn && !detachedTurn && steers.length === 0;
+  // The calibration session this chat's own tool calls last acted on, if any.
+  const liveSteps = liveTurn?.steps;
+  const agentSessionId = useMemo(
+    () => linkedAgentSessions(messages, liveSteps).slice(-1)[0] ?? null,
+    [messages, liveSteps],
+  );
+  const chatTurn = isStreaming ? "live" : detachedTurn ? "detached" : "none";
   const lastIndex = messages.length - 1;
   const sentCount = messages.filter((m) => m.role === "user").length + steers.length;
 
@@ -393,7 +405,14 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
                 />
               ),
             )}
-            {liveTurn && <LiveAssistantMessage turn={liveTurn} statusMessage={statusMessage} />}
+            {liveTurn && (
+              <LiveAssistantMessage
+                turn={liveTurn}
+                statusMessage={statusMessage}
+                connection={connection}
+              />
+            )}
+            {!liveTurn && detachedTurn && <DetachedTurnRow turn={detachedTurn} />}
             <ChatPendingSteers
               steers={steers}
               isStreaming={isStreaming}
@@ -408,6 +427,20 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
 
         <div className={`shrink-0 ${pad} pb-3`}>
           <div className={variant === "page" ? "max-w-3xl mx-auto" : ""}>
+            {agentSessionId && (
+              <div className="mb-2">
+                <ChatAgentSessionStatus
+                  agentSessionId={agentSessionId}
+                  chatTurn={chatTurn}
+                  // An explicit, ordinary message: the user's model and approvals apply.
+                  onContinue={
+                    isLoadingMessages
+                      ? undefined
+                      : () => submit(`Continue calibration session ${agentSessionId}.`)
+                  }
+                />
+              </div>
+            )}
             {composer}
             {variant === "page" && (
               <p className="text-xs text-base-content/35 text-center mt-2">

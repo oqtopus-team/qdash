@@ -1,5 +1,6 @@
 import { writeFileSync } from "node:fs";
 
+import { clampThinkingLevel, type Api, type Model } from "@earendil-works/pi-ai";
 import { parse } from "yaml";
 
 import { compactionBudget, type CompactionBudget } from "./budget.ts";
@@ -22,6 +23,47 @@ import {
 export const PROVIDER_ALIASES: Record<string, string> = { bedrock: "amazon-bedrock" };
 
 const OPENAI_COMPATIBLE_PROVIDER_PREFIX = "openai-compatible";
+
+/**
+ * Catalog providers whose models need an API key from the environment, and its variable. A
+ * chat on one of them without the key is refused before the turn starts, with what to set,
+ * instead of failing inside the model request or running on another model.
+ */
+export const NATIVE_API_KEY_ENV: Readonly<Record<string, string>> = {
+  openai: "OPENAI_API_KEY",
+  anthropic: "ANTHROPIC_API_KEY",
+};
+
+/** The thinking levels a chat turn may ask for (the chat's Thinking menu). */
+type ChatThinkingLevel = "off" | "minimal" | "low" | "medium" | "high";
+const CHAT_THINKING_LEVELS: ReadonlySet<string> = new Set(["off", "minimal", "low", "medium", "high"]);
+
+/**
+ * The level a turn on `model` runs at for the asked `level`: the asked one when the model supports
+ * it, else pi's nearest supported level. A model whose thinking is always on (Claude Opus 5.5:
+ * adaptive thinking, which Anthropic does not let a request disable) has no `off` or `minimal`:
+ * without this, pi would send such a turn no level and the model would think at pi's fallback
+ * effort, `high`. With it, `off` and `minimal` run at `low`, the least the model offers. Unset
+ * stays unset (the agent's own default).
+ */
+export function supportedThinkingLevel<L extends ChatThinkingLevel>(
+  model: Model<Api> | undefined,
+  level: L | undefined,
+): ChatThinkingLevel | undefined {
+  if (level === undefined || model === undefined) return level;
+  const clamped = clampThinkingLevel(model, level);
+  return CHAT_THINKING_LEVELS.has(clamped) ? (clamped as ChatThinkingLevel) : level;
+}
+
+/** Why a chat on `providerId/modelId` cannot run without a credential, or undefined when it can. */
+export function missingCredentialMessage(providerId: string, modelId: string, hasCredential: boolean): string | undefined {
+  const variable = NATIVE_API_KEY_ENV[providerId];
+  if (variable === undefined || hasCredential) return undefined;
+  return (
+    `${providerId}/${modelId} needs ${variable} in the agent runtime's environment, and it is not set. ` +
+    `Set ${variable} in .env and recreate the agent-runtime container, or choose another model.`
+  );
+}
 
 /** Used for locally hosted models, whose context window chat.yaml does not state. */
 const DEFAULT_CONTEXT_WINDOW = 131072;

@@ -1,6 +1,6 @@
 ---
 name: qdash-characterization
-description: Plan and run QDash qubit and coupling characterization with the coherence_check, characterization, ef_calibration, and coherence_limit flow templates, covering T1, T2, Ramsey, noise spectroscopy, EF-transition calibration, thermal excitation, static ZZ, and gate coherence limits. Use when the goal is to measure device properties or check coherence rather than to produce calibrated gates.
+description: Plan and run new QDash measurements of qubit and coupling properties, from remeasuring one property of named qubits to the coherence_check, characterization, ef_calibration, and coherence_limit flow templates, covering T1, T2, Ramsey, noise spectroscopy, EF-transition calibration, thermal excitation, static ZZ, and gate coherence limits. Use when the user wants a property measured or measured again ("remeasure the T1 of Q0", "check coherence on MUX2"), not calibrated gates. Not for reporting stored values or trends, which need no new measurement.
 license: Apache-2.0
 ---
 
@@ -25,6 +25,14 @@ read the `qdash` skill file at the path supplied by skill discovery.
 | Broad GE, EF, and coupling characterization in one run | `characterization` | Recalibrates GE pulses and the readout classifier before measuring |
 
 All four accept `mux_ids` (with optional `exclude_qids`) or `qids`.
+
+To measure one property again, such as the T1 of named qubits, a run of only that task is
+usually smaller than any of these templates: the `simple` template with `qids` and that task.
+Read the task's prerequisites with `qdash_get_pipeline_catalog` and the qubits' latest results
+in the current cooldown first; the run must apply the configuration the task needs, and a qubit
+without current pulses needs `qdash-one-qubit-calibration` before its coherence means much. A run
+that applies `Configure` needs a fresh `CheckRabi` before T1, T2 echo, or Ramsey; follow the
+`qdash-rabi-after-configure` skill.
 
 - `coherence_check` runs `Configure`, a `CheckChevron` that does not update parameters,
   `CheckRabi`, `CheckT1`, `CheckT2Echo`, and a short `CheckRamsey`, then reconfigures and runs a
@@ -85,7 +93,9 @@ Saved flows run with `qdash_execute_flow`; a template the user has not saved can
 `qdash_save_flow` or reproduced as a pipeline, as the `qdash` skill describes. Both paths are
 confirmation-gated, take the project execution lock, and write the results of completed tasks to
 QDash directly. Before running `characterization` or `ef_calibration` on qubits calibrated for
-other work, tell the user which parameters the run will replace.
+other work, tell the user which parameters the run will replace. To remeasure a property of one
+or a few named qubits with the results staged as candidates rather than written, run the task
+through an agent session with the `qdash-agent-calibration` skill.
 
 Use a pipeline in place of a template only after checking that it preserves the template's
 configuration, session boundaries, target selection, failure filtering, and coupling schedule

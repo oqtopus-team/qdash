@@ -45,12 +45,9 @@ body:
       label: Environment
       description: Please select your environment.
       options:
-        - label: Windows
-          value: windows
-        - label: Mac
-          value: mac
-        - label: Linux
-          value: linux
+        - Windows
+        - Mac
+        - Linux
 
   - type: textarea
     id: additional

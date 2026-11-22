@@ -5,10 +5,14 @@ import { QDashClient, QDashTimeoutError } from "@oqtopus-team/qdash-client";
 
 import {
   EXECUTION_TERMINAL_STATUSES,
+  MIN_CHECK_MS,
   WAIT_AGENT_ACTION,
+  WAIT_AGENT_INTERVENTION,
   WAIT_EXECUTION,
   WAIT_SPECS,
+  boundedCheck,
   isWaitToolName,
+  pollUntilSettled,
 } from "../.test-dist/lib/waits.js";
 
 /** A client whose reads return `responses` in order (the last repeats), with the client's own polling loops. */
@@ -105,8 +109,143 @@ test("results are pi-qdash's tool results with links and redaction", () => {
   assert.ok(result.details.data._links);
   assert.deepEqual(JSON.parse(result.content[0].text), result.details.data);
   assert.equal(WAIT_AGENT_ACTION.result(client, {}, { action_id: "a1" }).details.tool, "qdash_wait_agent_action");
-  assert.deepEqual(Object.keys(WAIT_SPECS).sort(), ["qdash_wait_agent_action", "qdash_wait_execution"]);
+  assert.deepEqual(Object.keys(WAIT_SPECS).sort(), ["qdash_wait_agent_action", "qdash_wait_agent_intervention", "qdash_wait_execution"]);
   assert.ok(isWaitToolName("qdash_wait_execution"));
   assert.ok(!isWaitToolName("qdash_wait_agent_candidate_apply"));
   assert.ok(!isWaitToolName("toString"));
+});
+
+/** A promise settled from outside, for a read that hangs until the test lets it answer. */
+function deferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
+/** A wait spec whose polls are the given functions, one per call (the last repeats). */
+function scriptedSpec(polls, timing = { timeoutSeconds: 60, pollIntervalSeconds: 0 }) {
+  const queue = [...polls];
+  const spec = {
+    calls: 0,
+    signals: [],
+    timing: () => timing,
+    check: (_client, _params, signal) => {
+      spec.calls += 1;
+      spec.signals.push(signal);
+      return (queue.length > 1 ? queue.shift() : queue[0])();
+    },
+    result: (_client, _params, value) => ({ value }),
+    timeoutError: () => new QDashTimeoutError("timed out"),
+  };
+  return spec;
+}
+
+/** Collect unhandled rejections while `run` and a grace period after it go by. */
+async function withoutUnhandledRejections(run) {
+  const unhandled = [];
+  const listener = (reason) => unhandled.push(reason);
+  process.on("unhandledRejection", listener);
+  try {
+    await run();
+    await new Promise((resolve) => setTimeout(resolve, 30));
+  } finally {
+    process.off("unhandledRejection", listener);
+  }
+  assert.deepEqual(unhandled, []);
+}
+
+const tick = (ms = 10) => new Promise((resolve) => setTimeout(resolve, ms));
+
+test("a bounded poll returns the value and leaves no timer or listener behind", async () => {
+  const controller = new AbortController();
+  const spec = scriptedSpec([async () => undefined, async () => "done"]);
+  const result = await pollUntilSettled(spec, {}, {}, controller.signal, async () => {});
+  assert.deepEqual(result, { value: "done" });
+  assert.equal(spec.calls, 2);
+  // The signal reaches the check, so a check with several reads can stop between them.
+  assert.equal(spec.signals[0], controller.signal);
+  const outcome = await boundedCheck(spec, {}, {}, { timeoutMs: 60_000, signal: controller.signal });
+  assert.deepEqual(outcome, { kind: "value", value: "done" });
+  // A pending 60 s timer would keep the test process alive; none is left.
+});
+
+test("cancelling during a hung read ends the wait at once and drops the late answer", async () => {
+  await withoutUnhandledRejections(async () => {
+    for (const late of ["value", "failure"]) {
+      const hung = deferred();
+      const spec = scriptedSpec([() => hung.promise]);
+      const controller = new AbortController();
+      const started = Date.now();
+      const waiting = pollUntilSettled(spec, {}, {}, controller.signal);
+      await tick();
+      controller.abort();
+      await assert.rejects(waiting, (error) => error.name === "AbortError" && /cancelled/.test(error.message));
+      assert.ok(Date.now() - started < 500);
+      if (late === "value") hung.resolve("late");
+      else hung.reject(new Error("late failure"));
+      await tick(20);
+      assert.equal(spec.calls, 1, late);
+    }
+  });
+});
+
+test("a read still running at the deadline ends the wait with the timeout error, once", async () => {
+  await withoutUnhandledRejections(async () => {
+    for (const late of ["value", "failure"]) {
+      const hung = deferred();
+      const spec = scriptedSpec([() => hung.promise], { timeoutSeconds: 0.05, pollIntervalSeconds: 0 });
+      const started = Date.now();
+      await assert.rejects(pollUntilSettled(spec, {}, {}), /timed out/);
+      const took = Date.now() - started;
+      // The deadline is near, so the read gets the minimum time and no more.
+      assert.ok(took >= MIN_CHECK_MS - 50 && took < MIN_CHECK_MS + 500, `took ${took} ms`);
+      if (late === "value") hung.resolve("late");
+      else hung.reject(new Error("late failure"));
+      await tick(20);
+      assert.equal(spec.calls, 1, late);
+    }
+  });
+});
+
+test("a read failure ends the wait with that failure", async () => {
+  const spec = scriptedSpec([async () => { throw new Error("HTTP 500"); }]);
+  await assert.rejects(pollUntilSettled(spec, {}, {}), /HTTP 500/);
+  assert.equal(spec.calls, 1);
+});
+
+test("an intervention poll stops before its next request once cancelled", async () => {
+  const controller = new AbortController();
+  const reads = [];
+  const client = {
+    async getAgentSession() {
+      reads.push("session");
+      controller.abort();
+      return { session_id: "s1", status: "waiting_for_human", active_intervention_id: "int-1" };
+    },
+    async getAgentIntervention() { reads.push("intervention"); return { status: "open" }; },
+    async listAgentActions() { reads.push("actions"); return []; },
+    async listAgentInterventions() { reads.push("interventions"); return []; },
+  };
+  await assert.rejects(WAIT_AGENT_INTERVENTION.check(client, { sessionId: "s1" }, controller.signal), (error) => error.name === "AbortError");
+  assert.deepEqual(reads, ["session"]);
+});
+
+test("a failed run's wait result adds the mechanical next step after the unchanged record", () => {
+  const { client } = fakeClient("getAgentAction", []);
+  const failed = { action_id: "a9", action_type: "run_task", execution_status: "failed", execution_id: "e9" };
+  const result = WAIT_AGENT_ACTION.result(client, {}, failed);
+  assert.deepEqual(JSON.parse(result.content[0].text), result.details.data);
+  assert.equal(result.content.length, 2);
+  assert.match(result.content[1].text, /^Next: Action a9 did not complete\. .*call qdash_request_agent_human now, citing it in attemptActionIds, before any wider research\./);
+  for (const action of [
+    { action_id: "a1", action_type: "run_task", execution_status: "running", execution_id: "e1" },
+    { action_id: "a2", action_type: "run_task", execution_status: "completed", execution_id: "e2" },
+    { action_id: "a3", action_type: "request_human", execution_status: "failed" },
+  ]) {
+    assert.equal(WAIT_AGENT_ACTION.result(client, {}, action).content.length, 1, action.action_id);
+  }
 });

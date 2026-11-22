@@ -25,6 +25,7 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  AgentSessionGraphResponse,
   ArtifactPreviewResponse,
   CancelExecutionResponse,
   Detail,
@@ -38,6 +39,8 @@ import type {
   GetExecutionActivityParams,
   GetFigureByPathParams,
   HTTPValidationError,
+  ListExecutionGroupsParams,
+  ListExecutionGroupsResponse,
   ListExecutionsParams,
   ListExecutionsResponse,
   PreviewArtifactByPathParams
@@ -734,6 +737,206 @@ export function useListExecutions<TData = Awaited<ReturnType<typeof listExecutio
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getListExecutionsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
+ * List a chip's executions newest first, with each agent session as one row.
+ *
+ * A session row holds the real executions the session's actions dispatched, linked through
+ * the session's action records; a tag alone does not group an execution. Rows are grouped
+ * before pagination, so a session is never split across pages and no execution is listed
+ * twice. ``total`` counts rows and ``total_executions`` counts executions. A session row is
+ * ordered by its latest activity (its latest measurement start, or its creation before the
+ * first). The session's status is its own; each child keeps its execution's status.
+ * @summary List executions with agent sessions grouped
+ */
+export const listExecutionGroups = (
+    params: ListExecutionGroupsParams,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<ListExecutionGroupsResponse>(
+      {url: `/executions/groups`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+
+
+
+
+export const getListExecutionGroupsQueryKey = (params?: ListExecutionGroupsParams,) => {
+    return [
+    `/executions/groups`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListExecutionGroupsQueryOptions = <TData = Awaited<ReturnType<typeof listExecutionGroups>>, TError = HTTPValidationError>(params: ListExecutionGroupsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listExecutionGroups>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListExecutionGroupsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listExecutionGroups>>> = ({ signal }) => listExecutionGroups(params, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listExecutionGroups>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListExecutionGroupsQueryResult = NonNullable<Awaited<ReturnType<typeof listExecutionGroups>>>
+export type ListExecutionGroupsQueryError = HTTPValidationError
+
+
+export function useListExecutionGroups<TData = Awaited<ReturnType<typeof listExecutionGroups>>, TError = HTTPValidationError>(
+ params: ListExecutionGroupsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listExecutionGroups>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listExecutionGroups>>,
+          TError,
+          Awaited<ReturnType<typeof listExecutionGroups>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListExecutionGroups<TData = Awaited<ReturnType<typeof listExecutionGroups>>, TError = HTTPValidationError>(
+ params: ListExecutionGroupsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listExecutionGroups>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listExecutionGroups>>,
+          TError,
+          Awaited<ReturnType<typeof listExecutionGroups>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListExecutionGroups<TData = Awaited<ReturnType<typeof listExecutionGroups>>, TError = HTTPValidationError>(
+ params: ListExecutionGroupsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listExecutionGroups>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List executions with agent sessions grouped
+ */
+
+export function useListExecutionGroups<TData = Awaited<ReturnType<typeof listExecutionGroups>>, TError = HTTPValidationError>(
+ params: ListExecutionGroupsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listExecutionGroups>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListExecutionGroupsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
+ * Return one agent session's measurements, proposals, decisions, and interventions.
+ *
+ * Nodes are typed and carry ids of the authoritative records (actions, executions, task
+ * results, decisions, interventions), not raw data. Edges are typed: ``sequence`` is the
+ * order measurements were dispatched; the other kinds come from references in the records.
+ * It is a live read, not a snapshot; the session audit endpoints hold the full record.
+ * A session of another project is not found.
+ * @summary Get an agent session as a graph over its executions
+ */
+export const getAgentSessionGraph = (
+    sessionId: string,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<AgentSessionGraphResponse>(
+      {url: `/executions/groups/agent-sessions/${sessionId}`, method: 'GET', signal
+    },
+      options);
+    }
+
+
+
+
+export const getGetAgentSessionGraphQueryKey = (sessionId: string,) => {
+    return [
+    `/executions/groups/agent-sessions/${sessionId}`
+    ] as const;
+    }
+
+
+export const getGetAgentSessionGraphQueryOptions = <TData = Awaited<ReturnType<typeof getAgentSessionGraph>>, TError = Detail | HTTPValidationError>(sessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAgentSessionGraph>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAgentSessionGraphQueryKey(sessionId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAgentSessionGraph>>> = ({ signal }) => getAgentSessionGraph(sessionId, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: sessionId !== null && sessionId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAgentSessionGraph>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetAgentSessionGraphQueryResult = NonNullable<Awaited<ReturnType<typeof getAgentSessionGraph>>>
+export type GetAgentSessionGraphQueryError = Detail | HTTPValidationError
+
+
+export function useGetAgentSessionGraph<TData = Awaited<ReturnType<typeof getAgentSessionGraph>>, TError = Detail | HTTPValidationError>(
+ sessionId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAgentSessionGraph>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAgentSessionGraph>>,
+          TError,
+          Awaited<ReturnType<typeof getAgentSessionGraph>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAgentSessionGraph<TData = Awaited<ReturnType<typeof getAgentSessionGraph>>, TError = Detail | HTTPValidationError>(
+ sessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAgentSessionGraph>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAgentSessionGraph>>,
+          TError,
+          Awaited<ReturnType<typeof getAgentSessionGraph>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAgentSessionGraph<TData = Awaited<ReturnType<typeof getAgentSessionGraph>>, TError = Detail | HTTPValidationError>(
+ sessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAgentSessionGraph>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get an agent session as a graph over its executions
+ */
+
+export function useGetAgentSessionGraph<TData = Awaited<ReturnType<typeof getAgentSessionGraph>>, TError = Detail | HTTPValidationError>(
+ sessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAgentSessionGraph>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetAgentSessionGraphQueryOptions(sessionId,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

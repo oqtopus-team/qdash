@@ -29,6 +29,8 @@ from qdash.client.services.client_models import (
     AgentCandidateListResponse,
     AgentCandidateResponse,
     AgentCandidateSetCommitResponse,
+    AgentInterventionListResponse,
+    AgentInterventionResponse,
     AgentSessionResponse,
     CandidateGateResponse,
     CreateEvaluationRunResponse,
@@ -963,22 +965,25 @@ class QDashClient:
         skill_name: str = "",
         skill_version: str = "",
         skill_hash: str = "",
-        model_name: str = "",
+        model: dict[str, str] | None = None,
     ) -> AgentSessionResponse:
-        """Create a bounded authorization session for a local agent."""
-        response = self._request(
-            "POST",
-            "/agent-sessions",
-            json={
-                "chip_id": chip_id,
-                "policy": policy,
-                "expires_in_seconds": expires_in_seconds,
-                "skill_name": skill_name,
-                "skill_version": skill_version,
-                "skill_hash": skill_hash,
-                "model_name": model_name,
-            },
-        )
+        """Create a bounded authorization session for a local agent.
+
+        ``model`` is the provider and model the calling host runs the agent with
+        (``{"provider": ..., "model_id": ..., "host": ...}``). QDash records it as client
+        reported and does not verify it; omit it when the host does not know it.
+        """
+        body: dict[str, Any] = {
+            "chip_id": chip_id,
+            "policy": policy,
+            "expires_in_seconds": expires_in_seconds,
+            "skill_name": skill_name,
+            "skill_version": skill_version,
+            "skill_hash": skill_hash,
+        }
+        if model is not None:
+            body["model"] = model
+        response = self._request("POST", "/agent-sessions", json=body)
         return self._validate_model_payload(AgentSessionResponse, response.data)
 
     def get_agent_session(self, session_id: str) -> AgentSessionResponse:
@@ -1235,6 +1240,89 @@ class QDashClient:
                     f"within {timeout_seconds} seconds"
                 )
             self._sleep(poll_interval_seconds)
+
+    def create_agent_intervention(
+        self,
+        session_id: str,
+        *,
+        idempotency_key: str,
+        reason: str,
+        summary: str,
+        question: str,
+        node_id: str | None = None,
+        task_name: str | None = None,
+        qids: list[str] | None = None,
+        attempts: list[dict[str, Any]] | None = None,
+        checkpoint: dict[str, Any] | None = None,
+        previous_intervention_id: str | None = None,
+    ) -> AgentInterventionResponse:
+        """Record that the agent needs a person; QDash pauses the session if it is active."""
+        response = self._request(
+            "POST",
+            f"/agent-sessions/{session_id}/interventions",
+            json={
+                "idempotency_key": idempotency_key,
+                "reason": reason,
+                "summary": summary,
+                "question": question,
+                "node_id": node_id,
+                "task_name": task_name,
+                "qids": qids or [],
+                "attempts": attempts or [],
+                "checkpoint": checkpoint,
+                "previous_intervention_id": previous_intervention_id,
+            },
+        )
+        return self._validate_model_payload(AgentInterventionResponse, response.data)
+
+    def get_agent_intervention(
+        self, session_id: str, intervention_id: str
+    ) -> AgentInterventionResponse:
+        """Get an intervention, the expert's answer, and whether it can resume."""
+        response = self._request(
+            "GET", f"/agent-sessions/{session_id}/interventions/{intervention_id}"
+        )
+        return self._validate_model_payload(AgentInterventionResponse, response.data)
+
+    def list_agent_interventions(self, session_id: str) -> list[AgentInterventionResponse]:
+        """List a session's interventions, newest first."""
+        response = self._request("GET", f"/agent-sessions/{session_id}/interventions")
+        payload = self._validate_model_payload(AgentInterventionListResponse, response.data)
+        return payload.items
+
+    def claim_agent_resume(
+        self, session_id: str, intervention_id: str, *, claim_key: str
+    ) -> AgentInterventionResponse:
+        """Claim an expert-authorized resume; QDash reactivates the session for this runner."""
+        response = self._request(
+            "POST",
+            f"/agent-sessions/{session_id}/interventions/{intervention_id}/claim-resume",
+            json={"claim_key": claim_key},
+        )
+        return self._validate_model_payload(AgentInterventionResponse, response.data)
+
+    def record_agent_resume_outcome(
+        self,
+        session_id: str,
+        intervention_id: str,
+        *,
+        claim_key: str,
+        transition: str,
+        reason: str = "",
+        follow_up_intervention_id: str | None = None,
+    ) -> AgentInterventionResponse:
+        """Record how a resumed plan ended."""
+        response = self._request(
+            "POST",
+            f"/agent-sessions/{session_id}/interventions/{intervention_id}/resume-outcome",
+            json={
+                "claim_key": claim_key,
+                "transition": transition,
+                "reason": reason[:2000],
+                "follow_up_intervention_id": follow_up_intervention_id,
+            },
+        )
+        return self._validate_model_payload(AgentInterventionResponse, response.data)
 
     def list_agent_actions(self, session_id: str) -> list[AgentActionResponse]:
         """List the audit trail for a local-agent session."""

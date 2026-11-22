@@ -3,9 +3,11 @@
  * the pi-qdash tools: the standalone pi CLI (see guidance-hook.ts) and the
  * QDash Agent Runtime (agent-runtime/src/prompt.ts and tool-guide.ts).
  *
- * Two parts make up the guidance:
+ * Three parts make up the guidance:
  *
  * - The investigation policy: how to treat evidence, whatever the host.
+ * - The request policy: how a plain-language request selects a skill and its
+ *   targets without granting any write permission.
  * - The tool routing guide: the "Preferred tools" section of the `qdash`
  *   skill, limited to the tools the host actually offers.
  *
@@ -25,6 +27,8 @@ export const QDASH_INVESTIGATION_POLICY: readonly string[] = [
   "Every QDash fact must come from a tool result or from the user. Do not fill gaps from memory.",
   "Quote concrete values with units and say which chip, qubit, and execution they came from.",
   "When data is missing or a tool fails, say so plainly instead of guessing.",
+  "When a QDash tool fails unexpectedly (an HTTP 5xx, or a response the tool could not read), say plainly that the operation did not run or its outcome is unknown, and that it may be an application fault the user can report with the repository's GitHub bug form, describing the operation and the error kind without credentials, prompts, or full results. A refused step, a failed measurement, a rejected candidate or quality gate, a declined approval, or input to correct is not a bug: do not suggest a report for it. Never say an issue was filed.",
+  "For the current date or time, call `qdash_current_time` each time you need it instead of using memory or an earlier reading. Without a time zone the user named, answer in UTC; never infer their time zone from their language or the host's setting.",
   "Before comparing results across time, establish which cooldown each result belongs to; the `qdash` skill has the rules.",
   "Treat comparisons, trends, correlations, and figure readings as evidence, not as approval to commit or apply parameters.",
   "For calibration interpretation, diagnosis, and multi-step workflows, follow the matching QDash skill instead of improvising a procedure.",
@@ -33,6 +37,29 @@ export const QDASH_INVESTIGATION_POLICY: readonly string[] = [
 /** The policy as Markdown list items. */
 export function investigationPolicyBullets(): string[] {
   return QDASH_INVESTIGATION_POLICY.map((rule) => `- ${rule}`);
+}
+
+/**
+ * How to act on requests written in plain language, one rule per entry.
+ *
+ * The rules decide what kind of help a request asks for and leave the choice
+ * of experiment to the skill descriptions and the skills themselves: no task
+ * names, thresholds, or flow steps belong here. They grant no permission;
+ * every write still goes through the host's existing gate.
+ */
+export const QDASH_REQUEST_POLICY: readonly string[] = [
+  'Users state goals in plain words, such as "remeasure the T1 of Q0", "calibrate this pair", or "bring up MUX0". Match the goal to the QDash skill whose description fits, load that skill, and work out its flows and tasks yourself. Do not ask the user for skill, flow, task, or command names, or for a step-by-step procedure; the one question you may need is how a broad calibration should run, below.',
+  'Tell a question about a value from a request to measure: "What is the T1 of Q0?" reads the stored results and status; "remeasure the T1 of Q0" plans a new measurement. Do not plan an execution for a question.',
+  "Run no more than the goal needs: a request to remeasure one property is not a request to recalibrate the qubit. Let the skill choose the stage from the targets' current state.",
+  "Take targets from the request, the conversation, and any context the host supplies, such as the QDash page the user has open, then from read-only tools such as the default chip. Ask one short question only for a target that is still missing or ambiguous. Keep each pair's control and target as the user wrote them.",
+  'A broad calibration request such as "calibrate Q6" can run two ways when the matching skill offers both for its targets: agentic, where you choose each next measurement from the results inside the scope the user approves, or as a workflow, where the whole sequence (a saved template or flow, or a composed pipeline) is set out for review first and then runs as planned. When neither the request, the conversation, nor the host\'s context settles which one the user wants, ask one short question with those two options before you create an agent session or compose, save, or run a flow or pipeline, then keep the answer for the rest of the conversation. "Step by step based on the results" or continuing a session means agentic; "run this flow" or a named template means a workflow; do not ask again then. A question about stored values or a remeasurement of one property needs no such question. The answer is a preference, not an approval: every write keeps its own approval, and an agentic session keeps its approved scope, update authority, and stops for a human. When the chosen way refuses, fails, or stops, report it and ask; do not switch to the other way to get past the stop.',
+  "A request to measure or calibrate lets you prepare that operation; it is not approval for a write and does not widen the agreed scope, so every write still goes through its usual approval. When the user asks only for a plan or says not to run anything, explain the plan and call no tool that executes or saves.",
+  "Once the user approved an agent session they created with autonomy auto, its own steps and expert requests run without asking again, inside its scope only; committing or applying a value stays a separate approval, and a step that depends on a measured value runs after that value is committed. QDash's records of a session, not your memory of the conversation, say what already ran and what an expert answered; read them before continuing, and treat an expert's guidance as evidence, not as new permission.",
+];
+
+/** The request policy as Markdown list items. */
+export function requestPolicyBullets(): string[] {
+  return QDASH_REQUEST_POLICY.map((rule) => `- ${rule}`);
 }
 
 const SECTION_HEADING = /^## preferred tools\s*$/i;

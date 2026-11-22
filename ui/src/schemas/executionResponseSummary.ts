@@ -5,6 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { ExecutionResponseSummaryAgentSession } from './executionResponseSummaryAgentSession';
 import type { ExecutionResponseSummaryElapsedTime } from './executionResponseSummaryElapsedTime';
 import type { ExecutionResponseSummaryEndAt } from './executionResponseSummaryEndAt';
 import type { ExecutionResponseSummaryNote } from './executionResponseSummaryNote';
@@ -39,4 +40,6 @@ export interface ExecutionResponseSummary {
   elapsed_time?: ExecutionResponseSummaryElapsedTime;
   tags: string[];
   note: ExecutionResponseSummaryNote;
+  /** Set only when an action of an agent session dispatched this execution; a tag alone never sets it */
+  agent_session?: ExecutionResponseSummaryAgentSession;
 }

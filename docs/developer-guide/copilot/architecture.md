@@ -157,6 +157,12 @@ list here:
 - A `beforeTool` hook in `toolPolicyExtension` blocks a nested call to a tool outside the list,
   including a tool that was never given `callers`.
 
+A listed read returns its `details.data` to the script as structured output. Its
+`structuredOutputSchema` is the pi-qdash tool's `outputSchema` when it declares one (the
+response contracts in `extensions/lib/query-contracts.ts`), else the generic `QDASH_DATA_SCHEMA`,
+so a script sees the same declaration as in pi CLI. Pi validates the output against it and fails
+the nested call on a mismatch.
+
 The hook allows one other kind of nested call: an internal tool called by the tool that owns it.
 `present_results` calls its classifier, `qdash.presentation.classify` (`callers: ["tools"]`), as
 a nested call. `PRESENTATION_INTERNAL_CALLS` names `present_results` as the classifier's only
@@ -187,13 +193,15 @@ runtime's own layer passes a park through unchanged: `modelOnly` and the Code Mo
 tool's `execute()` result and `cancel`, and the policy hook works for parked callers as described
 above.
 
-The pinned `qdash_wait_execution` and `qdash_wait_agent_action` park between polls instead of
-running the client's polling loop (`agent-runtime/src/durable-waits.ts`). pi-qdash's
-`extensions/lib/waits.ts` (`WAIT_SPECS`) splits each tool into one poll, `check`, and its result,
-`result`. `check` stops on the same value as the client's loop: the whole pipeline's terminal
-status for an execution, and the requested `operation_id` or `execution_id`, or a failed
-`execution_status`, for an action. The pi CLI keeps the client's loop and builds the same result
-with `result`. In chat, each run of the tool polls once with a client built from the chat's
+The pinned `qdash_wait_execution`, `qdash_wait_agent_action`, and `qdash_wait_agent_intervention`
+park between polls instead of running a polling loop (`agent-runtime/src/durable-waits.ts`).
+pi-qdash's `extensions/lib/waits.ts` (`WAIT_SPECS`) splits each tool into one poll, `check`, and
+its result, `result`. `check` stops on the same value as the client's loop: the whole pipeline's
+terminal status for an execution, and the requested `operation_id` or `execution_id`, or a failed
+`execution_status`, for an action. For an intervention it stops when the session leaves
+`waiting_for_human` or its intervention leaves `open` and `responding`, and returns the session's
+loop context. The pi CLI keeps the client's loop for the first two, runs `pollUntilSettled` for
+the third, and builds the same result with `result`. In chat, each run of the tool polls once with a client built from the chat's
 connection, then returns the result, throws the client's timeout error once the deadline passed,
 or parks with `{ sleep: { until } }` for one poll interval. The tool's inputs, defaults, results,
 and errors are those of the pi CLI tool. A parked wait differs from the loop in these ways:
@@ -210,11 +218,15 @@ and errors are those of the pi CLI tool. A parked wait differs from the loop in 
   holds only the deadline.
 
 Polls keep the requested interval, 0.5 seconds by default, so each poll also commits a park to
-the chat store. A trusted checkout that replaces either tool runs its own code. Both tools stay
-model-only, so a script cannot long-poll.
+the chat store. The intervention wait polls every 15 seconds by default, never more often than
+every 5 seconds, and caps its timeout at one hour: it is a bounded wait inside a turn the user
+started, not a background watcher, and nothing continues a chat after it ends. A trusted
+tool that replaces a waiting tool runs its own code. The waiting tools stay model-only, so a
+script cannot long-poll.
 
-Write tools therefore still run only after the user approves the model's own call on the
-approval card, never from a script. In a script, a listed read resolves to its redacted response
+Reviewed write tools therefore still run only after the user approves the model's own call on
+the approval card, and session-granted writes only from the model's own call; neither runs from
+a script. In a script, a listed read resolves to its redacted response
 data (`details.data` of the pi-qdash result) as JSON rather than its truncated text answer. A failed call rejects with
 the tool's error text. Pi journals nested results until the script ends and does not bound
 structured output, so the policy hook drops a nested result's `details` and fails a call whose
@@ -424,27 +436,31 @@ The runtime loads their tools and skills directly; npm publication is not needed
 for QDash development or deployment. [Pi packages](./packages.md) describes
 independent distribution and release validation.
 
-`compose.yaml` also mounts `agent-runtime/extensions/` at `/app/extensions`
-(read-only) for additional development extensions. At startup, each subdirectory
-with a `pi` manifest is loaded. A checkout whose package name matches a bundled
-package replaces that package's tools and skills. Install any extra dependencies
-inside the checkout before starting the container, and restart the runtime after
-editing it. The image does not copy this gitignored directory.
+The runtime loads only these two packages and the skills their manifests declare
+(`createBundledResourceLoader` in `agent-runtime/src/bundled-extensions.ts`). It
+reads no packages from a pi `settings.json` and no extensions or skills that pi
+would discover under `PI_CODING_AGENT_DIR` or the working directory, so an
+installed or stale copy of a package cannot replace or extend the bundled tools
+and skills. A standalone pi installation keeps its own settings. The runtime
+neither mounts nor reads a leftover `agent-runtime/extensions/` directory from the
+retired development mount.
 
-The bundled pi-qdash package and overrides of it retain the per-name allowlist
-in `agent-runtime/src/allowed-tools.ts`. The bundled pi-qcaleval package is trusted
-as a whole. Additional checkouts are trusted by path, with these limits:
+The bundled pi-qdash package retains the per-name allowlist in
+`agent-runtime/src/allowed-tools.ts`. The bundled pi-qcaleval package is trusted
+as a whole by its package root, with these limits:
 
 - Reviewed write names (`REVIEWED_WRITE_TOOL_NAMES`) still require approval of
-  their arguments and execute with the requesting user's credentials.
-- A checkout tool is replayed after interruption only when its
+  their arguments and execute with the requesting user's credentials. Session-granted
+  write names (`SESSION_GRANTED_WRITE_TOOL_NAMES`) run without a card; see
+  [Supported hosts](./extensions.md#supported-hosts).
+- A trusted tool is replayed after interruption only when its
   `annotations.readOnlyHint` is `true`.
-- A trusted checkout that reuses a bundled tool's name replaces it, with a
+- A trusted tool that reuses a pi-qdash tool's name replaces it, with a
   replacement message in the startup log.
-- Checkout tools are callable only by the model, never from a `codemode` script,
+- Trusted tools are callable only by the model, never from a `codemode` script,
   including a replacement of a tool in `NESTED_READ_TOOL_NAMES`.
 
-Checkout tools receive `modelRegistry` and the same context as pi-qdash tools. Their
+Trusted tools receive `modelRegistry` and the same context as pi-qdash tools. Their
 `promptSnippet` and `promptGuidelines` appear under "Additional tools" in the system prompt.
 
 For tools declaring `images`, the runtime supplies the newest durable conversation figure,
@@ -459,9 +475,13 @@ for derivation. `details.prompt` records the text sent to the evaluation model.
 
 The runtime's `/chat` body carries two image lists: `initial_images` (the
 task chat's opening figures, attached only when the conversation is new)
-and `images` (attachments of the current turn, attached every time). The startup log lists loaded
-extension paths and tools. Anything placed under `agent-runtime/extensions/` on the host is trusted
-the same way, so keep that directory empty on production hosts.
+and `images` (attachments of the current turn, attached every time).
+
+At startup, the runtime logs one `skills:` line listing all loaded skills, then
+one `bundled extension` line per package with its name, `+source.<hash>` version,
+path, trust (`allowlisted` or `trusted`), tool count, and skills. Compare the
+version with an evaluation record's evaluator version to confirm which build a
+running runtime serves.
 
 ## Evaluation runs
 

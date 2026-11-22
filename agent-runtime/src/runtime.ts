@@ -5,11 +5,7 @@ import { fileURLToPath } from "node:url";
 
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import type { Api, Model } from "@earendil-works/pi-ai";
-import {
-  DefaultResourceLoader,
-  ModelRuntime,
-  type ToolDefinition as CodingAgentTool,
-} from "@earendil-works/pi-coding-agent";
+import { ModelRuntime, type ToolDefinition as CodingAgentTool } from "@earendil-works/pi-coding-agent";
 import {
   AssistantEntry,
   createRegistry,
@@ -31,7 +27,7 @@ import {
   ALLOWLISTED_PACKAGES,
   isDeferredTool,
   REVIEWED_WRITE_TOOL_NAMES,
-  TRUSTED_EXTENSION_PACKAGES,
+  SESSION_GRANTED_WRITE_TOOL_NAMES,
 } from "./allowed-tools.ts";
 import { compactionBudget, type CompactionBudget } from "./budget.ts";
 import { chartTool } from "./chart-tool.ts";
@@ -67,16 +63,14 @@ import { ExecWorkspace, execConfigFromEnv, removeWorkspace, WORKSPACE_TOOL_NAMES
 import { askUserTool } from "./ask-tool.ts";
 import {
   buildLocalToolGuide,
-  bundledExtensionCheckouts,
-  withExtensionOverrides,
-  localToolNames,
-  describeExtensionError,
+  bundledExtensions,
+  createBundledResourceLoader,
+  describeBundledExtensions,
   extensionPackage,
   isTrustedExtension,
-  withoutReplacedInstalls,
-  discoverExtensionCheckouts,
-  trustedCheckoutRoots,
-} from "./local-extensions.ts";
+  localToolNames,
+  trustedBundleRoots,
+} from "./bundled-extensions.ts";
 import {
   runCodingAgentTool,
   type ApprovalRequest,
@@ -103,7 +97,7 @@ import { logDurableReport } from "./durable-report.ts";
 import { examplesOf, fetchKnowledgeDraft, fetchTaskKnowledgeResponse, renderReference } from "./knowledge-context.ts";
 import type { TaskKnowledgeLike } from "./knowledge-context.ts";
 import { resolveCopilotModelFiles } from "./copilot-profile.ts";
-import { chatCompactionOverrides, PROVIDER_ALIASES, writeModelsConfig } from "./models-config.ts";
+import { chatCompactionOverrides, missingCredentialMessage, NATIVE_API_KEY_ENV, PROVIDER_ALIASES, supportedThinkingLevel, writeModelsConfig } from "./models-config.ts";
 import type { PageContext } from "./page-context.ts";
 import { buildSystemPrompt, buildUserInstructionsSection } from "./prompt.ts";
 import { buildSkillTool, type SkillSummary } from "./skill-tool.ts";
@@ -124,16 +118,12 @@ const MODEL_STREAM_TIMEOUT_MS = Number(process.env.MODEL_STREAM_TIMEOUT_MS ?? 18
 // The Copilot workspace (agent-exec container); without it the chat has no
 // shell or files, only QDash tools.
 const EXEC_CONFIG = execConfigFromEnv();
-// Local extension checkouts: compose mounts agent-runtime/extensions/ here. It
-// is empty in production and in a clone without checkouts. Every checkout is
-// loaded (replacing the bundled or installed copy of the same package); only those outside
-// the allowlisted packages are trusted as a whole.
-const EXTENSIONS_DIR = "/app/extensions";
-const BUNDLED = bundledExtensionCheckouts(fileURLToPath(new URL("../../packages/", import.meta.url)));
+// The pi packages built into this image are the only extensions and skills
+// loaded (see bundled-extensions.ts). Those outside the allowlisted packages
+// are trusted as a whole.
+const BUNDLED = bundledExtensions(fileURLToPath(new URL("../../packages/", import.meta.url)));
 const BUNDLED_PATHS = BUNDLED.map(({ path }) => path);
-const CHECKOUTS = withExtensionOverrides(BUNDLED, discoverExtensionCheckouts(EXTENSIONS_DIR));
-const CHECKOUT_PATHS = CHECKOUTS.map((checkout) => checkout.path);
-const EXTENSION_PATHS = trustedCheckoutRoots(CHECKOUTS, ALLOWLISTED_PACKAGES);
+const EXTENSION_PATHS = trustedBundleRoots(BUNDLED, ALLOWLISTED_PACKAGES);
 
 export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high";
 
@@ -272,7 +262,7 @@ export class SharedRuntime {
     return chatSystemPromptOf(this.systemPrompt, this.toolNames, userInstructions);
   }
 
-  /** Load the Pi model catalog and adapt the installed pi-qdash extension once. */
+  /** Load the Pi model catalog and adapt the bundled pi extensions once. */
   static async create(): Promise<SharedRuntime> {
     mkdirSync(STATE_DIR, { recursive: true });
     if (EXEC_CONFIG) {
@@ -282,21 +272,10 @@ export class SharedRuntime {
     }
 
     const { responseLanguage, thinkingLanguage } = loadLanguageConfig(COPILOT_CONFIG_PATH);
-    const loader = new DefaultResourceLoader({
-      cwd: WORK_DIR,
-      agentDir: AGENT_DIR,
-      additionalExtensionPaths: CHECKOUT_PATHS,
-    });
+    const loader = createBundledResourceLoader({ cwd: WORK_DIR, agentDir: AGENT_DIR, bundled: BUNDLED });
     await loader.reload();
-    // pi reports one conflict per tool name, so a checkout that replaces an
-    // installed package yields the same replacement notice dozens of times.
-    const reported = new Set<string>();
     for (const { path, error } of loader.getExtensions().errors) {
-      const report = describeExtensionError(path, error, CHECKOUT_PATHS);
-      if (reported.has(report.message)) continue;
-      reported.add(report.message);
-      if (report.level === "error") console.error(report.message);
-      else console.log(report.message);
+      console.error(`[agent-runtime] extension ${path}: ${error}`);
     }
 
     const modelFiles = resolveCopilotModelFiles(process.env, COPILOT_CONFIG_PATH);
@@ -324,18 +303,17 @@ export class SharedRuntime {
       `[agent-runtime] skills: ${skills.map((skill) => skill.name).join(", ") || "none"}`,
     );
 
-    const extensions = withoutReplacedInstalls(loader.getExtensions().extensions, CHECKOUTS);
-    // Local checkouts and trusted installed packages are trusted as a whole
-    // (see buildQDashExtension); reviewed write names still require approval.
-    const localTools = localToolNames(extensions, EXTENSION_PATHS, TRUSTED_EXTENSION_PACKAGES);
-    if (CHECKOUT_PATHS.length || localTools.length) {
-      console.log(
-        `[agent-runtime] trusted extensions: packages=${TRUSTED_EXTENSION_PACKAGES.join(", ") || "none"}; local=${EXTENSION_PATHS.join(", ") || "none"} (tools: ${localTools.join(", ") || "none"}); allowlisted checkouts=${CHECKOUT_PATHS.filter((path) => !EXTENSION_PATHS.includes(path)).join(", ") || "none"}`,
-      );
+    const extensions = loader.getExtensions().extensions;
+    for (const line of describeBundledExtensions(BUNDLED, EXTENSION_PATHS, extensions, loader.getSkills().skills)) {
+      console.log(line);
     }
+    // Trusted bundled roots offer every tool they define (see
+    // buildQDashExtension); reviewed write names still require approval.
+    const localTools = localToolNames(extensions, EXTENSION_PATHS);
     const allowed = new Set<string>([
       ...ALLOWED_TOOL_NAMES,
       ...REVIEWED_WRITE_TOOL_NAMES,
+      ...SESSION_GRANTED_WRITE_TOOL_NAMES,
       ...localTools,
     ]);
     const qdashToolNames = [
@@ -352,12 +330,7 @@ export class SharedRuntime {
       ? extractToolGuide(readFileSync(guideSkill.filePath, "utf8"), qdashToolNames, deferredToolNames)
       : null;
     if (!toolGuide) console.warn("[agent-runtime] no tool guide: qdash skill not found");
-    const localToolGuide = buildLocalToolGuide(
-      extensions,
-      EXTENSION_PATHS,
-      new Set(localTools),
-      TRUSTED_EXTENSION_PACKAGES,
-    );
+    const localToolGuide = buildLocalToolGuide(extensions, EXTENSION_PATHS, new Set(localTools));
 
     const classifiers = configureClassifierModels(
       readClassifierConfig(CLASSIFIER_CONFIG_PATH),
@@ -398,7 +371,6 @@ export class SharedRuntime {
       modelRuntime,
       workDir: WORK_DIR,
       extensionPaths: EXTENSION_PATHS,
-      trustedPackages: TRUSTED_EXTENSION_PACKAGES,
       copilot: copilotExtension,
       internalCalls: presentation ? PRESENTATION_INTERNAL_CALLS : {},
       codingTools: EXEC_CONFIG !== undefined,
@@ -423,8 +395,7 @@ export class SharedRuntime {
     ];
     // Pinned definitions first so a trusted one replaces, as in buildQDashExtension.
     const enabledTools = new Map<string, EnabledTool>();
-    const trusted = (extension: { path: string }) =>
-      isTrustedExtension(extension.path, EXTENSION_PATHS, TRUSTED_EXTENSION_PACKAGES);
+    const trusted = (extension: { path: string }) => isTrustedExtension(extension.path, EXTENSION_PATHS);
     for (const extension of [...extensions].sort((a, b) => Number(trusted(a)) - Number(trusted(b)))) {
       for (const [name, registered] of extension.tools) {
         if (allowed.has(name)) enabledTools.set(name, { definition: registered.definition, path: extension.path });
@@ -514,7 +485,7 @@ export class SharedRuntime {
           )) as ToolRun;
         },
         ...knowledgeSource(connection, request.knowledgeDraftId, signal),
-        evaluator: evaluation.path ? extensionPackage(evaluation.path, CHECKOUT_PATHS, BUNDLED_PATHS) : undefined,
+        evaluator: evaluation.path ? extensionPackage(evaluation.path, BUNDLED_PATHS) : undefined,
       });
     } finally {
       await connection.close();
@@ -661,7 +632,7 @@ export class SharedRuntime {
       return recordFromDetails(request.taskId, outcome.details, {
         mode: "planner",
         usage: outcome.usage,
-        evaluator: evaluation.path ? extensionPackage(evaluation.path, CHECKOUT_PATHS, BUNDLED_PATHS) : undefined,
+        evaluator: evaluation.path ? extensionPackage(evaluation.path, BUNDLED_PATHS) : undefined,
         planner: {
           model: `${providerId}/${request.modelName}`,
           answer,
@@ -869,6 +840,16 @@ export class SharedRuntime {
       contextWindow,
       maxTokens,
     } = this.resolveModelWithLimits(request.provider, request.modelName);
+    // A native catalog model without its key is refused here, named, never swapped for another.
+    const missing =
+      model.provider in NATIVE_API_KEY_ENV
+        ? missingCredentialMessage(
+            model.provider,
+            model.modelId,
+            (await this.modelRuntime.checkAuth(model.provider)) !== undefined,
+          )
+        : undefined;
+    if (missing) throw new Error(missing);
     const selectedBudget = compactionBudget(contextWindow, maxTokens);
     const opened = await this.openStore(request.ownerId, request.storeSessionId ?? request.sessionId, auth, {
       userInstructions: request.userInstructions,
@@ -886,9 +867,15 @@ export class SharedRuntime {
     });
     const { harness, writeTools, workspace, close } = opened;
     try {
+      // A level the model cannot run (Off on a model whose thinking is always on) runs at the
+      // nearest one it can, not at pi's fallback effort (see supportedThinkingLevel).
+      const thinkingLevel = supportedThinkingLevel(
+        this.modelRuntime.getModel(model.provider, model.modelId),
+        request.thinkingLevel,
+      );
       const agent = {
         model,
-        ...(request.thinkingLevel ? { thinkingLevel: request.thinkingLevel } : {}),
+        ...(thinkingLevel ? { thinkingLevel } : {}),
         // Where the harness builds the workspace environment: a directory of
         // the agent-exec container, not of this one.
         cwd: workspace?.cwd ?? WORK_DIR,

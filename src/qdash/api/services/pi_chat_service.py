@@ -142,6 +142,7 @@ async def abort_runtime_turn(
     target: RuntimeTarget | None = None,
     *,
     stored_with: QDashAuth | None = None,
+    turn_request_id: str | None = None,
 ) -> StopOutcome:
     """Stop the turn the runtime is running for this session, if any.
 
@@ -157,6 +158,9 @@ async def abort_runtime_turn(
     restart is stopped too, while the runtime holds the store, without running
     any of it. ``stopped`` then also means that work will run no model or tool
     again; ``not_running``, that there was none.
+
+    With ``turn_request_id``, only the turn that request started is stopped; a
+    newer turn of the chat is ``not_running`` for this stop.
     """
     try:
         async with httpx.AsyncClient(timeout=10, trust_env=False) as client:
@@ -171,6 +175,7 @@ async def abort_runtime_turn(
                     "conversation_id": session_id,
                     **_target_payload(session_id, target),
                     **({"include_stored": True} if stored_with is not None else {}),
+                    **({"turn_request_id": turn_request_id} if turn_request_id else {}),
                 },
             )
     except (httpx.HTTPError, RuntimeError):
@@ -409,8 +414,14 @@ async def remove_runtime_store(
 class EvaluationRecorder(Protocol):
     """Where the evaluations a chat turn's planner makes are stored."""
 
-    def record(self, record: dict[str, Any]) -> dict[str, str] | None:
-        """Store one evaluation record; return its ids, or None when it was not stored."""
+    def record(self, record: dict[str, Any], call: str | None = None) -> dict[str, str] | None:
+        """Store one evaluation record; return its ids, or None when it was not stored.
+
+        ``call`` names the tool call within the turn by its result's durable entry,
+        the same way in every stream of the turn, so storing it again from a
+        reattached stream stores nothing new. A turn's recorder stores nothing
+        without it.
+        """
         ...
 
     def finish(self, answer: str) -> None:
@@ -504,6 +515,8 @@ def _request_payload(
         **approval_payload(request.approval),
         # Continue the run that ended without an answer; the message is not sent.
         **({"continue": True} if request.continue_run else {}),
+        # Watch the turn ``request_id`` started again; nothing is sent.
+        **({"reattach": True} if request.reattach else {}),
     }
 
 
@@ -607,7 +620,10 @@ async def stream(
 
     payload = _request_payload(request, config, username, target)
     extra_result: dict[str, Any] | None = None
-    if opening_message is not None:
+    if request.reattach:
+        # The turn already carries its opening context; nothing new is sent.
+        pass
+    elif opening_message is not None:
         try:
             await ensure_agent_session(username, request.session_id)
         except Exception:
@@ -671,7 +687,11 @@ async def stream_payload(
             if response.status_code != httpx.codes.OK:
                 await response.aread()
                 detail = _status_detail(response)
-                yield sse_event("error", {"step": step, "detail": detail})
+                error: dict[str, Any] = {"step": step, "detail": detail}
+                code = _status_code(response)
+                if code is not None:
+                    error["code"] = code
+                yield sse_event("error", error)
                 return
 
             async for event in translate(
@@ -682,14 +702,51 @@ async def stream_payload(
             ):
                 yield event
     except httpx.HTTPError as exc:
+        # The connection to the runtime failed or dropped: the turn may still run
+        # there, so the chat reattaches instead of reporting a failed answer.
         logger.exception("Pi agent runtime request failed")
-        yield sse_event("error", {"step": step, "detail": f"Agent runtime error: {exc}"})
+        yield sse_event(
+            "error",
+            {"step": step, "detail": f"Agent runtime error: {exc}", "code": STREAM_LOST},
+        )
     except RuntimeError:
         logger.exception("Pi agent runtime authentication is not configured")
         yield sse_event(
             "error",
             {"step": step, "detail": "Agent runtime authentication is not configured"},
         )
+
+
+# SSE ``error`` codes the chat acts on. ``stream_lost``: the stream to the runtime
+# failed or ended before the turn did, so the turn may still be running and the
+# chat reattaches with ``reattach``. ``turn_not_found``: a reattach named a turn
+# the runtime has no record of. ``turn_boundary_unknown``: a reattach named an
+# ended turn whose end the store does not settle yet, so the chat tries again.
+# Other codes come from the runtime's own errors.
+STREAM_LOST = "stream_lost"
+TURN_NOT_FOUND = "turn_not_found"
+TURN_BOUNDARY_UNKNOWN = "turn_boundary_unknown"
+
+
+def _status_code(response: httpx.Response) -> str | None:
+    """The ``error`` code of a non-200 from the runtime the chat acts on, if any."""
+    if response.status_code in (httpx.codes.NOT_FOUND, httpx.codes.CONFLICT):
+        try:
+            body = response.json()
+        except ValueError:
+            body = None
+        reason = body.get("reason") if isinstance(body, dict) else None
+        if response.status_code == httpx.codes.NOT_FOUND and reason == TURN_NOT_FOUND:
+            return TURN_NOT_FOUND
+        if response.status_code == httpx.codes.CONFLICT and reason == TURN_BOUNDARY_UNKNOWN:
+            return TURN_BOUNDARY_UNKNOWN
+    if response.status_code in (
+        httpx.codes.BAD_GATEWAY,
+        httpx.codes.SERVICE_UNAVAILABLE,
+        httpx.codes.GATEWAY_TIMEOUT,
+    ):
+        return STREAM_LOST
+    return None
 
 
 def _status_detail(response: httpx.Response) -> str:
@@ -703,6 +760,13 @@ def _status_detail(response: httpx.Response) -> str:
         if isinstance(body, dict) and body.get("reason") and isinstance(body.get("error"), str):
             return str(body["error"])
         return "Another request is already running for this conversation"
+    if response.status_code == httpx.codes.NOT_FOUND:
+        try:
+            body = response.json()
+        except ValueError:
+            body = None
+        if isinstance(body, dict) and isinstance(body.get("error"), str):
+            return str(body["error"])
     if response.status_code == httpx.codes.BAD_REQUEST:
         # The runtime rejects models missing from chat.yaml / evaluation.yaml.
         try:
@@ -828,7 +892,17 @@ async def translate(
             )
         elif kind == "tool_end":
             figures = event.get("figures")
-            evaluation = _evaluation_for_chat(event.get("evaluation"), recorder)
+            # A result's durable entry names its call the same way in the original
+            # stream of the turn and in every replay, whatever ID the model gave it.
+            entry_id = event.get("entry_id")
+            call = f"entry:{entry_id}" if isinstance(entry_id, str) and entry_id else None
+            # A result committed before this turn's message is an earlier turn's (a run
+            # recovered after the runtime restarted): this turn never files it.
+            evaluation = _evaluation_for_chat(
+                event.get("evaluation"),
+                None if event.get("before_turn") is True else recorder,
+                call=call,
+            )
             classification = _classification_for_chat(event.get("classification"))
             yield sse_event(
                 "tool_end",
@@ -913,10 +987,10 @@ async def translate(
             yield sse_event("noop", {"reason": str(event.get("reason") or "nothing_to_answer")})
             return
         elif kind == "error":
-            yield sse_event(
-                "error",
-                {"step": step, "detail": event.get("message", "Agent failed")},
-            )
+            failure: dict[str, Any] = {"step": step, "detail": event.get("message", "Agent failed")}
+            if isinstance(event.get("code"), str):
+                failure["code"] = event["code"]
+            yield sse_event("error", failure)
             return
         elif kind == "done":
             if recorder is not None:
@@ -941,12 +1015,16 @@ async def translate(
 
     yield sse_event(
         "error",
-        {"step": step, "detail": "Agent runtime closed the stream without a result"},
+        {
+            "step": step,
+            "detail": "Agent runtime closed the stream without a result",
+            "code": STREAM_LOST,
+        },
     )
 
 
 def _evaluation_for_chat(
-    evaluation: Any, recorder: EvaluationRecorder | None
+    evaluation: Any, recorder: EvaluationRecorder | None, *, call: str | None = None
 ) -> dict[str, Any] | None:
     """The evaluation summary the chat shows, with the record stored and replaced by its ids."""
     if not isinstance(evaluation, dict):
@@ -954,7 +1032,7 @@ def _evaluation_for_chat(
     record = evaluation.get("record")
     shown = {key: value for key, value in evaluation.items() if key != "record"}
     if recorder is not None and isinstance(record, dict):
-        ids = recorder.record(record)
+        ids = recorder.record(record, call)
         if ids:
             shown.update(ids)
     return shown

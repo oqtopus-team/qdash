@@ -54,10 +54,17 @@ const CONTEXT: TaskChatContext = {
 
 let stream: ReturnType<typeof controllableStream>;
 let fetchMock: ReturnType<typeof vi.fn>;
+/** How a reattach after a dropped stream is answered; by default the runtime never got the turn. */
+let reattachReply: (body: Record<string, unknown>) => Response;
 
 beforeEach(() => {
   stream = controllableStream();
+  reattachReply = () =>
+    new Response(sse("error", { detail: "no record", code: "turn_not_found" }), { status: 200 });
   fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+    if (url.endsWith("/stream") && JSON.parse(String(init?.body)).reattach) {
+      return reattachReply(JSON.parse(String(init!.body)));
+    }
     if (url.endsWith("/stream")) {
       init?.signal?.addEventListener("abort", () => stream.abort(init.signal!.reason));
       return new Response(stream.body, { status: 200 });
@@ -259,8 +266,10 @@ describe("useCopilotChat streaming", () => {
       String(url).endsWith("/copilot/chat/stop"),
     );
     expect(stopCall).toBeDefined();
+    // It names the turn, so a late stop never reaches a newer turn of the chat.
     expect(JSON.parse(String(stopCall![1].body))).toEqual({
       session_id: result.current.chat.session!.id,
+      turn_request_id: streamRequest().body.request_id,
     });
   });
 
@@ -391,7 +400,7 @@ describe("useCopilotChat streaming", () => {
     expect(result.current.chat.messages[0].content).toBe("Hello");
   });
 
-  it("records a stream that ends without a result as an error", async () => {
+  it("reattaches to a stream that ends without a result, and never resends the message", async () => {
     const result = await renderChat();
 
     act(() => result.current.chat.send("hi"));
@@ -400,8 +409,13 @@ describe("useCopilotChat streaming", () => {
     stream.close();
     await waitFor(() => expect(result.current.chat.isStreaming).toBe(false));
 
+    // The reattach names the same turn; the runtime never got it, so the chat says to send again.
+    const bodies = streamCalls().map(([, init]) => JSON.parse(String(init.body)));
+    expect(bodies).toHaveLength(2);
+    expect(bodies[1]).toMatchObject({ reattach: true, request_id: bodies[0].request_id });
+    expect(bodies[0].reattach).toBeUndefined();
     const messages = result.current.chat.messages;
-    expect(messages[messages.length - 1].content).toMatch(/^Error: .*closed before/);
+    expect(messages[messages.length - 1].content).toMatch(/^Error: .*Send it again/);
   });
 
   it("sends a task chat through the chat endpoint naming its task result", async () => {
@@ -911,6 +925,8 @@ describe("steering an answer in progress", () => {
 
   it("places a steer applied by its own request when the connection dropped before the stream said", async () => {
     replyToSteers(() => Response.json({ status: "applied", entry_id: "4", submission_id: "3" }));
+    // The chat cannot reattach either: no stream ever says where the steer landed.
+    reattachReply = () => new Response("down", { status: 500 });
     const result = await renderChat();
     act(() => result.current.chat.send("Long job"));
     await waitFor(() => expect(result.current.chat.isStreaming).toBe(true));

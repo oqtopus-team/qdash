@@ -1,6 +1,6 @@
 ---
 name: qdash-one-qubit-calibration
-description: Plan, run, and recover single-qubit QDash calibration with the coarse_one, fine_one, one_qubit, fast_full_calibration, full_calibration, and simple flow templates, from readout search and pulse calibration through randomized benchmarking. Use when the user wants qubits calibrated or recalibrated, wants a failed single-qubit stage recovered, or asks which single-qubit flow fits the chip's state. Not for first-time spectroscopy (qdash-chip-bringup) or two-qubit gates (qdash-two-qubit-calibration).
+description: Plan, run, and recover single-qubit QDash calibration with the coarse_one, fine_one, one_qubit, fast_full_calibration, full_calibration, and simple flow templates, from readout search and pulse calibration through randomized benchmarking. Use when the user wants qubits or MUXes calibrated or recalibrated ("calibrate Q0"), wants a failed single-qubit stage recovered, or asks which single-qubit flow fits the chip's state. Not for first-time spectroscopy (qdash-chip-bringup), two-qubit gates (qdash-two-qubit-calibration), or remeasuring one property such as T1 (qdash-characterization).
 license: Apache-2.0
 ---
 
@@ -12,7 +12,10 @@ measurement; this skill chooses the flow template and decides when a qubit may m
 
 Before planning or execution, load the `qdash` skill for the shared execution paths and
 approval scope. In the hosted Agent, call `read_skill` with `name: "qdash"`; in pi CLI,
-read the `qdash` skill file at the path supplied by skill discovery.
+read the `qdash` skill file at the path supplied by skill discovery. When the user has not
+said whether to calibrate step by step from the results (`qdash-agent-calibration`) or to run a
+reviewed sequence (this skill's templates), ask once as the `qdash` skill describes; once they
+choose the agentic path, follow `qdash-agent-calibration` with the stage this skill selects.
 
 ## Choose the template from the chip's state
 
@@ -52,7 +55,9 @@ List templates with `qdash_query` action `flow_templates` and read one with acti
 `flow_template`. Check `qdash_list_flows` for a flow the user saved from the template. Before
 editing a task list or recovering a failure, read the tasks with `qdash_get_pipeline_catalog` and
 `taskNames` for their purpose and prerequisites, and with `qdash_get_task_knowledge` for expected
-results and failure modes.
+results and failure modes. When an edited task list or a recovery runs `Configure` or
+`ConfigureAll` before a task that reads the Rabi normalization (such as `CheckT1`), check its
+order with the `qdash-rabi-after-configure` skill.
 
 ## Move on, recover, or stop
 
@@ -81,9 +86,10 @@ key outputs (for example `x90_fidelity`) and execution links.
 Saved flows run with `qdash_execute_flow`; a template the user has not saved can be saved with
 `qdash_save_flow` or reproduced as a pipeline with the template's step and task lists, as the
 `qdash` skill describes. Both paths are confirmation-gated and write the results of completed
-tasks to QDash directly. A bounded, candidate-gated recovery of one qubit uses an agent
-calibration session instead; see the `qdash` skill. Do not use a flow or pipeline to repeat what
-an agent session refused, rejected, or stopped on.
+tasks to QDash directly. To calibrate or recover one or a few named qubits step by step, with
+results staged as candidates and an expert asked when the next step is unclear, run this skill's
+tasks through an agent session with the `qdash-agent-calibration` skill instead. Do not use a
+flow or pipeline to repeat what an agent session refused, rejected, or stopped on.
 
 Use a pipeline in place of a template only after checking that it preserves the template's
 configuration, session boundaries, target selection, failure filtering, and coupling schedule

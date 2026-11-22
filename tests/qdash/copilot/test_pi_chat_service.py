@@ -473,10 +473,12 @@ class _Recorder:
     def __init__(self, ids: dict[str, str] | None) -> None:
         self.ids = ids
         self.records: list[dict[str, Any]] = []
+        self.calls: list[str | None] = []
         self.answers: list[str] = []
 
-    def record(self, record: dict[str, Any]) -> dict[str, str] | None:
+    def record(self, record: dict[str, Any], call: str | None = None) -> dict[str, str] | None:
         self.records.append(record)
+        self.calls.append(call)
         return self.ids
 
     def finish(self, answer: str) -> None:
@@ -495,6 +497,7 @@ async def test_chat_evaluations_are_recorded_and_the_chat_sees_where() -> None:
                     "type": "tool_end",
                     "name": "qcal_evaluate",
                     "id": "c8",
+                    "entry_id": "12",
                     "isError": False,
                     "evaluation": {"prompt": "p", "model": "vllm/ising", "record": record},
                 },
@@ -505,6 +508,7 @@ async def test_chat_evaluations_are_recorded_and_the_chat_sees_where() -> None:
     ]
 
     assert recorder.records == [record]
+    assert recorder.calls == ["entry:12"]
     assert recorder.answers == ["Looks good"]
     end = next(data for name, data in events if name == "tool_end")
     assert end["evaluation"] == {
@@ -513,6 +517,40 @@ async def test_chat_evaluations_are_recorded_and_the_chat_sees_where() -> None:
         "run_id": "evr_1",
         "evaluation_id": "ev_1",
     }
+
+
+@pytest.mark.asyncio
+async def test_each_evaluation_call_is_named_by_its_result_entry() -> None:
+    """Every stream of a turn reports a result's durable entry the same way, whatever ID
+    the model gave the call (a local model may reuse or omit it); a result committed
+    before the turn's own message is an earlier turn's and is not recorded at all."""
+    recorder = _Recorder(None)
+
+    def end(call_id: str | None, entry_id: str | None, **extra: Any) -> dict[str, Any]:
+        return {
+            "type": "tool_end",
+            "name": "qcal_evaluate",
+            **({"id": call_id} if call_id is not None else {}),
+            **({"entry_id": entry_id} if entry_id is not None else {}),
+            "isError": False,
+            "evaluation": {"prompt": "p", "record": {"task_id": "t"}},
+            **extra,
+        }
+
+    async for _ in translate(
+        _lines(
+            end("c1", "3", before_turn=True),
+            {"type": "turn_start", "answer": ""},
+            end("c1", "7"),
+            end("c1", "9"),
+            end(None, "11"),
+            end("c2", None),
+            {"type": "done", "text": "ok"},
+        ),
+        recorder=recorder,
+    ):
+        pass
+    assert recorder.calls == ["entry:7", "entry:9", "entry:11", None]
 
 
 @pytest.mark.asyncio
@@ -1277,6 +1315,12 @@ async def test_stopping_a_turn_reports_what_the_runtime_confirmed(
     )
     assert sent[0]["json"]["include_stored"] is True
     assert sent[0]["headers"]["X-QDash-Token"] == "alice-token"
+    # A stop naming its turn is forwarded with it, so the runtime spares a newer turn.
+    sent.clear()
+    await pi_chat_service.abort_runtime_turn(
+        "alice", "b1", RuntimeTarget("s1", "7", "g1"), turn_request_id="t1"
+    )
+    assert sent[0]["json"]["turn_request_id"] == "t1"
 
 
 @pytest.mark.asyncio
@@ -1289,3 +1333,168 @@ async def test_a_stop_the_runtime_never_answered_is_unknown(
 
     _failing_runtime(monkeypatch, httpx.ConnectError("down"))
     assert await pi_chat_service.abort_runtime_turn("alice", "s1") == "unknown"
+
+
+def test_a_reattach_is_forwarded_and_sends_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
+    from qdash.api.services import pi_chat_service
+    from qdash.copilot.config import CopilotConfig, ModelConfig
+    from qdash.copilot.contracts.models import ChatRequest
+
+    monkeypatch.setattr(pi_chat_service, "user_instructions", lambda _username: None)
+    config = CopilotConfig(model=ModelConfig(provider="vllm", name="m"))
+    request = ChatRequest.model_validate(
+        {"message": "calibrate Q0", "session_id": "s1", "request_id": "r1", "reattach": True}
+    )
+    payload = pi_chat_service._request_payload(request, config, "alice")
+
+    assert payload["reattach"] is True
+    assert payload["request_id"] == "r1"
+    plain = ChatRequest.model_validate({"message": "hi", "session_id": "s1"})
+    assert "reattach" not in pi_chat_service._request_payload(plain, config, "alice")
+
+
+class TestStreamLoss:
+    """A stream that ends before the turn did says so, so the chat reattaches."""
+
+    @pytest.mark.asyncio
+    async def test_a_stream_that_closes_without_a_result_is_lost_not_failed(self) -> None:
+        events = await _collect(
+            {"type": "tool_start", "name": "qdash_wait_agent_intervention", "id": "w1"},
+        )
+
+        name, data = events[-1]
+        assert name == "error"
+        assert data["code"] == "stream_lost"
+
+    @pytest.mark.asyncio
+    async def test_a_runtime_error_keeps_its_code(self) -> None:
+        events = await _collect(
+            {"type": "error", "message": "refused", "code": "turn_not_started"},
+        )
+
+        assert events == [
+            ("error", {"step": "run_chat", "detail": "refused", "code": "turn_not_started"})
+        ]
+
+    @pytest.mark.asyncio
+    async def test_a_failed_answer_has_no_stream_loss_code(self) -> None:
+        events = await _collect({"type": "error", "message": "conversation was not answered"})
+
+        assert "code" not in events[0][1]
+
+
+def _mock_runtime(monkeypatch: pytest.MonkeyPatch, handler: Any) -> None:
+    import httpx
+
+    real = httpx.AsyncClient
+
+    def client(**kwargs: Any) -> httpx.AsyncClient:
+        return real(**kwargs, transport=httpx.MockTransport(handler))
+
+    monkeypatch.setattr(httpx, "AsyncClient", client)
+    monkeypatch.setenv("AGENT_RUNTIME_TOKEN", "runtime-token")
+
+
+async def _stream_payload(payload: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
+    from qdash.api.services.pi_chat_service import QDashAuth, stream_payload
+
+    auth = QDashAuth(access_token="user-token", project_id="p1")
+    return [
+        _parse(sse)
+        async for sse in stream_payload(payload, step="run_chat", auth=auth)
+        if not sse.startswith(":")
+    ]
+
+
+@pytest.mark.asyncio
+async def test_a_dropped_runtime_connection_is_reported_as_stream_lost(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import httpx
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.RemoteProtocolError("peer closed connection", request=request)
+
+    _mock_runtime(monkeypatch, handler)
+    events = await _stream_payload({"request_id": "r1", "reattach": True})
+
+    assert events[-1][0] == "error"
+    assert events[-1][1]["code"] == "stream_lost"
+
+
+@pytest.mark.asyncio
+async def test_a_reattach_to_an_unknown_turn_is_turn_not_found(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import httpx
+
+    sent: list[dict[str, Any]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        sent.append(json.loads(request.content))
+        return httpx.Response(
+            404, json={"error": "The assistant has no record", "reason": "turn_not_found"}
+        )
+
+    _mock_runtime(monkeypatch, handler)
+    events = await _stream_payload({"request_id": "r1", "reattach": True})
+
+    assert sent == [{"request_id": "r1", "reattach": True}]
+    assert events == [
+        (
+            "error",
+            {
+                "step": "run_chat",
+                "detail": "The assistant has no record",
+                "code": "turn_not_found",
+            },
+        )
+    ]
+
+
+@pytest.mark.asyncio
+async def test_a_reattach_whose_turn_end_is_unsettled_is_retryable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import httpx
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            409, json={"error": "not settled yet", "reason": "turn_boundary_unknown"}
+        )
+
+    _mock_runtime(monkeypatch, handler)
+    events = await _stream_payload({"request_id": "r1", "reattach": True})
+
+    assert events == [
+        (
+            "error",
+            {"step": "run_chat", "detail": "not settled yet", "code": "turn_boundary_unknown"},
+        )
+    ]
+
+
+@pytest.mark.asyncio
+async def test_a_reattached_stream_replays_the_resumed_turn_to_its_result(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import httpx
+
+    lines = [
+        {"type": "tool_start", "name": "qdash_wait_agent_intervention", "id": "w1"},
+        {"type": "ping"},
+        {"type": "tool_end", "name": "qdash_wait_agent_intervention", "id": "w1", "isError": False},
+        {"type": "text_delta", "delta": "Resumed."},
+        {"type": "done", "text": "Resumed.", "entry_id": "12"},
+    ]
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        body = "".join(json.dumps(line) + "\n" for line in lines)
+        return httpx.Response(200, text=body, headers={"Content-Type": "application/x-ndjson"})
+
+    _mock_runtime(monkeypatch, handler)
+    events = await _stream_payload({"request_id": "r1", "reattach": True})
+
+    names = [name for name, _ in events]
+    assert names == ["tool_start", "status", "tool_end", "status", "delta", "status", "result"]
+    assert events[-1][1]["entry_id"] == "12"

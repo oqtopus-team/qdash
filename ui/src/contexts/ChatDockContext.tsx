@@ -164,6 +164,8 @@ export function ChatDockProvider({ children }: { children: React.ReactNode }) {
   const {
     activeSession,
     sessions,
+    runs,
+    detachedTurns,
     findSessionByContext,
     switchSession,
     createNewSession,
@@ -266,16 +268,22 @@ export function ChatDockProvider({ children }: { children: React.ReactNode }) {
     [focusContext],
   );
 
+  // Whether the active chat has a turn going, streamed or not: reopening the chat shows it.
+  const activeBusy = Boolean(
+    activeSession && (activeSession.id in runs || activeSession.id in detachedTurns),
+  );
+
   const openGeneralChat = useCallback(() => {
     // Keep the chat the user was in; start fresh only when there is none or it
-    // is about a specific result.
-    if (!activeSession || activeSession.context || activeSession.investigation) {
+    // is about a specific result and has no answer going. A running answer is
+    // never replaced by an empty chat: the user reopened the chat to see it.
+    if (!activeSession || ((activeSession.context || activeSession.investigation) && !activeBusy)) {
       createNewSession(null);
     }
     // One surface at a time: the sidebar replaces the floating window.
     setMiniOpen(false);
     setIsOpen(true);
-  }, [activeSession, createNewSession]);
+  }, [activeBusy, activeSession, createNewSession]);
 
   const openSidebar = useCallback(() => {
     setMiniOpen(false);

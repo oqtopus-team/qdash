@@ -28,7 +28,7 @@ ui/src/hooks/useCopilotChat.ts
 | `tool_draft` | `tool_draft` | Add a collapsed tool row while the model is still writing the call (`index`: the call's position in the message). |
 | `tool_args_delta` | `tool_args_delta` | Append text to one argument (`path`, such as `["content"]`) of the call being written; an expanded tool row shows code as it is typed. |
 | `tool_start` | `tool_start`, `status` | The call runs: the drafted row gets its validated arguments and progress. |
-| `tool_end` | `tool_end`, `status` | Complete the tool row and attach figures, evaluation details, a `classify` call's `classification`, a workspace tool's `output` and `exit_code`, or a `codemode` script's `output` followed by one line per tool call it made. |
+| `tool_end` | `tool_end`, `status` | Complete the tool row and attach figures, evaluation details, a `classify` call's `classification`, a workspace tool's `output` and `exit_code`, or a `codemode` script's `output` followed by one line per tool call it made. The runtime adds `entry_id`, the result's durable entry, and `before_turn` for a result committed before the turn's own message. |
 | `chart` | Included in final `result` | Render a collected chart. |
 | `ask` | Included in final `result` | Render a question card. |
 | `approval` | Included in final `result` | Render an approval card. |
@@ -38,19 +38,25 @@ ui/src/hooks/useCopilotChat.ts
 | `turn_start` | `turn_start` with `result` | The turn's own message was placed. What streamed before it came from a run recovered after the runtime died, answering a steer of an earlier turn; `result` holds those blocks, with `answer`, the text that run ended with. `answer` holds only an answer committed after the stream started, so on an ordinary turn it is empty and the UI adds nothing. The UI keeps them with the earlier turn, before the new message. |
 | `done` | `status`, `result` | Finish the turn with renderable blocks; `entry_id` names the answer's durable entry. |
 | `noop` | `noop` | A continue found nothing to answer; no model request was sent. The UI keeps the chat as it was and shows a notice. |
-| `error` | `error` | Stop the stream with a user-visible failure. |
-| `ping` | SSE comment | Keep idle proxy connections open. |
+| `error` | `error` | Stop the stream with a user-visible failure; a runtime `code` (`compaction_failed`, `turn_not_started`) is passed on. |
+| `ping` | SSE comment | Keep idle proxy connections open, and tell the UI the stream is alive. |
 
 Malformed runtime events become an `error` event. A completed turn with no renderable text, chart,
-question, or approval also becomes an error so the UI does not appear to hang.
+question, or approval also becomes an error so the UI does not appear to hang. A stream that ends
+before the turn did, a failed connection to the runtime, or a `502`, `503`, or `504` from it
+becomes an `error` with `code: "stream_lost"`, which the UI answers with a reattach (see
+[Reattaching to a Turn](#reattaching-to-a-turn)) rather than a failed answer.
 
 ## Durable Turns and Cancellation
 
 Closing the browser stream does not cancel work in the Agent Runtime. The Stop action calls the
-separate cancellation path for the active turn. A stop reaches the turn as soon as it holds the
+separate cancellation path for the active turn: `POST /copilot/chat/stop` with the turn's
+`turn_request_id` (`ChatStopRequest`), sent on to the runtime's `/chat/abort`, which answers `404`
+when the chat's running turn has another request ID, so a stop that arrives late never stops a
+newer turn. A stop without it, from an older client, stops whatever turn the chat runs. A stop reaches the turn as soon as it holds the
 store, also while its own message is still being admitted: `ActiveChat.stop` records it, and the
-turn aborts again once its submission is in, before it admits any steer. Request IDs let a retry
-recover an answer that the runtime already committed. A parked `qdash_wait_execution` or
+turn aborts again once its submission is in, before it admits any steer. Request IDs let a
+reattach recover a turn whose stream dropped (see [Reattaching to a Turn](#reattaching-to-a-turn)). A parked `qdash_wait_execution` or
 `qdash_wait_agent_action` call stays a running tool in the stream until it ends, and a stop ends it
 without stopping the execution in QDash (see
 [Copilot Architecture](./architecture.md#code-mode-and-deferred-tools)).
@@ -191,8 +197,185 @@ durable conversation, which keeps every earlier message. Steers and Continue add
 divergence: a steer is stored once, where the stream placed it or after the answer it
 interrupted, and a continue adds no user message.
 
-The runtime sends keepalives while a tool is quiet. The API converts them to SSE comments, which
-preserve the connection without creating transcript entries.
+The runtime sends a keepalive every `CHAT_PING_MS` (15 seconds by default) for the whole turn,
+also while a tool is quiet. The API converts them to SSE comments, which preserve the connection
+without creating transcript entries.
+
+## Reattaching to a Turn
+
+A turn outlives its stream. A tool parked on an expert's answer or a calibration can keep a turn
+quiet for an hour, and a proxy, the network, or a restarting API can drop the stream meanwhile;
+the turn runs on in the runtime. The UI then reattaches with a `/chat` request that repeats the
+turn's `request_id` with `reattach: true` (`ChatRequest.reattach`, sent on as `reattach`). A
+reattach submits nothing, so it never asks the model again or runs a tool twice:
+
+- **Turn still running.** Every event the turn wrote is kept in its `TurnFeed`
+  (`agent-runtime/src/turn-feed.ts`), held with the store. The reattached stream gets the whole
+  turn from its start, appends to one text, thinking, or argument block merged, then the live
+  events and the terminal event, exactly as the original stream would have. Only the turn's own
+  owner, chat, and project reach it (`403` for another project); a reattach naming another turn of
+  a busy chat is `409`. A turn that ends without a terminal event refused its request before it
+  started, and the reattached stream ends with an `error` with `code: "turn_not_started"`.
+- **Turn ended, or the runtime restarted.** `handleChat` finds the submission by request ID
+  (`submissionByRequest`), skips the approval check and the submit, and replays the turn's entries
+  from the store before `done`; a runtime restart recovers the run as for any request. A request
+  ID the store has never seen is `404` with `reason: "turn_not_found"`, an SSE `error` with
+  `code: "turn_not_found"`: the message never arrived, and the UI asks the user to send it again
+  rather than resending it itself.
+
+The replay covers the turn only, from its own message to where the store's submissions say it
+ends (`readStoredTurn` and `storedTurn` in `chat-control.ts`). A steer has a `steer:` request key
+and the runtime's wrap-up steer has none; every other input, and every continue, starts a turn.
+The next turn's message bounds the turn exactly: `ViewEventStream` translates no entry from it on
+and ignores the live state, which belongs to whatever runs now. After a continue, which places no
+entry, the turn ends at the last message or answer its own submissions placed, so a failed
+attempt after that is not replayed. With no later turn, every later entry is the turn's. Of the
+turn's own submission and the steers it placed, the one placed last gives `done` its answer
+(`storedTurnFinal`), as `settleChat` does for a live turn. A later message still queued for
+placement, or a continue after an unsettled steer, leaves the end unknown: the reattach is `409`
+with `reason: "turn_boundary_unknown"` and replays nothing rather than another turn's events. The
+API passes it on as an SSE `error` with `code: "turn_boundary_unknown"`, which the UI treats as a
+dropped stream and reattaches again later.
+
+The API builds no task or investigation context for a reattach, but it records evaluations from
+the replayed `tool_end` events as it does for the original stream, so a `qcal_evaluate` result
+that reached only the reattached stream is still filed. What a call is filed under comes from the
+turn, not from the request that reports it: the turn's first request stores its project, planner
+model, and task once in `copilot_chat_turn` (`EvaluationService.chat_turn_recorder`) before it
+reaches the runtime, and a retry or a reattach of the turn reads that record and ignores the model
+and task it sends itself. A request of the turn from another project gets an SSE `error` with
+`code: "wrong_project"` and nothing is streamed. The runtime itself checks the project only for a running
+turn, so for an ended turn this record is the project check. A reattach of a turn with no
+record, such as one sent before records were kept or whose record could not be written, streams
+but files nothing, since what the turn was sent with, its project included, is not known.
+
+`translate` names each call by its result's durable entry (`entry:<entry_id>`), which every
+stream of the turn reports the same way whatever ID the model gave the call; a local model may
+give every call of a turn the same ID, and each such call still starts, ends, and is filed on
+its own. `ChatCallKey` derives the run and evaluation IDs from that name, the project, the user,
+the chat session, and the turn's `request_id`. A call that the original stream, a concurrent
+stream, or an earlier replay already stored keeps its first record, and the stream reports that
+record's IDs; a write that stopped between the run and the evaluation is completed under the
+turn's record. A result with no entry, or one marked `before_turn` (a run recovered after a
+restart committed it before this turn's message), is shown without IDs and filed by no stream of
+this turn. Whichever stream reaches `done` attaches the answer to the evaluations it filed. An
+evaluation that could not be stored is reported without IDs. These guarantees hold for every
+stream of one turn that reports a result; a result no stream of the turn reports is not filed.
+
+In the UI (`runTurn` in `CopilotChatSessionContext.tsx`, which `sendMessage` and a restore
+start), every request of a turn, its reattaches and its Stop included, names the project the
+turn was sent from (`X-Project-Id`), not the project stored at the time, so a reattach is never
+refused as `wrong_project` because the user switched projects. A stream counts as dropped when the
+request or a read fails, the stream ends without `result` or `noop`, an SSE `error` has
+`code: "stream_lost"`, the response is `502`, `503`, or `504`, or no byte, keepalive included,
+arrives for `STREAM_SILENCE_MS` (60 seconds). The UI then reattaches at once, and again after 1,
+2, 4, 8, 16, and then every 30 seconds, up to 25 attempts, after which it shows an error saying
+the assistant may still be working. A reattached stream folds the turn again from its start, so
+the live trace is rebuilt rather than doubled and a steer it placed is placed again. Stop ends
+the reattaching and the turn. `SessionRun.connection` keeps the stream's health apart from what
+the turn does: `live` or `reconnecting`, and `lastUpdateAt`, the time of the turn's last event,
+which a keepalive does not change. `TurnActivity` (`ChatTrace.tsx`) shows **Connected · last
+update … ago** once the turn has sent nothing for 30 seconds (`QUIET_AFTER_MS`), and **Connection
+lost, reconnecting** in place of the last activity while reattaching. The waiting tools'
+rows say what the turn waits for (`stepTitle`), such as **Waiting for the expert's answer**.
+
+### Restoring a Turn After a Reload or a Remount
+
+The provider keeps a pointer to each turn it started in the tab's `sessionStorage`
+(`ui/src/lib/copilotTurnStore.ts`), one per session and user (`owner`), at most
+`MAX_STORED_TURNS` (20): the session, the turn's request ID, its project, where it starts in the
+transcript (`start`), whether it is a continue, when it started, and the last activity the chat
+showed (a tool name and label, or a phrase such as "Thinking", from `activitySnapshot` in
+`ui/src/lib/chatActivity.ts`) with its time. It holds no message text, tool argument, result, or
+credential. The pointer is written before the turn's request goes out, after the transcript save
+that holds the user's message is queued. Updates and removals name the turn's request ID, so a
+late one never touches a newer turn's pointer. When the stream ends, the pointer is marked
+`ended` and removed once a transcript save that holds the turn's end is acknowledged
+(`transcriptSeq`); a reload before that replays the turn instead of losing its answer.
+
+Moving between pages keeps the provider, so a stream goes on whatever surface shows it. When the
+provider mounts again, after a reload or after it unmounted, its restore effect reads the
+pointers once the user, their session list, and the open project are known. A pointer of a
+session the list does not hold is removed. A pointer of the open project is restored with
+`resumeTurn`: the session's saved messages are loaded, the transcript up to and including the
+turn's own message becomes the turn's start (shown without saving until the stream says more),
+and the turn is reattached with its request ID. The runtime streams a running turn from its
+start, replays an ended one from its store, or answers `turn_not_found`, which removes the
+pointer and asks the user to send the message again. A turn whose message was never saved has
+nowhere to show its answer: the pointer is removed and the chat says so. When the reattach
+attempts run out, as for a live turn, the pointer stays for the next restore. Any other error
+leaves the saved transcript as it was, shows a notice, and removes the pointer. While the session loads,
+`detachedTurns` holds the turn as `restoring` with its last known activity and time, which
+`ChatStatusLine` (`ChatTurnStatus.tsx`) shows as stale. A send in that session is refused until
+the turn streams.
+
+The provider receives the open project from `AppLayout` (`project`). On a switch it aborts the
+streams of turns sent from another project with the reason `detached`, which neither stops the
+turn nor saves anything, and lists them in `detachedTurns` as `other_project`; nothing of them is
+shown in the other project, and a send in that session is refused. Switching back restores them
+as above. A turn whose pointer could not be stored, because storage is unavailable, keeps its
+stream across a switch. When the owner changes or signs out, the provider aborts every stream
+without stopping its turn, and signing out removes the user's pointers; `removeAuth` in
+`AuthContext.tsx` also clears every user's pointers and steers in the tab
+(`forgetChatTabState`) before the page leaves.
+
+The chat's header (`SurfaceTitle`, and the **Agent** page header) shows `chatStatus`: the live
+turn's activity or its waiting tool, `reconnecting`, a detached turn, or how the last saved answer
+ended. The closed sidebar's tab shows a dot while any turn runs or is restored, and
+`openGeneralChat` reopens an active task or investigation chat with a turn going instead of
+creating an empty chat. A tab that was closed has no pointers, and a reload in another tab does
+not see this tab's.
+
+### Chat Notifications
+
+`runTurn` raises a `ChatTurnEvent` through `subscribeChatEvents` at a turn's notable moments,
+from its own stream only: `expert` on a `qdash_wait_agent_intervention` start or a successful
+`qdash_request_agent_human`, then at the final `result` one of `approval`, `question`, or
+`edit` when its blocks ask that of the user (`answerEventKind`), else `answer`, and `failed`
+when the turn ends in an error. A stop the user made, a `noop`, a refused continue, and tool
+steps or text as they stream raise nothing, nor does history loaded from the server. Each kind is
+raised once per turn: the kinds raised are kept in the turn's pointer (`notified`) and seed the
+next stream of the turn, so a reattach or a restore that replays the turn raises only what it had
+not. A detached stream is not read, so a turn of another project raises nothing there.
+Listeners run inside the stream's read loop, each in its own `try`: one that throws is logged and
+skipped, so a failing notification never ends the turn or replaces its answer with an error.
+Closing the sidebar or the floating window only unmounts that surface; the turn's stream belongs
+to `CopilotChatSessionProvider` in `AppLayout`, and that is also when `ChatNotifier` starts
+showing toasts for it.
+
+`ChatNotifier` (mounted in `AppLayout` inside `ChatDockProvider`) turns an event into a Ding
+toast (`@yusufceng1z/ding-react`, pinned in `ui/package.json`) with the ID
+`chat:<request_id>:<kind>`, so a repeat updates the toast instead of adding one. It drops an
+event of another owner or project, and one whose chat is on screen in a visible tab (the
+**Agent** page, or the sidebar or floating window showing the active chat), and closes a chat's
+toasts once that chat comes on screen. **Open chat** switches to the chat and opens the sidebar
+off the **Agent** page; it checks the owner and that the chat still exists, and sends nothing.
+Input needed (`approval`, `question`) and `failed` stay until dismissed.
+
+`ChatToaster` (`ui/src/components/ui/Toast/ChatToaster.tsx`), mounted once by `ToastContainer`
+beside the app's Sonner toaster, renders only chat notifications, at the top center. Its colors
+come from the DaisyUI theme (`body .tst-viewport` in `globals.css`); Ding handles reduced motion,
+Escape, and Alt+T. Sound is Ding's `toast.configure({ sound, volume })` from
+`ui/src/lib/chatNotificationSettings.ts`: off by default and kept per browser in local storage,
+set under **Settings → Copilot** (`ChatNotificationSettings`, whose **Preview** plays Ding's
+`chime`).
+
+### Calibration Session State in the Chat
+
+A chat stores no link to an agent session. `linkedAgentSessions` in
+`ui/src/lib/chatAgentSession.ts` reads it from the chat's own session-scoped agent tool calls,
+saved in the answers' traces or in the live turn, that QDash completed or that still run, by
+their `sessionId` argument; never from the model's text or a failed call. The last one is shown.
+`ChatAgentSessionStatus` reads that session, its active intervention, its actions, and the
+candidates of its latest completed measurement through the generated agent session hooks, under
+the open project (in the request header and the query key), and shows nothing when QDash does not
+find it there. `agentSessionStatus` derives the phase from those records only: an `active`
+session without a running measurement waits for the agent's next decision, which only a chat
+turn makes, and an intervention in `resume_authorized` is an expert's answer waiting for it. With
+no turn running, the card says so and offers **Continue session**, which sends an ordinary
+message under the user's model and approvals; nothing starts a turn on a reload or an expert's
+answer. A session a codemode script touched without a direct tool call, or one a chat named
+before traces kept arguments, is not found this way.
 
 ## Branches
 
@@ -379,8 +562,27 @@ task ci-agent-runtime
 
 `agent-runtime/test/chat-control.test.mjs` runs steer and continue on real harnesses with a
 scripted model, and `chat-steer-server.test.mjs` runs them over the runtime's HTTP routes.
+`chat-reattach-server.test.mjs` drops a turn's stream while a tool parks on an expert's answer,
+reattaches, answers, and checks that the resumed turn reaches the new stream with each step run
+once, and that a reattach to a finished turn replays that turn and not the turn after it;
+`stored-turn.test.mjs` covers the turn boundaries, and `turn-feed.test.mjs` the feed.
+`tests/qdash/api/routers/test_evaluation.py` replays turns through `translate` against the
+ledger, including a reattach that names another model and task. `ui/src/hooks/__tests__/useCopilotChatReattach.test.tsx`
+and `ui/src/components/features/chat/__tests__/ChatTurnConnection.test.tsx` cover the browser
+side.
 `chat-steer-crash.test.mjs` kills a runtime process with a steer queued and checks that the next
 process places it before the new message and reports `before_turn`.
 `ui/src/hooks/__tests__/useCopilotChatSteerReload.test.tsx` covers restoring steers across a
-reload, user isolation, and placing a `before_turn` steer. Run
+reload, user isolation, and placing a `before_turn` steer.
+`ui/src/hooks/__tests__/useCopilotChatRestore.test.tsx` covers a surface closing and reopening
+over one stream, a provider remount that reattaches and resumes a turn waiting on the expert, an
+ended turn restored from its record, `turn_not_found`, an unsaved message, a turn that cannot be
+followed, switching projects and back, the turn's own project on every reattach and Stop, and
+user isolation and sign-out; `ui/src/lib/__tests__/copilotTurnStore.test.ts` covers the stored
+pointers, and `ChatTurnStatus.test.tsx`, `ChatAgentSessionStatus.test.tsx`, and
+`ui/src/lib/__tests__/chatAgentSession.test.ts` the status shown. The notification events are
+covered in `useCopilotChatRestore.test.tsx` (once per turn across a reattach and a restore,
+approval apart from a final answer, none for history or another project, a failure), and the
+toasts in `ChatNotifier.test.tsx`, `ChatToaster.test.tsx`, and
+`ChatNotificationSettings.test.tsx` (sound off by default). Run
 the complete `task test-ui` suite when event rendering changes.

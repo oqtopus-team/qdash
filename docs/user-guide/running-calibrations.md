@@ -100,6 +100,16 @@ a partially filled block holds fewer. Hover over or focus a column for exact cou
 to filter the list to that day, even in the six-hour view; select the same day again to clear
 the filter.
 
+With **Group agent sessions** on (the default), each agent calibration session is one row of the
+list, holding the runs the agent started. The row shows the session's own state, such as
+**Active** or **Paused for an expert**, not the state of its last run: a session waiting between
+measurements or for an expert is not failed. Expand the row to list its runs and open one in the
+same details panel as any other run; select **Open session graph** to see every step. The count above
+the list gives runs and rows separately, because one session row can hold several runs. With a
+day selected, a session appears when it was approved or started a run that day, and its row
+still lists all of its runs. Turn the switch off for the plain list of runs. See
+[Agent Calibration](./agent-calibration.md#follow-a-session-on-the-execution-page).
+
 ## Inspect a Result
 
 Open **Task Results** when you know the chip, execution, task, target, or status you want to find.

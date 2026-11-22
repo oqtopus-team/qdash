@@ -109,7 +109,9 @@ test("the shared lists name real pi-qdash tools and agree with each other", () =
     const read = NESTED_READ_TOOL_NAMES.includes(name);
     const deferred = DEFERRED_TOOL_NAMES.includes(name);
     assert.equal(definition.exposure, deferred ? "deferred" : read ? undefined : "model-only", name);
-    assert.equal(definition.outputSchema === SCRIPT_DATA_SCHEMA, read, name);
+    // A read with a checked response contract declares that shape; the others the generic data schema.
+    const contracted = ["qdash_list_task_results", "qdash_get_chip_metrics", "qdash_get_timeseries"].includes(name);
+    assert.equal(definition.outputSchema !== undefined && (definition.outputSchema === SCRIPT_DATA_SCHEMA) !== contracted, read, name);
     if (read) assert.equal(definition.annotations?.readOnlyHint, true, name);
     if (REVIEWED_WRITE_TOOL_NAMES.includes(name)) assert.equal(definition.annotations?.destructiveHint, true, name);
     // The same code mode namespace QDash chat declares on its qdash extension.

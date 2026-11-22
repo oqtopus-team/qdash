@@ -6,6 +6,11 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { AgentSessionPolicy } from './agentSessionPolicy';
+import type { AgentSessionResponseActiveInterventionId } from './agentSessionResponseActiveInterventionId';
+import type { AgentSessionResponseEndNotification } from './agentSessionResponseEndNotification';
+import type { AgentSessionResponseModel } from './agentSessionResponseModel';
+import type { AgentSessionResponseStartNotification } from './agentSessionResponseStartNotification';
+import type { AgentSessionResponseStop } from './agentSessionResponseStop';
 import type { AgentSessionStatus } from './agentSessionStatus';
 
 /**
@@ -20,11 +25,22 @@ export interface AgentSessionResponse {
   skill_name: string;
   skill_version: string;
   skill_hash: string;
-  model_name: string;
+  /** The model the client host reported for this record; null when none was reported. Client reported, not verified by QDash. */
+  model?: AgentSessionResponseModel;
+  /** provider/model_id of model, for display; empty when none was reported */
+  model_name?: string;
   status: AgentSessionStatus;
   state_version: number;
   action_count: number;
   created_at: string;
   updated_at: string;
   expires_at: string;
+  /** The intervention the session waits on, if any */
+  active_intervention_id?: AgentSessionResponseActiveInterventionId;
+  /** Slack delivery of the session's start message; null for a session created before lifecycle messages existed */
+  start_notification?: AgentSessionResponseStartNotification;
+  /** Slack delivery of the session's end message, stored by the update that ended it; null while the session is open */
+  end_notification?: AgentSessionResponseEndNotification;
+  /** Who stopped the session with a stop request, why, and when; null unless a stop request ended it (an expert's stop answer is recorded on its intervention) */
+  stop?: AgentSessionResponseStop;
 }

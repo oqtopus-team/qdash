@@ -64,7 +64,7 @@ from qdash.api.services.copilot_investigation_service import (
     CopilotInvestigationService,
     InvestigationNotFoundError,
 )
-from qdash.api.services.evaluation_service import EvaluationService
+from qdash.api.services.evaluation_service import ChatTurnRefusedError, EvaluationService
 from qdash.api.services.source_access_service import SourceAccessError, SourceAccessService
 from qdash.copilot.config import (
     CopilotConfig,
@@ -181,7 +181,10 @@ async def chat_stop(
     except ChatUnavailableError:
         return ChatStopResponse(stopped=False)
     outcome = await pi_chat_service.abort_runtime_turn(
-        current_user.username, request.session_id, target
+        current_user.username,
+        request.session_id,
+        target,
+        turn_request_id=request.turn_request_id,
     )
     return ChatStopResponse(stopped=outcome == "stopped")
 
@@ -299,7 +302,8 @@ async def chat_stream(
     )
     investigation_message: str | None = None
     # A continue adds no message: the conversation already holds its opening context.
-    if request.investigation is not None and not request.continue_run:
+    # A reattach sends nothing at all.
+    if request.investigation is not None and not request.continue_run and not request.reattach:
         if request.task is not None:
             raise HTTPException(
                 status_code=400, detail="A chat cannot set both task and investigation"
@@ -329,7 +333,7 @@ async def chat_stream(
 
         task_bundle = None
         images_sent: dict[str, Any] | None = None
-        if request.task is not None and not request.continue_run:
+        if request.task is not None and not request.continue_run and not request.reattach:
             yield sse_event(
                 "status",
                 {"step": "build_context", "message": "タスク結果のコンテキストを構築中..."},
@@ -357,18 +361,34 @@ async def chat_stream(
 
         effective_project = project_id or current_user.default_project_id
         # The planner's own qcal_evaluate calls are kept as evaluations
-        # (trigger "chat"), so every model judgement is on one ledger.
-        recorder = (
-            evaluation_service.chat_recorder(
-                project_id=effective_project,
-                username=current_user.username,
-                session_id=request.session_id,
-                planner_model=f"{chat_config.model.provider}/{chat_config.model.name}",
-                task_id=request.task.task_id if request.task else None,
-            )
-            if effective_project
-            else None
-        )
+        # (trigger "chat"), so every model judgement is on one ledger. The turn's
+        # first request stores the project, planner model and task it was sent
+        # with; every later request of the turn (a retry, or a reattach replaying
+        # it) files the turn's evaluations under that record, never under what it
+        # says itself. Each call is named by its result's durable entry, so a call
+        # two streams of the turn both saw is stored once.
+        recorder = None
+        if effective_project:
+            try:
+                recorder = await asyncio.to_thread(
+                    evaluation_service.chat_turn_recorder,
+                    project_id=effective_project,
+                    username=current_user.username,
+                    session_id=request.session_id,
+                    request_id=request.request_id,
+                    planner_model=f"{chat_config.model.provider}/{chat_config.model.name}",
+                    task_id=request.task.task_id if request.task else None,
+                    reattach=request.reattach,
+                )
+            except ChatTurnRefusedError as exc:
+                yield sse_event(
+                    "error", {"step": "init", "detail": exc.detail, "code": "wrong_project"}
+                )
+                return
+            except Exception:
+                # The chat still answers; what it evaluates is not filed, as its
+                # provenance could not be stored.
+                logger.exception("Could not store the chat turn of session %s", request.session_id)
         async for event in pi_chat_service.stream(
             request,
             chat_config,

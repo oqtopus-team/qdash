@@ -15,6 +15,7 @@ import traceback
 from contextlib import AbstractContextManager, nullcontext
 from typing import TYPE_CHECKING, Any, cast
 
+from qdash.datamodel.quality_metrics import QUALITY_METRIC_R2
 from qdash.repository import FilesystemCalibDataSaver
 from qdash.workflow.calibtasks.results import PostProcessResult, PreProcessResult, RunResult
 from qdash.workflow.engine.progress import ProgressPlan
@@ -155,6 +156,10 @@ class TaskExecutor:
         qid: str,
     ) -> RunResult | None:
         """Run the main task logic."""
+        # Only the fake backend acts here (opt-in validation faults); see BaseBackend.
+        before_task_run = getattr(backend, "before_task_run", None)
+        if callable(before_task_run):
+            before_task_run(task.get_name(), qid)
         return task.run(backend, qid)
 
     def _progress_context(
@@ -433,7 +438,7 @@ class TaskExecutor:
                 r2_value = run_result.r2.get(qid)
                 if r2_value is not None:
                     task_model = self.state_manager.get_task(task_name, task_type, qid)
-                    task_model.quality_metrics["r2"] = float(r2_value)
+                    task_model.quality_metrics[QUALITY_METRIC_R2] = float(r2_value)
 
             if run_result is None:
                 self._complete_task(task_name, task_type, qid, "No run result")
@@ -679,7 +684,7 @@ class TaskExecutor:
                 result.r2 = {qid: r2_value} if r2_value is not None else None
                 if r2_value is not None:
                     task_model = self.state_manager.get_task(task_name, task_type, qid)
-                    task_model.quality_metrics["r2"] = float(r2_value)
+                    task_model.quality_metrics[QUALITY_METRIC_R2] = float(r2_value)
 
             if run_result is None:
                 for qid, result in results.items():

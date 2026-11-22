@@ -11,6 +11,10 @@ import type {
   AgentActionResponse,
   AgentCandidateCommitResponse,
   AgentCandidateSetCommitResponse,
+  AgentDecisionResponse,
+  AgentInterventionResponse,
+  AgentSessionAuditResponse,
+  AgentSessionGraphResponse,
   AgentSessionResponse,
   AllConfigResponse,
   ApplyAgentCandidateRequest,
@@ -33,6 +37,7 @@ import type {
   ChipMetricsResponse,
   ChipNotesSummaryResponse,
   ChipResponse,
+  ClaimAgentResumeRequest,
   CommitAgentCandidateRequest,
   CommitAgentCandidateSetRequest,
   CompareExecutionsParams,
@@ -49,6 +54,7 @@ import type {
   CopilotPreferencesUpdate,
   CopilotSystemPrompt,
   CouplingResponse,
+  CreateAgentInterventionRequest,
   CreateAgentSessionRequest,
   CreateChipRequest,
   CreateChipResponse,
@@ -118,6 +124,7 @@ import type {
   ForumPostCreate,
   ForumPostResponse,
   ForumPostUpdate,
+  GetAgentSessionAuditParams,
   GetCalibrationPipelineCatalogParams,
   GetChipMetricsParams,
   GetChipNoteParams,
@@ -162,6 +169,10 @@ import type {
   LineageResponse,
   ListAgentActionsResponse,
   ListAgentCandidatesResponse,
+  ListAgentDecisionsResponse,
+  ListAgentInterventionsResponse,
+  ListAgentSessionsParams,
+  ListAgentSessionsResponse,
   ListAllFlowSchedulesParams,
   ListAllProjectsParams,
   ListAllUsersParams,
@@ -184,6 +195,8 @@ import type {
   ListEvaluationRunsResponse,
   ListEvaluationsParams,
   ListEvaluationsResponse,
+  ListExecutionGroupsParams,
+  ListExecutionGroupsResponse,
   ListExecutionsParams,
   ListExecutionsResponse,
   ListFlowSchedulesParams,
@@ -267,7 +280,10 @@ import type {
   RecalibrationRecommendationResponse,
   RecentChangesResponse,
   RecentExecutionsResponse,
+  RecordAgentDecisionRequest,
+  RecordAgentResumeOutcomeRequest,
   RemoveProjectMemberAdmin200,
+  RespondAgentInterventionRequest,
   RetryEvaluationRunResponse,
   SaveFileContent200,
   SaveFileRequest,
@@ -283,6 +299,8 @@ import type {
   SetEvaluationVerdictRequest,
   SettingsResponse,
   SourceFileResponse,
+  StopAgentSessionRequest,
+  StopAgentSessionResponse,
   SubmitAgentActionRequest,
   SuccessResponse,
   TaskFileSettings,
@@ -977,6 +995,46 @@ const listExecutions = (
     }
 
 /**
+ * List a chip's executions newest first, with each agent session as one row.
+ *
+ * A session row holds the real executions the session's actions dispatched, linked through
+ * the session's action records; a tag alone does not group an execution. Rows are grouped
+ * before pagination, so a session is never split across pages and no execution is listed
+ * twice. ``total`` counts rows and ``total_executions`` counts executions. A session row is
+ * ordered by its latest activity (its latest measurement start, or its creation before the
+ * first). The session's status is its own; each child keeps its execution's status.
+ * @summary List executions with agent sessions grouped
+ */
+const listExecutionGroups = (
+    params: ListExecutionGroupsParams,
+ options?: SecondParameter<typeof qdashRequest<ListExecutionGroupsResponse>>,) => {
+      return qdashRequest<ListExecutionGroupsResponse>(
+      {url: `/executions/groups`, method: 'GET',
+        params
+    },
+      options);
+    }
+
+/**
+ * Return one agent session's measurements, proposals, decisions, and interventions.
+ *
+ * Nodes are typed and carry ids of the authoritative records (actions, executions, task
+ * results, decisions, interventions), not raw data. Edges are typed: ``sequence`` is the
+ * order measurements were dispatched; the other kinds come from references in the records.
+ * It is a live read, not a snapshot; the session audit endpoints hold the full record.
+ * A session of another project is not found.
+ * @summary Get an agent session as a graph over its executions
+ */
+const getAgentSessionGraph = (
+    sessionId: string,
+ options?: SecondParameter<typeof qdashRequest<AgentSessionGraphResponse>>,) => {
+      return qdashRequest<AgentSessionGraphResponse>(
+      {url: `/executions/groups/agent-sessions/${sessionId}`, method: 'GET'
+    },
+      options);
+    }
+
+/**
  * Count executions per bucket, by status, over a trailing window.
  *
  * With ``chip_id`` only that chip's executions count; without it, every execution in the
@@ -1212,6 +1270,9 @@ const gitPushConfig = (
 
 /**
  * Create a bounded authorization scope for a user-operated local agent.
+ *
+ * The new session's Slack start message, when agent notifications are on, is sent after
+ * the response; the notification sweeper retries it.
  * @summary Create an agent session
  */
 const createAgentSession = (
@@ -1221,6 +1282,20 @@ const createAgentSession = (
       {url: `/agent-sessions`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
       data: createAgentSessionRequest
+    },
+      options);
+    }
+
+/**
+ * List the project's agent sessions, newest first, with their settled status.
+ * @summary List agent sessions
+ */
+const listAgentSessions = (
+    params?: ListAgentSessionsParams,
+ options?: SecondParameter<typeof qdashRequest<ListAgentSessionsResponse>>,) => {
+      return qdashRequest<ListAgentSessionsResponse>(
+      {url: `/agent-sessions`, method: 'GET',
+        params
     },
       options);
     }
@@ -1256,6 +1331,9 @@ const evaluateAgentCandidateGate = (
 
 /**
  * Authorize and audit an action proposal without executing it.
+ *
+ * An authorized ``request_human`` also records an intervention, pauses the session on it,
+ * and queues its Slack message.
  * @summary Submit an agent action
  */
 const submitAgentAction = (
@@ -1279,6 +1357,28 @@ const listAgentActions = (
  options?: SecondParameter<typeof qdashRequest<ListAgentActionsResponse>>,) => {
       return qdashRequest<ListAgentActionsResponse>(
       {url: `/agent-sessions/${sessionId}/actions`, method: 'GET'
+    },
+      options);
+    }
+
+/**
+ * End an active or paused session's authority on a person's request.
+ *
+ * Any editor of the project may stop it, as an expert may stop it from an intervention.
+ * The session becomes ``cancelled`` and nothing new is dispatched, committed, applied, or
+ * resumed in it. A measurement, commit, or backend apply that passed the session gate
+ * before the stop is not cancelled; ``in_flight`` lists those still unsettled. A session
+ * that already ended is returned unchanged (``already_ended``).
+ * @summary Stop an agent session
+ */
+const stopAgentSession = (
+    sessionId: string,
+    stopAgentSessionRequest: StopAgentSessionRequest,
+ options?: SecondParameter<typeof qdashRequest<StopAgentSessionResponse>>,) => {
+      return qdashRequest<StopAgentSessionResponse>(
+      {url: `/agent-sessions/${sessionId}/stop`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: stopAgentSessionRequest
     },
       options);
     }
@@ -1403,6 +1503,179 @@ const executeAgentAction = (
       {url: `/agent-sessions/${sessionId}/actions/${actionId}/execute`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
       data: executeAgentActionRequest
+    },
+      options);
+    }
+
+/**
+ * Record that the agent needs a person and pause the session if it is active.
+ *
+ * The record is saved before any Slack message is attempted, and it is saved even when the
+ * session has no actions left or has expired.
+ * @summary Record an agent intervention
+ */
+const createAgentIntervention = (
+    sessionId: string,
+    createAgentInterventionRequest: CreateAgentInterventionRequest,
+ options?: SecondParameter<typeof qdashRequest<AgentInterventionResponse>>,) => {
+      return qdashRequest<AgentInterventionResponse>(
+      {url: `/agent-sessions/${sessionId}/interventions`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: createAgentInterventionRequest
+    },
+      options);
+    }
+
+/**
+ * List a session's interventions, newest first.
+ * @summary List agent interventions
+ */
+const listAgentInterventions = (
+    sessionId: string,
+ options?: SecondParameter<typeof qdashRequest<ListAgentInterventionsResponse>>,) => {
+      return qdashRequest<ListAgentInterventionsResponse>(
+      {url: `/agent-sessions/${sessionId}/interventions`, method: 'GET'
+    },
+      options);
+    }
+
+/**
+ * Get an intervention with the session state needed to answer it.
+ * @summary Get an agent intervention
+ */
+const getAgentIntervention = (
+    sessionId: string,
+    interventionId: string,
+ options?: SecondParameter<typeof qdashRequest<AgentInterventionResponse>>,) => {
+      return qdashRequest<AgentInterventionResponse>(
+      {url: `/agent-sessions/${sessionId}/interventions/${interventionId}`, method: 'GET'
+    },
+      options);
+    }
+
+/**
+ * Record an expert's guidance and either stop the session or authorize a resume.
+ *
+ * A plan with a checkpoint stays paused until its runner claims the resume.
+ * @summary Respond to an agent intervention
+ */
+const respondAgentIntervention = (
+    sessionId: string,
+    interventionId: string,
+    respondAgentInterventionRequest: RespondAgentInterventionRequest,
+ options?: SecondParameter<typeof qdashRequest<AgentInterventionResponse>>,) => {
+      return qdashRequest<AgentInterventionResponse>(
+      {url: `/agent-sessions/${sessionId}/interventions/${interventionId}/respond`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: respondAgentInterventionRequest
+    },
+      options);
+    }
+
+/**
+ * Reactivate the paused session for the one runner that holds the claim key.
+ * @summary Claim an authorized agent resume
+ */
+const claimAgentInterventionResume = (
+    sessionId: string,
+    interventionId: string,
+    claimAgentResumeRequest: ClaimAgentResumeRequest,
+ options?: SecondParameter<typeof qdashRequest<AgentInterventionResponse>>,) => {
+      return qdashRequest<AgentInterventionResponse>(
+      {url: `/agent-sessions/${sessionId}/interventions/${interventionId}/claim-resume`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: claimAgentResumeRequest
+    },
+      options);
+    }
+
+/**
+ * Record how the resumed run ended.
+ * @summary Record the outcome of a resumed agent plan
+ */
+const recordAgentResumeOutcome = (
+    sessionId: string,
+    interventionId: string,
+    recordAgentResumeOutcomeRequest: RecordAgentResumeOutcomeRequest,
+ options?: SecondParameter<typeof qdashRequest<AgentInterventionResponse>>,) => {
+      return qdashRequest<AgentInterventionResponse>(
+      {url: `/agent-sessions/${sessionId}/interventions/${interventionId}/resume-outcome`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: recordAgentResumeOutcomeRequest
+    },
+      options);
+    }
+
+/**
+ * Try once more to send an unsent Slack message; a sent message is never posted again.
+ * @summary Retry an agent intervention Slack message
+ */
+const retryAgentInterventionNotification = (
+    sessionId: string,
+    interventionId: string,
+ options?: SecondParameter<typeof qdashRequest<AgentInterventionResponse>>,) => {
+      return qdashRequest<AgentInterventionResponse>(
+      {url: `/agent-sessions/${sessionId}/interventions/${interventionId}/notification/retry`, method: 'POST'
+    },
+      options);
+    }
+
+/**
+ * Append the agent's reading of a result and its next step to the session's audit.
+ *
+ * Only the session's creator records decisions. Recording changes no session state, so it
+ * is allowed in every session status; it never dispatches, commits, or applies anything.
+ * @summary Record an agent decision
+ */
+const recordAgentDecision = (
+    sessionId: string,
+    recordAgentDecisionRequest: RecordAgentDecisionRequest,
+ options?: SecondParameter<typeof qdashRequest<AgentDecisionResponse>>,) => {
+      return qdashRequest<AgentDecisionResponse>(
+      {url: `/agent-sessions/${sessionId}/decisions`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: recordAgentDecisionRequest
+    },
+      options);
+    }
+
+/**
+ * List a session's recorded decisions, oldest first.
+ * @summary List agent decisions
+ */
+const listAgentDecisions = (
+    sessionId: string,
+ options?: SecondParameter<typeof qdashRequest<ListAgentDecisionsResponse>>,) => {
+      return qdashRequest<ListAgentDecisionsResponse>(
+      {url: `/agent-sessions/${sessionId}/decisions`, method: 'GET'
+    },
+      options);
+    }
+
+/**
+ * Read the session's chronological experiment audit, a page at a time, oldest first.
+ * @summary Read an agent session's audit timeline
+ */
+const getAgentSessionAudit = (
+    sessionId: string,
+    params?: GetAgentSessionAuditParams,
+ options?: SecondParameter<typeof qdashRequest<AgentSessionAuditResponse>>,) => {
+      return qdashRequest<AgentSessionAuditResponse>(
+      {url: `/agent-sessions/${sessionId}/audit`, method: 'GET',
+        params
+    },
+      options);
+    }
+
+/**
+ * Export the whole audit as versioned JSON; refused rather than cut short when too long.
+ * @summary Export an agent session's audit timeline
+ */
+const exportAgentSessionAudit = (
+    sessionId: string,
+ options?: SecondParameter<typeof qdashRequest<AgentSessionAuditResponse>>,) => {
+      return qdashRequest<AgentSessionAuditResponse>(
+      {url: `/agent-sessions/${sessionId}/audit/export`, method: 'GET'
     },
       options);
     }
@@ -5281,7 +5554,7 @@ const listUserAvatars = (
       options);
     }
 
-return {login,registerUser,getCurrentUser,updateCurrentUserProfile,logout,changePassword,resetPassword,reloadConfigCaches,listAllUsers,getUserDetails,updateUserSettings,deleteUser,bulkImportUsers,listAllProjects,adminDeleteProject,listProjectMembersAdmin,addProjectMemberAdmin,removeProjectMemberAdmin,createProjectForUser,listProjects,createProject,getProject,updateProject,deleteProject,listProjectMembers,inviteProjectMember,updateProjectMember,removeProjectMember,transferProjectOwnership,getFigureByPath,downloadArtifactByPath,downloadArtifactsAsArchive,previewArtifactByPath,getExecutionLockStatus,checkExecutionAvailability,listExecutions,getExecutionActivity,getExecution,cancelExecution,downloadFile,downloadZipFile,getFileTree,getFileContent,saveFileContent,getFileImage,validateFileContent,getGitStatus,gitPullConfig,gitPushConfig,createAgentSession,getAgentSession,evaluateAgentCandidateGate,submitAgentAction,listAgentActions,listAgentActionCandidates,commitAgentActionCandidate,commitAgentCandidateSet,getAgentCandidateSetCommit,getAgentCandidateCommit,applyAgentCandidateCommit,getAgentAction,executeAgentAction,retryCalibrationGitHubSync,getCalibrationNote,importSeedParameters,getAvailableSeedParameters,compareSeedValues,updateCalibrationParameters,deleteCalibrationParameter,getManualEdits,getCalibrationPipelineCatalog,validateCalibrationPipeline,executeCalibrationPipeline,getCopilotConfig,listCopilotChatSessions,createCopilotChatSession,getCopilotChatSession,updateCopilotChatSession,deleteCopilotChatSession,branchCopilotChatSession,listCopilotSourceRoots,searchCopilotSource,getCopilotSourceFile,getCopilotPreferences,updateCopilotPreferences,getCopilotSystemPrompt,getSettings,listChips,createChip,listChipConfigSources,updateChip,deleteChip,getChip,getChipDeletionImpact,getChipDates,getChipMux,listChipMuxes,getChipNote,upsertChipNote,deleteChipNote,listChipQubits,getChipQubit,reanalyzeResonatorSpectroscopy,reanalyzeQubitSpectroscopy,listChipCouplings,getChipCoupling,getChipMetricsSummary,getChipMetricHeatmap,listTasks,quickRunTask,getTaskResult,listTaskKnowledge,getTaskKnowledgeMarkdown,downloadTaskKnowledgeArchive,getTaskEvaluationPrompts,getTaskKnowledge,getTaskFileSettings,listTaskFileBackends,getBackendConfig,listTaskInfo,listTaskResults,getLatestQubitTaskResults,getHistoricalQubitTaskResults,getQubitTaskHistory,getLatestCouplingTaskResults,getHistoricalCouplingTaskResults,getCouplingTaskHistory,getTimeseriesTaskResults,reExecuteTaskResult,setTaskResultExcluded,downloadFiguresAsZip,createEvaluationRun,listEvaluationRuns,getEvaluationRun,retryEvaluationRun,cancelEvaluationRun,listEvaluations,setEvaluationVerdict,getEvaluationFigure,createKnowledgeDraft,getKnowledgeDraft,getKnowledgeDraftKnowledge,downloadKnowledgeDraftArchive,listForumCategories,createForumCategory,updateForumCategory,deleteForumCategory,listForumLabels,createForumLabel,updateForumLabel,deleteForumLabel,listForumPosts,createForumPost,getForumPost,updateForumPost,deleteForumPost,getForumPostReplies,uploadForumImage,closeForumPost,reopenForumPost,listTags,getDeviceTopology,getDeviceTopologyPlot,listBackends,saveFlow,listFlows,formatFlowSource,listFlowTemplates,getFlowTemplate,listFlowHelperFiles,getFlowHelperFile,listAllFlowSchedules,deleteFlowSchedule,updateFlowSchedule,getFlow,deleteFlow,getFlowExecutionPlan,executeFlow,moveFlow,scheduleFlow,listFlowSchedules,getMetricsConfig,getChipMetrics,getQubitMetricHistory,getCouplingMetricHistory,downloadMetricsPdf,upsertQubitNote,deleteQubitNote,createQubitNoteComment,updateQubitNoteComment,deleteQubitNoteComment,upsertQubitMetricNote,deleteQubitMetricNote,upsertCouplingNote,deleteCouplingNote,createCouplingNoteComment,updateCouplingNoteComment,deleteCouplingNoteComment,upsertCouplingMetricNote,deleteCouplingMetricNote,getTaskNote,upsertTaskNote,deleteTaskNote,getChipNotesSummary,listChipNoteEvents,listTargetNoteEvents,searchNoteEvents,listNotifications,getUnreadNotificationCount,markNotificationRead,markAllNotificationsRead,listCryostats,createCryostat,getCryostat,updateCryostat,deleteCryostat,listCooldowns,createCooldown,getCooldown,updateCooldown,deleteCooldown,assignChipToCooldown,unassignChipFromCooldown,createCooldownWiringCheckpoint,listCooldownWiringEvents,listDashboards,createDashboard,listDashboardTemplates,previewDashboardTemplate,getDashboard,updateDashboard,deleteDashboard,duplicateDashboard,listMetricScripts,createMetricScript,listMetricScriptTemplates,getMetricScriptCatalog,validateMetricScript,formatMetricScriptSource,evaluateMetricScriptDraft,getMetricScript,updateMetricScript,deleteMetricScript,copyMetricScript,evaluateMetricScript,listTopologies,getTopologyById,getConfigAll,getProvenanceEntity,getProvenanceLineage,getProvenanceImpact,compareExecutions,getParameterHistory,getProvenanceStats,getRecentExecutions,getRecentChanges,getDegradationTrends,getRecalibrationRecommendations,getCurrentUserAvatar,updateCurrentUserAvatar,listUserAvatars}};
+return {login,registerUser,getCurrentUser,updateCurrentUserProfile,logout,changePassword,resetPassword,reloadConfigCaches,listAllUsers,getUserDetails,updateUserSettings,deleteUser,bulkImportUsers,listAllProjects,adminDeleteProject,listProjectMembersAdmin,addProjectMemberAdmin,removeProjectMemberAdmin,createProjectForUser,listProjects,createProject,getProject,updateProject,deleteProject,listProjectMembers,inviteProjectMember,updateProjectMember,removeProjectMember,transferProjectOwnership,getFigureByPath,downloadArtifactByPath,downloadArtifactsAsArchive,previewArtifactByPath,getExecutionLockStatus,checkExecutionAvailability,listExecutions,listExecutionGroups,getAgentSessionGraph,getExecutionActivity,getExecution,cancelExecution,downloadFile,downloadZipFile,getFileTree,getFileContent,saveFileContent,getFileImage,validateFileContent,getGitStatus,gitPullConfig,gitPushConfig,createAgentSession,listAgentSessions,getAgentSession,evaluateAgentCandidateGate,submitAgentAction,listAgentActions,stopAgentSession,listAgentActionCandidates,commitAgentActionCandidate,commitAgentCandidateSet,getAgentCandidateSetCommit,getAgentCandidateCommit,applyAgentCandidateCommit,getAgentAction,executeAgentAction,createAgentIntervention,listAgentInterventions,getAgentIntervention,respondAgentIntervention,claimAgentInterventionResume,recordAgentResumeOutcome,retryAgentInterventionNotification,recordAgentDecision,listAgentDecisions,getAgentSessionAudit,exportAgentSessionAudit,retryCalibrationGitHubSync,getCalibrationNote,importSeedParameters,getAvailableSeedParameters,compareSeedValues,updateCalibrationParameters,deleteCalibrationParameter,getManualEdits,getCalibrationPipelineCatalog,validateCalibrationPipeline,executeCalibrationPipeline,getCopilotConfig,listCopilotChatSessions,createCopilotChatSession,getCopilotChatSession,updateCopilotChatSession,deleteCopilotChatSession,branchCopilotChatSession,listCopilotSourceRoots,searchCopilotSource,getCopilotSourceFile,getCopilotPreferences,updateCopilotPreferences,getCopilotSystemPrompt,getSettings,listChips,createChip,listChipConfigSources,updateChip,deleteChip,getChip,getChipDeletionImpact,getChipDates,getChipMux,listChipMuxes,getChipNote,upsertChipNote,deleteChipNote,listChipQubits,getChipQubit,reanalyzeResonatorSpectroscopy,reanalyzeQubitSpectroscopy,listChipCouplings,getChipCoupling,getChipMetricsSummary,getChipMetricHeatmap,listTasks,quickRunTask,getTaskResult,listTaskKnowledge,getTaskKnowledgeMarkdown,downloadTaskKnowledgeArchive,getTaskEvaluationPrompts,getTaskKnowledge,getTaskFileSettings,listTaskFileBackends,getBackendConfig,listTaskInfo,listTaskResults,getLatestQubitTaskResults,getHistoricalQubitTaskResults,getQubitTaskHistory,getLatestCouplingTaskResults,getHistoricalCouplingTaskResults,getCouplingTaskHistory,getTimeseriesTaskResults,reExecuteTaskResult,setTaskResultExcluded,downloadFiguresAsZip,createEvaluationRun,listEvaluationRuns,getEvaluationRun,retryEvaluationRun,cancelEvaluationRun,listEvaluations,setEvaluationVerdict,getEvaluationFigure,createKnowledgeDraft,getKnowledgeDraft,getKnowledgeDraftKnowledge,downloadKnowledgeDraftArchive,listForumCategories,createForumCategory,updateForumCategory,deleteForumCategory,listForumLabels,createForumLabel,updateForumLabel,deleteForumLabel,listForumPosts,createForumPost,getForumPost,updateForumPost,deleteForumPost,getForumPostReplies,uploadForumImage,closeForumPost,reopenForumPost,listTags,getDeviceTopology,getDeviceTopologyPlot,listBackends,saveFlow,listFlows,formatFlowSource,listFlowTemplates,getFlowTemplate,listFlowHelperFiles,getFlowHelperFile,listAllFlowSchedules,deleteFlowSchedule,updateFlowSchedule,getFlow,deleteFlow,getFlowExecutionPlan,executeFlow,moveFlow,scheduleFlow,listFlowSchedules,getMetricsConfig,getChipMetrics,getQubitMetricHistory,getCouplingMetricHistory,downloadMetricsPdf,upsertQubitNote,deleteQubitNote,createQubitNoteComment,updateQubitNoteComment,deleteQubitNoteComment,upsertQubitMetricNote,deleteQubitMetricNote,upsertCouplingNote,deleteCouplingNote,createCouplingNoteComment,updateCouplingNoteComment,deleteCouplingNoteComment,upsertCouplingMetricNote,deleteCouplingMetricNote,getTaskNote,upsertTaskNote,deleteTaskNote,getChipNotesSummary,listChipNoteEvents,listTargetNoteEvents,searchNoteEvents,listNotifications,getUnreadNotificationCount,markNotificationRead,markAllNotificationsRead,listCryostats,createCryostat,getCryostat,updateCryostat,deleteCryostat,listCooldowns,createCooldown,getCooldown,updateCooldown,deleteCooldown,assignChipToCooldown,unassignChipFromCooldown,createCooldownWiringCheckpoint,listCooldownWiringEvents,listDashboards,createDashboard,listDashboardTemplates,previewDashboardTemplate,getDashboard,updateDashboard,deleteDashboard,duplicateDashboard,listMetricScripts,createMetricScript,listMetricScriptTemplates,getMetricScriptCatalog,validateMetricScript,formatMetricScriptSource,evaluateMetricScriptDraft,getMetricScript,updateMetricScript,deleteMetricScript,copyMetricScript,evaluateMetricScript,listTopologies,getTopologyById,getConfigAll,getProvenanceEntity,getProvenanceLineage,getProvenanceImpact,compareExecutions,getParameterHistory,getProvenanceStats,getRecentExecutions,getRecentChanges,getDegradationTrends,getRecalibrationRecommendations,getCurrentUserAvatar,updateCurrentUserAvatar,listUserAvatars}};
 export type LoginResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['login']>>>
 export type RegisterUserResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['registerUser']>>>
 export type GetCurrentUserResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getCurrentUser']>>>
@@ -5318,6 +5591,8 @@ export type PreviewArtifactByPathResult = NonNullable<Awaited<ReturnType<ReturnT
 export type GetExecutionLockStatusResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getExecutionLockStatus']>>>
 export type CheckExecutionAvailabilityResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['checkExecutionAvailability']>>>
 export type ListExecutionsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listExecutions']>>>
+export type ListExecutionGroupsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listExecutionGroups']>>>
+export type GetAgentSessionGraphResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getAgentSessionGraph']>>>
 export type GetExecutionActivityResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getExecutionActivity']>>>
 export type GetExecutionResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getExecution']>>>
 export type CancelExecutionResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['cancelExecution']>>>
@@ -5332,10 +5607,12 @@ export type GetGitStatusResult = NonNullable<Awaited<ReturnType<ReturnType<typeo
 export type GitPullConfigResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['gitPullConfig']>>>
 export type GitPushConfigResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['gitPushConfig']>>>
 export type CreateAgentSessionResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['createAgentSession']>>>
+export type ListAgentSessionsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listAgentSessions']>>>
 export type GetAgentSessionResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getAgentSession']>>>
 export type EvaluateAgentCandidateGateResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['evaluateAgentCandidateGate']>>>
 export type SubmitAgentActionResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['submitAgentAction']>>>
 export type ListAgentActionsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listAgentActions']>>>
+export type StopAgentSessionResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['stopAgentSession']>>>
 export type ListAgentActionCandidatesResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listAgentActionCandidates']>>>
 export type CommitAgentActionCandidateResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['commitAgentActionCandidate']>>>
 export type CommitAgentCandidateSetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['commitAgentCandidateSet']>>>
@@ -5344,6 +5621,17 @@ export type GetAgentCandidateCommitResult = NonNullable<Awaited<ReturnType<Retur
 export type ApplyAgentCandidateCommitResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['applyAgentCandidateCommit']>>>
 export type GetAgentActionResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getAgentAction']>>>
 export type ExecuteAgentActionResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['executeAgentAction']>>>
+export type CreateAgentInterventionResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['createAgentIntervention']>>>
+export type ListAgentInterventionsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listAgentInterventions']>>>
+export type GetAgentInterventionResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getAgentIntervention']>>>
+export type RespondAgentInterventionResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['respondAgentIntervention']>>>
+export type ClaimAgentInterventionResumeResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['claimAgentInterventionResume']>>>
+export type RecordAgentResumeOutcomeResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['recordAgentResumeOutcome']>>>
+export type RetryAgentInterventionNotificationResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['retryAgentInterventionNotification']>>>
+export type RecordAgentDecisionResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['recordAgentDecision']>>>
+export type ListAgentDecisionsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listAgentDecisions']>>>
+export type GetAgentSessionAuditResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getAgentSessionAudit']>>>
+export type ExportAgentSessionAuditResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['exportAgentSessionAudit']>>>
 export type RetryCalibrationGitHubSyncResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['retryCalibrationGitHubSync']>>>
 export type GetCalibrationNoteResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getCalibrationNote']>>>
 export type ImportSeedParametersResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['importSeedParameters']>>>

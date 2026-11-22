@@ -16,7 +16,7 @@ It uses [`@oqtopus-team/qdash-client`](https://www.npmjs.com/package/@oqtopus-te
 
 - **Read-only investigation**: dedicated tools to inspect chips, qubits, couplings, calibration task results, task knowledge (`qdash_get_task_knowledge`), executions, and Forum posts. Secrets are redacted from tool output.
 - **Dashboards and insights**: compact dashboards, triage overviews, target-level incident reports, degradation reports, and wiring insights.
-- **Agent calibration workflow**: create agent sessions, submit and track agent actions, and commit/apply calibration candidates. Write operations are approval-gated.
+- **Agent calibration workflow**: run a model-driven calibration loop in an agent session you approve once (see the `qdash-agent-calibration` skill), ask an expert through a QDash intervention, continue from QDash's records after the answer, and commit/apply calibration candidates. Write operations are approval-gated; inside an `auto` session you created and approved, its own steps and expert requests need no further approval, and QDash checks them again.
 - **Calibration pipelines**: compose a declarative pipeline spec from QDash's step catalog (`qdash_get_pipeline_catalog`), validate it (`qdash_plan_pipeline`), and run it as one execution (`qdash_run_pipeline`, approval-gated).
 - **Figures**: fetch calibration PNG/JSON figures and render them in the interactive TUI.
 - **Metric scripts and dashboards**: write `qdash_metrics` scripts that compute per-qubit or per-coupling values, validate and preview them on a chip (`qdash_validate_metric_script`, `qdash_preview_metric_script`), and save scripts and dashboards after approval, guided by the `qdash-metric-scripts` skill.

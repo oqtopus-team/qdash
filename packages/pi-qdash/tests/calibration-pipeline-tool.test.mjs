@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   firstSentence,
   formatPipelineCatalog,
+  formatTaskParameters,
   formatPipelinePlan,
   problemsFromError,
   registerCalibrationPipelineTools,
@@ -49,9 +50,11 @@ const VALID = {
   task_run_count: 12,
 };
 
-function registeredTools(api, chipId = "64Qv3", projectId = "project-1") {
+function registeredTools(api, chipId = "64Qv3", projectId = "project-1", pausedSessions = []) {
   const tools = new Map();
   const client = {
+    // The pause guard: the user's agent sessions waiting for an expert.
+    async listAgentSessions() { return pausedSessions; },
     api,
     // null stands for a profile without a project.
     config: { projectId: projectId ?? undefined },
@@ -66,6 +69,8 @@ function registeredTools(api, chipId = "64Qv3", projectId = "project-1") {
   return tools;
 }
 
+// A host that collected the user's approval of call `toolCallId` in its own UI (write-approval.ts).
+const approved = (toolCallId, toolName = "qdash_run_pipeline") => ({ hasUI: false, qdashWriteApproval: { toolCallId, toolName } });
 const uiContext = (answer) => ({ hasUI: true, ui: { async confirm() { return answer; } } });
 
 test("plan validates on the resolved chip and lists the resolved steps", async () => {
@@ -168,7 +173,7 @@ test("run requires confirmation, then reports the execution", async () => {
   );
   assert.equal(calls.length, 0);
 
-  const result = await run.execute("t", { chipId: "64Qv3", spec: SPEC, confirmWrite: true }, undefined, undefined, { hasUI: false });
+  const result = await run.execute("t", { chipId: "64Qv3", spec: SPEC }, undefined, undefined, approved("t"));
   assert.deepEqual(calls, [{ chip_id: "64Qv3", spec: SPEC }]);
   assert.equal(result.details.started, true);
   assert.equal(result.details.executionId, "20261006-012");
@@ -195,9 +200,16 @@ test("without a project every tool keeps the server's default: the run is still 
   await assert.rejects(run.execute("t", { chipId: "64Qv3", spec: SPEC }, undefined, undefined, uiContext(false)), /requires explicit confirmation/);
   assert.equal(calls.length, 0);
 
-  const viaFlag = await run.execute("t", { chipId: "64Qv3", spec: SPEC, confirmWrite: true }, undefined, undefined, { hasUI: false });
+  // A model's own confirmWrite approves nothing, whatever its value.
+  for (const confirmWrite of [true, "true", 1]) {
+    await assert.rejects(run.execute("t", { chipId: "64Qv3", spec: SPEC, confirmWrite }, undefined, undefined, { hasUI: false }), /requires explicit confirmation/);
+  }
+  // The approval of one call does not carry over to another.
+  await assert.rejects(run.execute("other", { chipId: "64Qv3", spec: SPEC }, undefined, undefined, approved("t")), /requires explicit confirmation/);
+  assert.equal(calls.length, 0);
+  const viaHost = await run.execute("t", { chipId: "64Qv3", spec: SPEC }, undefined, undefined, approved("t"));
   const viaUi = await run.execute("t", { chipId: "64Qv3", spec: SPEC }, undefined, undefined, uiContext(true));
-  for (const result of [viaFlag, viaUi]) {
+  for (const result of [viaHost, viaUi]) {
     assert.equal(result.details.started, true);
     assert.equal(result.details.executionId, "20261006-013");
   }
@@ -214,7 +226,7 @@ test("run turns a 422 with problems into a readable rejection and nothing else i
   const tools = registeredTools({
     async executeCalibrationPipeline() { throw rejected; },
   });
-  const result = await tools.get("qdash_run_pipeline").execute("t", { chipId: "64Qv3", spec: SPEC, confirmWrite: true }, undefined, undefined, { hasUI: false });
+  const result = await tools.get("qdash_run_pipeline").execute("t", { chipId: "64Qv3", spec: SPEC }, undefined, undefined, approved("t"));
   assert.equal(result.details.started, false);
   assert.equal(result.details.problemCount, 1);
   assert.match(result.content[0].text, /Nothing was started/);
@@ -224,7 +236,7 @@ test("run turns a 422 with problems into a readable rejection and nothing else i
     async executeCalibrationPipeline() { throw Object.assign(new Error("503"), { statusCode: 503 }); },
   });
   await assert.rejects(
-    unavailable.get("qdash_run_pipeline").execute("t", { chipId: "64Qv3", spec: SPEC, confirmWrite: true }, undefined, undefined, { hasUI: false }),
+    unavailable.get("qdash_run_pipeline").execute("t", { chipId: "64Qv3", spec: SPEC }, undefined, undefined, approved("t")),
     /worker has not registered/,
   );
 
@@ -232,7 +244,7 @@ test("run turns a 422 with problems into a readable rejection and nothing else i
     async executeCalibrationPipeline() { throw new Error("boom"); },
   });
   await assert.rejects(
-    other.get("qdash_run_pipeline").execute("t", { chipId: "64Qv3", spec: SPEC, confirmWrite: true }, undefined, undefined, { hasUI: false }),
+    other.get("qdash_run_pipeline").execute("t", { chipId: "64Qv3", spec: SPEC }, undefined, undefined, approved("t")),
     /boom/,
   );
 });
@@ -310,4 +322,84 @@ test("formatting helpers cover the edge cases", () => {
   assert.equal(problemsFromError({ payload: { detail: "plain string" } }), null);
   assert.deepEqual(problemsFromError({ payload: { detail: { problems: [{ path: "a", message: "b" }, { bogus: true }] } } }), [{ path: "a", message: "b" }]);
   assert.match(formatPipelineCatalog({ backend_name: "f", step_types: [], one_qubit_execution_modes: [], tasks: {}, spec_schema: {} }), /Step types:/);
+});
+
+test("a pipeline does not run on qubits of the user's agent session paused for an expert", async () => {
+  const paused = [{ session_id: "s-1", chip_id: "64Qv3", status: "waiting_for_human", active_intervention_id: "int-1", policy: { qids: ["1"] } }];
+  const api = { async executeCalibrationPipeline() { throw new Error("must not run"); } };
+  const tools = registeredTools(api, "64Qv3", "project-1", paused);
+  const result = await tools.get("qdash_run_pipeline").execute("t", { chipId: "64Qv3", spec: SPEC }, undefined, undefined, approved("t"));
+  assert.equal(result.details.started, false);
+  assert.equal(result.details.blockedByPausedSession, true);
+  assert.match(result.content[0].text, /paused for an expert on chip 64Qv3 and covers these targets/);
+  // A MUX target names no qubits, so it counts as overlapping.
+  const mux = await tools.get("qdash_run_pipeline").execute("t", { chipId: "64Qv3", spec: { ...SPEC, targets: { mux_ids: [0] } } }, undefined, undefined, approved("t"));
+  assert.equal(mux.details.blockedByPausedSession, true);
+  // A server that cannot list sessions blocks, including one that predates the list.
+  for (const [status, message] of [[500, /could not tell whether/], [503, /could not tell whether/], [404, /cannot list agent sessions \(HTTP 404; it predates GET \/agent-sessions\)/], [405, /cannot list agent sessions \(HTTP 405/]]) {
+    let dispatched = 0;
+    const errorClient = {
+      api: { async executeCalibrationPipeline() { dispatched += 1; return { execution_id: "e-1", flow_run_id: "f", message: "" }; } },
+      config: { projectId: "project-1" },
+      async listAgentSessions() { const error = new Error(`HTTP ${status}`); error.statusCode = status; throw error; },
+    };
+    const own = new Map();
+    registerCalibrationPipelineTools({ registerTool(tool) { own.set(tool.name, tool); } }, { async makeClient() { return errorClient; }, async resolveChipId() { return "64Qv3"; } });
+    const outcome = await own.get("qdash_run_pipeline").execute("t", { chipId: "64Qv3", spec: SPEC }, undefined, undefined, approved("t"));
+    assert.match(outcome.content[0].text, message, String(status));
+    assert.equal(outcome.details.started, false, String(status));
+    assert.equal(outcome.details.blockedByPausedSession, true, String(status));
+    assert.equal(dispatched, 0, String(status));
+  }
+});
+
+test("a pipeline does not run when a full page of paused sessions hides older ones", async () => {
+  const pausedOn = (count, qid) => Array.from({ length: count }, (_, index) => ({
+    session_id: `s-${index}`, chip_id: "64Qv3", status: "waiting_for_human", active_intervention_id: `int-${index}`, policy: { qids: [qid] },
+  }));
+  for (const [count, started] of [[99, true], [100, false], [101, false]]) {
+    let dispatched = 0;
+    const api = { async executeCalibrationPipeline() { dispatched += 1; return { execution_id: "e-1", flow_run_id: "f", message: "" }; } };
+    const tools = registeredTools(api, "64Qv3", "project-1", pausedOn(count, "99"));
+    const result = await tools.get("qdash_run_pipeline").execute("t", { chipId: "64Qv3", spec: SPEC }, undefined, undefined, approved("t"));
+    assert.equal(result.details.started, started, String(count));
+    assert.equal(dispatched, started ? 1 : 0, String(count));
+    if (!started) {
+      assert.equal(result.details.blockedByPausedSession, true, String(count));
+      assert.match(result.content[0].text, /at least 100 agent sessions paused for an expert on chip 64Qv3/, String(count));
+    }
+  }
+});
+
+test("catalog with taskNames lists each task's declared inputs and outputs with units", async () => {
+  const catalog = { backend_name: "fake", step_types: [], one_qubit_execution_modes: [], tasks: { qubit: ["CheckChevron"] }, spec_schema: {} };
+  const tasks = [
+    {
+      name: "CheckChevron",
+      input_parameters: { control_frequency: { unit: "GHz" }, readout_amplitude: { unit: "a.u." }, shots: { unit: "" } },
+      output_parameters: { qubit_frequency: { unit: "GHz" }, control_amplitude: { unit: "a.u." } },
+    },
+  ];
+  const backends = [];
+  // registeredTools' client has no listTasks, standing for a task list that cannot be read.
+  const tools = registeredTools({ async getCalibrationPipelineCatalog() { return catalog; } });
+  const withTasks = new Map();
+  const stub = {
+    api: { async getCalibrationPipelineCatalog() { return catalog; } },
+    config: {},
+    async listTasks(backend) { backends.push(backend); return { tasks }; },
+  };
+  registerCalibrationPipelineTools({ registerTool(tool) { withTasks.set(tool.name, tool); } }, { async makeClient() { return stub; }, async resolveChipId() { return "X"; } });
+  const text = (await withTasks.get("qdash_get_pipeline_catalog").execute("t", { taskNames: ["CheckChevron", "CheckMissing"] })).content[0].text;
+  assert.deepEqual(backends, ["fake"]);
+  assert.match(text, /Declared task parameters \(names and units as QDash stores them\):\n- CheckChevron\n  Inputs: control_frequency \(GHz\), readout_amplitude \(a\.u\.\), shots\n  Outputs: control_amplitude \(a\.u\.\), qubit_frequency \(GHz\)\n- CheckMissing: not in this backend's task list/);
+
+  // Without taskNames nothing extra is read; a failing task list is reported, not hidden.
+  const brief = (await withTasks.get("qdash_get_pipeline_catalog").execute("t", {})).content[0].text;
+  assert.doesNotMatch(brief, /Declared task parameters/);
+  assert.equal(backends.length, 1);
+  const failing = (await tools.get("qdash_get_pipeline_catalog").execute("t", { taskNames: ["CheckChevron"] })).content[0].text;
+  assert.match(failing, /Declared task parameters unavailable: /);
+  assert.deepEqual(formatTaskParameters(tasks, []), []);
+  assert.match(formatTaskParameters([{ name: "T" }], ["T"]).join("\n"), /Inputs: none\n  Outputs: none/);
 });
