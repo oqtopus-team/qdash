@@ -53,8 +53,10 @@ lives under `extensions/tools/`, including `timeseries.ts`.
 The investigation policy, request policy, and tool routing guide that every host gives the
 model live in `extensions/lib/qdash-guidance.ts`. The request policy lets a plain request such as
 "remeasure the T1 of Q0" select a skill by its description: it separates questions about stored
-values from requests to measure, takes targets from context before asking, and keeps plan-only
-requests free of writes. It names no flows, tasks, or thresholds, and grants no write permission. The routing guide is the "Preferred tools" section of
+values from requests to measure, takes targets from context before asking, keeps plan-only
+requests free of writes, and has a broad calibration ask once whether to run agentically or as a
+reviewed workflow unless the request or conversation already says. That answer is a preference:
+it neither approves a write nor lets a stopped path fall back to the other. It names no flows, tasks, or thresholds, and grants no write permission. The routing guide is the "Preferred tools" section of
 `skills/qdash/SKILL.md`, limited to the tools the host offers. In pi CLI,
 `extensions/lib/guidance-hook.ts` sets them as the `qdash_guidance` system prompt section before
 each run, from the tools selected for that run. pi keeps its own prompt, `--system-prompt`,

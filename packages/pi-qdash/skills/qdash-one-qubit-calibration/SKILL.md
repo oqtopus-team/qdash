@@ -12,7 +12,10 @@ measurement; this skill chooses the flow template and decides when a qubit may m
 
 Before planning or execution, load the `qdash` skill for the shared execution paths and
 approval scope. In the hosted Agent, call `read_skill` with `name: "qdash"`; in pi CLI,
-read the `qdash` skill file at the path supplied by skill discovery.
+read the `qdash` skill file at the path supplied by skill discovery. When the user has not
+said whether to calibrate step by step from the results (`qdash-agent-calibration`) or to run a
+reviewed sequence (this skill's templates), ask once as the `qdash` skill describes; once they
+choose the agentic path, follow `qdash-agent-calibration` with the stage this skill selects.
 
 ## Choose the template from the chip's state
 

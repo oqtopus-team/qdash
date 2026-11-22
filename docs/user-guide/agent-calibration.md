@@ -30,7 +30,9 @@ To have experts notified in Slack when the agent stops, configure
 
 1. Ask for the goal and the qubits, for example "Calibrate Q00 on chip-001 step by step, and
    ask an expert if it gets stuck." The agent reads the qubits' current results and the task
-   documentation and chooses the tasks; you do not name tasks or commands.
+   documentation and chooses the tasks; you do not name tasks or commands. If you ask only
+   "calibrate Q00", the agent first asks whether to calibrate step by step or to run a reviewed
+   workflow; see [Choose How a Calibration Runs](./ai-chat.md#choose-how-a-calibration-runs).
 2. The agent proposes a session: the chip, the qubits, the tasks it may run, the range of each
    input it may change, the number of measurements, how often one task may run on one qubit,
    how long the session lasts, and that it may run them on its own. When the goal needs a

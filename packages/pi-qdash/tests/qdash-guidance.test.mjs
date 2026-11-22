@@ -84,6 +84,43 @@ test("the request policy is host-neutral and grants no write", () => {
   assert.match(text, /page the user has open, then from read-only tools/);
 });
 
+test("a broad calibration asks agentic or workflow once, and the answer approves nothing", () => {
+  // These check the guidance both hosts send; whether a live model asks at the right moment is
+  // not something a scripted test shows.
+  const rule = QDASH_REQUEST_POLICY.find((item) => /can run two ways/.test(item));
+  assert.ok(rule, "no execution-mode rule");
+  // Two options, asked before anything is created or run, only when nothing settles it.
+  assert.match(rule, /agentic, where you choose each next measurement from the results inside the scope the user approves/);
+  assert.match(rule, /as a workflow, where the whole sequence \(a saved template or flow, or a composed pipeline\) is set out for review first/);
+  assert.match(rule, /When neither the request, the conversation, nor the host's context settles which one/);
+  assert.match(rule, /ask one short question with those two options before you create an agent session or compose, save, or run a flow or pipeline/);
+  // Explicit wording and an earlier answer are reused, not asked again.
+  assert.match(rule, /keep the answer for the rest of the conversation/);
+  assert.match(rule, /"Step by step based on the results" or continuing a session means agentic; "run this flow" or a named template means a workflow; do not ask again/);
+  // Reads and single remeasurements never get the question.
+  assert.match(rule, /A question about stored values or a remeasurement of one property needs no such question/);
+  // A preference only: approvals, session scope, and stops stay; no switching past a stop.
+  assert.match(rule, /The answer is a preference, not an approval: every write keeps its own approval/);
+  assert.match(rule, /keeps its approved scope, update authority, and stops for a human/);
+  assert.match(rule, /do not switch to the other way to get past the stop/);
+  // The rule that forbids procedural questions names this one exception.
+  assert.match(QDASH_REQUEST_POLICY[0], /the one question you may need is how a broad calibration should run/);
+  assert.match(QDASH_REQUEST_POLICY.join("\n"), /not approval for a write/);
+});
+
+test("the calibration skills carry the same execution-mode choice", () => {
+  assert.match(SKILL, /For single-qubit calibration both paths fit/);
+  assert.match(SKILL, /ask once, with those two options, before creating a session or composing,\nsaving, or running a flow or pipeline/);
+  assert.match(SKILL, /A workflow does not have to be a new pipeline: a saved\ntemplate or flow that fits the goal is the simpler choice/);
+  assert.match(SKILL, /a read of stored\nresults, or a remeasurement of one property such as T1 needs no question/);
+  assert.match(SKILL, /it approves no write, so each path's own approvals still apply/);
+  // Neither path is a fallback for the other.
+  assert.match(SKILL, /Do not run the same task through a flow or pipeline instead/);
+  assert.match(SKILL, /is reported, not routed into an agent session; changing path is\nthe user's decision/);
+  const oneQubit = readFileSync(new URL("../skills/qdash-one-qubit-calibration/SKILL.md", import.meta.url), "utf8");
+  assert.match(oneQubit, /ask once as the `qdash` skill describes; once they\nchoose the agentic path, follow `qdash-agent-calibration`/);
+});
+
 test("the bundled skill has a routing guide that names real pi-qdash tools", () => {
   const { tools } = loadExtension();
   const routing = extractToolRouting(SKILL, tools);

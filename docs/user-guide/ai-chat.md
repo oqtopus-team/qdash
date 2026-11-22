@@ -189,6 +189,19 @@ Selecting the button again for the same failure reopens that chat instead of sta
 To run the investigation again from the start, select **New chat** while the investigation chat is
 open, then select **Investigate with AI**. The earlier chat stays in your chat history.
 
+## Choose How a Calibration Runs
+
+A single-qubit calibration can run two ways: step by step, where the assistant picks each next
+measurement from the last result inside a session you approve, or as a workflow, where it sets
+out the whole sequence (a saved workflow, a template, or a pipeline) for you to review before it
+runs. When you ask only "calibrate Q06", the assistant asks which you want before it proposes
+anything. Say it in the request, for example "calibrate Q06 step by step from the results" or
+"run the one_qubit workflow on Q06", and it does not ask; it keeps your answer for the rest of
+the chat. Questions about stored results and remeasuring one property such as T1 never get this
+question. Your answer only picks the way: every session, run, and saved value still needs its
+own approval, and when the chosen way stops or fails, the assistant reports it and asks instead of
+switching to the other way.
+
 ## Run a Calibration Pipeline from Chat
 
 The assistant can compose a calibration from QDash's step catalog and run it as one execution

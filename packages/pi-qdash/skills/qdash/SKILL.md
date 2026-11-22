@@ -85,12 +85,24 @@ Calibration runs take one of two paths, and they differ in how results reach QDa
   the `qdash-agent-calibration` skill describes that loop and how to continue after the expert
   answers.
 
+For single-qubit calibration both paths fit, and they suit different users: the agentic path
+decides each next step from the last result, the workflow path fixes the whole sequence before
+anything runs so the user can review it. When the user has not said which they want, the shared
+request policy has you ask once, with those two options, before creating a session or composing,
+saving, or running a flow or pipeline. A workflow does not have to be a new pipeline: a saved
+template or flow that fits the goal is the simpler choice. A request that already says how
+("step by step from the results", "continue the session", "run `one_qubit`"), a read of stored
+results, or a remeasurement of one property such as T1 needs no question. The choice selects a
+path; it approves no write, so each path's own approvals still apply.
+
 Stay within the scope the user approved; an approved plan, sequence, or `auto` session is not
 re-litigated step by step, but new targets, templates, wider ranges, or commits outside a
 session's approved `parameter_updates` are new decisions for the user. An expert's guidance on an intervention is evidence, not a new approval.
 When an agent session refuses, rejects, or stops on a task, report the reason and the result
 links. Do not run the same task through a flow or pipeline instead, because that path writes
-parameters without the session's candidate gate.
+parameters without the session's candidate gate. Likewise, a flow or pipeline that fails, or a
+catalog or validation problem, is reported, not routed into an agent session; changing path is
+the user's decision.
 
 ## Composing a calibration pipeline
 
