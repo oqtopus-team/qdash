@@ -66,6 +66,7 @@ test("the policy is host-neutral", () => {
   assert.deepEqual(investigationPolicyBullets(), QDASH_INVESTIGATION_POLICY.map((rule) => `- ${rule}`));
   for (const rule of QDASH_INVESTIGATION_POLICY) assert.doesNotMatch(rule, RUNTIME_ONLY);
   assert.match(QDASH_INVESTIGATION_POLICY.join("\n"), /tool result or from the user/);
+  assert.match(QDASH_INVESTIGATION_POLICY.join("\n"), /call `qdash_current_time` each time.*answer in UTC; never infer their time zone from their language or the host's setting/);
 });
 
 test("the request policy is host-neutral and grants no write", () => {

@@ -12,6 +12,7 @@ pi-qdash tools reuse the session's profile and chip when callers omit those para
 
 | Tools | Result |
 | --- | --- |
+| `qdash_current_time` | Current UTC time, and the local time and offset in an IANA time zone when one is named. Needs no QDash connection or approval. |
 | `qdash_list_chips`, `qdash_get_default_chip` | Chip list and default chip. |
 | `qdash_get_chip_metrics`, `qdash_list_chip_qubits`, `qdash_list_chip_couplings` | Chip metrics and targets. |
 | `qdash_list_cryostats`, `qdash_list_cooldowns` | Cryostats and cooldowns. |
@@ -30,6 +31,7 @@ pi-qdash tools reuse the session's profile and chip when callers omit those para
 | Figure tools | PNG figures return image content with text; JSON figures remain text. The TUI renders images and chat shows figure paths. |
 | `qdash_get_cooldown_wiring` | Active or newest cooldown wiring for a cryostat or current chip; attenuation insights and raw blocks are optional. |
 | `qdash_wiring_insights` | Control/readout attenuation totals, unusual totals, and MUX×4 qubit mapping for control-port anomalies. |
+| `qdash_current_time` | Read from the operating system clock of the host running the tool (the pi CLI machine or the web Agent's container) at every call; not the QDash server's or the measurement hardware's clock, and not checked against a time service. Without `timeZone` the answer is UTC; the host's or container's zone and the user's language are never used as the user's zone. An unknown or non-IANA name such as `+09:00` is refused. |
 | `qdash_inspect_timeseries_csv` | Local CSV headers, row count, numeric ranges, and optional timestamp profile; no upload or timezone guess. |
 | `qdash_compare_timeseries` | QDash and local CSV series on a bounded grid, with correlations and optional smoothing, detrending, normalization, and shared-period fit. Each CSV is limited to 10 MB and is never uploaded. |
 | Timeseries comparison context | `/qdash-investigation-setup` fills omitted comparison arguments; explicit arguments win. Set `useInvestigationContext: false` to disable it for a call. |

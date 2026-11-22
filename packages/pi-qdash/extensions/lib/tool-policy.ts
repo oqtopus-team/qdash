@@ -76,9 +76,10 @@ export const SESSION_GRANTED_WRITE_TOOL_NAMES = [
 /**
  * Read-only pi-qdash tools that code mode scripts may call.
  *
- * Each was audited to only read the QDash API as the signed-in user: no
- * write, no local files, no long polling, and no image output (a script
- * receives JSON, so a figure would be lost). Every other tool, including
+ * Each was audited to only read the QDash API as the signed-in user
+ * (`qdash_current_time` reads only the host clock): no write, no local files,
+ * no long polling, and no image output (a script receives JSON, so a figure
+ * would be lost). Every other tool, including
  * write tools, figure tools, raw API access, and another extension's tool
  * that reuses one of these names, can only be called by the model directly,
  * where approval and the host's own rendering apply.
@@ -87,6 +88,7 @@ export const NESTED_READ_TOOL_NAMES = [
   "qdash_analyze_figure_json",
   "qdash_compare_calibration",
   "qdash_compare_executions",
+  "qdash_current_time",
   "qdash_dashboard",
   "qdash_dashboard_insights",
   "qdash_degradation_report",

@@ -11,6 +11,7 @@ export const ALLOWED_TOOL_NAMES = [
   "qdash_compare_executions",
   "qdash_compare_timeseries",
   "qdash_config_info",
+  "qdash_current_time",
   "qdash_dashboard",
   "qdash_dashboard_insights",
   "qdash_degradation_report",

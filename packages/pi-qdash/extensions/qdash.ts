@@ -33,6 +33,7 @@ import { WAIT_AGENT_ACTION, WAIT_EXECUTION } from "./lib/waits.js";
 import { qcalContextText, recordedParameters, sweepsOf, type RecordedParameter, type Sweep } from "./lib/qcal-evidence.js";
 import { registerAgentLoopTools } from "./tools/agent-loop.js";
 import { registerCalibrationPipelineTools } from "./tools/calibration-pipeline.js";
+import { registerCurrentTimeTool } from "./tools/current-time.js";
 import { registerFlowAuthoringTools } from "./tools/flow-authoring.js";
 import { isMetricScriptQueryAction, metricScriptQuery, registerMetricScriptTools, type MetricScriptQueryAction } from "./tools/metric-scripts.js";
 import { registerSourceCodeTools } from "./tools/source-code.js";
@@ -1566,6 +1567,7 @@ export default function qdashExtension(host: ExtensionAPI) {
   installQDashWriteGate(pi);
   installQDashGuidance(pi);
   installQcalHydration(pi, { loadTaskKnowledge });
+  registerCurrentTimeTool(pi);
   registerTaskKnowledgeTool(pi, { makeClient });
   registerSourceCodeTools(pi, { makeClient });
   registerAgentLoopTools(pi, { makeClient });

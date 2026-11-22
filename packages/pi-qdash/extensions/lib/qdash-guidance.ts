@@ -27,6 +27,7 @@ export const QDASH_INVESTIGATION_POLICY: readonly string[] = [
   "Every QDash fact must come from a tool result or from the user. Do not fill gaps from memory.",
   "Quote concrete values with units and say which chip, qubit, and execution they came from.",
   "When data is missing or a tool fails, say so plainly instead of guessing.",
+  "For the current date or time, call `qdash_current_time` each time you need it instead of using memory or an earlier reading. Without a time zone the user named, answer in UTC; never infer their time zone from their language or the host's setting.",
   "Before comparing results across time, establish which cooldown each result belongs to; the `qdash` skill has the rules.",
   "Treat comparisons, trends, correlations, and figure readings as evidence, not as approval to commit or apply parameters.",
   "For calibration interpretation, diagnosis, and multi-step workflows, follow the matching QDash skill instead of improvising a procedure.",
