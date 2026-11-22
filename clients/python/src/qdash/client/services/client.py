@@ -965,22 +965,25 @@ class QDashClient:
         skill_name: str = "",
         skill_version: str = "",
         skill_hash: str = "",
-        model_name: str = "",
+        model: dict[str, str] | None = None,
     ) -> AgentSessionResponse:
-        """Create a bounded authorization session for a local agent."""
-        response = self._request(
-            "POST",
-            "/agent-sessions",
-            json={
-                "chip_id": chip_id,
-                "policy": policy,
-                "expires_in_seconds": expires_in_seconds,
-                "skill_name": skill_name,
-                "skill_version": skill_version,
-                "skill_hash": skill_hash,
-                "model_name": model_name,
-            },
-        )
+        """Create a bounded authorization session for a local agent.
+
+        ``model`` is the provider and model the calling host runs the agent with
+        (``{"provider": ..., "model_id": ..., "host": ...}``). QDash records it as client
+        reported and does not verify it; omit it when the host does not know it.
+        """
+        body: dict[str, Any] = {
+            "chip_id": chip_id,
+            "policy": policy,
+            "expires_in_seconds": expires_in_seconds,
+            "skill_name": skill_name,
+            "skill_version": skill_version,
+            "skill_hash": skill_hash,
+        }
+        if model is not None:
+            body["model"] = model
+        response = self._request("POST", "/agent-sessions", json=body)
         return self._validate_model_payload(AgentSessionResponse, response.data)
 
     def get_agent_session(self, session_id: str) -> AgentSessionResponse:

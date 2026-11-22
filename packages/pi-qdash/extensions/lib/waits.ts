@@ -33,6 +33,7 @@ import {
   buildAgentLoopContext,
   DEFAULT_INTERVENTION_POLL_SECONDS,
   DEFAULT_INTERVENTION_WAIT_SECONDS,
+  FAILED_RUN_HINT,
   formatAgentLoopContext,
   MAX_INTERVENTION_WAIT_SECONDS,
   MIN_INTERVENTION_POLL_SECONDS,
@@ -135,7 +136,12 @@ export const WAIT_AGENT_ACTION: WaitSpec<WaitAgentActionParams, AgentActionRespo
     const action = await client.getAgentAction(params.sessionId, params.actionId);
     return action.execution_status === "failed" || action[actionField(params)] != null ? action : undefined;
   },
-  result: (_client, _params, action) => toToolResult(action, { tool: "qdash_wait_agent_action" }),
+  result: (_client, _params, action) => {
+    const result = toToolResult(action, { tool: "qdash_wait_agent_action" });
+    // A failed run gets the same mechanical next step the session context gives it.
+    if (action.action_type !== "run_task" || String(action.execution_status).toLowerCase() !== "failed") return result;
+    return { ...result, content: [...result.content, { type: "text" as const, text: `Next: ${FAILED_RUN_HINT([action.action_id])}` }] };
+  },
   timeoutError: (params, { timeoutSeconds }) =>
     new Error(
       `Agent action '${params.actionId}' did not produce ${actionField(params)} within ${timeoutSeconds} seconds`,

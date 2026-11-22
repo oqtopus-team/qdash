@@ -281,6 +281,12 @@ tasks:
     cmds:
       - bun agent-runtime/src/local-cli.ts {{range .CLI_ARGS_LIST}}{{shellQuote .}} {{end}}
 
+  validate-agent-fake-loop:
+    desc: Opt-in real-model agent loop validation against a local fake-backend QDash (args after --)
+    deps: [build-client-ts]
+    cmds:
+      - bun agent-runtime/validation/fake-loop/run.ts {{range .CLI_ARGS_LIST}}{{shellQuote .}} {{end}}
+
   test-client-ts:
     desc: Run TypeScript client checks
     dir: clients/typescript

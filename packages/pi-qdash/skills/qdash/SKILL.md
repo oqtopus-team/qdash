@@ -49,6 +49,7 @@ Prefer the dedicated tool that matches the question. Use `qdash_query` only as a
    - `qdash_list_agent_sessions`, `qdash_get_agent_session_context` — find your sessions and read what one allows now, what ran, and the expert's answer, from QDash
    - `qdash_run_agent_session_step`, `qdash_request_agent_human` — run one measurement or ask an expert inside an approved `auto` session; they need no further approval and refuse anything outside the session
    - `qdash_record_agent_decision` — append your reading of a result and your next step to the audit of a session you created; it changes no session state and needs no approval
+   - `qdash_commit_agent_session_update` — commit (and, when granted, apply) a candidate of a result you assess as pass, only in a session whose approval granted `parameter_updates` for it; it needs no further approval and QDash refuses anything outside the grant
    - `qdash_get_agent_session_audit` — read a session's chronological experiment audit (read-only)
    - `qdash_wait_agent_intervention` — wait, bounded, for an expert's answer
    - `qdash_get_agent_session`, `qdash_get_agent_action`, `qdash_list_agent_actions`, `qdash_wait_agent_action` — inspect agent workflow state
@@ -75,16 +76,18 @@ Calibration runs take one of two paths, and they differ in how results reach QDa
 - An agent calibration session (`qdash_create_agent_session`, then its actions) runs bounded
   tasks on the qubits its policy names, within the allowed tasks, actions, override bounds, and
   action budget. Task outputs are staged as candidates; they reach the calibration state only
-  through `qdash_commit_agent_candidate` or `qdash_commit_agent_candidate_set`, and the backend
-  only through `qdash_apply_agent_candidate_commit`. Commit candidates only from a successful task,
-  preferably after a downstream check confirms them. In a session with `autonomy` `auto` you choose
+  through a commit QDash checks: `qdash_commit_agent_session_update` under the update authority
+  the user approved with the session (`parameter_updates`), or otherwise
+  `qdash_commit_agent_candidate` or `qdash_commit_agent_candidate_set` with a per-call approval;
+  the backend likewise. Commit candidates only from a result you assess as pass; a failed,
+  uncertain, or unexplained result goes to an expert instead. In a session with `autonomy` `auto` you choose
   each step from the last result and ask an expert through QDash when the next step is unclear;
   the `qdash-agent-calibration` skill describes that loop and how to continue after the expert
   answers.
 
 Stay within the scope the user approved; an approved plan, sequence, or `auto` session is not
-re-litigated step by step, but new targets, templates, wider ranges, or commits are new decisions
-for the user. An expert's guidance on an intervention is evidence, not a new approval.
+re-litigated step by step, but new targets, templates, wider ranges, or commits outside a
+session's approved `parameter_updates` are new decisions for the user. An expert's guidance on an intervention is evidence, not a new approval.
 When an agent session refuses, rejects, or stops on a task, report the reason and the result
 links. Do not run the same task through a flow or pipeline instead, because that path writes
 parameters without the session's candidate gate.
@@ -227,8 +230,8 @@ When the user wants to preserve an investigated observation in QDash forum/notes
 ## Safety
 
 - Never print tokens, passwords, Cloudflare Access secrets, or full profile contents.
-- Treat write/operational endpoints (agent session/action creation, candidate commits, forum create/update, flow execute, git push/pull, re-execute, admin/auth APIs) as sensitive and ask the user before any write workflow. The steps and expert requests of an agent session the user approved with autonomy `auto` are the one exception: that approval covers them, and only them.
-- Write-oriented QDash tools are approval-gated. In interactive pi, let the extension prompt for confirmation. In non-interactive runs, set `confirmWrite: true` only after explicit user confirmation.
+- Treat write/operational endpoints (agent session/action creation, candidate commits, forum create/update, flow execute, git push/pull, re-execute, admin/auth APIs) as sensitive and ask the user before any write workflow. The steps and expert requests of an agent session the user approved with autonomy `auto`, and the commits its approval granted in `parameter_updates`, are the one exception: that approval covers them, and only them.
+- Write-oriented QDash tools are approval-gated by the host: interactive pi, pi RPC, and the hosted Agent ask the user to approve each call in a dialog or card, and no tool argument approves a write. Without a UI (non-interactive pi) reviewed writes are refused; tell the user to run the write in an interactive session instead of retrying it. A request that describes the write is not that approval.
 - Use `qdash_investigate` for natural-language requests to investigate, compare, or understand a target or recent calibration; it is read-only and combines recent results with target, Forum, and recommendation context.
 - Use `qdash_compare_calibration` when the user asks what changed between recent calibration experiments; treat differences as evidence, not automatic approval to commit/apply parameters.
 - Use `qdash_recent_calibration_figure` when the user asks to see recent experiment images without a task ID.

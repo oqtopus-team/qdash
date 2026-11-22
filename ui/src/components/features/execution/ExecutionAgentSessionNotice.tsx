@@ -8,11 +8,11 @@ import type { ExecutionAgentSessionLink } from "@/schemas";
 
 import { sessionStatusLabel } from "@/components/features/agent-session/interventionLabels";
 
-import { sessionJourneyHref } from "./agentSessionDisplay";
+import { sessionGraphHref } from "./agentSessionDisplay";
 
 /**
  * Where an execution sits in an agent session. A linked execution points to its session's
- * journey and names the user responsible for the session, apart from the agent that ran it;
+ * graph and names the user responsible for the session, apart from the agent that ran it;
  * one only tagged for a session says so, because the tag is no link and the execution stays
  * an ordinary one with no agent attribution.
  */
@@ -54,8 +54,8 @@ export function ExecutionAgentSessionNotice({
           their own users in the session audit.
         </span>
       </div>
-      <Link href={sessionJourneyHref(chipId, link.session_id)} className="link link-hover">
-        Open journey
+      <Link href={sessionGraphHref(chipId, link.session_id)} className="link link-hover">
+        Open session graph
       </Link>
     </div>
   );

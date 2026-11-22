@@ -36,7 +36,12 @@ from qdash.api.services.agent_execution_links import resolve_chip_links, utc
 from qdash.api.services.agent_session_gate import load_agent_session
 from qdash.api.services.agent_session_service import AgentSessionService
 from qdash.common.utils.datetime import now
-from qdash.datamodel.agent_session import AgentActionDecision, AgentActionType
+from qdash.datamodel.agent_session import (
+    AgentActionDecision,
+    AgentActionType,
+    AgentModelIdentity,
+    model_label,
+)
 from qdash.dbmodel.agent_session import (
     AgentActionDocument,
     AgentCandidateCommitDocument,
@@ -99,6 +104,11 @@ AUDIT_NOTES = [
     "at one instant, provided no record changed and then changed back in between. Records "
     "written later are not in it; a new read includes them. Pages of one snapshot share its "
     "`snapshot_id`; a page is refused when the records changed since the first page.",
+    "`model` is the provider and model the client host (pi CLI, the QDash web Agent, or "
+    "another API client) reported for that record, read from its own runtime rather than from "
+    "the agent's arguments. QDash records it as reported and does not verify it; a record "
+    "without one lists `model` in `missing`. A model switch shows as a different `model` on "
+    "later records and changes no scope or approval.",
     "Records are append-only through the QDash API. This is an application audit, not a "
     "tamper-proof ledger: a database administrator can change stored records.",
 ]
@@ -150,6 +160,16 @@ def _parameters(raw: dict[str, Any] | None) -> tuple[dict[str, dict[str, Any]], 
             continue
         items[name] = row
     return items, dropped
+
+
+def _recorded_model(value: Any) -> AgentModelIdentity | None:
+    """A model identity stored as a dict, or None when absent or not a valid identity."""
+    if not isinstance(value, dict):
+        return None
+    try:
+        return AgentModelIdentity.model_validate(value)
+    except ValueError:
+        return None
 
 
 def _snapshot_value(snapshot: dict[str, Any] | None) -> Any:
@@ -397,7 +417,11 @@ class AgentSessionAuditService:
 
     @staticmethod
     def _decision_hash(body: RecordAgentDecisionRequest) -> str:
-        payload = json.dumps(body.model_dump(mode="json"), sort_keys=True, separators=(",", ":"))
+        # The reported model is provenance, not part of the decision: a retry keeps the first
+        # record's model.
+        payload = json.dumps(
+            body.model_dump(mode="json", exclude={"model"}), sort_keys=True, separators=(",", ":")
+        )
         return hashlib.sha256(payload.encode()).hexdigest()
 
     def record_decision(
@@ -506,6 +530,7 @@ class AgentSessionAuditService:
             "next_action_id": body.next_action_id,
             "intervention_id": body.intervention_id,
             "supersedes_decision_id": body.supersedes_decision_id,
+            "model": body.model,
             "evidence_snapshot": json.loads(
                 json.dumps(
                     {
@@ -621,7 +646,7 @@ class AgentSessionAuditService:
     def _header(session: AgentSessionDocument) -> AgentAuditSessionHeader:
         missing = [
             name
-            for name in ("skill_name", "skill_version", "skill_hash", "model_name")
+            for name in ("skill_name", "skill_version", "skill_hash", "model")
             if not getattr(session, name)
         ]
         return AgentAuditSessionHeader(
@@ -638,7 +663,8 @@ class AgentSessionAuditService:
             skill_name=session.skill_name,
             skill_version=session.skill_version,
             skill_hash=session.skill_hash,
-            model_name=session.model_name,
+            model=session.model,
+            model_name=model_label(session.model),
             missing=missing,
         )
 
@@ -661,10 +687,11 @@ class AgentSessionAuditService:
             fields["at"] = _utc(fields["at"])
             events.append(AgentAuditEvent(sequence=0, **fields))
 
-        identity = {
+        identity: dict[str, Any] = {
             name: getattr(session, name) or None
-            for name in ("skill_name", "skill_version", "skill_hash", "model_name")
+            for name in ("skill_name", "skill_version", "skill_hash")
         }
+        identity["model"] = session.model.model_dump(mode="json") if session.model else None
         add(
             event_id=f"session_created:{session.session_id}",
             state_version=0,
@@ -677,6 +704,7 @@ class AgentSessionAuditService:
             actor=session.created_by,
             actor_kind="human",
             provenance="server_record",
+            model=session.model,
             missing=[name for name, value in identity.items() if value is None],
             data={
                 "policy": session.policy.model_dump(mode="json"),
@@ -687,6 +715,7 @@ class AgentSessionAuditService:
         )
 
         for action in records.actions:
+            action_model = _recorded_model(action.metadata.get("model"))
             submitted_by = action.metadata.get("submitted_by")
             autonomous = bool(action.metadata.get("autonomous", False))
             actor = submitted_by or (session.created_by if autonomous else None)
@@ -716,7 +745,8 @@ class AgentSessionAuditService:
                 task_name=action.task_name,
                 qid=action.qids[0] if len(action.qids) == 1 else None,
                 intervention_id=action.metadata.get("intervention_id"),
-                missing=[] if actor else ["actor"],
+                model=action_model,
+                missing=([] if actor else ["actor"]) + ([] if action_model else ["model"]),
                 data={
                     "action_type": action.action_type.value,
                     "qids": list(action.qids),
@@ -818,7 +848,9 @@ class AgentSessionAuditService:
                 action_id=decision.evidence_action_ids[0] if decision.evidence_action_ids else None,
                 intervention_id=decision.intervention_id,
                 decision_id=decision.decision_id,
-                missing=[] if decision.assessment else ["assessment"],
+                model=decision.model,
+                missing=([] if decision.assessment else ["assessment"])
+                + ([] if decision.model else ["model"]),
                 data={
                     "assessment": decision.assessment.value if decision.assessment else None,
                     "interpretation": decision.interpretation,
@@ -836,6 +868,14 @@ class AgentSessionAuditService:
             )
 
         for commit in records.commits:
+            # A commit under session authority acts on the agent's pass decision; its model
+            # is the one QDash froze from that decision. A reviewed commit is a person's.
+            scoped = commit.authority == "session_policy"
+            commit_model = (
+                _recorded_model(commit.assessment_evidence.get("assessment", {}).get("model"))
+                if scoped
+                else None
+            )
             before = _snapshot_value(commit.before_snapshot)
             after = _snapshot_value(commit.after_snapshot)
             reason = "Candidate persistence failed" if commit.status == "failed" else commit.reason
@@ -848,9 +888,15 @@ class AgentSessionAuditService:
                     f"Commit of {commit.parameter_name} = {commit.value} on {commit.qid}: "
                     f"{commit.status}"
                     + (f" (was {before})" if commit.status == "committed" else "")
+                    + (
+                        " under the session's approved update authority"
+                        if commit.authority == "session_policy"
+                        else ""
+                    )
                 ),
                 actor=commit.committed_by,
-                actor_kind="human",
+                # A session_policy commit is the agent acting on the creator's one approval.
+                actor_kind="agent" if commit.authority == "session_policy" else "human",
                 provenance="server_record",
                 status=commit.status,
                 status_is_current=True,
@@ -860,9 +906,13 @@ class AgentSessionAuditService:
                 task_name=commit.task_name,
                 qid=commit.qid,
                 commit_id=commit.commit_id,
-                missing=[]
-                if commit.status != "committed" or commit.after_snapshot is not None
-                else ["after_snapshot"],
+                model=commit_model,
+                missing=(
+                    []
+                    if commit.status != "committed" or commit.after_snapshot is not None
+                    else ["after_snapshot"]
+                )
+                + (["model"] if scoped and commit_model is None else []),
                 data={
                     "parameter_name": commit.parameter_name,
                     "value": commit.value,
@@ -872,6 +922,9 @@ class AgentSessionAuditService:
                     "committed_at": _utc(commit.committed_at),
                     "state_version_before": commit.state_version_before,
                     "state_version_after": commit.state_version_after,
+                    "authority": commit.authority,
+                    "decision_id": commit.decision_id,
+                    "assessment_evidence": commit.assessment_evidence,
                 },
             )
             if commit.backend_requested_at is not None:
@@ -903,6 +956,8 @@ class AgentSessionAuditService:
                         "base_git_commit": commit.backend_base_git_commit,
                         "git_commit": commit.backend_git_commit,
                         "push_to_github": commit.backend_push_to_github,
+                        "authority": commit.backend_authority,
+                        "requested_by": commit.backend_requested_by,
                         "applied_at": _utc(commit.backend_applied_at),
                         "error_recorded": bool(commit.backend_error),
                     },
@@ -968,6 +1023,8 @@ class AgentSessionAuditService:
                 task_name=item.task_name,
                 qid=item.qids[0] if len(item.qids) == 1 else None,
                 intervention_id=item.intervention_id,
+                model=item.model,
+                missing=[] if item.model else ["model"],
                 data={
                     "reason": item.reason.value,
                     "summary": item.summary,

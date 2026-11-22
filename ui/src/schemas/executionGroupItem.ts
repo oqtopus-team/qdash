@@ -28,6 +28,6 @@ export interface ExecutionGroupItem {
   children_total?: number;
   /** The session's executions that match the day filter */
   children_in_filter?: number;
-  /** Earlier executions left out of children; the journey lists all */
+  /** Earlier executions left out of children; the graph lists all */
   children_omitted?: number;
 }

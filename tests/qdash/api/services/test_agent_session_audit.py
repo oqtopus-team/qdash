@@ -31,6 +31,7 @@ from qdash.datamodel.agent_session import (
     AgentActionDecision,
     AgentActionType,
     AgentAutonomy,
+    AgentModelIdentity,
     AgentSessionPolicy,
     NumericBounds,
 )
@@ -89,7 +90,7 @@ def _session(
     project_id: str = PROJECT,
     skill_name: str = "",
     skill_version: str = "",
-    model_name: str = "",
+    model: AgentModelIdentity | None = None,
 ):
     return sessions.create_session(
         project_id=project_id,
@@ -107,7 +108,7 @@ def _session(
             ),
             skill_name=skill_name,
             skill_version=skill_version,
-            model_name=model_name,
+            model=model,
         ),
     )
 
@@ -121,6 +122,7 @@ def _submit(
     qids: list[str] | None = None,
     overrides: dict[str, float] | None = None,
     project_id: str = PROJECT,
+    model: AgentModelIdentity | None = None,
 ):
     version = sessions.get_session(project_id=project_id, session_id=session_id).state_version
     return sessions.submit_action(
@@ -135,6 +137,7 @@ def _submit(
             qids=qids or ["Q00"],
             parameter_overrides=overrides or {},
             diagnosis=f"Measure {task} to locate the next value.",
+            model=model,
         ),
     )
 
@@ -242,7 +245,10 @@ async def test_measurement_decision_commit_and_dependent_step_form_one_timeline(
 ) -> None:
     """Intent, parameters, results, gates, decision, commit, apply, and the next step."""
     session = _session(
-        sessions, skill_name="qdash-agent-calibration", skill_version="0.9.0", model_name="m-1"
+        sessions,
+        skill_name="qdash-agent-calibration",
+        skill_version="0.9.0",
+        model=AgentModelIdentity(provider="local", model_id="m-1", host="pi"),
     )
     first = _submit(sessions, session.session_id, key="a-1", overrides={"qubit_frequency": 5.1})
     task_id = _finish(
@@ -335,7 +341,8 @@ async def test_measurement_decision_commit_and_dependent_step_form_one_timeline(
     assert result.schema_version == "qdash.agent-session-audit.v1"
     assert result.complete is True
     assert result.session.missing == ["skill_hash"]
-    assert result.session.model_name == "m-1"
+    assert result.session.model_name == "local/m-1"
+    assert result.session.model == AgentModelIdentity(provider="local", model_id="m-1", host="pi")
     ids = [event.event_id for event in result.events]
     # Stored times have millisecond precision, so records written in the same millisecond
     # (the apply and the next proposal here) may share a timestamp; causal pairs still order.
@@ -615,7 +622,120 @@ def test_decision_snapshot_stays_frozen_while_current_status_moves(
     assert _event(result, f"measurement:{action.action_id}").status == "completed"
     frozen = _event(result, f"decision:{decided.decision_id}")
     assert frozen.data["evidence_snapshot"]["actions"][0]["execution_status"] == "running"
-    assert frozen.missing == ["assessment"]
+    assert frozen.missing == ["assessment", "model"]
+
+
+def test_model_switch_between_steps_keeps_each_records_reported_model(
+    sessions: AgentSessionService, audit: AgentSessionAuditService
+) -> None:
+    """Each record keeps the model its host reported; a later switch rewrites nothing."""
+    pi_model = AgentModelIdentity(provider="ollama", model_id="qwen3:32b", host="pi")
+    # The same model ID under another provider is another identity.
+    web_model = AgentModelIdentity(provider="vllm", model_id="qwen3:32b", host="qdash-web-agent")
+    session = _session(sessions, model=pi_model)
+    policy = session.policy
+    first = _submit(sessions, session.session_id, key="a-1", model=pi_model)
+    decided = _decision(
+        audit,
+        session.session_id,
+        key="d-1",
+        evidence_action_ids=[first.action_id],
+        next_action="repeat",
+        model=pi_model.model_dump(),
+    )
+    # The session resumes in another host with another provider.
+    second = _submit(sessions, session.session_id, key="a-2", model=web_model)
+    redecided = _decision(
+        audit,
+        session.session_id,
+        key="d-2",
+        evidence_action_ids=[second.action_id],
+        next_action="next_task",
+        model=web_model.model_dump(),
+    )
+    asked = sessions.submit_action(
+        project_id=PROJECT,
+        session_id=session.session_id,
+        username=OWNER,
+        body=SubmitAgentActionRequest(
+            idempotency_key="a-3",
+            expected_state_version=sessions.get_session(
+                project_id=PROJECT, session_id=session.session_id
+            ).state_version,
+            action_type=AgentActionType.REQUEST_HUMAN,
+            diagnosis="The frequency moved; is the readout stable?",
+            model=web_model,
+        ),
+    )
+    # A retry under the new model returns the first record unchanged, not a conflict.
+    retried = sessions.submit_action(
+        project_id=PROJECT,
+        session_id=session.session_id,
+        username=OWNER,
+        body=SubmitAgentActionRequest(
+            idempotency_key="a-1",
+            expected_state_version=first.state_version_before,
+            action_type=AgentActionType.RUN_TASK,
+            task_name="CheckQubitFrequency",
+            qids=["Q00"],
+            diagnosis="Measure CheckQubitFrequency to locate the next value.",
+            model=web_model,
+        ),
+    )
+    assert retried.action_id == first.action_id
+    assert retried.model == pi_model
+    replayed = _decision(
+        audit,
+        session.session_id,
+        key="d-1",
+        evidence_action_ids=[first.action_id],
+        next_action="repeat",
+        model=web_model.model_dump(),
+    )
+    assert replayed.decision_id == decided.decision_id
+    assert replayed.model == pi_model
+
+    current = sessions.get_session(project_id=PROJECT, session_id=session.session_id)
+    assert current.model == pi_model
+    assert current.model_name == "ollama/qwen3:32b"
+    assert current.policy == policy  # the switch changed no scope or approval
+    assert current.action_count == 2  # request_human uses no measurement budget
+
+    result = audit.export_audit(project_id=PROJECT, session_id=session.session_id)
+    assert result.session.model == pi_model
+    assert "model" not in result.session.missing
+    assert _event(result, "session_created:" + session.session_id).model == pi_model
+    assert _event(result, f"action_proposed:{first.action_id}").model == pi_model
+    assert _event(result, f"decision:{decided.decision_id}").model == pi_model
+    assert _event(result, f"action_proposed:{second.action_id}").model == web_model
+    assert _event(result, f"decision:{redecided.decision_id}").model == web_model
+    assert _event(result, f"action_proposed:{asked.action_id}").model == web_model
+    assert asked.intervention_id is not None
+    opened = _event(result, f"intervention_opened:{asked.intervention_id}")
+    assert opened.model == web_model
+    assert opened.missing == []
+    exported = result.model_dump(mode="json")
+    models = {event["event_id"]: event["model"] for event in exported["events"] if event["model"]}
+    assert models[f"action_proposed:{second.action_id}"] == {
+        "provider": "vllm",
+        "model_id": "qwen3:32b",
+        "host": "qdash-web-agent",
+    }
+    assert any("does not verify" in note for note in result.notes)
+
+
+@pytest.mark.parametrize(
+    "identity",
+    [
+        {"provider": "openai", "model_id": "https://api.example/v1/models/x"},
+        {"provider": "local", "model_id": "model with prose"},
+        {"provider": "", "model_id": "m"},
+        {"provider": "local", "model_id": "m", "host": "Pi CLI"},
+    ],
+)
+def test_model_identity_accepts_identifiers_only(identity: dict[str, str]) -> None:
+    with pytest.raises(ValueError):
+        AgentModelIdentity.model_validate(identity)
 
 
 def test_legacy_session_shows_known_facts_and_marks_missing_metadata(
@@ -625,7 +745,9 @@ def test_legacy_session_shows_known_facts_and_marks_missing_metadata(
     session = _session(sessions)
     AgentSessionDocument.get_motor_collection().update_one(
         {"session_id": session.session_id},
-        {"$set": {"skill_name": "", "skill_version": "", "model_name": ""}},
+        # An older record held a free-text model_name the agent supplied; it is not an
+        # identity and is not shown as one.
+        {"$set": {"skill_name": "", "skill_version": "", "model_name": "claimed-model"}},
     )
     legacy = AgentActionDocument(
         action_id="legacy-1",
@@ -652,11 +774,17 @@ def test_legacy_session_shows_known_facts_and_marks_missing_metadata(
         "skill_name",
         "skill_version",
         "skill_hash",
-        "model_name",
+        "model",
     }
+    assert result.session.model is None
+    assert result.session.model_name == ""
+    created = _event(result, "session_created:" + session.session_id)
+    assert created.model is None
+    assert "model" in created.missing
     proposed = _event(result, "action_proposed:legacy-1")
     assert proposed.actor is None
-    assert proposed.missing == ["actor"]
+    assert proposed.model is None
+    assert proposed.missing == ["actor", "model"]
     measurement = _event(result, "measurement:legacy-1")
     assert measurement.status == "completed"
     assert set(measurement.missing) == {"task_result", "decision"}

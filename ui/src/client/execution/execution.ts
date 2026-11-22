@@ -25,7 +25,7 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
-  AgentSessionJourneyResponse,
+  AgentSessionGraphResponse,
   ArtifactPreviewResponse,
   CancelExecutionResponse,
   Detail,
@@ -857,15 +857,15 @@ export function useListExecutionGroups<TData = Awaited<ReturnType<typeof listExe
  * order measurements were dispatched; the other kinds come from references in the records.
  * It is a live read, not a snapshot; the session audit endpoints hold the full record.
  * A session of another project is not found.
- * @summary Get an agent session as a journey over its executions
+ * @summary Get an agent session as a graph over its executions
  */
-export const getAgentSessionJourney = (
+export const getAgentSessionGraph = (
     sessionId: string,
  options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
 
 
-      return customInstance<AgentSessionJourneyResponse>(
+      return customInstance<AgentSessionGraphResponse>(
       {url: `/executions/groups/agent-sessions/${sessionId}`, method: 'GET', signal
     },
       options);
@@ -874,69 +874,69 @@ export const getAgentSessionJourney = (
 
 
 
-export const getGetAgentSessionJourneyQueryKey = (sessionId: string,) => {
+export const getGetAgentSessionGraphQueryKey = (sessionId: string,) => {
     return [
     `/executions/groups/agent-sessions/${sessionId}`
     ] as const;
     }
 
 
-export const getGetAgentSessionJourneyQueryOptions = <TData = Awaited<ReturnType<typeof getAgentSessionJourney>>, TError = Detail | HTTPValidationError>(sessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAgentSessionJourney>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getGetAgentSessionGraphQueryOptions = <TData = Awaited<ReturnType<typeof getAgentSessionGraph>>, TError = Detail | HTTPValidationError>(sessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAgentSessionGraph>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetAgentSessionJourneyQueryKey(sessionId);
+  const queryKey =  queryOptions?.queryKey ?? getGetAgentSessionGraphQueryKey(sessionId);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAgentSessionJourney>>> = ({ signal }) => getAgentSessionJourney(sessionId, requestOptions, signal);
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAgentSessionGraph>>> = ({ signal }) => getAgentSessionGraph(sessionId, requestOptions, signal);
 
 
 
 
 
-   return  { queryKey, queryFn, enabled: sessionId !== null && sessionId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAgentSessionJourney>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+   return  { queryKey, queryFn, enabled: sessionId !== null && sessionId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAgentSessionGraph>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
-export type GetAgentSessionJourneyQueryResult = NonNullable<Awaited<ReturnType<typeof getAgentSessionJourney>>>
-export type GetAgentSessionJourneyQueryError = Detail | HTTPValidationError
+export type GetAgentSessionGraphQueryResult = NonNullable<Awaited<ReturnType<typeof getAgentSessionGraph>>>
+export type GetAgentSessionGraphQueryError = Detail | HTTPValidationError
 
 
-export function useGetAgentSessionJourney<TData = Awaited<ReturnType<typeof getAgentSessionJourney>>, TError = Detail | HTTPValidationError>(
- sessionId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAgentSessionJourney>>, TError, TData>> & Pick<
+export function useGetAgentSessionGraph<TData = Awaited<ReturnType<typeof getAgentSessionGraph>>, TError = Detail | HTTPValidationError>(
+ sessionId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAgentSessionGraph>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getAgentSessionJourney>>,
+          Awaited<ReturnType<typeof getAgentSessionGraph>>,
           TError,
-          Awaited<ReturnType<typeof getAgentSessionJourney>>
+          Awaited<ReturnType<typeof getAgentSessionGraph>>
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetAgentSessionJourney<TData = Awaited<ReturnType<typeof getAgentSessionJourney>>, TError = Detail | HTTPValidationError>(
- sessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAgentSessionJourney>>, TError, TData>> & Pick<
+export function useGetAgentSessionGraph<TData = Awaited<ReturnType<typeof getAgentSessionGraph>>, TError = Detail | HTTPValidationError>(
+ sessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAgentSessionGraph>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getAgentSessionJourney>>,
+          Awaited<ReturnType<typeof getAgentSessionGraph>>,
           TError,
-          Awaited<ReturnType<typeof getAgentSessionJourney>>
+          Awaited<ReturnType<typeof getAgentSessionGraph>>
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetAgentSessionJourney<TData = Awaited<ReturnType<typeof getAgentSessionJourney>>, TError = Detail | HTTPValidationError>(
- sessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAgentSessionJourney>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export function useGetAgentSessionGraph<TData = Awaited<ReturnType<typeof getAgentSessionGraph>>, TError = Detail | HTTPValidationError>(
+ sessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAgentSessionGraph>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary Get an agent session as a journey over its executions
+ * @summary Get an agent session as a graph over its executions
  */
 
-export function useGetAgentSessionJourney<TData = Awaited<ReturnType<typeof getAgentSessionJourney>>, TError = Detail | HTTPValidationError>(
- sessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAgentSessionJourney>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export function useGetAgentSessionGraph<TData = Awaited<ReturnType<typeof getAgentSessionGraph>>, TError = Detail | HTTPValidationError>(
+ sessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAgentSessionGraph>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getGetAgentSessionJourneyQueryOptions(sessionId,options)
+  const queryOptions = getGetAgentSessionGraphQueryOptions(sessionId,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

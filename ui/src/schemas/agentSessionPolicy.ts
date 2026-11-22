@@ -8,6 +8,7 @@
 import type { AgentActionType } from './agentActionType';
 import type { AgentAutonomy } from './agentAutonomy';
 import type { AgentSessionPolicyAllowedOverrides } from './agentSessionPolicyAllowedOverrides';
+import type { AgentSessionPolicyParameterUpdates } from './agentSessionPolicyParameterUpdates';
 import type { AgentSessionPolicyQualityGates } from './agentSessionPolicyQualityGates';
 
 /**
@@ -36,4 +37,6 @@ export interface AgentSessionPolicy {
      * @maximum 20
      */
   max_rounds_per_target?: number;
+  /** Opt-in authority to commit (and optionally apply) passing candidates without a per-update approval; absent means every commit and apply is reviewed */
+  parameter_updates?: AgentSessionPolicyParameterUpdates;
 }

@@ -80,9 +80,14 @@ const EVENTS = [
     kind: "decision",
     provenance: "agent_reported",
     summary: "Assessed pass; next next_task",
+    model: { provider: "vllm", model_id: "qwen3:32b", host: "qdash-web-agent" },
     data: { interpretation: "R2 0.98 passes the criterion." },
   }),
 ];
+
+const PI_MODEL = { provider: "ollama", model_id: "qwen3:32b", host: "pi" };
+/** The audit header's identity fields: absent in a session that recorded no model. */
+let header: Record<string, unknown> = { missing: ["model"] };
 
 const audits: { cursor: unknown; project: unknown }[] = [];
 let exported = 0;
@@ -140,7 +145,7 @@ const fakeAdapter: AxiosAdapter = async (config) => {
       schema_version: "qdash.agent-session-audit.v1",
       generated_at: "2026-11-21T02:00:00Z",
       snapshot_id: snapshot,
-      session: { ...SESSION, missing: ["model_name"] },
+      session: { ...SESSION, ...header },
       events: page,
       total_events: 3,
       next_cursor: cursor ? null : `${snapshot}:2`,
@@ -169,6 +174,7 @@ describe("AgentSessionAuditTimeline", () => {
     exported = 0;
     failAudit = null;
     snapshot = "snap-1";
+    header = { missing: ["model"] };
     AXIOS_INSTANCE.defaults.adapter = fakeAdapter;
   });
   afterEach(() => {
@@ -182,7 +188,9 @@ describe("AgentSessionAuditTimeline", () => {
     expect(await screen.findByText("CheckRabi on Q00: completed")).toBeTruthy();
     expect(screen.getByText(/Showing 2 of 3 events as read at/)).toBeTruthy();
     expect(screen.getByText("Not recorded: decision")).toBeTruthy();
-    expect(screen.getByText("The session did not record: model_name.")).toBeTruthy();
+    // A session without a reported model says so and names none.
+    expect(screen.getByText("The session did not record: model.")).toBeTruthy();
+    expect(screen.queryByText(/Created with model/)).toBeNull();
     expect(screen.getByText("control_amplitude 0.05")).toBeTruthy();
     expect(screen.getByText("control_amplitude accepted")).toBeTruthy();
     expect(screen.getByRole("link", { name: "Result and figures" }).getAttribute("href")).toBe(
@@ -193,9 +201,26 @@ describe("AgentSessionAuditTimeline", () => {
     fireEvent.click(screen.getByRole("button", { name: "Load more" }));
     expect(await screen.findByText("R2 0.98 passes the criterion.")).toBeTruthy();
     expect(screen.getByText("Agent statement")).toBeTruthy();
+    // Each event names the model its own record reported, and who reported it.
+    const model = screen.getByText("model vllm/qwen3:32b");
+    expect(model.getAttribute("title")).toBe(
+      "Reported by qdash-web-agent; QDash does not verify it",
+    );
+    expect(screen.getAllByText(/^model /)).toHaveLength(1);
     expect(screen.getByText(/Showing 3 of 3 events/)).toBeTruthy();
     expect(screen.getByText("End of the timeline")).toBeTruthy();
     expect(audits[audits.length - 1]).toEqual({ cursor: "snap-1:2", project: "lab-a" });
+  });
+
+  it("shows the model the creating host reported, labelled as not verified", async () => {
+    header = { model: PI_MODEL, model_name: "ollama/qwen3:32b", missing: [] };
+    setup();
+    expect(
+      await screen.findByText(
+        /Created with model ollama\/qwen3:32b, reported by pi and not verified by QDash/,
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText(/The session did not record/)).toBeNull();
   });
 
   it("never joins pages of two snapshots and reads the audit again on request", async () => {

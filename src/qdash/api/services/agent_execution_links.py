@@ -12,7 +12,7 @@ one chip: the execution is looked up in the session's project and on the session
 action whose operation resolves elsewhere links nothing.
 
 The resolution is deterministic and shared by the grouped list, the execution detail, and the
-session journey and audit measurement attribution:
+session graph and audit measurement attribution:
 
 - An action resolves through its ``operation_id`` first, then its ``execution_id``. A flow run
   id that several executions carry resolves to the earliest of them by ``start_at``, then by
@@ -40,6 +40,7 @@ from qdash.datamodel.agent_session import (
     AgentActionDecision,
     AgentActionType,
     AgentSessionStatus,
+    model_label,
 )
 from qdash.dbmodel.agent_session import AgentActionDocument, AgentSessionDocument
 from qdash.dbmodel.execution_history import ExecutionHistoryDocument
@@ -242,7 +243,7 @@ _SESSION_FIELDS = {
     "status": 1,
     "expires_at": 1,
     "created_by": 1,
-    "model_name": 1,
+    "model": 1,
 }
 
 
@@ -256,7 +257,7 @@ def _linked(link: ExecutionLink, session: dict[str, Any]) -> ExecutionAgentSessi
             AgentSessionStatus(session["status"]), session.get("expires_at")
         ),
         created_by=session.get("created_by") or None,
-        model_name=session.get("model_name") or "",
+        model_name=model_label(session.get("model")),
     )
 
 

@@ -42,7 +42,9 @@ class AgentSessionResponse(BaseModel):
     skill_name: str
     skill_version: str
     skill_hash: str
-    model_name: str
+    # The model the creating host reported (client reported, not verified); None when none.
+    model: dict[str, str] | None = None
+    model_name: str = ""
     status: str
     state_version: int
     action_count: int

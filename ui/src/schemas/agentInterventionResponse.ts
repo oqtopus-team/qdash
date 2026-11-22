@@ -10,6 +10,7 @@ import type { AgentInterventionEvent } from './agentInterventionEvent';
 import type { AgentInterventionReason } from './agentInterventionReason';
 import type { AgentInterventionResponseActionId } from './agentInterventionResponseActionId';
 import type { AgentInterventionResponseCheckpoint } from './agentInterventionResponseCheckpoint';
+import type { AgentInterventionResponseModel } from './agentInterventionResponseModel';
 import type { AgentInterventionResponseNodeId } from './agentInterventionResponseNodeId';
 import type { AgentInterventionResponsePreviousInterventionId } from './agentInterventionResponsePreviousInterventionId';
 import type { AgentInterventionResponseResponse } from './agentInterventionResponseResponse';
@@ -54,6 +55,8 @@ export interface AgentInterventionResponse {
   resume_outcome?: AgentInterventionResponseResumeOutcome;
   notification: AgentNotificationDeliveryResponse;
   events: AgentInterventionEvent[];
+  /** The model the client host reported for this record; null when none was reported. Client reported, not verified by QDash. */
+  model?: AgentInterventionResponseModel;
   created_at: string;
   updated_at: string;
   session_status: AgentSessionStatus;

@@ -85,7 +85,7 @@ describe("ExecutionDetailClient parameter changes", () => {
 describe("ExecutionDetailClient agent session link", () => {
   afterEach(() => cleanup());
 
-  it("links a measurement to its agent session journey", () => {
+  it("links a measurement to its agent session graph", () => {
     execution = {
       name: "agent:CheckRabi",
       status: "completed",
@@ -95,7 +95,7 @@ describe("ExecutionDetailClient agent session link", () => {
     };
     render(<ExecutionDetailClient chipId="64Q" executionId="exec-1" />);
     expect(screen.getByRole("note").textContent).toContain("One measurement of agent session");
-    expect(screen.getByRole("link", { name: "Open journey" }).getAttribute("href")).toBe(
+    expect(screen.getByRole("link", { name: "Open session graph" }).getAttribute("href")).toBe(
       "/execution/64Q/sessions/s-1",
     );
   });
@@ -133,7 +133,7 @@ describe("ExecutionDetailClient agent session link", () => {
     };
     render(<ExecutionDetailClient chipId="64Q" executionId="exec-1" />);
     expect(screen.getByRole("note").textContent).toContain("listed as its own execution");
-    expect(screen.queryByRole("link", { name: "Open journey" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Open session graph" })).toBeNull();
     expect(screen.queryByText("Run by:")).toBeNull();
     expect(screen.queryByText("Agent")).toBeNull();
   });

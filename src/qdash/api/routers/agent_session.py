@@ -317,6 +317,7 @@ async def apply_agent_candidate_commit(
         commit_id=commit_id,
         body=body,
         flow_service=flow_service,
+        username=ctx.user.username,
     )
 
 

@@ -8,6 +8,7 @@
 import type { AgentActionDecision } from './agentActionDecision';
 import type { AgentActionResponseExecutionId } from './agentActionResponseExecutionId';
 import type { AgentActionResponseInterventionId } from './agentActionResponseInterventionId';
+import type { AgentActionResponseModel } from './agentActionResponseModel';
 import type { AgentActionResponseOperationId } from './agentActionResponseOperationId';
 import type { AgentActionResponseParameterOverrides } from './agentActionResponseParameterOverrides';
 import type { AgentActionResponseTaskName } from './agentActionResponseTaskName';
@@ -37,4 +38,6 @@ export interface AgentActionResponse {
   intervention_id?: AgentActionResponseInterventionId;
   /** Whether QDash authorized the action as an autonomous step */
   autonomous?: boolean;
+  /** The model the client host reported for this record; null when none was reported. Client reported, not verified by QDash. */
+  model?: AgentActionResponseModel;
 }

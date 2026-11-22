@@ -14,6 +14,7 @@ import type { AgentAuditEventDecisionId } from './agentAuditEventDecisionId';
 import type { AgentAuditEventEvaluationId } from './agentAuditEventEvaluationId';
 import type { AgentAuditEventExecutionId } from './agentAuditEventExecutionId';
 import type { AgentAuditEventInterventionId } from './agentAuditEventInterventionId';
+import type { AgentAuditEventModel } from './agentAuditEventModel';
 import type { AgentAuditEventProvenance } from './agentAuditEventProvenance';
 import type { AgentAuditEventQid } from './agentAuditEventQid';
 import type { AgentAuditEventStatus } from './agentAuditEventStatus';
@@ -54,6 +55,8 @@ export interface AgentAuditEvent {
   evaluation_id?: AgentAuditEventEvaluationId;
   intervention_id?: AgentAuditEventInterventionId;
   decision_id?: AgentAuditEventDecisionId;
+  /** The model the client host reported for the record behind an agent event: the session's creation, an action proposal, a decision, an agent's intervention request, or a commit made under session authority (the model of the decision it rests on). Client reported, not verified by QDash; null when none was reported, and then named in missing */
+  model?: AgentAuditEventModel;
   /** Facts the records do not hold for this event; never filled in */
   missing?: string[];
   /** Kind-specific details; see the developer guide */

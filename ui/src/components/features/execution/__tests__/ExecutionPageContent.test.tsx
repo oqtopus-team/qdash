@@ -711,7 +711,7 @@ describe("ExecutionPageContent agent session groups", () => {
     expect(screen.getByText(/Waiting for an expert/)).toBeTruthy();
     expect(screen.getByText("3 executions, 2 of them in 1 agent session; 2 rows")).toBeTruthy();
     expect(screen.getByText(/1 rejected proposal/)).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Open journey" }).getAttribute("href")).toBe(
+    expect(screen.getByRole("link", { name: "Open session graph" }).getAttribute("href")).toBe(
       "/execution/chip-1/sessions/session-1?project=project-1",
     );
     // Children stay folded until the row is expanded.
@@ -754,9 +754,9 @@ describe("ExecutionPageContent agent session groups", () => {
     fireEvent.click(screen.getByText("Running Execution"));
     const panel = screen.getByRole("complementary", { name: "Execution details" });
     expect(within(panel).getByText(/One measurement of agent session/)).toBeTruthy();
-    expect(within(panel).getByRole("link", { name: "Open journey" }).getAttribute("href")).toBe(
-      "/execution/chip-1/sessions/session-1",
-    );
+    expect(
+      within(panel).getByRole("link", { name: "Open session graph" }).getAttribute("href"),
+    ).toBe("/execution/chip-1/sessions/session-1");
   });
 
   it("switches to the flat list without grouping", () => {

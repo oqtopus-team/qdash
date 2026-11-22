@@ -40,7 +40,7 @@ from qdash.api.schemas.execution import (
     ListExecutionsResponse,
 )
 from qdash.api.schemas.execution_group import (
-    AgentSessionJourneyResponse,
+    AgentSessionGraphResponse,
     ListExecutionGroupsResponse,
 )
 from qdash.api.services.artifact_preview_service import preview_netcdf
@@ -360,16 +360,16 @@ def list_execution_groups(
 
 @router.get(
     "/executions/groups/agent-sessions/{session_id}",
-    response_model=AgentSessionJourneyResponse,
+    response_model=AgentSessionGraphResponse,
     responses={404: {"model": Detail}},
-    summary="Get an agent session as a journey over its executions",
-    operation_id="getAgentSessionJourney",
+    summary="Get an agent session as a graph over its executions",
+    operation_id="getAgentSessionGraph",
 )
-def get_agent_session_journey(
+def get_agent_session_graph(
     session_id: str,
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
     group_service: Annotated[ExecutionGroupService, Depends(get_execution_group_service)],
-) -> AgentSessionJourneyResponse:
+) -> AgentSessionGraphResponse:
     """Return one agent session's measurements, proposals, decisions, and interventions.
 
     Nodes are typed and carry ids of the authoritative records (actions, executions, task
@@ -378,7 +378,7 @@ def get_agent_session_journey(
     It is a live read, not a snapshot; the session audit endpoints hold the full record.
     A session of another project is not found.
     """
-    return group_service.journey(project_id=ctx.project_id, session_id=session_id)
+    return group_service.get_session_graph(project_id=ctx.project_id, session_id=session_id)
 
 
 @router.get(

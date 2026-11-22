@@ -1,4 +1,4 @@
-"""Schemas of the Execution list grouped by agent session, and of one session's journey.
+"""Schemas of the Execution list grouped by agent session, and of one session's graph.
 
 An agent session is not an execution: it is the policy, budget, and pause authority of one
 agent request. Each measurement it dispatched is an ordinary execution with its own status and
@@ -13,7 +13,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from qdash.api.schemas.execution import ExecutionAgentSessionLink, ExecutionResponseSummary
-from qdash.datamodel.agent_session import AgentSessionStatus
+from qdash.datamodel.agent_session import AgentModelIdentity, AgentSessionStatus
 
 __all__ = ["ExecutionAgentSessionLink"]
 
@@ -78,7 +78,16 @@ class AgentSessionGroupSummary(BaseModel):
     allowed_tasks: list[str]
     autonomy: str
     skill_name: str = ""
-    model_name: str = ""
+    model: AgentModelIdentity | None = Field(
+        default=None,
+        description=(
+            "The model the creating host reported; later steps carry their own. Client "
+            "reported, not verified by QDash"
+        ),
+    )
+    model_name: str = Field(
+        default="", description="provider/model_id of model; empty when none was reported"
+    )
     counts: AgentSessionGroupCounts
     latest_activity_at: datetime = Field(
         description="The session's latest measurement start, or its creation before the first"
@@ -134,7 +143,7 @@ class ExecutionGroupItem(BaseModel):
         default=0, description="The session's executions that match the day filter"
     )
     children_omitted: int = Field(
-        default=0, description="Earlier executions left out of children; the journey lists all"
+        default=0, description="Earlier executions left out of children; the graph lists all"
     )
 
 
@@ -160,17 +169,17 @@ class ListExecutionGroupsResponse(BaseModel):
     children_limit: int = Field(description="Most executions one session row lists")
 
 
-# ---------------------------------------------------------------------- journey
+# ---------------------------------------------------------------------- graph
 
-AgentJourneyNodeKind = Literal[
+AgentSessionGraphNodeKind = Literal[
     "measurement", "proposal", "session_action", "decision", "intervention"
 ]
-AgentJourneyEdgeKind = Literal[
+AgentSessionGraphEdgeKind = Literal[
     "sequence", "evidence", "next_action", "retry_of", "escalation", "follow_up"
 ]
 
 
-class AgentJourneyMeasurement(BaseModel):
+class AgentSessionGraphMeasurement(BaseModel):
     """A measurement the session authorized, and what its real execution reports."""
 
     action_id: str
@@ -202,7 +211,7 @@ class AgentJourneyMeasurement(BaseModel):
     intent: str = Field(default="", description="The agent's stated intent; agent reported")
 
 
-class AgentJourneyProposal(BaseModel):
+class AgentSessionGraphProposal(BaseModel):
     """An action that did not reach hardware: rejected by the policy."""
 
     action_id: str
@@ -213,7 +222,7 @@ class AgentJourneyProposal(BaseModel):
     intent: str = Field(default="", description="The agent's stated intent; agent reported")
 
 
-class AgentJourneySessionAction(BaseModel):
+class AgentSessionGraphSessionAction(BaseModel):
     """An authorized action other than a measurement: asking for an expert, or completing."""
 
     action_id: str
@@ -221,7 +230,7 @@ class AgentJourneySessionAction(BaseModel):
     reason: str = ""
 
 
-class AgentJourneyDecision(BaseModel):
+class AgentSessionGraphDecision(BaseModel):
     """The agent's reading of earlier results and the step it chose; agent reported."""
 
     decision_id: str
@@ -236,7 +245,7 @@ class AgentJourneyDecision(BaseModel):
     supersedes_decision_id: str | None = None
 
 
-class AgentJourneyIntervention(BaseModel):
+class AgentSessionGraphIntervention(BaseModel):
     """A stop for an expert and the expert's answer."""
 
     intervention_id: str
@@ -253,12 +262,12 @@ class AgentJourneyIntervention(BaseModel):
     resume_outcome: str | None = None
 
 
-class AgentJourneyNode(BaseModel):
-    """One step of the journey. Exactly the field named by ``kind`` is set."""
+class AgentSessionGraphNode(BaseModel):
+    """One step of the graph. Exactly the field named by ``kind`` is set."""
 
     node_id: str = Field(description="Stable id: the kind and the id of its record")
-    kind: AgentJourneyNodeKind
-    order: int = Field(description="0-based position in time among all nodes of the journey")
+    kind: AgentSessionGraphNodeKind
+    order: int = Field(description="0-based position in time among all nodes of the graph")
     at: datetime
     label: str
     status: str = Field(
@@ -272,6 +281,13 @@ class AgentJourneyNode(BaseModel):
     status_is_current: bool = Field(
         default=False, description="The status is read live from a record that can still change"
     )
+    model: AgentModelIdentity | None = Field(
+        default=None,
+        description=(
+            "The model the client host reported for the action, decision, or intervention "
+            "record; client reported, not verified by QDash. Null when none was reported"
+        ),
+    )
     missing: list[str] = Field(
         default_factory=list,
         description=(
@@ -280,14 +296,14 @@ class AgentJourneyNode(BaseModel):
             "(shown from the session's pending payload, not written yet)"
         ),
     )
-    measurement: AgentJourneyMeasurement | None = None
-    proposal: AgentJourneyProposal | None = None
-    session_action: AgentJourneySessionAction | None = None
-    decision: AgentJourneyDecision | None = None
-    intervention: AgentJourneyIntervention | None = None
+    measurement: AgentSessionGraphMeasurement | None = None
+    proposal: AgentSessionGraphProposal | None = None
+    session_action: AgentSessionGraphSessionAction | None = None
+    decision: AgentSessionGraphDecision | None = None
+    intervention: AgentSessionGraphIntervention | None = None
 
 
-class AgentJourneyEdge(BaseModel):
+class AgentSessionGraphEdge(BaseModel):
     """A typed link between two nodes.
 
     ``sequence`` is temporal only: the next measurement dispatched. Every other kind comes from
@@ -296,13 +312,13 @@ class AgentJourneyEdge(BaseModel):
     """
 
     edge_id: str
-    kind: AgentJourneyEdgeKind
+    kind: AgentSessionGraphEdgeKind
     source: str
     target: str
 
 
-class AgentSessionJourneyResponse(BaseModel):
-    """One agent session as an experiment journey over its real executions.
+class AgentSessionGraphResponse(BaseModel):
+    """One agent session as an experiment graph over its real executions.
 
     A live read of the session's records, collected one after another: statuses can move while
     it is read, and it is not a snapshot. The full audit, with its consistency check and export,
@@ -311,8 +327,8 @@ class AgentSessionJourneyResponse(BaseModel):
 
     generated_at: datetime
     session: AgentSessionGroupSummary
-    nodes: list[AgentJourneyNode]
-    edges: list[AgentJourneyEdge]
+    nodes: list[AgentSessionGraphNode]
+    edges: list[AgentSessionGraphEdge]
     total_nodes: int
     omitted_nodes: int = Field(
         description="Earliest nodes left out to bound the response; the audit holds them all"

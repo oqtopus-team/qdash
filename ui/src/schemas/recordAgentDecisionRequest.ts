@@ -8,6 +8,7 @@
 import type { AgentDecisionNextAction } from './agentDecisionNextAction';
 import type { RecordAgentDecisionRequestAssessment } from './recordAgentDecisionRequestAssessment';
 import type { RecordAgentDecisionRequestInterventionId } from './recordAgentDecisionRequestInterventionId';
+import type { RecordAgentDecisionRequestModel } from './recordAgentDecisionRequestModel';
 import type { RecordAgentDecisionRequestNextActionId } from './recordAgentDecisionRequestNextActionId';
 import type { RecordAgentDecisionRequestSupersedesDecisionId } from './recordAgentDecisionRequestSupersedesDecisionId';
 
@@ -58,4 +59,6 @@ export interface RecordAgentDecisionRequest {
   intervention_id?: RecordAgentDecisionRequestInterventionId;
   /** An earlier decision of this session that this record corrects */
   supersedes_decision_id?: RecordAgentDecisionRequestSupersedesDecisionId;
+  /** The provider and model the client host reports it ran the agent with, read from the host's own runtime, never from the agent's tool arguments. Recorded as reported; QDash does not verify it, and it changes no scope or approval. Omitted when the host does not know it. */
+  model?: RecordAgentDecisionRequestModel;
 }

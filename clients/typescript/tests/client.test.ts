@@ -159,7 +159,7 @@ describe("QDashClient", () => {
       skill_name: "pi-extension",
       skill_version: "0.1.0",
       skill_hash: "hash",
-      model_name: "model",
+      model: { provider: "ollama", model_id: "qwen3:32b", host: "pi" },
     });
 
     expect(request?.method).toBe("POST");
@@ -168,6 +168,7 @@ describe("QDashClient", () => {
       policy: { allowed_qids: ["32"] },
       skill_name: "pi-extension",
       expires_in_seconds: 21600,
+      model: { provider: "ollama", model_id: "qwen3:32b", host: "pi" },
     });
   });
 
@@ -272,6 +273,9 @@ describe("QDashClient", () => {
     await client.submitAgentAction("s-1", { ...step, autonomous: true, repeatOfActionId: "a-0" });
     await client.executeAgentAction("s-1", "a-1", { autonomous: true });
     await client.createAgentIntervention("s-1", { idempotencyKey: "h", reason: "agent_request", summary: "s", question: "q", autonomous: true });
+    const model = { provider: "vllm", model_id: "qwen3-32b", host: "qdash-web-agent" };
+    await client.submitAgentAction("s-1", { ...step, model });
+    await client.createAgentIntervention("s-1", { idempotencyKey: "h2", reason: "agent_request", summary: "s", question: "q", model });
 
     expect(requests[0]).toMatchObject({ method: "GET", path: "/api/auth/me" });
     // Without the flag the request is what an older server already accepts.
@@ -280,6 +284,11 @@ describe("QDashClient", () => {
     expect(requests[2]!.body).toMatchObject({ autonomous: true, repeat_of_action_id: "a-0" });
     expect(requests[3]!.body).toEqual({ update_params: false, reconfigure: false, autonomous: true });
     expect(requests[4]!.body).toMatchObject({ idempotency_key: "h", autonomous: true });
+    // The host's model is sent only when the host reported one.
+    expect(requests[1]!.body).not.toHaveProperty("model");
+    expect(requests[4]!.body).not.toHaveProperty("model");
+    expect(requests[5]!.body).toMatchObject({ model });
+    expect(requests[6]!.body).toMatchObject({ model });
   });
 
   it("reads a session's interventions without changing them", async () => {
@@ -338,6 +347,7 @@ describe("QDashClient", () => {
       nextAction: "next_task",
       nextActionId: "a-2",
       supersedesDecisionId: "d-0",
+      model: { provider: "ollama", model_id: "qwen3:32b", host: "pi" },
     });
     expect((await client.listAgentDecisions("s 1")).map((item) => item.decision_id)).toEqual(["d-1"]);
     await client.getAgentSessionAudit("s 1", { cursor: "c-1", limit: 50 });
@@ -352,7 +362,12 @@ describe("QDashClient", () => {
       evidence_action_ids: ["a-1"],
       evaluation_ids: [],
     });
-    expect(requests[1]!.body).toMatchObject({ assessment: "pass", next_action_id: "a-2", supersedes_decision_id: "d-0" });
+    expect(requests[1]!.body).toMatchObject({
+      assessment: "pass",
+      next_action_id: "a-2",
+      supersedes_decision_id: "d-0",
+      model: { provider: "ollama", model_id: "qwen3:32b", host: "pi" },
+    });
     expect(requests[3]!.url.pathname).toBe("/api/agent-sessions/s%201/audit");
     expect(requests[3]!.url.searchParams.get("cursor")).toBe("c-1");
     expect(requests[3]!.url.searchParams.get("limit")).toBe("50");

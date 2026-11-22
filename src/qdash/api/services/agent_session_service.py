@@ -39,6 +39,15 @@ from qdash.api.schemas.agent_session import (
     SubmitAgentActionRequest,
 )
 from qdash.api.services.agent_intervention_service import AgentInterventionService
+from qdash.api.services.agent_parameter_update import (
+    BASELINE_METADATA_KEY,
+    check_apply,
+    check_commit,
+    downstream_refusal,
+    paused_session_overlap,
+    record_baseline,
+    update_authority,
+)
 from qdash.api.services.agent_session_gate import (
     autonomous_session_refusal,
     expire_session_if_due,
@@ -55,7 +64,16 @@ from qdash.common.utils.datetime import now
 from qdash.datamodel.agent_session import (
     AgentActionDecision,
     AgentActionType,
+    AgentAutonomy,
     AgentSessionStatus,
+    model_label,
+)
+from qdash.dbmodel.agent_parameter_state import (
+    StoredParameter,
+    acquire_backend_apply_lock,
+    compare_and_set_parameter,
+    read_parameter,
+    release_backend_apply_lock,
 )
 from qdash.dbmodel.agent_session import (
     AgentActionDocument,
@@ -64,11 +82,14 @@ from qdash.dbmodel.agent_session import (
     AgentSessionDocument,
 )
 from qdash.dbmodel.chip import ChipDocument
+from qdash.dbmodel.evaluation import EvaluationDocument
 from qdash.dbmodel.execution_history import ExecutionHistoryDocument
 from qdash.dbmodel.qubit import QubitDocument
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from qdash.api.schemas.task_file import TaskInfo
     from qdash.api.services.flow_service import FlowService
     from qdash.api.services.task_file_service import TaskFileService
@@ -114,7 +135,9 @@ class AgentSessionService:
 
     @staticmethod
     def _session_response(doc: AgentSessionDocument) -> AgentSessionResponse:
-        return AgentSessionResponse.model_validate(doc.model_dump())
+        return AgentSessionResponse.model_validate(
+            {**doc.model_dump(), "model_name": model_label(doc.model)}
+        )
 
     @staticmethod
     def _action_response(doc: AgentActionDocument) -> AgentActionResponse:
@@ -123,6 +146,7 @@ class AgentSessionService:
                 **doc.model_dump(),
                 "intervention_id": doc.metadata.get("intervention_id"),
                 "autonomous": bool(doc.metadata.get("autonomous", False)),
+                "model": doc.metadata.get("model"),
             }
         )
 
@@ -194,8 +218,9 @@ class AgentSessionService:
     @staticmethod
     def _request_hash(body: SubmitAgentActionRequest) -> str:
         # Fields at their defaults hash as they did before they existed, so a retry of an
-        # older request still matches its record.
-        exclude = {
+        # older request still matches its record. The reported model is provenance, not part
+        # of the proposal: a retry keeps the first record's model.
+        exclude = {"model"} | {
             name
             for name, default in (("autonomous", False), ("repeat_of_action_id", None))
             if getattr(body, name) == default
@@ -209,8 +234,10 @@ class AgentSessionService:
 
     @staticmethod
     def _backend_apply_request_hash(body: ApplyAgentCandidateRequest) -> str:
+        # A reviewed request hashes as it did before autonomous existed.
+        exclude = {"autonomous"} if not body.autonomous else set()
         payload = json.dumps(
-            body.model_dump(mode="json"),
+            body.model_dump(mode="json", exclude=exclude),
             sort_keys=True,
             separators=(",", ":"),
         )
@@ -227,7 +254,11 @@ class AgentSessionService:
             {
                 "action_id": action_id,
                 "parameter_name": parameter_name,
-                "body": body.model_dump(mode="json"),
+                # A reviewed request hashes as it did before autonomous commits existed.
+                "body": body.model_dump(
+                    mode="json",
+                    exclude={"autonomous", "decision_id"} if not body.autonomous else set(),
+                ),
             },
             sort_keys=True,
             separators=(",", ":"),
@@ -262,6 +293,23 @@ class AgentSessionService:
                 detail=f"Chip '{body.chip_id}' not found",
             )
 
+        # An auto session acts without per-call approval, so it must not start work a paused
+        # session of the same user is waiting on a person for.
+        paused = (
+            paused_session_overlap(project_id, body.chip_id, username, body.policy.qids)
+            if body.policy.autonomy == AgentAutonomy.AUTO
+            else None
+        )
+        if paused is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    f"Your agent session {paused.session_id} on {body.chip_id} is paused for "
+                    f"a person (intervention {paused.active_intervention_id}) and covers "
+                    "these qubits. A new session would bypass that pause; wait for the "
+                    "answer, or have the paused session stopped, first."
+                ),
+            )
         policy = body.policy.model_copy(
             update={
                 "qids": list(dict.fromkeys(body.policy.qids)),
@@ -279,7 +327,7 @@ class AgentSessionService:
             skill_name=body.skill_name,
             skill_version=body.skill_version,
             skill_hash=body.skill_hash,
-            model_name=body.model_name,
+            model=body.model,
             expires_at=timestamp + timedelta(seconds=body.expires_in_seconds),
             created_at=timestamp,
             updated_at=timestamp,
@@ -424,6 +472,42 @@ class AgentSessionService:
         )
         return [self._refresh_action_execution(doc) for doc in docs]
 
+    def _candidates_reader(
+        self, project_id: str, session_id: str
+    ) -> Callable[[str], list[AgentCandidateResponse]]:
+        """Read an action's gated candidates; raises when its result cannot be read."""
+
+        def read(action_id: str) -> list[AgentCandidateResponse]:
+            return self.list_action_candidates(
+                project_id=project_id, session_id=session_id, action_id=action_id
+            ).items
+
+        return read
+
+    @staticmethod
+    def _evaluations_of(action: AgentActionDocument) -> list[EvaluationDocument]:
+        """The evaluations of an action's authoritative task result; empty when none exist."""
+        if action.execution_id is None or not action.task_name or len(action.qids) != 1:
+            return []
+        task_result = TaskResultHistoryDocument.find_one(
+            {
+                "project_id": action.project_id,
+                "execution_id": action.execution_id,
+                "name": action.task_name,
+                "qid": action.qids[0],
+            },
+            sort=[("end_at", SortDirection.DESCENDING)],
+        ).run()
+        if task_result is None:
+            return []
+        return cast(
+            "list[EvaluationDocument]",
+            EvaluationDocument.find(
+                {"project_id": action.project_id, "task_id": task_result.task_id},
+                sort=[("requested_at", SortDirection.ASCENDING)],
+            ).run(),
+        )
+
     def _autonomous_step_refusal(
         self,
         project_id: str,
@@ -502,6 +586,17 @@ class AgentSessionService:
                     "identical measurement of this session"
                 ),
             )
+        if body.task_name and qid:
+            waiting = downstream_refusal(
+                session=session,
+                actions=actions,
+                task_name=body.task_name,
+                qid=qid,
+                candidates_of=self._candidates_reader(project_id, session.session_id),
+                evaluations_of=self._evaluations_of,
+            )
+            if waiting:
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=waiting)
 
     def submit_action(
         self,
@@ -590,6 +685,7 @@ class AgentSessionService:
                 action_id=action_id,
                 username=username or session.created_by,
                 diagnosis=body.diagnosis,
+                model=body.model,
             )
             increments = {"state_version": 1}
         state_version_after = session.state_version + 1
@@ -614,10 +710,23 @@ class AgentSessionService:
         if username:
             # The authenticated account that proposed the action, for the audit timeline.
             action.metadata["submitted_by"] = username
+        if body.model is not None:
+            # The model the client host reported for this proposal; provenance only.
+            action.metadata["model"] = body.model.model_dump(mode="json")
         if body.autonomous:
             action.metadata["autonomous"] = True
             if body.repeat_of_action_id is not None:
                 action.metadata["repeat_of_action_id"] = body.repeat_of_action_id
+            if decision == AgentActionDecision.AUTHORIZED and (
+                body.action_type == AgentActionType.RUN_TASK
+            ):
+                # The stored values this measurement starts from; an autonomous commit of its
+                # result writes only while the stored value is still exactly this one.
+                baseline = record_baseline(
+                    session, body.task_name, body.qids[0] if body.qids else None
+                )
+                if baseline is not None:
+                    action.metadata[BASELINE_METADATA_KEY] = baseline
         if intervention is not None:
             # The pause and both records are one session update; the records are written
             # from it below, or by the next load of the session after a crash.
@@ -933,6 +1042,7 @@ class AgentSessionService:
                     f"expected {body.expected_state_version}, current {session.state_version}"
                 ),
             )
+        updates = update_authority(session, username) if body.autonomous else None
         candidates = self.list_action_candidates(
             project_id=project_id,
             session_id=session_id,
@@ -954,6 +1064,22 @@ class AgentSessionService:
                 status_code=status.HTTP_409_CONFLICT,
                 detail=f"Candidate gate rejected the value: {candidate.reason}",
             )
+        evidence: dict[str, Any] = {}
+        baseline: StoredParameter | None = None
+        if updates is not None and body.decision_id is not None:
+            grounds = check_commit(
+                session=session,
+                updates=updates,
+                action=self._refresh_action_execution(
+                    self._get_action_document(project_id, session_id, action_id)
+                ),
+                candidate=candidate,
+                decision_id=body.decision_id,
+                session_run_tasks=self._session_run_tasks(project_id, session_id),
+                candidates_of=self._candidates_reader(project_id, session_id),
+                evaluations_of=self._evaluations_of,
+            )
+            evidence, baseline = grounds.evidence, grounds.baseline
 
         timestamp = now()
         commit = AgentCandidateCommitDocument(
@@ -976,6 +1102,9 @@ class AgentSessionService:
             state_version_before=session.state_version,
             state_version_after=session.state_version + 1,
             created_at=timestamp,
+            authority="session_policy" if body.autonomous else "reviewed",
+            decision_id=body.decision_id,
+            assessment_evidence=evidence,
         )
         replay = self._reserve_commit(
             commit, session, request_hash, gone="candidate commit was being reserved"
@@ -984,17 +1113,18 @@ class AgentSessionService:
             return self._candidate_commit_response(cast("AgentCandidateCommitDocument", replay))
         commit.reason = "Candidate passed deterministic gate; persistence reserved"
 
+        stale_detail: str | None = None
         try:
-            qubit = QubitDocument.find_one(
-                {
-                    "project_id": project_id,
-                    "chip_id": session.chip_id,
-                    "qid": candidate.qid,
-                }
-            ).run()
-            if qubit is None:
+            stored = read_parameter(
+                project_id, session.chip_id, candidate.qid, candidate.parameter_name
+            )
+            if stored is None:
                 raise ValueError(f"Qubit '{candidate.qid}' not found in chip '{session.chip_id}'")
-            before = deepcopy(qubit.data.get(candidate.parameter_name))
+            # An autonomous commit writes over the value its measurement started from; a
+            # reviewed one over the value read here. Either way the write below is a
+            # compare-and-set, so a write by anyone else in between is never overwritten.
+            expected = baseline if baseline is not None else stored
+            before = deepcopy(expected.value) if expected.present else None
             commit.before_snapshot = (
                 before if isinstance(before, dict) or before is None else {"value": before}
             )
@@ -1009,17 +1139,23 @@ class AgentSessionService:
                 "task_id": candidate.task_id,
                 "calibrated_at": timestamp,
             }
-            updated_qubit = QubitDocument.update_calib_data(
-                username=username,
-                qid=candidate.qid,
-                chip_id=session.chip_id,
-                output_parameters={candidate.parameter_name: parameter_snapshot},
+            after = compare_and_set_parameter(
                 project_id=project_id,
+                chip_id=session.chip_id,
+                qid=candidate.qid,
+                name=candidate.parameter_name,
+                expected=expected,
+                snapshot=parameter_snapshot,
+                username=username,
             )
-            after = deepcopy(updated_qubit.data.get(candidate.parameter_name))
-            commit.after_snapshot = (
-                after if isinstance(after, dict) or after is None else {"value": after}
-            )
+            if after is None:
+                stale_detail = (
+                    f"The stored {candidate.parameter_name} of {candidate.qid} changed before "
+                    "the commit could write it; nothing was written. Read the session again "
+                    "and measure again if the result may be stale."
+                )
+                raise ValueError(stale_detail)
+            commit.after_snapshot = deepcopy(after)
             commit.status = "committed"
             commit.reason = "Candidate committed to authoritative QDash calibration state"
             commit.committed_at = now()
@@ -1028,6 +1164,11 @@ class AgentSessionService:
             commit.status = "failed"
             commit.reason = f"Candidate persistence failed: {exc}"
             commit.save()
+            if stale_detail is not None:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"{stale_detail} (audit record '{commit.commit_id}')",
+                ) from exc
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=(
@@ -1262,6 +1403,7 @@ class AgentSessionService:
         commit_id: str,
         body: ApplyAgentCandidateRequest,
         flow_service: FlowService,
+        username: str = "",
     ) -> AgentCandidateCommitResponse:
         """Dispatch a committed candidate to the worker-side backend apply flow."""
         request_hash = self._backend_apply_request_hash(body)
@@ -1309,6 +1451,15 @@ class AgentSessionService:
                     status_code=status.HTTP_409_CONFLICT,
                     detail="Candidate backend apply was already requested with different content",
                 )
+        if body.autonomous:
+            check_apply(
+                session=session,
+                updates=update_authority(session, username),
+                commit=commit,
+                session_run_tasks=self._session_run_tasks(project_id, session_id),
+                candidates_of=self._candidates_reader(project_id, session_id),
+                evaluations_of=self._evaluations_of,
+            )
 
         timestamp = now()
         token = str(uuid4())
@@ -1318,7 +1469,10 @@ class AgentSessionService:
                 "session_id": session_id,
                 "commit_id": commit_id,
                 "status": "committed",
-                "backend_status": {"$in": ["not_started", "failed"]},
+                # An autonomous apply never retries a failed one; that needs a person.
+                "backend_status": {
+                    "$in": ["not_started"] if body.autonomous else ["not_started", "failed"]
+                },
             },
             {
                 "$set": {
@@ -1331,6 +1485,8 @@ class AgentSessionService:
                     "backend_error": "",
                     "backend_dispatch_token": token,
                     "backend_dispatch_confirmed": False,
+                    "backend_authority": "session_policy" if body.autonomous else "reviewed",
+                    "backend_requested_by": username or None,
                 }
             },
             return_document=ReturnDocument.BEFORE,
@@ -1355,10 +1511,12 @@ class AgentSessionService:
                 detail="Candidate backend apply is already in progress",
             )
 
+        apply_chip = commit.chip_id or session.chip_id
         reservation = {"commit_id": commit_id, "backend_dispatch_token": token}
         commits = AgentCandidateCommitDocument.get_motor_collection()
-        if not pass_execution_gate(project_id, session_id):
-            # Paused or ended after the reservation: restore the previous apply state.
+
+        def restore() -> None:
+            """Return an unconfirmed reservation to the previous apply state."""
             commits.update_one(
                 {**reservation, "backend_dispatch_confirmed": False},
                 {
@@ -1372,11 +1530,36 @@ class AgentSessionService:
                             "backend_requested_at",
                             "backend_operation_id",
                             "backend_error",
+                            "backend_authority",
+                            "backend_requested_by",
                         )
                     }
                     | {"backend_dispatch_token": None, "backend_dispatch_confirmed": None},
                 },
             )
+
+        # One agent apply writes a chip's parameter files at a time, from this reservation
+        # until the worker settles it (see qdash.dbmodel.agent_parameter_state).
+        holder = acquire_backend_apply_lock(
+            project_id=project_id,
+            chip_id=apply_chip,
+            session_id=session_id,
+            commit_id=commit_id,
+            token=token,
+        )
+        if holder is not None:
+            restore()
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    f"The backend apply of commit {holder} on chip {apply_chip} has not "
+                    "settled; wait for it before another apply on the chip"
+                ),
+            )
+        if not pass_execution_gate(project_id, session_id):
+            # Paused or ended after the reservation: restore the previous apply state.
+            restore()
+            release_backend_apply_lock(apply_chip, commit_id, token)
             current = self._get_session_document(project_id, session_id)
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -1388,6 +1571,7 @@ class AgentSessionService:
             return_document=ReturnDocument.AFTER,
         )
         if confirmed is None:
+            release_backend_apply_lock(apply_chip, commit_id, token)
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="The backend apply reservation was released as abandoned; retry",
@@ -1405,6 +1589,7 @@ class AgentSessionService:
                 {**reservation, "project_id": project_id},
                 {"$set": {"backend_status": "failed", "backend_error": str(exc)}},
             )
+            release_backend_apply_lock(apply_chip, commit_id, token)
             raise
 
         commits.update_one(

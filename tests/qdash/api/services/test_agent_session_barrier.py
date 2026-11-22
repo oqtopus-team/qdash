@@ -743,7 +743,8 @@ def test_a_commit_reserved_before_the_pause_finishes_and_blocks_resume_meanwhile
     session_id = _session(sessions)
     action_id = _authorize_run(sessions, session_id)
     _completed_with_candidate(session_id, action_id)
-    write = QubitDocument.update_calib_data
+    from qdash.dbmodel.agent_parameter_state import compare_and_set_parameter as write
+
     seen: list[list[str]] = []
 
     def pause_during_write(**kwargs: Any) -> Any:
@@ -751,7 +752,9 @@ def test_a_commit_reserved_before_the_pause_finishes_and_blocks_resume_meanwhile
         seen.append(_blockers(interventions, session_id, iid))
         return write(**kwargs)
 
-    monkeypatch.setattr(QubitDocument, "update_calib_data", staticmethod(pause_during_write))
+    monkeypatch.setattr(
+        "qdash.api.services.agent_session_service.compare_and_set_parameter", pause_during_write
+    )
     committed = sessions.commit_action_candidate(
         project_id=PROJECT,
         session_id=session_id,

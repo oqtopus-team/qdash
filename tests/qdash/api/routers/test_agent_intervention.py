@@ -208,13 +208,13 @@ def test_other_projects_cannot_see_or_answer(test_client, slack: FakeSlack) -> N
     assert answered.status_code == 404
 
 
-def _create_session(test_client, token: str, project_id: str = "lab-a") -> str:
+def _create_session(test_client, token: str, project_id: str = "lab-a", qid: str = "Q00") -> str:
     created = test_client.post(
         "/agent-sessions",
         headers=_headers(token, project_id),
         json={
             "chip_id": "chip-001",
-            "policy": {"qids": ["Q00"], "allowed_tasks": ["CheckRabi"], "autonomy": "auto"},
+            "policy": {"qids": [qid], "allowed_tasks": ["CheckRabi"], "autonomy": "auto"},
         },
     )
     assert created.status_code == 201, created.text
@@ -228,8 +228,19 @@ def test_list_sessions_filters_settles_and_keeps_projects_apart(
     from qdash.dbmodel.project_membership import ProjectMembershipDocument
 
     paused, _ = _open_intervention(test_client)
-    active = _create_session(test_client, "owner-token")
-    lapsed = _create_session(test_client, "owner-token")
+    # The owner's paused session covers Q00, and an auto session must not bypass that pause.
+    refused = test_client.post(
+        "/agent-sessions",
+        headers=_headers("owner-token"),
+        json={
+            "chip_id": "chip-001",
+            "policy": {"qids": ["Q00"], "allowed_tasks": ["CheckRabi"], "autonomy": "auto"},
+        },
+    )
+    assert refused.status_code == 409, refused.text
+    assert "is paused for a person" in refused.json()["detail"]
+    active = _create_session(test_client, "owner-token", qid="Q01")
+    lapsed = _create_session(test_client, "owner-token", qid="Q01")
     other_project = _create_session(test_client, "owner-token", "lab-b")
     # An editor in the same project creates a session of their own.
     membership = ProjectMembershipDocument.find_one(

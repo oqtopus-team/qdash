@@ -22,7 +22,7 @@ import {
   interventionStatusStyle,
   sessionStatusLabel,
 } from "./interventionLabels";
-import { sessionJourneyHref } from "@/components/features/execution/agentSessionDisplay";
+import { sessionGraphHref } from "@/components/features/execution/agentSessionDisplay";
 
 import { AgentSessionAuditTimeline } from "./AgentSessionAuditTimeline";
 import { projectRequest, useLinkedProject } from "./useLinkedProject";
@@ -133,7 +133,7 @@ export function AgentSessionPageContent({ sessionId }: { sessionId: string }) {
             </div>
             <div className="sm:col-span-2 md:col-span-4">
               <Link
-                href={sessionJourneyHref(data.chip_id, sessionId, projectId)}
+                href={sessionGraphHref(data.chip_id, sessionId, projectId)}
                 className="link link-hover text-sm"
               >
                 View the measurements on the Execution page

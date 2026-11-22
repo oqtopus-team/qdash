@@ -20,6 +20,7 @@ from qdash.datamodel.agent_session import (
     AgentInterventionReason,
     AgentInterventionResponseRecord,
     AgentInterventionStatus,
+    AgentModelIdentity,
     AgentNotificationDelivery,
     AgentPlanCheckpoint,
     AgentResumeOutcomeRecord,
@@ -39,7 +40,8 @@ class AgentSessionDocument(Document):
     skill_name: str = ""
     skill_version: str = ""
     skill_hash: str = ""
-    model_name: str = ""
+    # The model the creating host reported; None when it reported none.
+    model: AgentModelIdentity | None = None
     status: AgentSessionStatus = AgentSessionStatus.ACTIVE
     state_version: int = 0
     action_count: int = 0
@@ -127,6 +129,13 @@ class AgentCandidateCommitDocument(Document):
     # Reservation of one backend apply dispatch; unconfirmed until it passed the session gate.
     backend_dispatch_token: str | None = None
     backend_dispatch_confirmed: bool | None = None
+    # "reviewed" (approved per call) or "session_policy" (the session's parameter_updates).
+    authority: str = "reviewed"
+    # The agent's pass decision a session_policy commit rests on, and what QDash checked.
+    decision_id: str | None = None
+    assessment_evidence: dict[str, Any] = Field(default_factory=dict)
+    backend_authority: str | None = None
+    backend_requested_by: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -153,6 +162,32 @@ class AgentCandidateCommitDocument(Document):
                 ]
             ),
         ]
+
+
+class AgentBackendApplyLockDocument(Document):
+    """Lease that serializes agent candidate backend applies on one chip.
+
+    One record per chip exists while an apply holds it. Acquiring is an insert against the
+    unique ``lock_key``, so two applies on a chip never write its parameter files at the same
+    time. The holder releases it when its apply settles; a record whose holder already settled
+    (its release crashed) is stale and is replaced. See ``qdash.dbmodel.agent_parameter_state``.
+    """
+
+    lock_key: str
+    project_id: str
+    chip_id: str
+    session_id: str
+    commit_id: str
+    token: str
+    acquired_at: datetime = Field(default_factory=now)
+
+    model_config = ConfigDict(from_attributes=True)
+
+    class Settings:
+        """MongoDB collection settings."""
+
+        name = "agent_backend_apply_locks"
+        indexes: ClassVar = [IndexModel([("lock_key", ASCENDING)], unique=True)]
 
 
 class AgentCandidateSetCommitDocument(Document):
@@ -285,6 +320,8 @@ class AgentInterventionDocument(Document):
     resume_outcome: AgentResumeOutcomeRecord | None = None
     notification: AgentNotificationDelivery = Field(default_factory=AgentNotificationDelivery)
     events: list[AgentInterventionEvent] = Field(default_factory=list)
+    # The model the requesting host reported; None when it reported none.
+    model: AgentModelIdentity | None = None
     created_at: datetime = Field(default_factory=now)
     updated_at: datetime = Field(default_factory=now)
 
@@ -350,6 +387,8 @@ class AgentDecisionDocument(Document):
     supersedes_decision_id: str | None = None
     # Frozen server-side reading of the cited records: {"actions": [...], "evaluations": [...]}.
     evidence_snapshot: dict[str, Any] = Field(default_factory=dict)
+    # The model the recording host reported; None when it reported none.
+    model: AgentModelIdentity | None = None
     # The record's place in the session's decision quota, 0 up to the quota minus one. The
     # unique index on it makes the quota check and the insert one atomic write: two
     # concurrent recordings cannot take the same slot, so a session never holds more.

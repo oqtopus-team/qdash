@@ -11,6 +11,10 @@ import {
   getGetAgentSessionAuditQueryKey,
 } from "@/client/agent-session/agent-session";
 import type { AgentAuditEvent, AgentSessionAuditResponse } from "@/schemas";
+import {
+  reportedModelLabel,
+  reportedModelTitle,
+} from "@/components/features/execution/agentSessionDisplay";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
 import { formatDateTime } from "@/lib/utils/datetime";
 
@@ -176,6 +180,11 @@ function AuditEventItem({
             {auditProvenanceLabel(event.provenance)}
           </span>
           {event.actor ? <span>{event.actor}</span> : null}
+          {event.model ? (
+            <span title={reportedModelTitle(event.model)}>
+              model {reportedModelLabel(event.model)}
+            </span>
+          ) : null}
           {event.status_is_current && event.status ? (
             <span title="Live status of a record that can still change">now {event.status}</span>
           ) : null}
@@ -257,6 +266,7 @@ export function AgentSessionAuditTimeline({
   const events = pages.flatMap((page) => page.events);
   const total = pages[0]?.total_events ?? 0;
   const missingIdentity = pages[0]?.session.missing ?? [];
+  const sessionModel = pages[0]?.session.model;
   const readAt = pages[0]?.generated_at;
 
   const reload = () => {
@@ -329,6 +339,13 @@ export function AgentSessionAuditTimeline({
               records changed after the timeline loaded. Refresh to show the same records.
             </span>
           </div>
+        ) : null}
+        {sessionModel ? (
+          <p className="text-xs text-base-content/60">
+            Created with model {reportedModelLabel(sessionModel)}, reported by{" "}
+            {sessionModel.host || "the client"} and not verified by QDash. Each entry names the
+            model its own record reported.
+          </p>
         ) : null}
         {missingIdentity.length ? (
           <p className="text-xs text-base-content/60">

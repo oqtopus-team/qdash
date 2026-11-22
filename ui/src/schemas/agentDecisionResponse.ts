@@ -9,6 +9,7 @@ import type { AgentDecisionNextAction } from './agentDecisionNextAction';
 import type { AgentDecisionResponseAssessment } from './agentDecisionResponseAssessment';
 import type { AgentDecisionResponseEvidenceSnapshot } from './agentDecisionResponseEvidenceSnapshot';
 import type { AgentDecisionResponseInterventionId } from './agentDecisionResponseInterventionId';
+import type { AgentDecisionResponseModel } from './agentDecisionResponseModel';
 import type { AgentDecisionResponseNextActionId } from './agentDecisionResponseNextActionId';
 import type { AgentDecisionResponseSupersedesDecisionId } from './agentDecisionResponseSupersedesDecisionId';
 
@@ -36,4 +37,6 @@ export interface AgentDecisionResponse {
   supersedes_decision_id?: AgentDecisionResponseSupersedesDecisionId;
   /** What QDash's records said about the cited evidence when it was recorded */
   evidence_snapshot?: AgentDecisionResponseEvidenceSnapshot;
+  /** The model the client host reported for this record; null when none was reported. Client reported, not verified by QDash. */
+  model?: AgentDecisionResponseModel;
 }

@@ -237,7 +237,7 @@ test("the production chat registry: present_results reaches its classifier; scri
 
     // The model's write call still asks the user for approval and does not run.
     assert.equal(write.toolName, "qdash_save_flow");
-    assert.deepEqual(write.details.approval, { id: "w1", tool: "qdash_save_flow", label: "qdash_save_flow", args: { title: "flow" } });
+    assert.deepEqual(write.details.approval, { id: "w1", tool: "qdash_save_flow", label: "qdash_save_flow", args: { title: "flow" }, model: { provider: "faux", modelId: "faux-1" } });
     assert.equal(save.calls.length, 0);
 
     // Neither the model's tools nor the prompt's list of script tools names the internal classifier.

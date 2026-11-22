@@ -1,4 +1,4 @@
-"""Router tests for the grouped Execution list and the agent session journey."""
+"""Router tests for the grouped Execution list and the agent session graph."""
 
 from __future__ import annotations
 
@@ -125,7 +125,7 @@ def _setup(test_client) -> tuple[str, str]:
     return session_id, action_id
 
 
-def test_viewer_reads_grouped_list_journey_and_detail_link(test_client) -> None:
+def test_viewer_reads_grouped_list_graph_and_detail_link(test_client) -> None:
     session_id, action_id = _setup(test_client)
 
     listed = test_client.get(
@@ -152,11 +152,11 @@ def test_viewer_reads_grouped_list_journey_and_detail_link(test_client) -> None:
     assert flat.json()["total"] == 3
     assert len(flat.json()["executions"]) == 3
 
-    journey = test_client.get(
+    graph = test_client.get(
         f"/executions/groups/agent-sessions/{session_id}", headers=_headers("viewer-token")
     )
-    assert journey.status_code == 200, journey.text
-    nodes = journey.json()["nodes"]
+    assert graph.status_code == 200, graph.text
+    nodes = graph.json()["nodes"]
     assert [node["node_id"] for node in nodes] == [f"action:{action_id}"]
     assert nodes[0]["measurement"]["execution_id"] == "agent-exec-1"
 
@@ -174,7 +174,7 @@ def test_viewer_reads_grouped_list_journey_and_detail_link(test_client) -> None:
     assert manual.json()["agent_session"] is None
 
 
-def test_other_projects_cannot_read_groups_or_journeys(test_client) -> None:
+def test_other_projects_cannot_read_groups_or_graphs(test_client) -> None:
     session_id, _ = _setup(test_client)
     path = f"/executions/groups/agent-sessions/{session_id}"
     assert test_client.get(path, headers=_headers("outsider-token", "lab-b")).status_code == 404

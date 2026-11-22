@@ -38,7 +38,10 @@ again ([The model-driven loop](./agentic-calibration.md#the-model-driven-loop)),
 `max_rounds_per_target` limits node visits. Server-side action checks are the same for both,
 except that a request marked `autonomous` (pi's session-granted tools) also needs the signed-in
 creator of an `auto` session and passes QDash's own checks of running measurements, rounds, and
-repeats; see [Server checks](./agentic-calibration.md#server-checks).
+repeats; see [Server checks](./agentic-calibration.md#server-checks). The optional
+`parameter_updates` grant extends the same one-time approval to commits, and optionally backend
+applies, of named parameters after a recorded pass assessment; see
+[Update authority](./agentic-calibration.md#update-authority).
 
 ## Operation dispatch
 
@@ -93,7 +96,10 @@ deterministic path; the primary path lets the model choose each step in pi or th
   keeps the policy, budget, expiry, and visit counts, and a stopped, completed, or expired
   session is never reactivated.
 - A parameter write-back needs the deterministic bounds and quality gates; a model's proposal
-  alone cannot commit a value.
+  alone cannot commit a value. A commit without a per-call approval also needs the session's
+  `parameter_updates` grant and a recorded `pass` assessment, and is never made from a result
+  assessed `fail` or `inconclusive`. A failed or questionable result stops the session's
+  autonomous steps, a repeat included, until an expert answers an intervention citing it.
 - Each action records its skill hash, model identity, evidence references, decision, and the
   resulting operation.
 - Decision-graph references are validated before dispatch, every node visit is audited, and the

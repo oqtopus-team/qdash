@@ -1,14 +1,14 @@
-import { AgentSessionJourneyPageContent } from "@/components/features/execution/AgentSessionJourneyPageContent";
+import { AgentSessionGraphPageContent } from "@/components/features/execution/AgentSessionGraphPageContent";
 
-interface AgentSessionJourneyPageProps {
+interface AgentSessionGraphPageProps {
   params: Promise<{
     chipId: string;
     sessionId: string;
   }>;
 }
 
-export default async function AgentSessionJourneyPage({ params }: AgentSessionJourneyPageProps) {
+export default async function AgentSessionGraphPage({ params }: AgentSessionGraphPageProps) {
   const { chipId, sessionId } = await params;
 
-  return <AgentSessionJourneyPageContent chipId={chipId} sessionId={sessionId} />;
+  return <AgentSessionGraphPageContent chipId={chipId} sessionId={sessionId} />;
 }

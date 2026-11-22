@@ -88,6 +88,48 @@ class AgentActionDecision(str, Enum):
     REJECTED = "rejected"
 
 
+_MODEL_IDENTIFIER_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9._:/@+\-]*$"
+
+
+class AgentModelIdentity(BaseModel):
+    """The provider and model a client host reports it ran the agent with.
+
+    The host (pi CLI, the QDash web Agent, or another API client) reads it from its own
+    runtime and sends it with the request; the agent's tool arguments never supply it. QDash
+    records it as reported and cannot verify it. A model ID is only unique within its
+    provider, so the two are always recorded together. Only identifiers are accepted: no
+    endpoint URLs, credentials, or free text.
+    """
+
+    provider: str = Field(min_length=1, max_length=100, pattern=_MODEL_IDENTIFIER_PATTERN)
+    model_id: str = Field(min_length=1, max_length=200, pattern=_MODEL_IDENTIFIER_PATTERN)
+    host: str = Field(
+        default="",
+        max_length=64,
+        pattern=r"^([a-z0-9][a-z0-9._-]*)?$",
+        description="The client host that reported the identity, such as pi or qdash-web-agent",
+    )
+
+    @model_validator(mode="after")
+    def reject_urls(self) -> AgentModelIdentity:
+        """Refuse an endpoint URL in place of an identifier."""
+        if "://" in self.provider or "://" in self.model_id:
+            raise ValueError("provider and model_id must be identifiers, not URLs")
+        return self
+
+
+def model_label(identity: AgentModelIdentity | dict[str, Any] | None) -> str:
+    """``provider/model_id`` for display, or an empty string when no identity was recorded."""
+    if identity is None:
+        return ""
+    if isinstance(identity, dict):
+        try:
+            identity = AgentModelIdentity.model_validate(identity)
+        except ValueError:
+            return ""
+    return f"{identity.provider}/{identity.model_id}"
+
+
 class AgentDecisionAssessment(str, Enum):
     """How the agent judged the evidence a decision cites; reported by the agent."""
 
@@ -134,6 +176,42 @@ class NumericBounds(BaseModel):
         return not (self.maximum is not None and value > self.maximum)
 
 
+class AgentParameterUpdatePolicy(BaseModel):
+    """Opt-in authority, approved once with the session, to commit passing results.
+
+    Without it (the default, and every session created before it existed) a candidate is
+    committed or applied only through the reviewed calls a person approves each time. With
+    it, the session's creator may let the agent commit a candidate of one of ``parameters``
+    from a completed measurement of one of ``tasks`` on a session qubit, and with
+    ``apply_backend`` also write that committed value to the backend, without a per-update
+    approval. QDash still requires, for every such update, an explicit ``pass`` assessment
+    the agent recorded for that measurement, the session's candidate bounds and quality
+    gates, the task's own completion checks, and the current session and calibration state.
+    A failed, uncertain, or unexplained result is never committed this way.
+    """
+
+    parameters: list[str] = Field(
+        min_length=1,
+        max_length=50,
+        description=(
+            "Calibration parameters the agent may commit; each needs both bounds in "
+            "allowed_overrides"
+        ),
+    )
+    tasks: list[str] = Field(
+        min_length=1,
+        max_length=50,
+        description="Tasks whose completed results may supply an update; a subset of allowed_tasks",
+    )
+    apply_backend: bool = Field(
+        default=False,
+        description=(
+            "Also write a value committed under this authority to the backend configuration "
+            "(never pushed to GitHub)"
+        ),
+    )
+
+
 class AgentSessionPolicy(BaseModel):
     """Immutable scope authorized by a user for one agent session."""
 
@@ -161,6 +239,39 @@ class AgentSessionPolicy(BaseModel):
         le=20,
         description="How many times an autonomous plan may run the same node on one target",
     )
+    parameter_updates: AgentParameterUpdatePolicy | None = Field(
+        default=None,
+        description=(
+            "Opt-in authority to commit (and optionally apply) passing candidates without a "
+            "per-update approval; absent means every commit and apply is reviewed"
+        ),
+    )
+
+    @model_validator(mode="after")
+    def validate_parameter_updates(self) -> AgentSessionPolicy:
+        """Keep update authority inside the approved scope and its explicit bounds."""
+        updates = self.parameter_updates
+        if updates is None:
+            return self
+        if self.autonomy != AgentAutonomy.AUTO:
+            raise ValueError("parameter_updates requires autonomy auto")
+        outside = sorted(set(updates.tasks) - set(self.allowed_tasks))
+        if outside:
+            raise ValueError(f"parameter_updates tasks must be allowed tasks: {', '.join(outside)}")
+        for name in updates.parameters:
+            bounds = self.allowed_overrides.get(name)
+            if bounds is None or bounds.minimum is None or bounds.maximum is None:
+                raise ValueError(
+                    f"parameter_updates parameter '{name}' needs both minimum and maximum "
+                    "in allowed_overrides"
+                )
+        self.parameter_updates = updates.model_copy(
+            update={
+                "parameters": list(dict.fromkeys(updates.parameters)),
+                "tasks": list(dict.fromkeys(updates.tasks)),
+            }
+        )
+        return self
 
 
 def _id_field() -> Any:

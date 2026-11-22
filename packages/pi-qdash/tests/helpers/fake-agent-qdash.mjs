@@ -63,12 +63,18 @@ export function startFakeAgentQDash({ username: initialUser = "alice", projectId
     decisions: [],
   };
 
+  /** Like QDash, a stored expiry without an offset is UTC (tests may store one to mimic the real API). */
+  const utcMillis = (value) => Date.parse(/(?:Z|[+-]\d{2}:?\d{2})$/i.test(value) ? value : `${value}Z`);
+
   function sessionView(session) {
-    if ((session.status === "active" || session.status === "waiting_for_human") && Date.parse(session.expires_at) <= tick) {
+    if ((session.status === "active" || session.status === "waiting_for_human") && utcMillis(session.expires_at) <= tick) {
       session.status = "expired";
     }
     const { candidates: _c, ...view } = session;
-    return structuredClone(view);
+    const copy = structuredClone(view);
+    // A release before update authority drops the unknown policy field.
+    if (legacy) delete copy.policy.parameter_updates;
+    return copy;
   }
 
   function interventionView(item) {
@@ -110,7 +116,9 @@ export function startFakeAgentQDash({ username: initialUser = "alice", projectId
       skill_name: body.skill_name ?? "",
       skill_version: body.skill_version ?? "",
       skill_hash: body.skill_hash ?? "",
-      model_name: body.model_name ?? "",
+      // The model the host reported, as agent_session_service.py stores it; model_name is its label.
+      model: body.model ?? null,
+      model_name: body.model ? `${body.model.provider}/${body.model.model_id}` : "",
       status: "active",
       state_version: 0,
       action_count: 0,
@@ -204,6 +212,79 @@ export function startFakeAgentQDash({ username: initialUser = "alice", projectId
       return `Action ${finished.at(-1).action_id} already ran this exact measurement; repeat it only with repeat_of_action_id naming a finished identical action`;
     }
     if (body.repeat_of_action_id && !finished.length) return `repeat_of_action_id ${body.repeat_of_action_id} is not a finished identical measurement of this session`;
+    return downstreamRefusal(session, actions, body.task_name, body.qids[0]);
+  }
+
+  /**
+   * QDash's step rule (agent_parameter_update.downstream_refusal), in short: unresolved evidence
+   * anywhere in the session stops every step, a repeat included, until an expert's resume
+   * answer cites that action; a dependent step also waits for the commit of a valid result.
+   */
+  function downstreamRefusal(session, actions, taskName, qid) {
+    const answers = own(state.interventions, session).filter((item) => item.response?.decision === "resume" && ["resumed", "resume_authorized"].includes(item.status));
+    const decisions = own(state.decisions, session);
+    const grant = session.policy.parameter_updates;
+    const resolved = new Set();
+    for (const action of actions) {
+      if (action.execution_status === "not_started" || !SETTLED.has(action.execution_status)) continue;
+      const label = `${action.task_name} on ${action.qids[0]} (action ${action.action_id})`;
+      const doubts = decisions.filter((item) => item.evidence_action_ids.includes(action.action_id) && ["fail", "inconclusive"].includes(item.assessment));
+      let problem = null;
+      let since = action.created_at;
+      if (action.execution_status !== "completed") problem = `${label} did not complete (${action.execution_status})`;
+      else if (doubts.length) {
+        problem = `${label} was assessed ${doubts.at(-1).assessment}`;
+        since = doubts.at(-1).recorded_at;
+      } else if (grant && grant.tasks.includes(action.task_name)) {
+        const granted = (action.candidates ?? []).filter((item) => grant.parameters.includes(item.parameter_name));
+        const rejected = granted.find((item) => !item.accepted);
+        if (!granted.length) problem = `The result of ${label} carries none of the approved update parameters`;
+        else if (rejected) problem = `The ${rejected.parameter_name} candidate of ${label} was rejected`;
+      }
+      if (!problem) continue;
+      const cited = answers.some((item) => (item.attempts ?? []).some((attempt) => attempt.action_id === action.action_id) && item.response.responded_at >= since);
+      if (cited) {
+        resolved.add(action.action_id);
+        continue;
+      }
+      return `${problem}. QDash stops this session's autonomous steps, commits, and applies until a person answers an intervention about it: call qdash_request_agent_human with attemptActionIds [${action.action_id}].`;
+    }
+    if (!grant) return null;
+    const latest = new Map();
+    for (const action of actions) {
+      if (action.task_name !== taskName && grant.tasks.includes(action.task_name) && action.qids.includes(qid) && action.execution_status === "completed") latest.set(action.task_name, action);
+    }
+    for (const [other, action] of latest) {
+      if (resolved.has(action.action_id)) continue;
+      const label = `${other} on ${qid} (action ${action.action_id})`;
+      for (const candidate of (action.candidates ?? []).filter((item) => grant.parameters.includes(item.parameter_name) && item.accepted)) {
+        if (!state.commits.some((commit) => commit.action_id === action.action_id && commit.parameter_name === candidate.parameter_name)) {
+          return `The accepted ${candidate.parameter_name} of ${label} is not committed. Commit it with qdash_commit_agent_session_update after a pass assessment, or ask a person, before a dependent step.`;
+        }
+      }
+    }
+    return null;
+  }
+
+  function own(list, session) {
+    return list.filter((entry) => entry.session_id === session.session_id);
+  }
+
+  /** QDash's checks of a commit under the session's update authority, in short. */
+  function updateRefusal(session, action, candidate, body) {
+    const refusal = autonomousRefusal(session);
+    if (refusal) return refusal;
+    const grant = session.policy.parameter_updates;
+    if (!grant) return [409, "The session's approval did not grant parameter updates."];
+    if (!grant.parameters.includes(candidate.parameter_name) || !grant.tasks.includes(action.task_name)) return [409, "The session's approval does not grant this update."];
+    const decisions = own(state.decisions, session);
+    const decision = decisions.find((item) => item.decision_id === body.decision_id);
+    if (!decision) return [409, `Decision '${body.decision_id}' is not a decision of this session`];
+    if (!decision.evidence_action_ids.includes(action.action_id)) return [409, `Decision ${decision.decision_id} does not cite action ${action.action_id} as its evidence`];
+    if (decision.assessment !== "pass") return [409, `Decision ${decision.decision_id} assessed the result as ${decision.assessment ?? "not stated"}; only an explicit pass can ground an update.`];
+    const doubt = decisions.find((item) => item.evidence_action_ids.includes(action.action_id) && ["fail", "inconclusive"].includes(item.assessment));
+    if (doubt) return [409, `Decision ${doubt.decision_id} assessed action ${action.action_id} as ${doubt.assessment}; a failed or uncertain result is never committed under the session's authority.`];
+    if (state.commits.some((commit) => commit.action_id === action.action_id && commit.parameter_name === candidate.parameter_name)) return [409, "The candidate was already committed"];
     return null;
   }
 
@@ -248,10 +329,11 @@ export function startFakeAgentQDash({ username: initialUser = "alice", projectId
       created_at: clock(),
       intervention_id: null,
       autonomous: body.autonomous === true,
+      model: body.model ?? null,
     };
     state.actions.push(action);
     if (!rejection && body.action_type === "request_human") {
-      const item = newIntervention(session, { reason: "agent_request", summary: action.diagnosis, question: action.diagnosis, action_id: action.action_id, idempotency_key: `request-human:${action.action_id}` });
+      const item = newIntervention(session, { reason: "agent_request", summary: action.diagnosis, question: action.diagnosis, action_id: action.action_id, idempotency_key: `request-human:${action.action_id}`, model: action.model });
       action.intervention_id = item.intervention_id;
       pause(session, item);
     } else {
@@ -383,7 +465,9 @@ export function startFakeAgentQDash({ username: initialUser = "alice", projectId
         return send(status, status < 300 ? publicAction(payload) : payload);
       }
       if (parts[4] === "candidates" && parts[6] === "commit" && request.method === "POST") {
-        // The reviewed commit: re-checks the staged candidate and writes the calibration state.
+        // The commit: re-checks the staged candidate and writes the calibration state.
+        const replay = state.commits.find((commit) => commit.session_id === session.session_id && commit.idempotency_key && commit.idempotency_key === body.idempotency_key);
+        if (replay) return send(200, publicCommit(replay));
         sessionView(session);
         if (session.status !== "active") return send(409, { detail: `Agent session is not active: ${session.status}` });
         if (body.expected_state_version !== session.state_version) {
@@ -391,12 +475,37 @@ export function startFakeAgentQDash({ username: initialUser = "alice", projectId
         }
         const candidate = (action.candidates ?? []).find((item) => item.parameter_name === parts[5] && item.task_id === body.task_id);
         if (!candidate || !candidate.accepted) return send(409, { detail: "The candidate is missing or was rejected by the session gates" });
+        if (body.autonomous) {
+          const refusal = updateRefusal(session, action, candidate, body);
+          if (refusal) return send(refusal[0], { detail: refusal[1] });
+        }
         const before = state.calibration[candidate.qid]?.[candidate.parameter_name] ?? null;
         state.calibration[candidate.qid] = { ...(state.calibration[candidate.qid] ?? {}), [candidate.parameter_name]: candidate.value };
-        const commit = { commit_id: id("commit"), session_id: session.session_id, action_id: action.action_id, parameter_name: candidate.parameter_name, value: candidate.value, qid: candidate.qid, status: "committed", before_value: before, state_version_before: session.state_version, state_version_after: session.state_version + 1, created_at: clock() };
+        const commit = {
+          commit_id: id("commit"),
+          session_id: session.session_id,
+          action_id: action.action_id,
+          idempotency_key: body.idempotency_key,
+          task_id: candidate.task_id,
+          parameter_name: candidate.parameter_name,
+          value: candidate.value,
+          qid: candidate.qid,
+          status: "committed",
+          before_value: before,
+          before_snapshot: before === null ? null : { value: before },
+          after_snapshot: { value: candidate.value },
+          committed_by: username,
+          state_version_before: session.state_version,
+          state_version_after: session.state_version + 1,
+          created_at: clock(),
+          authority: body.autonomous ? "session_policy" : "reviewed",
+          decision_id: body.autonomous ? body.decision_id : null,
+          backend_status: "not_started",
+          backend_authority: null,
+        };
         session.state_version += 1;
         state.commits.push(commit);
-        return send(200, commit);
+        return send(200, publicCommit(commit));
       }
       if (parts[4] === "candidates") {
         if (!SETTLED.has(action.execution_status)) return send(409, { detail: "The action has not finished" });
@@ -404,6 +513,25 @@ export function startFakeAgentQDash({ username: initialUser = "alice", projectId
         const items = structuredClone(action.candidates ?? []);
         return send(200, { items, total: items.length });
       }
+    }
+    if (parts[2] === "commits" && parts[4] === "apply" && request.method === "POST") {
+      const commit = state.commits.find((entry) => entry.session_id === session.session_id && entry.commit_id === parts[3]);
+      if (!commit) return send(404, { detail: `Agent candidate commit '${parts[3]}' not found` });
+      if (commit.backend_apply_key === body.idempotency_key) return send(200, publicCommit(commit));
+      sessionView(session);
+      if (session.status !== "active") return send(409, { detail: `Agent session is not active: ${session.status}` });
+      if (body.autonomous) {
+        const refusal = autonomousRefusal(session);
+        if (refusal) return send(refusal[0], { detail: refusal[1] });
+        if (!session.policy.parameter_updates?.apply_backend) return send(409, { detail: "The session's approval granted commits but not backend applies" });
+        if (commit.authority !== "session_policy") return send(409, { detail: "Only a commit made under the session's update authority is applied under it" });
+        if (commit.backend_status !== "not_started") return send(409, { detail: "A backend apply was already requested; a failed apply needs a person" });
+      }
+      commit.backend_apply_key = body.idempotency_key;
+      commit.backend_status = "queued";
+      commit.backend_operation_id = id("apply");
+      commit.backend_authority = body.autonomous ? "session_policy" : "reviewed";
+      return send(200, publicCommit(commit));
     }
     if ((parts[2] === "decisions" || parts[2] === "audit") && noAudit) return send(404, { detail: "Not Found" });
     if (parts[2] === "decisions") {
@@ -415,7 +543,9 @@ export function startFakeAgentQDash({ username: initialUser = "alice", projectId
       if (!username || username !== session.created_by) {
         return send(403, { detail: `Only ${session.created_by}, who created this agent session, records its decisions` });
       }
-      const hash = JSON.stringify(body);
+      // As QDash does, the reported model is provenance and not part of the request hash.
+      const { model: _model, ...hashed } = body;
+      const hash = JSON.stringify(hashed);
       const existing = own(state.decisions).find((item) => item.idempotency_key === body.idempotency_key);
       if (existing) {
         if (existing.request_hash !== hash) return send(409, { detail: "Idempotency key was already used for a different decision" });
@@ -459,6 +589,7 @@ export function startFakeAgentQDash({ username: initialUser = "alice", projectId
         next_action_id: body.next_action_id ?? null,
         intervention_id: body.intervention_id ?? null,
         supersedes_decision_id: body.supersedes_decision_id ?? null,
+        model: body.model ?? null,
         evidence_snapshot: {
           actions: (body.evidence_action_ids ?? []).map((actionId) => {
             const action = actions.find((entry) => entry.action_id === actionId);
@@ -474,7 +605,7 @@ export function startFakeAgentQDash({ username: initialUser = "alice", projectId
     if (parts[2] === "audit") {
       // Pages of one snapshot, as agent_session_audit.py serves them: a cursor names the
       // snapshot, and a page of a snapshot whose records changed is refused with 409.
-      const header = { ...sessionView(session), missing: ["skill_name", "skill_version", "skill_hash", "model_name"].filter((name) => !session[name]) };
+      const header = { ...sessionView(session), missing: ["skill_name", "skill_version", "skill_hash", "model"].filter((name) => !session[name]) };
       const events = auditEvents(session);
       const snapshotId = createHash("sha256").update(JSON.stringify([header, events])).digest("hex").slice(0, 32);
       const cursor = url.searchParams.get("cursor");
@@ -525,6 +656,7 @@ export function startFakeAgentQDash({ username: initialUser = "alice", projectId
           qids: body.qids ?? [],
           attempts: (body.attempts ?? []).map((attempt) => ({ node_id: "", task_name: "", qid: "", transition: "", status: "", reason: "", execution_id: null, task_id: null, evaluation_id: null, evaluation_run_id: null, ...attempt })),
           pauses_session: session.status === "active",
+          model: body.model ?? null,
         });
         if (session.status === "active") pause(session, item);
         else state.interventions.push(item);
@@ -546,22 +678,24 @@ export function startFakeAgentQDash({ username: initialUser = "alice", projectId
   /** The session's timeline, built from the fake's records as the server builds it. */
   function auditEvents(session) {
     const mine = (list) => list.filter((entry) => entry.session_id === session.session_id);
-    const event = (fields) => ({ actor: null, actor_kind: "unknown", status: null, status_is_current: false, action_id: null, execution_id: null, task_id: null, task_name: null, qid: null, commit_id: null, evaluation_id: null, intervention_id: null, decision_id: null, missing: [], data: {}, ...fields });
-    const events = [event({ event_id: `session_created:${session.session_id}`, at: session.created_at, state_version: 0, kind: "session_created", summary: `${session.created_by} approved a session`, actor: session.created_by, actor_kind: "human", provenance: "server_record" })];
+    const event = (fields) => ({ actor: null, actor_kind: "unknown", status: null, status_is_current: false, action_id: null, execution_id: null, task_id: null, task_name: null, qid: null, commit_id: null, evaluation_id: null, intervention_id: null, decision_id: null, model: null, missing: [], data: {}, ...fields });
+    // An agent record without a reported model names it in missing, as agent_session_audit.py does.
+    const modelFields = (model, missing = []) => ({ model: model ?? null, missing: model ? missing : [...missing, "model"] });
+    const events = [event({ event_id: `session_created:${session.session_id}`, at: session.created_at, state_version: 0, kind: "session_created", summary: `${session.created_by} approved a session`, actor: session.created_by, actor_kind: "human", provenance: "server_record", ...modelFields(session.model) })];
     const cited = new Set(mine(state.decisions).flatMap((decision) => decision.evidence_action_ids));
     for (const action of mine(state.actions)) {
       const target = action.task_name ? `${action.task_name} on ${action.qids.join(", ")}` : action.action_type;
-      events.push(event({ event_id: `action_proposed:${action.action_id}`, at: action.created_at, state_version: action.state_version_before, kind: "action_proposed", summary: action.decision === "rejected" ? `Rejected ${target}: ${action.reason} (not executed)` : `Authorized ${target}`, actor: session.created_by, actor_kind: "agent", provenance: "server_record", status: action.decision, action_id: action.action_id, data: { intent: action.diagnosis, requested_overrides: action.parameter_overrides } }));
+      events.push(event({ event_id: `action_proposed:${action.action_id}`, at: action.created_at, state_version: action.state_version_before, kind: "action_proposed", summary: action.decision === "rejected" ? `Rejected ${target}: ${action.reason} (not executed)` : `Authorized ${target}`, actor: session.created_by, actor_kind: "agent", provenance: "server_record", status: action.decision, action_id: action.action_id, ...modelFields(action.model), data: { intent: action.diagnosis, requested_overrides: action.parameter_overrides } }));
       if (action.operation_id) {
         const settled = SETTLED.has(action.execution_status);
         events.push(event({ event_id: `measurement:${action.action_id}`, at: action.created_at, state_version: action.state_version_after, kind: "measurement", summary: `${target}: ${action.execution_status}`, actor_kind: "worker", provenance: "server_record", status: action.execution_status, status_is_current: true, action_id: action.action_id, execution_id: action.execution_id, missing: settled && !cited.has(action.action_id) ? ["decision"] : [], data: { gate: action.candidates ?? [] } }));
       }
     }
     for (const decision of mine(state.decisions)) {
-      events.push(event({ event_id: `decision:${decision.decision_id}`, at: decision.recorded_at, state_version: decision.session_state_version_at_record, kind: "decision", summary: `Assessed ${decision.assessment ?? "not stated"}; next ${decision.next_action}${decision.next_detail ? `: ${decision.next_detail}` : ""}`, actor: decision.recorded_by, actor_kind: "agent", provenance: "agent_reported", status: "recorded", decision_id: decision.decision_id, intervention_id: decision.intervention_id, data: decision }));
+      events.push(event({ event_id: `decision:${decision.decision_id}`, at: decision.recorded_at, state_version: decision.session_state_version_at_record, kind: "decision", summary: `Assessed ${decision.assessment ?? "not stated"}; next ${decision.next_action}${decision.next_detail ? `: ${decision.next_detail}` : ""}`, actor: decision.recorded_by, actor_kind: "agent", provenance: "agent_reported", status: "recorded", decision_id: decision.decision_id, intervention_id: decision.intervention_id, ...modelFields(decision.model), data: decision }));
     }
     for (const item of mine(state.interventions)) {
-      events.push(event({ event_id: `intervention_opened:${item.intervention_id}`, at: item.created_at, state_version: session.state_version, kind: "intervention_opened", summary: `Asked an expert (${item.reason}): ${item.question}`, actor: item.created_by, actor_kind: "agent", provenance: "agent_reported", status: item.status, status_is_current: true, intervention_id: item.intervention_id }));
+      events.push(event({ event_id: `intervention_opened:${item.intervention_id}`, at: item.created_at, state_version: session.state_version, kind: "intervention_opened", summary: `Asked an expert (${item.reason}): ${item.question}`, actor: item.created_by, actor_kind: "agent", provenance: "agent_reported", status: item.status, status_is_current: true, intervention_id: item.intervention_id, ...modelFields(item.model) }));
       if (item.response) {
         events.push(event({ event_id: `intervention_response:${item.response.response_id}`, at: item.response.responded_at, state_version: item.response.expected_state_version, kind: "intervention_response", summary: `${item.response.responded_by} chose ${item.response.decision}: ${item.response.guidance}`, actor: item.response.responded_by, actor_kind: "human", provenance: "human_reported", intervention_id: item.intervention_id }));
       }
@@ -571,6 +705,15 @@ export function startFakeAgentQDash({ username: initialUser = "alice", projectId
     }
     events.sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : a.state_version - b.state_version));
     return events.map((item, sequence) => ({ ...item, sequence }));
+  }
+
+  function publicCommit(commit) {
+    const { before_value: _before, backend_apply_key: _key, ...view } = commit;
+    if (legacy) {
+      delete view.authority;
+      delete view.decision_id;
+    }
+    return structuredClone(view);
   }
 
   function publicAction(action) {

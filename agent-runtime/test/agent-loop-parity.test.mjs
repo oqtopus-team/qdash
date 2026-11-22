@@ -49,6 +49,7 @@ const LOOP_TOOLS = [
   "qdash_wait_agent_action",
   "qdash_record_agent_decision",
   "qdash_get_agent_session_audit",
+  "qdash_commit_agent_session_update",
 ];
 
 let fake;
@@ -89,8 +90,11 @@ function scripted(steps) {
   return faux;
 }
 
-/** A real pi CLI session without a UI, as `pi -p` runs, with codemode and tool_search. */
-async function openCli(steps) {
+/**
+ * A real pi CLI session with codemode and tool_search: without a UI, as `pi -p`
+ * runs, or with `ui`, a dialog double that answers pi's confirmations.
+ */
+async function openCli(steps, { ui } = {}) {
   const faux = scripted(steps);
   const model = faux.getModel();
   const agentDir = join(workDir, "agent");
@@ -124,7 +128,7 @@ async function openCli(steps) {
     settingsManager: SettingsManager.inMemory(),
     modelRuntime,
   });
-  await session.bindExtensions({});
+  await session.bindExtensions(ui ? { uiContext: ui, mode: "rpc" } : {});
   await session.setModel(modelRuntime.getModel(model.provider, model.id));
   return {
     ask: (text) => session.prompt(text),
@@ -175,6 +179,8 @@ async function openChat(steps) {
         .map((entry) => entry.model[0])
         .map((message) => ({ name: message.toolName, text: textOf(message.content), details: message.details, isError: message.isError }));
     },
+    /** The user approves a write in the approval card; the runtime runs it (server.ts submitInput). */
+    approve: (approval) => chat.writeTools.runApproved(approval),
     async close() {
       await harness.close(context);
       await chat.close();
@@ -183,11 +189,19 @@ async function openChat(steps) {
 }
 
 const HOSTS = [["cli", openCli], ["chat", openChat]];
+
+/** pi's UI for a CLI session whose user answers each confirmation with `answers`, in order. */
+function dialog(answers, asked = []) {
+  return new Proxy(
+    { confirm: async (title) => (asked.push(title), answers.shift() ?? false) },
+    { get: (target, key) => (key in target ? target[key] : () => undefined) },
+  );
+}
 const load = () => fauxAssistantMessage([fauxToolCall("tool_search", { query: LOOP_TOOLS.join(" "), limit: 25 })], { stopReason: "toolUse" });
 const call = (name, args) => () => fauxAssistantMessage([fauxToolCall(name, typeof args === "function" ? args() : args)], { stopReason: "toolUse" });
 const done = (text = "done") => fauxAssistantMessage([fauxText(text)]);
 
-function autoSession() {
+function autoSession(extra = {}) {
   return fake.createSession({
     chip_id: "chip-001",
     policy: {
@@ -196,6 +210,7 @@ function autoSession() {
       allowed_overrides: { qubit_frequency: { minimum: 7.4, maximum: 7.6 } },
       autonomy: "auto",
       max_actions: 6,
+      ...extra,
     },
   }).session_id;
 }
@@ -213,7 +228,7 @@ test("creating a session waits for the user's approval in both hosts and sends n
       assert.ok(created, host);
       if (host === "cli") {
         assert.equal(created.isError, true);
-        assert.match(created.text, /requires confirmWrite: true in non-interactive mode/);
+        assert.match(created.text, /requires explicit confirmation: it is a QDash write the user approves in a confirmation dialog/);
       } else {
         assert.match(created.text, /^Approval requested/);
         assert.deepEqual(created.details.approval.args.policy, policy);
@@ -222,6 +237,30 @@ test("creating a session waits for the user's approval in both hosts and sends n
     } finally {
       await run.close();
     }
+  }
+});
+
+test("in both hosts an approved session records the host's model, never one the arguments name", async () => {
+  const policy = { qids: ["Q00"], allowed_tasks: ["CheckRabi"], autonomy: "auto", max_actions: 4 };
+  const args = { chipId: "chip-001", policy, modelName: "claimed/other-model" };
+  for (const [host, open] of HOSTS) {
+    const sessionsBefore = fake.state.sessions.size;
+    const run = await open([load(), call("qdash_create_agent_session", args), done()], host === "cli" ? { ui: dialog([true]) } : {});
+    try {
+      await run.ask("Q00 を校正して");
+      if (host === "chat") {
+        const created = (await run.results()).find((result) => result.name === "qdash_create_agent_session");
+        assert.deepEqual(created.details.approval.model, { provider: "faux", modelId: "faux-1" });
+        await run.approve(created.details.approval);
+      }
+    } finally {
+      await run.close();
+    }
+    assert.equal(fake.state.sessions.size, sessionsBefore + 1, host);
+    const session = [...fake.state.sessions.values()].at(-1);
+    assert.deepEqual(session.model, { provider: "faux", model_id: "faux-1", host: host === "cli" ? "pi" : "qdash-web-agent" }, host);
+    assert.equal(session.model_name, "faux/faux-1", host);
+    assert.deepEqual(session.policy.qids, ["Q00"], host);
   }
 });
 
@@ -432,16 +471,39 @@ test("in both hosts a dependent step reads a value only after the user approves 
       await first.close();
     }
     const commit = firstResults.find((result) => result.name === "qdash_commit_agent_candidate");
-    if (host === "cli") assert.match(commit.text, /requires confirmWrite: true in non-interactive mode/, host);
+    if (host === "cli") assert.match(commit.text, /requires explicit confirmation: it is a QDash write the user approves in a confirmation dialog/, host);
     else assert.match(commit.text, /^Approval requested/, host);
     // The step tool never commits, and an unapproved commit writes nothing.
     assert.deepEqual(fake.state.calibration.Q00 ?? {}, {}, host);
     assert.match(firstResults.find((result) => result.name === "qdash_get_agent_session_context").text, /candidate qubit_frequency = 7\.452: accepted/, host);
 
-    // The user approves the commit (pi CLI: an explicit confirmWrite; the web Agent's approval
-    // runs the same reviewed call), then the loop continues on the committed value.
+    // The user approves the commit (pi CLI: in pi's confirmation dialog; the web Agent's
+    // approval runs the same reviewed call), then the loop continues on the committed value.
     if (host === "cli") {
-      const approved = await open([loadWithCommit(), call("qdash_commit_agent_candidate", commitArgs({ confirmWrite: true })), done()]);
+      // A model that sets confirmWrite itself approves nothing: without a UI the commit is refused.
+      const forged = await open([loadWithCommit(), call("qdash_commit_agent_candidate", commitArgs({ confirmWrite: true })), done()]);
+      try {
+        await forged.ask("コミットして");
+        const refused = (await forged.results()).find((result) => result.name === "qdash_commit_agent_candidate");
+        assert.equal(refused.isError, true);
+        assert.match(refused.text, /requires explicit confirmation: it is a QDash write the user approves in a confirmation dialog/);
+      } finally {
+        await forged.close();
+      }
+      assert.deepEqual(fake.state.calibration.Q00 ?? {}, {}, host);
+      // With a UI the dialog is asked even though the model set confirmWrite; declining writes nothing.
+      const asked = [];
+      const declined = await open([loadWithCommit(), call("qdash_commit_agent_candidate", commitArgs({ confirmWrite: true })), done()], { ui: dialog([false], asked) });
+      try {
+        await declined.ask("コミットして");
+        const refused = (await declined.results()).find((result) => result.name === "qdash_commit_agent_candidate");
+        assert.equal(refused.isError, true);
+        assert.match(refused.text, /rejected by user/);
+      } finally {
+        await declined.close();
+      }
+      assert.deepEqual(fake.state.calibration.Q00 ?? {}, {}, host);
+      const approved = await open([loadWithCommit(), call("qdash_commit_agent_candidate", commitArgs()), done()], { ui: dialog([true], asked) });
       try {
         await approved.ask("コミットを承認します");
         const committed = (await approved.results()).find((result) => result.name === "qdash_commit_agent_candidate");
@@ -449,6 +511,8 @@ test("in both hosts a dependent step reads a value only after the user approves 
       } finally {
         await approved.close();
       }
+      // One dialog per call: the tool did not ask again after the gate's approval.
+      assert.equal(asked.length, 2);
     } else {
       const args = commitArgs()();
       const response = await fetch(`${fake.baseUrl}/agent-sessions/${sessionId}/actions/${args.actionId}/candidates/qubit_frequency/commit`, {
@@ -517,7 +581,12 @@ text("RESULT " + JSON.stringify({
     assert.match(chevron.text, /Dispatched action .*: CheckChevron on Q00/, `${host}: ${chevron.text}`);
     assert.match(rabi.text, /Audit: recorded decision decision-\d+ on action-\d+ \(next next_task\)/, `${host}: ${rabi.text}`);
     assert.match(note.text, /^Recorded decision decision-\d+: pass; next propose_commit/, `${host}: ${note.text}`);
-    assert.match(audit.text, /decision \[agent_reported, alice\]: Assessed pass; next next_task: CheckRabi on Q00/, host);
+    // Each record names the host's model, read from the host, never from an argument.
+    const label = host === "cli" ? "pi" : "qdash-web-agent";
+    assert.match(audit.text, new RegExp(`decision \\[agent_reported, alice\\] \\{model faux/faux-1 via ${label}\\}: Assessed pass; next next_task: CheckRabi on Q00`), host);
+    for (const record of [...fake.state.actions.filter((action) => action.session_id === sessionId), ...fake.state.decisions.filter((decision) => decision.session_id === sessionId)]) {
+      assert.deepEqual(record.model, { provider: "faux", model_id: "faux-1", host: label }, host);
+    }
     assert.match(audit.text, /The timeline of snapshot [0-9a-f]+ is complete; records written after the snapshot was taken are not in it/, host);
     const line = script.text.split("\n").find((item) => item.includes("RESULT "));
     assert.ok(line, `${host}: ${script.text}`);
@@ -587,5 +656,94 @@ test("in both hosts a step dispatches only after QDash confirms its decision, an
   assert.deepEqual(outcomes.cli.actions, 2);
   assert.deepEqual(outcomes.cli.dispatches, 2);
   assert.deepEqual(outcomes.cli.decisions, [["next_task", true]]);
+  assert.deepEqual(outcomes.chat, outcomes.cli);
+});
+
+test("in both hosts update authority is approved once with the session, then passing results commit without a card and failures pause before any dependent step", async () => {
+  const grant = { parameters: ["qubit_frequency"], tasks: ["CheckChevron"], apply_backend: false };
+  const outcomes = {};
+  for (const [host, open] of HOSTS) {
+    // The grant is part of the one session approval the user sees.
+    const policy = { qids: ["Q00"], allowed_tasks: ["CheckChevron", "CheckRabi"], allowed_overrides: { qubit_frequency: { minimum: 7.4, maximum: 7.6 } }, autonomy: "auto", max_actions: 4, parameter_updates: grant };
+    const asking = await open([load(), call("qdash_create_agent_session", { chipId: "chip-001", policy, expiresInSeconds: 3600 }), done()]);
+    try {
+      await asking.ask("Q00 の周波数を校正して Rabi まで確認して");
+      const created = (await asking.results()).find((result) => result.name === "qdash_create_agent_session");
+      if (host === "cli") assert.match(created.text, /requires explicit confirmation: it is a QDash write the user approves in a confirmation dialog/, host);
+      else assert.deepEqual(created.details?.approval?.args?.policy?.parameter_updates, grant, `${host}: ${created.text}`);
+    } finally {
+      await asking.close();
+    }
+
+    // The approved session (created here as the approval would), then the loop without cards.
+    const sessionId = autoSession({ parameter_updates: grant });
+    const dispatchStart = fake.state.dispatches.length;
+    delete fake.state.calibration.Q00;
+    fake.queueOutcome("CheckChevron", { status: "completed", candidates: [{ parameter_name: "qubit_frequency", value: 7.452, qid: "Q00" }] });
+    const chevronId = () => fake.state.actions.filter((action) => action.session_id === sessionId && action.task_name === "CheckChevron").at(-1).action_id;
+    const run = await open([
+      load(),
+      call("qdash_run_agent_session_step", { sessionId, taskName: "CheckChevron", qid: "Q00", parameterOverrides: { qubit_frequency: 7.45 }, rationale: "Find the frequency first." }),
+      call("qdash_commit_agent_session_update", () => ({ sessionId, actionId: chevronId(), parameterName: "qubit_frequency", interpretation: "Clear Chevron peak at 7.452 GHz inside the approved range." })),
+      call("qdash_run_agent_session_step", { sessionId, taskName: "CheckRabi", qid: "Q00", rationale: "Rabi on the committed frequency." }),
+      call("codemode", {
+        code: `
+let outcome = "ran";
+try { await tools.qdash_commit_agent_session_update({ sessionId: ${JSON.stringify(sessionId)}, actionId: "x", parameterName: "qubit_frequency", interpretation: "script" }); } catch (error) { outcome = "refused"; }
+text("RESULT " + outcome);
+`,
+      }),
+      done(),
+    ]);
+    let results;
+    try {
+      await run.ask("続けて");
+      results = (await run.results()).filter((result) => result.name !== "tool_search");
+    } finally {
+      await run.close();
+    }
+    const [chevron, update, rabi, script] = results;
+    assert.equal(chevron.details.dispatched, true, `${host}: ${chevron.text}`);
+    assert.equal(update.details.committed, true, `${host}: ${update.text}`);
+    assert.doesNotMatch(update.text, /Approval requested/, host);
+    assert.equal(rabi.details.dispatched, true, `${host}: ${rabi.text}`);
+    assert.ok(script.text.includes("RESULT refused"), `${host}: ${script.text}`);
+    const runs = fake.state.dispatches.slice(dispatchStart);
+
+    // A failed measurement: no update, no dependent step, and the session pauses for a person.
+    const failedSession = autoSession({ parameter_updates: grant });
+    fake.queueOutcome("CheckChevron", { status: "failed", candidates: [] });
+    const failedId = () => fake.state.actions.filter((action) => action.session_id === failedSession).at(0).action_id;
+    const failing = await open([
+      load(),
+      call("qdash_run_agent_session_step", { sessionId: failedSession, taskName: "CheckChevron", qid: "Q00", parameterOverrides: { qubit_frequency: 7.45 }, rationale: "Find the frequency first." }),
+      call("qdash_run_agent_session_step", { sessionId: failedSession, taskName: "CheckRabi", qid: "Q00", rationale: "Rabi anyway." }),
+      call("qdash_request_agent_human", () => ({ sessionId: failedSession, reason: "unknown_outcome", summary: "Chevron failed without a known cause.", question: "How should I continue?", attemptActionIds: [failedId()] })),
+      done(),
+    ]);
+    let failedResults;
+    try {
+      await failing.ask("Q00 を校正して");
+      failedResults = (await failing.results()).filter((result) => result.name !== "tool_search");
+    } finally {
+      await failing.close();
+    }
+    const [, blocked, asked] = failedResults;
+    assert.match(blocked.text, /did not complete \(failed\)/, `${host}: ${blocked.text}`);
+    assert.match(asked.text, /The session is paused until an expert answers/, `${host}: ${asked.text}`);
+    assert.equal(fake.state.sessions.get(failedSession).status, "waiting_for_human", host);
+    outcomes[host] = {
+      runs: runs.map((entry) => [entry.task_name, entry.calibration]),
+      commits: fake.state.commits.filter((commit) => commit.session_id === sessionId).map((commit) => [commit.parameter_name, commit.value, commit.authority]),
+      failedCommits: fake.state.commits.filter((commit) => commit.session_id === failedSession).length,
+      failedDispatches: fake.state.dispatches.filter((entry) => fake.state.actions.some((action) => action.session_id === failedSession && action.action_id === entry.action_id)).map((entry) => entry.task_name),
+    };
+  }
+  assert.deepEqual(outcomes.cli, {
+    runs: [["CheckChevron", {}], ["CheckRabi", { qubit_frequency: 7.452 }]],
+    commits: [["qubit_frequency", 7.452, "session_policy"]],
+    failedCommits: 0,
+    failedDispatches: ["CheckChevron"],
+  });
   assert.deepEqual(outcomes.chat, outcomes.cli);
 });

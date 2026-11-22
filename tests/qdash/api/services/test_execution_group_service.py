@@ -1,4 +1,4 @@
-"""Tests for the Execution list grouped by agent session and for a session's journey.
+"""Tests for the Execution list grouped by agent session and for a session's graph.
 
 Groups are read from authoritative records: a session's action names the execution it
 dispatched. A tag alone never groups an execution, grouping happens before pagination, and a
@@ -32,6 +32,7 @@ from qdash.api.services.execution_service import ExecutionService
 from qdash.datamodel.agent_session import (
     AgentActionType,
     AgentAutonomy,
+    AgentModelIdentity,
     AgentSessionPolicy,
     AgentSessionStatus,
 )
@@ -46,11 +47,11 @@ from qdash.repository.execution_lock import MongoExecutionLockRepository
 
 if TYPE_CHECKING:
     from qdash.api.schemas.execution_group import (
-        AgentJourneyIntervention,
-        AgentJourneyMeasurement,
-        AgentJourneyNode,
+        AgentSessionGraphIntervention,
+        AgentSessionGraphMeasurement,
+        AgentSessionGraphNode,
+        AgentSessionGraphResponse,
         AgentSessionGroupSummary,
-        AgentSessionJourneyResponse,
         ExecutionGroupItem,
         ListExecutionGroupsResponse,
     )
@@ -258,12 +259,12 @@ def _summary(item: ExecutionGroupItem) -> AgentSessionGroupSummary:
     return item.agent_session
 
 
-def _measured(node: AgentJourneyNode) -> AgentJourneyMeasurement:
+def _measured(node: AgentSessionGraphNode) -> AgentSessionGraphMeasurement:
     assert node.measurement is not None
     return node.measurement
 
 
-def _asked(node: AgentJourneyNode) -> AgentJourneyIntervention:
+def _asked(node: AgentSessionGraphNode) -> AgentSessionGraphIntervention:
     assert node.intervention is not None
     return node.intervention
 
@@ -390,22 +391,22 @@ def test_session_without_execution_and_rejected_proposal_is_a_group(
     assert summary.counts.pending_dispatch == 1
     assert summary.counts.in_flight == 0
 
-    journey = groups.journey(project_id=PROJECT, session_id=session.session_id)
-    kinds = {node.node_id: node.kind for node in journey.nodes}
+    graph = groups.get_session_graph(project_id=PROJECT, session_id=session.session_id)
+    kinds = {node.node_id: node.kind for node in graph.nodes}
     assert kinds[f"action:{rejected.action_id}"] == "proposal"
-    measurement = next(n for n in journey.nodes if n.node_id == f"action:{pending.action_id}")
+    measurement = next(n for n in graph.nodes if n.node_id == f"action:{pending.action_id}")
     assert measurement.kind == "measurement"
     assert measurement.status == "not_started"
     assert _measured(measurement).execution_id is None
     assert _measured(measurement).sequence is None
     # A proposal never ran, so it carries no execution or task id.
-    proposal = next(n for n in journey.nodes if n.kind == "proposal")
+    proposal = next(n for n in graph.nodes if n.kind == "proposal")
     assert (
         proposal.measurement is None and proposal.proposal is not None and proposal.proposal.reason
     )
 
 
-def test_journey_typed_edges_retries_and_multiple_antecedents(
+def test_graph_typed_edges_retries_and_multiple_antecedents(
     sessions: AgentSessionService, groups: ExecutionGroupService
 ) -> None:
     session = _session(sessions)
@@ -429,9 +430,9 @@ def test_journey_typed_edges_retries_and_multiple_antecedents(
         next_action_id=rabi.action_id,
     )
 
-    journey = groups.journey(project_id=PROJECT, session_id=session.session_id)
-    assert journey.complete and journey.omitted_nodes == 0
-    by_id = {node.node_id: node for node in journey.nodes}
+    graph = groups.get_session_graph(project_id=PROJECT, session_id=session.session_id)
+    assert graph.complete and graph.omitted_nodes == 0
+    by_id = {node.node_id: node for node in graph.nodes}
     m1, m2, m3 = (by_id[f"action:{a.action_id}"] for a in (first, retry, rabi))
     # Retries are distinct nodes with their own execution and task result.
     assert (_measured(m1).execution_id, _measured(m2).execution_id) == (
@@ -444,7 +445,7 @@ def test_journey_typed_edges_retries_and_multiple_antecedents(
     # The child status is the real execution's.
     assert m3.status == "failed" and _measured(m3).figure_count == 1
 
-    edges = {(edge.kind, edge.source, edge.target) for edge in journey.edges}
+    edges = {(edge.kind, edge.source, edge.target) for edge in graph.edges}
     d = f"decision:{decision.decision_id}"
     assert ("sequence", m1.node_id, m2.node_id) in edges
     assert ("sequence", m2.node_id, m3.node_id) in edges
@@ -456,10 +457,10 @@ def test_journey_typed_edges_retries_and_multiple_antecedents(
     # Time alone never makes a causal edge: the failed Rabi feeds no decision.
     assert not any(kind == "evidence" and src == m3.node_id for kind, src, _ in edges)
     assert all(
-        edge.kind != "evidence" or edge.target.startswith("decision:") for edge in journey.edges
+        edge.kind != "evidence" or edge.target.startswith("decision:") for edge in graph.edges
     )
-    assert [node.order for node in journey.nodes] == list(range(len(journey.nodes)))
-    assert "raw_data_path" not in journey.model_dump_json()
+    assert [node.order for node in graph.nodes] == list(range(len(graph.nodes)))
+    assert "raw_data_path" not in graph.model_dump_json()
 
 
 def test_human_wait_and_reply_status_come_from_the_session(
@@ -491,8 +492,8 @@ def test_human_wait_and_reply_status_come_from_the_session(
     # The finished child keeps its own status while the session waits.
     assert waiting.children[0].execution.status == "completed"
 
-    journey = groups.journey(project_id=PROJECT, session_id=session.session_id)
-    node = next(n for n in journey.nodes if n.kind == "intervention")
+    graph = groups.get_session_graph(project_id=PROJECT, session_id=session.session_id)
+    node = next(n for n in graph.nodes if n.kind == "intervention")
     assert node.status == "open"
     assert _asked(node).question == "Widen the sweep or stop?"
     assert node.measurement is None
@@ -512,7 +513,7 @@ def test_human_wait_and_reply_status_come_from_the_session(
             }
         ),
     )
-    answered = groups.journey(project_id=PROJECT, session_id=session.session_id)
+    answered = groups.get_session_graph(project_id=PROJECT, session_id=session.session_id)
     node = next(n for n in answered.nodes if n.kind == "intervention")
     assert _asked(node).response_decision == "stop"
     assert _asked(node).responded_by == "expert"
@@ -628,6 +629,53 @@ def test_list_rows_carry_agent_attribution_only_from_action_links(
     assert detail is not None and detail.agent_session == link
 
 
+def test_rows_and_graph_show_each_records_reported_model(
+    sessions: AgentSessionService, groups: ExecutionGroupService
+) -> None:
+    """The session row shows the creating host's model; each graph node keeps its own."""
+    created = AgentModelIdentity(provider="ollama", model_id="qwen3:32b", host="pi")
+    switched = AgentModelIdentity(provider="vllm", model_id="qwen3:32b", host="qdash-web-agent")
+    session = sessions.create_session(
+        project_id=PROJECT,
+        username=OWNER,
+        body=CreateAgentSessionRequest(
+            chip_id=CHIP,
+            policy=AgentSessionPolicy(qids=["Q00"], allowed_tasks=["CheckQubitFrequency"]),
+            model=created,
+        ),
+    )
+    action = sessions.submit_action(
+        project_id=PROJECT,
+        session_id=session.session_id,
+        username=OWNER,
+        body=SubmitAgentActionRequest(
+            idempotency_key="a-1",
+            expected_state_version=0,
+            action_type=AgentActionType.RUN_TASK,
+            task_name="CheckQubitFrequency",
+            qids=["Q00"],
+            model=switched,
+        ),
+    )
+    _dispatch(session.session_id, action.action_id, sequence=1, start=BASE)
+    legacy = _submit(sessions, session.session_id, key="a-2")
+    decided = _decide(session.session_id, "d-1", model=switched.model_dump())
+
+    grouped = groups.list_groups(project_id=PROJECT, chip_id=CHIP)
+    summary = _summary(_group(grouped, session.session_id))
+    assert summary.model == created
+    assert summary.model_name == "ollama/qwen3:32b"
+    link = link_for_execution(PROJECT, _execution_doc("agent-exec-1"))
+    assert link is not None and link.model_name == "ollama/qwen3:32b"
+
+    graph = groups.get_session_graph(project_id=PROJECT, session_id=session.session_id)
+    assert graph.session.model == created
+    assert _node(graph, action.action_id).model == switched
+    assert _node(graph, legacy.action_id).model is None
+    decision_node = next(n for n in graph.nodes if n.node_id == f"decision:{decided.decision_id}")
+    assert decision_node.model == switched
+
+
 def test_link_for_execution_is_authoritative_and_chip_scoped(
     sessions: AgentSessionService, groups: ExecutionGroupService
 ) -> None:
@@ -653,8 +701,8 @@ def test_link_for_execution_is_authoritative_and_chip_scoped(
     stray_exec = _execution_doc("agent-exec-2")
     stray_link = link_for_execution(PROJECT, stray_exec)
     assert stray_link is not None and not stray_link.linked
-    journey = groups.journey(project_id=PROJECT, session_id=session.session_id)
-    stray_node = next(n for n in journey.nodes if n.node_id == f"action:{stray.action_id}")
+    graph = groups.get_session_graph(project_id=PROJECT, session_id=session.session_id)
+    stray_node = next(n for n in graph.nodes if n.node_id == f"action:{stray.action_id}")
     assert _measured(stray_node).execution_id is None
     assert "execution_on_session_chip" in stray_node.missing
 
@@ -669,7 +717,7 @@ def test_cross_project_records_are_never_read(
 
     assert _rows(groups.list_groups(project_id=PROJECT, chip_id=CHIP)) == [f"S:{mine.session_id}"]
     with pytest.raises(HTTPException) as denied:
-        groups.journey(project_id=PROJECT, session_id=theirs.session_id)
+        groups.get_session_graph(project_id=PROJECT, session_id=theirs.session_id)
     assert denied.value.status_code == 404
 
 
@@ -699,8 +747,8 @@ def test_list_children_are_bounded_and_say_so(
 # ---------------------------------------------------------------------- link resolution
 
 
-def _node(journey: AgentSessionJourneyResponse, action_id: str) -> AgentJourneyNode:
-    return next(n for n in journey.nodes if n.node_id == f"action:{action_id}")
+def _node(graph: AgentSessionGraphResponse, action_id: str) -> AgentSessionGraphNode:
+    return next(n for n in graph.nodes if n.node_id == f"action:{action_id}")
 
 
 def _set_action(action_id: str, **fields: Any) -> None:
@@ -720,7 +768,7 @@ def _group(result: ListExecutionGroupsResponse, session_id: str) -> ExecutionGro
 def test_two_sessions_naming_one_execution_agree_on_the_earliest_action(
     sessions: AgentSessionService, groups: ExecutionGroupService
 ) -> None:
-    """The list, the detail, and both journeys give the execution to the same action."""
+    """The list, the detail, and both graphs give the execution to the same action."""
     first = _session(sessions)
     second = _session(sessions)
     early = _submit(sessions, first.session_id, key="a-1")
@@ -743,10 +791,10 @@ def test_two_sessions_naming_one_execution_agree_on_the_earliest_action(
     link = link_for_execution(PROJECT, _execution_doc("agent-exec-1"))
     assert link is not None and link.linked and link.action_id == late.action_id
 
-    won = groups.journey(project_id=PROJECT, session_id=second.session_id)
+    won = groups.get_session_graph(project_id=PROJECT, session_id=second.session_id)
     assert _measured(_node(won, late.action_id)).execution_id == "agent-exec-1"
     assert _measured(_node(won, late.action_id)).task_id == "task-1"
-    lost = groups.journey(project_id=PROJECT, session_id=first.session_id)
+    lost = groups.get_session_graph(project_id=PROJECT, session_id=first.session_id)
     node = _node(lost, early.action_id)
     assert node.kind == "measurement" and node.status == "link_claimed"
     assert "execution_link_claimed" in node.missing
@@ -792,11 +840,11 @@ def test_duplicate_references_in_one_session_hold_one_execution(
         (first.action_id, 1),
         (third.action_id, 2),
     ]
-    journey = groups.journey(project_id=PROJECT, session_id=session.session_id)
-    assert _measured(_node(journey, third.action_id)).sequence == 2
-    duplicate = _node(journey, again.action_id)
+    graph = groups.get_session_graph(project_id=PROJECT, session_id=session.session_id)
+    assert _measured(_node(graph, third.action_id)).sequence == 2
+    duplicate = _node(graph, again.action_id)
     assert duplicate.status == "link_claimed" and _measured(duplicate).task_id is None
-    edges = {(e.kind, e.source, e.target) for e in journey.edges}
+    edges = {(e.kind, e.source, e.target) for e in graph.edges}
     assert ("sequence", f"action:{first.action_id}", f"action:{third.action_id}") in edges
     assert not any(again.action_id in source for kind, source, _ in edges if kind == "sequence")
 
@@ -844,7 +892,8 @@ def test_shared_flow_run_id_resolves_to_the_earliest_execution_everywhere(
     late = link_for_execution(PROJECT, _execution_doc("dup-late"))
     assert late is None or not late.linked
     node = _node(
-        groups.journey(project_id=PROJECT, session_id=session.session_id), action.action_id
+        groups.get_session_graph(project_id=PROJECT, session_id=session.session_id),
+        action.action_id,
     )
     # The other execution's result is never attributed to the action.
     assert _measured(node).execution_id == "dup-early" and _measured(node).task_id is None
@@ -875,7 +924,8 @@ def test_operation_and_execution_ids_that_disagree_link_nothing(
         link = link_for_execution(PROJECT, _execution_doc(execution_id))
         assert link is None or not link.linked
     node = _node(
-        groups.journey(project_id=PROJECT, session_id=session.session_id), action.action_id
+        groups.get_session_graph(project_id=PROJECT, session_id=session.session_id),
+        action.action_id,
     )
     assert node.status == "link_ambiguous" and "execution_link_ambiguous" in node.missing
     assert _measured(node).execution_id is None and _measured(node).task_id is None
@@ -889,12 +939,13 @@ def test_execution_in_another_project_is_missing_not_linked(
     _dispatch(session.session_id, action.action_id, sequence=1, start=BASE, project_id=OTHER)
     assert groups.list_groups(project_id=PROJECT, chip_id=CHIP).grouped_executions == 0
     node = _node(
-        groups.journey(project_id=PROJECT, session_id=session.session_id), action.action_id
+        groups.get_session_graph(project_id=PROJECT, session_id=session.session_id),
+        action.action_id,
     )
     assert node.missing == ["execution"] and _measured(node).execution_id is None
 
 
-# ---------------------------------------------------------------------- read-only journey
+# ---------------------------------------------------------------------- read-only graph
 
 
 def _snapshot() -> dict[str, list[dict[str, Any]]]:
@@ -912,7 +963,7 @@ def _snapshot() -> dict[str, list[dict[str, Any]]]:
 
 
 @pytest.mark.parametrize("stored", ["active", "waiting_for_human"])
-def test_journey_of_overdue_session_with_pending_records_writes_nothing(
+def test_graph_of_overdue_session_with_pending_records_writes_nothing(
     sessions: AgentSessionService, groups: ExecutionGroupService, stored: str
 ) -> None:
     from qdash.dbmodel.agent_session import AgentInterventionDocument
@@ -960,18 +1011,16 @@ def test_journey_of_overdue_session_with_pending_records_writes_nothing(
     )
 
     before = _snapshot()
-    journey = groups.journey(project_id=PROJECT, session_id=session.session_id)
+    graph = groups.get_session_graph(project_id=PROJECT, session_id=session.session_id)
     assert _snapshot() == before
 
-    assert journey.session.status == AgentSessionStatus.EXPIRED
-    assert journey.session.stored_status == AgentSessionStatus(stored)
-    assert f"action record {pending.action_id} (pending write)" in journey.session.missing
-    assert (
-        f"intervention record {opened.intervention_id} (pending write)" in journey.session.missing
-    )
-    node = _node(journey, pending.action_id)
+    assert graph.session.status == AgentSessionStatus.EXPIRED
+    assert graph.session.stored_status == AgentSessionStatus(stored)
+    assert f"action record {pending.action_id} (pending write)" in graph.session.missing
+    assert f"intervention record {opened.intervention_id} (pending write)" in graph.session.missing
+    node = _node(graph, pending.action_id)
     assert "action_record" in node.missing
-    asked = next(n for n in journey.nodes if n.kind == "intervention")
+    asked = next(n for n in graph.nodes if n.kind == "intervention")
     assert _asked(asked).intervention_id == opened.intervention_id
 
     listed = _summary(groups.list_groups(project_id=PROJECT, chip_id=CHIP).items[0])

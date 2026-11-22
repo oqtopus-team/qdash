@@ -18,12 +18,32 @@ from qdash.datamodel.agent_session import (
     AgentInterventionReason,
     AgentInterventionResponseRecord,
     AgentInterventionStatus,
+    AgentModelIdentity,
     AgentNotificationStatus,
     AgentPlanCheckpoint,
     AgentResumeOutcomeRecord,
     AgentSessionPolicy,
     AgentSessionStatus,
 )
+
+MODEL_FIELD_DESCRIPTION = (
+    "The provider and model the client host reports it ran the agent with, read from the "
+    "host's own runtime, never from the agent's tool arguments. Recorded as reported; QDash "
+    "does not verify it, and it changes no scope or approval. Omitted when the host does not "
+    "know it."
+)
+RECORDED_MODEL_DESCRIPTION = (
+    "The model the client host reported for this record; null when none was reported. "
+    "Client reported, not verified by QDash."
+)
+
+
+def _model_field() -> Any:
+    return Field(default=None, description=MODEL_FIELD_DESCRIPTION)
+
+
+def _recorded_model_field() -> Any:
+    return Field(default=None, description=RECORDED_MODEL_DESCRIPTION)
 
 
 class CreateAgentSessionRequest(BaseModel):
@@ -35,7 +55,7 @@ class CreateAgentSessionRequest(BaseModel):
     skill_name: str = Field(default="", max_length=200)
     skill_version: str = Field(default="", max_length=200)
     skill_hash: str = Field(default="", max_length=256)
-    model_name: str = Field(default="", max_length=300)
+    model: AgentModelIdentity | None = _model_field()
 
 
 class AgentSessionResponse(BaseModel):
@@ -49,7 +69,11 @@ class AgentSessionResponse(BaseModel):
     skill_name: str
     skill_version: str
     skill_hash: str
-    model_name: str
+    model: AgentModelIdentity | None = _recorded_model_field()
+    model_name: str = Field(
+        default="",
+        description="provider/model_id of model, for display; empty when none was reported",
+    )
     status: AgentSessionStatus
     state_version: int
     action_count: int
@@ -98,6 +122,7 @@ class SubmitAgentActionRequest(BaseModel):
         max_length=200,
         description="The finished identical action an autonomous step measures again on purpose",
     )
+    model: AgentModelIdentity | None = _model_field()
 
     @model_validator(mode="after")
     def validate_action_shape(self) -> SubmitAgentActionRequest:
@@ -143,6 +168,7 @@ class AgentActionResponse(BaseModel):
         default=False,
         description="Whether QDash authorized the action as an autonomous step",
     )
+    model: AgentModelIdentity | None = _recorded_model_field()
 
 
 class ListAgentActionsResponse(BaseModel):
@@ -237,6 +263,34 @@ class CommitAgentCandidateRequest(BaseModel):
     idempotency_key: str = Field(min_length=1, max_length=128)
     expected_state_version: int = Field(ge=0)
     task_id: str = Field(min_length=1, max_length=200)
+    autonomous: bool = Field(
+        default=False,
+        description=(
+            "Commit under the session's parameter_updates authority instead of a per-call "
+            "approval. QDash then also requires that the signed-in user created the auto "
+            "session, that its approval granted updates of this parameter from this task, "
+            "that decision_id is the agent's latest pass assessment of exactly this "
+            "measurement, that the measurement is the newest finished one of its task and "
+            "qubit and nothing else of the session is running, that no assessment of it "
+            "was fail or inconclusive, and that the stored value did not change since it "
+            "was measured."
+        ),
+    )
+    decision_id: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=200,
+        description="The recorded pass decision an autonomous commit rests on",
+    )
+
+    @model_validator(mode="after")
+    def validate_authority(self) -> CommitAgentCandidateRequest:
+        """An autonomous commit names its assessment; a reviewed one does not."""
+        if self.autonomous and self.decision_id is None:
+            raise ValueError("decision_id is required for an autonomous commit")
+        if not self.autonomous and self.decision_id is not None:
+            raise ValueError("decision_id is only valid for an autonomous commit")
+        return self
 
 
 class AgentCandidateReference(BaseModel):
@@ -261,6 +315,23 @@ class ApplyAgentCandidateRequest(BaseModel):
     idempotency_key: str = Field(min_length=1, max_length=128)
     expected_state_version: int = Field(ge=0)
     push_to_github: bool = False
+    autonomous: bool = Field(
+        default=False,
+        description=(
+            "Apply under the session's parameter_updates authority instead of a per-call "
+            "approval. QDash then also requires that the signed-in user created the auto "
+            "session, that its approval granted apply_backend, that the commit was made "
+            "under that authority in this session and is still the stored value, and that "
+            "no earlier apply of it was requested. push_to_github must stay false."
+        ),
+    )
+
+    @model_validator(mode="after")
+    def validate_authority(self) -> ApplyAgentCandidateRequest:
+        """Session authority never pushes to GitHub."""
+        if self.autonomous and self.push_to_github:
+            raise ValueError("an autonomous apply cannot push to GitHub")
+        return self
 
 
 class AgentCandidateCommitResponse(BaseModel):
@@ -296,6 +367,29 @@ class AgentCandidateCommitResponse(BaseModel):
     backend_error: str = ""
     backend_requested_at: datetime | None = None
     backend_applied_at: datetime | None = None
+    authority: Literal["reviewed", "session_policy"] = Field(
+        default="reviewed",
+        description=(
+            "reviewed: a per-call approved commit; session_policy: committed under the "
+            "session's parameter_updates authority"
+        ),
+    )
+    decision_id: str | None = Field(
+        default=None, description="The pass decision a session_policy commit rests on"
+    )
+    assessment_evidence: dict[str, Any] = Field(
+        default_factory=dict,
+        description=(
+            "What QDash checked for a session_policy commit, frozen when it was reserved: the "
+            "agent-reported assessment, the mechanical gates, and cited evaluations"
+        ),
+    )
+    backend_authority: Literal["reviewed", "session_policy"] | None = Field(
+        default=None, description="Authority of the backend apply request, once requested"
+    )
+    backend_requested_by: str | None = Field(
+        default=None, description="Who requested the backend apply, once requested"
+    )
 
 
 class AgentCandidateSetCommitResponse(BaseModel):
@@ -347,6 +441,7 @@ class CreateAgentInterventionRequest(BaseModel):
             "autonomy is auto. Who may answer the intervention does not change."
         ),
     )
+    model: AgentModelIdentity | None = _model_field()
 
 
 class RespondAgentInterventionRequest(BaseModel):
@@ -444,6 +539,7 @@ class AgentInterventionResponse(BaseModel):
     resume_outcome: AgentResumeOutcomeRecord | None = None
     notification: AgentNotificationDeliveryResponse
     events: list[AgentInterventionEvent]
+    model: AgentModelIdentity | None = _recorded_model_field()
     created_at: datetime
     updated_at: datetime
     session_status: AgentSessionStatus
@@ -521,6 +617,7 @@ class RecordAgentDecisionRequest(BaseModel):
         max_length=200,
         description="An earlier decision of this session that this record corrects",
     )
+    model: AgentModelIdentity | None = _model_field()
 
 
 class AgentDecisionResponse(BaseModel):
@@ -548,6 +645,7 @@ class AgentDecisionResponse(BaseModel):
         default_factory=dict,
         description="What QDash's records said about the cited evidence when it was recorded",
     )
+    model: AgentModelIdentity | None = _recorded_model_field()
 
 
 class ListAgentDecisionsResponse(BaseModel):
@@ -610,6 +708,16 @@ class AgentAuditEvent(BaseModel):
     evaluation_id: str | None = None
     intervention_id: str | None = None
     decision_id: str | None = None
+    model: AgentModelIdentity | None = Field(
+        default=None,
+        description=(
+            "The model the client host reported for the record behind an agent event: the "
+            "session's creation, an action proposal, a decision, an agent's intervention "
+            "request, or a commit made under session authority (the model of the decision it "
+            "rests on). Client reported, not verified by QDash; null when none was reported, "
+            "and then named in missing"
+        ),
+    )
     missing: list[str] = Field(
         default_factory=list,
         description="Facts the records do not hold for this event; never filled in",
@@ -635,10 +743,19 @@ class AgentAuditSessionHeader(BaseModel):
     skill_name: str
     skill_version: str
     skill_hash: str
-    model_name: str
+    model: AgentModelIdentity | None = Field(
+        default=None,
+        description=(
+            "The model the creating host reported; later events carry their own model. Client "
+            "reported, not verified by QDash"
+        ),
+    )
+    model_name: str = Field(
+        default="", description="provider/model_id of model; empty when none was reported"
+    )
     missing: list[str] = Field(
         default_factory=list,
-        description="Identity fields the session did not record (for example model_name)",
+        description="Identity fields the session did not record (for example model)",
     )
 
 

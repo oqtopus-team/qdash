@@ -1,4 +1,14 @@
-import type { AgentSessionGroupSummary } from "@/schemas";
+import type { AgentModelIdentity, AgentSessionGroupSummary } from "@/schemas";
+
+/** `provider/model_id` of a host-reported model, or null when the record holds none. */
+export function reportedModelLabel(model?: AgentModelIdentity | null): string | null {
+  return model ? `${model.provider}/${model.model_id}` : null;
+}
+
+/** Who reported a model; QDash records it as given and never verifies it. */
+export function reportedModelTitle(model: AgentModelIdentity): string {
+  return `Reported by ${model.host || "the client"}; QDash does not verify it`;
+}
 
 /** Badge color of an agent session's own state; never an execution status color for failure. */
 export function sessionStatusBadgeClass(status: string): string {
@@ -32,8 +42,8 @@ export function sessionActivityLabel(summary: AgentSessionGroupSummary): string 
     : "Ended";
 }
 
-/** The Execution page path of one session's journey. */
-export function sessionJourneyHref(chipId: string, sessionId: string, projectId?: string | null) {
+/** The Execution page path of one session's graph. */
+export function sessionGraphHref(chipId: string, sessionId: string, projectId?: string | null) {
   const path = `/execution/${encodeURIComponent(chipId)}/sessions/${encodeURIComponent(sessionId)}`;
   return projectId ? `${path}?project=${encodeURIComponent(projectId)}` : path;
 }

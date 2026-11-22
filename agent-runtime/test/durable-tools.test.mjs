@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { Type } from "typebox";
+import { HOST_WRITE_APPROVAL_KEY } from "@oqtopus-team/pi-qdash/extensions/lib/write-approval.ts";
+import { HOST_MODEL_KEY, HOST_NAME_KEY, hostModelIdentity } from "@oqtopus-team/pi-qdash/extensions/lib/host-model.ts";
 import { REVIEWED_WRITE_TOOL_NAMES } from "../src/allowed-tools.ts";
 
 import { boundToolText, buildQDashExtension, decisionMessage, MAX_TOOL_TEXT_CHARS, ToolCancelled, untilAborted } from "../src/durable-tools.ts";
@@ -16,18 +18,21 @@ const connection = {
 
 function registered(name) {
   let calls = 0;
+  const seen = [];
   return {
     definition: {
       name,
       label: name,
       description: name,
       parameters: Type.Object({}),
-      execute: async () => {
+      execute: async (toolCallId, params, _signal, _onUpdate, ctx) => {
         calls += 1;
+        seen.push({ toolCallId, params, ctx });
         return { content: [], details: {} };
       },
     },
     calls: () => calls,
+    seen,
   };
 }
 
@@ -284,8 +289,70 @@ for (const name of REVIEWED_WRITE_TOOL_NAMES) {
 
     await writeTools.runApproved(requested.details.approval);
     assert.equal(write.calls(), 1);
+    // The approval reaches the tool through the host's context, naming this call; no
+    // argument carries it, so a model's confirmWrite never arrives.
+    const [run] = write.seen;
+    assert.equal(run.toolCallId, "call-1");
+    assert.equal("confirmWrite" in run.params, false);
+    assert.deepEqual(run.ctx[HOST_WRITE_APPROVAL_KEY], { toolCallId: "call-1", toolName: name });
+    assert.equal(run.ctx.hasUI, false);
   });
 }
+
+test("an approved call runs on a frozen copy of the arguments the user saw", async () => {
+  const name = "qdash_create_agent_session";
+  const write = registered(name);
+  const { writeTools } = buildQDashExtension([{ tools: new Map([[name, write]]) }], {}, "/tmp/work", connection);
+  const approval = { id: "call-9", tool: name, label: name, args: { chipId: "64Qv3", policy: { qids: ["Q00"], allowed_tasks: ["CheckRabi"] } } };
+  await writeTools.runApproved(approval);
+  const [run] = write.seen;
+  assert.deepEqual(run.params.policy, approval.args.policy);
+  // Neither the tool nor anything else can change what runs, nor the persisted request.
+  assert.ok(Object.isFrozen(run.params) && Object.isFrozen(run.params.policy) && Object.isFrozen(run.params.policy.qids));
+  assert.notEqual(run.params.policy, approval.args.policy);
+  assert.throws(() => run.params.policy.qids.push("Q01"), TypeError);
+  assert.deepEqual(approval.args.policy.qids, ["Q00"]);
+  // Arguments that are not plain data never reach the tool.
+  await assert.rejects(writeTools.runApproved({ ...approval, id: "call-10", args: { chipId: "64Qv3", when: new Date(0) } }), /not plain JSON data/);
+  assert.equal(write.calls(), 1);
+});
+
+test("a write records the model that made the call, even after the conversation switches models", async () => {
+  const name = "qdash_create_agent_session";
+  const write = registered(name);
+  const read = registered("qdash_get_agent_session_context");
+  const catalog = { getModel: (provider, id) => (provider === "vllm" ? { provider, id, baseUrl: "http://10.0.0.5:8000/v1" } : undefined) };
+  const { extension, writeTools } = buildQDashExtension(
+    [{ tools: new Map([[name, write], ["qdash_get_agent_session_context", read]]) }],
+    catalog,
+    "/tmp/work",
+    connection,
+  );
+  let current = { provider: "vllm", modelId: "qwen3-32b" };
+  const api = (callId) => ({ callId, agent: async () => ({ model: current }) });
+  const context = { abortSignal: new AbortController().signal };
+  const writeTool = extension.tools.find((tool) => tool.name === name);
+
+  // The model names another model in its arguments; only the runtime's record counts.
+  const requested = await writeTool.execute({ chipId: "64Qv3", modelName: "claimed/other" }, api("call-m1"), context);
+  assert.deepEqual(requested.details.approval.model, { provider: "vllm", modelId: "qwen3-32b" });
+  // The user switches the conversation to a model outside the catalog before approving.
+  current = { provider: "ollama", modelId: "qwen3:8b" };
+  await writeTools.runApproved(requested.details.approval);
+  const [run] = write.seen;
+  assert.deepEqual(run.ctx[HOST_MODEL_KEY], { provider: "vllm", id: "qwen3-32b" });
+  assert.equal(run.ctx[HOST_NAME_KEY], "qdash-web-agent");
+  assert.deepEqual(hostModelIdentity(run.ctx), { provider: "vllm", model_id: "qwen3-32b", host: "qdash-web-agent" });
+
+  // A call the runtime runs directly reports the current model, catalog entry or not.
+  await extension.tools.find((tool) => tool.name === "qdash_get_agent_session_context").execute({ sessionId: "s" }, api("call-m2"), context);
+  assert.deepEqual(hostModelIdentity(read.seen[0].ctx), { provider: "ollama", model_id: "qwen3:8b", host: "qdash-web-agent" });
+  assert.equal(read.seen[0].ctx.model, undefined, "no catalog model is invented");
+
+  // An approval recorded without a model (no agent record) reports none.
+  await writeTools.runApproved({ id: "call-m3", tool: name, label: name, args: { chipId: "64Qv3" } });
+  assert.equal(hostModelIdentity(write.seen[1].ctx), undefined);
+});
 
 test("the model is not offered the confirmation flag", () => {
   const tool = registered("qdash_create_forum_post");

@@ -28,6 +28,7 @@ from qdash.api.services.agent_session_service import AgentSessionService
 from qdash.datamodel.agent_session import (
     AgentActionDecision,
     AgentActionType,
+    AgentModelIdentity,
     AgentSessionPolicy,
     NumericBounds,
 )
@@ -86,7 +87,7 @@ def _create_session(
             skill_name="single-qubit-bringup",
             skill_version="1",
             skill_hash="sha256:test",
-            model_name="local-model",
+            model=AgentModelIdentity(provider="local", model_id="local-model"),
         ),
     )
 

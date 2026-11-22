@@ -58,10 +58,22 @@ in as (`client.getCurrentUser()`, `GET /auth/me`) and `sessionOwnerRefusal` refu
 editor's session or an unknown user before any write; a name the model supplies is never used.
 QDash checks the same again (see [Server checks](#server-checks)). They refuse a session with `autonomy: confirm_each`, where
 every action goes through the reviewed `qdash_submit_agent_action` and
-`qdash_execute_agent_action`. Commits and backend applies stay reviewed writes in every case,
-and no script may call a session-granted tool. The web runtime's policy schema
-(`agent-runtime/src/tool-schemas.ts`) carries `autonomy` and `max_rounds_per_target` so the
-model can propose such a session there.
+`qdash_execute_agent_action`. No script may call a session-granted tool. The `policy` parameter
+of `qdash_create_agent_session` is one schema, `agentSessionPolicySchema` in
+`packages/pi-qdash/extensions/lib/agent-session-policy.ts`, which the pi CLI and the web runtime
+both expose. It spells out `AgentSessionPolicy` with its nested types, including `autonomy`,
+`max_rounds_per_target`, and `parameter_updates` as an object, so Pi rejects a malformed policy,
+such as `parameter_updates` sent as a list, before the approval and before any QDash call; the
+tool checks the policy again before it asks. QDash still validates every policy itself.
+
+Commits and backend applies are reviewed writes unless the same approval also granted
+`parameter_updates` ([Update authority](#update-authority)). The approval card
+(`AgentSessionPolicyPreview` in `ui/src/components/features/chat/`) and the pi confirmation
+(`agentSessionApprovalText`) list the qubits, tasks, bounds, quality gates, budget, expiry, and
+whether parameter updates and backend applies are granted, above the exact policy. An `auto`
+session cannot replace a paused one: QDash refuses to create one for qubits that one of the same
+user's sessions on the chip is paused for, and `qdash_create_agent_session` checks
+`pausedSessionConflict` first.
 
 ### State from QDash's records
 
@@ -81,6 +93,12 @@ applied before filtering) finds the session when its id is not in the conversati
 | `confirm_each` | The user approved no autonomous steps | No |
 | `budget_exhausted` | Every action used; only an intervention can be recorded | No |
 | `expired`, `ended` | Over and never reactivated | No |
+
+QDash returns datetimes in UTC, often without an offset. The context reads them with
+`parseServerTimestamp` (`extensions/lib/server-time.ts`): a value without an offset is UTC, an
+explicit `Z` or offset is kept, and the reported timestamps gain `Z` so they name one instant.
+The host's time zone never changes the result. An `expires_at` that is not an ISO date-time
+counts as expired, so a malformed record cannot extend the session.
 
 The context also reports, for the newest intervention, the original question, the attempts, the
 expert's decision and guidance, the actions recorded since the answer, and
@@ -117,6 +135,8 @@ checks, with the request's authenticated user and its own records:
 | Any autonomous request | A session whose `autonomy` is not `auto` | 409 |
 | Proposal (`run_task` only) | A measurement of the session that is dispatching or running; an undispatched identical action (dispatch it instead); a task and qubit at `max_rounds_per_target`; a finished identical measurement without `repeat_of_action_id` naming it | 409 |
 | Dispatch | Another measurement of the session that is dispatching or running | 409 |
+| Proposal (`run_task` only) | Unresolved evidence anywhere in the session, a repeat of the same task included, until an expert's `resume` answer cites that action; a backend apply of the session still in progress (see [Unresolved evidence](#unresolved-evidence)) | 409 |
+| Proposal of a dependent step | A different task on a qubit whose newest valid result of a granted task is not committed or, with `apply_backend`, not applied (see [Update authority](#update-authority)) | 409 |
 
 A refused proposal is not recorded and uses no budget. `AgentSessionService.submit_action`
 loads the session, reads its history, and authorizes with a compare-and-set on the state
@@ -145,14 +165,149 @@ not make these checks.
 A step measures on the current calibration state: a qubex task reads its declared inputs from
 the Qubit record for a fresh run, and staged candidates are not part of that state. A step that
 needs a value an earlier step measured (Rabi after Chevron's frequency) therefore runs after
-the model proposes `qdash_commit_agent_candidate` or `qdash_commit_agent_candidate_set` and the
-user approves it; the commit is a reviewed write that the session's approval does not cover. A
-value Qubex reads from its own configuration files reaches a run only after
-`qdash_apply_agent_candidate_commit`, another reviewed write. The commit advances the state
-version, so the model reads the context again before the next step. If the user declines, the
-model reports the staged value instead of measuring as if it had changed.
+that value is committed. In a session whose approval granted `parameter_updates` for it, the
+model commits it with `qdash_commit_agent_session_update` after a result it assesses as pass
+([Update authority](#update-authority)). Otherwise the model proposes
+`qdash_commit_agent_candidate` or `qdash_commit_agent_candidate_set` and the user approves that
+call. A value Qubex reads from its own configuration files reaches a run only after a backend
+apply: under the grant's `apply_backend`, or through `qdash_apply_agent_candidate_commit`, a
+reviewed write. The commit advances the state version, so the model reads the context again
+before the next step. If the user declines a reviewed commit, the model reports the staged
+value instead of measuring as if it had changed.
+
+Only an accepted candidate can be committed, and the session's `allowed_overrides` decides
+which outputs can be accepted: each key bounds a task input a step may override and also the
+task output of the same name (`gate_task_result` in `agent_session_service.py`). An output that
+is not a key is staged with `accepted: false` and the reason "not allowed by the session
+policy", and the policy cannot change after approval. The model therefore names each output the
+goal must commit when it proposes the session. `qdash_get_pipeline_catalog` with `taskNames`
+lists the declared output names and units, the `policy` parameter of
+`qdash_create_agent_session` states the rule, and the `qdash-agent-calibration` skill takes each
+bound from the task knowledge or asks the user for it rather than inventing a range. A bound is a
+deterministic check, not a quality verdict.
+
+### Update authority
+
+`AgentSessionPolicy.parameter_updates` is an opt-in part of the session approval:
+`parameters` (each needs both a minimum and a maximum in `allowed_overrides`), `tasks` (a subset
+of `allowed_tasks` whose results may supply them), and `apply_backend` (default `false`). It
+requires `autonomy: auto`. A session without it, including every session created before the
+field existed, grants nothing, and its commits and applies stay reviewed.
+
+`qdash_commit_agent_session_update` is session-granted. It reads the grant from the session
+QDash returns, refuses a parameter, task, or result outside it, records the model's `pass`
+decision on exactly that action (`next_action: propose_commit`), and sends `POST
+.../candidates/{parameter}/commit` with `autonomous: true` and that `decision_id`. With
+`apply_backend` it then sends `POST .../commits/{commit_id}/apply` with `autonomous: true`. A
+QDash release that does not return `parameter_updates` gets no commit from the tool, because it
+would ignore the flag. The reviewed commit and apply tools take no such flag, so a model cannot
+turn a reviewed call into a granted one.
+
+QDash checks each autonomous commit in `agent_parameter_update.check_commit`, with the request's
+authenticated user and its own records:
+
+| Check | Refused when |
+| --- | --- |
+| Authority | The signed-in user is not the creator (403), the session is not `auto`, or the grant does not name the parameter and the action's task |
+| Measurement | The action did not complete, the candidate is rejected by the bounds or `quality_gates`, a newer settled measurement of the same task and qubit exists, or another measurement of the session is running |
+| Assessment | `decision_id` is not a decision of the session by its creator, does not cite the action, is not `pass`, names a next step other than `propose_commit`, `next_task`, or `complete`, or was superseded; any decision on the action was ever `fail` or `inconclusive`; a later decision on it is not `pass` |
+| Evaluations | An evaluation of the task result is still pending or running; ended `failed`, `cancelled`, or `interrupted`; completed without a diagnosis, without a `fit_reliability` or `calibration_diagnosis` answer, with a fit other than `Reliable`, or with a status other than `SUCCESS`; or has a reviewer who disagreed |
+| Session evidence | Any run of the session has [unresolved evidence](#unresolved-evidence) |
+| State | The stored value is not exactly the one recorded when the action was proposed (`metadata.parameter_baseline`), or none was recorded; the candidate was already committed; the session is not active; or the state version moved |
+
+The task's own completion checks, such as the R² threshold that fails a task in
+`TaskExecutor`, apply because only a completed task result yields candidates. A result without
+any evaluation can still be committed; `assessment_evidence.evaluation_state` then says `none`
+instead of `supported`. The commit records `authority: session_policy`, the `decision_id`, and
+`assessment_evidence`: the agent-reported assessment, the server-computed gates, the evaluation
+facts, and a note that neither the pass nor the gates are a scientific verdict.
+
+The stored value is versioned by its content, because `QubitDocument` has no version field and
+standalone MongoDB has no transactions (`qdash.dbmodel.agent_parameter_state`). An autonomous
+proposal of a granted task records the stored granted parameters in
+`metadata.parameter_baseline`. The commit compares the stored value with that baseline, and
+then writes with one `find_one_and_update` whose filter requires the stored sub-document to
+still equal it, so a value someone wrote in between, with or without `calibrated_at`, is never
+overwritten: the commit is recorded `failed` (409) and nothing is written. A reviewed commit
+writes the same way against the value it read just before. Writers outside agent sessions
+(`update_calib_data` in workflow result saving and manual edits, and reviewed set commits) still
+save the whole qubit document and can overwrite an agent's value afterwards; the apply checks
+below then refuse it rather than write over theirs.
+
+An autonomous apply (`check_apply`) needs `apply_backend`, a `session_policy` commit by the
+creator that is still exactly the stored value (`after_snapshot`), no unresolved evidence, no
+earlier apply request, and `push_to_github: false`; a failed apply is retried only through the
+reviewed call. Both record `backend_authority` and `backend_requested_by`. That API check is
+early, not final. Every agent apply, reviewed or granted, takes the chip's apply lease
+(`agent_backend_apply_locks`, one record per chip) when it reserves the dispatch, and holds it
+until the worker settles the apply, so two agent applies never write a chip's parameter files
+at once; a lease whose holder already settled is stale and replaced. Under the lease, the worker
+(`agent_candidate_apply`) checks a `session_policy` value against the stored one before it
+writes the files and again after it verified them, and rolls back its write and fails the apply
+when either check, the verification, or the GitHub push fails. A qubit write after the second
+check is ordered after the apply. Workflow runs that write parameter files themselves
+(`update_params`) do not take the lease, so the lease orders agent applies only among themselves.
+
+The rollback undoes only the YAML keys the apply wrote, so it never erases a value another writer
+saved in the meantime. `YamlParamsUpdater.apply` records each key's previous value in a
+`ParamsApplyRecord` under the same file lock (`<file>.yaml.lock`) as the write, and releases the
+lock after each file. `rollback` then takes the lock again for each file and restores a key only
+while it still holds the value the apply wrote. A key another writer changed since is left in
+place, and the apply's `backend_error` lists it after `backend rollback left later changes in
+place`. A `meta.unit` the apply added is removed only when the file's data is back to its state
+before the apply, and a file the apply created is removed only when nothing else remains in it.
+The check compares values, so a later writer that saved the same value as the apply is not
+distinguishable from it and its key is restored. The guarantee covers writers that go through
+`YamlParamsUpdater` and its lock: ordinary task results, the pre-push sync, the backend's
+connect-time sync, and manual edits. A GitHub pull (`pull_github`), chip scaffolding, and a person
+editing the files by hand bypass the lock and are not protected. A worker that dies after the
+write and before the rollback leaves the applied value in the files; the operating system releases
+its file locks.
+
+#### Unresolved evidence
+
+`review_evidence` stops the session on a questionable result. A settled run of the session has
+unresolved evidence when it did not complete, any decision on it was `fail` or `inconclusive`,
+an evaluation of its result ended `failed`, `cancelled`, or `interrupted`, has no diagnosis,
+judged the fit unreliable, reported a status other than `SUCCESS`, completed without both a
+`fit_reliability` and a `calibration_diagnosis` answer, or a reviewer disputed it, or, for a
+granted task, its candidates cannot be read, carry no granted parameter, or were rejected. Any
+such run refuses every autonomous step, commit, and apply of the session. An evaluation still
+pending or running makes them wait instead.
+
+Only an expert clears it: an intervention answered with `resume` whose attempts cite exactly
+that action, answered at or after the latest of all the action's problems was recorded. QDash
+collects every problem of the action, not only the first: each `fail` or `inconclusive`
+decision (`recorded_at`) and each unusable evaluation (its `completed_at` or a reviewer
+verdict's `updated_at`, whichever is later). An answer given before a later failed evaluation,
+diagnosis, decision, or reviewer verdict of the same action does not cover it. A settled
+evaluation without `completed_at`, or with any reviewer verdict (`verdict`, `verdicts`, or
+`verdict_history`) whose `updated_at` is missing or unreadable, has no provable time, so no
+answer covers it. An evaluation without verdicts is timed by `completed_at` alone. An answer that
+covers the problems still waits for an evaluation of the action that is pending or running. A repeat
+of the same task, a new `pass`, an answer to an intervention that does not cite the action, or
+a `stop` answer clears nothing, and each new questionable result, a repeat's included, needs its
+own answer. The answer lets the plan continue, including the repeat it calls for; it never makes
+the result committable and grants nothing outside the session's scope.
+
+`dependency_refusal` then keeps a dependent step from reading an old value. A different task on
+a qubit waits while the newest valid completed result of a granted task on it has an accepted
+granted candidate that is not committed or, with `apply_backend`, not applied, including when its
+apply failed. An expert's answer does not skip that; the value is committed and applied, under
+the grant or through the reviewed calls. A result an expert's answer resolved carries no update
+to wait for. A repeat of a valid result needs no answer; the newer result supersedes it.
 
 ### Stopping for an expert
+
+A run that settles without completing gets a mechanical next step (`FAILED_RUN_HINT` in
+`extensions/lib/agent-loop.ts`): the session context adds it while that result has no decision,
+and the `qdash_wait_agent_action` result adds it after the action record when the run failed.
+It says that QDash refuses every further step, a repeat included, until an expert answers an
+intervention that cites the run, and tells the model to call `qdash_request_agent_human` with it
+in `attemptActionIds` before any wider research, because only that call pauses the session and
+reaches an expert. It names no
+cause and starts nothing. `qdash_record_agent_decision` with `nextAction: request_human` in an
+active session says in its result that it opened no intervention.
 
 `qdash_request_agent_human` records an intervention through `POST
 /agent-sessions/{id}/interventions` with the reason, summary, question, and attempts that
@@ -428,7 +583,7 @@ applies one at a time. `src/qdash/api/services/agent_session_gate.py` holds it.
 - **Counted action.** The update that counts a submitted action stores its record in
   `pending_action`; the record is inserted afterwards and by every later load, so no load
   returns a state version without the action it counted (see [Server checks](#server-checks)).
-  The read-only Execution journey does not insert it; it shows the payload and marks it pending
+  The read-only session graph does not insert it; it shows the payload and marks it pending
   (see [Execution grouping](#execution-grouping)).
 - **Pause.** One update moves the session from `active` to `waiting_for_human`, sets
   `active_intervention_id`, and stores the intervention record (and, for `request_human`, the
@@ -482,21 +637,44 @@ written from it.
 | `measurement` | action, `execution_history`, `task_result_history` | Execution and task-result IDs and statuses, effective inputs, scalar outputs with units and errors, quality metrics, gate results recomputed by `AgentSessionService.gate_task_result`, figure and raw-data counts with the `/tasks/{task_id}/result` path |
 | `evaluation` | `evaluation` (same project, a task result of the session) | Status, evaluator model, scalar diagnosis fields, reviewer verdicts |
 | `decision` | `agent_decisions` | The agent's assessment, interpretation, and next action, with the evidence snapshot QDash froze |
-| `candidate_commit`, `candidate_set_commit` | `agent_candidate_commits`, `agent_candidate_set_commits` | Committed value, previous and new value, committing account |
-| `backend_apply` | `agent_candidate_commits` | Apply status, operation, changed files, verification, git commit |
+| `candidate_commit`, `candidate_set_commit` | `agent_candidate_commits`, `agent_candidate_set_commits` | Committed value, previous and new value, committing account; for a commit, its `authority`, and for a `session_policy` commit (actor kind `agent`) the `decision_id` and `assessment_evidence` |
+| `backend_apply` | `agent_candidate_commits` | Apply status, operation, changed files, verification, git commit, apply `authority` and requesting account |
 | `intervention_opened`, `intervention_response`, `intervention_resumed`, `resume_outcome` | `agent_interventions` | Question, summary, attempts, the expert's decision and guidance, the resume and its outcome |
 
 Each event carries a stable `event_id` (`<kind>:<source id>`) and the reference IDs it
 concerns. `provenance` separates QDash's facts (`server_record`) from text a party supplied
 (`agent_reported`, `human_reported`, `evaluator_reported`). `status_is_current` marks a status
 read live from a record that can still change, such as a running measurement or a queued apply.
-`missing` lists facts the records do not hold: a session created without `model_name`, an action
-from before `submitted_by` existed, a finished measurement no decision cites. The timeline never
+`missing` lists facts the records do not hold: a session or step without a reported `model`, an
+action from before `submitted_by` existed, a finished measurement no decision cites. The timeline never
 fills them in, so a historical session shows what it recorded and nothing it did not. Failure
 and error text that can carry transport details is not copied: a failed commit reads
 `Candidate persistence failed`, and dispatch, apply, and evaluation errors appear only as
 `dispatch_error_recorded` or `error_recorded`. A scope rejection appears as a rejected
 `action_proposed` with no `measurement`.
+
+**Model identity.** `model` (`AgentModelIdentity` in `src/qdash/datamodel/agent_session.py`) is
+the `provider`, `model_id`, and `host` a client reported for one record. The session, each action
+(`metadata.model`), each decision, and each intervention store the identity sent with their own
+request, so a model switch or a resume in the other host shows on later records only; a retry
+with the same idempotency key keeps the first record's model, because `model` is excluded from
+the request hash. The timeline sets `model` on `session_created`, `action_proposed`, `decision`,
+and `intervention_opened`, and on a `session_policy` `candidate_commit` from the decision it
+rests on (`assessment_evidence.assessment.model`); a reviewed commit stays a person's act with no
+model. An agent event without one lists `model` in `missing`. QDash cannot verify the identity:
+it is client reported, accepts only identifier characters (no URL, credential, or free text),
+and changes no scope or approval. The audit header and `AgentSessionResponse` keep
+`model_name`, the `provider/model_id` label of the session's `model`, or empty when none was
+reported; an older session's free-text `model_name` is not read as an identity.
+
+pi-qdash fills `model` from the host, never from a tool argument: `hostModelIdentity`
+(`packages/pi-qdash/extensions/lib/host-model.ts`) reads `ctx.model` in pi CLI (host `pi`), and
+the agent runtime passes the conversation's harness model reference as `qdashHostModel` with
+host `qdash-web-agent` (`runCodingAgentTool` in `agent-runtime/src/durable-tools.ts`). An
+approval card stores the model that made the call (`ApprovalRequest.model`), so the approved
+write reports it even when the user switched models before approving. The Python
+`qdash-agent start-session` reports `--model-provider` and `--model-id` with host
+`qdash-agent-cli`.
 
 ### Decisions
 
@@ -596,14 +774,14 @@ The Execution page presents a session as one experiment over its real executions
 making the session an execution. The session stays the authority for policy, budget, and
 pauses; each measurement stays an ordinary execution whose workflow and hardware lifecycle the
 session does not own. Nothing here dispatches, locks, cancels, or writes: the grouping and the
-journey are read-only projections in `src/qdash/api/services/execution_group_service.py`.
+graph are read-only projections in `src/qdash/api/services/execution_group_service.py`.
 
 **Link authority.** An execution belongs to a session only when an authorized `run_task` action
 of that session names it: the action's `operation_id` matches the execution's
 `note.flow_run_id`, or its `operation_id` or `execution_id` matches the `execution_id`. The
 execution must be in the session's project and on its chip. `resolve_chip_links` and
 `link_for_execution` in `src/qdash/api/services/agent_execution_links.py` hold the one
-resolution used by the list, an execution's `agent_session` field, the journey, and the audit
+resolution used by the list, an execution's `agent_session` field, the graph, and the audit
 when attributing measurements:
 
 - An action resolves through its `operation_id` first, then its `execution_id`. A flow run id
@@ -616,7 +794,7 @@ when attributing measurements:
   sits in two groups or is two measurements; a later action that resolves to it is claimed.
 
 A claimed or ambiguous action is a link conflict, not an undispatched action: the list names it
-and its holder in the session's `missing`, and the journey shows it as a `measurement` node with
+and its holder in the session's `missing`, and the graph shows it as a `measurement` node with
 status `link_claimed` or `link_ambiguous`, `missing` `execution_link_claimed` or
 `execution_link_ambiguous`, no execution, task result, or dispatch `sequence`, and its own
 `dispatch_status`. The audit also marks the link conflict as missing and excludes that action's
@@ -627,7 +805,7 @@ group, and no `upstream_id` is changed.
 **Attribution.** Each `ExecutionResponseSummary` of `GET /executions` and of the grouped list
 carries `agent_session` only when an action holds the execution, from one `resolve_chip_links`
 per request rather than a lookup per row; a tag never sets it. A linked `agent_session` also
-carries the session's `created_by` and, when recorded, `model_name`. The UI labels such a run
+carries the session's `created_by` and, when a model was reported, `model_name`. The UI labels such a run
 **Agent** · @user with the execution's recorded user, and names `created_by` as the user
 responsible for the session. It never derives the label from a name or tag, and it does not
 present `created_by` as the expert who answered, resumed, or authorized a commit; those stay
@@ -655,7 +833,7 @@ expert is normal. The pipeline progress of `_pipeline_progress`, which infers a 
 the project lock, is not used for sessions. Facts the records do not hold, such as a dispatched
 action whose execution is not found on the chip, are listed in `missing`.
 
-**Journey.** `GET /executions/groups/agent-sessions/{session_id}` (`getAgentSessionJourney`)
+**Graph.** `GET /executions/groups/agent-sessions/{session_id}` (`getAgentSessionGraph`)
 reads the session in the caller's project (404 otherwise) and returns typed nodes and edges.
 It writes nothing: unlike `load_agent_session`, it does not insert a `pending_action` or
 `pending_intervention` payload or record an expiry. A session past `expires_at` is reported as
@@ -671,15 +849,20 @@ its record's id. Edges are `sequence` (the next dispatched measurement; temporal
 `evidence` (each `evidence_action_ids` entry, and each `evaluation_ids` entry through its task
 result), `next_action`, `retry_of` (a declared `repeat_of_action_id`), `escalation` (an
 intervention's action, a decision's intervention), and `follow_up` (an intervention's
-predecessor or follow-up). A reference outside the journey is listed in the node's `missing`
-instead of an edge. Nodes carry ids and scalars, never raw arrays. The response is a live read,
-not a snapshot, keeps at most the latest `MAX_JOURNEY_NODES` (1000) nodes with `complete` and
-`omitted_nodes`, and points to the audit above for the consistency-checked record and export.
+predecessor or follow-up). A reference outside the graph is listed in the node's `missing`
+instead of an edge. Nodes carry ids and scalars, never raw arrays. The response keeps at most
+the latest `MAX_SESSION_GRAPH_NODES` (1000) nodes with `complete` and `omitted_nodes`.
+
+The graph and the audit answer different questions. The graph is a live projection of how the
+session's records relate: it reads the records in several queries without a snapshot, so a
+graph read while the session changes can combine records from slightly different moments. The
+audit above is the ordered timeline of the session, checked for consistency and exportable.
+Use the audit, not the graph, as the record of what happened.
 
 The UI lives in `ui/src/components/features/execution/`: `AgentSessionGroupRow` in the list,
-`AgentSessionJourneyPageContent` and `AgentSessionJourneyGraph` on
+`AgentSessionGraphPageContent` and `AgentSessionGraphDiagram` on
 `/execution/[chipId]/sessions/[sessionId]`, and `ExecutionAgentSessionNotice` on the execution
-detail and panel. The journey page pins its requests to the linked project with
+detail and panel. The graph page pins its requests to the linked project with
 `useLinkedProject`, as the session pages do, and the list adds the project to its query key and
 request header; a project switch closes the panel and collapses the groups. Tests:
 `tests/qdash/api/services/test_execution_group_service.py`,
@@ -734,10 +917,14 @@ planner may escalate after the value is already written; only `commit_on_success
 - `packages/pi-qdash/extensions/tools/agent-loop.ts`, `packages/pi-qdash/extensions/lib/agent-loop.ts`:
   the model-driven loop tools, loop state, step checks, and the pause guard of flows and
   pipelines; `packages/pi-qdash/extensions/lib/waits.ts`: `WAIT_AGENT_INTERVENTION`
+- `packages/pi-qdash/extensions/lib/agent-session-policy.ts`: the session policy schema both
+  hosts expose; tests in `agent-runtime/test/tool-schemas.test.mjs`
 - `packages/pi-qdash/skills/qdash-agent-calibration/SKILL.md`: the loop's procedure for the model
 - `packages/pi-qdash/tests/agent-loop-tool.test.mjs`, `agent-runtime/test/agent-loop-parity.test.mjs`,
   `agent-runtime/test/durable-waits.test.mjs`: the loop against a stateful fake of the
   agent-session API (`packages/pi-qdash/tests/helpers/fake-agent-qdash.mjs`) in both hosts
+- `agent-runtime/validation/fake-loop/`: the opt-in run of the loop with the real chat model
+  against a local fake-backend QDash; see [Agent Loop Validation](./agent-validation.md)
 - `clients/python/src/qdash/client/services/agent_runner.py`: step runner, plan runner,
   planner protocol and sentinels
 - `clients/python/src/qdash/client/services/evaluation_planner.py`: evaluation planner, range
@@ -748,6 +935,11 @@ planner may escalate after the value is already written; only `commit_on_success
 - `src/qdash/datamodel/task_knowledge.py`: `NextAction`, `status_codes()`, `next_action_problems()`
 - `src/qdash/api/services/agent_session_service.py`: action policy, candidate gates, candidate set
   commit
+- `src/qdash/api/services/agent_parameter_update.py`: update authority checks for autonomous
+  commits, applies, and dependent steps, and unresolved evidence; tests in
+  `tests/qdash/api/services/test_agent_parameter_updates.py`
+- `src/qdash/dbmodel/agent_parameter_state.py`: compare-and-set parameter writes and the chip
+  apply lease; worker checks in `src/qdash/workflow/service/agent_candidate_apply_flow.py`
 - `src/qdash/api/services/agent_intervention_service.py`,
   `src/qdash/api/services/agent_intervention_slack.py`: interventions, resume, Slack delivery
 - `src/qdash/api/services/agent_session_gate.py`: execution barrier, pause recovery, in-flight
@@ -758,7 +950,7 @@ planner may escalate after the value is already written; only `commit_on_success
 - `ui/src/components/features/agent-session/`: session and intervention pages
 - `src/qdash/api/services/agent_execution_links.py`,
   `src/qdash/api/services/execution_group_service.py`: action-to-execution links, the grouped
-  Execution list, and the journey; see [Execution grouping](#execution-grouping)
+  Execution list, and the graph; see [Execution grouping](#execution-grouping)
 - `src/qdash/api/services/calibration_pipeline_preflight.py`: pipeline preflight
 - `clients/python/tests/test_agent_runner.py`, `clients/python/tests/test_evaluation_planner.py`,
   `tests/qdash/api/services/test_agent_session_service.py`,

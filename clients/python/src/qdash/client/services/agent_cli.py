@@ -25,6 +25,15 @@ if TYPE_CHECKING:
     from qdash.client.services.client_models import AgentInterventionResponse
 
 
+def _reported_model(provider: str, model_id: str) -> dict[str, str] | None:
+    """The model the operator reported for the session, or None when it was not given."""
+    if not provider and not model_id:
+        return None
+    if not provider or not model_id:
+        raise SystemExit("--model-provider and --model-id are given together")
+    return {"provider": provider, "model_id": model_id, "host": "qdash-agent-cli"}
+
+
 def _json_object(value: str) -> dict[str, Any]:
     parsed = json.loads(value)
     if not isinstance(parsed, dict):
@@ -168,7 +177,16 @@ def _build_parser() -> argparse.ArgumentParser:
     start.add_argument("--skill-name", default="")
     start.add_argument("--skill-version", default="")
     start.add_argument("--skill-hash", default="")
-    start.add_argument("--model-name", default="")
+    start.add_argument(
+        "--model-provider",
+        default="",
+        help="Provider of the model the agent runs with; recorded as reported, with --model-id",
+    )
+    start.add_argument(
+        "--model-id",
+        default="",
+        help="ID of that model within its provider; recorded as reported, with --model-provider",
+    )
 
     step = commands.add_parser("run-step", help="Run one staged Skill measurement node")
     step.add_argument("--session-id", required=True)
@@ -444,7 +462,7 @@ def run(argv: list[str] | None = None) -> int:
                 skill_name=args.skill_name,
                 skill_version=args.skill_version,
                 skill_hash=args.skill_hash,
-                model_name=args.model_name,
+                model=_reported_model(args.model_provider, args.model_id),
             )
             print(json.dumps(session.model_dump(mode="json"), sort_keys=True))
             return 0

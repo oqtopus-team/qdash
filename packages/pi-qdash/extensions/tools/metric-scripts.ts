@@ -5,6 +5,7 @@ import { Type } from "typebox";
 
 import { dashboardPagePath, metricScriptPagePath } from "../lib/links.js";
 import { toTextToolResult } from "../lib/results.js";
+import { requireWriteApproval } from "../lib/write-approval.js";
 
 /**
  * Metric scripts and dashboards.
@@ -704,10 +705,9 @@ export function registerMetricScriptTools(pi: Pick<ExtensionAPI, "registerTool">
       visibility: Type.Optional(Type.Union([Type.Literal("private"), Type.Literal("project")], { description: "private (default for new scripts) or project. Project dashboards can only use project scripts." })),
       source: Type.String({ description: "The complete Python source (a qdash_metrics module)." }),
       expectedRevision: Type.Optional(Type.Number({ description: "Update only if the script is still at this revision (409 otherwise)." })),
-      confirmWrite: Type.Optional(Type.Boolean({ description: "Required for non-interactive execution. Set true only after explicit user confirmation." })),
     }),
     async execute(
-      _toolCallId,
+      toolCallId,
       params: ConnectionParams & {
         scriptId?: string;
         name: string;
@@ -715,7 +715,6 @@ export function registerMetricScriptTools(pi: Pick<ExtensionAPI, "registerTool">
         visibility?: "private" | "project";
         source: string;
         expectedRevision?: number;
-        confirmWrite?: boolean;
       },
       _signal,
       _onUpdate,
@@ -741,12 +740,8 @@ export function registerMetricScriptTools(pi: Pick<ExtensionAPI, "registerTool">
           { tool, saved: false, ok: false },
         );
       }
-      if (!params.confirmWrite) {
-        const what = params.scriptId ? `a new revision of metric script ${params.scriptId}` : `a new metric script '${params.name}'`;
-        if (!ctx.hasUI || !(await ctx.ui.confirm("Save QDash metric script?", `This saves ${what} to the project.`))) {
-          throw new Error(`${tool} requires explicit confirmation`);
-        }
-      }
+      const what = params.scriptId ? `a new revision of metric script ${params.scriptId}` : `a new metric script '${params.name}'`;
+      await requireWriteApproval(tool, toolCallId, params, ctx, { title: "Save QDash metric script?", message: `This saves ${what} to the project.` });
       try {
         const created = !params.scriptId;
         const qdash = new QDash(client as QDashClient);
@@ -806,10 +801,9 @@ export function registerMetricScriptTools(pi: Pick<ExtensionAPI, "registerTool">
       panels: Type.Optional(Type.Array(Type.Object({}, { additionalProperties: true }), { description: "The complete panel list (see the description for the shape)." })),
       templateId: Type.Optional(Type.String({ description: "Creation only: a starter template to copy panels from (qdash_query dashboard_templates)." })),
       expectedVersion: Type.Optional(Type.Number({ description: "Update only if the dashboard is still at this version (its `version` from qdash_query dashboard; 409 otherwise)." })),
-      confirmWrite: Type.Optional(Type.Boolean({ description: "Required for non-interactive execution. Set true only after explicit user confirmation." })),
     }),
     async execute(
-      _toolCallId,
+      toolCallId,
       params: ConnectionParams & {
         dashboardId?: string;
         name?: string;
@@ -819,7 +813,6 @@ export function registerMetricScriptTools(pi: Pick<ExtensionAPI, "registerTool">
         panels?: Array<Record<string, unknown>>;
         templateId?: string;
         expectedVersion?: number;
-        confirmWrite?: boolean;
       },
       _signal,
       _onUpdate,
@@ -840,13 +833,9 @@ export function registerMetricScriptTools(pi: Pick<ExtensionAPI, "registerTool">
         }
       }
       const scriptsNotice = templateScriptsNotice(preview);
-      if (!params.confirmWrite) {
-        const what = params.dashboardId ? `dashboard ${params.dashboardId}` : `a new dashboard '${params.name}'`;
-        const message = [`This saves ${what} to the project.`, scriptsNotice].filter(Boolean).join(" ");
-        if (!ctx.hasUI || !(await ctx.ui.confirm("Save QDash dashboard?", message))) {
-          throw new Error(`${tool} requires explicit confirmation`);
-        }
-      }
+      const what = params.dashboardId ? `dashboard ${params.dashboardId}` : `a new dashboard '${params.name}'`;
+      const message = [`This saves ${what} to the project.`, scriptsNotice].filter(Boolean).join(" ");
+      await requireWriteApproval(tool, toolCallId, params, ctx, { title: "Save QDash dashboard?", message });
       const panels = params.panels ? requestPanels(params.panels) : undefined;
       const fields = {
         ...(params.description !== undefined ? { description: params.description } : {}),

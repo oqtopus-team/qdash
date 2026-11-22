@@ -14,6 +14,7 @@ import type {
   AgentCandidateSetCommitResponse,
   AgentCandidateCommitResponse,
   AgentCandidateResponse,
+  AgentModelIdentity,
   AgentSessionPolicy,
   AgentActionType,
   AgentCandidateReference,
@@ -142,7 +143,12 @@ export interface CreateAgentSessionOptions {
   skillName?: string;
   skillVersion?: string;
   skillHash?: string;
-  modelName?: string;
+  /**
+   * The provider and model the calling host ran the agent with, read from the host's own
+   * runtime (never from the agent's tool arguments). QDash records it as client reported and
+   * does not verify it; omit it when the host does not know it.
+   */
+  model?: AgentModelIdentity;
 }
 
 export interface SubmitAgentActionOptions {
@@ -161,6 +167,12 @@ export interface SubmitAgentActionOptions {
   autonomous?: boolean;
   /** The finished identical action an autonomous step measures again on purpose. */
   repeatOfActionId?: string;
+  /**
+   * The provider and model the calling host ran the agent with, read from the host's own
+   * runtime (never from the agent's tool arguments). QDash records it as client reported and
+   * does not verify it; omit it when the host does not know it.
+   */
+  model?: AgentModelIdentity;
 }
 
 export interface ListAgentSessionsOptions {
@@ -183,6 +195,12 @@ export interface CreateAgentInterventionOptions {
   previousInterventionId?: string;
   /** Recorded by an autonomous agent: QDash requires the signed-in creator of an `auto` session. */
   autonomous?: boolean;
+  /**
+   * The provider and model the calling host ran the agent with, read from the host's own
+   * runtime (never from the agent's tool arguments). QDash records it as client reported and
+   * does not verify it; omit it when the host does not know it.
+   */
+  model?: AgentModelIdentity;
 }
 
 export interface RecordAgentDecisionOptions {
@@ -198,6 +216,12 @@ export interface RecordAgentDecisionOptions {
   nextActionId?: string;
   interventionId?: string;
   supersedesDecisionId?: string;
+  /**
+   * The provider and model the calling host ran the agent with, read from the host's own
+   * runtime (never from the agent's tool arguments). QDash records it as client reported and
+   * does not verify it; omit it when the host does not know it.
+   */
+  model?: AgentModelIdentity;
 }
 
 export interface AgentSessionAuditPageOptions {
@@ -724,7 +748,7 @@ export class QDashClient {
       skill_name: options.skillName ?? "",
       skill_version: options.skillVersion ?? "",
       skill_hash: options.skillHash ?? "",
-      model_name: options.modelName ?? "",
+      ...(options.model ? { model: options.model } : {}),
     });
   }
 
@@ -771,6 +795,7 @@ export class QDashClient {
       diagnosis: options.diagnosis ?? "",
       ...(options.autonomous ? { autonomous: true } : {}),
       ...(options.repeatOfActionId ? { repeat_of_action_id: options.repeatOfActionId } : {}),
+      ...(options.model ? { model: options.model } : {}),
     });
   }
 
@@ -833,6 +858,7 @@ export class QDashClient {
         ? { previous_intervention_id: options.previousInterventionId }
         : {}),
       ...(options.autonomous ? { autonomous: true } : {}),
+      ...(options.model ? { model: options.model } : {}),
     });
   }
 
@@ -867,6 +893,7 @@ export class QDashClient {
       ...(options.supersedesDecisionId
         ? { supersedes_decision_id: options.supersedesDecisionId }
         : {}),
+      ...(options.model ? { model: options.model } : {}),
     });
   }
 
@@ -936,7 +963,15 @@ export class QDashClient {
     sessionId: string,
     actionId: string,
     parameterName: string,
-    options: { idempotencyKey: string; expectedStateVersion: number; taskId: string },
+    options: {
+      idempotencyKey: string;
+      expectedStateVersion: number;
+      taskId: string;
+      /** Commit under the session's approved parameter_updates authority; needs decisionId. */
+      autonomous?: boolean;
+      /** The recorded pass decision an autonomous commit rests on. */
+      decisionId?: string;
+    },
   ): Promise<AgentCandidateCommitResponse> {
     return this.post(
       `/agent-sessions/${pathPart(sessionId)}/actions/${pathPart(actionId)}/candidates/${pathPart(parameterName)}/commit`,
@@ -944,6 +979,8 @@ export class QDashClient {
         idempotency_key: options.idempotencyKey,
         expected_state_version: options.expectedStateVersion,
         task_id: options.taskId,
+        // Sent only when set, so a reviewed request keeps its earlier shape.
+        ...(options.autonomous ? { autonomous: true, decision_id: options.decisionId } : {}),
       },
     );
   }
@@ -983,6 +1020,8 @@ export class QDashClient {
       idempotencyKey: string;
       expectedStateVersion: number;
       pushToGithub?: boolean;
+      /** Apply under the session's approved apply_backend authority; never pushes. */
+      autonomous?: boolean;
     },
   ): Promise<AgentCandidateCommitResponse> {
     return this.post(
@@ -991,6 +1030,7 @@ export class QDashClient {
         idempotency_key: options.idempotencyKey,
         expected_state_version: options.expectedStateVersion,
         push_to_github: options.pushToGithub ?? false,
+        ...(options.autonomous ? { autonomous: true } : {}),
       },
     );
   }

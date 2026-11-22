@@ -269,7 +269,7 @@ test("write tools and unaudited tools cannot run from a script; the direct appro
 
     // The model's own call to a write tool still asks the user, with the exact arguments.
     assert.equal(write.toolName, "qdash_save_flow");
-    assert.deepEqual(write.details.approval, { id: "w1", tool: "qdash_save_flow", label: "qdash_save_flow", args: { title: "flow" } });
+    assert.deepEqual(write.details.approval, { id: "w1", tool: "qdash_save_flow", label: "qdash_save_flow", args: { title: "flow" }, model: { provider: "faux", modelId: "faux-1" } });
     assert.deepEqual(await pendingApproval(chat.conversation, "w1"), write.details.approval);
     assert.equal(save.calls.length, 0);
   } finally {

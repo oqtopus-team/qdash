@@ -49,7 +49,9 @@ def test_start_session_uses_profile_and_bounded_policy(
             '{"t1":{"minimum":1,"maximum":500}}',
             "--skill-name",
             "qubit-characterize",
-            "--model-name",
+            "--model-provider",
+            "ollama",
+            "--model-id",
             "local-model",
         ]
     )
@@ -73,7 +75,7 @@ def test_start_session_uses_profile_and_bounded_policy(
         skill_name="qubit-characterize",
         skill_version="",
         skill_hash="",
-        model_name="local-model",
+        model={"provider": "ollama", "model_id": "local-model", "host": "qdash-agent-cli"},
     )
     client.close.assert_called_once()
 
@@ -107,6 +109,29 @@ def test_start_session_can_load_connection_from_environment(
     assert json.loads(capsys.readouterr().out)["session_id"] == "session-1"
     client.create_agent_session.assert_called_once()
     client.close.assert_called_once()
+
+
+def test_start_session_reports_a_model_only_with_provider_and_id(monkeypatch) -> None:
+    client = MagicMock()
+    client.create_agent_session.return_value.model_dump.return_value = {"session_id": "s"}
+    monkeypatch.setattr(agent_cli.QDashClient, "from_env", lambda: client)
+    base = [
+        "--from-env",
+        "start-session",
+        "--chip-id",
+        "chip-1",
+        "--qid",
+        "Q00",
+        "--task",
+        "T",
+        "--allowed-overrides",
+        "{}",
+    ]
+
+    assert agent_cli.run(base) == 0
+    assert client.create_agent_session.call_args.kwargs["model"] is None
+    with pytest.raises(SystemExit, match="given together"):
+        agent_cli.run([*base, "--model-id", "local-model"])
 
 
 def test_run_step_prints_typed_transition(

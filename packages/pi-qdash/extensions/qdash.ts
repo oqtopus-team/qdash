@@ -17,12 +17,14 @@ import { analyzePlotlyFigure, figureAnalysisText } from "./lib/figure-analysis.j
 import { fetchFigureDetails, figureComponent, figureResultText, mediaTypeForPath, type FigureDetails } from "./lib/figures.js";
 import { forumImageReplyContent, forumImageReplyPreview, loadLocalForumImages, type LocalForumImage } from "./lib/forum-images.js";
 import { forumDetailComponent, forumDetailLines, forumListLines, forumPostTitle, forumPostsFromPayload } from "./lib/forum-render.js";
+import { hostModelIdentity } from "./lib/host-model.js";
 import { investigationContextSummary, validateInvestigationContext, type TimeseriesInvestigationContext } from "./lib/investigation-context.js";
 import { executionPagePath, forumPostPagePath, qdashObjectLinks, qdashWebBaseUrl, qdashWebUrl, safeConfig, withQDashLinks } from "./lib/links.js";
 import { arrayFromPayload, compactItems, firstNumber, firstString, formatItem, payloadTotal, statusIcon } from "./lib/payload.js";
 import { toFigureToolResult, toTextToolResult, toToolResult } from "./lib/results.js";
 import { ansi, boxLinesToWidth, boxed, formatNumber, textComponent } from "./lib/render.js";
 import { installQDashWriteGate } from "./lib/write-gate.js";
+import { requireWriteApproval } from "./lib/write-approval.js";
 import { installQDashGuidance } from "./lib/guidance-hook.js";
 import { qdashContextPath } from "./lib/context-path.js";
 import { errorStatus, fileContentSourceGuidance, filesTreeSourceGuidance, looksLikeSourcePath } from "./lib/source-guidance.js";
@@ -35,6 +37,8 @@ import { registerFlowAuthoringTools } from "./tools/flow-authoring.js";
 import { isMetricScriptQueryAction, metricScriptQuery, registerMetricScriptTools, type MetricScriptQueryAction } from "./tools/metric-scripts.js";
 import { registerSourceCodeTools } from "./tools/source-code.js";
 import { notFound, registerTaskKnowledgeTool } from "./tools/task-knowledge.js";
+import { agentSessionApprovalText, pausedSessionConflict } from "./lib/agent-loop.js";
+import { agentSessionPolicyProblems, agentSessionPolicySchema, type AgentSessionPolicyInput } from "./lib/agent-session-policy.js";
 import { installQDashToolPolicy } from "./lib/script-policy.js";
 import { installQcalHydration } from "./lib/qcal-hydration-hook.js";
 import type { TaskKnowledgeLike } from "./lib/qcal-hydration.js";
@@ -131,10 +135,6 @@ type RawGetParams = {
   useEnv?: boolean;
   path: string;
   query?: Record<string, string | number | boolean | null | undefined>;
-};
-
-type ConfirmableParams = {
-  confirmWrite?: boolean;
 };
 
 type QDashContextState = {
@@ -1962,38 +1962,43 @@ export default function qdashExtension(host: ExtensionAPI) {
     promptSnippet: "Create a QDash agent calibration session after explicit user confirmation",
     promptGuidelines: [
       "Use qdash_create_agent_session only after the user explicitly asks to start an agent calibration workflow.",
-      "qdash_create_agent_session is a write operation; set confirmWrite only after user confirmation.",
+      "qdash_create_agent_session is a write operation: the host asks the user to approve each call, and no argument approves it.",
+      "allowed_overrides is also the candidate gate: list every output the goal must commit (for a dependent step, the value it reads) with bounds the user approved, and no output the goal does not need. Find output names and units with qdash_get_pipeline_catalog taskNames.",
+      "When the goal needs a measured value committed (a dependent step reads it), propose parameter_updates in the policy (autonomy auto) as one object {parameters: [...], tasks: [...], apply_backend: false}, never a list: only the parameters the goal commits, only the tasks that measure them, apply_backend only when the goal needs the backend files written. Each parameter needs both bounds in allowed_overrides; base them on the task catalog, task knowledge, and the stored value, and say where they come from. Show the user every field before asking: approving it lets passing results be committed without asking again.",
+      "Never create a new session to get around a paused one; the tool refuses while one of your sessions on the chip is paused for these qubits.",
     ],
     parameters: Type.Object({
       ...connectionParams,
       ...chipScopedParams,
-      policy: Type.Any({ description: "Agent session policy object accepted by QDash." }),
+      policy: agentSessionPolicySchema,
       expiresInSeconds: Type.Optional(Type.Number()),
       skillName: Type.Optional(Type.String()),
       skillVersion: Type.Optional(Type.String()),
       skillHash: Type.Optional(Type.String()),
-      modelName: Type.Optional(Type.String()),
-      confirmWrite: Type.Optional(Type.Boolean({ description: "Required for non-interactive execution. Set true only after explicit user confirmation." })),
     }),
-    async execute(_toolCallId, params: ConfirmableParams & {
+    async execute(toolCallId, params: {
       profile?: string;
       configPath?: string;
       useEnv?: boolean;
       chipId?: string;
-      policy: unknown;
+      policy: AgentSessionPolicyInput;
       expiresInSeconds?: number;
       skillName?: string;
       skillVersion?: string;
       skillHash?: string;
-      modelName?: string;
     }, _signal, _onUpdate, ctx) {
-      if (!params.confirmWrite) {
-        if (!ctx.hasUI || !(await ctx.ui.confirm("Create QDash agent session?", "This will create an agent session in QDash."))) {
-          throw new Error("qdash_create_agent_session requires explicit confirmation");
-        }
-      }
+      // A malformed policy fails here, before any approval or QDash call.
+      const problems = agentSessionPolicyProblems(params.policy);
+      if (problems) throw new Error(problems);
       const client = await makeClient(params);
       const chipId = await defaultChipId(client, params.chipId);
+      const policy = params.policy as { qids?: unknown };
+      const qids = Array.isArray(policy.qids) ? policy.qids.map(String) : undefined;
+      // A new session must not start what a paused session of the user waits on a person for.
+      const autonomous = (policy as { autonomy?: unknown }).autonomy === "auto";
+      const conflict = autonomous ? await pausedSessionConflict(client, chipId, qids) : null;
+      if (conflict) throw new Error(conflict.replace("Nothing was started", "No session was created").replace("A flow or pipeline", "A new session"));
+      await requireWriteApproval("qdash_create_agent_session", toolCallId, params, ctx, { title: "Create QDash agent session?", message: agentSessionApprovalText(chipId, params.policy, params.expiresInSeconds) });
       const data = await client.createAgentSession({
         chipId,
         policy: params.policy as never,
@@ -2001,7 +2006,8 @@ export default function qdashExtension(host: ExtensionAPI) {
         skillName: params.skillName ?? "pi-qdash",
         skillVersion: params.skillVersion,
         skillHash: params.skillHash,
-        modelName: params.modelName,
+        // The host's model, from the extension context; no argument can set it.
+        model: hostModelIdentity(ctx),
       });
       return toToolResult(data, { tool: "qdash_create_agent_session", chipId });
     },
@@ -2027,7 +2033,7 @@ export default function qdashExtension(host: ExtensionAPI) {
     promptSnippet: "Submit an action to a QDash agent session after explicit user confirmation",
     promptGuidelines: [
       "Use qdash_submit_agent_action only after the user confirms the exact agent action.",
-      "Set confirmWrite only after explicit user confirmation.",
+      "The host asks the user to approve each call; no argument approves it.",
       "An authorized request_human action records an intervention in QDash and pauses the session until an expert answers there; put the question for the expert in diagnosis.",
     ],
     parameters: Type.Object({
@@ -2040,9 +2046,8 @@ export default function qdashExtension(host: ExtensionAPI) {
       qids: Type.Optional(Type.Array(Type.String())),
       parameterOverrides: Type.Optional(Type.Record(Type.String(), Type.Number())),
       diagnosis: Type.Optional(Type.String()),
-      confirmWrite: Type.Optional(Type.Boolean()),
     }),
-    async execute(_toolCallId, params: ConfirmableParams & {
+    async execute(toolCallId, params: {
       profile?: string;
       configPath?: string;
       useEnv?: boolean;
@@ -2055,11 +2060,7 @@ export default function qdashExtension(host: ExtensionAPI) {
       parameterOverrides?: Record<string, number>;
       diagnosis?: string;
     }, _signal, _onUpdate, ctx) {
-      if (!params.confirmWrite) {
-        if (!ctx.hasUI || !(await ctx.ui.confirm("Submit QDash agent action?", `Submit action '${params.actionType}' to session '${params.sessionId}'?`))) {
-          throw new Error("qdash_submit_agent_action requires explicit confirmation");
-        }
-      }
+      await requireWriteApproval("qdash_submit_agent_action", toolCallId, params, ctx, { title: "Submit QDash agent action?", message: `Submit action '${params.actionType}' to session '${params.sessionId}'?` });
       const client = await makeClient(params);
       const data = await client.submitAgentAction(params.sessionId, {
         idempotencyKey: params.idempotencyKey ?? randomUUID(),
@@ -2069,6 +2070,7 @@ export default function qdashExtension(host: ExtensionAPI) {
         qids: params.qids,
         parameterOverrides: params.parameterOverrides,
         diagnosis: params.diagnosis,
+        model: hostModelIdentity(ctx),
       });
       return toToolResult(data, { tool: "qdash_submit_agent_action" });
     },
@@ -2174,14 +2176,9 @@ export default function qdashExtension(host: ExtensionAPI) {
       sourceExecutionId: Type.Optional(Type.String({ description: "Execution the action was decided from, recorded for provenance. The run does not restore it." })),
       updateParams: Type.Optional(Type.Boolean()),
       reconfigure: Type.Optional(Type.Boolean()),
-      confirmWrite: Type.Optional(Type.Boolean()),
     }),
-    async execute(_toolCallId, params: ConfirmableParams & { profile?: string; configPath?: string; useEnv?: boolean; sessionId: string; actionId: string; sourceExecutionId?: string; updateParams?: boolean; reconfigure?: boolean }, _signal, _onUpdate, ctx) {
-      if (!params.confirmWrite) {
-        if (!ctx.hasUI || !(await ctx.ui.confirm("Execute QDash agent action?", `Run action '${params.actionId}' on the current calibration state? Outputs stay staged until a candidate is committed.`))) {
-          throw new Error("qdash_execute_agent_action requires explicit confirmation");
-        }
-      }
+    async execute(toolCallId, params: { profile?: string; configPath?: string; useEnv?: boolean; sessionId: string; actionId: string; sourceExecutionId?: string; updateParams?: boolean; reconfigure?: boolean }, _signal, _onUpdate, ctx) {
+      await requireWriteApproval("qdash_execute_agent_action", toolCallId, params, ctx, { title: "Execute QDash agent action?", message: `Run action '${params.actionId}' on the current calibration state? Outputs stay staged until a candidate is committed.` });
       const client = await makeClient(params);
       return toToolResult(await client.executeAgentAction(params.sessionId, params.actionId, {
         sourceExecutionId: params.sourceExecutionId,
@@ -2205,14 +2202,9 @@ export default function qdashExtension(host: ExtensionAPI) {
       taskId: Type.String(),
       idempotencyKey: Type.Optional(Type.String()),
       expectedStateVersion: Type.Number(),
-      confirmWrite: Type.Optional(Type.Boolean()),
     }),
-    async execute(_toolCallId, params: ConfirmableParams & { profile?: string; configPath?: string; useEnv?: boolean; sessionId: string; actionId: string; parameterName: string; taskId: string; idempotencyKey?: string; expectedStateVersion: number }, _signal, _onUpdate, ctx) {
-      if (!params.confirmWrite) {
-        if (!ctx.hasUI || !(await ctx.ui.confirm("Commit QDash agent candidate?", `Commit candidate '${params.parameterName}' for task '${params.taskId}'?`))) {
-          throw new Error("qdash_commit_agent_candidate requires explicit confirmation");
-        }
-      }
+    async execute(toolCallId, params: { profile?: string; configPath?: string; useEnv?: boolean; sessionId: string; actionId: string; parameterName: string; taskId: string; idempotencyKey?: string; expectedStateVersion: number }, _signal, _onUpdate, ctx) {
+      await requireWriteApproval("qdash_commit_agent_candidate", toolCallId, params, ctx, { title: "Commit QDash agent candidate?", message: `Commit candidate '${params.parameterName}' for task '${params.taskId}'?` });
       const client = await makeClient(params);
       const data = await client.commitAgentActionCandidate(params.sessionId, params.actionId, params.parameterName, {
         idempotencyKey: params.idempotencyKey ?? randomUUID(),
@@ -2306,14 +2298,9 @@ export default function qdashExtension(host: ExtensionAPI) {
     parameters: Type.Object({
       ...connectionParams,
       request: Type.Any({ description: "ForumPostCreate request body accepted by QDash." }),
-      confirmWrite: Type.Optional(Type.Boolean()),
     }),
-    async execute(_toolCallId, params: ConfirmableParams & { profile?: string; configPath?: string; useEnv?: boolean; request: unknown }, _signal, _onUpdate, ctx) {
-      if (!params.confirmWrite) {
-        if (!ctx.hasUI || !(await ctx.ui.confirm("Create QDash forum post?", "This will create a forum post in QDash."))) {
-          throw new Error("qdash_create_forum_post requires explicit confirmation");
-        }
-      }
+    async execute(toolCallId, params: { profile?: string; configPath?: string; useEnv?: boolean; request: unknown }, _signal, _onUpdate, ctx) {
+      await requireWriteApproval("qdash_create_forum_post", toolCallId, params, ctx, { title: "Create QDash forum post?", message: "This will create a forum post in QDash." });
       const client = await makeClient(params);
       return toToolResult(await client.createForumPost(params.request as never), { tool: "qdash_create_forum_post" });
     },
@@ -2388,15 +2375,11 @@ export default function qdashExtension(host: ExtensionAPI) {
       imagePaths: Type.Array(Type.String(), { minItems: 1, maxItems: 8 }),
       interpretation: Type.String({ description: "Human-readable interpretation or context shown after the images." }),
       title: Type.Optional(Type.String()),
-      confirmWrite: Type.Optional(Type.Boolean()),
     }),
-    async execute(_toolCallId, params: ConfirmableParams & { profile?: string; configPath?: string; useEnv?: boolean; parentPostId: string; imagePaths: string[]; interpretation: string; title?: string }, _signal, _onUpdate, ctx) {
+    async execute(toolCallId, params: { profile?: string; configPath?: string; useEnv?: boolean; parentPostId: string; imagePaths: string[]; interpretation: string; title?: string }, _signal, _onUpdate, ctx) {
       const client = await makeClient(params);
       const prepared = await prepareForumImageReply(client, params);
-      if (!params.confirmWrite) {
-        const confirmed = ctx.hasUI && await ctx.ui.confirm("Upload images and create QDash forum reply?", prepared.preview.slice(0, 1800));
-        if (!confirmed) throw new Error("qdash_create_forum_image_reply requires explicit confirmation");
-      }
+      await requireWriteApproval("qdash_create_forum_image_reply", toolCallId, params, ctx, { title: "Upload images and create QDash forum reply?", message: prepared.preview });
       const created = await createForumImageReply(client, params, prepared);
       const postId = firstString(created.reply as unknown as Record<string, unknown>, ["id"]);
       const parentUrl = qdashWebUrl(client, `/forum/posts/${encodeURIComponent(params.parentPostId)}`);
@@ -2421,15 +2404,11 @@ export default function qdashExtension(host: ExtensionAPI) {
       maxFigures: Type.Optional(Type.Number()),
       includeHistory: Type.Optional(Type.Boolean()),
       historyLimit: Type.Optional(Type.Number()),
-      confirmWrite: Type.Optional(Type.Boolean()),
     }),
-    async execute(_toolCallId, params: ConfirmableParams & { profile?: string; configPath?: string; useEnv?: boolean; parentPostId: string; taskId: string; interpretation: string; title?: string; includeFigures?: boolean; maxFigures?: number; includeHistory?: boolean; historyLimit?: number }, _signal, _onUpdate, ctx) {
+    async execute(toolCallId, params: { profile?: string; configPath?: string; useEnv?: boolean; parentPostId: string; taskId: string; interpretation: string; title?: string; includeFigures?: boolean; maxFigures?: number; includeHistory?: boolean; historyLimit?: number }, _signal, _onUpdate, ctx) {
       const client = await makeClient(params);
       const built = await buildForumEvidenceReply(client, params);
-      if (!params.confirmWrite) {
-        const confirmed = ctx.hasUI && await ctx.ui.confirm("Create QDash forum evidence reply?", built.preview.slice(0, 1800));
-        if (!confirmed) throw new Error("qdash_create_forum_evidence_reply requires explicit confirmation");
-      }
+      await requireWriteApproval("qdash_create_forum_evidence_reply", toolCallId, params, ctx, { title: "Create QDash forum evidence reply?", message: built.preview });
       const data = await client.createForumPost(built.request as never);
       const postId = firstString(data as unknown as Record<string, unknown>, ["id"]);
       const parentUrl = qdashWebUrl(client, `/forum/posts/${encodeURIComponent(params.parentPostId)}`);
@@ -2448,14 +2427,9 @@ export default function qdashExtension(host: ExtensionAPI) {
       ...connectionParams,
       postId: Type.String(),
       request: Type.Any({ description: "ForumPostUpdate request body accepted by QDash." }),
-      confirmWrite: Type.Optional(Type.Boolean()),
     }),
-    async execute(_toolCallId, params: ConfirmableParams & { profile?: string; configPath?: string; useEnv?: boolean; postId: string; request: unknown }, _signal, _onUpdate, ctx) {
-      if (!params.confirmWrite) {
-        if (!ctx.hasUI || !(await ctx.ui.confirm("Update QDash forum post?", `Update forum post '${params.postId}'?`))) {
-          throw new Error("qdash_update_forum_post requires explicit confirmation");
-        }
-      }
+    async execute(toolCallId, params: { profile?: string; configPath?: string; useEnv?: boolean; postId: string; request: unknown }, _signal, _onUpdate, ctx) {
+      await requireWriteApproval("qdash_update_forum_post", toolCallId, params, ctx, { title: "Update QDash forum post?", message: `Update forum post '${params.postId}'?` });
       const client = await makeClient(params);
       return toToolResult(await client.updateForumPost(params.postId, params.request as never), { tool: "qdash_update_forum_post" });
     },
@@ -2473,14 +2447,9 @@ export default function qdashExtension(host: ExtensionAPI) {
       candidates: Type.Array(Type.Any({ description: "Agent plan candidate references accepted by QDash." })),
       idempotencyKey: Type.Optional(Type.String()),
       expectedStateVersion: Type.Number(),
-      confirmWrite: Type.Optional(Type.Boolean()),
     }),
-    async execute(_toolCallId, params: ConfirmableParams & { profile?: string; configPath?: string; useEnv?: boolean; sessionId: string; candidates: unknown[]; idempotencyKey?: string; expectedStateVersion: number }, _signal, _onUpdate, ctx) {
-      if (!params.confirmWrite) {
-        if (!ctx.hasUI || !(await ctx.ui.confirm("Commit QDash agent candidate set?", `Commit ${params.candidates.length} candidate(s)?`))) {
-          throw new Error("qdash_commit_agent_candidate_set requires explicit confirmation");
-        }
-      }
+    async execute(toolCallId, params: { profile?: string; configPath?: string; useEnv?: boolean; sessionId: string; candidates: unknown[]; idempotencyKey?: string; expectedStateVersion: number }, _signal, _onUpdate, ctx) {
+      await requireWriteApproval("qdash_commit_agent_candidate_set", toolCallId, params, ctx, { title: "Commit QDash agent candidate set?", message: `Commit ${params.candidates.length} candidate(s)?` });
       const client = await makeClient(params);
       return toToolResult(await client.commitAgentCandidateSet(params.sessionId, params.candidates as never, {
         idempotencyKey: params.idempotencyKey ?? randomUUID(),
@@ -2515,14 +2484,9 @@ export default function qdashExtension(host: ExtensionAPI) {
       idempotencyKey: Type.Optional(Type.String()),
       expectedStateVersion: Type.Number(),
       pushToGithub: Type.Optional(Type.Boolean()),
-      confirmWrite: Type.Optional(Type.Boolean()),
     }),
-    async execute(_toolCallId, params: ConfirmableParams & { profile?: string; configPath?: string; useEnv?: boolean; sessionId: string; commitId: string; idempotencyKey?: string; expectedStateVersion: number; pushToGithub?: boolean }, _signal, _onUpdate, ctx) {
-      if (!params.confirmWrite) {
-        if (!ctx.hasUI || !(await ctx.ui.confirm("Apply QDash agent candidate commit?", `Apply commit '${params.commitId}' to backend configuration?`))) {
-          throw new Error("qdash_apply_agent_candidate_commit requires explicit confirmation");
-        }
-      }
+    async execute(toolCallId, params: { profile?: string; configPath?: string; useEnv?: boolean; sessionId: string; commitId: string; idempotencyKey?: string; expectedStateVersion: number; pushToGithub?: boolean }, _signal, _onUpdate, ctx) {
+      await requireWriteApproval("qdash_apply_agent_candidate_commit", toolCallId, params, ctx, { title: "Apply QDash agent candidate commit?", message: `Apply commit '${params.commitId}' to backend configuration?` });
       const client = await makeClient(params);
       return toToolResult(await client.applyAgentCandidateCommit(params.sessionId, params.commitId, {
         idempotencyKey: params.idempotencyKey ?? randomUUID(),

@@ -375,6 +375,25 @@ def test_unknown_outcome_pauses_session_notifies_once_and_resumes_without_replay
     assert kinds == ["created", "resume", "resumed", "resume_outcome"]
 
 
+def test_an_intervention_keeps_the_model_its_request_reported(
+    sessions: AgentSessionService, interventions: AgentInterventionService
+) -> None:
+    session = _session(sessions)
+    action_id = _completed_run(sessions, session.session_id)
+    model = {"provider": "vllm", "model_id": "qwen3-32b", "host": "qdash-web-agent"}
+    opened = _create(interventions, session.session_id, _request(action_id, model=model))
+    assert opened.model is not None and opened.model.model_dump() == model
+    # A retry under another model is the same request and returns the record unchanged.
+    retried = interventions.create_intervention(
+        project_id=PROJECT,
+        session_id=session.session_id,
+        username="tester",
+        body=_request(action_id, model={"provider": "ollama", "model_id": "qwen3:8b"}),
+    )
+    assert retried.intervention_id == opened.intervention_id
+    assert retried.model is not None and retried.model.model_dump() == model
+
+
 def test_stale_and_duplicate_responses_are_rejected(
     sessions: AgentSessionService, interventions: AgentInterventionService
 ) -> None:

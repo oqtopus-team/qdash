@@ -33,13 +33,21 @@ To have experts notified in Slack when the agent stops, configure
    documentation and chooses the tasks; you do not name tasks or commands.
 2. The agent proposes a session: the chip, the qubits, the tasks it may run, the range of each
    input it may change, the number of measurements, how often one task may run on one qubit,
-   how long the session lasts, and that it may run them on its own. The web Agent shows it on an
-   approval card; pi asks for confirmation. A non-interactive `pi -p` run cannot ask, so the
-   session is created only when your request tells the agent to confirm it.
+   how long the session lasts, and that it may run them on its own. When the goal needs a
+   measured value saved, for example a new frequency that Rabi then uses, the proposal also lists
+   **Parameter updates**: which values the agent may save to the calibration, from which tasks,
+   and whether it may also write them to the backend configuration. Otherwise it reads **not
+   granted**. The web Agent shows it on an
+   approval card. pi shows it in a review with every argument: scroll to the end, then press
+   `y` to approve or `n` to decline. A non-interactive `pi -p` run cannot ask, so it does not
+   create the session.
 3. Approve it. The approval covers every measurement inside that scope: the agent does not ask
    again per step. It never covers a qubit, task, range, or number of measurements beyond the
-   session, and saving values to the calibration asks you separately. The approval is yours:
-   the agent runs steps on its own only in a session you created, not in a colleague's.
+   session. With parameter updates granted, it also covers saving those values: after a result
+   the agent assesses as a pass, and only within the value's approved range, the agent saves it
+   (and writes it to the backend if that was granted) without asking again. Without them, saving
+   a value asks you separately. The approval is yours: the agent runs steps on its own only in a
+   session you created, not in a colleague's.
 4. The agent measures, reads each result, its figures, and the task documentation, and chooses
    the next measurement. Each run appears on the **Execution** page as `agent:<task>`, inside
    the session's row. A
@@ -47,10 +55,13 @@ To have experts notified in Slack when the agent stops, configure
    against the session's ranges and quality limits.
 5. Each measurement uses the saved calibration values, not waiting candidates. When the next
    measurement needs a value just measured, for example Rabi after a new frequency, the agent
-   asks you to approve saving that value first. If you decline, it stops and reports the value
-   instead of measuring on the old one.
+   saves that value first. Under granted parameter updates it saves it on its own once it
+   assesses the result as a pass; otherwise it asks you to approve saving it, and if you
+   decline, it stops and reports the value instead of measuring on the old one. A failed,
+   uncertain, or unexplained result is never saved: the agent stops for an expert before
+   anything changes (see [When the agent stops for an expert](#when-the-agent-stops-for-an-expert)).
 6. When the goal is reached, the agent reports each qubit's runs and candidates and which values
-   were saved. To keep more values, approve the commit it proposes.
+   were saved. To keep a value the session did not grant, approve the commit it proposes.
 
 The agent refuses, without measuring, a step outside the session, a measurement that is still
 running, and an exact repeat of a finished measurement it does not justify. QDash checks the same
@@ -121,6 +132,13 @@ so you can tell what QDash recorded from what the agent or a person said. **Not 
 fact the records do not hold, for example a decision the agent never recorded in an older
 session; QDash does not fill it in. A status marked **now** is live and can still change.
 
+Each agent entry also names the model that took the step, as provider and model, for example
+**model vllm/qwen3:32b**; hover over it to see which host reported it. pi CLI and the QDash
+**Agent** report the model they actually run, so a session that switched models, or continued in
+the other host, shows each step with its own model. QDash records the model as the host reported
+it and does not verify it. An entry from a session that reported no model lists **model** under
+**Not recorded**. Switching models changes nothing the session approved.
+
 The section shows 50 entries at a time, all from one reading of the records, whose time it
 shows; select **Load more** until it shows **End of the timeline**. While the agent is still
 working, new entries appear after you select **Refresh**. If the records change before the next
@@ -137,11 +155,11 @@ How this works: [Experiment audit](../developer-guide/copilot/agentic-calibratio
 ## Follow a session on the Execution page
 
 Open **Execution** and expand the session's row to see the runs the agent started, or select
-**Open journey** for the whole session. A run's details panel and its page also link to its
-session with **Open journey**. The session's own page links back with **View the measurements
+**Open session graph** for the whole session. A run's details panel and its page also link to its
+session with **Open session graph**. The session's own page links back with **View the measurements
 on the Execution page**.
 
-The journey page shows the session's state and how many runs, proposals, decisions, and open
+The graph page shows the session's state and how many runs, proposals, decisions, and open
 questions it has, then the steps in time order, left to right:
 
 | Step | What it shows | Selecting it |
@@ -160,7 +178,8 @@ hold: the results a decision cites, the step it chose, and the question it raise
 marks a declared repeat. A step is never linked to another only because it came later. The same
 steps are listed in a table below the graph. The page refreshes every five seconds. It shows at
 most the latest 1000 steps and says so when it leaves earlier ones out; the audit keeps all of
-them. Use **Policy and audit** for the session's limits and the full audit, and **Answer the
+them. The graph is a live view of how the session's records relate, read while the session may
+still be changing; the audit is the session's ordered record of what happened. Use **Policy and audit** for the session's limits and the full audit, and **Answer the
 expert request** while the session waits.
 
 A run a session step started shows **Agent** · @user in the list and on its page. The user is
@@ -198,8 +217,9 @@ application configuration (`workflow.params_updater.parameter_file_map`).
 ### Create a bounded session
 
 A session fixes the chip, qubits, allowed tasks, parameter bounds, quality gates, action budget,
-expiry, skill/model identity, and hardware-reconfiguration permission. Later actions must stay
-within that scope.
+expiry, skill identity, and hardware-reconfiguration permission. Later actions must stay
+within that scope. `--model-provider` and `--model-id`, given together, report the model your
+agent runs with; QDash records them as reported and does not verify them.
 
 ```bash
 qdash-agent --profile local start-session \
@@ -213,7 +233,8 @@ qdash-agent --profile local start-session \
   --skill-name qdash-agent-calibrator \
   --skill-version 1 \
   --skill-hash sha256:replace-with-skill-hash \
-  --model-name local-agent-model
+  --model-provider ollama \
+  --model-id local-agent-model
 ```
 
 Keep the returned `session_id`. Review the whole scope before authorising a plan on

@@ -7,6 +7,7 @@ import { buildAgentLoopContext, decideAgentStep, measurementKey } from "../.test
 import { SESSION_GRANTED_WRITE_TOOL_NAMES, REVIEWED_WRITE_TOOL_NAMES, NESTED_READ_TOOL_NAMES, DEFERRED_TOOL_NAMES } from "../.test-dist/lib/tool-policy.js";
 import { registerAgentLoopTools } from "../.test-dist/tools/agent-loop.js";
 import { startFakeAgentQDash } from "./helpers/fake-agent-qdash.mjs";
+import { inZone, NON_UTC_ZONES } from "./helpers/time-zone.mjs";
 
 let fake;
 before(async () => {
@@ -31,6 +32,7 @@ function tools() {
     list: (params = {}) => call("qdash_list_agent_sessions")("list", params),
     record: (id, params) => call("qdash_record_agent_decision")(id, params),
     audit: (params) => call("qdash_get_agent_session_audit")("audit", params),
+    update: (id, params) => call("qdash_commit_agent_session_update")(id, params),
     registered,
   };
 }
@@ -52,7 +54,7 @@ function autoSession(policy = {}) {
 }
 
 test("the loop tools are session-granted writes or audited reads, never script-callable writes", () => {
-  assert.deepEqual([...SESSION_GRANTED_WRITE_TOOL_NAMES].sort(), ["qdash_record_agent_decision", "qdash_request_agent_human", "qdash_run_agent_session_step"]);
+  assert.deepEqual([...SESSION_GRANTED_WRITE_TOOL_NAMES].sort(), ["qdash_commit_agent_session_update", "qdash_record_agent_decision", "qdash_request_agent_human", "qdash_run_agent_session_step"]);
   for (const name of SESSION_GRANTED_WRITE_TOOL_NAMES) {
     assert.ok(!REVIEWED_WRITE_TOOL_NAMES.includes(name), name);
     assert.ok(!NESTED_READ_TOOL_NAMES.includes(name), `${name} must not run from a script`);
@@ -740,4 +742,228 @@ test("a step that follows a result is not proposed while QDash cannot list the s
   assert.match(textOf(step), /^Not run: QDash did not list the session's audit decisions .*Nothing was proposed or dispatched; try again once QDash answers/s);
   assert.equal(dispatchesOf(sessionId).length, 1);
   assert.equal(fake.state.actions.filter((action) => action.session_id === sessionId).length, 1);
+});
+
+/** QDash's form of an instant: UTC wall time without an offset, as its API returns datetimes. */
+const naiveUtc = (millis) => new Date(millis).toISOString().slice(0, -1) + "000";
+const MINUTE = 60_000;
+
+test("a naive UTC expiry from QDash is read as UTC under any host zone; expired and invalid expiries refuse", async () => {
+  const now = new Date("2026-11-22T02:00:00Z");
+  const session = (expires_at, status = "active") => ({
+    session_id: "s", project_id: "p", chip_id: "c", created_by: "alice", status, state_version: 0, action_count: 0,
+    created_at: naiveUtc(now.getTime() - 5 * MINUTE), expires_at, active_intervention_id: null,
+    policy: { qids: ["Q00"], allowed_tasks: ["CheckRabi"], autonomy: "auto", max_actions: 5, max_rounds_per_target: 3, allowed_overrides: {} },
+  });
+  const contextOf = (expires_at) => buildAgentLoopContext({ session: session(expires_at), actions: [], interventions: [], now });
+  for (const zone of NON_UTC_ZONES) {
+    await inZone(zone, () => {
+      // Active for 30 more minutes, in every form QDash or a proxy may send.
+      const soon = now.getTime() + 30 * MINUTE;
+      for (const expires of [naiveUtc(soon), new Date(soon).toISOString(), "2026-11-22T11:30:00+09:00", "2026-11-21T21:30:00-05:00"]) {
+        const context = contextOf(expires);
+        assert.equal(context.state, "ready", `${zone}: ${expires}`);
+        assert.equal(context.may_run_step, true, `${zone}: ${expires}`);
+      }
+      // The context names the instant unambiguously: naive gains Z, an offset is kept.
+      assert.equal(contextOf(naiveUtc(soon)).session.expires_at, "2026-11-22T02:30:00.000000Z");
+      assert.equal(contextOf("2026-11-22T11:30:00+09:00").session.expires_at, "2026-11-22T11:30:00+09:00");
+      // Expired 30 minutes ago: refused, though the host's local reading of the naive value is in the future west of UTC.
+      for (const expires of [naiveUtc(now.getTime() - 30 * MINUTE), "2026-11-22T10:30:00+09:00", naiveUtc(now.getTime())]) {
+        const context = contextOf(expires);
+        assert.equal(context.state, "expired", `${zone}: ${expires}`);
+        assert.equal(context.may_run_step, false, `${zone}: ${expires}`);
+      }
+      // An expiry that is not a timestamp never extends the session.
+      for (const expires of ["", "garbage", "2026-11-22", "11/22/2026 03:00", null]) {
+        assert.equal(contextOf(expires).state, "expired", `${zone}: ${String(expires)}`);
+      }
+    });
+  }
+});
+
+test("attempts and answers order by instant when QDash mixes naive and offset timestamps", async () => {
+  await inZone("Asia/Tokyo", () => {
+    const now = new Date("2026-11-22T03:00:00Z");
+    const session = {
+      session_id: "s", project_id: "p", chip_id: "c", created_by: "alice", status: "active", state_version: 3, action_count: 2,
+      created_at: "2026-11-22T00:00:00", expires_at: "2026-11-22T06:00:00", active_intervention_id: null,
+      policy: { qids: ["Q00"], allowed_tasks: ["CheckRabi", "CheckChevron"], autonomy: "auto", max_actions: 5, max_rounds_per_target: 3, allowed_overrides: {} },
+    };
+    const action = (action_id, task_name, created_at) => ({ action_id, action_type: "run_task", decision: "authorized", task_name, qids: ["Q00"], parameter_overrides: {}, execution_status: "completed", created_at, reason: "", diagnosis: "" });
+    // a-late is 02:00 UTC; a-early is 01:00 UTC written in +09:00.
+    const actions = [action("a-late", "CheckChevron", "2026-11-22T02:00:00"), action("a-early", "CheckRabi", "2026-11-22T10:00:00+09:00")];
+    // Answered 01:30 UTC: only a-late came after the answer.
+    const answered = { intervention_id: "i1", status: "answered", attempts: [], qids: [], created_at: "2026-11-22T01:10:00", page_path: "/x", notification: { status: "sent" }, response: { decision: "continue", guidance: "go", responded_by: "e", responded_at: "2026-11-22T01:30:00" }, reason: "agent_request", summary: "s", question: "q" };
+    const context = buildAgentLoopContext({ session, actions, interventions: [answered], now });
+    assert.equal(context.state, "ready");
+    assert.deepEqual(context.attempts.map((attempt) => attempt.action_id), ["a-early", "a-late"]);
+    assert.deepEqual(context.intervention.actions_since_answer, ["a-late"]);
+  });
+});
+
+test("a session QDash returns with a naive UTC expiry runs its step under Asia/Tokyo and another zone", async () => {
+  for (const zone of NON_UTC_ZONES) {
+    await inZone(zone, async () => {
+      const sessionId = autoSession();
+      // QDash returns datetimes without an offset; the fake now stores the expiry the same way.
+      // An hour after creation by the fake's clock, which runs at or ahead of the real one.
+      const stored = fake.state.sessions.get(sessionId);
+      stored.expires_at = naiveUtc(Date.parse(stored.created_at) + 60 * MINUTE);
+      fake.queueOutcome("CheckRabi", { status: "completed", candidates: [] });
+      const t = tools();
+      const read = await t.context(sessionId);
+      assert.equal(read.details.state, "ready", `${zone}: ${textOf(read)}`);
+      const step = await t.step(`tz-${zone}`, { sessionId, taskName: "CheckRabi", qid: "Q00", rationale: "Rabi first." });
+      assert.equal(step.details.dispatched, true, `${zone}: ${textOf(step)}`);
+      const listed = await t.list({ chipId: "chip-001" });
+      assert.match(textOf(listed), new RegExp(`${sessionId}: .*expires \\d{4}-\\d{2}-\\d{2}T[\\d:.]+Z`));
+    });
+  }
+});
+
+test("after a failed run, the context names the intervention as the stop, and a request_human decision alone says it pauses nothing", async () => {
+  const sessionId = autoSession();
+  fake.queueOutcome("CheckRabi", { status: "failed" });
+  const failed = await tools().step("f-1", { sessionId, taskName: "CheckRabi", qid: "Q00", rationale: "Rabi first." });
+  const failedId = failed.details.actionId;
+
+  const read = textOf(await tools().context(sessionId));
+  assert.match(read, new RegExp(`Action ${failedId} did not complete\\.`));
+  assert.match(read, /QDash refuses every further autonomous step of this session, a repeat of the same task included, and every commit and apply under its update authority, until an expert answers an intervention that cites it: call qdash_request_agent_human now, citing it in attemptActionIds, before any wider research\./);
+  assert.match(read, /Only that call opens an intervention and pauses the session/);
+
+  // A decision that only names request_human records it and says plainly that nothing paused.
+  const noted = await tools().record("f-2", { sessionId, assessment: "fail", interpretation: "CheckRabi failed; QDash reported no cause.", nextAction: "request_human", evidenceActionIds: [failedId] });
+  assert.match(textOf(noted), /This decision opened no intervention and the session is not paused/);
+  assert.equal(fake.state.sessions.get(sessionId).status, "active");
+  // The decision covers the result, so the hint is gone; the session still runs.
+  assert.doesNotMatch(textOf(await tools().context(sessionId)), /did not complete/);
+
+  const asked = await tools().human("f-3", { sessionId, reason: "unknown_outcome", summary: "CheckRabi failed; QDash reported no cause.", question: "Retry or investigate?", attemptActionIds: [failedId] });
+  assert.match(textOf(asked), /The session is paused/);
+  // In a paused session the note would be false, so it is not given.
+  const later = await tools().record("f-4", { sessionId, interpretation: "Waiting for the expert.", nextAction: "request_human" });
+  assert.doesNotMatch(textOf(later), /opened no intervention/);
+});
+
+test("a completed run gets no failure hint", async () => {
+  const sessionId = autoSession();
+  fake.queueOutcome("CheckChevron", { status: "completed", candidates: [{ parameter_name: "qubit_frequency", value: 7.45 }] });
+  await tools().step("c-1", { sessionId, taskName: "CheckChevron", qid: "Q00", rationale: "Chevron." });
+  const read = textOf(await tools().context(sessionId));
+  assert.match(read, /Results without a recorded decision/);
+  assert.doesNotMatch(read, /did not complete|qdash_request_agent_human now/);
+});
+
+const GRANT = { parameters: ["qubit_frequency"], tasks: ["CheckChevron"], apply_backend: false };
+
+async function measuredChevron(t, sessionId, candidate = { parameter_name: "qubit_frequency", value: 7.452, qid: "Q00" }) {
+  fake.queueOutcome("CheckChevron", { status: "completed", candidates: [candidate] });
+  const step = await t.step(`chevron-${sessionId}`, { sessionId, taskName: "CheckChevron", qid: "Q00", parameterOverrides: { qubit_frequency: 7.45 }, rationale: "Find the frequency first." });
+  assert.equal(step.details.dispatched, true, textOf(step));
+  return step.details.actionId;
+}
+
+test("with update authority approved once, a passing result is committed without approval and the dependent step reads it", async () => {
+  const sessionId = autoSession({ parameter_updates: GRANT });
+  const t = tools();
+  delete fake.state.calibration.Q00;
+  const chevron = await measuredChevron(t, sessionId);
+  const context = await t.context(sessionId);
+  assert.match(textOf(context), /Parameter updates: granted for qubit_frequency from CheckChevron/);
+  assert.match(textOf(context), /commit its accepted candidate with qdash_commit_agent_session_update/);
+
+  // The dependent step waits for the update.
+  const early = await t.step("rabi-early", { sessionId, taskName: "CheckRabi", qid: "Q00", rationale: "Rabi next." });
+  assert.equal(early.details.refused, true);
+  assert.match(textOf(early), /is not committed/);
+
+  const committed = await t.update("u-1", { sessionId, actionId: chevron, parameterName: "qubit_frequency", interpretation: "Clear Chevron peak at 7.452 GHz inside the approved range." });
+  assert.equal(committed.details.committed, true, textOf(committed));
+  assert.match(textOf(committed), /Committed qubit_frequency = 7\.452 on Q00 \(commit commit-\d+, was unset\) under the update authority the user approved/);
+  assert.match(textOf(committed), /did not grant backend apply/);
+  const commit = fake.state.commits.at(-1);
+  assert.equal(commit.authority, "session_policy");
+  const decision = fake.state.decisions.find((item) => item.decision_id === commit.decision_id);
+  assert.deepEqual([decision.assessment, decision.next_action, decision.evidence_action_ids], ["pass", "propose_commit", [chevron]]);
+  // A replay of the call commits nothing twice.
+  const replay = await t.update("u-1", { sessionId, actionId: chevron, parameterName: "qubit_frequency", interpretation: "Clear Chevron peak at 7.452 GHz inside the approved range." });
+  assert.equal(replay.details.commitId, committed.details.commitId, textOf(replay));
+  assert.equal(fake.state.commits.filter((item) => item.session_id === sessionId).length, 1);
+
+  const rabi = await t.step("rabi", { sessionId, taskName: "CheckRabi", qid: "Q00", rationale: "Rabi on the committed frequency." });
+  assert.equal(rabi.details.dispatched, true, textOf(rabi));
+  assert.deepEqual(fake.state.dispatches.at(-1).calibration, { qubit_frequency: 7.452 });
+});
+
+test("without the grant, for another user, on an older QDash, or for a rejected result nothing is committed", async () => {
+  const t = tools();
+  const plain = autoSession();
+  const plainAction = await measuredChevron(t, plain);
+  const refused = await t.update("p", { sessionId: plain, actionId: plainAction, parameterName: "qubit_frequency", interpretation: "pass" });
+  assert.match(textOf(refused), /^Not committed: the approval of session .* did not grant parameter updates/);
+
+  const granted = autoSession({ parameter_updates: GRANT });
+  const action = await measuredChevron(t, granted);
+  fake.setCurrentUser("bob");
+  try {
+    const theirs = await t.update("b", { sessionId: granted, actionId: action, parameterName: "qubit_frequency", interpretation: "pass" });
+    assert.match(textOf(theirs), /^Not committed: Session .* was created by alice, not by you \(bob\)/);
+  } finally {
+    fake.setCurrentUser("alice");
+  }
+  fake.setLegacyServer(true);
+  try {
+    const legacy = await t.update("l", { sessionId: granted, actionId: action, parameterName: "qubit_frequency", interpretation: "pass" });
+    assert.match(textOf(legacy), /did not grant parameter updates, or this QDash does not support them/);
+  } finally {
+    fake.setLegacyServer(false);
+  }
+  const outside = await t.update("o", { sessionId: granted, actionId: action, parameterName: "drag_beta", interpretation: "pass" });
+  assert.match(textOf(outside), /grants updates of qubit_frequency only/);
+
+  const rejectedSession = autoSession({ parameter_updates: GRANT });
+  const rejected = await measuredChevron(t, rejectedSession, { parameter_name: "qubit_frequency", value: 9.1, qid: "Q00", accepted: false });
+  const gate = await t.update("g", { sessionId: rejectedSession, actionId: rejected, parameterName: "qubit_frequency", interpretation: "pass" });
+  assert.match(textOf(gate), /gate rejected qubit_frequency = 9\.1 .*call qdash_request_agent_human/);
+  const stillWaiting = await t.step("rabi-rejected", { sessionId: rejectedSession, taskName: "CheckRabi", qid: "Q00", rationale: "Rabi anyway." });
+  assert.match(textOf(stillWaiting), /was rejected/);
+  for (const sessionId of [plain, granted, rejectedSession]) {
+    assert.equal(fake.state.commits.filter((item) => item.session_id === sessionId).length, 0, sessionId);
+  }
+});
+
+test("an uncertain assessment is never committed, and a failed run blocks the dependent step until an expert answers", async () => {
+  const t = tools();
+  const sessionId = autoSession({ parameter_updates: GRANT });
+  const chevron = await measuredChevron(t, sessionId);
+  await t.record("doubt", { sessionId, assessment: "inconclusive", interpretation: "Two peaks; unclear which is f01.", nextAction: "request_human", evidenceActionIds: [chevron] });
+  const refused = await t.update("u", { sessionId, actionId: chevron, parameterName: "qubit_frequency", interpretation: "Looks fine now." });
+  assert.match(textOf(refused), /QDash refused the update: .*never committed under the session's authority/);
+  assert.equal(fake.state.commits.filter((item) => item.session_id === sessionId).length, 0);
+
+  const failedSession = autoSession({ parameter_updates: GRANT });
+  fake.queueOutcome("CheckChevron", { status: "failed", candidates: [] });
+  const failed = await t.step("f", { sessionId: failedSession, taskName: "CheckChevron", qid: "Q00", parameterOverrides: { qubit_frequency: 7.45 }, rationale: "Find the frequency." });
+  const blocked = await t.step("f-rabi", { sessionId: failedSession, taskName: "CheckRabi", qid: "Q00", rationale: "Rabi next." });
+  assert.match(textOf(blocked), /did not complete \(failed\)/);
+  const asked = await t.human("f-h", { sessionId: failedSession, reason: "unknown_outcome", summary: "Chevron failed without a known cause.", question: "Continue?", attemptActionIds: [failed.details.actionId] });
+  assert.match(textOf(asked), /paused/);
+  fake.respond(failedSession, { guidance: "Simulator fault cleared; continue with Rabi." });
+  const after = await t.step("f-rabi-2", { sessionId: failedSession, taskName: "CheckRabi", qid: "Q00", rationale: "Expert answered; Rabi next." });
+  assert.equal(after.details.dispatched, true, textOf(after));
+  assert.equal(fake.state.commits.filter((item) => item.session_id === failedSession).length, 0);
+});
+
+test("a granted backend apply follows the update; it is never requested without the grant", async () => {
+  const t = tools();
+  const sessionId = autoSession({ parameter_updates: { ...GRANT, apply_backend: true } });
+  const chevron = await measuredChevron(t, sessionId);
+  const result = await t.update("a", { sessionId, actionId: chevron, parameterName: "qubit_frequency", interpretation: "Clear peak." });
+  assert.equal(result.details.applied, "queued", textOf(result));
+  assert.match(textOf(result), /Backend apply queued .*qdash_wait_agent_candidate_apply/);
+  const apply = fake.state.requests.filter((request) => request.path.endsWith("/apply")).at(-1);
+  assert.deepEqual([apply.body.autonomous, apply.body.push_to_github], [true, false]);
+  assert.equal(fake.state.commits.at(-1).backend_authority, "session_policy");
 });

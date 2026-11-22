@@ -71,6 +71,7 @@ from qdash.datamodel.agent_session import (
     AgentInterventionReason,
     AgentInterventionResponseRecord,
     AgentInterventionStatus,
+    AgentModelIdentity,
     AgentNotificationDelivery,
     AgentNotificationStatus,
     AgentResumeOutcomeRecord,
@@ -131,8 +132,9 @@ def _short_error(exc: BaseException) -> str:
 
 def _request_hash(body: CreateAgentInterventionRequest) -> str:
     # A request without the autonomous flag hashes as it did before the flag existed, so a
-    # retry of an older request still matches its record.
-    exclude = set() if body.autonomous else {"autonomous"}
+    # retry of an older request still matches its record. The reported model is provenance,
+    # not part of the request: a retry keeps the first record's model.
+    exclude = {"model"} if body.autonomous else {"autonomous", "model"}
     payload = json.dumps(
         body.model_dump(mode="json", exclude=exclude), sort_keys=True, separators=(",", ":")
     )
@@ -1031,6 +1033,7 @@ class AgentInterventionService:
             checkpoint=body.checkpoint,
             plan_hash=plan_hash(body.checkpoint) if body.checkpoint else "",
             pauses_session=pauses,
+            model=body.model,
             session_status_at_open=session.status,
             session_state_version_at_open=session.state_version,
             notification=self._initial_delivery(),
@@ -1158,6 +1161,7 @@ class AgentInterventionService:
         action_id: str,
         username: str,
         diagnosis: str,
+        model: AgentModelIdentity | None = None,
     ) -> AgentInterventionDocument:
         """The intervention of an authorized ``request_human`` action, not yet persisted.
 
@@ -1179,6 +1183,7 @@ class AgentInterventionService:
             question=text[:2000],
             action_id=action_id,
             pauses_session=True,
+            model=model,
             session_status_at_open=session.status,
             session_state_version_at_open=session.state_version,
             notification=self._initial_delivery(),

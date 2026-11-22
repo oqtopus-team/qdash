@@ -233,3 +233,19 @@ test("an intervention poll stops before its next request once cancelled", async 
   await assert.rejects(WAIT_AGENT_INTERVENTION.check(client, { sessionId: "s1" }, controller.signal), (error) => error.name === "AbortError");
   assert.deepEqual(reads, ["session"]);
 });
+
+test("a failed run's wait result adds the mechanical next step after the unchanged record", () => {
+  const { client } = fakeClient("getAgentAction", []);
+  const failed = { action_id: "a9", action_type: "run_task", execution_status: "failed", execution_id: "e9" };
+  const result = WAIT_AGENT_ACTION.result(client, {}, failed);
+  assert.deepEqual(JSON.parse(result.content[0].text), result.details.data);
+  assert.equal(result.content.length, 2);
+  assert.match(result.content[1].text, /^Next: Action a9 did not complete\. .*call qdash_request_agent_human now, citing it in attemptActionIds, before any wider research\./);
+  for (const action of [
+    { action_id: "a1", action_type: "run_task", execution_status: "running", execution_id: "e1" },
+    { action_id: "a2", action_type: "run_task", execution_status: "completed", execution_id: "e2" },
+    { action_id: "a3", action_type: "request_human", execution_status: "failed" },
+  ]) {
+    assert.equal(WAIT_AGENT_ACTION.result(client, {}, action).content.length, 1, action.action_id);
+  }
+});

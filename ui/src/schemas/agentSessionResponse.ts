@@ -7,6 +7,7 @@
  */
 import type { AgentSessionPolicy } from './agentSessionPolicy';
 import type { AgentSessionResponseActiveInterventionId } from './agentSessionResponseActiveInterventionId';
+import type { AgentSessionResponseModel } from './agentSessionResponseModel';
 import type { AgentSessionStatus } from './agentSessionStatus';
 
 /**
@@ -21,7 +22,10 @@ export interface AgentSessionResponse {
   skill_name: string;
   skill_version: string;
   skill_hash: string;
-  model_name: string;
+  /** The model the client host reported for this record; null when none was reported. Client reported, not verified by QDash. */
+  model?: AgentSessionResponseModel;
+  /** provider/model_id of model, for display; empty when none was reported */
+  model_name?: string;
   status: AgentSessionStatus;
   state_version: number;
   action_count: number;

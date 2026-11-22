@@ -2,6 +2,7 @@ from typing import Any
 
 from qdash.dbmodel.agent_session import (
     AgentActionDocument,
+    AgentBackendApplyLockDocument,
     AgentCandidateCommitDocument,
     AgentCandidateSetCommitDocument,
     AgentDecisionDocument,
@@ -62,6 +63,7 @@ def document_models() -> list[Any]:
         AgentSessionDocument,
         AgentActionDocument,
         AgentCandidateCommitDocument,
+        AgentBackendApplyLockDocument,
         AgentCandidateSetCommitDocument,
         AgentDecisionDocument,
         AgentInterventionDocument,

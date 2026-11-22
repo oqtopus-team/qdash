@@ -2,6 +2,10 @@
 
 import { useState } from "react";
 import { Check, CircleHelp, FileDiff, PenLine, X } from "lucide-react";
+import {
+  AgentSessionPolicyPreview,
+  isAgentSessionPolicy,
+} from "@/components/features/chat/AgentSessionPolicyPreview";
 import { CodeBlock } from "@/components/features/chat/CodeBlock";
 import { PipelinePreview, isPipelineSpec } from "@/components/features/chat/PipelinePreview";
 import { PierreDiffViewer } from "@/components/ui/PierreDiffViewer";
@@ -203,13 +207,18 @@ export function ApprovalCard({
   // A metric script save shows its source the same way.
   const scriptSave =
     approval.tool === "qdash_save_metric_script" && typeof approval.args.source === "string";
+  // A new agent session states what it grants before its exact policy.
+  const sessionPolicy =
+    approval.tool === "qdash_create_agent_session" && isAgentSessionPolicy(approval.args.policy)
+      ? approval.args.policy
+      : null;
   const entries = Object.entries(approval.args).filter(
     ([key]) =>
       !(pipelineSpec && key === "spec") &&
       !(flowSave && FLOW_PREVIEW_KEYS.has(key)) &&
       !(scriptSave && METRIC_SCRIPT_PREVIEW_KEYS.has(key)),
   );
-  const hasPreview = Boolean(pipelineSpec) || flowSave || scriptSave;
+  const hasPreview = Boolean(pipelineSpec) || flowSave || scriptSave || Boolean(sessionPolicy);
 
   return (
     <div
@@ -229,6 +238,12 @@ export function ApprovalCard({
         {pipelineSpec && <PipelinePreview chipId={chipId} spec={pipelineSpec} />}
         {flowSave && <FlowSavePreview args={approval.args} />}
         {scriptSave && <MetricScriptSavePreview args={approval.args} />}
+        {sessionPolicy && (
+          <AgentSessionPolicyPreview
+            policy={sessionPolicy}
+            expiresInSeconds={approval.args.expiresInSeconds}
+          />
+        )}
         {entries.length > 0 ? (
           <dl
             className="m-0 grid grid-cols-[fit-content(40%)_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-xs"

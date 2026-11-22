@@ -5,6 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { AgentAuditSessionHeaderModel } from './agentAuditSessionHeaderModel';
 import type { AgentSessionPolicy } from './agentSessionPolicy';
 import type { AgentSessionStatus } from './agentSessionStatus';
 
@@ -25,7 +26,10 @@ export interface AgentAuditSessionHeader {
   skill_name: string;
   skill_version: string;
   skill_hash: string;
-  model_name: string;
-  /** Identity fields the session did not record (for example model_name) */
+  /** The model the creating host reported; later events carry their own model. Client reported, not verified by QDash */
+  model?: AgentAuditSessionHeaderModel;
+  /** provider/model_id of model; empty when none was reported */
+  model_name?: string;
+  /** Identity fields the session did not record (for example model) */
   missing?: string[];
 }

@@ -12,7 +12,7 @@ import { formatDateTime } from "@/lib/utils/datetime";
 import {
   pluralize,
   sessionActivityLabel,
-  sessionJourneyHref,
+  sessionGraphHref,
   sessionStatusBadgeClass,
 } from "./agentSessionDisplay";
 import { AgentActorLabel, recordedUserLabel } from "./ExecutionAttribution";
@@ -33,7 +33,7 @@ interface AgentSessionGroupRowProps {
 /**
  * One agent session in the Execution list: the session's own state, and the real executions
  * its actions dispatched. Expanding the row lists those executions with the same cards as the
- * rest of the list; the journey page shows every step, decision, and intervention.
+ * rest of the list; the graph page shows every step, decision, and intervention.
  */
 export function AgentSessionGroupRow({
   item,
@@ -102,19 +102,18 @@ export function AgentSessionGroupRow({
           </span>
         </button>
         <Link
-          href={sessionJourneyHref(summary.chip_id, summary.session_id, projectId)}
+          href={sessionGraphHref(summary.chip_id, summary.session_id, projectId)}
           className="btn btn-ghost btn-sm shrink-0"
         >
           <ExternalLink data-icon="inline-start" aria-hidden="true" />
-          Open journey
+          Open session graph
         </Link>
       </div>
       {isExpanded && (
         <div id={childrenId} className="flex flex-col gap-2 border-t border-base-content/10 p-3">
           {omitted > 0 && (
             <p className="text-xs text-base-content/60">
-              {pluralize(omitted, "earlier execution")} not listed here; the journey lists all of
-              them
+              {pluralize(omitted, "earlier execution")} not listed here; the graph lists all of them
             </p>
           )}
           {children.length === 0 ? (

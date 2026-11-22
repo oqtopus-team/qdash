@@ -67,7 +67,7 @@ def _setup(test_client) -> str:
         json={
             "chip_id": "chip-001",
             "policy": {"qids": ["Q00"], "allowed_tasks": ["CheckRabi"]},
-            "model_name": "provider/model",
+            "model": {"provider": "ollama", "model_id": "qwen3:32b", "host": "pi"},
         },
     )
     assert created.status_code == 201, created.text
@@ -82,6 +82,7 @@ def _setup(test_client) -> str:
             "task_name": "CheckRabi",
             "qids": ["Q00"],
             "diagnosis": "Rabi after the frequency commit.",
+            "model": {"provider": "vllm", "model_id": "qwen3:32b", "host": "qdash-web-agent"},
         },
     )
     assert proposed.status_code == 201, proposed.text
@@ -146,7 +147,27 @@ def test_creator_records_members_read_and_export(test_client) -> None:
     assert "attachment" in exported.headers["content-disposition"]
     assert exported.json()["complete"] is True
     assert [event["sequence"] for event in exported.json()["events"]] == [0, 1, 2]
+    header = exported.json()["session"]
+    assert header["model"] == {"provider": "ollama", "model_id": "qwen3:32b", "host": "pi"}
+    assert header["model_name"] == "ollama/qwen3:32b"
+    models = [event["model"] for event in exported.json()["events"]]
+    assert models == [
+        {"provider": "ollama", "model_id": "qwen3:32b", "host": "pi"},
+        {"provider": "vllm", "model_id": "qwen3:32b", "host": "qdash-web-agent"},
+        None,  # this decision reported no model
+    ]
+    assert "model" in exported.json()["events"][2]["missing"]
     assert "owner-token" not in exported.text
+
+
+def test_a_url_or_free_text_is_not_accepted_as_a_model(test_client) -> None:
+    session_id = _setup(test_client)
+    refused = test_client.post(
+        f"/agent-sessions/{session_id}/decisions",
+        headers=_headers("owner-token"),
+        json={**_decision(), "model": {"provider": "x", "model_id": "https://host/v1"}},
+    )
+    assert refused.status_code == 422
 
 
 def test_other_projects_and_outsiders_cannot_read_or_write(test_client) -> None:

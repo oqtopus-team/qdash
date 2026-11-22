@@ -199,6 +199,68 @@ describe("ApprovalCard", () => {
   });
 });
 
+describe("ApprovalCard for agent sessions", () => {
+  const policy = {
+    qids: ["Q00"],
+    allowed_tasks: ["CheckChevron", "CheckRabi"],
+    allowed_overrides: { qubit_frequency: { minimum: 7.0, maximum: 8.0 } },
+    autonomy: "auto",
+    max_actions: 4,
+  };
+
+  it("states granted parameter updates before the exact policy", () => {
+    render(
+      <ApprovalCard
+        approval={{
+          id: "call-s",
+          tool: "qdash_create_agent_session",
+          label: "QDash Create Agent Session",
+          args: {
+            chipId: "64Q",
+            expiresInSeconds: 3600,
+            policy: {
+              ...policy,
+              parameter_updates: {
+                parameters: ["qubit_frequency"],
+                tasks: ["CheckChevron"],
+                apply_backend: false,
+              },
+            },
+          },
+        }}
+        state={state()}
+      />,
+    );
+
+    const preview = screen.getByTestId("agent-session-policy-preview");
+    expect(preview.textContent).toContain("granted");
+    expect(preview.textContent).toContain("qubit_frequency [7, 8]");
+    expect(preview.textContent).toContain("no backend apply");
+    expect(preview.textContent).toContain("up to 4 actions");
+    expect(preview.textContent).toContain("60 min");
+    // The exact policy stays reviewable as an argument.
+    expect(screen.getByText("policy")).toBeTruthy();
+  });
+
+  it("says that commits still ask when no updates are granted", () => {
+    render(
+      <ApprovalCard
+        approval={{
+          id: "call-t",
+          tool: "qdash_create_agent_session",
+          label: "QDash Create Agent Session",
+          args: { chipId: "64Q", policy },
+        }}
+        state={state()}
+      />,
+    );
+
+    const preview = screen.getByTestId("agent-session-policy-preview");
+    expect(preview.textContent).toContain("not granted: each commit asks you");
+    expect(preview.textContent).toContain("QDash default (6 h)");
+  });
+});
+
 describe("ApprovalCard for metric scripts", () => {
   it("shows a metric script about to be saved as code", () => {
     const source =

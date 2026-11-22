@@ -155,6 +155,10 @@ class TaskExecutor:
         qid: str,
     ) -> RunResult | None:
         """Run the main task logic."""
+        # Only the fake backend acts here (opt-in validation faults); see BaseBackend.
+        before_task_run = getattr(backend, "before_task_run", None)
+        if callable(before_task_run):
+            before_task_run(task.get_name(), qid)
         return task.run(backend, qid)
 
     def _progress_context(

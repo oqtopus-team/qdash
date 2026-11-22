@@ -104,7 +104,7 @@ With **Group agent sessions** on (the default), each agent calibration session i
 list, holding the runs the agent started. The row shows the session's own state, such as
 **Active** or **Paused for an expert**, not the state of its last run: a session waiting between
 measurements or for an expert is not failed. Expand the row to list its runs and open one in the
-same details panel as any other run; select **Open journey** to see every step. The count above
+same details panel as any other run; select **Open session graph** to see every step. The count above
 the list gives runs and rows separately, because one session row can hold several runs. With a
 day selected, a session appears when it was approved or started a run that day, and its row
 still lists all of its runs. Turn the switch off for the plain list of runs. See

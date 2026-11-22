@@ -17,14 +17,18 @@ described instead of implying parity.
 | Presentation, sessions, the context a turn carries, orchestration, and which tools are exposed | Each host |
 
 - **Permissions.** Both hosts apply the same rule: reads run directly, and a reviewed write
-  runs only after the user approves that call. Each host keeps its own gate. pi CLI asks in
-  its UI, or requires `confirmWrite: true` without one (`extensions/lib/write-gate.ts`); the
-  runtime shows an approval card and runs the approved call with the arguments the user saw
+  runs only after the user approves that call in the host's own UI; no tool argument approves a
+  write (`extensions/lib/write-approval.ts`). pi CLI asks in its dialog and refuses the write
+  when it has no UI, as with `pi -p` (`extensions/lib/write-gate.ts`); the runtime shows an
+  approval card and runs the approved call on a frozen copy of the arguments the user saw,
+  passing the approval for that call id and tool in the extension context
   (`QDashWriteTools.runApproved` in `agent-runtime/src/durable-tools.ts`). The one exception is
-  the session-granted writes `qdash_run_agent_session_step`, `qdash_request_agent_human`, and
-  `qdash_record_agent_decision` (`SESSION_GRANTED_WRITE_TOOL_NAMES`): neither host asks. The
-  first two act in an agent session the user approved with `autonomy: auto` when it was
-  created, a reviewed write; the third only appends to the audit of a session the user created. Each call re-reads the
+  the session-granted writes `qdash_run_agent_session_step`, `qdash_request_agent_human`,
+  `qdash_record_agent_decision`, and `qdash_commit_agent_session_update`
+  (`SESSION_GRANTED_WRITE_TOOL_NAMES`): neither host asks. The step and request tools act in an
+  agent session the user approved with `autonomy: auto` when it was created, a reviewed write;
+  the update tool acts only when that approval also granted `parameter_updates`; the decision
+  tool only appends to the audit of a session the user created. Each call re-reads the
   session and refuses anything outside it before QDash checks it again; see
   [The model-driven loop](./agentic-calibration.md#the-model-driven-loop).
 - **Results.** A tool returns readable text in `content` and reusable structured data in
@@ -32,7 +36,10 @@ described instead of implying parity.
   shows its text.
 - **Host context.** Context such as the open page or a task result comes from the host,
   not from pi-qdash; see [Page context and editor edits](./architecture.md#page-context-and-editor-edits)
-  for the web application.
+  for the web application. The model each QDash agent record names also comes from the host,
+  never from a tool argument: `ctx.model` in pi CLI and the conversation's model reference in
+  the runtime (`extensions/lib/host-model.ts`); see
+  [Experiment audit](./agentic-calibration.md#experiment-audit).
 - **Verification.** A change to shared behavior is checked in both hosts, as described in
   [Verify a change](#verify-a-change). A feature or limit specific to one host, such as pi
   CLI slash commands or the web application's approval cards, is stated as such.
@@ -82,10 +89,41 @@ so a description states the goal it serves in the user's terms and the requests 
 serve; `agent-runtime/test/bundled-extensions.test.mjs` checks that they
 load and name only tools the runtime offers.
 
-New tools are read-only by default. Writes and operational calls must use the
-existing approval gates, including explicit `confirmWrite: true` in non-interactive
-runs. Shared gate logic lives in `extensions/lib/write-gate.ts`; output redaction
-lives in `extensions/lib/results.ts`. Keep credentials out of fixtures and examples.
+New tools are read-only by default. A write or operational call is added to
+`REVIEWED_WRITE_TOOL_NAMES` and calls `requireWriteApproval` before it writes; it takes no
+argument that approves it, so a model cannot approve its own write, and it is refused in a
+session without a UI. The approval logic lives in `extensions/lib/write-approval.ts`, the pi
+CLI gate in `extensions/lib/write-gate.ts`, and the review the user approves in
+`extensions/lib/write-review.ts`; output redaction lives in `extensions/lib/results.ts`.
+
+Every review shows the complete canonical arguments after a summary of the write
+(`approvalReviewText`), and nothing in it is shortened. pi's `ctx.ui.confirm()` draws its message
+in the input dock, which pi clips to the terminal without scrolling, so in the pi terminal UI
+(`ctx.mode === "tui"`) `reviewWrite` opens a full-height overlay through `ctx.ui.custom()`
+instead. The overlay sizes itself to the terminal's rows and scrolls with the arrow, Page Up, Page
+Down, Home, and End keys. It accepts `y` only after its last line has been on screen, and `n`,
+Escape, or pi's abort signal declines. A terminal too small to show the review refuses approval.
+In pi RPC mode, which has no custom UI, the RPC client receives the complete text through
+`confirm()` and is responsible for showing it. The QDash web Agent uses neither: it shows its
+own approval card.
+
+An approval covers one call's value, not an object reference. The pi CLI gate's `tool_call`
+hook takes a canonical snapshot of the arguments (`canonicalArgs`: plain JSON data with sorted
+keys), shows the session grant for `qdash_create_agent_session` and every argument of that
+snapshot in the review, and waits with pi's abort signal. It records the snapshot for the call id and tool name only when the user
+accepted, the turn was not aborted, and the arguments did not change while the dialog was open.
+The tool's `requireWriteApproval` consumes the record once and runs only when its arguments
+still equal it, so a later `tool_call` hook that changes nested arguments in place stops the
+call. The gate forgets a record at `tool_execution_end`, which pi emits for a call that a later
+hook blocked or an abort skipped, and forgets all of its records at `turn_end`, `agent_end`, and
+`session_shutdown`. A tool's own dialog, used when neither the gate nor a host approved the
+call, likewise refuses a call whose arguments changed or whose turn was aborted while it was
+open. Arguments that are not plain
+JSON data, such as a cycle, a class instance, or an accessor, are refused without a dialog.
+`packages/pi-qdash/tests/write-approval.test.mjs`,
+`packages/pi-qdash/tests/write-review.test.mjs`, which runs the review in pi-tui's
+`TuiMainScreen`, and `agent-runtime/test/write-gate-lifecycle.test.mjs`, which drives a real pi
+session in RPC and terminal modes, cover the lifecycle. Keep credentials out of fixtures and examples.
 The runtime additionally controls which tools it exposes, as described in
 [Copilot Architecture](./architecture.md#developing-a-pi-extension-against-the-runtime).
 To expose a new pi-qdash tool in Copilot, add its reviewed read name to

@@ -112,7 +112,13 @@ class ExecutionAgentSessionLink(BaseModel):
             "Answers, resumes, and commit authorizations are recorded separately in the audit"
         ),
     )
-    model_name: str = Field(default="", description="The model the session recorded, if any")
+    model_name: str = Field(
+        default="",
+        description=(
+            "provider/model_id the creating host reported for the session (client reported, "
+            "not verified); empty when none was reported"
+        ),
+    )
 
 
 class ExecutionResponseSummary(BaseModel):

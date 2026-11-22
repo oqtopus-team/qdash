@@ -1,9 +1,9 @@
-"""The Execution list grouped by agent session, and one session's journey over its executions.
+"""The Execution list grouped by agent session, and one session's graph over its executions.
 
 Both are read-only projections of records that already exist. Nothing here creates, schedules,
 locks, or cancels an execution, and no record is changed to make a group: a session row is the
 session record plus the real executions its actions dispatched (see ``agent_execution_links``),
-and the journey adds the session's decisions and interventions as typed nodes and edges.
+and the graph adds the session's decisions and interventions as typed nodes and edges.
 
 Statuses keep their owners. A group's status is the session's (``active``, ``waiting_for_human``,
 ``completed``, ``cancelled``, ``expired``); each child is its own execution's. A session holds no
@@ -23,18 +23,18 @@ from bunnet import SortDirection
 from fastapi import HTTPException
 
 from qdash.api.schemas.execution_group import (
-    AgentJourneyDecision,
-    AgentJourneyEdge,
-    AgentJourneyEdgeKind,
-    AgentJourneyIntervention,
-    AgentJourneyMeasurement,
-    AgentJourneyNode,
-    AgentJourneyProposal,
-    AgentJourneySessionAction,
     AgentSessionChildExecution,
+    AgentSessionGraphDecision,
+    AgentSessionGraphEdge,
+    AgentSessionGraphEdgeKind,
+    AgentSessionGraphIntervention,
+    AgentSessionGraphMeasurement,
+    AgentSessionGraphNode,
+    AgentSessionGraphProposal,
+    AgentSessionGraphResponse,
+    AgentSessionGraphSessionAction,
     AgentSessionGroupCounts,
     AgentSessionGroupSummary,
-    AgentSessionJourneyResponse,
     ExecutionGroupItem,
     ListExecutionGroupsResponse,
 )
@@ -56,6 +56,7 @@ from qdash.datamodel.agent_session import (
     AgentActionDecision,
     AgentActionType,
     AgentInterventionStatus,
+    model_label,
 )
 from qdash.dbmodel.agent_session import (
     AgentActionDocument,
@@ -72,10 +73,10 @@ if TYPE_CHECKING:
 
     from qdash.repository.execution_history import MongoExecutionHistoryRepository
 
-# Executions one session row of the list carries; the journey lists every one.
+# Executions one session row of the list carries; the graph lists every one.
 MAX_LIST_CHILDREN = 20
-# Nodes one journey response carries; the latest are kept and the audit holds the rest.
-MAX_JOURNEY_NODES = 1000
+# Nodes one graph response carries; the latest are kept and the audit holds the rest.
+MAX_SESSION_GRAPH_NODES = 1000
 MAX_TEXT = 500
 MAX_MISSING = 10
 UNANSWERED_INTERVENTION_STATUSES = frozenset(
@@ -83,7 +84,7 @@ UNANSWERED_INTERVENTION_STATUSES = frozenset(
 )
 _EPOCH = datetime.min.replace(tzinfo=UTC)
 
-JOURNEY_NOTES = [
+SESSION_GRAPH_NOTES = [
     "A live read of the session's records, collected one after another. It is not a "
     "snapshot: a status can change while it is read. The session audit offers a "
     "consistency-checked read and an export.",
@@ -124,7 +125,7 @@ def _measurement_numbers(
     """Dispatch order and per-target attempt of every dispatched measurement.
 
     An action in a link conflict gets no number: no execution can be attributed to it, so it
-    is not counted as a measurement in either the list or the journey.
+    is not counted as a measurement in either the list or the graph.
     """
     numbers: dict[str, tuple[int, int]] = {}
     attempts: Counter[tuple[str | None, tuple[str, ...]]] = Counter()
@@ -236,7 +237,8 @@ def _session_summary(
         allowed_tasks=list(session.policy.allowed_tasks),
         autonomy=session.policy.autonomy.value,
         skill_name=session.skill_name,
-        model_name=session.model_name,
+        model=session.model,
+        model_name=model_label(session.model),
         counts=AgentSessionGroupCounts(
             actions=session.action_count,
             max_actions=session.policy.max_actions,
@@ -256,8 +258,8 @@ def _session_summary(
 
 
 @dataclass
-class _JourneyRecords:
-    """One session's records for its journey, read without writing anything.
+class _SessionGraphRecords:
+    """One session's records for its graph, read without writing anything.
 
     Executions come from the chip-wide resolution the grouped list uses, so an execution is
     held by the same action in both. Task results and evaluations are read only for the
@@ -278,7 +280,7 @@ class _JourneyRecords:
     pending_action_ids: set[str] = field(default_factory=set)
 
     @classmethod
-    def read(cls, project_id: str, session_id: str) -> _JourneyRecords:
+    def read(cls, project_id: str, session_id: str) -> _SessionGraphRecords:
         session = AgentSessionDocument.find_one(
             {"project_id": project_id, "session_id": session_id}
         ).run()
@@ -403,7 +405,7 @@ class _JourneyRecords:
 
 
 class ExecutionGroupService:
-    """Read the Execution list grouped by agent session, and one session's journey."""
+    """Read the Execution list grouped by agent session, and one session's graph."""
 
     def __init__(self, execution_history_repository: MongoExecutionHistoryRepository) -> None:
         self._history_repo = execution_history_repository
@@ -616,9 +618,9 @@ class ExecutionGroupService:
             )
         return items
 
-    # ------------------------------------------------------------------ journey
+    # ------------------------------------------------------------------ graph
 
-    def journey(self, *, project_id: str, session_id: str) -> AgentSessionJourneyResponse:
+    def get_session_graph(self, *, project_id: str, session_id: str) -> AgentSessionGraphResponse:
         """The session's measurements, proposals, decisions, and interventions as a graph.
 
         The session is read in the caller's project only, so another project's session is
@@ -631,7 +633,7 @@ class ExecutionGroupService:
         shown from its pending payload and named in ``missing``. Writing them, and recording
         the expiry, stay with the session's own load on its next operation.
         """
-        records = _JourneyRecords.read(project_id, session_id)
+        records = _SessionGraphRecords.read(project_id, session_id)
         session = records.session
         actions = records.actions
         numbers = _measurement_numbers(actions, records.unlinked)
@@ -644,7 +646,7 @@ class ExecutionGroupService:
         task_of_evaluation = {e.evaluation_id: e.task_id for e in records.evaluations}
         wrong_chip = records.wrong_chip
 
-        nodes: list[AgentJourneyNode] = []
+        nodes: list[AgentSessionGraphNode] = []
         task_node: dict[str, str] = {}
         for action in actions:
             node_id = f"action:{action.action_id}"
@@ -652,14 +654,15 @@ class ExecutionGroupService:
             target = f"{action.task_name or action.action_type.value} on {', '.join(action.qids)}"
             if action.decision == AgentActionDecision.REJECTED:
                 nodes.append(
-                    AgentJourneyNode(
+                    AgentSessionGraphNode(
                         node_id=node_id,
                         kind="proposal",
                         order=0,
                         at=cast("datetime", utc(action.created_at)),
                         label=f"Rejected: {target}",
                         status="rejected",
-                        proposal=AgentJourneyProposal(
+                        model=action.metadata.get("model"),
+                        proposal=AgentSessionGraphProposal(
                             action_id=action.action_id,
                             action_type=action.action_type.value,
                             task_name=action.task_name,
@@ -672,7 +675,7 @@ class ExecutionGroupService:
                 continue
             if action.action_type != AgentActionType.RUN_TASK:
                 nodes.append(
-                    AgentJourneyNode(
+                    AgentSessionGraphNode(
                         node_id=node_id,
                         kind="session_action",
                         order=0,
@@ -683,7 +686,8 @@ class ExecutionGroupService:
                             else "Completed the session"
                         ),
                         status=action.decision.value,
-                        session_action=AgentJourneySessionAction(
+                        model=action.metadata.get("model"),
+                        session_action=AgentSessionGraphSessionAction(
                             action_id=action.action_id,
                             action_type=action.action_type.value,
                             reason=_text(action.reason),
@@ -725,7 +729,7 @@ class ExecutionGroupService:
             if result is not None:
                 task_node[result.task_id] = node_id
             nodes.append(
-                AgentJourneyNode(
+                AgentSessionGraphNode(
                     node_id=node_id,
                     kind="measurement",
                     order=0,
@@ -740,8 +744,9 @@ class ExecutionGroupService:
                     label=target if attempt in (None, 1) else f"{target} (attempt {attempt})",
                     status=status,
                     status_is_current=True,
+                    model=action.metadata.get("model"),
                     missing=missing,
-                    measurement=AgentJourneyMeasurement(
+                    measurement=AgentSessionGraphMeasurement(
                         action_id=action.action_id,
                         task_name=action.task_name,
                         qid=qid,
@@ -771,15 +776,16 @@ class ExecutionGroupService:
         for decision in records.decisions:
             assessment = decision.assessment.value if decision.assessment else None
             nodes.append(
-                AgentJourneyNode(
+                AgentSessionGraphNode(
                     node_id=f"decision:{decision.decision_id}",
                     kind="decision",
                     order=0,
                     at=cast("datetime", utc(decision.recorded_at)),
                     label=f"{assessment or 'not stated'} → {decision.next_action.value}",
                     status="superseded" if decision.decision_id in superseded_by else "recorded",
+                    model=decision.model,
                     missing=[] if assessment else ["assessment"],
-                    decision=AgentJourneyDecision(
+                    decision=AgentSessionGraphDecision(
                         decision_id=decision.decision_id,
                         assessment=assessment,
                         interpretation=_text(decision.interpretation),
@@ -797,7 +803,7 @@ class ExecutionGroupService:
         for item in sorted(records.interventions, key=lambda i: utc(i.created_at) or _EPOCH):
             response = item.response
             nodes.append(
-                AgentJourneyNode(
+                AgentSessionGraphNode(
                     node_id=f"intervention:{item.intervention_id}",
                     kind="intervention",
                     order=0,
@@ -805,7 +811,8 @@ class ExecutionGroupService:
                     label=f"Expert asked: {_text(item.question, 120)}",
                     status=item.status.value,
                     status_is_current=True,
-                    intervention=AgentJourneyIntervention(
+                    model=item.model,
+                    intervention=AgentSessionGraphIntervention(
                         intervention_id=item.intervention_id,
                         reason=item.reason.value,
                         status=item.status.value,
@@ -836,7 +843,7 @@ class ExecutionGroupService:
             node.order = index
 
         edges = self._edges(nodes, records, task_node, task_of_evaluation)
-        omitted = max(0, len(nodes) - MAX_JOURNEY_NODES)
+        omitted = max(0, len(nodes) - MAX_SESSION_GRAPH_NODES)
         kept = nodes[omitted:]
         kept_ids = {node.node_id for node in kept}
         open_count = sum(
@@ -844,7 +851,7 @@ class ExecutionGroupService:
             for item in records.interventions
             if item.status.value in UNANSWERED_INTERVENTION_STATUSES
         )
-        return AgentSessionJourneyResponse(
+        return AgentSessionGraphResponse(
             generated_at=cast("datetime", utc(now())),
             session=_session_summary(
                 session,
@@ -859,26 +866,27 @@ class ExecutionGroupService:
             total_nodes=len(nodes),
             omitted_nodes=omitted,
             complete=omitted == 0,
-            notes=JOURNEY_NOTES,
+            notes=SESSION_GRAPH_NOTES,
         )
 
     @staticmethod
     def _edges(
-        nodes: list[AgentJourneyNode],
-        records: _JourneyRecords,
+        nodes: list[AgentSessionGraphNode],
+        records: _SessionGraphRecords,
         task_node: dict[str, str],
         task_of_evaluation: dict[str, str],
-    ) -> list[AgentJourneyEdge]:
+    ) -> list[AgentSessionGraphEdge]:
         """Typed edges: temporal sequence, and links named by the records."""
         known = {node.node_id for node in nodes}
-        edges: dict[str, AgentJourneyEdge] = {}
+        edges: dict[str, AgentSessionGraphEdge] = {}
 
-        def add(kind: AgentJourneyEdgeKind, source: str, target: str) -> bool:
+        def add(kind: AgentSessionGraphEdgeKind, source: str, target: str) -> bool:
             if source not in known or target not in known or source == target:
                 return False
             edge_id = f"{kind}:{source}->{target}"
             edges.setdefault(
-                edge_id, AgentJourneyEdge(edge_id=edge_id, kind=kind, source=source, target=target)
+                edge_id,
+                AgentSessionGraphEdge(edge_id=edge_id, kind=kind, source=source, target=target),
             )
             return True
 
@@ -888,7 +896,7 @@ class ExecutionGroupService:
                 for node in nodes
                 if node.measurement is not None and node.measurement.sequence is not None
             ),
-            key=lambda node: cast("AgentJourneyMeasurement", node.measurement).sequence or 0,
+            key=lambda node: cast("AgentSessionGraphMeasurement", node.measurement).sequence or 0,
         )
         for previous, current in pairwise(dispatched):
             add("sequence", previous.node_id, current.node_id)

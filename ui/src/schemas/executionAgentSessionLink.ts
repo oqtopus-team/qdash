@@ -21,6 +21,6 @@ export interface ExecutionAgentSessionLink {
   status?: ExecutionAgentSessionLinkStatus;
   /** The user who created the session and is responsible for it; set only when linked. Answers, resumes, and commit authorizations are recorded separately in the audit */
   created_by?: ExecutionAgentSessionLinkCreatedBy;
-  /** The model the session recorded, if any */
+  /** provider/model_id the creating host reported for the session (client reported, not verified); empty when none was reported */
   model_name?: string;
 }

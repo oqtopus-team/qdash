@@ -48,7 +48,16 @@ export const REVIEWED_WRITE_TOOL_NAMES = [
  * is a reviewed write). These tools act only inside such a session: each call
  * re-reads it from QDash and refuses when it is not active, not `auto`, out
  * of budget, busy, or the step leaves its scope, and QDash checks the scope
- * again. They never commit or apply a candidate, which stay reviewed writes.
+ * again.
+ *
+ * `qdash_commit_agent_session_update` commits (and, when granted, applies) a
+ * candidate only in a session whose approval also granted
+ * `policy.parameter_updates`: the parameters, the tasks that may supply them,
+ * and whether backend apply is included. It records the agent's pass
+ * assessment first and sends the write as `autonomous`, so QDash checks the
+ * grant, the creator, the assessment, the gates, and the current state itself.
+ * Without that grant, and for every other session, commits and applies stay
+ * the reviewed writes above; no flag a model sets turns one into the other.
  * Like reviewed writes, no code mode script may call them; each call's
  * idempotency key derives from its tool call id, so a replayed call reuses
  * what it created instead of measuring again.
@@ -61,6 +70,7 @@ export const SESSION_GRANTED_WRITE_TOOL_NAMES = [
   "qdash_run_agent_session_step",
   "qdash_request_agent_human",
   "qdash_record_agent_decision",
+  "qdash_commit_agent_session_update",
 ] as const;
 
 /**
@@ -178,6 +188,7 @@ export const DEFERRED_TOOL_NAMES = [
   "qdash_run_agent_session_step",
   "qdash_request_agent_human",
   "qdash_record_agent_decision",
+  "qdash_commit_agent_session_update",
   "qdash_get_agent_session_audit",
   "qdash_wait_agent_intervention",
   "qdash_wait_agent_action",

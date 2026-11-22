@@ -30,6 +30,7 @@ from qdash.datamodel.agent_session import (
     AgentActionType,
     AgentAutonomy,
     AgentInterventionReason,
+    AgentModelIdentity,
     AgentSessionPolicy,
 )
 from qdash.datamodel.system_info import SystemInfoModel
@@ -252,11 +253,16 @@ def test_running_repeats_and_rounds_are_refused_without_using_budget(
 
 def test_older_requests_hash_as_before() -> None:
     body = _step(0, key="old", autonomous=False)
-    legacy = body.model_dump(mode="json", exclude={"autonomous", "repeat_of_action_id"})
+    legacy = body.model_dump(mode="json", exclude={"autonomous", "repeat_of_action_id", "model"})
     expected = hashlib.sha256(
         json.dumps(legacy, sort_keys=True, separators=(",", ":")).encode()
     ).hexdigest()
     assert AgentSessionService._request_hash(body) == expected
+    # The reported model is provenance: the same proposal from another model hashes the same.
+    reported = body.model_copy(
+        update={"model": AgentModelIdentity(provider="vllm", model_id="qwen3", host="pi")}
+    )
+    assert AgentSessionService._request_hash(reported) == expected
     assert AgentSessionService._request_hash(_step(0, key="old")) != expected
 
 

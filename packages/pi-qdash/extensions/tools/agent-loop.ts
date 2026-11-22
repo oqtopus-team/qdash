@@ -1,17 +1,20 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type {
   AgentActionResponse,
+  AgentCandidateCommitResponse,
   AgentCandidateResponse,
   AgentDecisionAssessment,
   AgentDecisionNextAction,
   AgentDecisionResponse,
   AgentInterventionReason,
+  AgentModelIdentity,
   AgentSessionAuditResponse,
   QDashClient,
 } from "@oqtopus-team/qdash-client";
 import { Type } from "typebox";
 
 import { withAbort } from "../lib/abort.js";
+import { hostModelIdentity } from "../lib/host-model.js";
 import {
   actionOfCall,
   buildAgentLoopContext,
@@ -26,6 +29,7 @@ import {
 } from "../lib/agent-loop.js";
 import { qdashWebUrl } from "../lib/links.js";
 import { toTextToolResult } from "../lib/results.js";
+import { serverTimestampText } from "../lib/server-time.js";
 import { pollUntilSettled, WAIT_AGENT_INTERVENTION } from "../lib/waits.js";
 
 /**
@@ -108,6 +112,10 @@ function statusOf(error: unknown): number | undefined {
 /** Most reads of a session's history while its state version keeps changing. */
 export const SNAPSHOT_ATTEMPTS = 3;
 
+/** Said after a decision, in an active session, whose next step is request_human but which names no intervention. */
+export const REQUEST_HUMAN_DECISION_NOTE =
+  "This decision opened no intervention and the session is not paused: it only records that a person should decide. To ask an expert through QDash, call qdash_request_agent_human; if you are asking the user in this conversation instead, say so in your answer.";
+
 /**
  * The loop context of a session, read from QDash; candidates only when asked for.
  *
@@ -187,6 +195,8 @@ type DecisionFields = {
   evaluationIds?: string[];
   nextActionId?: string;
   interventionId?: string;
+  /** The host's model (`hostModelIdentity`), never a tool argument. */
+  model?: AgentModelIdentity;
 };
 
 /**
@@ -360,7 +370,7 @@ export function registerAgentLoopTools(pi: ExtensionAPI, deps: AgentLoopDependen
       const lines = sessions.length
         ? sessions.map((session) => {
             const policy = session.policy;
-            return `- ${session.session_id}: ${session.status}, chip ${session.chip_id}, qubits ${policy.qids.join(", ")}, tasks ${policy.allowed_tasks.join(", ")}, autonomy ${policy.autonomy ?? "confirm_each"}, ${session.action_count}/${policy.max_actions ?? 100} actions, expires ${String(session.expires_at)}${session.active_intervention_id ? `, waiting on intervention ${session.active_intervention_id}` : ""}`;
+            return `- ${session.session_id}: ${session.status}, chip ${session.chip_id}, qubits ${policy.qids.join(", ")}, tasks ${policy.allowed_tasks.join(", ")}, autonomy ${policy.autonomy ?? "confirm_each"}, ${session.action_count}/${policy.max_actions ?? 100} actions, expires ${serverTimestampText(session.expires_at)}${session.active_intervention_id ? `, waiting on intervention ${session.active_intervention_id}` : ""}`;
           })
         : ["- none"];
       const text = [`Agent sessions (${statuses.join(", ")}${params.mine === false ? "" : ", yours"}${params.chipId ? `, chip ${params.chipId}` : ""}):`, ...lines].join("\n");
@@ -435,7 +445,11 @@ export function registerAgentLoopTools(pi: ExtensionAPI, deps: AgentLoopDependen
         evaluationIds?: string[];
       },
       signal,
+      _onUpdate,
+      ctx,
     ) {
+      // The host's current model, recorded with every record this call writes.
+      const model = hostModelIdentity(ctx);
       const client = await deps.makeClient(params);
       const key = callIdempotencyKey("step", params.sessionId, toolCallId);
       const decisionKey = callIdempotencyKey("decision", params.sessionId, toolCallId);
@@ -462,6 +476,7 @@ export function registerAgentLoopTools(pi: ExtensionAPI, deps: AgentLoopDependen
             evidenceActionIds: evidence,
             evaluationIds: params.evaluationIds,
             nextActionId: action.action_id,
+            model,
           },
           known,
           signal,
@@ -559,6 +574,7 @@ export function registerAgentLoopTools(pi: ExtensionAPI, deps: AgentLoopDependen
             diagnosis: params.rationale,
             autonomous: true,
             repeatOfActionId: params.repeatOfActionId,
+            model,
           }),
           signal,
           "Proposing agent action",
@@ -617,7 +633,11 @@ export function registerAgentLoopTools(pi: ExtensionAPI, deps: AgentLoopDependen
         assessment?: AgentDecisionAssessment;
       },
       signal,
+      _onUpdate,
+      ctx,
     ) {
+      // The host's current model, recorded with every record this call writes.
+      const model = hostModelIdentity(ctx);
       const client = await deps.makeClient(params);
       const key = callIdempotencyKey("human", params.sessionId, toolCallId);
       const decisionKey = callIdempotencyKey("decision", params.sessionId, toolCallId);
@@ -676,6 +696,7 @@ export function registerAgentLoopTools(pi: ExtensionAPI, deps: AgentLoopDependen
               qids: params.qids,
               attempts,
               autonomous: true,
+              model,
             }),
             signal,
             "Recording intervention",
@@ -703,6 +724,7 @@ export function registerAgentLoopTools(pi: ExtensionAPI, deps: AgentLoopDependen
           nextDetail: params.question,
           evidenceActionIds: evidence,
           interventionId: intervention.intervention_id,
+          model,
         },
         decisions,
         signal,
@@ -761,6 +783,7 @@ export function registerAgentLoopTools(pi: ExtensionAPI, deps: AgentLoopDependen
       "qdash_run_agent_session_step and qdash_request_agent_human already record a decision from their rationale or summary; call qdash_record_agent_decision for a decision no step carries: a result you accept before proposing a commit, a target you skip, stopping, or finishing the goal.",
       "Write the interpretation as the evidence and the conclusion (fit values, quality metrics, evaluation status, task-knowledge criterion), in a few sentences. Do not paste raw arrays, logs, or credentials.",
       "Never claim a commit or apply happened in a decision; QDash records those itself.",
+      "nextAction request_human only records your choice; it opens no intervention and pauses nothing. To stop for an expert, call qdash_request_agent_human, which records the decision itself.",
     ],
     parameters: Type.Object({
       ...connectionParams,
@@ -792,7 +815,11 @@ export function registerAgentLoopTools(pi: ExtensionAPI, deps: AgentLoopDependen
         supersedesDecisionId?: string;
       },
       signal,
+      _onUpdate,
+      ctx,
     ) {
+      // The host's current model, recorded with every record this call writes.
+      const model = hostModelIdentity(ctx);
       const client = await deps.makeClient(params);
       const key = callIdempotencyKey("decision", params.sessionId, toolCallId);
       const details = { tool: "qdash_record_agent_decision", sessionId: params.sessionId };
@@ -820,6 +847,7 @@ export function registerAgentLoopTools(pi: ExtensionAPI, deps: AgentLoopDependen
               nextActionId: params.nextActionId,
               interventionId: params.interventionId,
               supersedesDecisionId: params.supersedesDecisionId,
+              model,
             }),
             signal,
             "Recording the decision",
@@ -852,8 +880,160 @@ export function registerAgentLoopTools(pi: ExtensionAPI, deps: AgentLoopDependen
         `${existing ? "Already recorded" : "Recorded"} decision ${decision.decision_id}: ${decision.assessment ?? "no assessment"}; next ${decision.next_action}${decision.next_detail ? ` (${decision.next_detail})` : ""}.`,
         ...(cited.length ? ["Evidence QDash froze with it:", ...cited] : []),
         "It changes no session state; read the timeline with qdash_get_agent_session_audit.",
+        // Only while the session runs: a paused session already has its intervention.
+        ...(decision.next_action === "request_human" && !decision.intervention_id && session.status === "active"
+          ? [REQUEST_HUMAN_DECISION_NOTE]
+          : []),
       ].join("\n");
       return toTextToolResult(text, decision, { ...details, decisionId: decision.decision_id });
+    },
+  });
+
+  pi.registerTool({
+    name: "qdash_commit_agent_session_update",
+    label: "QDash Commit Agent Session Update",
+    description:
+      "Commit one accepted candidate of a completed measurement in a QDash agent session you created whose approval granted parameter updates (policy.parameter_updates), and write it to the backend when that approval also granted apply_backend. Runs without a per-call approval only for the session's creator, as QDash authenticates you, and only for the approved parameters, tasks, and qubits. It first records your pass assessment of exactly that measurement in the audit; QDash then refuses the update unless that pass, the candidate bounds, the session's quality gates, the task's completion checks, and the current session and calibration state all hold. QDash records the old and new value, the assessment, and the authority. Never use it for a failed, uncertain, rejected, or unexplained result: commit nothing and call qdash_request_agent_human.",
+    promptSnippet: "Commit a passing candidate under the update authority the user approved with the session",
+    promptGuidelines: [
+      "Use qdash_commit_agent_session_update only when qdash_get_agent_session_context shows parameter updates granted for that parameter and task, the measurement completed, its candidate is accepted, and you judge the result a clear pass from the fit values, quality metrics, figures, and task knowledge.",
+      "Commit the value a dependent step needs before running that step; QDash refuses the dependent step until the update is committed (and applied, when apply is granted).",
+      "A failed, uncertain, rejected, or unexplained result is never committed: call qdash_request_agent_human, cite the action, and wait for the expert. Their guidance is evidence, not permission to commit that result.",
+      "Sessions without granted updates keep the reviewed qdash_commit_agent_candidate and qdash_apply_agent_candidate_commit, which the user approves per call.",
+    ],
+    parameters: Type.Object({
+      ...connectionParams,
+      sessionId: Type.String(),
+      actionId: Type.String({ description: "The completed measurement whose candidate is committed." }),
+      parameterName: Type.String({ description: "A parameter the session's approval grants updates of." }),
+      interpretation: Type.String({ description: "Why the result is a pass, citing the fit values, quality metrics, and figures you read (2000 characters). Recorded as your pass assessment." }),
+      evaluationIds: Type.Optional(Type.Array(Type.String(), { description: "qcal_evaluate evaluations of that result." })),
+    }),
+    async execute(
+      toolCallId,
+      params: ConnectionParams & { sessionId: string; actionId: string; parameterName: string; interpretation: string; evaluationIds?: string[] },
+      signal,
+      _onUpdate,
+      ctx,
+    ) {
+      // The host's current model, recorded with the pass decision this update rests on.
+      const model = hostModelIdentity(ctx);
+      const client = await deps.makeClient(params);
+      const details = { tool: "qdash_commit_agent_session_update", sessionId: params.sessionId, actionId: params.actionId };
+      const refuse = (reason: string, extra: Record<string, unknown> = {}) =>
+        toTextToolResult(`Not committed: ${reason}`, { reason, ...extra }, { ...details, refused: true, ...extra });
+      const ask = "Commit nothing; call qdash_request_agent_human citing the action, and wait for the expert.";
+
+      const { context, actions, decisions, refusal } = await ownedSessionContext(client, params.sessionId, signal);
+      if (refusal) return refuse(refusal, { createdBy: context.session.created_by });
+      // A server that predates update authority returns no parameter_updates and would ignore
+      // the autonomous flag, so only a grant QDash itself returned is used.
+      const grant = context.session.scope.parameter_updates;
+      if (!grant) {
+        return refuse(
+          `the approval of session ${params.sessionId} did not grant parameter updates, or this QDash does not support them. Use qdash_commit_agent_candidate, which the user approves per call, or ask the user to approve a session that grants updates.`,
+        );
+      }
+      if (!["ready", "budget_exhausted"].includes(context.state) || !context.snapshot_consistent) {
+        return refuse(context.next, { state: context.state });
+      }
+      const action = actions.find((item) => item.action_id === params.actionId);
+      if (!action) return refuse(`${params.actionId} is not an action of session ${params.sessionId}.`);
+      if (!grant.parameters.includes(params.parameterName)) {
+        return refuse(`the approval grants updates of ${grant.parameters.join(", ")} only, not ${params.parameterName}.`);
+      }
+      if (!action.task_name || !grant.tasks.includes(action.task_name)) {
+        return refuse(`the approval grants updates from ${grant.tasks.join(", ")} only, not ${action.task_name ?? "this action"}.`);
+      }
+      if (String(action.execution_status).toLowerCase() !== "completed") {
+        return refuse(`action ${action.action_id} did not complete (${action.execution_status}). ${ask}`);
+      }
+      let candidates: AgentCandidateResponse[];
+      try {
+        candidates = await withAbort(client.listAgentActionCandidates(params.sessionId, params.actionId), signal, `Candidates of ${params.actionId}`);
+      } catch (error) {
+        if (signal?.aborted) throw error;
+        return refuse(`QDash could not read the candidates of ${params.actionId} (${errorText(error)}). ${ask}`);
+      }
+      const candidate = candidates.find((item) => item.parameter_name === params.parameterName);
+      if (!candidate) return refuse(`the result of ${params.actionId} has no ${params.parameterName} candidate (missing evidence). ${ask}`);
+      if (!candidate.accepted) return refuse(`QDash's gate rejected ${params.parameterName} = ${candidate.value} (${candidate.reason}). ${ask}`);
+
+      const assessed = await recordCallDecision(
+        client,
+        params.sessionId,
+        callIdempotencyKey("decision", params.sessionId, toolCallId),
+        {
+          assessment: "pass",
+          interpretation: params.interpretation,
+          nextAction: "propose_commit",
+          nextDetail: `commit ${params.parameterName} = ${candidate.value}${candidate.unit ? ` ${candidate.unit}` : ""} from ${params.actionId}`,
+          evidenceActionIds: [params.actionId],
+          evaluationIds: params.evaluationIds,
+          model,
+        },
+        decisions,
+        signal,
+        "assessment",
+      );
+      if (assessed.kind !== "recorded") {
+        return refuse(`QDash did not record the pass assessment the update rests on (${assessed.reason}). Nothing was committed; call the tool again once QDash answers.`, { decisionRecorded: false });
+      }
+      let commit: AgentCandidateCommitResponse;
+      try {
+        commit = await withAbort(
+          client.commitAgentActionCandidate(params.sessionId, params.actionId, params.parameterName, {
+            idempotencyKey: callIdempotencyKey("update", params.sessionId, toolCallId),
+            // The version the assessment was recorded at, so a replay of this call sends the same request.
+            expectedStateVersion: assessed.decision.session_state_version_at_record,
+            taskId: candidate.task_id,
+            autonomous: true,
+            decisionId: assessed.decision.decision_id,
+          }),
+          signal,
+          `Committing ${params.parameterName}`,
+        );
+      } catch (error) {
+        const refused = refusedByQDash(error);
+        if (refused === undefined) throw error;
+        return refuse(`QDash refused the update: ${refused}. Nothing was committed.\n${assessed.line}`, { decisionId: assessed.decision.decision_id });
+      }
+      if (commit.authority !== "session_policy") {
+        return toTextToolResult(
+          `QDash did not confirm that it committed commit ${commit.commit_id} under the session's update authority (authority ${commit.authority ?? "missing"}). Stop and tell the user; run no dependent step.`,
+          commit,
+          { ...details, refused: true, commitId: commit.commit_id },
+        );
+      }
+      const before = (commit.before_snapshot as { value?: unknown } | null | undefined)?.value;
+      const lines = [
+        `Committed ${commit.parameter_name} = ${commit.value}${candidate.unit ? ` ${candidate.unit}` : ""} on ${commit.qid} (commit ${commit.commit_id}, was ${before ?? "unset"}) under the update authority the user approved with the session; QDash recorded the old and new value, your pass assessment, and its own gate checks.`,
+        assessed.line,
+      ];
+      let applied: AgentCandidateCommitResponse | undefined;
+      if (grant.apply_backend) {
+        try {
+          applied = await withAbort(
+            client.applyAgentCandidateCommit(params.sessionId, commit.commit_id, {
+              idempotencyKey: callIdempotencyKey("apply", params.sessionId, toolCallId),
+              expectedStateVersion: commit.state_version_after,
+              autonomous: true,
+            }),
+            signal,
+            `Applying commit ${commit.commit_id}`,
+          );
+          lines.push(
+            `Backend apply ${applied.backend_status}${applied.backend_operation_id ? ` (operation ${applied.backend_operation_id})` : ""}. Wait for it with qdash_wait_agent_candidate_apply before a dependent step; if it fails, call qdash_request_agent_human.`,
+          );
+        } catch (error) {
+          const refused = refusedByQDash(error);
+          if (refused === undefined) throw error;
+          lines.push(`QDash refused the backend apply: ${refused}. The value is committed in QDash but not applied. ${ask}`);
+        }
+      } else {
+        lines.push("The approval did not grant backend apply: the value is in QDash's calibration state only.");
+      }
+      return toTextToolResult(lines.join("\n"), { commit, apply: applied ?? null }, { ...details, commitId: commit.commit_id, committed: true, applied: applied?.backend_status ?? null, decisionId: assessed.decision.decision_id });
     },
   });
 
@@ -897,13 +1077,14 @@ export function registerAgentLoopTools(pi: ExtensionAPI, deps: AgentLoopDependen
       const header = audit.session;
       const lines = [
         `Audit of agent session ${header.session_id} (${audit.schema_version}): chip ${header.chip_id}, created by ${header.created_by}, status ${header.status}`,
-        `Identity reported at creation: skill ${header.skill_name || "?"} ${header.skill_version || ""}, model ${header.model_name || "?"}${header.missing?.length ? `; not recorded: ${header.missing.join(", ")}` : ""}`,
+        `Identity reported at creation: skill ${header.skill_name || "?"} ${header.skill_version || ""}, model ${header.model_name || "not reported"}${header.model?.host ? ` (reported by ${header.model.host})` : ""}${header.missing?.length ? `; not recorded: ${header.missing.join(", ")}` : ""}. Models are reported by the client host and not verified by QDash.`,
         `Events ${audit.events[0]?.sequence ?? 0}-${audit.events.at(-1)?.sequence ?? 0} of ${audit.total_events} in snapshot ${audit.snapshot_id} (read ${String(audit.generated_at)}):`,
       ];
       for (const event of audit.events) {
         const missing = event.missing?.length ? ` [missing: ${event.missing.join(", ")}]` : "";
         const current = event.status_is_current ? " (current status)" : "";
-        lines.push(`- #${event.sequence} ${String(event.at)} ${event.kind} [${event.provenance}${event.actor ? `, ${event.actor}` : ""}]: ${event.summary}${current}${missing}`);
+        const model = event.model ? ` {model ${event.model.provider}/${event.model.model_id}${event.model.host ? ` via ${event.model.host}` : ""}}` : "";
+        lines.push(`- #${event.sequence} ${String(event.at)} ${event.kind} [${event.provenance}${event.actor ? `, ${event.actor}` : ""}]${model}: ${event.summary}${current}${missing}`);
       }
       lines.push(
         audit.complete

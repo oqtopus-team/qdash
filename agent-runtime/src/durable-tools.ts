@@ -30,7 +30,13 @@ import { hostRecord } from "./evaluate.ts";
 import { acceptsKnowledge, fetchTaskKnowledgeResponse, referenceOf } from "./knowledge-context.ts";
 import { hydrateEvaluationArgs } from "@oqtopus-team/pi-qdash/extensions/lib/qcal-hydration.ts";
 import { QDASH_TOOL_NAMESPACE } from "@oqtopus-team/pi-qdash/extensions/lib/tool-policy.ts";
+import {
+  canonicalArgs,
+  HOST_WRITE_APPROVAL_KEY,
+  unserializableArgsMessage,
+} from "@oqtopus-team/pi-qdash/extensions/lib/write-approval.ts";
 import { isWaitToolName, WAIT_SPECS, type WaitSpec } from "@oqtopus-team/pi-qdash/extensions/lib/waits.ts";
+import { HOST_MODEL_KEY, HOST_NAME_KEY } from "@oqtopus-team/pi-qdash/extensions/lib/host-model.ts";
 import { isTrustedExtension } from "./local-extensions.ts";
 import { withParameterOverrides } from "./tool-schemas.ts";
 import { parkingWait } from "./durable-waits.ts";
@@ -47,15 +53,19 @@ function isTrusted(
   return extension.path !== undefined && isTrustedExtension(extension.path, roots, packages);
 }
 
-/** The model the conversation runs on, resolved from the durable agent record. */
-async function conversationModel(
+/** The provider and model ID the conversation's agent runs with, from the durable agent record. */
+async function conversationModelRef(
   api: Pick<ToolExecutionApi, "agent">,
   context: Context,
-  modelRuntime: ModelRuntime,
-): Promise<Model<Api> | undefined> {
+): Promise<ApprovalModel | undefined> {
   if (typeof api.agent !== "function") return undefined;
   const ref = (await api.agent(context)).model;
-  return ref ? (modelRuntime.getModel(ref.provider, ref.modelId) ?? undefined) : undefined;
+  return ref ? { provider: ref.provider, modelId: ref.modelId } : undefined;
+}
+
+/** The catalog model of a reference, for tools that call it (pi-qcaleval falls back to it). */
+function catalogModel(modelRuntime: ModelRuntime, ref: ApprovalModel): Model<Api> | undefined {
+  return modelRuntime.getModel(ref.provider, ref.modelId) ?? undefined;
 }
 
 /** Convert a value returned by an extension into durable's strict JSON shape. */
@@ -107,9 +117,24 @@ export interface ApprovalRequest {
   tool: string;
   label: string;
   args: Record<string, unknown>;
+  /**
+   * The conversation's model when it made the call, captured by the runtime
+   * (never from the call's arguments). The approved call reports it to QDash
+   * as the model of the records it writes; a model switch before the user
+   * decides does not change it.
+   */
+  model?: ApprovalModel;
 }
 
-// pi-qdash connection plumbing; meaningless to the person approving the call.
+/** A model reference: pi provider ID and model ID, nothing else. */
+export interface ApprovalModel {
+  provider: string;
+  modelId: string;
+}
+
+// pi-qdash connection plumbing, meaningless to the person approving the call,
+// and the retired `confirmWrite`, which a model may still send and which
+// approves nothing.
 const HIDDEN_ARGS = new Set(["confirmWrite", "profile", "configPath", "useEnv"]);
 
 function approvalArgs(args: unknown): Record<string, unknown> {
@@ -117,7 +142,7 @@ function approvalArgs(args: unknown): Record<string, unknown> {
   return Object.fromEntries(Object.entries(args).filter(([key]) => !HIDDEN_ARGS.has(key)));
 }
 
-/** Connection settings and write confirmation belong exclusively to the runtime. */
+/** Connection settings belong exclusively to the runtime; the model sees none of them. */
 function withoutRuntimeArguments(parameters: TSchema): TSchema {
   const { properties, required } = parameters as {
     properties?: Record<string, TSchema>;
@@ -146,7 +171,21 @@ export async function runCodingAgentTool(
   connection: QDashConnection,
   /** The conversation's model, so a tool can fall back to it (pi-qcaleval does). */
   model?: Model<Api>,
+  /**
+   * The user approved this exact call in the approval card (`runApproved`
+   * only). pi-qdash reads it from the extension context, where the model
+   * cannot put it; no argument approves a write.
+   */
+  approvedByUser = false,
+  /**
+   * The provider and model ID the harness runs the conversation with (for an
+   * approved write: the model that made the call). pi-qdash reports it with
+   * the QDash records the call writes (host-model.ts); unlike `model` it needs
+   * no catalog entry.
+   */
+  modelRef?: ApprovalModel,
 ) {
+  const approved = approvedByUser && isReviewedWriteTool(tool.name);
   const extensionContext = {
     cwd,
     mode: "json",
@@ -157,19 +196,42 @@ export async function runCodingAgentTool(
     isIdle: () => false,
     isProjectTrusted: () => true,
     hasPendingMessages: () => false,
+    // pi-qdash reports QDash records as written by this host, with this model (host-model.ts).
+    [HOST_NAME_KEY]: "qdash-web-agent",
+    ...(modelRef ? { [HOST_MODEL_KEY]: { provider: modelRef.provider, id: modelRef.modelId } } : {}),
+    ...(approved
+      ? { [HOST_WRITE_APPROVAL_KEY]: { toolCallId: callId, toolName: tool.name } }
+      : {}),
   };
+  const params = { ...approvalArgs(args), ...connection.toolArgs };
   const run = tool.execute(
     callId,
-    {
-      ...approvalArgs(args),
-      ...connection.toolArgs,
-      ...(isReviewedWriteTool(tool.name) ? { confirmWrite: true } : {}),
-    } as never,
+    (approved ? frozenCopy(params, tool.name) : params) as never,
     signal,
     undefined,
     extensionContext as never,
   );
   return untilAborted(run, signal, tool.name);
+}
+
+function deepFreeze<T>(value: T): T {
+  if (value !== null && typeof value === "object") {
+    for (const item of Object.values(value)) deepFreeze(item);
+    Object.freeze(value);
+  }
+  return value;
+}
+
+/**
+ * A deeply frozen plain-data copy of an approved call's arguments. The tool
+ * gets its own copy, so neither it nor anything else can change what runs
+ * after the approval, nor the persisted approval request the user saw.
+ * Arguments that are not plain JSON data are refused.
+ */
+function frozenCopy(params: Record<string, unknown>, toolName: string): Record<string, unknown> {
+  const canonical = canonicalArgs(params);
+  if (canonical === undefined) throw new Error(unserializableArgsMessage(toolName));
+  return deepFreeze(JSON.parse(canonical) as Record<string, unknown>);
 }
 
 /** Thrown when a tool call is cancelled while the tool itself is still running. */
@@ -264,11 +326,13 @@ export function adaptCodingAgentTool(
     ...(tool.executionMode ? { executionMode: tool.executionMode } : {}),
     execute: async (args, api: ToolExecutionApi, context: Context) => {
       if (writesQDash) {
+        const model = await conversationModelRef(api, context);
         const approval: ApprovalRequest = {
           id: api.callId,
           tool: tool.name,
           label: tool.label || tool.name,
           args: approvalArgs(args),
+          ...(model ? { model } : {}),
         };
         return {
           output: [
@@ -330,6 +394,7 @@ export function adaptCodingAgentTool(
       const reference = hydrated?.reference;
       const examples = hydrated?.examples;
       const started = Date.now();
+      const modelRef = await conversationModelRef(api, context);
       const result = await runCodingAgentTool(
         tool,
         api.callId,
@@ -338,7 +403,9 @@ export function adaptCodingAgentTool(
         modelRuntime,
         cwd,
         connection,
-        await conversationModel(api, context, modelRuntime),
+        modelRef ? catalogModel(modelRuntime, modelRef) : undefined,
+        false,
+        modelRef,
       );
       // An evaluation result records what the host put into the call (figure
       // hashes, the reference, the context), so a planner turn leaves the
@@ -433,14 +500,19 @@ export class QDashWriteTools {
   async runApproved(approval: ApprovalRequest, signal?: AbortSignal): Promise<string> {
     const tool = this.tools.get(approval.tool);
     if (!tool) throw new Error(`write tool ${approval.tool} is not enabled`);
+    // The model that made the call, so the records it writes name it, even
+    // when the conversation switched models before the user decided.
     const result = await runCodingAgentTool(
       tool,
       approval.id,
-      { ...approval.args, confirmWrite: true },
+      approval.args,
       signal,
       this.modelRuntime,
       this.cwd,
       this.connection,
+      approval.model ? catalogModel(this.modelRuntime, approval.model) : undefined,
+      true,
+      approval.model,
     );
     const text = result.content
       .map((block) => (block.type === "text" ? block.text : ""))

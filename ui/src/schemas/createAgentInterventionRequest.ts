@@ -8,6 +8,7 @@
 import type { AgentInterventionAttempt } from './agentInterventionAttempt';
 import type { AgentInterventionReason } from './agentInterventionReason';
 import type { CreateAgentInterventionRequestCheckpoint } from './createAgentInterventionRequestCheckpoint';
+import type { CreateAgentInterventionRequestModel } from './createAgentInterventionRequestModel';
 import type { CreateAgentInterventionRequestNodeId } from './createAgentInterventionRequestNodeId';
 import type { CreateAgentInterventionRequestPreviousInterventionId } from './createAgentInterventionRequestPreviousInterventionId';
 import type { CreateAgentInterventionRequestTaskName } from './createAgentInterventionRequestTaskName';
@@ -47,4 +48,6 @@ export interface CreateAgentInterventionRequest {
   previous_intervention_id?: CreateAgentInterventionRequestPreviousInterventionId;
   /** The request comes from an autonomous agent without a per-call approval. QDash then also requires that the signed-in user created the session and that its autonomy is auto. Who may answer the intervention does not change. */
   autonomous?: boolean;
+  /** The provider and model the client host reports it ran the agent with, read from the host's own runtime, never from the agent's tool arguments. Recorded as reported; QDash does not verify it, and it changes no scope or approval. Omitted when the host does not know it. */
+  model?: CreateAgentInterventionRequestModel;
 }
