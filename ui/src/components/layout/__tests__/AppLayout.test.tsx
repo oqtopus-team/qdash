@@ -121,25 +121,34 @@ describe("AppLayout navigation chrome", () => {
     expect(shell.className).toContain("pt-[env(safe-area-inset-top)]");
   });
 
-  it("opens the header menu, lists the other destinations, and restores focus on Escape", async () => {
+  it("removes the header hamburger and makes More the last tab bar item", () => {
+    const { container } = renderLayout();
+
+    expect(screen.queryByRole("button", { name: "Open menu" })).toBeNull();
+    const header = container.querySelector("nav.navbar") as HTMLElement;
+    expect(within(header).queryByRole("button", { name: "More" })).toBeNull();
+
+    const tabBar = container.querySelector('nav#mobile-tab-bar[aria-label="Primary navigation"]');
+    const dock = (tabBar as HTMLElement).querySelector(".dock") as HTMLElement;
+    expect(dock.lastElementChild).toBe(within(dock).getByRole("button", { name: "More" }));
+  });
+
+  it("opens the More sheet, lists the other destinations, and restores focus on Escape", async () => {
     const { container } = renderLayout();
 
     const tabBar = container.querySelector('nav#mobile-tab-bar[aria-label="Primary navigation"]');
-    // The header trigger is the only menu opener; the tab bar holds route links only.
-    expect(within(tabBar as HTMLElement).queryByRole("button")).toBeNull();
-
-    const trigger = screen.getByRole("button", { name: "Open menu" });
+    const trigger = within(tabBar as HTMLElement).getByRole("button", { name: "More" });
     expect(trigger).toHaveAttribute("aria-expanded", "false");
     expect(trigger).toHaveAttribute("aria-haspopup", "dialog");
 
     act(() => trigger.focus());
     fireEvent.click(trigger);
 
-    const drawer = screen.getByRole("dialog", { name: "Navigation menu" });
+    const sheet = screen.getByRole("dialog", { name: "More" });
     expect(trigger).toHaveAttribute("aria-expanded", "true");
-    expect(drawer.contains(document.activeElement)).toBe(true);
+    expect(sheet.contains(document.activeElement)).toBe(true);
 
-    const nav = within(within(drawer).getByRole("navigation", { name: "Menu navigation" }));
+    const nav = within(within(sheet).getByRole("navigation", { name: "More navigation" }));
     for (const label of [
       "Home",
       "Metrics",
@@ -154,47 +163,79 @@ describe("AppLayout navigation chrome", () => {
       "Knowledge",
       "Config",
       "Settings",
+      "Docs",
+      "Prefect",
     ]) {
       expect(nav.getByRole("link", { name: label })).toBeTruthy();
     }
-    for (const label of ["Overview", "Workflow", "Execution", "Agent"]) {
+    // The Beta badge is part of the Dashboards link name.
+    expect(nav.getByRole("link", { name: /^Dashboards/ })).toHaveAttribute("href", "/dashboards");
+    for (const label of ["Overview", "Workflow", "Execution", "Agent", "Admin"]) {
       expect(nav.queryByRole("link", { name: label })).toBeNull();
     }
+    // The profile entry stays in the sheet.
+    expect(within(sheet).getByRole("button", { name: /tester/ })).toBeTruthy();
 
-    fireEvent.keyDown(drawer, { key: "Escape" });
+    fireEvent.keyDown(sheet, { key: "Escape" });
 
-    expect(screen.queryByRole("dialog", { name: "Navigation menu" })).toBeNull();
+    expect(screen.queryByRole("dialog", { name: "More" })).toBeNull();
     expect(trigger).toHaveAttribute("aria-expanded", "false");
-    // Radix restores focus to the trigger once the closed scope unmounts.
     await waitFor(() => expect(document.activeElement).toBe(trigger));
   });
 
-  it("closes the header menu from its close button and returns focus to the trigger", async () => {
+  it("closes the More sheet from its close button and returns focus to More", async () => {
     renderLayout();
 
-    const trigger = screen.getByRole("button", { name: "Open menu" });
+    const trigger = screen.getByRole("button", { name: "More" });
     act(() => trigger.focus());
     fireEvent.click(trigger);
 
-    const drawer = screen.getByRole("dialog", { name: "Navigation menu" });
-    fireEvent.click(within(drawer).getByRole("button", { name: "Close menu" }));
+    const sheet = screen.getByRole("dialog", { name: "More" });
+    fireEvent.click(within(sheet).getByRole("button", { name: "Close menu" }));
 
-    expect(screen.queryByRole("dialog", { name: "Navigation menu" })).toBeNull();
+    expect(screen.queryByRole("dialog", { name: "More" })).toBeNull();
     expect(trigger).toHaveAttribute("aria-expanded", "false");
     await waitFor(() => expect(document.activeElement).toBe(trigger));
   });
 
-  it("closes the header menu after choosing a destination", () => {
+  it("closes the More sheet after choosing a destination", () => {
     renderLayout();
 
-    fireEvent.click(screen.getByRole("button", { name: "Open menu" }));
+    fireEvent.click(screen.getByRole("button", { name: "More" }));
     fireEvent.click(
-      within(screen.getByRole("dialog", { name: "Navigation menu" })).getByRole("link", {
+      within(screen.getByRole("dialog", { name: "More" })).getByRole("link", {
         name: "Metrics",
       }),
     );
 
-    expect(screen.queryByRole("dialog", { name: "Navigation menu" })).toBeNull();
+    expect(screen.queryByRole("dialog", { name: "More" })).toBeNull();
+  });
+
+  it("closes the More sheet when the viewport widens to the desktop rail", () => {
+    renderLayout();
+
+    fireEvent.click(screen.getByRole("button", { name: "More" }));
+    expect(screen.getByRole("dialog", { name: "More" })).toBeTruthy();
+
+    const previousWidth = window.innerWidth;
+    try {
+      act(() => {
+        Object.defineProperty(window, "innerWidth", { configurable: true, value: 1280 });
+        window.dispatchEvent(new Event("resize"));
+      });
+      expect(screen.queryByRole("dialog", { name: "More" })).toBeNull();
+    } finally {
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: previousWidth });
+    }
+  });
+
+  it("highlights More on an overflow route", () => {
+    mockPathname.mockReturnValue("/metrics");
+    const { container } = renderLayout();
+
+    const tabBar = container.querySelector('nav#mobile-tab-bar[aria-label="Primary navigation"]');
+    const more = within(tabBar as HTMLElement).getByRole("button", { name: "More" });
+    expect(more).toHaveAttribute("data-active", "true");
   });
 });
 

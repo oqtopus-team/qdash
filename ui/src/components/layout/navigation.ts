@@ -127,7 +127,7 @@ export function getNavigationSections({ canEdit, isAdmin }: NavigationOptions): 
  * Destinations shown as tabs in the mobile tab bar, in display order. Each tab
  * is active on its own route and on every route nested under one of its bases;
  * `/executions/{id}` resolves to an execution page, so it belongs to Execution.
- * Every other destination stays in the header menu.
+ * Every other destination sits in the More sheet that the last tab opens.
  */
 const MOBILE_TAB_BASES: ReadonlyArray<{ href: string; bases: readonly string[] }> = [
   { href: "/overview", bases: ["/overview"] },
@@ -140,6 +140,11 @@ export type MobileTab = {
   item: NavItem;
   bases: readonly string[];
 };
+
+/** Resolves whether `item` owns the current route, honouring its `match` mode. */
+export function isNavItemActive(item: NavItem, pathname: string): boolean {
+  return item.match === "prefix" ? pathname.startsWith(item.href) : pathname === item.href;
+}
 
 /** True when `pathname` is `base` itself or a route nested under it. */
 export function isPathWithin(pathname: string, base: string): boolean {
@@ -169,4 +174,14 @@ export function withoutMobileTabs(sections: NavSection[]): NavSection[] {
     ...section,
     items: section.items.filter((item) => !tabHrefs.has(item.href)),
   }));
+}
+
+/**
+ * True when a visible destination outside the mobile tabs owns `pathname`, so the
+ * More tab can show that the current page lives in its sheet.
+ */
+export function isMobileOverflowActive(sections: NavSection[], pathname: string): boolean {
+  return withoutMobileTabs(sections).some((section) =>
+    section.items.some((item) => item.visible !== false && isNavItemActive(item, pathname)),
+  );
 }
