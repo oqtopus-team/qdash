@@ -618,6 +618,9 @@ function statusOf(error: unknown): number | undefined {
   return typeof status === "number" ? status : undefined;
 }
 
+/** The largest page QDash returns from GET /agent-sessions. */
+export const PAUSED_SESSION_LIST_LIMIT = 100;
+
 /**
  * Why a flow or pipeline must not run now, or null: one of the user's own
  * agent sessions on the chip is paused for an expert and covers one of the
@@ -631,6 +634,10 @@ function statusOf(error: unknown): number | undefined {
  * authorized request_human), so pi cannot show that none covers the targets.
  * There is no flag to skip the guard; the server needs upgrading, or the run
  * can be started from QDash itself.
+ *
+ * The list holds at most PAUSED_SESSION_LIST_LIMIT sessions, newest first. A
+ * full page cannot show that an older paused session does not cover the
+ * targets, so a full page without an overlap blocks too.
  */
 export async function pausedSessionConflict(
   client: PausedSessionLister,
@@ -640,7 +647,7 @@ export async function pausedSessionConflict(
   const where = chipId ? `chip ${chipId}` : "any chip";
   let paused: AgentSessionResponse[];
   try {
-    paused = await client.listAgentSessions({ chipId, statuses: ["waiting_for_human"], mine: true, limit: 100 });
+    paused = await client.listAgentSessions({ chipId, statuses: ["waiting_for_human"], mine: true, limit: PAUSED_SESSION_LIST_LIMIT });
   } catch (error) {
     const status = statusOf(error);
     if (status === 404 || status === 405) {
@@ -652,7 +659,10 @@ export async function pausedSessionConflict(
   const blocking = paused.filter(
     (session) => (!chipId || session.chip_id === chipId) && (!wanted || session.policy.qids.some((qid) => wanted.has(qid))),
   );
-  if (blocking.length === 0) return null;
+  if (blocking.length === 0) {
+    if (paused.length < PAUSED_SESSION_LIST_LIMIT) return null;
+    return `Nothing was started: you have at least ${PAUSED_SESSION_LIST_LIMIT} agent sessions paused for an expert on ${where}, as many as QDash lists at once, so pi cannot show that no older paused session covers ${wanted ? "these targets" : "this run"}. A flow or pipeline could bypass such a pause and the session's candidate gate. Have an expert answer or stop the paused sessions in QDash, or start the run from QDash itself.`;
+  }
   const names = blocking
     .map((session) => `${session.session_id} (qubits ${session.policy.qids.join(", ")}, waiting on intervention ${session.active_intervention_id ?? "unknown"})`)
     .join("; ");

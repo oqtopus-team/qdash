@@ -354,7 +354,9 @@ def test_run_step_retries_transient_api_error() -> None:
 
     assert outcome.transition == AgentSkillTransition.RETRY
     assert outcome.action_id is None
-    assert "network unavailable" in outcome.reason
+    # The reason names the failure class, never the transport's own text.
+    assert outcome.reason == "QDash API request failed (QDashTransportError)"
+    assert "network unavailable" not in outcome.reason
 
 
 def test_run_step_escalates_commit_validation_error_with_provenance() -> None:

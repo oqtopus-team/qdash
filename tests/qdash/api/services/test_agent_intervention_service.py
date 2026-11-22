@@ -1121,3 +1121,347 @@ def test_slack_errors_are_stored_without_their_text(
     assert SECRET not in retried.model_dump_json()
     assert SECRET not in caplog.text
     assert "Slack delivery attempt" in caplog.text
+
+
+# ------------------------------------------------------------------ attempt evidence
+
+
+def _evaluation(task_id: str, *, evaluation_id: str, run_id: str, **overrides: Any) -> None:
+    from qdash.dbmodel.evaluation import EvaluationDocument
+    from qdash.dbmodel.evaluation_run import EvaluationRunDocument
+
+    run = {
+        "run_id": run_id,
+        "project_id": PROJECT,
+        "chip_id": "chip-001",
+        "task_name": "CheckRabi",
+        "entity_type": "qubit",
+        "requested_by": "tester",
+    }
+    run.update(overrides.pop("run", {}))
+    if EvaluationRunDocument.find_one({"run_id": run_id}).run() is None:
+        EvaluationRunDocument(**run).insert()
+    evaluation = {
+        "evaluation_id": evaluation_id,
+        "run_id": run_id,
+        "project_id": PROJECT,
+        "chip_id": "chip-001",
+        "task_id": task_id,
+        "task_name": "CheckRabi",
+        "qid": "Q00",
+    }
+    evaluation.update(overrides)
+    EvaluationDocument(**evaluation).insert()
+
+
+def _attempt_request(key: str = "int-ev", **attempt: Any) -> CreateAgentInterventionRequest:
+    return CreateAgentInterventionRequest.model_validate(
+        {
+            "idempotency_key": key,
+            "reason": "evaluation_failed",
+            "summary": "The evaluation did not complete",
+            "question": "Is the measurement usable?",
+            "qids": ["Q00"],
+            "attempts": [{"node_id": "rabi", "reason": "reported by the runner", **attempt}],
+        }
+    )
+
+
+def _second_session_on_chip(sessions: AgentSessionService, chip_id: str):
+    if ChipDocument.find_one({"chip_id": chip_id}).run() is None:
+        ChipDocument(
+            project_id=PROJECT,
+            chip_id=chip_id,
+            username="tester",
+            size=4,
+            system_info=SystemInfoModel(),
+        ).insert()
+    return sessions.create_session(
+        project_id=PROJECT,
+        username="tester",
+        body=CreateAgentSessionRequest(
+            chip_id=chip_id,
+            policy=AgentSessionPolicy(qids=["Q00"], allowed_tasks=["CheckRabi"], max_actions=4),
+            expires_in_seconds=3600,
+        ),
+    )
+
+
+def _move_to_chip(ref: str, chip_id: str) -> None:
+    for model in (ExecutionHistoryDocument, TaskResultHistoryDocument):
+        model.get_motor_collection().update_many(
+            {"execution_id": f"exec-{ref}"}, {"$set": {"chip_id": chip_id}}
+        )
+
+
+def test_a_full_evidence_chain_is_recorded(
+    sessions: AgentSessionService, interventions: AgentInterventionService
+) -> None:
+    session = _session(sessions)
+    action_id = _completed_run(sessions, session.session_id)
+    _evaluation("task-a-1", evaluation_id="ev-1", run_id="evr-1")
+
+    opened = _create(
+        interventions,
+        session.session_id,
+        _attempt_request(
+            task_name="CheckRabi",
+            qid="Q00",
+            status="failed",
+            action_id=action_id,
+            execution_id="exec-a-1",
+            task_id="task-a-1",
+            evaluation_id="ev-1",
+            evaluation_run_id="evr-1",
+        ),
+    )
+
+    attempt = opened.attempts[0]
+    assert attempt.evaluation_id == "ev-1"
+    assert attempt.execution_id == "exec-a-1"
+    # Client-reported fields are stored as given.
+    assert attempt.reason == "reported by the runner"
+    assert attempt.status == "failed"
+
+
+@pytest.mark.parametrize(
+    "attempt",
+    [
+        {},
+        {"task_name": "CheckRabi", "qid": "Q00", "transition": "retry"},
+        {"evaluation_id": "ev-1"},
+        {"task_id": "task-a-1"},
+        {"execution_id": "exec-a-1"},
+        {"evaluation_run_id": "evr-1", "task_id": "task-a-1"},
+    ],
+)
+def test_partial_evidence_of_this_session_is_recorded(
+    sessions: AgentSessionService, interventions: AgentInterventionService, attempt: dict[str, Any]
+) -> None:
+    """An attempt that failed early cites only what it has; each id is still checked."""
+    session = _session(sessions)
+    _completed_run(sessions, session.session_id)
+    _evaluation("task-a-1", evaluation_id="ev-1", run_id="evr-1")
+
+    opened = _create(interventions, session.session_id, _attempt_request(**attempt))
+    assert opened.status.value == "open"
+
+
+def test_a_pre_dispatch_failure_and_exhausted_budget_are_recorded(
+    sessions: AgentSessionService, interventions: AgentInterventionService
+) -> None:
+    session = _session(sessions, max_actions=1)
+    # An authorized action that never produced an execution.
+    action = _run_task(sessions, session.session_id)
+
+    opened = _create(
+        interventions,
+        session.session_id,
+        CreateAgentInterventionRequest.model_validate(
+            {
+                "idempotency_key": "budget-1",
+                "reason": "policy_limit",
+                "summary": "The session has no actions left",
+                "question": "Stop?",
+                "qids": ["Q00"],
+                "attempts": [
+                    {
+                        "task_name": "CheckRabi",
+                        "qid": "Q00",
+                        "action_id": action.action_id,
+                        "reason": "QDash API request failed (QDashTransportError)",
+                    }
+                ],
+            }
+        ),
+    )
+    assert opened.status.value == "open"
+    assert opened.can_resume is False
+
+
+def _refused_plain(interventions, session_id, body) -> str:
+    detail = _refused_detail(interventions, session_id, body)
+    # A reference failure is never the checkpoint_rejected code a runner may fall back on.
+    assert isinstance(detail, str), detail
+    assert AgentInterventionDocument.count() == 0
+    return detail
+
+
+@pytest.mark.parametrize(
+    "evidence",
+    [
+        {"task_id": "task-a-1"},
+        {"evaluation_id": "ev-1"},
+        {"task_id": "task-a-1", "evaluation_run_id": "evr-1"},
+    ],
+)
+def test_an_unlinked_action_cannot_borrow_another_actions_result(
+    sessions: AgentSessionService,
+    interventions: AgentInterventionService,
+    evidence: dict[str, str],
+) -> None:
+    session = _session(sessions)
+    _completed_run(sessions, session.session_id)
+    _evaluation("task-a-1", evaluation_id="ev-1", run_id="evr-1")
+    unlinked = _run_task(sessions, session.session_id, key="unlinked-action")
+
+    detail = _refused_plain(
+        interventions,
+        session.session_id,
+        _attempt_request(action_id=unlinked.action_id, **evidence),
+    )
+    assert "without its resolved execution" in detail
+    opened = _create(
+        interventions, session.session_id, _attempt_request(action_id=unlinked.action_id)
+    )
+    assert opened.status.value == "open"
+
+
+def test_an_execution_of_another_session_is_refused(
+    sessions: AgentSessionService, interventions: AgentInterventionService
+) -> None:
+    session = _session(sessions)
+    own = _completed_run(sessions, session.session_id, ref="a-1")
+    other = _session(sessions)
+    _completed_run(sessions, other.session_id, ref="b-1")
+
+    detail = _refused_plain(
+        interventions,
+        session.session_id,
+        _attempt_request(action_id=own, execution_id="exec-b-1"),
+    )
+    assert "is not the execution QDash links to action" in detail
+    detail = _refused_plain(
+        interventions, session.session_id, _attempt_request(execution_id="exec-b-1")
+    )
+    assert "was not dispatched by this session" in detail
+    detail = _refused_plain(interventions, session.session_id, _attempt_request(task_id="task-b-1"))
+    assert "did not come from an execution of this session" in detail
+    detail = _refused_plain(
+        interventions,
+        session.session_id,
+        _attempt_request(action_id=own, task_id="task-b-1"),
+    )
+    assert "did not come from execution exec-a-1" in detail
+
+
+def test_an_execution_on_another_chip_is_refused(
+    sessions: AgentSessionService, interventions: AgentInterventionService
+) -> None:
+    session = _session(sessions)
+    action_id = _completed_run(sessions, session.session_id)
+    _move_to_chip("a-1", "chip-002")
+
+    detail = _refused_plain(
+        interventions,
+        session.session_id,
+        _attempt_request(action_id=action_id, execution_id="exec-a-1"),
+    )
+    assert "is not the execution QDash links" in detail
+    detail = _refused_plain(interventions, session.session_id, _attempt_request(task_id="task-a-1"))
+    assert "outside the session's chip" in detail
+
+    # A session on the other chip cannot cite it either, from this session.
+    elsewhere = _second_session_on_chip(sessions, "chip-002")
+    detail = _refused_plain(
+        interventions, elsewhere.session_id, _attempt_request(execution_id="exec-a-1")
+    )
+    assert "was not dispatched by this session" in detail
+
+
+def test_swapped_task_results_and_evaluations_are_refused(
+    sessions: AgentSessionService, interventions: AgentInterventionService
+) -> None:
+    session = _session(sessions, max_actions=4)
+    first = _completed_run(sessions, session.session_id, ref="a-1")
+    _completed_run(sessions, session.session_id, key="plan-1-node-0-visit-1-action", ref="a-2")
+    _evaluation("task-a-1", evaluation_id="ev-1", run_id="evr-1")
+    _evaluation("task-a-2", evaluation_id="ev-2", run_id="evr-2")
+    _evaluation(
+        "task-a-1",
+        evaluation_id="ev-chevron",
+        run_id="evr-chevron",
+        task_name="CheckChevron",
+        run={"task_name": "CheckChevron"},
+    )
+
+    cases = [
+        (
+            {"action_id": first, "execution_id": "exec-a-1", "task_id": "task-a-2"},
+            "did not come from execution exec-a-1",
+        ),
+        ({"action_id": first, "execution_id": "exec-a-2"}, "is not the execution QDash links"),
+        ({"task_id": "task-a-1", "evaluation_id": "ev-2"}, "evaluated task result task-a-2"),
+        ({"evaluation_id": "ev-1", "evaluation_run_id": "evr-2"}, "is not part of evaluation run"),
+        ({"task_id": "task-a-1", "evaluation_run_id": "evr-chevron"}, "did not evaluate CheckRabi"),
+        ({"evaluation_run_id": "evr-1"}, "without the task result it evaluated"),
+        ({"action_id": first, "task_name": "CheckChevron"}, "ran CheckRabi, not CheckChevron"),
+        ({"task_id": "task-a-1", "task_name": "CheckChevron"}, "is a CheckRabi result"),
+        ({"task_id": "task-a-1", "qid": "Q09"}, "target Q09 is outside the session scope"),
+        ({"evaluation_id": "nope"}, "Evaluations not found in this project"),
+        ({"evaluation_run_id": "nope", "task_id": "task-a-1"}, "Evaluation runs not found"),
+    ]
+    for index, (attempt, message) in enumerate(cases):
+        detail = _refused_plain(
+            interventions, session.session_id, _attempt_request(key=f"swap-{index}", **attempt)
+        )
+        assert message in detail, (attempt, detail)
+
+
+def test_a_fabricated_task_display_on_a_result_is_refused(
+    sessions: AgentSessionService, interventions: AgentInterventionService
+) -> None:
+    """The result's own qid decides; an attempt cannot relabel it."""
+    session = sessions.create_session(
+        project_id=PROJECT,
+        username="tester",
+        body=CreateAgentSessionRequest(
+            chip_id="chip-001",
+            policy=AgentSessionPolicy(
+                qids=["Q00", "Q01"], allowed_tasks=["CheckRabi"], max_actions=4
+            ),
+            expires_in_seconds=3600,
+        ),
+    )
+    action_id = _completed_run(sessions, session.session_id)
+
+    detail = _refused_plain(
+        interventions, session.session_id, _attempt_request(task_id="task-a-1", qid="Q01")
+    )
+    assert "is for Q00, not Q01" in detail
+    detail = _refused_plain(
+        interventions, session.session_id, _attempt_request(action_id=action_id, qid="Q01")
+    )
+    assert "did not run on Q01" in detail
+
+
+def test_references_of_another_project_are_refused(
+    sessions: AgentSessionService, interventions: AgentInterventionService
+) -> None:
+    session = _session(sessions)
+    _completed_run(sessions, session.session_id)
+    for model in (ExecutionHistoryDocument, TaskResultHistoryDocument):
+        model.get_motor_collection().update_many(
+            {"execution_id": "exec-a-1"}, {"$set": {"project_id": "project-2"}}
+        )
+
+    detail = _refused_plain(interventions, session.session_id, _attempt_request(task_id="task-a-1"))
+    assert "Task results not found in this project" in detail
+    detail = _refused_plain(
+        interventions, session.session_id, _attempt_request(execution_id="exec-a-1")
+    )
+    assert "was not dispatched by this session" in detail
+
+
+def test_an_unknown_checkpoint_source_execution_is_refused(
+    sessions: AgentSessionService, interventions: AgentInterventionService
+) -> None:
+    session = _session(sessions)
+    _run_task(sessions, session.session_id)
+
+    detail = _refused_plain(
+        interventions,
+        session.session_id,
+        _request(checkpoint=_checkpoint(source_execution_id="exec-missing")),
+    )
+    assert "source execution exec-missing" in detail

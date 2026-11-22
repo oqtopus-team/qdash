@@ -166,6 +166,40 @@ test("a flow does not run around the user's agent session paused for an expert",
   assert.equal(other.details.started, true);
 });
 
+test("a flow does not run when a full page of paused sessions hides older ones", async () => {
+  // QDash lists at most 100 sessions, newest first; an older paused session may cover the targets.
+  const pausedOn = (count, qid) => Array.from({ length: count }, (_, index) => ({
+    session_id: `s-${index}`, chip_id: "64Qv3", status: "waiting_for_human", active_intervention_id: `int-${index}`, policy: { qids: [qid] },
+  }));
+  const ok = async () => ({ execution_id: "e-1", flow_run_id: "f", flow_run_url: "", qdash_ui_url: "", message: "ok" });
+  const params = { name: "my_check", parameters: { chip_id: "64Qv3", qids: ["Q00"] }, confirmWrite: true };
+  for (const count of [100, 101]) {
+    const execute = async () => { throw new Error("must not run"); };
+    const { run, calls } = registeredTools(async () => ({}), "64Qv3", execute, "project-1", pausedOn(count, "Q09"));
+    const result = await run.execute("t", params);
+    assert.equal(result.details.started, false, String(count));
+    assert.equal(result.details.blockedByPausedSession, true, String(count));
+    assert.match(result.content[0].text, /at least 100 agent sessions paused for an expert on chip 64Qv3.*no older paused session covers these targets/, String(count));
+    assert.doesNotMatch(result.content[0].text, /flag|skip the guard|--force/i);
+    assert.deepEqual(calls, [], String(count));
+  }
+  // A known overlap on a full page is reported by name.
+  const overlap = [...pausedOn(99, "Q09"), ...pausedOn(1, "Q00").map((s) => ({ ...s, session_id: "s-old" }))];
+  const named = registeredTools(async () => ({}), "64Qv3", async () => { throw new Error("must not run"); }, "project-1", overlap);
+  const blocked = await named.run.execute("t", params);
+  assert.match(blocked.content[0].text, /s-old \(qubits Q00/);
+  assert.deepEqual(named.calls, []);
+  // Unknown targets and an unknown chip still block on a full page.
+  const unknown = registeredTools(async () => ({}), "64Qv3", async () => { throw new Error("must not run"); }, "project-1", pausedOn(100, "Q09"));
+  assert.equal((await unknown.run.execute("t", { name: "my_check", confirmWrite: true })).details.blockedByPausedSession, true);
+  assert.equal((await unknown.run.execute("t", { name: "my_check", parameters: { qids: ["Q00"] }, confirmWrite: true })).details.blockedByPausedSession, true);
+  assert.deepEqual(unknown.calls, []);
+  // Fewer than a full page shows every paused session, so other qubits run.
+  const clear = registeredTools(async () => ({}), "64Qv3", ok, "project-1", pausedOn(99, "Q09"));
+  const started = await clear.run.execute("t", params);
+  assert.equal(started.details.started, true);
+});
+
 test("a flow does not run when QDash cannot show that no agent session is paused", async () => {
   const cases = [
     [404, /cannot list agent sessions \(HTTP 404; it predates GET \/agent-sessions\)/],

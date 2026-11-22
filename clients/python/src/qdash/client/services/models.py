@@ -359,17 +359,27 @@ class EvaluationRunId(RootModel[str]):
 class AgentInterventionAttempt(BaseModel):
     """
     One recent attempt shown to the expert, as references rather than log output.
+
+    ``transition``, ``status``, and ``reason`` are what the client reported; QDash stores
+    them as given. The ids are evidence: QDash checks that they form one chain of this
+    session's action, execution, task result, and evaluation before it records them.
     """
 
     node_id: Annotated[str, Field(max_length=200, title="Node Id")] = ""
     task_name: Annotated[str, Field(max_length=200, title="Task Name")] = ""
     qid: Annotated[str, Field(max_length=200, title="Qid")] = ""
     transition: Annotated[str, Field(max_length=64, title="Transition")] = ""
+    """
+    Reported by the client
+    """
     status: Annotated[str, Field(max_length=200, title="Status")] = ""
     """
-    Evaluation or execution status
+    Evaluation or execution status, as reported by the client
     """
     reason: Annotated[str, Field(max_length=1000, title="Reason")] = ""
+    """
+    Reported by the client
+    """
     action_id: Annotated[ActionId | None, Field(title="Action Id")] = None
     execution_id: Annotated[ExecutionId | None, Field(title="Execution Id")] = None
     task_id: Annotated[TaskId | None, Field(title="Task Id")] = None

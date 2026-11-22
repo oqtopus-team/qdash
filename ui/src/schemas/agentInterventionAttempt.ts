@@ -13,6 +13,10 @@ import type { AgentInterventionAttemptTaskId } from './agentInterventionAttemptT
 
 /**
  * One recent attempt shown to the expert, as references rather than log output.
+ *
+ * ``transition``, ``status``, and ``reason`` are what the client reported; QDash stores
+ * them as given. The ids are evidence: QDash checks that they form one chain of this
+ * session's action, execution, task result, and evaluation before it records them.
  */
 export interface AgentInterventionAttempt {
   /** @maxLength 200 */
@@ -21,14 +25,20 @@ export interface AgentInterventionAttempt {
   task_name?: string;
   /** @maxLength 200 */
   qid?: string;
-  /** @maxLength 64 */
+  /**
+     * Reported by the client
+     * @maxLength 64
+     */
   transition?: string;
   /**
-     * Evaluation or execution status
+     * Evaluation or execution status, as reported by the client
      * @maxLength 200
      */
   status?: string;
-  /** @maxLength 1000 */
+  /**
+     * Reported by the client
+     * @maxLength 1000
+     */
   reason?: string;
   action_id?: AgentInterventionAttemptActionId;
   execution_id?: AgentInterventionAttemptExecutionId;

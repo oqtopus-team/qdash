@@ -503,3 +503,77 @@ def test_out_of_scope_checkpoint_is_refused_without_a_fallback(lab) -> None:
     assert client.get_agent_session(session.session_id).status == "active"
     assert client.list_agent_interventions(session.session_id) == []
     assert slack.calls == []
+
+
+def test_evaluation_error_text_reaches_no_record_audit_or_slack(lab) -> None:
+    """A raw evaluation error carries a fake secret; only its class and the ids are kept."""
+    from unittest.mock import MagicMock
+
+    from qdash.client.services.client_models import TaskNextAction
+    from qdash.client.services.evaluation_planner import EvaluationPlanner
+    from qdash.dbmodel.agent_session import AgentInterventionDocument
+
+    marker = "SYNTHETIC_SECRET_MARKER xoxb-FAKE-TOKEN-0000"
+    client, slack, http = lab
+    session = client.create_agent_session(
+        chip_id="chip-001",
+        policy={
+            "qids": ["Q00"],
+            "allowed_tasks": ["CheckRabi", "CheckChevron"],
+            "allowed_overrides": {
+                "control_amplitude": {"minimum": 0.0, "maximum": 1.0},
+                "qubit_frequency": {"minimum": 7.0, "maximum": 8.0},
+            },
+            "max_actions": 4,
+            "autonomy": "auto",
+        },
+    )
+    evaluator = MagicMock()
+    evaluator.create_evaluation_run.side_effect = RuntimeError(marker)
+    planner = EvaluationPlanner(
+        evaluator,
+        chip_id="chip-001",
+        allowed_overrides={"control_amplitude": {"minimum": 0.0, "maximum": 1.0}},
+        next_actions=lambda task_name: {"SUCCESS": TaskNextAction(action="continue")},
+        poll_interval_seconds=0,
+    )
+    runner = AgentPlanRunner(client, step_runner=SimulatedStepRunner(client))  # type: ignore[arg-type]
+
+    stopped = runner.run_plan(
+        session_id=session.session_id,
+        qid="Q00",
+        nodes=NODES,
+        planner=planner,
+        max_node_executions=4,
+        max_node_visits=2,
+        idempotency_prefix="plan-redact",
+        record_interventions=True,
+        planner_name="evaluation",
+    )
+
+    assert stopped.intervention is not None, stopped.intervention_error
+    intervention_id = stopped.intervention.intervention_id
+    headers = {"Authorization": "Bearer owner-token", "X-Project-Id": "lab-a"}
+    stored = AgentInterventionDocument.find_one({"intervention_id": intervention_id}).run()
+    assert stored is not None
+    api = http.get(
+        f"/agent-sessions/{session.session_id}/interventions/{intervention_id}", headers=headers
+    )
+    audit = http.get(f"/agent-sessions/{session.session_id}/audit/export", headers=headers)
+    assert api.status_code == 200, api.text
+    assert audit.status_code == 200, audit.text
+    for text in (
+        stored.model_dump_json(),
+        api.text,
+        audit.text,
+        repr(slack.calls),
+        stopped.reason,
+    ):
+        assert "SYNTHETIC_SECRET_MARKER" not in text
+        assert "xoxb-FAKE-TOKEN-0000" not in text
+    # The safe diagnostic and the references stay useful to the expert.
+    assert "Evaluating task result task-1 failed (RuntimeError)" in stored.summary
+    assert stored.attempts[0].task_id == "task-1"
+    assert stored.attempts[0].execution_id == "exec-1"
+    assert len(slack.calls) == 1
+    assert slack.calls[0]["text"] == "Agent needs an expert: Evaluation failed (chip-001 Q00)"

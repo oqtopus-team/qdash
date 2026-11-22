@@ -310,7 +310,8 @@ def test_skipped_task_result_escalates() -> None:
     decision = _planner(client).choose_next(_observation(candidate=_candidate()))
     assert decision.target_node_id == PLAN_ESCALATE
     assert decision.escalation_reason == "evaluation_failed"
-    assert "no figure" in decision.reason
+    assert "(no figure)" in decision.reason
+    assert decision.evidence == {"evaluation_run_id": "run-1"}
 
 
 def test_escalations_are_classified_and_carry_the_evaluation() -> None:

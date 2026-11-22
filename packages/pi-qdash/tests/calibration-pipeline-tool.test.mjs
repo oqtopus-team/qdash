@@ -342,3 +342,21 @@ test("a pipeline does not run on qubits of the user's agent session paused for a
     assert.equal(dispatched, 0, String(status));
   }
 });
+
+test("a pipeline does not run when a full page of paused sessions hides older ones", async () => {
+  const pausedOn = (count, qid) => Array.from({ length: count }, (_, index) => ({
+    session_id: `s-${index}`, chip_id: "64Qv3", status: "waiting_for_human", active_intervention_id: `int-${index}`, policy: { qids: [qid] },
+  }));
+  for (const [count, started] of [[99, true], [100, false], [101, false]]) {
+    let dispatched = 0;
+    const api = { async executeCalibrationPipeline() { dispatched += 1; return { execution_id: "e-1", flow_run_id: "f", message: "" }; } };
+    const tools = registeredTools(api, "64Qv3", "project-1", pausedOn(count, "99"));
+    const result = await tools.get("qdash_run_pipeline").execute("t", { chipId: "64Qv3", spec: SPEC, confirmWrite: true });
+    assert.equal(result.details.started, started, String(count));
+    assert.equal(dispatched, started ? 1 : 0, String(count));
+    if (!started) {
+      assert.equal(result.details.blockedByPausedSession, true, String(count));
+      assert.match(result.content[0].text, /at least 100 agent sessions paused for an expert on chip 64Qv3/, String(count));
+    }
+  }
+});

@@ -89,6 +89,10 @@ function AttemptsTable({ attempts }: { attempts: AgentInterventionAttempt[] }) {
   }
   return (
     <div className="overflow-x-auto">
+      <p className="mb-2 text-xs text-base-content/60">
+        Outcome and reason are as the agent reported them. QDash checked that the evidence links
+        belong to this session.
+      </p>
       <table className="table table-sm">
         <thead>
           <tr>

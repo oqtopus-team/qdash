@@ -52,6 +52,7 @@ from qdash.api.schemas.agent_session import (
     RecordAgentResumeOutcomeRequest,
     RespondAgentInterventionRequest,
 )
+from qdash.api.services.agent_execution_links import resolve_chip_links
 from qdash.api.services.agent_intervention_slack import AgentInterventionSlackNotifier
 from qdash.api.services.agent_session_gate import (
     autonomous_session_refusal,
@@ -81,6 +82,7 @@ from qdash.dbmodel.agent_session import (
     AgentSessionDocument,
 )
 from qdash.dbmodel.evaluation import EvaluationDocument
+from qdash.dbmodel.evaluation_run import EvaluationRunDocument
 from qdash.dbmodel.execution_history import ExecutionHistoryDocument
 from qdash.dbmodel.project import ProjectDocument
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
@@ -581,39 +583,28 @@ class AgentInterventionService:
                 raise _invalid(
                     "An evaluation-planned checkpoint needs a session with autonomy=auto"
                 )
+        actions: dict[str, AgentActionDocument] = {}
         if action_ids:
-            found = cast(
-                "list[AgentActionDocument]",
-                AgentActionDocument.find(
-                    {
-                        "project_id": project_id,
-                        "session_id": session.session_id,
-                        "action_id": {"$in": sorted(action_ids)},
-                    }
-                ).run(),
-            )
-            missing = sorted(action_ids - {doc.action_id for doc in found})
-            if missing:
-                raise _invalid(f"Actions are not part of this session: {', '.join(missing)}")
-
-        execution_ids = {a.execution_id for a in body.attempts if a.execution_id}
-        if execution_ids:
-            known = {
-                doc.execution_id
+            actions = {
+                doc.action_id: doc
                 for doc in cast(
-                    "list[ExecutionHistoryDocument]",
-                    ExecutionHistoryDocument.find(
-                        {"project_id": project_id, "execution_id": {"$in": sorted(execution_ids)}}
+                    "list[AgentActionDocument]",
+                    AgentActionDocument.find(
+                        {
+                            "project_id": project_id,
+                            "session_id": session.session_id,
+                            "action_id": {"$in": sorted(action_ids)},
+                        }
                     ).run(),
                 )
             }
-            missing = sorted(execution_ids - known)
+            missing = sorted(action_ids - set(actions))
             if missing:
-                raise _invalid(f"Executions not found in this project: {', '.join(missing)}")
-        task_ids = {a.task_id for a in body.attempts if a.task_id}
-        if checkpoint is not None:
-            task_ids |= {c.task_id for c in checkpoint.accepted_candidates}
-        if task_ids:
+                raise _invalid(f"Actions are not part of this session: {', '.join(missing)}")
+
+        AgentInterventionService._validate_attempt_evidence(session, body, actions)
+        if checkpoint is not None and checkpoint.accepted_candidates:
+            task_ids = {c.task_id for c in checkpoint.accepted_candidates}
             known = {
                 doc.task_id
                 for doc in cast(
@@ -626,23 +617,21 @@ class AgentInterventionService:
             missing = sorted(task_ids - known)
             if missing:
                 raise _invalid(f"Task results not found in this project: {', '.join(missing)}")
-        evaluation_ids = {a.evaluation_id for a in body.attempts if a.evaluation_id}
-        if evaluation_ids:
-            known = {
-                doc.evaluation_id
-                for doc in cast(
-                    "list[EvaluationDocument]",
-                    EvaluationDocument.find(
-                        {
-                            "project_id": project_id,
-                            "evaluation_id": {"$in": sorted(evaluation_ids)},
-                        }
-                    ).run(),
+        if checkpoint is not None and checkpoint.source_execution_id:
+            # Provenance only (the snapshot the plan was started from); it need not be one of
+            # this session's executions, but it must be a real execution of the session's chip.
+            source = ExecutionHistoryDocument.find_one(
+                {
+                    "project_id": project_id,
+                    "chip_id": session.chip_id,
+                    "execution_id": checkpoint.source_execution_id,
+                }
+            ).run()
+            if source is None:
+                raise _invalid(
+                    f"Checkpoint source execution {checkpoint.source_execution_id} is not an "
+                    f"execution of chip {session.chip_id} in this project"
                 )
-            }
-            missing = sorted(evaluation_ids - known)
-            if missing:
-                raise _invalid(f"Evaluations not found in this project: {', '.join(missing)}")
         if body.previous_intervention_id is not None:
             previous = AgentInterventionDocument.find_one(
                 {
@@ -657,6 +646,196 @@ class AgentInterventionService:
         # only a reconciliation failure carries code=checkpoint_rejected.
         if checkpoint is not None:
             AgentInterventionService._validate_checkpoint(session, checkpoint)
+
+    @staticmethod
+    def _validate_attempt_evidence(
+        session: AgentSessionDocument,
+        body: CreateAgentInterventionRequest,
+        actions: dict[str, AgentActionDocument],
+    ) -> None:
+        """Check that each attempt's references form one chain of this session's evidence.
+
+        An attempt's ``transition``, ``status``, and ``reason`` are what the client reports;
+        QDash stores them as given. Its ids are evidence, and QDash checks them together
+        rather than one by one:
+
+        - the action belongs to this session, and its execution is the one QDash links to
+          that action (``agent_execution_links``, so a claimed or ambiguous execution links
+          nothing);
+        - an execution cited without an action is one that an action of this session
+          dispatched;
+        - the task result came from that execution (or, without one, from an execution of
+          this session), on the session's chip, for a target and task in its scope and the
+          attempt's own ``qid`` and ``task_name``;
+        - the evaluation evaluated that task result, and belongs to the cited run; a run
+          cited without an evaluation evaluated the result's task on the session's chip.
+
+        No field is required: an attempt that failed before dispatch, or before a result
+        existed, cites only what it has. Every failure is a plain 422.
+        """
+        project_id = session.project_id
+        policy = session.policy
+        attempts = body.attempts
+        if not attempts:
+            return
+        evaluation_ids = sorted({a.evaluation_id for a in attempts if a.evaluation_id})
+        evaluations = (
+            {
+                doc.evaluation_id: doc
+                for doc in cast(
+                    "list[EvaluationDocument]",
+                    EvaluationDocument.find(
+                        {"project_id": project_id, "evaluation_id": {"$in": evaluation_ids}}
+                    ).run(),
+                )
+            }
+            if evaluation_ids
+            else {}
+        )
+        missing = sorted(set(evaluation_ids) - set(evaluations))
+        if missing:
+            raise _invalid(f"Evaluations not found in this project: {', '.join(missing)}")
+        run_ids = sorted({a.evaluation_run_id for a in attempts if a.evaluation_run_id})
+        runs = (
+            {
+                doc.run_id: doc
+                for doc in cast(
+                    "list[EvaluationRunDocument]",
+                    EvaluationRunDocument.find(
+                        {"project_id": project_id, "run_id": {"$in": run_ids}}
+                    ).run(),
+                )
+            }
+            if run_ids
+            else {}
+        )
+        missing = sorted(set(run_ids) - set(runs))
+        if missing:
+            raise _invalid(f"Evaluation runs not found in this project: {', '.join(missing)}")
+        task_ids = sorted(
+            {a.task_id for a in attempts if a.task_id}
+            | {evaluations[a.evaluation_id].task_id for a in attempts if a.evaluation_id}
+        )
+        results = (
+            {
+                doc.task_id: doc
+                for doc in cast(
+                    "list[TaskResultHistoryDocument]",
+                    TaskResultHistoryDocument.find(
+                        {"project_id": project_id, "task_id": {"$in": task_ids}}
+                    ).run(),
+                )
+            }
+            if task_ids
+            else {}
+        )
+        missing = sorted(set(task_ids) - set(results))
+        if missing:
+            raise _invalid(f"Task results not found in this project: {', '.join(missing)}")
+        needs_links = any(a.execution_id or a.action_id for a in attempts) or bool(task_ids)
+        links = resolve_chip_links(project_id, session.chip_id) if needs_links else None
+
+        for index, attempt in enumerate(attempts):
+            label = f"Attempt {index + 1}"
+            if attempt.qid and attempt.qid not in policy.qids:
+                raise _invalid(f"{label}: target {attempt.qid} is outside the session scope")
+            if attempt.task_name and attempt.task_name not in policy.allowed_tasks:
+                raise _invalid(f"{label}: task '{attempt.task_name}' is outside the session scope")
+            action = actions.get(attempt.action_id) if attempt.action_id else None
+            if action is not None and action.action_type == AgentActionType.RUN_TASK:
+                if attempt.task_name and action.task_name != attempt.task_name:
+                    raise _invalid(
+                        f"{label}: action {action.action_id} ran {action.task_name}, "
+                        f"not {attempt.task_name}"
+                    )
+                if attempt.qid and attempt.qid not in action.qids:
+                    raise _invalid(
+                        f"{label}: action {action.action_id} did not run on {attempt.qid}"
+                    )
+
+            # The execution the attempt stands for: the action's own, else the one cited.
+            execution_id = attempt.execution_id
+            if action is not None and links is not None:
+                link = links.by_action.get(action.action_id)
+                linked = link.execution_id if link is not None else None
+                if execution_id and execution_id != linked:
+                    raise _invalid(
+                        f"{label}: execution {execution_id} is not the execution QDash links "
+                        f"to action {action.action_id}"
+                    )
+                execution_id = execution_id or linked
+            elif execution_id and links is not None:
+                link = links.by_execution.get(execution_id)
+                if link is None or link.session_id != session.session_id:
+                    raise _invalid(
+                        f"{label}: execution {execution_id} was not dispatched by this session"
+                    )
+
+            evaluation = evaluations.get(attempt.evaluation_id) if attempt.evaluation_id else None
+            task_id = attempt.task_id
+            if evaluation is not None:
+                if task_id and evaluation.task_id != task_id:
+                    raise _invalid(
+                        f"{label}: evaluation {evaluation.evaluation_id} evaluated task result "
+                        f"{evaluation.task_id}, not {task_id}"
+                    )
+                if attempt.evaluation_run_id and evaluation.run_id != attempt.evaluation_run_id:
+                    raise _invalid(
+                        f"{label}: evaluation {evaluation.evaluation_id} is not part of "
+                        f"evaluation run {attempt.evaluation_run_id}"
+                    )
+                task_id = task_id or evaluation.task_id
+            run = runs.get(attempt.evaluation_run_id) if attempt.evaluation_run_id else None
+            if run is not None and not task_id:
+                raise _invalid(
+                    f"{label}: evaluation run {run.run_id} is cited without the task result "
+                    "it evaluated"
+                )
+            if task_id is None:
+                continue
+            if action is not None and not execution_id:
+                raise _invalid(
+                    f"{label}: task result {task_id} cannot be linked to action "
+                    f"{action.action_id} without its resolved execution"
+                )
+            result = results[task_id]
+            if result.chip_id != session.chip_id or result.qid not in policy.qids:
+                raise _invalid(
+                    f"{label}: task result {task_id} is outside the session's chip and targets"
+                )
+            if attempt.qid and result.qid != attempt.qid:
+                raise _invalid(
+                    f"{label}: task result {task_id} is for {result.qid}, not {attempt.qid}"
+                )
+            if attempt.task_name and result.name != attempt.task_name:
+                raise _invalid(
+                    f"{label}: task result {task_id} is a {result.name} result, not "
+                    f"{attempt.task_name}"
+                )
+            if execution_id:
+                if result.execution_id != execution_id:
+                    raise _invalid(
+                        f"{label}: task result {task_id} did not come from execution {execution_id}"
+                    )
+            else:
+                link = links.by_execution.get(result.execution_id) if links else None
+                if link is None or link.session_id != session.session_id:
+                    raise _invalid(
+                        f"{label}: task result {task_id} did not come from an execution of "
+                        "this session"
+                    )
+            if run is not None and (run.chip_id != session.chip_id or run.task_name != result.name):
+                raise _invalid(
+                    f"{label}: evaluation run {run.run_id} did not evaluate {result.name} "
+                    f"on chip {session.chip_id}"
+                )
+            if evaluation is not None and (
+                evaluation.chip_id != session.chip_id or evaluation.qid != result.qid
+            ):
+                raise _invalid(
+                    f"{label}: evaluation {evaluation.evaluation_id} does not match task "
+                    f"result {task_id}"
+                )
 
     @staticmethod
     def _validate_checkpoint(

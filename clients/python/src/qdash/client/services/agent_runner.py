@@ -107,6 +107,22 @@ _INTERVENTION_QUESTIONS: dict[AgentInterventionReason, str] = {
 _MAX_ATTEMPTS = 10
 
 
+def safe_error_reason(operation: str, exc: BaseException) -> str:
+    """A fixed diagnostic for a failed operation that never carries the error's own text.
+
+    Plan reasons end up in durable QDash records (intervention summaries, attempt
+    reasons, resume outcomes) and in expert notifications. An exception message, a
+    transport error, or a service's error text can echo request data, so only the
+    exception class and an HTTP status code go into the reason. References to the
+    objects involved (action, execution, evaluation ids) travel as separate fields.
+    """
+    detail = type(exc).__name__
+    status = getattr(exc, "status_code", None)
+    if isinstance(status, int):
+        detail = f"{detail}, HTTP {status}"
+    return f"{operation} failed ({detail})"
+
+
 def _reason_or(value: str, default: AgentInterventionReason) -> AgentInterventionReason:
     try:
         return AgentInterventionReason(value)
@@ -298,7 +314,7 @@ def _api_error_outcome(
     )
     return AgentStepOutcome(
         transition=transition,
-        reason=f"QDash API request failed: {exc}",
+        reason=safe_error_reason("QDash API request", exc),
         session_id=session_id,
         action_id=action_id,
         operation_id=operation_id,
@@ -389,7 +405,8 @@ class AgentCalibrationRunner:
         if dispatched.execution_status == "failed":
             return AgentStepOutcome(
                 transition=AgentSkillTransition.RETRY,
-                reason=dispatched.reason,
+                # The action's reason is its authorization; QDash keeps the dispatch error.
+                reason="Agent action dispatch failed",
                 session_id=session_id,
                 action_id=action.action_id,
                 action=dispatched,
@@ -405,7 +422,7 @@ class AgentCalibrationRunner:
         except TimeoutError as exc:
             return AgentStepOutcome(
                 transition=AgentSkillTransition.RETRY,
-                reason=str(exc),
+                reason=safe_error_reason("Waiting for QDash", exc),
                 session_id=session_id,
                 action_id=action.action_id,
                 action=action,
@@ -438,7 +455,7 @@ class AgentCalibrationRunner:
         except TimeoutError as exc:
             return AgentStepOutcome(
                 transition=AgentSkillTransition.RETRY,
-                reason=str(exc),
+                reason=safe_error_reason("Waiting for QDash", exc),
                 session_id=session_id,
                 action_id=action.action_id,
                 operation_id=operation_id,
@@ -473,7 +490,7 @@ class AgentCalibrationRunner:
         except TimeoutError as exc:
             return AgentStepOutcome(
                 transition=AgentSkillTransition.RETRY,
-                reason=str(exc),
+                reason=safe_error_reason("Waiting for QDash", exc),
                 session_id=session_id,
                 action_id=action.action_id,
                 operation_id=operation_id,
@@ -596,7 +613,7 @@ class AgentCalibrationRunner:
                 except TimeoutError as exc:
                     return AgentStepOutcome(
                         transition=AgentSkillTransition.RETRY,
-                        reason=str(exc),
+                        reason=safe_error_reason("Waiting for the backend apply", exc),
                         session_id=session_id,
                         action_id=action.action_id,
                         operation_id=operation_id,
@@ -620,9 +637,11 @@ class AgentCalibrationRunner:
                     return AgentStepOutcome(
                         execution_id=execution_id,
                         transition=AgentSkillTransition.HUMAN_ESCALATION,
+                        # backend_error holds the backend's own error text; the commit id
+                        # on the outcome leads to it in QDash.
                         reason=(
-                            committed.backend_error
-                            or "Backend application failed deterministic verification"
+                            f"Backend application of commit {committed.commit_id} ended "
+                            f"{committed.backend_status or 'unknown'} and was not verified"
                         ),
                         session_id=session_id,
                         action_id=action.action_id,
@@ -901,7 +920,11 @@ class AgentPlanRunner:
                     session_id, reference["action_id"]
                 )
             except QDashApiError as exc:
-                return {}, f"Could not re-read candidate {reference['parameter_name']}: {exc}"
+                return {}, safe_error_reason(
+                    f"Re-reading candidate {reference['parameter_name']} from action "
+                    f"{reference['action_id']}",
+                    exc,
+                )
             match = next(
                 (
                     c
@@ -1098,7 +1121,7 @@ class AgentPlanRunner:
             try:
                 decision = planner.choose_next(observation)
             except Exception as exc:
-                return None, f"Planner failed: {exc}", platform
+                return None, safe_error_reason("The planner", exc), platform
             if decision.evidence and attempt_records:
                 attempt_records[-1] = {**attempt_records[-1], **decision.evidence}
             target = decision.target_node_id
@@ -1261,7 +1284,7 @@ class AgentPlanRunner:
             except QDashApiError as exc:
                 return stop(
                     AgentSkillTransition.HUMAN_ESCALATION,
-                    f"Plan passed but final candidate commit failed: {exc}",
+                    safe_error_reason("Plan passed but the final candidate commit", exc),
                     AgentInterventionReason.PLATFORM_ERROR,
                 )
 

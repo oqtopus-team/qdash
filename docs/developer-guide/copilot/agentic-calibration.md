@@ -291,7 +291,11 @@ an input.
 The planner stops the plan (`$escalate`) when the table has no entry for the status, when the
 same status comes back three times for one node, when the fit was unreliable twice in a row,
 when a node would exceed `max_rounds_per_target`, when an override leaves the session bounds,
-and when the evaluation was skipped, failed, or timed out. Each decision is kept as an
+and when the evaluation was skipped, failed, or timed out. A failed evaluation's reason names
+the evaluation and run ids and the exception class, never the evaluator's or the transport's
+error text; the runner's own failure reasons (`safe_error_reason` in
+`clients/python/src/qdash/client/services/agent_runner.py`) follow the same rule, because the
+reason becomes the intervention summary, the attempt reason, and the resume outcome. Each decision is kept as an
 `EvaluationPlannerTrace` and printed by `run-plan` under `evaluations`, so a reviewer can
 record a verdict on every evaluation that steered the run.
 
@@ -325,9 +329,18 @@ intervention in one compare-and-set on the session document (see
 version; the server retries up to five times against the current version, so a concurrent
 action delays the stop, and only a session that keeps changing returns 409. Recording needs neither `run_task` budget nor an unexpired session:
 on an expired, completed, or cancelled session the record is kept with `pauses_session: false`
-and can only be closed. The server checks that every referenced action
-belongs to the session, that executions, task results, and evaluations exist in the project, and
-that targets, tasks, and checkpoint nodes are inside the policy. A repeated request with the same
+and can only be closed. The server checks that targets, tasks, and checkpoint nodes are inside
+the policy, and that each attempt's ids form one chain of the session's evidence
+(`AgentInterventionService._validate_attempt_evidence`): the action belongs to the session and
+its execution is the one [`agent_execution_links`](#execution-grouping) links to that action; an
+execution or task result cited without an action came from an execution of the session; the
+task result came from that execution, on the session's chip, for the attempt's `qid` and
+`task_name`; and the evaluation evaluated that task result within the cited run. No id is
+required, so an attempt that failed before dispatch cites only its action or nothing. An
+attempt's `transition`, `status`, and `reason` are what the runner reported, stored as given;
+the intervention page labels them so. A checkpoint's `source_execution_id` is provenance only
+and must name an execution of the session's chip. Each failure is a plain 422, never
+`checkpoint_rejected`. A repeated request with the same
 idempotency key returns the same record; a second intervention while the session already waits
 is refused with the waiting one's id.
 

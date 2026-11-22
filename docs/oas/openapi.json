@@ -21127,19 +21127,21 @@
             "type": "string",
             "maxLength": 64,
             "title": "Transition",
+            "description": "Reported by the client",
             "default": ""
           },
           "status": {
             "type": "string",
             "maxLength": 200,
             "title": "Status",
-            "description": "Evaluation or execution status",
+            "description": "Evaluation or execution status, as reported by the client",
             "default": ""
           },
           "reason": {
             "type": "string",
             "maxLength": 1000,
             "title": "Reason",
+            "description": "Reported by the client",
             "default": ""
           },
           "action_id": {
@@ -21210,7 +21212,7 @@
         },
         "type": "object",
         "title": "AgentInterventionAttempt",
-        "description": "One recent attempt shown to the expert, as references rather than log output."
+        "description": "One recent attempt shown to the expert, as references rather than log output.\n\n``transition``, ``status``, and ``reason`` are what the client reported; QDash stores\nthem as given. The ids are evidence: QDash checks that they form one chain of this\nsession's action, execution, task result, and evaluation before it records them."
       },
       "AgentInterventionDecision": {
         "type": "string",

@@ -200,6 +200,8 @@ describe("AgentInterventionPageContent", () => {
     expect(screen.getByRole("link", { name: "Evaluation" }).getAttribute("href")).toBe(
       "/evaluations/evr-1",
     );
+    // The agent's own words are labelled as reported; the links as checked by QDash.
+    expect(screen.getByText(/Outcome and reason are as the agent reported them/)).toBeTruthy();
     expect(screen.getByText("Slack sent")).toBeTruthy();
   });
 

@@ -30,6 +30,7 @@ from qdash.client.services.agent_runner import (
     AgentInterventionReason,
     AgentPlannerDecision,
     AgentSkillTransition,
+    safe_error_reason,
 )
 
 if TYPE_CHECKING:
@@ -41,7 +42,17 @@ if TYPE_CHECKING:
         TaskNextAction,
     )
 
+# The skip reasons QDash's evaluation service writes itself.
+_SKIP_REASON_RE = re.compile(r"no result|no figure|status [A-Za-z_]{1,32}")
 _RANGE_NUMBER_RE = re.compile(r"[-+]?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][-+]?\d+)?")
+
+
+class EvaluationIncomplete(RuntimeError):
+    """An evaluation that produced no verdict, described by a safe reason and its ids."""
+
+    def __init__(self, reason: str, evidence: Mapping[str, str]) -> None:
+        super().__init__(reason)
+        self.evidence = dict(evidence)
 
 
 @dataclass(frozen=True)
@@ -157,12 +168,23 @@ class EvaluationPlanner:
         task_name = candidate.task_name
         try:
             verdict = self._evaluate(task_id, task_name)
-        except Exception as exc:
+        except EvaluationIncomplete as incomplete:
             return self._escalate(
                 observation,
                 task_id,
                 None,
-                f"the evaluation failed: {exc}",
+                str(incomplete),
+                AgentInterventionReason.EVALUATION_FAILED,
+                evidence=incomplete.evidence,
+            )
+        except Exception as exc:
+            # The error text of the evaluation backend or the transport can echo request
+            # data, so only its class reaches the durable intervention record.
+            return self._escalate(
+                observation,
+                task_id,
+                None,
+                safe_error_reason(f"Evaluating task result {task_id}", exc),
                 AgentInterventionReason.EVALUATION_FAILED,
             )
         history = self._history.setdefault(observation.last_node_id, [])
@@ -299,8 +321,12 @@ class EvaluationPlanner:
             chip_id=self._chip_id, task=task_name, task_ids=[task_id], trigger="single"
         )
         if task_id in created.skipped:
-            raise RuntimeError(
-                f"task result {task_id} was not evaluated: {created.skipped[task_id]}"
+            # Only QDash's fixed skip reasons are repeated; any other text stays out.
+            skip = created.skipped[task_id]
+            known = skip if _SKIP_REASON_RE.fullmatch(skip) else "reason not shown"
+            raise EvaluationIncomplete(
+                f"Task result {task_id} was not evaluated by run {created.run.run_id} ({known})",
+                {"evaluation_run_id": created.run.run_id},
             )
         detail = self._client.wait_for_evaluation_run(
             created.run.run_id,
@@ -309,10 +335,21 @@ class EvaluationPlanner:
         )
         item = next((e for e in detail.evaluations if e.task_id == task_id), None)
         if item is None:
-            raise RuntimeError(f"evaluation run {created.run.run_id} holds no result for {task_id}")
+            raise EvaluationIncomplete(
+                f"Evaluation run {created.run.run_id} holds no result for task result {task_id}",
+                {"evaluation_run_id": created.run.run_id},
+            )
         if item.status != "completed" or item.output is None or not item.output.diagnosis:
-            raise RuntimeError(
-                f"evaluation {item.evaluation_id} did not complete ({item.status}): {item.error or ''}".strip()
+            # item.error is the evaluation backend's raw error; QDash keeps it on the
+            # evaluation, which the ids below lead to.
+            raise EvaluationIncomplete(
+                f"Evaluation {item.evaluation_id} of task result {task_id} did not complete "
+                f"(status {item.status})",
+                {
+                    "evaluation_id": item.evaluation_id,
+                    "evaluation_run_id": created.run.run_id,
+                    "status": item.status,
+                },
             )
         verdict = verdict_from_diagnosis(item.evaluation_id, item.output.diagnosis)
         return EvaluationVerdict(
@@ -374,12 +411,19 @@ class EvaluationPlanner:
         verdict: EvaluationVerdict | None,
         reason: str,
         kind: AgentInterventionReason,
+        *,
+        evidence: Mapping[str, str] | None = None,
     ) -> AgentPlannerDecision:
         return self._record(
             observation,
             task_id,
             verdict,
-            AgentPlannerDecision(PLAN_ESCALATE, reason, escalation_reason=kind.value),
+            AgentPlannerDecision(
+                PLAN_ESCALATE,
+                reason,
+                escalation_reason=kind.value,
+                evidence=dict(evidence or {}),
+            ),
         )
 
     def _record(

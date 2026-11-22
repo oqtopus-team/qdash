@@ -172,14 +172,23 @@ def _optional_id_field() -> Any:
 
 
 class AgentInterventionAttempt(BaseModel):
-    """One recent attempt shown to the expert, as references rather than log output."""
+    """One recent attempt shown to the expert, as references rather than log output.
+
+    ``transition``, ``status``, and ``reason`` are what the client reported; QDash stores
+    them as given. The ids are evidence: QDash checks that they form one chain of this
+    session's action, execution, task result, and evaluation before it records them.
+    """
 
     node_id: str = Field(default="", max_length=200)
     task_name: str = Field(default="", max_length=200)
     qid: str = Field(default="", max_length=200)
-    transition: str = Field(default="", max_length=64)
-    status: str = Field(default="", max_length=200, description="Evaluation or execution status")
-    reason: str = Field(default="", max_length=1000)
+    transition: str = Field(default="", max_length=64, description="Reported by the client")
+    status: str = Field(
+        default="",
+        max_length=200,
+        description="Evaluation or execution status, as reported by the client",
+    )
+    reason: str = Field(default="", max_length=1000, description="Reported by the client")
     action_id: str | None = _optional_id_field()
     execution_id: str | None = _optional_id_field()
     task_id: str | None = _optional_id_field()

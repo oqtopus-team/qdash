@@ -124,7 +124,8 @@ user's own agent sessions waits for an expert on the same chip and targets
 (`pausedSessionConflict` in `extensions/lib/agent-loop.ts`). When the session list cannot be
 read, including a 404 or 405 from a QDash release without `GET /agent-sessions`, they start
 nothing either: such a server can still hold paused sessions, and there is no flag to skip the
-check. The check is in pi-qdash, not in QDash: a person running a flow from the web application
+check. The guard reads one page of at most 100 paused sessions, newest first, so a full page
+without an overlap also starts nothing: an older paused session could cover the targets. The check is in pi-qdash, not in QDash: a person running a flow from the web application
 is not blocked.
 
 The pipeline tools and `qdash_execute_flow` reach QDash through the
