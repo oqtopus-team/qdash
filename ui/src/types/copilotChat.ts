@@ -278,6 +278,52 @@ export interface TurnConnection {
   attempt: number;
 }
 
+/**
+ * What a turn was last seen doing, kept short so it can be stored with the turn's pointer
+ * (`copilotTurnStore.ts`): the tool it ran, with the tool's label, or a phrase such as
+ * "Thinking". Never the call's arguments or result.
+ */
+export interface TurnActivitySnapshot {
+  tool: string | null;
+  label: string;
+}
+
+/**
+ * A turn of this tab the chat does not stream now. `restoring`: after a reload or a
+ * remount, the chat loads the session and reattaches. `other_project`: the turn was sent
+ * from another project; it runs on, and the chat follows it again in that project.
+ */
+export interface DetachedTurn {
+  reason: "restoring" | "other_project";
+  requestId: string;
+  projectId: string | null;
+  startedAt: number;
+  /** What the chat last saw the turn do, and when the turn last sent something. */
+  activity: TurnActivitySnapshot | null;
+  lastUpdateAt: number | null;
+}
+
+/**
+ * A moment of a turn worth telling the user about, raised once per turn: an answer is
+ * ready, it waits for the user's approval, answer, or a proposed change, the turn waits for
+ * an expert, or it failed.
+ */
+export type ChatEventKind = "answer" | "approval" | "question" | "edit" | "expert" | "failed";
+
+export interface ChatTurnEvent {
+  kind: ChatEventKind;
+  sessionId: string;
+  /** The turn's own request ID. */
+  requestId: string;
+  /** The user and the project the turn belongs to. */
+  owner: string | null | undefined;
+  projectId: string | null;
+  /** The chat's title when the event was raised. */
+  chatTitle: string;
+  /** A short line from the event, such as the error. */
+  detail?: string;
+}
+
 /** The turn that is still streaming. */
 export interface LiveTurn {
   steps: TraceStep[];

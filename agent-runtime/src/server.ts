@@ -136,6 +136,11 @@ interface AbortBody extends DeleteSessionBody {
    * deleted chat only, whose work no later turn would recover.
    */
   include_stored?: boolean;
+  /**
+   * Stop only the turn this request ID started: a stop that arrives after that turn
+   * ended never stops a newer turn of the chat.
+   */
+  turn_request_id?: string;
 }
 
 interface BranchBody {
@@ -997,6 +1002,10 @@ async function handleAbortChat(req: IncomingMessage, res: ServerResponse): Promi
   // From the moment the turn holds the store, also before its input is
   // admitted: the turn applies the stop once it is (see ActiveChat.stop).
   const active = activeFor(target);
+  if (active && body.turn_request_id && active.turnRequestId !== body.turn_request_id) {
+    sendJson(res, 404, { error: "the named turn is not running" });
+    return;
+  }
   if (active) {
     await active.stop(BACKGROUND_CONTEXT);
     sendJson(res, 200, { aborted: true });

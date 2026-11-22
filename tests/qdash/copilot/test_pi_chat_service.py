@@ -1315,6 +1315,12 @@ async def test_stopping_a_turn_reports_what_the_runtime_confirmed(
     )
     assert sent[0]["json"]["include_stored"] is True
     assert sent[0]["headers"]["X-QDash-Token"] == "alice-token"
+    # A stop naming its turn is forwarded with it, so the runtime spares a newer turn.
+    sent.clear()
+    await pi_chat_service.abort_runtime_turn(
+        "alice", "b1", RuntimeTarget("s1", "7", "g1"), turn_request_id="t1"
+    )
+    assert sent[0]["json"]["turn_request_id"] == "t1"
 
 
 @pytest.mark.asyncio
@@ -1442,6 +1448,28 @@ async def test_a_reattach_to_an_unknown_turn_is_turn_not_found(
                 "detail": "The assistant has no record",
                 "code": "turn_not_found",
             },
+        )
+    ]
+
+
+@pytest.mark.asyncio
+async def test_a_reattach_whose_turn_end_is_unsettled_is_retryable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import httpx
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            409, json={"error": "not settled yet", "reason": "turn_boundary_unknown"}
+        )
+
+    _mock_runtime(monkeypatch, handler)
+    events = await _stream_payload({"request_id": "r1", "reattach": True})
+
+    assert events == [
+        (
+            "error",
+            {"step": "run_chat", "detail": "not settled yet", "code": "turn_boundary_unknown"},
         )
     ]
 

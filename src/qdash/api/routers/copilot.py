@@ -181,7 +181,10 @@ async def chat_stop(
     except ChatUnavailableError:
         return ChatStopResponse(stopped=False)
     outcome = await pi_chat_service.abort_runtime_turn(
-        current_user.username, request.session_id, target
+        current_user.username,
+        request.session_id,
+        target,
+        turn_request_id=request.turn_request_id,
     )
     return ChatStopResponse(stopped=outcome == "stopped")
 

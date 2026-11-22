@@ -266,8 +266,10 @@ describe("useCopilotChat streaming", () => {
       String(url).endsWith("/copilot/chat/stop"),
     );
     expect(stopCall).toBeDefined();
+    // It names the turn, so a late stop never reaches a newer turn of the chat.
     expect(JSON.parse(String(stopCall![1].body))).toEqual({
       session_id: result.current.chat.session!.id,
+      turn_request_id: streamRequest().body.request_id,
     });
   });
 

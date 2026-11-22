@@ -186,6 +186,43 @@ def test_a_steer_is_sent_for_the_current_user_and_project(monkeypatch, selected_
         assert len(captured) == 2
 
 
+def test_a_stop_names_the_turn_it_stops(monkeypatch):
+    user = UserInDB(
+        user_id="alice-id",
+        username="alice",
+        access_token="alice-token",
+        hashed_password="unused",
+        default_project_id="default-project",
+    )
+    monkeypatch.setattr(
+        auth, "get_user_by_token", lambda token: user if token == user.access_token else None
+    )
+    stops: list[tuple[str, str, str | None]] = []
+
+    async def abort(username, session_id, target=None, *, turn_request_id=None):
+        stops.append((username, session_id, turn_request_id))
+        return "stopped" if turn_request_id in (None, "t2") else "not_running"
+
+    monkeypatch.setattr(pi_chat_service, "abort_runtime_turn", abort)
+    app = FastAPI()
+    app.include_router(copilot.router)
+    headers = {"Authorization": "Bearer alice-token"}
+    with TestClient(app) as client:
+        stale = client.post(
+            "/chat/stop", json={"session_id": "s1", "turn_request_id": "t1"}, headers=headers
+        )
+        assert stale.json() == {"stopped": False}
+        current = client.post(
+            "/chat/stop", json={"session_id": "s1", "turn_request_id": "t2"}, headers=headers
+        )
+        assert current.json() == {"stopped": True}
+        # An older client that names no turn still stops the chat's turn.
+        assert client.post("/chat/stop", json={"session_id": "s1"}, headers=headers).json() == {
+            "stopped": True
+        }
+    assert stops == [("alice", "s1", "t1"), ("alice", "s1", "t2"), ("alice", "s1", None)]
+
+
 def test_a_steer_status_is_read_for_the_current_user_and_project(monkeypatch):
     captured = []
     user = UserInDB(

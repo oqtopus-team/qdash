@@ -34,14 +34,14 @@ import {
 } from "@/components/ui/ChainOfThought";
 import { Loader } from "@/components/ui/Loader";
 
-function formatDuration(ms: number): string {
+export function formatDuration(ms: number): string {
   const s = Math.max(0, Math.round(ms / 1000));
   if (s < 60) return `${s}s`;
   return `${Math.floor(s / 60)}m ${s % 60}s`;
 }
 
 /** Re-render once per second while something is running, for live timers. */
-function useNow(active: boolean): number {
+export function useNow(active: boolean): number {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     if (!active) return;

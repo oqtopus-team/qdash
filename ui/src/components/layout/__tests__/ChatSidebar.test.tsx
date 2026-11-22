@@ -4,7 +4,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { AGENT_TAB_WIDTH, ChatSidebar, useAgentTabShown } from "../ChatSidebar";
 
-const mocks = vi.hoisted(() => ({ pathname: "/dashboards/dash-1", isOpen: false }));
+const mocks = vi.hoisted(() => ({
+  pathname: "/dashboards/dash-1",
+  isOpen: false,
+  runs: {} as Record<string, { connection?: { state: string } }>,
+  detachedTurns: {} as Record<string, { reason: string }>,
+}));
 
 vi.mock("next/navigation", () => ({ usePathname: () => mocks.pathname }));
 vi.mock("@/contexts/ChatDockContext", () => ({
@@ -14,6 +19,9 @@ vi.mock("@/contexts/ChatDockContext", () => ({
     closeSidebar: vi.fn(),
   }),
 }));
+vi.mock("@/contexts/CopilotChatSessionContext", () => ({
+  useCopilotChatSessionContext: () => ({ runs: mocks.runs, detachedTurns: mocks.detachedTurns }),
+}));
 vi.mock("@/components/features/chat/DockedChatPanel", () => ({
   DockedChatPanel: () => <div data-testid="docked-chat" />,
 }));
@@ -22,6 +30,8 @@ afterEach(() => {
   cleanup();
   mocks.pathname = "/dashboards/dash-1";
   mocks.isOpen = false;
+  mocks.runs = {};
+  mocks.detachedTurns = {};
 });
 
 describe("the Ask Agent tab", () => {
@@ -29,6 +39,23 @@ describe("the Ask Agent tab", () => {
     render(<ChatSidebar />);
     const tab = screen.getByRole("button", { name: "Ask Agent" });
     expect(tab.style.width).toBe(AGENT_TAB_WIDTH);
+  });
+
+  it("says when an answer is running or being reattached, from the chat's actual turns", () => {
+    mocks.runs = { s1: { connection: { state: "live" } } };
+    const { unmount } = render(<ChatSidebar />);
+    expect(screen.getByRole("button", { name: "Ask Agent, an answer is running" })).toHaveAttribute(
+      "data-activity",
+      "working",
+    );
+    unmount();
+    // A turn restored after a reload, not streaming yet: reconnecting, not idle.
+    mocks.runs = {};
+    mocks.detachedTurns = { s1: { reason: "restoring" } };
+    render(<ChatSidebar />);
+    expect(
+      screen.getByRole("button", { name: "Ask Agent, reconnecting to an answer" }),
+    ).toHaveAttribute("data-activity", "reconnecting");
   });
 
   it("is shown only while the sidebar is closed, and never on the chat page", () => {

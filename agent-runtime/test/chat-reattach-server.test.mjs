@@ -279,7 +279,10 @@ test("a reattached stream and the original both end with the turn; a stop still 
     await original.until((l) => l.type === "tool_start" && l.name === "wait_expert");
     const attached = lineReader(await post("/chat", { ...turn, request_id: "t1", reattach: true }));
     await attached.until((l) => l.type === "tool_start" && l.name === "wait_expert");
-    const response = await post("/chat/abort", { owner_id: "alice", conversation_id: "c1" });
+    // A late stop of an earlier turn leaves this one running.
+    const stale = await post("/chat/abort", { owner_id: "alice", conversation_id: "c1", turn_request_id: "t0" });
+    assert.equal(stale.status, 404);
+    const response = await post("/chat/abort", { owner_id: "alice", conversation_id: "c1", turn_request_id: "t1" });
     assert.equal(response.status, 200);
     const [a, b] = await Promise.all([original.rest(), attached.rest()]);
     for (const out of [a, b]) {

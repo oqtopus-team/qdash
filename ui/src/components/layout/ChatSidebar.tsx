@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { Bot } from "lucide-react";
 import { useChatDock } from "@/contexts/ChatDockContext";
+import { useCopilotChatSessionContext } from "@/contexts/CopilotChatSessionContext";
 import { DockedChatPanel } from "@/components/features/chat/DockedChatPanel";
 import {
   clampSidebarWidth,
@@ -122,9 +123,25 @@ export function useAgentTabShown(): boolean {
   return pathname !== "/chat" && !isOpen;
 }
 
+/**
+ * Whether any chat has an answer going, for the closed sidebar's tab: `reconnecting` when a
+ * stream is attaching again or a turn is being restored, `working` otherwise, null when none.
+ */
+function useAgentActivity(): "working" | "reconnecting" | null {
+  const { runs, detachedTurns } = useCopilotChatSessionContext();
+  const live = Object.values(runs ?? {});
+  const detached = Object.values(detachedTurns ?? {});
+  if (live.length === 0 && detached.length === 0) return null;
+  const reconnecting =
+    live.some((run) => run.connection?.state === "reconnecting") ||
+    detached.some((turn) => turn.reason === "restoring");
+  return reconnecting ? "reconnecting" : "working";
+}
+
 export function ChatSidebar() {
   const { isOpen, openGeneralChat, closeSidebar } = useChatDock();
   const pathname = usePathname();
+  const activity = useAgentActivity();
   const { width, limit, dragging, startDrag, reset, onKeyDown } = useSidebarWidth();
 
   // The /chat page is the same chat at full size; a second copy beside it is noise.
@@ -139,8 +156,28 @@ export function ChatSidebar() {
           type="button"
           className="fixed right-0 top-1/2 -translate-y-1/2 z-50 flex flex-col items-center gap-1.5 rounded-l-lg border border-r-0 border-base-300 bg-base-100 py-3 text-base-content/70 shadow-sm transition-colors hover:text-base-content"
           style={{ width: AGENT_TAB_WIDTH }}
-          title="Ask Agent"
+          title={
+            activity === "reconnecting"
+              ? "Ask Agent · reconnecting to an answer"
+              : activity
+                ? "Ask Agent · an answer is running"
+                : "Ask Agent"
+          }
+          aria-label={
+            activity === "reconnecting"
+              ? "Ask Agent, reconnecting to an answer"
+              : activity
+                ? "Ask Agent, an answer is running"
+                : "Ask Agent"
+          }
+          data-activity={activity ?? "idle"}
         >
+          {activity && (
+            <span
+              className={`status status-xs ${activity === "reconnecting" ? "status-warning" : "status-info"}`}
+              aria-hidden="true"
+            />
+          )}
           <Bot className="w-5 h-5" aria-hidden="true" />
           <span className="text-xs font-medium select-none" style={{ writingMode: "vertical-rl" }}>
             Ask Agent

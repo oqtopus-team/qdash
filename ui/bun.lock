@@ -26,6 +26,8 @@
         "@tanstack/react-table": "^9.1.2",
         "@types/dagre": "^0.7.54",
         "@xyflow/react": "^12.11.2",
+        "@yusufceng1z/ding": "0.0.9",
+        "@yusufceng1z/ding-react": "0.0.9",
         "axios": "^1.18.1",
         "cmdk": "^1.1.1",
         "dagre": "^0.8.5",
@@ -815,6 +817,10 @@
     "@xyflow/react": ["@xyflow/react@12.12.1", "", { "dependencies": { "@xyflow/system": "0.0.84", "classcat": "^5.0.3", "zustand": "^4.4.0" }, "peerDependencies": { "@types/react": ">=17", "@types/react-dom": ">=17", "react": ">=17", "react-dom": ">=17" }, "optionalPeers": ["@types/react", "@types/react-dom"] }, "sha512-g41OHmP+GL5wDBQKpgYt8AF6RlB4CrABtiStXhCMqdItK6gPdSpsuDk8V0YtdyvIvMPTjDJvkuLkz0JbSYu5Cw=="],
 
     "@xyflow/system": ["@xyflow/system@0.0.84", "", { "dependencies": { "@types/d3-drag": "^3.0.7", "@types/d3-interpolate": "^3.0.4", "@types/d3-selection": "^3.0.10", "@types/d3-transition": "^3.0.8", "@types/d3-zoom": "^3.0.8", "d3-drag": "^3.0.0", "d3-interpolate": "^3.0.1", "d3-selection": "^3.0.0", "d3-zoom": "^3.0.0" } }, "sha512-96zfGFjH3oZ3T0MRdH4gJ0SlXuCIxbBuHVevZ4xry5UTxqjzjt010+LRdholgepq7jhrcaz1JNtzrETscwnkEA=="],
+
+    "@yusufceng1z/ding": ["@yusufceng1z/ding@0.0.9", "", {}, "sha512-WtIq8OmYK0d0HczoxH43eIlcCTtGyjLI0XObfLftF8BePeUJZOL6CYdMVI+VCepc2ok5jPyIduz0QozINdKnWg=="],
+
+    "@yusufceng1z/ding-react": ["@yusufceng1z/ding-react@0.0.9", "", { "dependencies": { "@yusufceng1z/ding": "0.0.9" }, "peerDependencies": { "react": ">=18" } }, "sha512-nBPdOZFENcbfSo/nZbkZdZ7YcI0wZTtV8J77nyPLWJoInB3UPL6EUTbdgsbmNfAVlIFWXNbg/uq+a9plSan/vQ=="],
 
     "agent-base": ["agent-base@6.0.2", "", { "dependencies": { "debug": "4" } }, "sha512-RZNwNclF7+MS/8bDg70amg32dyeZGZxiDuQmZxKLAlQjr3jGyLx+4Kkk58UO7D2QdgFIQCovuSuZESne6RG6XQ=="],
 

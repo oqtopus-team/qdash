@@ -142,6 +142,7 @@ async def abort_runtime_turn(
     target: RuntimeTarget | None = None,
     *,
     stored_with: QDashAuth | None = None,
+    turn_request_id: str | None = None,
 ) -> StopOutcome:
     """Stop the turn the runtime is running for this session, if any.
 
@@ -157,6 +158,9 @@ async def abort_runtime_turn(
     restart is stopped too, while the runtime holds the store, without running
     any of it. ``stopped`` then also means that work will run no model or tool
     again; ``not_running``, that there was none.
+
+    With ``turn_request_id``, only the turn that request started is stopped; a
+    newer turn of the chat is ``not_running`` for this stop.
     """
     try:
         async with httpx.AsyncClient(timeout=10, trust_env=False) as client:
@@ -171,6 +175,7 @@ async def abort_runtime_turn(
                     "conversation_id": session_id,
                     **_target_payload(session_id, target),
                     **({"include_stored": True} if stored_with is not None else {}),
+                    **({"turn_request_id": turn_request_id} if turn_request_id else {}),
                 },
             )
     except (httpx.HTTPError, RuntimeError):
@@ -715,20 +720,26 @@ async def stream_payload(
 # SSE ``error`` codes the chat acts on. ``stream_lost``: the stream to the runtime
 # failed or ended before the turn did, so the turn may still be running and the
 # chat reattaches with ``reattach``. ``turn_not_found``: a reattach named a turn
-# the runtime has no record of. Other codes come from the runtime's own errors.
+# the runtime has no record of. ``turn_boundary_unknown``: a reattach named an
+# ended turn whose end the store does not settle yet, so the chat tries again.
+# Other codes come from the runtime's own errors.
 STREAM_LOST = "stream_lost"
 TURN_NOT_FOUND = "turn_not_found"
+TURN_BOUNDARY_UNKNOWN = "turn_boundary_unknown"
 
 
 def _status_code(response: httpx.Response) -> str | None:
     """The ``error`` code of a non-200 from the runtime the chat acts on, if any."""
-    if response.status_code == httpx.codes.NOT_FOUND:
+    if response.status_code in (httpx.codes.NOT_FOUND, httpx.codes.CONFLICT):
         try:
             body = response.json()
         except ValueError:
             body = None
-        if isinstance(body, dict) and body.get("reason") == TURN_NOT_FOUND:
+        reason = body.get("reason") if isinstance(body, dict) else None
+        if response.status_code == httpx.codes.NOT_FOUND and reason == TURN_NOT_FOUND:
             return TURN_NOT_FOUND
+        if response.status_code == httpx.codes.CONFLICT and reason == TURN_BOUNDARY_UNKNOWN:
+            return TURN_BOUNDARY_UNKNOWN
     if response.status_code in (
         httpx.codes.BAD_GATEWAY,
         httpx.codes.SERVICE_UNAVAILABLE,

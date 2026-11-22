@@ -189,6 +189,8 @@ describe("ChatDock investigations", () => {
     await waitFor(() => expect(streamBodies()).toHaveLength(1));
     const investigationId = result.current.store.activeSessionId;
 
+    // The investigation's answer has ended: an ordinary chat replaces it.
+    await waitFor(() => expect(result.current.store.runs).toEqual({}));
     act(() => result.current.dock.openGeneralChat());
     const generalId = result.current.store.activeSessionId!;
     expect(generalId).not.toBe(investigationId);
@@ -298,6 +300,8 @@ describe("ChatDock investigations", () => {
     expect(result.current.store.activeSessionId).toBe(first);
 
     // New chat from an ordinary chat does not end the investigation.
+    // The investigation's answer has ended: an ordinary chat replaces it.
+    await waitFor(() => expect(result.current.store.runs).toEqual({}));
     act(() => result.current.dock.openGeneralChat());
     newChatFromDock(rendered);
     act(() => result.current.dock.investigate(TASK));
@@ -457,6 +461,8 @@ describe("ChatDock investigations", () => {
     expect(surfaces()).toEqual([true, false]);
     act(() => result.current.dock.investigate(EXECUTION_ONLY, "mini"));
     expect(surfaces()).toEqual([false, true]);
+    // The investigation's answer has ended: an ordinary chat replaces it.
+    await waitFor(() => expect(result.current.store.runs).toEqual({}));
     act(() => result.current.dock.openGeneralChat());
     expect(surfaces()).toEqual([true, false]);
     act(() =>
@@ -469,5 +475,30 @@ describe("ChatDock investigations", () => {
       }),
     );
     expect(surfaces()).toEqual([false, true]);
+  });
+
+  it("reopens a running investigation instead of replacing it with an empty chat", async () => {
+    // The answer is still running: its stream stays open.
+    fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url.endsWith("/stream")) {
+        return new Response(new ReadableStream({ start() {} }), { status: 200 });
+      }
+      if (url.endsWith("/copilot/chat/sessions") && !init?.method) {
+        return Response.json({ sessions: [] });
+      }
+      return Response.json({ session_id: "x", title: "", context: null, messages: [] });
+    });
+    const { result } = await renderDock();
+    act(() => result.current.dock.investigate(TASK));
+    await waitFor(() => expect(streamBodies()).toHaveLength(1));
+    const investigationId = result.current.store.activeSessionId!;
+    await waitFor(() => expect(result.current.store.runs[investigationId]).toBeDefined());
+
+    // The user closed the sidebar, moved to another page, and clicked Ask Agent.
+    act(() => result.current.dock.closeSidebar());
+    act(() => result.current.dock.openGeneralChat());
+    expect(result.current.store.activeSessionId).toBe(investigationId);
+    expect(result.current.dock.isOpen).toBe(true);
+    expect(result.current.store.runs[investigationId]).toBeDefined();
   });
 });

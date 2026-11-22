@@ -57,8 +57,32 @@ update, and the chat reconnects to the same answer by itself, without sending yo
 Once back, it shows the answer from its start and goes on with it; nothing the assistant did runs
 twice. If the assistant never received the message, the chat says so and asks you to send it
 again. After about 10 minutes without a connection, the chat stops trying and says that the
-assistant may still be working; reloading the page also stops following the answer.
-**Stop** works throughout.
+assistant may still be working. **Stop** works throughout and stops only that answer.
+
+Moving to another page, closing and reopening the sidebar or the floating window, or reloading
+the page in the same browser tab does not stop an answer. The chat reconnects to it and shows it
+from its start, without sending your message again; until then it shows **Reconnecting to the
+running answer** with what it last saw the assistant do and **last known update … ago**. An answer
+that ended meanwhile is shown as it ended. If the chat cannot reconnect, it says so above the
+message box and leaves the conversation as it was. An answer you started in another project keeps
+running when you switch projects; the chat shows **Running in another project** and follows it
+again when you switch back. Signing out forgets what the tab kept about running answers.
+
+The chat's header says what its answer is doing: what the assistant runs, **Waiting for the
+expert's answer**, **Reconnecting**, or, once the answer ended, **Answered**, **Waiting for your
+approval**, **Waiting for your answer**, **Stopped**, or **Failed**. While the sidebar is closed,
+a dot on **Ask Agent** shows that an answer is running, and **Ask Agent** opens that chat rather
+than a new one.
+
+A notification at the top of the page tells you when an answer is ready, needs your approval or
+your answer, proposed a change, waits for an expert, or failed, unless that chat is already on
+screen in a visible tab. Each happens once per answer, also after a reconnect or a reload, and
+only for the project you have open. **Open chat** shows that chat; nothing is sent for you.
+Notifications that need your input stay until you dismiss them or open the chat; press Escape to
+dismiss one, or Alt+T to move to it. The notification goes, but the chat's header keeps saying
+where the answer stands. Notifications play no sound unless you turn on **Settings → Copilot →
+Chat notifications → Play a sound**; set its **Volume** and try it with **Preview**. The setting
+applies to this browser only.
 
 ### Add to an Answer in Progress, or Continue One
 

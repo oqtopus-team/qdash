@@ -27,6 +27,7 @@ import type { MemberResponse, ProjectRole } from "@/schemas";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
 import { copyText } from "@/lib/utils/clipboard";
 
+import { ChatNotificationSettings } from "./ChatNotificationSettings";
 import { CopilotInstructionsSettings } from "./CopilotInstructionsSettings";
 import { CopilotSystemPromptView } from "./CopilotSystemPromptView";
 
@@ -109,6 +110,10 @@ function CopilotSettingsPanel() {
               {effective ? `${effective.provider}:${effective.name}` : selected.label}
             </div>
           </div>
+
+          <div className="divider my-0" />
+
+          <ChatNotificationSettings />
 
           <div className="divider my-0" />
 

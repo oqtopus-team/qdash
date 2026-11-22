@@ -119,6 +119,15 @@ the same reply for at most an hour, and the web Agent shows **Waiting for the ex
 see [Follow an Answer in Progress](./ai-chat.md#follow-an-answer-in-progress). Closing pi, stopping the reply, or ending the chat stops the
 wait, and nothing resumes the calibration until you ask again; the answer stays in QDash.
 
+In the web Agent, a chat that worked on a session shows that session's state above the message
+box, read from QDash: **Measurement running**, **Waiting for the expert**, **Expert answered ·
+waiting for the agent's next decision**, **Waiting for the agent's next decision**, or how the
+session ended, with the latest measurement and who acts next. An active session is not an agent
+at work: the agent decides only during a reply. When no reply is running, the card says nothing
+happens until you continue, and **Continue session** sends that request as an ordinary message
+with the model and approvals you chose. Neither a reload nor an expert's answer starts a reply on
+its own.
+
 Guidance that needs something outside the session, such as another task or a wider range, leads
 the agent to tell you a new session is needed; approving that session is your decision. A
 stopped, expired, or used-up session is never reactivated.
