@@ -657,3 +657,171 @@ describe("SDK-facing client helpers", () => {
     expect(projects).toEqual(["b"]);
   });
 });
+
+describe("task result pages", () => {
+  const row = (index: number) => ({
+    task_id: `t-${index}`,
+    task_name: "CheckT1",
+    qid: "6",
+    chip_id: "C",
+    status: "completed",
+    execution_id: "e-1",
+  });
+
+  /** A fixture holding `total` rows; it answers each request with the rows at skip..skip+limit. */
+  function pagedClient(total: number, options: { failAt?: number; shortAt?: number } = {}) {
+    const requests: URL[] = [];
+    const fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(new Request(input).url);
+      requests.push(url);
+      const skip = Number(url.searchParams.get("skip") ?? 0);
+      const limit = Number(url.searchParams.get("limit") ?? 50);
+      if (options.failAt === skip) return jsonResponse({ detail: "boom" }, 500);
+      const end = options.shortAt === skip ? skip + 1 : Math.min(total, skip + limit);
+      const items = Array.from({ length: Math.max(0, end - skip) }, (_, index) => row(skip + index));
+      return jsonResponse({ items, total, skip, limit, status_counts: { completed: total } });
+    });
+    const client = new QDashClient(
+      new QDashConfig({
+        baseUrl: "https://qdash.example/api",
+        apiToken: "token",
+        retry: { maxAttempts: 1 },
+      }),
+      { fetch },
+    );
+    return { client, requests, fetch };
+  }
+
+  it("sends the API's own filter names, with qid passed through exactly", async () => {
+    const { client, requests } = pagedClient(3);
+    await client.listTaskResults({
+      chipId: "C",
+      qid: "6-7",
+      taskName: "CheckCR",
+      startFrom: "2026-11-01T00:00:00Z",
+      startTo: "2026-11-02T00:00:00Z",
+      messageContains: "fit",
+      limit: 100,
+      skip: 0,
+    });
+    expect(Object.fromEntries(requests[0]!.searchParams)).toEqual({
+      chip_id: "C",
+      qid: "6-7",
+      task_name: "CheckCR",
+      start_from: "2026-11-01T00:00:00Z",
+      start_to: "2026-11-02T00:00:00Z",
+      message_contains: "fit",
+      limit: "100",
+      skip: "0",
+    });
+  });
+
+  it.each([
+    [{ limit: 200 }, /limit must be an integer from 1 to 100 \(got 200\).*collectTaskResults/],
+    [{ limit: 0 }, /limit must be an integer from 1 to 100/],
+    [{ limit: 2.5 }, /limit must be an integer/],
+    [{ skip: -1 }, /skip must be an integer 0 or more/],
+    [{ skip: 1.5 }, /skip must be an integer 0 or more/],
+  ])("rejects %o before any request instead of clamping it", async (options, message) => {
+    const { client, fetch } = pagedClient(300);
+    await expect(client.listTaskResults(options)).rejects.toThrow(QDashValidationError);
+    await expect(client.listTaskResults(options)).rejects.toThrow(message);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("collects 200 rows in two pages of 100, keeping every filter", async () => {
+    const { client, requests } = pagedClient(250);
+    const result = await client.collectTaskResults({ chipId: "C", qid: "6", status: "failed", maxItems: 200 });
+    expect(result.items).toHaveLength(200);
+    expect(result.items[0]?.task_id).toBe("t-0");
+    expect(result.items[199]?.task_id).toBe("t-199");
+    expect(result).toMatchObject({ total: 250, skip: 0, pages: 2, truncated: true });
+    expect(requests.map((url) => [url.searchParams.get("skip"), url.searchParams.get("limit")])).toEqual([
+      ["0", "100"],
+      ["100", "100"],
+    ]);
+    for (const url of requests) {
+      expect(url.searchParams.get("chip_id")).toBe("C");
+      expect(url.searchParams.get("qid")).toBe("6");
+      expect(url.searchParams.get("status")).toBe("failed");
+    }
+  });
+
+  it("stops at the last matching row and reports a complete read", async () => {
+    const { client, requests } = pagedClient(130);
+    const result = await client.collectTaskResults({ maxItems: 500, skip: 20 });
+    expect(result).toMatchObject({ total: 130, skip: 20, pages: 2, truncated: false });
+    expect(result.items).toHaveLength(110);
+    expect(requests.map((url) => url.searchParams.get("skip"))).toEqual(["20", "120"]);
+  });
+
+  it("asks only for the rows still needed and stops after an empty or short page", async () => {
+    const empty = pagedClient(0);
+    await expect(empty.client.collectTaskResults({ maxItems: 50 })).resolves.toMatchObject({ items: [], total: 0, pages: 1, truncated: false });
+    const short = pagedClient(300, { shortAt: 100 });
+    const result = await short.client.collectTaskResults({ maxItems: 150 });
+    expect(short.requests.map((url) => url.searchParams.get("limit"))).toEqual(["100", "50"]);
+    expect(result.items).toHaveLength(101);
+    expect(result.truncated).toBe(true);
+  });
+
+  it("bounds duplicate pages even when totals keep growing", async () => {
+    const { client, fetch } = pagedClient(10);
+    let calls = 0;
+    fetch.mockImplementation(async () => {
+      calls += 1;
+      if (calls > 2) throw new Error("page budget exceeded");
+      return jsonResponse({ items: [row(0)], total: 100 + calls, skip: calls - 1, limit: 1, status_counts: {} });
+    });
+    const result = await client.collectTaskResults({ maxItems: 2, pageSize: 1 });
+    expect(calls).toBe(2);
+    expect(result).toMatchObject({ pages: 2, truncated: true });
+    expect(result.items).toHaveLength(1);
+  });
+
+  it("does not claim completeness when duplicate pages reach the reported end", async () => {
+    const { client, fetch } = pagedClient(2);
+    fetch.mockImplementation(async () => jsonResponse({ items: [row(0)], total: 2, skip: fetch.mock.calls.length - 1, limit: 1, status_counts: {} }));
+    const result = await client.collectTaskResults({ maxItems: 2, pageSize: 1 });
+    expect(result).toMatchObject({ pages: 2, truncated: true });
+    expect(result.items).toHaveLength(1);
+  });
+
+  it("cancels between pages without requesting another page", async () => {
+    const { client, fetch } = pagedClient(2);
+    const controller = new AbortController();
+    const list = client.listTaskResults.bind(client);
+    vi.spyOn(client, "listTaskResults").mockImplementation(async (options) => {
+      const page = await list(options);
+      controller.abort(new Error("cancelled between pages"));
+      return page;
+    });
+    await expect(client.collectTaskResults({ maxItems: 2, pageSize: 1, signal: controller.signal })).rejects.toThrow("cancelled between pages");
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects the whole read when a page fails, a page is malformed, or the caller cancels", async () => {
+    const failing = pagedClient(300, { failAt: 100 });
+    await expect(failing.client.collectTaskResults({ maxItems: 200 })).rejects.toThrow();
+
+    const fetch = vi.fn(async () => jsonResponse({ results: [], count: 0 }));
+    const malformed = new QDashClient(new QDashConfig({ baseUrl: "https://qdash.example/api", apiToken: "t" }), { fetch });
+    await expect(malformed.listTaskResults()).rejects.toThrow(/items is not an array; total is not an integer/);
+
+    const controller = new AbortController();
+    controller.abort(new Error("stopped by caller"));
+    const cancelled = pagedClient(300);
+    await expect(cancelled.client.collectTaskResults({ maxItems: 200, signal: controller.signal })).rejects.toThrow("stopped by caller");
+    expect(cancelled.fetch).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [{ maxItems: 0 }, /maxItems must be an integer from 1 to 10000/],
+    [{ maxItems: 20_000 }, /maxItems must be an integer from 1 to 10000/],
+    [{ maxItems: 10, pageSize: 200 }, /pageSize must be an integer from 1 to 100/],
+  ])("rejects collect options %o before any request", async (options, message) => {
+    const { client, fetch } = pagedClient(10);
+    await expect(client.collectTaskResults(options)).rejects.toThrow(message);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+});

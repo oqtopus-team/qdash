@@ -321,7 +321,11 @@ export function adaptCodingAgentTool(
     // card and rendering only exist for a call the model made.
     callers: options.nested && !writesQDash ? ["model", "tools"] : ["model"],
     ...(options.deferred ? { deferred: true as const } : {}),
-    ...(options.nested && !writesQDash ? { structuredOutputSchema: QDASH_DATA_SCHEMA } : {}),
+    // A tool that declares its response shape (pi-qdash's query contracts) keeps
+    // it, so a script sees the same declaration as in the pi CLI.
+    ...(options.nested && !writesQDash
+      ? { structuredOutputSchema: tool.outputSchema ?? QDASH_DATA_SCHEMA }
+      : {}),
     ...(tool.prepareArguments ? { prepareArguments: tool.prepareArguments } : {}),
     ...(tool.executionMode ? { executionMode: tool.executionMode } : {}),
     execute: async (args, api: ToolExecutionApi, context: Context) => {

@@ -81,6 +81,65 @@ const T1_RESULTS = {
   B: [{ qid: "0", t1: 80 }, { qid: "1", t1: 100 }, { qid: "2", t1: 90 }],
 };
 
+// Task results of chip P as the API pages them: 250 rows newest first, every
+// tenth on qubit "16" (so an exact qid "6" filter must not match it) and the
+// rest on "6". FAIL fails on its second page; EMPTY has none.
+const PAGED_CHIPS = new Set(["P", "FAIL", "EMPTY"]);
+const P_ROWS = Array.from({ length: 250 }, (_, index) => ({
+  task_id: `p-${String(index).padStart(3, "0")}`,
+  task_name: index % 2 ? "CheckT1" : "CheckRabi",
+  qid: index % 10 === 0 ? "16" : "6",
+  chip_id: "P",
+  status: index % 25 === 0 ? "failed" : "completed",
+  execution_id: `e-${Math.floor(index / 50)}`,
+  message: "",
+  start_at: new Date(Date.UTC(2026, 10, 20) - index * 60_000).toISOString(),
+}));
+
+function pagedTaskResults(params) {
+  const limit = Number(params.get("limit") ?? 50);
+  const skip = Number(params.get("skip") ?? 0);
+  // The API's own bounds; pi-qdash should never let a request reach them.
+  if (!Number.isInteger(limit) || limit < 1 || limit > 100 || !Number.isInteger(skip) || skip < 0) {
+    return [422, { detail: [{ loc: ["query", "limit"], msg: "Input should be less than or equal to 100" }] }];
+  }
+  const chip = params.get("chip_id");
+  if (chip === "FAIL" && skip > 0) return [500, { detail: "database unavailable" }];
+  const qid = params.get("qid");
+  const rows = chip === "EMPTY" ? [] : P_ROWS.filter((row) => qid === null || row.qid === qid);
+  const counts = {};
+  for (const row of rows) counts[row.status] = (counts[row.status] ?? 0) + 1;
+  return [200, { items: rows.slice(skip, skip + limit), total: rows.length, skip, limit, status_counts: counts }];
+}
+
+// ChipMetricsResponse: metric key -> qid -> MetricValue, with a null value and no timestamps.
+const CHIP_METRICS = {
+  chip_id: "P",
+  username: "fixture",
+  qubit_count: 16,
+  within_hours: null,
+  start_at: null,
+  end_at: null,
+  qubit_metrics: {
+    t1: { 6: { value: 42.5, task_id: "p-001", execution_id: "e-0", stddev: 1.5 }, 16: { value: null, task_id: "p-010", execution_id: "e-0", stddev: null } },
+    qubit_frequency: { 6: { value: 7.9, task_id: "p-003", execution_id: "e-0", stddev: null } },
+  },
+  coupling_metrics: { zx90_gate_fidelity: { "6-7": { value: 0.99, task_id: "p-020", execution_id: "e-0", stddev: null } } },
+};
+
+// TimeSeriesData: qid -> points, oldest first; only qubit_frequency exists on P.
+function timeseries(params) {
+  if (params.get("chip_id") === "BAD") return { data: [{ value: 1 }] };
+  if (params.get("parameter") !== "qubit_frequency") return { data: {} };
+  const point = (value, day) => ({
+    parameter_name: "", qid_role: "", source: null, required: false, value, value_type: "float", error: 0.001, unit: "GHz", description: "",
+    calibrated_at: `2026-11-${day}T00:00:00Z`, execution_id: `e-${day}`, task_id: `t-${day}`,
+  });
+  const all = { 6: [point(7.91, 18), point(7.92, 19)], 7: [point(8.1, 19)] };
+  const qid = params.get("qid");
+  return { data: qid === null ? all : qid in all ? { [qid]: all[qid] } : {} };
+}
+
 /** The read-only QDash fixture both hosts query, with a log of every request. */
 function startFixture() {
   const requests = [];
@@ -95,15 +154,21 @@ function startFixture() {
     if (url.pathname === "/chips") {
       return json(200, { chips: [{ chip_id: "A", size: 16, activity_status: "active" }, { chip_id: "B", size: 64 }] });
     }
+    if (url.pathname === "/task-results" && PAGED_CHIPS.has(url.searchParams.get("chip_id"))) {
+      return json(...pagedTaskResults(url.searchParams));
+    }
+    const metrics = url.pathname.match(/^\/metrics\/chips\/([^/]+)\/metrics$/);
+    if (metrics) return metrics[1] === "BAD" ? json(200, { results: [] }) : json(200, CHIP_METRICS);
+    if (url.pathname === "/task-results/timeseries") return json(200, timeseries(url.searchParams));
     if (url.pathname === "/task-results") {
       const chip = url.searchParams.get("chip_id") ?? "A";
       const items = (T1_RESULTS[chip] ?? []).map((row) => ({
-        task_id: `${chip}-${row.qid}`, task_name: "CheckT1", chip_id: chip, qid: row.qid, status: "completed",
+        task_id: `${chip}-${row.qid}`, task_name: "CheckT1", chip_id: chip, qid: row.qid, status: "completed", execution_id: `${chip}-run`,
         output_parameters: { t1: { value: row.t1, unit: "us" } },
         // Credentials never reach a script or the model.
         api_token: "fixture-secret-should-be-redacted",
       }));
-      return json(200, { items, total: items.length });
+      return json(200, { items, total: items.length, skip: 0, limit: 50, status_counts: { completed: items.length } });
     }
     if (url.pathname === "/cryostats") return json(200, { items: [{ cryostat_id: "fridge-1", name: "Fridge 1" }] });
     const task = url.pathname.match(/^\/tasks\/([^/]+)\/result$/);
@@ -379,6 +444,147 @@ test("a script aggregates several chips the same way in the pi CLI and in chat, 
   });
   assert.deepEqual(outcomes.cli, outcomes.chat);
   assert.deepEqual(outcomes.cli.refused, { write: "refused", figure: "refused", evaluate: "refused", shell: "refused" });
+});
+
+const QUERY_CONTRACTS_SCRIPT = `
+const fail = async (call) => { try { await call(); return "ran"; } catch (error) { return String(error?.message ?? error); } };
+const readRows = async (chipId, want) => {
+  const rows = [];
+  let skip = 0;
+  let total = Infinity;
+  while (rows.length < want && skip < total) {
+    const page = await tools.qdash_list_task_results({ chipId, limit: Math.min(100, want - rows.length), skip });
+    rows.push(...page.items);
+    total = page.total;
+    skip += page.items.length;
+    if (page.items.length === 0) break;
+  }
+  return { rows, total };
+};
+const out = {};
+const paged = await readRows("P", 200);
+out.paged = { count: paged.rows.length, first: paged.rows[0].task_id, last: paged.rows.at(-1).task_id, total: paged.total, unique: new Set(paged.rows.map((row) => row.task_id)).size };
+out.empty = (await readRows("EMPTY", 200)).rows.length;
+out.failedPage = await fail(() => readRows("FAIL", 200));
+out.limit200 = await fail(() => tools.qdash_query({ action: "task_results", chipId: "P", limit: 200 }));
+out.fraction = await fail(() => tools.qdash_query({ action: "task_results", chipId: "P", limit: 2.5 }));
+out.negativeSkip = await fail(() => tools.qdash_query({ action: "task_results", chipId: "P", skip: -1 }));
+out.dedicatedLimit200 = await fail(() => tools.qdash_list_task_results({ chipId: "P", limit: 200 }));
+const q6 = await tools.qdash_list_task_results({ chipId: "P", qid: "6", limit: 100 });
+out.q6 = { qids: [...new Set(q6.items.map((row) => row.qid))], total: q6.total, keys: Object.keys(q6).filter((key) => key !== "_links").sort() };
+const m = await tools.qdash_get_chip_metrics({ chipId: "P" });
+out.metrics = { isArray: Array.isArray(m), metrics: Object.keys(m.qubit_metrics).sort(), t1: m.qubit_metrics.t1, couplings: Object.keys(m.coupling_metrics.zx90_gate_fidelity) };
+out.badMetrics = await fail(() => tools.qdash_get_chip_metrics({ chipId: "BAD" }));
+const window = { startAt: "2026-11-01T00:00:00Z", endAt: "2026-11-21T00:00:00Z" };
+const one = await tools.qdash_get_timeseries({ chipId: "P", parameter: "qubit_frequency", qid: "6", ...window });
+const many = await tools.qdash_get_timeseries({ chipId: "P", parameter: "qubit_frequency", ...window });
+const absent = await tools.qdash_get_timeseries({ chipId: "P", parameter: "qubit_frequency", qid: "99", ...window });
+const unknown = await tools.qdash_get_timeseries({ chipId: "P", parameter: "frequency", qid: "6", ...window });
+const series = (ts, qid) => (Array.isArray(ts.data[qid]) ? ts.data[qid].map((point) => [point.calibrated_at, point.value]) : null);
+out.timeseries = {
+  dataIsArray: Array.isArray(one.data),
+  one: { keys: Object.keys(one.data), q6: series(one, "6") },
+  many: { keys: Object.keys(many.data).sort(), q7: series(many, "7") },
+  absent: { keys: Object.keys(absent.data), q99: series(absent, "99") },
+  unknownParameter: Object.keys(unknown.data),
+};
+out.badTimeseries = await fail(() => tools.qdash_get_timeseries({ chipId: "BAD", parameter: "qubit_frequency", ...window }));
+text("RESULT " + JSON.stringify(out));
+`;
+
+test("task-result paging, chip metrics, and timeseries reach a script with the API's shape in the pi CLI and in chat", async () => {
+  const outcomes = {};
+  for (const [host, open] of [["cli", openCli], ["chat", openChat]]) {
+    const start = fixture.requests.length;
+    const run = await open([
+      fauxAssistantMessage([fauxToolCall("codemode", { code: QUERY_CONTRACTS_SCRIPT })], { stopReason: "toolUse" }),
+      fauxAssistantMessage([fauxText("done")]),
+    ]);
+    try {
+      await run.ask("Read Q6 task results, metrics and frequency trend");
+      const results = await run.results();
+      const script = results.find((result) => result.name === "codemode");
+      assert.ok(script, `${host}: no codemode result`);
+      outcomes[host] = scriptResult(script.text);
+      const pageRequests = requestsSince(start).filter((request) => request.path === "/task-results");
+      // Invalid paging never reached the API, so it never answered 422.
+      assert.ok(pageRequests.every((request) => request.query.limit === undefined || (Number(request.query.limit) >= 1 && Number(request.query.limit) <= 100)), `${host}: ${JSON.stringify(pageRequests)}`);
+      assert.ok(pageRequests.every((request) => request.query.skip === undefined || Number(request.query.skip) >= 0));
+      const p = pageRequests.filter((request) => request.query.chip_id === "P" && request.query.qid === undefined);
+      assert.deepEqual(p.map((request) => [request.query.skip, request.query.limit]), [["0", "100"], ["100", "100"]], host);
+      assert.ok(pageRequests.some((request) => request.query.qid === "6"), `${host}: qid not sent exactly`);
+    } finally {
+      await run.close();
+    }
+  }
+  const cli = outcomes.cli;
+  assert.deepEqual(cli.paged, { count: 200, first: "p-000", last: "p-199", total: 250, unique: 200 });
+  assert.equal(cli.empty, 0);
+  assert.notEqual(cli.failedPage, "ran", "a failed second page must fail the read");
+  for (const key of ["limit200", "fraction", "negativeSkip"]) {
+    assert.notEqual(cli[key], "ran", key);
+    assert.match(outcomes.chat[key], /No request was sent/, `chat ${key}: ${outcomes.chat[key]}`);
+  }
+  assert.match(cli.limit200, /limit must be an integer from 1 to 100 \(got 200\).*skip increased by the rows already read/s);
+  assert.match(cli.fraction, /limit must be an integer from 1 to 100 \(got 2\.5\)/);
+  assert.match(cli.negativeSkip, /skip must be an integer of 0 or more \(got -1\)/);
+  assert.notEqual(cli.dedicatedLimit200, "ran");
+  assert.match(cli.dedicatedLimit200, /100/);
+  assert.deepEqual(cli.q6, { qids: ["6"], total: 225, keys: ["items", "limit", "skip", "status_counts", "total"] });
+  assert.deepEqual(cli.metrics, {
+    isArray: false,
+    metrics: ["qubit_frequency", "t1"],
+    t1: {
+      6: { value: 42.5, task_id: "p-001", execution_id: "e-0", stddev: 1.5 },
+      16: { value: null, task_id: "p-010", execution_id: "e-0", stddev: null },
+    },
+    couplings: ["6-7"],
+  });
+  assert.match(cli.badMetrics, /chip_metrics response that does not match its documented shape.*qubit_metrics/s);
+  assert.deepEqual(cli.timeseries, {
+    dataIsArray: false,
+    one: { keys: ["6"], q6: [["2026-11-18T00:00:00Z", 7.91], ["2026-11-19T00:00:00Z", 7.92]] },
+    many: { keys: ["6", "7"], q7: [["2026-11-19T00:00:00Z", 8.1]] },
+    absent: { keys: [], q99: null },
+    unknownParameter: [],
+  });
+  assert.match(cli.badTimeseries, /timeseries response that does not match its documented shape.*\/data/s);
+  // Both hosts give a script the same data and the same failures (error wording aside).
+  const shape = (outcome) => ({ ...outcome, failedPage: outcome.failedPage !== "ran", dedicatedLimit200: outcome.dedicatedLimit200 !== "ran", limit200: /No request was sent/.test(outcome.limit200), fraction: /No request was sent/.test(outcome.fraction), negativeSkip: /No request was sent/.test(outcome.negativeSkip), badMetrics: /documented shape/.test(outcome.badMetrics), badTimeseries: /documented shape/.test(outcome.badTimeseries) });
+  assert.deepEqual(shape(outcomes.chat), shape(cli));
+});
+
+test("a script discovers the response shape and paging bounds of the query tools in the pi CLI and in chat", async () => {
+  const code = `
+const out = {};
+for (const name of ["qdash_list_task_results", "qdash_get_chip_metrics", "qdash_get_timeseries"]) {
+  const tool = await describeTool(name);
+  out[name] = typeof tool === "string" ? tool : JSON.stringify(tool);
+}
+text("RESULT " + JSON.stringify(out));
+`;
+  for (const [host, open] of [["cli", openCli], ["chat", openChat]]) {
+    const run = await open([
+      fauxAssistantMessage([fauxToolCall("codemode", { code })], { stopReason: "toolUse" }),
+      fauxAssistantMessage([fauxText("done")]),
+    ]);
+    try {
+      await run.ask("What do the query tools return?");
+      const script = (await run.results()).find((result) => result.name === "codemode");
+      const declared = scriptResult(script.text);
+      const list = declared.qdash_list_task_results;
+      for (const fragment of ["status_counts", "total", "skip", "@maximum 100", "@minimum 1"]) {
+        assert.ok(list.includes(fragment), `${host} task results: ${fragment} in ${list}`);
+      }
+      assert.ok(declared.qdash_get_chip_metrics.includes("qubit_metrics.t1"), `${host}: ${declared.qdash_get_chip_metrics}`);
+      assert.ok(declared.qdash_get_chip_metrics.includes("stddev"), host);
+      assert.ok(declared.qdash_get_timeseries.includes("calibrated_at"), host);
+      assert.ok(declared.qdash_get_timeseries.includes("An object, not an array"), host);
+      for (const text of Object.values(declared)) assert.doesNotMatch(text, /updated_at/, host);
+    } finally {
+      await run.close();
+    }
+  }
 });
 
 /** The system prompt of a request: its own text, and the content and named sections of system messages. */

@@ -44,6 +44,7 @@ import { installQDashToolPolicy } from "./lib/script-policy.js";
 import { installQcalHydration } from "./lib/qcal-hydration-hook.js";
 import type { TaskKnowledgeLike } from "./lib/qcal-hydration.js";
 import { registerTimeseriesComparisonTool } from "./tools/timeseries.js";
+import { checkQueryResponse, isContractedAction, QUERY_CONTRACTS, taskResultPageProblem } from "./lib/query-contracts.js";
 import { analyzeWiringMarkdown, wiringInsightLines, type WiringInsights } from "./lib/wiring-analysis.js";
 
 type QDashQueryParams = {
@@ -392,8 +393,8 @@ const querySchema = Type.Object({
   startFrom: Type.Optional(Type.String()),
   startTo: Type.Optional(Type.String()),
   withinHours: Type.Optional(Type.Number()),
-  limit: Type.Optional(Type.Number()),
-  skip: Type.Optional(Type.Number()),
+  limit: Type.Optional(Type.Number({ description: "Page size. task_results: an integer from 1 to 100." })),
+  skip: Type.Optional(Type.Number({ description: "Rows to skip. task_results: an integer of 0 or more." })),
   offset: Type.Optional(Type.Number()),
 });
 
@@ -831,7 +832,7 @@ async function buildCalibrationComparison(params: { profile?: string; configPath
   if (!qid && !couplingId) throw new Error("qid or couplingId is required (or select one with /qdash-use-target)");
   const kind = qid ? "qubit" : "coupling";
   const id = (qid ?? couplingId) as string;
-  const results = await client.listTaskResults({ chipId, qid, couplingId, limit: Math.max(2, Math.min(100, params.limit ?? 20)) });
+  const results = await client.listTaskResults({ chipId, qid: id, limit: Math.max(2, Math.min(100, params.limit ?? 20)) });
   const items = arrayFromPayload(results).filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object");
   const groups = new Map<string, Record<string, unknown>[]>();
   for (const item of items) {
@@ -969,7 +970,7 @@ async function buildTargetOperationsReport(params: { profile?: string; configPat
   const limit = Math.max(1, Math.min(100, params.limit ?? 10));
   const [latestTarget, results, forumPosts] = await Promise.all([
     kind === "qubit" ? client.getChipQubit(chipId, id) : client.getChipCoupling(chipId, id),
-    client.listTaskResults({ chipId, qid, couplingId, startAt: start.toISOString(), endAt: end.toISOString(), limit }),
+    client.listTaskResults({ chipId, qid: id, startFrom: start.toISOString(), startTo: end.toISOString(), limit }),
     client.listForumPosts({ chipId, status: "open", targetType: kind, targetId: id, limit }),
   ]);
   const recentResults = arrayFromPayload(results).filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object");
@@ -1422,8 +1423,7 @@ async function buildForumEvidenceReply(client: QDashClient, params: ForumEvidenc
   const history = params.includeHistory === false ? [] : arrayFromPayload(await client.listTaskResults({
     chipId,
     taskName,
-    qid,
-    couplingId,
+    qid: qid ?? couplingId,
     limit: params.historyLimit ?? 5,
   })).filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object");
   const historyLines = history
@@ -1468,7 +1468,32 @@ async function buildForumEvidenceReply(client: QDashClient, params: ForumEvidenc
   return { request, preview: content, parent, task, figures };
 }
 
+/**
+ * The `qid` filter of a task-result query: the API filters qubits and
+ * couplings by one exact ID, so `couplingId` is sent as `qid`.
+ */
+function taskResultTarget(params: { qid?: string; couplingId?: string }): string | undefined {
+  if (params.qid !== undefined && params.couplingId !== undefined && params.qid !== params.couplingId) {
+    throw new Error("task_results: give qid or couplingId, not both; QDash filters task results by one exact target ID.");
+  }
+  return params.qid ?? params.couplingId;
+}
+
+/**
+ * Run a read-only query. Task-result paging is checked before any request,
+ * and the response of an action with a contract (query-contracts.ts) is
+ * checked against it, so a script never reads a malformed response as empty.
+ */
 async function executeQuery(params: QDashQueryParams) {
+  if (params.action === "task_results") {
+    const problem = taskResultPageProblem(params);
+    if (problem) throw new Error(`task_results: ${problem}`);
+  }
+  const data = await dispatchQuery(params);
+  return isContractedAction(params.action) ? checkQueryResponse(params.action, data) : data;
+}
+
+async function dispatchQuery(params: QDashQueryParams) {
   params = applyQDashContext(params);
   const client = await makeClient(params);
   if (isMetricScriptQueryAction(params.action)) return metricScriptQuery(client, params.action, params);
@@ -1487,7 +1512,7 @@ async function executeQuery(params: QDashQueryParams) {
     case "cooldown": return client.api.getCooldown(requireValue(params.cooldownId, "cooldownId"));
     case "cooldown_wiring_events": return client.api.listCooldownWiringEvents(requireValue(params.cooldownId, "cooldownId"), { limit: params.limit, skip: params.skip });
     case "timeseries": return client.getTaskResultsTimeseries({ chipId: await defaultChipId(client, params.chipId), parameter: requireValue(params.parameter, "parameter"), tag: params.tag, qid: params.qid, startAt: requireValue(params.startAt, "startAt"), endAt: requireValue(params.endAt, "endAt") });
-    case "task_results": return rawGet(client, "/task-results", { chip_id: params.chipId, task_name: params.taskName, qid: params.qid, coupling_id: params.couplingId, execution_id: params.executionId, username: params.username, status: params.status, start_from: params.startFrom ?? params.startAt, start_to: params.startTo ?? params.endAt, message_contains: params.messageContains, limit: params.limit, skip: params.skip });
+    case "task_results": return rawGet(client, "/task-results", { chip_id: params.chipId, task_name: params.taskName, qid: taskResultTarget(params), execution_id: params.executionId, username: params.username, status: params.status, start_from: params.startFrom ?? params.startAt, start_to: params.startTo ?? params.endAt, message_contains: params.messageContains, limit: params.limit, skip: params.skip });
     case "task_result": return client.getTaskResult(requireValue(params.taskId, "taskId"));
     case "task_note": return client.api.getTaskNote(requireValue(params.taskId, "taskId"));
     case "qubit_latest": return client.api.getLatestQubitTaskResults({ chip_id: await defaultChipId(client, params.chipId), task: requireValue(params.task ?? params.taskName, "task") });
@@ -1612,6 +1637,7 @@ export default function qdashExtension(host: ExtensionAPI) {
     promptGuidelines: [
       "Prefer dedicated QDash tools such as qdash_list_chips, qdash_get_chip_metrics, qdash_list_task_results, qdash_list_forum_posts, qdash_list_flows, and qdash_list_executions when they match the task.",
       "Use qdash_query for read-only QDash data access not covered by a dedicated tool, instead of curl or scraping the UI.",
+      "The task_results, chip_metrics, and timeseries actions return the same data as qdash_list_task_results, qdash_get_chip_metrics, and qdash_get_timeseries; their descriptions give the shape. task_results takes limit 1 to 100 and pages with skip.",
       "files_tree and file_content cover only the calibration config directory; for QDash or qubex source code use qdash_list_source_roots, qdash_search_source and qdash_read_source (for example qdash_read_source {\"path\":\"qdash/workflow/engine/task/executor.py\"}).",
       "Ask for confirmation before using operational or write APIs; qdash_query intentionally exposes read-only operations only.",
       "Never expose QDash tokens, passwords, or Cloudflare Access secrets.",
@@ -1646,6 +1672,8 @@ export default function qdashExtension(host: ExtensionAPI) {
       label: tool.label,
       description: tool.description,
       promptSnippet: tool.promptSnippet,
+      // A script's declaration of the tool shows the response shape pi-qdash checks.
+      ...(isContractedAction(tool.action) ? { outputSchema: QUERY_CONTRACTS[tool.action] } : {}),
       promptGuidelines: [
         `Prefer ${tool.name} for this specific read-only QDash operation instead of qdash_query or qdash_raw_get.`,
         "Never expose QDash tokens, passwords, or Cloudflare Access secrets.",
@@ -1680,7 +1708,7 @@ export default function qdashExtension(host: ExtensionAPI) {
   registerQueryTool({
     name: "qdash_get_chip_metrics",
     label: "QDash Chip Metrics",
-    description: "Get metrics for a chip. If chipId is omitted, the default chip is used.",
+    description: "Get the latest metric value per target on a chip (default chip if chipId is omitted). Returns { chip_id, qubit_count, qubit_metrics, coupling_metrics }, where qubit_metrics[metricKey][qid] is { value, task_id, execution_id, stddev }, e.g. qubit_metrics.t1[\"6\"]. Not an array; metric keys come from metrics_config, qids are stored IDs (from qdash_list_chip_qubits), and values carry no timestamp.",
     promptSnippet: "Get QDash chip metrics for the default or specified chip",
     action: "chip_metrics",
     parameters: Type.Object({ ...connectionParams, ...chipScopedParams }),
@@ -1806,7 +1834,7 @@ export default function qdashExtension(host: ExtensionAPI) {
   registerQueryTool({
     name: "qdash_get_timeseries",
     label: "QDash Timeseries",
-    description: "Get task-result timeseries for a parameter and time range.",
+    description: "Get the values of one output parameter over a time range. parameter is the exact output parameter name as tasks store it (for example from metrics_config or a task result), with no aliases. Returns { data }, where data[qid] is an array of { value, error, unit, calibrated_at, execution_id, task_id } oldest first, e.g. data[\"6\"]. data is an object keyed by target ID even when qid is set; a target with no points in the window is absent.",
     promptSnippet: "Get QDash task-result timeseries for a parameter over a time range",
     action: "timeseries",
     parameters: Type.Object({
@@ -1829,7 +1857,7 @@ export default function qdashExtension(host: ExtensionAPI) {
   registerQueryTool({
     name: "qdash_list_task_results",
     label: "QDash List Task Results",
-    description: "List task results with common filters.",
+    description: "List one page of task results, newest first. Returns { items, total, skip, limit, status_counts }; items have task_id, task_name, qid, status, execution_id, message, start_at, end_at but no output parameters. limit is 1 to 100 (default 50): for more rows call again with skip increased by the rows already read until skip >= total. qid and couplingId match one stored ID exactly (\"6\", \"6-7\").",
     promptSnippet: "List QDash task results with filters such as chip, task, status, qubit, coupling, or time range",
     action: "task_results",
     parameters: Type.Object({
@@ -1841,13 +1869,13 @@ export default function qdashExtension(host: ExtensionAPI) {
       executionId: Type.Optional(Type.String()),
       username: Type.Optional(Type.String()),
       status: Type.Optional(Type.String()),
-      startAt: Type.Optional(Type.String()),
-      endAt: Type.Optional(Type.String()),
-      startFrom: Type.Optional(Type.String()),
-      startTo: Type.Optional(Type.String()),
+      startAt: Type.Optional(Type.String({ description: "Same as startFrom." })),
+      endAt: Type.Optional(Type.String({ description: "Same as startTo." })),
+      startFrom: Type.Optional(Type.String({ description: "Inclusive lower bound on the task start time, ISO 8601." })),
+      startTo: Type.Optional(Type.String({ description: "Inclusive upper bound on the task start time, ISO 8601." })),
       messageContains: Type.Optional(Type.String()),
-      limit: Type.Optional(Type.Number()),
-      skip: Type.Optional(Type.Number()),
+      limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 100, description: "Rows in this page." })),
+      skip: Type.Optional(Type.Integer({ minimum: 0, description: "Rows to skip before this page." })),
     }),
   });
 
@@ -2536,7 +2564,7 @@ export default function qdashExtension(host: ExtensionAPI) {
       const chipId = await defaultChipId(client, params.chipId);
       const end = new Date();
       const start = new Date(end.getTime() - (params.withinHours ?? 168) * 3600_000);
-      const payload = await client.listTaskResults({ chipId, startAt: start.toISOString(), endAt: end.toISOString(), limit: 50 });
+      const payload = await client.listTaskResults({ chipId, startFrom: start.toISOString(), startTo: end.toISOString(), limit: 50 });
       const tasks = arrayFromPayload(payload).filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object");
       const task = tasks[params.taskIndex ?? 0];
       const taskId = task && firstString(task, ["task_id", "taskId"]);

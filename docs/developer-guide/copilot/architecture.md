@@ -157,6 +157,12 @@ list here:
 - A `beforeTool` hook in `toolPolicyExtension` blocks a nested call to a tool outside the list,
   including a tool that was never given `callers`.
 
+A listed read returns its `details.data` to the script as structured output. Its
+`structuredOutputSchema` is the pi-qdash tool's `outputSchema` when it declares one (the
+response contracts in `extensions/lib/query-contracts.ts`), else the generic `QDASH_DATA_SCHEMA`,
+so a script sees the same declaration as in pi CLI. Pi validates the output against it and fails
+the nested call on a mismatch.
+
 The hook allows one other kind of nested call: an internal tool called by the tool that owns it.
 `present_results` calls its classifier, `qdash.presentation.classify` (`callers: ["tools"]`), as
 a nested call. `PRESENTATION_INTERNAL_CALLS` names `present_results` as the classifier's only

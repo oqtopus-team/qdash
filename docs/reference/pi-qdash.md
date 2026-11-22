@@ -28,6 +28,10 @@ pi-qdash tools reuse the session's profile and chip when callers omit those para
 
 | Tool | Return or limit |
 | --- | --- |
+| `qdash_list_task_results` | One page, newest first: `{ items, total, skip, limit, status_counts }`, with no output parameters in `items`. `limit` is an integer from 1 to 100 and `skip` 0 or more; other values fail before any request with advice to page by `skip`. `qid` and `couplingId` both filter by one exact stored ID. |
+| `qdash_get_chip_metrics` | `qubit_metrics[metric][qid]` and `coupling_metrics[metric][couplingId]` hold `{ value, task_id, execution_id, stddev }`; `value` can be `null`, a target without a value is absent, and values carry no timestamp. |
+| `qdash_get_timeseries` | `{ data }`, where `data[qid]` lists points oldest first with `value`, `error`, `unit`, `calibrated_at`, `execution_id`, and `task_id`. `data` is an object even with `qid` set; a target without points is absent. `parameter` is the exact stored name, with no aliases. |
+| Checked responses | The three tools above and the matching `qdash_query` actions check each response against its documented shape (`extensions/lib/query-contracts.ts`) and fail with the differing path instead of returning a malformed response. |
 | Figure tools | PNG figures return image content with text; JSON figures remain text. The TUI renders images and chat shows figure paths. |
 | `qdash_get_cooldown_wiring` | Active or newest cooldown wiring for a cryostat or current chip; attenuation insights and raw blocks are optional. |
 | `qdash_wiring_insights` | Control/readout attenuation totals, unusual totals, and MUX×4 qubit mapping for control-port anomalies. |
@@ -143,7 +147,7 @@ pi-qdash applies the tool policy QDash chat uses (`extensions/lib/tool-policy.ts
 | Selection | A selection the user makes is kept across reloads, new sessions, forks, and resumes, in the order below. |
 | Without `tool_search` | When no `tool_search` tool is registered or it is inactive, deferred tools are registered again as direct tools, so the model can still call them without loading. |
 | Deferred tools | Tools in `DEFERRED_TOOL_NAMES` (cryostat and wiring, forum, pipelines, agent workflow state, metric scripts and dashboards, source code, configuration, and similar) use `exposure: "deferred"`. The model loads them with `tool_search`; the routing guide marks them with `*`. |
-| Script data | In a `codemode` script, the audited reads in `NESTED_READ_TOOL_NAMES` resolve to their redacted response data as JSON. A call returning more than 512 KiB of JSON fails with a request to narrow it. |
+| Script data | In a `codemode` script, the audited reads in `NESTED_READ_TOOL_NAMES` resolve to their redacted response data as JSON. A tool with a checked response declares that shape as its output schema, so `describeTool()` and the script tool listing show it. A call returning more than 512 KiB of JSON fails with a request to narrow it. |
 | Script limits | Scripts without `timeout_ms` get 120 seconds; longer deadlines are cut to 300 seconds. |
 | Namespace | Every `qdash_*` tool pi-qdash registers belongs to the `qdash` tool namespace (`QDASH_TOOL_NAMESPACE`), unless it states its own. pi's `codemode` lists it under `## qdash` with a one-line description when it lists QDash tools, `describeNamespace("qdash")` returns its instructions and the tools scripts can call, and `searchTools()` searches both. QDash chat declares the same namespace. |
 | Blocked from scripts | Write tools, figure tools, `qdash_raw_get`, and other unaudited QDash tools are model-only or blocked. While pi-qdash is loaded, a script may call another extension's tool only when it declares `readOnlyHint` and is not destructive; `bash`, `powershell`, `write`, and `edit` are always blocked. Call these tools directly. |

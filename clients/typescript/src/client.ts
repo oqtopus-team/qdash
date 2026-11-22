@@ -3,7 +3,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { getQDashAPI } from "./generated/api.js";
 
 import { QDashConfig } from "./config.js";
-import { QDashNotFoundError, QDashTimeoutError } from "./errors.js";
+import { QDashApiError, QDashNotFoundError, QDashTimeoutError, QDashValidationError } from "./errors.js";
 import type {
   AgentActionResponse,
   AgentDecisionAssessment,
@@ -84,6 +84,7 @@ import type {
   ProjectResponse,
   QubitResponse,
   TaskKnowledgeResponse,
+  TaskResultListItem,
   TaskResultListResponse,
   TaskResultResponse,
   TimeSeriesData,
@@ -124,16 +125,62 @@ export interface GetSourceFileOptions {
   endLine?: number;
 }
 
+/** Most rows one `GET /task-results` request returns; the API rejects a larger `limit`. */
+export const TASK_RESULTS_MAX_PAGE_SIZE = 100;
+/** Most rows one `collectTaskResults` call reads across all its pages. */
+export const TASK_RESULTS_MAX_COLLECT = 10_000;
+
+/**
+ * Filters and one page of `GET /task-results`. Rows come newest first
+ * (`start_at` descending, then `task_id`).
+ */
 export interface ListTaskResultsOptions {
   chipId?: string;
   taskName?: string;
+  /** Exact qubit (`"6"`) or coupling (`"6-7"`) ID as QDash stores it; not normalized. */
   qid?: string;
-  couplingId?: string;
+  executionId?: string;
+  username?: string;
   status?: string;
-  startAt?: string;
-  endAt?: string;
+  /** Inclusive lower bound on the task start time (ISO 8601). */
+  startFrom?: string;
+  /** Inclusive upper bound on the task start time (ISO 8601). */
+  startTo?: string;
+  /** Case-insensitive substring of the result message. */
+  messageContains?: string;
+  /** Planned step id (`invocation.step_id`). */
+  stepId?: string;
+  /** Planned call id (`invocation.call_id`). */
+  callId?: string;
+  /** Rows in this page: an integer from 1 to 100. The server default is 50. */
   limit?: number;
+  /** Rows to skip before this page: an integer of 0 or more. */
   skip?: number;
+  /** Cancels the request. */
+  signal?: AbortSignal;
+}
+
+/** Options of `collectTaskResults`: the list filters, a required row cap, and a page size. */
+export interface CollectTaskResultsOptions extends Omit<ListTaskResultsOptions, "limit"> {
+  /** Most rows to return, an integer from 1 to 10000. Reading stops once this many are collected. */
+  maxItems: number;
+  /** Rows per request, an integer from 1 to 100. Defaults to 100. */
+  pageSize?: number;
+}
+
+/** Rows `collectTaskResults` read, newest first. */
+export interface CollectedTaskResults {
+  items: TaskResultListItem[];
+  /** Rows matching the filters, as the last page reported. */
+  total: number;
+  /** Offset of the first returned row (the `skip` option). */
+  skip: number;
+  /** Requests made. */
+  pages: number;
+  /** True when matching rows remain or duplicate rows prevent confirming a complete read. */
+  truncated: boolean;
+  /** Rows per status over all rows matching the filters, as the last page reported. */
+  status_counts: TaskResultListResponse["status_counts"];
 }
 
 export interface CreateAgentSessionOptions {
@@ -283,6 +330,60 @@ function query(values: Record<string, QueryValue>): Query {
   return Object.fromEntries(Object.entries(values).filter(([, value]) => value != null));
 }
 
+const TASK_RESULTS_PAGE_HINT =
+  "QDash returns at most 100 task results per request; use collectTaskResults({ maxItems }) or request further pages with skip";
+
+/** Throw before any request when an optional option is not an integer within bounds. */
+function checkInteger(
+  name: string,
+  value: number | undefined,
+  minimum: number,
+  maximum: number | undefined,
+  hint?: string,
+): void {
+  if (value === undefined) return;
+  if (Number.isInteger(value) && value >= minimum && (maximum === undefined || value <= maximum)) return;
+  const range = maximum === undefined ? `${minimum} or more` : `from ${minimum} to ${maximum}`;
+  throw new QDashValidationError(
+    `${name} must be an integer ${range} (got ${String(value)})${hint ? `. ${hint}.` : "."}`,
+    { payload: { field: name, value } },
+  );
+}
+
+function taskResultQuery(options: ListTaskResultsOptions): Query {
+  return query({
+    chip_id: options.chipId,
+    task_name: options.taskName,
+    qid: options.qid,
+    execution_id: options.executionId,
+    username: options.username,
+    status: options.status,
+    start_from: options.startFrom,
+    start_to: options.startTo,
+    message_contains: options.messageContains,
+    step_id: options.stepId,
+    call_id: options.callId,
+    limit: options.limit,
+    skip: options.skip,
+  });
+}
+
+/** The page, or an error naming what is missing; never an empty page in place of a malformed one. */
+function checkTaskResultPage(payload: unknown): TaskResultListResponse {
+  const page = payload as Partial<TaskResultListResponse> | null;
+  const problems: string[] = [];
+  if (!page || typeof page !== "object") problems.push("the body is not an object");
+  else {
+    if (!Array.isArray(page.items)) problems.push("items is not an array");
+    else if (page.items.some((item) => !item || typeof item.task_id !== "string")) problems.push("an item has no task_id");
+    if (!Number.isInteger(page.total)) problems.push("total is not an integer");
+  }
+  if (problems.length > 0) {
+    throw new QDashApiError(`Unexpected GET /task-results response: ${problems.join("; ")}`, { payload });
+  }
+  return page as TaskResultListResponse;
+}
+
 function filenameFromPath(path: string): string | undefined {
   return path.split("/").filter(Boolean).at(-1);
 }
@@ -410,21 +511,72 @@ export class QDashClient {
     );
   }
 
+  /**
+   * One page of task results. `limit` must be an integer from 1 to 100 and
+   * `skip` an integer of 0 or more; other values throw `QDashValidationError`
+   * before any request, never a silently smaller page. Use
+   * `collectTaskResults` to read more than 100 rows.
+   */
   async listTaskResults(options: ListTaskResultsOptions = {}): Promise<TaskResultListResponse> {
-    return this.get(
-      "/task-results",
-      query({
-        chip_id: options.chipId,
-        task_name: options.taskName,
-        qid: options.qid,
-        coupling_id: options.couplingId,
-        status: options.status,
-        start_at: options.startAt,
-        end_at: options.endAt,
-        limit: options.limit,
-        skip: options.skip,
-      }),
-    );
+    checkInteger("limit", options.limit, 1, TASK_RESULTS_MAX_PAGE_SIZE, TASK_RESULTS_PAGE_HINT);
+    checkInteger("skip", options.skip, 0, undefined);
+    const payload = await this.transport.requestJson<unknown>("GET", "/task-results", {
+      query: taskResultQuery(options),
+      ...(options.signal ? { signal: options.signal } : {}),
+    });
+    return checkTaskResultPage(payload);
+  }
+
+  /**
+   * Up to `maxItems` task results matching the filters, read in pages of at
+   * most 100 from `skip` (default 0), newest first, with every filter on each
+   * page. Reading stops at `maxItems`, at the last matching row, or at a short
+   * page, with at most `ceil(maxItems / pageSize)` page reads. Duplicates can
+   * therefore leave fewer than `maxItems` rows and set `truncated`.
+   * A failed or cancelled page rejects the whole call; no partial result
+   * is returned as complete. Pages are offsets, not a snapshot: a result
+   * written while reading can shift rows, so rows are deduplicated by
+   * `task_id`.
+   */
+  async collectTaskResults(options: CollectTaskResultsOptions): Promise<CollectedTaskResults> {
+    const { maxItems, pageSize = TASK_RESULTS_MAX_PAGE_SIZE, ...filters } = options;
+    checkInteger("maxItems", maxItems, 1, TASK_RESULTS_MAX_COLLECT);
+    checkInteger("pageSize", pageSize, 1, TASK_RESULTS_MAX_PAGE_SIZE, TASK_RESULTS_PAGE_HINT);
+    checkInteger("skip", filters.skip, 0, undefined);
+    const start = filters.skip ?? 0;
+    const items: TaskResultListItem[] = [];
+    const seen = new Set<string>();
+    let offset = start;
+    let pages = 0;
+    let last: TaskResultListResponse | undefined;
+    const maxPages = Math.ceil(maxItems / pageSize);
+    let duplicates = false;
+    while (items.length < maxItems && pages < maxPages) {
+      filters.signal?.throwIfAborted();
+      const limit = Math.min(pageSize, maxItems - items.length);
+      const page = await this.listTaskResults({ ...filters, skip: offset, limit });
+      pages += 1;
+      last = page;
+      for (const item of page.items) {
+        if (seen.has(item.task_id)) {
+          duplicates = true;
+          continue;
+        }
+        seen.add(item.task_id);
+        items.push(item);
+      }
+      offset += page.items.length;
+      if (page.items.length < limit || offset >= page.total) break;
+    }
+    const total = last?.total ?? 0;
+    return {
+      items,
+      total,
+      skip: start,
+      pages,
+      truncated: duplicates || offset < total,
+      status_counts: last?.status_counts ?? {},
+    };
   }
 
   async getTaskResult(taskId: string): Promise<TaskResultResponse> {
