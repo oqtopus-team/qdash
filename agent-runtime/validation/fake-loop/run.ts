@@ -173,11 +173,18 @@ export interface FaultSpec {
   taskName: string;
 }
 
-/** A fault file the harness created, identified by its inode so cleanup removes only that file. */
+/**
+ * A fault file the harness created, identified by its device and inode so cleanup removes only
+ * that file. The descriptor stays open until cleanup: while it is open the inode cannot be freed,
+ * so a file that replaces the fault file cannot be given the same inode number. Linux file
+ * systems such as ext4 reuse a freed inode number at once.
+ */
 export interface ArmedFault {
   path: string;
   dev: number;
   ino: number;
+  /** The open descriptor of the created file; `undefined` once cleanup has closed it. */
+  fd: number | undefined;
   /** The harness created the `validation` directory, so cleanup may remove it when empty. */
   createdDir: boolean;
 }
@@ -250,33 +257,40 @@ export function armFault(configPath: string, spec: FaultSpec, now = new Date()):
     throw error;
   }
   const stat = fstatSync(fd);
-  const armed: ArmedFault = { path, dev: stat.dev, ino: stat.ino, createdDir };
+  const armed: ArmedFault = { path, dev: stat.dev, ino: stat.ino, fd, createdDir };
   try {
     writeSync(fd, content);
   } catch (error) {
-    closeSync(fd);
     disarmFault(armed);
     throw error;
   }
-  closeSync(fd);
   return armed;
 }
 
 /**
- * Remove the fault file only when it is still the file `armFault` created. A file or link
- * that replaced it is left in place. `absent` is whether nothing is left at the path, which is
- * what disarms the fault for the fake backend.
+ * Remove the fault file only when it is still the file `armFault` created, then close its
+ * descriptor. A file or link that replaced it is left in place. `absent` is whether nothing is
+ * left at the path, which is what disarms the fault for the fake backend. A later call removes
+ * nothing and reports only `absent`. When the check or the removal fails, the descriptor stays
+ * open so a retry still recognizes the file. The check and the removal are separate path
+ * operations, so a replacement made between them is not detected.
  */
 export function disarmFault(armed: ArmedFault): { removed: boolean; absent: boolean } {
   let removed = false;
-  try {
-    const stat = lstatSync(armed.path);
-    if (stat.isFile() && stat.dev === armed.dev && stat.ino === armed.ino) {
+  if (armed.fd !== undefined) {
+    let stat;
+    try {
+      stat = lstatSync(armed.path);
+    } catch (error) {
+      if (errorCode(error) !== "ENOENT") throw error;
+    }
+    if (stat?.isFile() && stat.dev === armed.dev && stat.ino === armed.ino) {
       unlinkSync(armed.path);
       removed = true;
     }
-  } catch (error) {
-    if (errorCode(error) !== "ENOENT") throw error;
+    const fd = armed.fd;
+    armed.fd = undefined;
+    closeSync(fd);
   }
   let absent = true;
   try {

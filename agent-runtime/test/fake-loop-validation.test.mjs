@@ -8,7 +8,7 @@
 
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, fstatSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -676,9 +676,18 @@ test("cleanup removes only the fault file the harness created, even after it is 
   writeFileSync(join(validation, "notes.txt"), "operator notes\n");
   const armed = armFault(config, { faultId: "f-1", chipId: "agentval-loop", qid: "4", taskName: "CheckT1" });
   assert.equal(armed.createdDir, false);
+  // The created file stays open until cleanup, so its inode cannot be freed and reused.
+  assert.equal(typeof armed.fd, "number");
+  assert.equal(fstatSync(armed.fd).ino, armed.ino);
   // Something else replaces the file: cleanup leaves the new file and reports the path occupied.
   rmSync(armed.path);
   writeFileSync(armed.path, "replacement\n");
+  // File systems that reuse a freed inode number at once (ext4) cannot give it to the replacement.
+  assert.notEqual(lstatSync(armed.path).ino, armed.ino);
+  assert.deepEqual(disarmFault(armed), { removed: false, absent: false });
+  assert.equal(armed.fd, undefined);
+  assert.equal(readFileSync(armed.path, "utf8"), "replacement\n");
+  // A repeated cleanup still leaves the replacement in place.
   assert.deepEqual(disarmFault(armed), { removed: false, absent: false });
   assert.equal(readFileSync(armed.path, "utf8"), "replacement\n");
   rmSync(armed.path);
@@ -691,6 +700,13 @@ test("cleanup removes only the fault file the harness created, even after it is 
   // A directory the harness did not create is kept, with its other files.
   const third = armFault(config, { faultId: "f-3", chipId: "agentval-loop", qid: "4", taskName: "CheckT1" });
   assert.deepEqual(disarmFault(third), { removed: true, absent: true });
+  assert.equal(third.fd, undefined);
+  assert.equal(readFileSync(join(validation, "notes.txt"), "utf8"), "operator notes\n");
+  // A file the harness created and that was rewritten in place is still its file, and is removed.
+  const fourth = armFault(config, { faultId: "f-4", chipId: "agentval-loop", qid: "4", taskName: "CheckT1" });
+  writeFileSync(fourth.path, "rewritten\n");
+  assert.deepEqual(disarmFault(fourth), { removed: true, absent: true });
+  assert.deepEqual(disarmFault(fourth), { removed: false, absent: true });
   assert.equal(readFileSync(join(validation, "notes.txt"), "utf8"), "operator notes\n");
 });
 
