@@ -317,6 +317,28 @@ test("an approved call runs on a frozen copy of the arguments the user saw", asy
   assert.equal(write.calls(), 1);
 });
 
+test("a session policy QDash would refuse fails before an approval card is requested", async () => {
+  const name = "qdash_create_agent_session";
+  const write = registered(name);
+  const { extension } = buildQDashExtension([{ tools: new Map([[name, write]]) }], {}, "/tmp/work", connection);
+  const writeTool = extension.tools.find((tool) => tool.name === name);
+  const context = { abortSignal: new AbortController().signal };
+  const policy = { qids: ["Q6"], allowed_tasks: ["CheckRabi"] };
+  for (const [gates, problem] of [
+    [{ quality_gates: { average_gate_fidelity: { minimum: 0.99 } } }, /policy\.quality_gates: a session-wide gate/],
+    [{ task_quality_gates: { RandomizedBenchmarking: { r2: { minimum: 0.9 } } } }, /RandomizedBenchmarking must also be in allowed_tasks/],
+  ]) {
+    await assert.rejects(writeTool.execute({ chipId: "64Qv3", policy: { ...policy, ...gates } }, { callId: "call-g" }, context), problem);
+  }
+  const requested = await writeTool.execute(
+    { chipId: "64Qv3", policy: { ...policy, task_quality_gates: { CheckRabi: { r2: { minimum: 0.9 } } } } },
+    { callId: "call-ok" },
+    context,
+  );
+  assert.match(requested.output[0].text, /Approval requested/);
+  assert.equal(write.calls(), 0);
+});
+
 test("a write records the model that made the call, even after the conversation switches models", async () => {
   const name = "qdash_create_agent_session";
   const write = registered(name);

@@ -7,7 +7,9 @@
  */
 import type { AgentSessionPolicy } from './agentSessionPolicy';
 import type { AgentSessionResponseActiveInterventionId } from './agentSessionResponseActiveInterventionId';
+import type { AgentSessionResponseEndNotification } from './agentSessionResponseEndNotification';
 import type { AgentSessionResponseModel } from './agentSessionResponseModel';
+import type { AgentSessionResponseStartNotification } from './agentSessionResponseStartNotification';
 import type { AgentSessionStatus } from './agentSessionStatus';
 
 /**
@@ -34,4 +36,8 @@ export interface AgentSessionResponse {
   expires_at: string;
   /** The intervention the session waits on, if any */
   active_intervention_id?: AgentSessionResponseActiveInterventionId;
+  /** Slack delivery of the session's start message; null for a session created before lifecycle messages existed */
+  start_notification?: AgentSessionResponseStartNotification;
+  /** Slack delivery of the session's end message, stored by the update that ended it; null while the session is open */
+  end_notification?: AgentSessionResponseEndNotification;
 }

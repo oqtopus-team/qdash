@@ -101,7 +101,10 @@ def _session(
                 qids=["Q00"],
                 allowed_tasks=["CheckQubitFrequency", "CheckRabi"],
                 allowed_overrides={"qubit_frequency": NumericBounds(minimum=4.0, maximum=6.0)},
-                quality_gates={"r2": NumericBounds(minimum=0.9)},
+                task_quality_gates={
+                    "CheckQubitFrequency": {"r2": NumericBounds(minimum=0.9)},
+                    "CheckRabi": {"r2": NumericBounds(minimum=0.9)},
+                },
                 autonomy=AgentAutonomy.AUTO,
                 max_actions=20,
                 max_rounds_per_target=10,
@@ -385,6 +388,15 @@ async def test_measurement_decision_commit_and_dependent_step_form_one_timeline(
     assert measurement.execution_id == "execution-1"
     assert measurement.missing == []
     assert measurement.data["quality_metrics"] == {"r2": 0.98}
+    assert measurement.data["applied_quality_gates"] == [
+        {
+            "metric_name": "r2",
+            "scope": "task",
+            "task_name": "CheckQubitFrequency",
+            "minimum": 0.9,
+            "maximum": None,
+        }
+    ]
     committed = _event(result, f"candidate_commit:{commit.commit_id}")
     assert committed.status == "committed"
     assert committed.data["before_value"] == 5.0

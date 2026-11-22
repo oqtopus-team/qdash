@@ -36,6 +36,7 @@ import {
 } from "@oqtopus-team/pi-qdash/extensions/lib/write-approval.ts";
 import { isWaitToolName, WAIT_SPECS, type WaitSpec } from "@oqtopus-team/pi-qdash/extensions/lib/waits.ts";
 import { HOST_MODEL_KEY, HOST_NAME_KEY } from "@oqtopus-team/pi-qdash/extensions/lib/host-model.ts";
+import { preApprovalProblems } from "@oqtopus-team/pi-qdash/extensions/lib/agent-session-policy.ts";
 import { isTrustedExtension } from "./bundled-extensions.ts";
 import { withParameterOverrides } from "./tool-schemas.ts";
 import { parkingWait } from "./durable-waits.ts";
@@ -325,6 +326,9 @@ export function adaptCodingAgentTool(
     ...(tool.executionMode ? { executionMode: tool.executionMode } : {}),
     execute: async (args, api: ToolExecutionApi, context: Context) => {
       if (writesQDash) {
+        // A call QDash would refuse fails here, before the user sees an approval card.
+        const problems = preApprovalProblems(tool.name, args);
+        if (problems) throw new Error(problems);
         const model = await conversationModelRef(api, context);
         const approval: ApprovalRequest = {
           id: api.callId,

@@ -23,6 +23,7 @@ def test_start_session_uses_profile_and_bounded_policy(
 ) -> None:
     client = MagicMock()
     session = MagicMock()
+    session.policy.evaluation = "off"
     session.model_dump.return_value = {
         "session_id": "session-1",
         "state_version": 0,
@@ -65,11 +66,12 @@ def test_start_session_uses_profile_and_bounded_policy(
             "qids": ["Q00"],
             "allowed_tasks": ["CheckT1"],
             "allowed_overrides": {"t1": {"minimum": 1, "maximum": 500}},
-            "quality_gates": {},
+            "task_quality_gates": {},
             "allow_reconfigure": False,
             "max_actions": 100,
             "autonomy": "confirm_each",
             "max_rounds_per_target": 3,
+            "evaluation": "off",
         },
         expires_in_seconds=21_600,
         skill_name="qubit-characterize",
@@ -80,12 +82,74 @@ def test_start_session_uses_profile_and_bounded_policy(
     client.close.assert_called_once()
 
 
+def test_start_session_sends_task_quality_gates_and_refuses_a_server_that_drops_them(
+    monkeypatch,
+    capsys,
+) -> None:
+    client = MagicMock()
+    created = MagicMock()
+    created.policy.evaluation = "off"
+    created.session_id = "session-1"
+    created.policy.task_quality_gates = {}
+    created.model_dump.return_value = {"session_id": "session-1"}
+    client.create_agent_session.return_value = created
+    monkeypatch.setattr(agent_cli.QDashClient, "from_env", lambda: client)
+    gates = '{"CheckRabi":{"r2":{"minimum":0.9}}}'
+
+    exit_code = agent_cli.run(
+        [
+            "--from-env",
+            "start-session",
+            "--chip-id",
+            "chip-1",
+            "--qid",
+            "Q00",
+            "--task",
+            "CheckRabi",
+            "--allowed-overrides",
+            "{}",
+            "--task-quality-gates",
+            gates,
+        ]
+    )
+
+    sent = client.create_agent_session.call_args.kwargs["policy"]
+    assert sent["task_quality_gates"] == {"CheckRabi": {"r2": {"minimum": 0.9}}}
+    assert "quality_gates" not in sent
+    captured = capsys.readouterr()
+    assert exit_code == 1
+    assert captured.out == ""
+    assert "predates task_quality_gates" in json.loads(captured.err)["error"]
+
+    created.policy.task_quality_gates = {"CheckRabi": {"r2": {"minimum": 0.9, "maximum": None}}}
+    assert (
+        agent_cli.run(
+            [
+                "--from-env",
+                "start-session",
+                "--chip-id",
+                "chip-1",
+                "--qid",
+                "Q00",
+                "--task",
+                "CheckRabi",
+                "--allowed-overrides",
+                "{}",
+                "--task-quality-gates",
+                gates,
+            ]
+        )
+        == 0
+    )
+
+
 def test_start_session_can_load_connection_from_environment(
     monkeypatch,
     capsys,
 ) -> None:
     client = MagicMock()
     session = MagicMock()
+    session.policy.evaluation = "off"
     session.model_dump.return_value = {"session_id": "session-1"}
     client.create_agent_session.return_value = session
     monkeypatch.setattr(agent_cli.QDashClient, "from_env", lambda: client)
@@ -114,6 +178,7 @@ def test_start_session_can_load_connection_from_environment(
 def test_start_session_reports_a_model_only_with_provider_and_id(monkeypatch) -> None:
     client = MagicMock()
     client.create_agent_session.return_value.model_dump.return_value = {"session_id": "s"}
+    client.create_agent_session.return_value.policy.evaluation = "off"
     monkeypatch.setattr(agent_cli.QDashClient, "from_env", lambda: client)
     base = [
         "--from-env",
@@ -715,3 +780,34 @@ def test_same_claim_after_a_recorded_measurement_error_does_not_run_again(
     assert other == 2
     assert "only its claim key" in json.loads(capsys.readouterr().out)["reason"]
     assert len(counting_runner.runs) == 1
+
+
+@pytest.mark.parametrize(
+    "requested,stored",
+    [("required", None), ("required", "off"), ("off", None), ("off", "required")],
+)
+def test_start_session_rejects_changed_evaluation_mode(monkeypatch, capsys, requested, stored):
+    client = MagicMock()
+    client.create_agent_session.return_value.session_id = "session-1"
+    client.create_agent_session.return_value.policy.evaluation = stored
+    monkeypatch.setattr(agent_cli.QDashClient, "from_env", lambda: client)
+    code = agent_cli.run(
+        [
+            "--from-env",
+            "start-session",
+            "--chip-id",
+            "chip-1",
+            "--qid",
+            "Q00",
+            "--task",
+            "CheckRabi",
+            "--allowed-overrides",
+            "{}",
+            "--evaluation",
+            requested,
+        ]
+    )
+    assert code == 1
+    captured = capsys.readouterr()
+    assert not captured.out
+    assert "approved evaluation mode" in json.loads(captured.err)["error"]

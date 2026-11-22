@@ -111,6 +111,15 @@ class AgentAutonomy(StrEnum):
     auto = "auto"
 
 
+class AgentCandidateAcceptanceBasis(StrEnum):
+    """
+    What accepted a candidate.
+    """
+
+    session_bounds = "session_bounds"
+    task_checks = "task_checks"
+
+
 class Authority(StrEnum):
     """
     reviewed: a per-call approved commit; session_policy: committed under the session's parameter_updates authority
@@ -198,52 +207,6 @@ class AgentCandidateReference(BaseModel):
     task_id: Annotated[str, Field(max_length=200, min_length=1, title="Task Id")]
 
 
-class AgentCandidateResponse(BaseModel):
-    """
-    A numeric candidate derived from an authoritative task result.
-    """
-
-    session_id: Annotated[str, Field(title="Session Id")]
-    action_id: Annotated[str, Field(title="Action Id")]
-    execution_id: Annotated[str, Field(title="Execution Id")]
-    task_id: Annotated[str, Field(title="Task Id")]
-    task_name: Annotated[str, Field(title="Task Name")]
-    qid: Annotated[str, Field(title="Qid")]
-    source_parameter_name: Annotated[str, Field(title="Source Parameter Name")]
-    parameter_name: Annotated[str, Field(title="Parameter Name")]
-    value: Annotated[float, Field(title="Value")]
-    error: Annotated[float, Field(title="Error")] = 0.0
-    unit: Annotated[str, Field(title="Unit")] = ""
-    value_type: Annotated[str, Field(title="Value Type")] = "float"
-    quality_metrics: Annotated[dict[str, float] | None, Field(title="Quality Metrics")] = None
-    accepted: Annotated[bool, Field(title="Accepted")]
-    reason: Annotated[str, Field(title="Reason")]
-    minimum: Annotated[float | None, Field(title="Minimum")] = None
-    maximum: Annotated[float | None, Field(title="Maximum")] = None
-
-
-class AgentCandidateSetCommitResponse(BaseModel):
-    """
-    Audited all-at-once QDash commit of the final candidate set.
-    """
-
-    commit_id: Annotated[str, Field(title="Commit Id")]
-    session_id: Annotated[str, Field(title="Session Id")]
-    idempotency_key: Annotated[str, Field(title="Idempotency Key")]
-    chip_id: Annotated[str, Field(title="Chip Id")]
-    qid: Annotated[str, Field(title="Qid")]
-    candidates: Annotated[list[AgentCandidateResponse], Field(title="Candidates")]
-    status: Annotated[str, Field(title="Status")]
-    reason: Annotated[str, Field(title="Reason")]
-    before_snapshot: Annotated[dict[str, Any] | None, Field(title="Before Snapshot")] = None
-    after_snapshot: Annotated[dict[str, Any] | None, Field(title="After Snapshot")] = None
-    committed_by: Annotated[str, Field(title="Committed By")]
-    state_version_before: Annotated[int, Field(title="State Version Before")]
-    state_version_after: Annotated[int, Field(title="State Version After")]
-    created_at: Annotated[AwareDatetime, Field(title="Created At")]
-    committed_at: Annotated[AwareDatetime | None, Field(title="Committed At")] = None
-
-
 class AgentCheckpointCandidate(BaseModel):
     """
     An accepted candidate the plan carries; the runner re-reads its value from QDash.
@@ -278,6 +241,19 @@ class AgentDecisionNextAction(StrEnum):
     skip_target = "skip_target"
     complete = "complete"
     stop = "stop"
+
+
+class AgentEvaluationMode(StrEnum):
+    """
+    Whether the session's results are evaluated with the calibration evaluator.
+
+    The evaluator (qcal_evaluate from pi-qcaleval) is optional and separate from the task's
+    own completion checks and any numeric gates. In every mode an evaluation that exists for
+    a result must support an update: a failed, pending, disputed, or negative one blocks it.
+    """
+
+    off = "off"
+    required = "required"
 
 
 class ActionId(RootModel[str]):
@@ -431,7 +407,7 @@ class AgentModelIdentity(BaseModel):
         str, Field(max_length=64, pattern="^([a-z0-9][a-z0-9._-]*)?$", title="Host")
     ] = ""
     """
-    The client host that reported the identity, such as pi or qdash-agent
+    The client host that reported the identity, such as pi or qdash-web-agent
     """
 
 
@@ -457,14 +433,17 @@ class AgentParameterUpdatePolicy(BaseModel):
     from a completed measurement of one of ``tasks`` on a session qubit, and with
     ``apply_backend`` also write that committed value to the backend, without a per-update
     approval. QDash still requires, for every such update, an explicit ``pass`` assessment
-    the agent recorded for that measurement, the session's candidate bounds and quality
-    gates, the task's own completion checks, and the current session and calibration state.
-    A failed, uncertain, or unexplained result is never committed this way.
+    the agent recorded for that measurement, the task's own completion checks (a completed
+    task result, so its fit and validation checks passed), the current session and
+    calibration state, and any numeric bounds or task quality gates the session holds for
+    the parameter and task. The grant names which parameters may change; it does not need
+    numeric bounds, so none has to be made up to authorize it. A failed, uncertain, or
+    unexplained result is never committed this way.
     """
 
     parameters: Annotated[list[str], Field(max_length=50, min_length=1, title="Parameters")]
     """
-    Calibration parameters the agent may commit; each needs both bounds in allowed_overrides
+    Calibration parameters the agent may commit. Numeric bounds are optional: bounds in allowed_overrides, when the session has them, still apply; without them a candidate is accepted on its task's own completion checks
     """
     tasks: Annotated[list[str], Field(max_length=50, min_length=1, title="Tasks")]
     """
@@ -526,6 +505,15 @@ class AgentPlannerVerdictRecord(BaseModel):
     status: Annotated[str, Field(max_length=200, title="Status")]
     fit_reliability: Annotated[FitReliability | None, Field(title="Fit Reliability")] = None
     evaluation_id: Annotated[str, Field(max_length=200, title="Evaluation Id")] = ""
+
+
+class AgentQualityGateScope(StrEnum):
+    """
+    Which results a quality gate checks.
+    """
+
+    task = "task"
+    all_tasks = "all_tasks"
 
 
 class AgentResumeOption(BaseModel):
@@ -740,6 +728,32 @@ class AgentSessionGroupCounts(BaseModel):
     """
     Agent decisions recorded in the session
     """
+
+
+class AgentSessionLifecycleEvent(StrEnum):
+    """
+    A session lifecycle event announced in the agent Slack channel.
+    """
+
+    started = "started"
+    completed = "completed"
+    cancelled = "cancelled"
+    expired = "expired"
+
+
+class AgentSessionNotificationResponse(BaseModel):
+    """
+    Slack delivery state of one session lifecycle message.
+    """
+
+    event: AgentSessionLifecycleEvent
+    actor: Annotated[str, Field(title="Actor")] = ""
+    status: AgentNotificationStatus
+    attempts: Annotated[int, Field(title="Attempts")]
+    last_error: Annotated[str, Field(title="Last Error")]
+    last_attempt_at: Annotated[AwareDatetime | None, Field(title="Last Attempt At")] = None
+    next_attempt_at: Annotated[AwareDatetime | None, Field(title="Next Attempt At")] = None
+    sent_at: Annotated[AwareDatetime | None, Field(title="Sent At")] = None
 
 
 class AgentSessionStatus(StrEnum):
@@ -3146,15 +3160,6 @@ class LineageEdgeResponse(BaseModel):
     relation_type: Annotated[str, Field(title="Relation Type")]
     source_id: Annotated[str, Field(title="Source Id")]
     target_id: Annotated[str, Field(title="Target Id")]
-
-
-class ListAgentCandidatesResponse(BaseModel):
-    """
-    Task-result candidates and their deterministic gate decisions.
-    """
-
-    items: Annotated[list[AgentCandidateResponse], Field(title="Items")]
-    total: Annotated[int, Field(title="Total")]
 
 
 class ListBackendsResponse(BaseModel):
@@ -6792,6 +6797,21 @@ class AgentActionResponse(BaseModel):
     """
 
 
+class AgentAppliedQualityGate(BaseModel):
+    """
+    One quality gate a specific task result was checked against.
+    """
+
+    metric_name: Annotated[str, Field(title="Metric Name")]
+    scope: AgentQualityGateScope
+    task_name: Annotated[str | None, Field(title="Task Name")] = None
+    """
+    The gate's task; null for a legacy session-wide gate
+    """
+    minimum: Annotated[float | None, Field(title="Minimum")] = None
+    maximum: Annotated[float | None, Field(title="Maximum")] = None
+
+
 class AgentAuditEvent(BaseModel):
     """
     One entry of a session's experiment audit timeline, built from QDash's own records.
@@ -6859,6 +6879,62 @@ class AgentAuditEvent(BaseModel):
     """
     Kind-specific details; see the developer guide
     """
+
+
+class AgentCandidateResponse(BaseModel):
+    """
+    A numeric candidate derived from an authoritative task result.
+    """
+
+    session_id: Annotated[str, Field(title="Session Id")]
+    action_id: Annotated[str, Field(title="Action Id")]
+    execution_id: Annotated[str, Field(title="Execution Id")]
+    task_id: Annotated[str, Field(title="Task Id")]
+    task_name: Annotated[str, Field(title="Task Name")]
+    qid: Annotated[str, Field(title="Qid")]
+    source_parameter_name: Annotated[str, Field(title="Source Parameter Name")]
+    parameter_name: Annotated[str, Field(title="Parameter Name")]
+    value: Annotated[float, Field(title="Value")]
+    error: Annotated[float, Field(title="Error")] = 0.0
+    unit: Annotated[str, Field(title="Unit")] = ""
+    value_type: Annotated[str, Field(title="Value Type")] = "float"
+    quality_metrics: Annotated[dict[str, float] | None, Field(title="Quality Metrics")] = None
+    applied_quality_gates: Annotated[
+        list[AgentAppliedQualityGate] | None, Field(title="Applied Quality Gates")
+    ] = None
+    """
+    The session's quality gates this result was checked against: its task's gates and any legacy session-wide gate. Gates of other tasks are not listed.
+    """
+    acceptance_basis: AgentCandidateAcceptanceBasis | None = None
+    """
+    What accepted the candidate: session_bounds (inside numeric bounds approved with the session) or task_checks (a parameter the session's update grant names, without bounds, accepted on its task's completion checks); null when rejected
+    """
+    accepted: Annotated[bool, Field(title="Accepted")]
+    reason: Annotated[str, Field(title="Reason")]
+    minimum: Annotated[float | None, Field(title="Minimum")] = None
+    maximum: Annotated[float | None, Field(title="Maximum")] = None
+
+
+class AgentCandidateSetCommitResponse(BaseModel):
+    """
+    Audited all-at-once QDash commit of the final candidate set.
+    """
+
+    commit_id: Annotated[str, Field(title="Commit Id")]
+    session_id: Annotated[str, Field(title="Session Id")]
+    idempotency_key: Annotated[str, Field(title="Idempotency Key")]
+    chip_id: Annotated[str, Field(title="Chip Id")]
+    qid: Annotated[str, Field(title="Qid")]
+    candidates: Annotated[list[AgentCandidateResponse], Field(title="Candidates")]
+    status: Annotated[str, Field(title="Status")]
+    reason: Annotated[str, Field(title="Reason")]
+    before_snapshot: Annotated[dict[str, Any] | None, Field(title="Before Snapshot")] = None
+    after_snapshot: Annotated[dict[str, Any] | None, Field(title="After Snapshot")] = None
+    committed_by: Annotated[str, Field(title="Committed By")]
+    state_version_before: Annotated[int, Field(title="State Version Before")]
+    state_version_after: Annotated[int, Field(title="State Version After")]
+    created_at: Annotated[AwareDatetime, Field(title="Created At")]
+    committed_at: Annotated[AwareDatetime | None, Field(title="Committed At")] = None
 
 
 class AgentDecisionResponse(BaseModel):
@@ -7077,7 +7153,19 @@ class AgentSessionPolicy(BaseModel):
     allowed_overrides: Annotated[
         dict[str, NumericBounds] | None, Field(title="Allowed Overrides")
     ] = None
+    """
+    Parameter name -> bounds. A step may override a task input of that name within the bounds, and a task output of that name is an accepted candidate only inside them. Output parameters are bounded here, never in quality gates. Give only bounds a person stated; QDash records them as approved with the session and cannot verify where they came from
+    """
     quality_gates: Annotated[dict[str, NumericBounds] | None, Field(title="Quality Gates")] = None
+    """
+    Legacy session-wide quality gates: metric name -> bounds checked on every candidate of every task. Kept so sessions approved before task_quality_gates keep their exact meaning; a new session must leave it empty and use task_quality_gates.
+    """
+    task_quality_gates: Annotated[
+        dict[str, dict[str, NumericBounds]] | None, Field(title="Task Quality Gates")
+    ] = None
+    """
+    Task name -> quality metric name -> bounds. A candidate from a result of that task is accepted only when the result records each named metric inside its bounds; a missing metric rejects it. Results of other tasks are not checked against these gates. Each task must be an allowed task, and each metric a quality metric QDash records on task results (currently only r2).
+    """
     allow_reconfigure: Annotated[bool, Field(title="Allow Reconfigure")] = False
     max_actions: Annotated[int, Field(ge=1, le=10000, title="Max Actions")] = 100
     autonomy: AgentAutonomy = AgentAutonomy.confirm_each
@@ -7091,6 +7179,10 @@ class AgentSessionPolicy(BaseModel):
     parameter_updates: AgentParameterUpdatePolicy | None = None
     """
     Opt-in authority to commit (and optionally apply) passing candidates without a per-update approval; absent means every commit and apply is reviewed
+    """
+    evaluation: AgentEvaluationMode | None = None
+    """
+    Calibration evaluator use, fixed at approval: off (the agent does not call qcal_evaluate) or required (every autonomous update needs a completed evaluation of its result with a reliable fit and a SUCCESS diagnosis). New sessions record off unless they ask for required; null marks a session approved before this field, which keeps its earlier meaning. In every mode an existing evaluation that is pending, failed, disputed, or negative blocks an update
     """
 
 
@@ -7124,6 +7216,14 @@ class AgentSessionResponse(BaseModel):
     active_intervention_id: Annotated[str | None, Field(title="Active Intervention Id")] = None
     """
     The intervention the session waits on, if any
+    """
+    start_notification: AgentSessionNotificationResponse | None = None
+    """
+    Slack delivery of the session's start message; null for a session created before lifecycle messages existed
+    """
+    end_notification: AgentSessionNotificationResponse | None = None
+    """
+    Slack delivery of the session's end message, stored by the update that ended it; null while the session is open
     """
 
 
@@ -8214,6 +8314,15 @@ class ListAgentActionsResponse(BaseModel):
     """
 
     items: Annotated[list[AgentActionResponse], Field(title="Items")]
+    total: Annotated[int, Field(title="Total")]
+
+
+class ListAgentCandidatesResponse(BaseModel):
+    """
+    Task-result candidates and their deterministic gate decisions.
+    """
+
+    items: Annotated[list[AgentCandidateResponse], Field(title="Items")]
     total: Annotated[int, Field(title="Total")]
 
 

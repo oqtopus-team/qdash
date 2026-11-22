@@ -1,6 +1,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 import { agentSessionApprovalText } from "./agent-loop.js";
+import { preApprovalProblems } from "./agent-session-policy.js";
 import { isReviewedWriteTool, nestedBlockMessage } from "./tool-policy.js";
 import {
   cancelledApprovalMessage,
@@ -75,6 +76,9 @@ export function installQDashWriteGate(pi: ExtensionAPI): void {
     if (signal?.aborted) return { block: true, reason: cancelledApprovalMessage(event.toolName) };
     const approved = canonicalArgs(event.input);
     if (approved === undefined) return { block: true, reason: unserializableArgsMessage(event.toolName) };
+    // A call QDash would refuse is blocked before the user is asked to approve it.
+    const problems = preApprovalProblems(event.toolName, JSON.parse(approved));
+    if (problems) return { block: true, reason: problems };
 
     // The whole review text is fixed here from the snapshot (write-review.ts).
     const ok = await reviewWrite(ctx, "Approve QDash write operation?", gateDialogMessage(event.toolName, approved), signal);

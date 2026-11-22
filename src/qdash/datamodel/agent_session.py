@@ -81,6 +81,18 @@ class AgentAutonomy(str, Enum):
     AUTO = "auto"  # the plan, bounds, and budget are confirmed once; steps follow the evaluation
 
 
+class AgentEvaluationMode(str, Enum):
+    """Whether the session's results are evaluated with the calibration evaluator.
+
+    The evaluator (qcal_evaluate from pi-qcaleval) is optional and separate from the task's
+    own completion checks and any numeric gates. In every mode an evaluation that exists for
+    a result must support an update: a failed, pending, disputed, or negative one blocks it.
+    """
+
+    OFF = "off"  # the agent does not call the evaluator; no evaluation is needed for an update
+    REQUIRED = "required"  # an autonomous update needs a completed, supporting evaluation
+
+
 class AgentActionDecision(str, Enum):
     """Platform authorization decision for an action proposal."""
 
@@ -176,6 +188,32 @@ class NumericBounds(BaseModel):
         return not (self.maximum is not None and value > self.maximum)
 
 
+class AgentCandidateAcceptanceBasis(str, Enum):
+    """What accepted a candidate."""
+
+    SESSION_BOUNDS = "session_bounds"  # inside numeric bounds approved with the session
+    TASK_CHECKS = "task_checks"  # a granted parameter without bounds: the task's own checks
+
+
+class AgentQualityGateScope(str, Enum):
+    """Which results a quality gate checks."""
+
+    TASK = "task"  # only results of the gate's own task
+    ALL_TASKS = "all_tasks"  # legacy session-wide gate: results of every task
+
+
+class AgentAppliedQualityGate(BaseModel):
+    """One quality gate a specific task result was checked against."""
+
+    metric_name: str
+    scope: AgentQualityGateScope
+    task_name: str | None = Field(
+        default=None, description="The gate's task; null for a legacy session-wide gate"
+    )
+    minimum: float | None = None
+    maximum: float | None = None
+
+
 class AgentParameterUpdatePolicy(BaseModel):
     """Opt-in authority, approved once with the session, to commit passing results.
 
@@ -185,17 +223,21 @@ class AgentParameterUpdatePolicy(BaseModel):
     from a completed measurement of one of ``tasks`` on a session qubit, and with
     ``apply_backend`` also write that committed value to the backend, without a per-update
     approval. QDash still requires, for every such update, an explicit ``pass`` assessment
-    the agent recorded for that measurement, the session's candidate bounds and quality
-    gates, the task's own completion checks, and the current session and calibration state.
-    A failed, uncertain, or unexplained result is never committed this way.
+    the agent recorded for that measurement, the task's own completion checks (a completed
+    task result, so its fit and validation checks passed), the current session and
+    calibration state, and any numeric bounds or task quality gates the session holds for
+    the parameter and task. The grant names which parameters may change; it does not need
+    numeric bounds, so none has to be made up to authorize it. A failed, uncertain, or
+    unexplained result is never committed this way.
     """
 
     parameters: list[str] = Field(
         min_length=1,
         max_length=50,
         description=(
-            "Calibration parameters the agent may commit; each needs both bounds in "
-            "allowed_overrides"
+            "Calibration parameters the agent may commit. Numeric bounds are optional: "
+            "bounds in allowed_overrides, when the session has them, still apply; without "
+            "them a candidate is accepted on its task's own completion checks"
         ),
     )
     tasks: list[str] = Field(
@@ -225,8 +267,35 @@ class AgentSessionPolicy(BaseModel):
         ],
         min_length=1,
     )
-    allowed_overrides: dict[str, NumericBounds] = Field(default_factory=dict)
-    quality_gates: dict[str, NumericBounds] = Field(default_factory=dict)
+    allowed_overrides: dict[str, NumericBounds] = Field(
+        default_factory=dict,
+        description=(
+            "Parameter name -> bounds. A step may override a task input of that name within "
+            "the bounds, and a task output of that name is an accepted candidate only inside "
+            "them. Output parameters are bounded here, never in quality gates. Give only "
+            "bounds a person stated; QDash records them as approved with the session and "
+            "cannot verify where they came from"
+        ),
+    )
+    quality_gates: dict[str, NumericBounds] = Field(
+        default_factory=dict,
+        description=(
+            "Legacy session-wide quality gates: metric name -> bounds checked on every "
+            "candidate of every task. Kept so sessions approved before task_quality_gates "
+            "keep their exact meaning; a new session must leave it empty and use "
+            "task_quality_gates."
+        ),
+    )
+    task_quality_gates: dict[str, dict[str, NumericBounds]] = Field(
+        default_factory=dict,
+        description=(
+            "Task name -> quality metric name -> bounds. A candidate from a result of that "
+            "task is accepted only when the result records each named metric inside its "
+            "bounds; a missing metric rejects it. Results of other tasks are not checked "
+            "against these gates. Each task must be an allowed task, and each metric a "
+            "quality metric QDash records on task results (currently only r2)."
+        ),
+    )
     allow_reconfigure: bool = False
     max_actions: int = Field(default=100, ge=1, le=10_000)
     autonomy: AgentAutonomy = Field(
@@ -246,10 +315,67 @@ class AgentSessionPolicy(BaseModel):
             "per-update approval; absent means every commit and apply is reviewed"
         ),
     )
+    evaluation: AgentEvaluationMode | None = Field(
+        default=None,
+        description=(
+            "Calibration evaluator use, fixed at approval: off (the agent does not call "
+            "qcal_evaluate) or required (every autonomous update needs a completed evaluation "
+            "of its result with a reliable fit and a SUCCESS diagnosis). New sessions record "
+            "off unless they ask for required; null marks a session approved before this "
+            "field, which keeps its earlier meaning. In every mode an existing evaluation "
+            "that is pending, failed, disputed, or negative blocks an update"
+        ),
+    )
+
+    @model_validator(mode="after")
+    def validate_task_quality_gates(self) -> AgentSessionPolicy:
+        """Scope every task quality gate to an allowed task with at least one metric."""
+        outside = sorted(set(self.task_quality_gates) - set(self.allowed_tasks))
+        if outside:
+            raise ValueError(
+                f"task_quality_gates tasks must be allowed tasks: {', '.join(outside)}"
+            )
+        empty = sorted(task for task, gates in self.task_quality_gates.items() if not gates)
+        if empty:
+            raise ValueError(
+                f"task_quality_gates needs at least one metric for: {', '.join(empty)}"
+            )
+        return self
+
+    def quality_gates_for(self, task_name: str) -> list[AgentAppliedQualityGate]:
+        """The quality gates a result of ``task_name`` must pass, in evaluation order.
+
+        Legacy session-wide gates apply to every task exactly as they were approved; task
+        gates apply only to their own task.
+        """
+        applied = [
+            AgentAppliedQualityGate(
+                metric_name=name,
+                scope=AgentQualityGateScope.ALL_TASKS,
+                minimum=bounds.minimum,
+                maximum=bounds.maximum,
+            )
+            for name, bounds in self.quality_gates.items()
+        ]
+        applied.extend(
+            AgentAppliedQualityGate(
+                metric_name=name,
+                scope=AgentQualityGateScope.TASK,
+                task_name=task_name,
+                minimum=bounds.minimum,
+                maximum=bounds.maximum,
+            )
+            for name, bounds in self.task_quality_gates.get(task_name, {}).items()
+        )
+        return applied
 
     @model_validator(mode="after")
     def validate_parameter_updates(self) -> AgentSessionPolicy:
-        """Keep update authority inside the approved scope and its explicit bounds."""
+        """Keep update authority inside the approved scope.
+
+        Bounds are not required: a grant states which parameters may change, and numeric
+        bounds exist only where a person gave them. A stored session's bounds keep applying.
+        """
         updates = self.parameter_updates
         if updates is None:
             return self
@@ -258,13 +384,6 @@ class AgentSessionPolicy(BaseModel):
         outside = sorted(set(updates.tasks) - set(self.allowed_tasks))
         if outside:
             raise ValueError(f"parameter_updates tasks must be allowed tasks: {', '.join(outside)}")
-        for name in updates.parameters:
-            bounds = self.allowed_overrides.get(name)
-            if bounds is None or bounds.minimum is None or bounds.maximum is None:
-                raise ValueError(
-                    f"parameter_updates parameter '{name}' needs both minimum and maximum "
-                    "in allowed_overrides"
-                )
         self.parameter_updates = updates.model_copy(
             update={
                 "parameters": list(dict.fromkeys(updates.parameters)),
@@ -433,6 +552,26 @@ class AgentNotificationDelivery(BaseModel):
     message_ts: str | None = None
     sent_at: datetime | None = None
     last_reply_error: str = ""
+
+
+class AgentSessionLifecycleEvent(str, Enum):
+    """A session lifecycle event announced in the agent Slack channel."""
+
+    STARTED = "started"  # the approved session was created
+    COMPLETED = "completed"  # an authorized complete_session ended it
+    CANCELLED = "cancelled"  # an expert stopped it through an intervention
+    EXPIRED = "expired"  # its expiry passed while it was active or paused
+
+
+class AgentSessionNotification(AgentNotificationDelivery):
+    """Slack delivery of one session lifecycle message.
+
+    It is stored by the same update that makes the transition, so a crash between the
+    transition and the post leaves a pending delivery the sweeper finishes, never a lost one.
+    """
+
+    event: AgentSessionLifecycleEvent
+    actor: str = Field(default="", description="Who caused the event, from QDash's records")
 
 
 class AgentInterventionEvent(BaseModel):

@@ -88,14 +88,20 @@ test("the harness approves only a session inside the scenario's scope", () => {
 test("update authority is approved only with the dependent scenario's session, exactly as planned, and no commit is approved per call", () => {
   const grant = { parameters: ["qubit_frequency"], tasks: ["CheckChevron"], apply_backend: false };
   const dependent = (policy = {}) =>
-    sessionArgs({ allowed_tasks: ["CheckChevron", "CheckRabi"], allowed_overrides: { qubit_frequency: { minimum: 7.0, maximum: 8.5 } }, max_actions: 4, parameter_updates: grant, ...policy });
+    sessionArgs({ allowed_tasks: ["CheckChevron", "CheckRabi"], max_actions: 4, parameter_updates: grant, ...policy });
   const approve = (args, scenario = "dependent-commit") => decideApproval({ toolName: "qdash_create_agent_session", args }, context(scenario)).approve;
   assert.equal(approve(dependent()), true);
   // Widened or vague grants, and grants in scenarios that approve none, are declined.
   assert.equal(approve(dependent({ parameter_updates: { ...grant, parameters: ["qubit_frequency", "control_amplitude"] } })), false);
   assert.equal(approve(dependent({ parameter_updates: { ...grant, tasks: ["CheckChevron", "CheckRabi"] } })), false);
   assert.equal(approve(dependent({ parameter_updates: { ...grant, apply_backend: true } })), false);
+  // The grant needs no bounds, and the scenario's user stated none: bounds or gates the model
+  // added would be thresholds it authored.
+  assert.equal(approve(dependent({ allowed_overrides: { qubit_frequency: { minimum: 7.0, maximum: 8.5 } } })), false);
   assert.equal(approve(dependent({ allowed_overrides: { qubit_frequency: { minimum: 7.0 } } })), false);
+  assert.equal(approve(dependent({ task_quality_gates: { CheckChevron: { r2: { minimum: 0.9 } } } })), false);
+  assert.equal(approve(dependent({ evaluation: "off" })), true);
+  assert.equal(approve(dependent({ evaluation: "required" })), false);
   assert.equal(approve(dependent({ parameter_updates: "all" })), false);
   assert.equal(approve(sessionArgs({ parameter_updates: { parameters: ["t1"], tasks: ["CheckT1"] } }), "t1-rerun"), false);
   assert.equal(approve(sessionArgs({ parameter_updates: { parameters: ["t1"], tasks: ["CheckT1"] } }), "unknown-failure"), false);

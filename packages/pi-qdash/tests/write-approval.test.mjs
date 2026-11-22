@@ -263,11 +263,12 @@ test("the session dialog shows the update grant, and the approved policy reaches
   assert.equal(await toolCall({ toolName: name, toolCallId: "grant", input }, ctx), undefined);
   assert.match(shown[0], /- Parameter updates: granted for qubit_frequency from CheckChevron after a pass assessment and QDash's gates; backend apply not granted/);
   assert.match(shown[0], /- bounds \(overrides and candidate gate\): qubit_frequency \[7\.4, 7\.6\]/);
+  assert.match(shown[0], /- Update criteria: qubit_frequency \[7\.4, 7\.6\]\. Bounds shown are values approved with this session; QDash does not verify where they came from\./);
   const before = fake.state.requests.length;
   await tools.get(name).execute("grant", input, undefined, undefined, ctx);
   const posted = fake.state.requests.slice(before).find((request) => request.method === "POST" && request.path.endsWith("/agent-sessions"));
   assert.ok(posted, "the session was created");
-  assert.deepEqual(posted.body.policy, GRANT_POLICY);
+  assert.deepEqual(posted.body.policy, { ...GRANT_POLICY, evaluation: "off" });
   assert.equal(shown.length, 1);
 });
 
@@ -289,6 +290,72 @@ test("a malformed session policy fails before any dialog or QDash call", async (
     );
     assert.deepEqual(asked, [], JSON.stringify(parameterUpdates));
     assert.equal(fake.state.requests.length, before, JSON.stringify(parameterUpdates));
+  }
+});
+
+test("a quality gate QDash would refuse is blocked before the dialog, and a task gate is shown with its task", async () => {
+  const name = "qdash_create_agent_session";
+  const { tools, toolCall } = loadPi();
+  for (const [gates, problem] of [
+    [{ quality_gates: { average_gate_fidelity: { minimum: 0.99 } } }, /policy\.quality_gates: a session-wide gate would check results of every task/],
+    [{ task_quality_gates: { CheckRabi: { average_gate_fidelity: { minimum: 0.99 } } } }, /policy\.task_quality_gates\.CheckRabi/],
+    [{ task_quality_gates: { RandomizedBenchmarking: { r2: { minimum: 0.9 } } } }, /RandomizedBenchmarking must also be in allowed_tasks/],
+  ]) {
+    const input = { chipId: "chip-001", policy: { ...structuredClone(GRANT_POLICY), ...gates } };
+    const asked = [];
+    const before = fake.state.requests.length;
+    const blocked = await toolCall({ toolName: name, toolCallId: "gate", input }, withUi(true, asked));
+    assert.equal(blocked?.block, true, JSON.stringify(gates));
+    assert.match(blocked.reason, /Invalid agent session policy; no session was created/);
+    assert.match(blocked.reason, problem);
+    await assert.rejects(tools.get(name).execute("gate", input, undefined, undefined, withUi(true, asked)), problem);
+    assert.deepEqual(asked, []);
+    assert.equal(fake.state.requests.length, before);
+  }
+
+  const { allowed_overrides: _bounds, ...unbounded } = structuredClone(GRANT_POLICY);
+  const gated = { ...unbounded, task_quality_gates: { CheckRabi: { r2: { minimum: 0.9 } } } };
+  const shown = [];
+  const ctx = { ...noUi(), hasUI: true, ui: { async confirm(_title, message) { shown.push(message); return true; } } };
+  assert.equal(await toolCall({ toolName: name, toolCallId: "gated", input: { chipId: "chip-001", policy: gated } }, ctx), undefined);
+  assert.match(shown[0], /- quality gates \(each checks only its task's results\): CheckRabi: r2 \[0\.9, inf\]/);
+  assert.doesNotMatch(shown[0], /session-wide quality gates/);
+  // A grant without bounds says the task's own checks decide; no number is shown for it.
+  assert.match(shown[0], /- Update criteria: qubit_frequency no numeric bounds \(its task's own checks decide\)/);
+  const before = fake.state.requests.length;
+  await tools.get(name).execute("gated", { chipId: "chip-001", policy: gated }, undefined, undefined, ctx);
+  const posted = fake.state.requests.slice(before).find((request) => request.method === "POST" && request.path.endsWith("/agent-sessions"));
+  assert.deepEqual(posted.body.policy.task_quality_gates, { CheckRabi: { r2: { minimum: 0.9 } } });
+});
+
+test("session creation refuses missing or changed evaluation authority from the server", async () => {
+  const originalFetch = globalThis.fetch;
+  const { tools } = loadPi();
+  try {
+    for (const [requested, returned] of [["required", undefined], ["required", "off"], [undefined, undefined], ["off", "required"], ["required", "required"], [undefined, "off"]]) {
+      globalThis.fetch = async (...args) => {
+        const response = await originalFetch(...args);
+        const init = args[1];
+        const method = args[0] instanceof Request ? args[0].method : init?.method;
+        const url = args[0] instanceof Request ? args[0].url : String(args[0]);
+        if (method?.toUpperCase() === "POST" && url.endsWith("/agent-sessions")) {
+          const body = await response.json();
+          if (returned === undefined) delete body.policy.evaluation;
+          else body.policy.evaluation = returned;
+          return new Response(JSON.stringify(body), { status: response.status, headers: response.headers });
+        }
+        return response;
+      };
+      const policy = structuredClone(GRANT_POLICY);
+      if (requested !== undefined) policy.evaluation = requested;
+      const call = tools.get("qdash_create_agent_session").execute("evaluation-contract", { chipId: "chip-001", policy }, undefined, undefined, withUi(true));
+      if (returned !== (requested ?? "off")) await assert.rejects(call, /without the approved evaluation mode/);
+      else await call;
+      const posted = fake.state.requests.filter((r) => r.method === "POST" && r.path.endsWith("/agent-sessions")).at(-1);
+      assert.equal(posted.body.policy.evaluation, requested ?? "off");
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
   }
 });
 

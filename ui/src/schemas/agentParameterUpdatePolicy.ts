@@ -15,13 +15,16 @@
  * from a completed measurement of one of ``tasks`` on a session qubit, and with
  * ``apply_backend`` also write that committed value to the backend, without a per-update
  * approval. QDash still requires, for every such update, an explicit ``pass`` assessment
- * the agent recorded for that measurement, the session's candidate bounds and quality
- * gates, the task's own completion checks, and the current session and calibration state.
- * A failed, uncertain, or unexplained result is never committed this way.
+ * the agent recorded for that measurement, the task's own completion checks (a completed
+ * task result, so its fit and validation checks passed), the current session and
+ * calibration state, and any numeric bounds or task quality gates the session holds for
+ * the parameter and task. The grant names which parameters may change; it does not need
+ * numeric bounds, so none has to be made up to authorize it. A failed, uncertain, or
+ * unexplained result is never committed this way.
  */
 export interface AgentParameterUpdatePolicy {
   /**
-     * Calibration parameters the agent may commit; each needs both bounds in allowed_overrides
+     * Calibration parameters the agent may commit. Numeric bounds are optional: bounds in allowed_overrides, when the session has them, still apply; without them a candidate is accepted on its task's own completion checks
      * @minItems 1
      * @maxItems 50
      */

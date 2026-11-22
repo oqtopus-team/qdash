@@ -56,6 +56,7 @@ from qdash.api.services.agent_execution_links import resolve_chip_links
 from qdash.api.services.agent_intervention_slack import AgentInterventionSlackNotifier
 from qdash.api.services.agent_session_gate import (
     autonomous_session_refusal,
+    end_notification_update,
     in_flight_blockers,
     load_agent_session,
     materialize_pending_intervention,
@@ -75,6 +76,7 @@ from qdash.datamodel.agent_session import (
     AgentNotificationDelivery,
     AgentNotificationStatus,
     AgentResumeOutcomeRecord,
+    AgentSessionLifecycleEvent,
     AgentSessionStatus,
 )
 from qdash.dbmodel.agent_session import (
@@ -281,6 +283,11 @@ class AgentInterventionService:
     def __init__(self, notifier: AgentInterventionSlackNotifier | None = None) -> None:
         """Initialize with the Slack notifier for the agent channel."""
         self._notifier = notifier or AgentInterventionSlackNotifier()
+
+    @property
+    def notifier(self) -> AgentInterventionSlackNotifier:
+        """The agent channel notifier, shared with the session lifecycle messages."""
+        return self._notifier
 
     # ------------------------------------------------------------------ lookups
 
@@ -1312,6 +1319,10 @@ class AgentInterventionService:
                 next_session |= {
                     "status": AgentSessionStatus.CANCELLED.value,
                     "active_intervention_id": None,
+                    # The end message is stored by the update that ends the session.
+                    **end_notification_update(
+                        session, AgentSessionLifecycleEvent.CANCELLED, actor=username
+                    ),
                 }
             elif doc.checkpoint is None:
                 next_session |= {
@@ -1706,12 +1717,16 @@ def run_notification_sweeper(
 ) -> asyncio.Task[None] | None:
     """Start the loop that retries due Slack deliveries, when agent notifications are on.
 
+    The loop also sends due session start and end messages and expires overdue sessions.
     Each API worker runs its own loop; the delivery lease keeps two workers from posting the
     same message at once. Returns None when Slack agent notifications are not configured.
     """
+    from qdash.api.services.agent_session_notifications import AgentSessionNotificationService
+
     sweeper_service = service or AgentInterventionService()
     if not sweeper_service._notifier.is_enabled():
         return None
+    lifecycle = AgentSessionNotificationService(sweeper_service.notifier)
 
     async def sweep() -> None:
         while True:
@@ -1720,5 +1735,10 @@ def run_notification_sweeper(
                 await asyncio.to_thread(sweeper_service.retry_due_notifications)
             except Exception:
                 logger.exception("Agent intervention Slack sweep failed")
+            try:
+                # Expires overdue sessions too, so their end is announced without a reader.
+                await asyncio.to_thread(lifecycle.sweep)
+            except Exception:
+                logger.exception("Agent session lifecycle Slack sweep failed")
 
     return asyncio.get_running_loop().create_task(sweep())

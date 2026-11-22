@@ -64,13 +64,20 @@ of `qdash_create_agent_session` is one schema, `agentSessionPolicySchema` in
 both expose. It spells out `AgentSessionPolicy` with its nested types, including `autonomy`,
 `max_rounds_per_target`, and `parameter_updates` as an object, so Pi rejects a malformed policy,
 such as `parameter_updates` sent as a list, before the approval and before any QDash call; the
-tool checks the policy again before it asks. QDash still validates every policy itself.
+tool checks the policy again before it asks. `preApprovalProblems` adds the checks a schema
+cannot express, such as a quality gate on a task outside `allowed_tasks` or a session-wide
+`quality_gates`, and both hosts run it before they show an approval (the pi write gate and the
+runtime's approval card). QDash still validates every policy itself. A client that sends
+`task_quality_gates` refuses a created session whose response lacks them, because a QDash
+release that predates the field ignores it.
 
 Commits and backend applies are reviewed writes unless the same approval also granted
 `parameter_updates` ([Update authority](#update-authority)). The approval card
 (`AgentSessionPolicyPreview` in `ui/src/components/features/chat/`) and the pi confirmation
-(`agentSessionApprovalText`) list the qubits, tasks, bounds, quality gates, budget, expiry, and
-whether parameter updates and backend applies are granted, above the exact policy. An `auto`
+(`agentSessionApprovalText`) list the qubits, tasks, bounds, each quality gate with the task
+it checks, budget, expiry, the evaluation mode, whether parameter updates and backend applies
+are granted, and for each granted parameter its bounds or that its task's own checks decide,
+above the exact policy. An `auto`
 session cannot replace a paused one: QDash refuses to create one for qubits that one of the same
 user's sessions on the chip is paused for, and `qdash_create_agent_session` checks
 `pausedSessionConflict` first.
@@ -175,24 +182,63 @@ reviewed write. The commit advances the state version, so the model reads the co
 before the next step. If the user declines a reviewed commit, the model reports the staged
 value instead of measuring as if it had changed.
 
-Only an accepted candidate can be committed, and the session's `allowed_overrides` decides
-which outputs can be accepted: each key bounds a task input a step may override and also the
-task output of the same name (`gate_task_result` in `agent_session_service.py`). An output that
-is not a key is staged with `accepted: false` and the reason "not allowed by the session
-policy", and the policy cannot change after approval. The model therefore names each output the
-goal must commit when it proposes the session. `qdash_get_pipeline_catalog` with `taskNames`
-lists the declared output names and units, the `policy` parameter of
-`qdash_create_agent_session` states the rule, and the `qdash-agent-calibration` skill takes each
-bound from the task knowledge or asks the user for it rather than inventing a range. A bound is a
-deterministic check, not a quality verdict.
+Only an accepted candidate can be committed (`gate_task_result` in
+`agent_session_service.py`). A candidate is accepted on one of two bases, which it reports in
+`acceptance_basis`:
+
+- `session_bounds`: the output's name is a key of `allowed_overrides` and the value lies inside
+  those bounds. Each key bounds a task input a step may override and also the task output of
+  the same name.
+- `task_checks`: the output is a parameter the session's [update authority](#update-authority)
+  grants from this task, and `allowed_overrides` holds no bounds for it. Only the task's own
+  completion checks decide, which passed because only a completed task result yields
+  candidates.
+
+Any other output is staged with `accepted: false` and the reason "not allowed by the session
+policy", and the policy cannot change after approval. Bounds that exist always apply, so a
+session approved with bounds keeps them.
+
+QDash cannot tell who wrote a number in a policy: it records bounds and gates as approved with
+the session. No managed configuration of output bounds exists. The task catalog's input limits
+(`greater_than_or_equal`, `less_than_or_equal`) apply to inputs, and the thresholds in
+`config/domain/metrics.yaml` are display metadata, so neither is a candidate bound. The
+`policy` parameter of `qdash_create_agent_session`, its prompt guidelines, and the
+`qdash-agent-calibration` skill therefore tell the model never to author a bound or gate: it
+puts numbers in the policy only when the user stated them, and without them the task's own
+checks are the criterion. This is guidance; the server cannot verify where a number came from.
+A bound is a deterministic check, not a quality verdict.
+
+### Quality gates
+
+A quality gate bounds a quality metric of a task result, not an output parameter.
+`TaskResultHistoryDocument.quality_metrics` holds only what the workflow engine writes there,
+which is the fit coefficient of determination `r2` when the task's `RunResult` reports one
+(`RECORDED_QUALITY_METRICS` in `src/qdash/datamodel/quality_metrics.py`). A fidelity or a
+frequency is an output parameter: an output of `RandomizedBenchmarking` such as
+`average_gate_fidelity` is never a quality metric of any task.
+
+`AgentSessionPolicy.task_quality_gates` maps a task to metric bounds, for example
+`{"CheckRabi": {"r2": {"minimum": 0.9}}}`. A gate checks only results of its own task, and a
+missing metric on such a result rejects the candidate. `CreateAgentSessionRequest` refuses,
+before anything is stored, a gate whose task is not in `allowed_tasks`, a task with no metric,
+and a metric QDash does not record. The task catalog does not declare which tasks report `r2`,
+so creation cannot prove that a gated task will report it; a result without it fails closed.
+
+The session-wide `quality_gates` field checks every candidate of every task. A new session must
+leave it empty, because a metric one task reports would reject every other task's candidates.
+A session approved before `task_quality_gates` keeps its session-wide gates with their exact
+meaning; to scope them to a task, approve a new session. `quality_gates_for` returns the gates
+that apply to one task, and each candidate lists them in `applied_quality_gates`, as do the
+audit's measurement facts and the update evidence.
 
 ### Update authority
 
 `AgentSessionPolicy.parameter_updates` is an opt-in part of the session approval:
-`parameters` (each needs both a minimum and a maximum in `allowed_overrides`), `tasks` (a subset
-of `allowed_tasks` whose results may supply them), and `apply_backend` (default `false`). It
-requires `autonomy: auto`. A session without it, including every session created before the
-field existed, grants nothing, and its commits and applies stay reviewed.
+`parameters` (the outputs that may change), `tasks` (a subset of `allowed_tasks` whose results
+may supply them), and `apply_backend` (default `false`). It requires `autonomy: auto`. The
+grant needs no numeric bounds; bounds in `allowed_overrides`, when the user gave them, apply on
+top. A session without it, including every session created before the field existed, grants
+nothing, and its commits and applies stay reviewed.
 
 `qdash_commit_agent_session_update` is session-granted. It reads the grant from the session
 QDash returns, refuses a parameter, task, or result outside it, records the model's `pass`
@@ -209,18 +255,38 @@ authenticated user and its own records:
 | Check | Refused when |
 | --- | --- |
 | Authority | The signed-in user is not the creator (403), the session is not `auto`, or the grant does not name the parameter and the action's task |
-| Measurement | The action did not complete, the candidate is rejected by the bounds or `quality_gates`, a newer settled measurement of the same task and qubit exists, or another measurement of the session is running |
+| Measurement | The action did not complete, the candidate is rejected by its bounds or the quality gates of its task, a newer settled measurement of the same task and qubit exists, or another measurement of the session is running |
 | Assessment | `decision_id` is not a decision of the session by its creator, does not cite the action, is not `pass`, names a next step other than `propose_commit`, `next_task`, or `complete`, or was superseded; any decision on the action was ever `fail` or `inconclusive`; a later decision on it is not `pass` |
-| Evaluations | An evaluation of the task result is still pending or running; ended `failed`, `cancelled`, or `interrupted`; completed without a diagnosis, without a `fit_reliability` or `calibration_diagnosis` answer, with a fit other than `Reliable`, or with a status other than `SUCCESS`; or has a reviewer who disagreed |
+| Evaluations | The session's evaluation mode is `required` and the task result has no evaluation; an evaluation of the task result is still pending or running; ended `failed`, `cancelled`, or `interrupted`; completed without a diagnosis, without a `fit_reliability` or `calibration_diagnosis` answer, with a fit other than `Reliable`, or with a status other than `SUCCESS`; or has a reviewer who disagreed |
 | Session evidence | Any run of the session has [unresolved evidence](#unresolved-evidence) |
 | State | The stored value is not exactly the one recorded when the action was proposed (`metadata.parameter_baseline`), or none was recorded; the candidate was already committed; the session is not active; or the state version moved |
 
 The task's own completion checks, such as the R² threshold that fails a task in
-`TaskExecutor`, apply because only a completed task result yields candidates. A result without
-any evaluation can still be committed; `assessment_evidence.evaluation_state` then says `none`
-instead of `supported`. The commit records `authority: session_policy`, the `decision_id`, and
-`assessment_evidence`: the agent-reported assessment, the server-computed gates, the evaluation
-facts, and a note that neither the pass nor the gates are a scientific verdict.
+`TaskExecutor`, apply because only a completed task result yields candidates. The commit
+records `authority: session_policy`, the `decision_id`, and `assessment_evidence`
+(`qdash.agent-update-evidence.v3`): the agent-reported assessment; the server-computed gates
+with `acceptance_basis`, the bounds, `applied_quality_gates`, and `task_checks`; the
+evaluation facts with the evaluator's reported model; and a note that neither the pass nor the
+gates are a scientific verdict.
+
+### Evaluation mode
+
+`AgentSessionPolicy.evaluation` fixes at approval whether the calibration evaluator
+(`qcal_evaluate` from pi-qcaleval) is part of the session. The evaluator is separate from the
+task's completion checks and from bounds and gates.
+
+| Mode | Agent | QDash before a commit |
+| --- | --- | --- |
+| `off` (default for new sessions) | Does not call `qcal_evaluate` and reports no evaluator verdict | Needs no evaluation; `evaluation_state` is `not_requested` when none exists |
+| `required` | Evaluates each result before committing it | Refuses an autonomous or reviewed commit without a completed evaluation with a `Reliable` fit and a `SUCCESS` diagnosis; waits while one is pending |
+| `null` (sessions approved before the field) | Evaluates when the host offers `qcal_evaluate`, as before | As before; `evaluation_state` is `none` when no evaluation exists |
+
+In every mode, an evaluation that exists for the result must support the update, so turning
+the evaluator off never clears a pending, failed, disputed, or negative evaluation, and
+[unresolved evidence](#unresolved-evidence) still stops the session. The mode cannot change
+during the session, and no request field overrides it. pi-qcaleval stays installed; the mode
+reaches the model through the session context's `scope.evaluation` and `next`, so skipping the
+call under `off` is guidance, while `required` is enforced by QDash.
 
 The stored value is versioned by its content, because `QubitDocument` has no version field and
 standalone MongoDB has no transactions (`qdash.dbmodel.agent_parameter_state`). An autonomous
@@ -620,6 +686,35 @@ can quote request headers or the token; the warning log uses the same summary. A
 that times out after Slack accepted it is indistinguishable from a lost one, so delivery is at
 least once, not exactly once.
 
+### Session start and end messages
+
+The same channel, bot, and `SLACK_AGENT_NOTIFICATION` toggle also announce when a session starts
+and ends (`src/qdash/api/services/agent_session_notifications.py`). The start message follows
+the creation of an approved session, not a proposal or a chat. The end message follows the
+first and only update that ends it: an authorized `complete_session` (`completed`), an expert's
+stop (`cancelled`), or the expiry (`expired`). A pause for an expert is not an end and keeps
+only its intervention message.
+
+Each message's delivery state is stored on the session document: `start_notification` by the
+insert that creates the session, and `end_notification` by the status-guarded update that ends
+it (`end_notification_update` in `agent_session_gate.py`). Only one end update can match the
+session's status, so there is one end event, and a crash after the transition leaves a pending
+delivery rather than a lost one. Delivery reuses the intervention lease, backoff, attempt limit,
+and error summary; a request's background task makes the first attempt, and the notification
+sweeper retries due messages and expires overdue sessions, so an expiry is announced without a
+reader. A message that used up its six attempts stays `failed`; no endpoint retries it. Delivery
+is at least once for the same reason as above. A message never changes the session.
+
+A message names the project, environment, chip, targets, creator, session id, and the model the
+host reported (or "not reported"), with links to the session page and its graph for the
+session's project. A start message adds the tasks, autonomy, client (`skill_name`), and expiry;
+an end message adds who ended it and counts of authorized measurements, committed updates,
+interventions, and actions used, all read from QDash's records. Recorded values are sent as
+Slack `plain_text`, so none is read as formatting, a mention, or a link. An end message replies
+in the start message's thread, broadcast to the channel, when the start message was sent. A
+session created before these messages existed gets none, and a session created while they
+were disabled is never announced later.
+
 ## Experiment audit
 
 A session's experiment audit is a chronological timeline that
@@ -874,12 +969,13 @@ Each layer keeps its own status, and the plan reads them from the outside in.
 
 | Object | Values | Set by |
 | --- | --- | --- |
-| Agent session | `active`, `waiting_for_human`, `completed`, `cancelled`, `expired` | `active` on creation; recording an intervention (directly or with an authorised `request_human`) sets `waiting_for_human`; an expert's resume or a runner's claim sets `active` again, an expert's stop sets `cancelled`; `complete_session` sets `completed`; a read or list after `expires_at` sets `expired`, paused or not |
+| Agent session | `active`, `waiting_for_human`, `completed`, `cancelled`, `expired` | `active` on creation; recording an intervention (directly or with an authorised `request_human`) sets `waiting_for_human`; an expert's resume or a runner's claim sets `active` again, an expert's stop sets `cancelled`; `complete_session` sets `completed`; a read, a list, or the notification sweeper after `expires_at` sets `expired`, paused or not |
 | Intervention | `open`, `responding`, `resume_authorized`, `resumed`, `stopped`, `discarded` | See [Human interventions](#human-interventions); current servers no longer set `discarded` |
 | Intervention Slack delivery | `disabled`, `pending`, `sending`, `sent`, `failed` | The API's delivery attempts |
+| Session start and end delivery | The same values, per message, with `event` `started`, `completed`, `cancelled`, or `expired` | The API's delivery attempts |
 | Action decision | `authorized`, `rejected` | The policy check at proposal time; a rejection is recorded and never executed |
 | Action execution | `not_started`, `dispatching`, `queued`, then the execution's `running`, `completed`, `failed`, `cancelled`; `failed` on a dispatch error | Dispatch, then each read syncs the linked execution's status; see [The execution barrier](#the-execution-barrier) |
-| Candidate | `accepted` true or false with a reason | The bounds and quality gates on the task result |
+| Candidate | `accepted` true or false with a reason and `acceptance_basis` | Its bounds, or the update grant's task checks, and the quality gates of its task |
 | Candidate commit, candidate set commit | `reserving`, `committing`, `committed`, `failed` | `reserving` until the session gate passes, `committing` during the Qubit save, settled after it |
 | Evaluation run | `running`, `completed`, `interrupted`, `cancelled` | The API worker; a stale heartbeat marks `interrupted` |
 | Evaluation | `pending`, `running`, `completed`, `failed`, `interrupted`, `cancelled` | One per task result in the run |
@@ -942,6 +1038,9 @@ planner may escalate after the value is already written; only `commit_on_success
   apply lease; worker checks in `src/qdash/workflow/service/agent_candidate_apply_flow.py`
 - `src/qdash/api/services/agent_intervention_service.py`,
   `src/qdash/api/services/agent_intervention_slack.py`: interventions, resume, Slack delivery
+- `src/qdash/api/services/agent_session_notifications.py`: session start and end messages;
+  tests in `tests/qdash/api/services/test_agent_session_notifications.py`
+- `src/qdash/datamodel/quality_metrics.py`: the quality metric names the workflow records
 - `src/qdash/api/services/agent_session_gate.py`: execution barrier, pause recovery, in-flight
   checks
 - `src/qdash/api/services/agent_session_audit.py`: decision records, evidence snapshots, the

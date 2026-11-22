@@ -73,6 +73,10 @@ export function reviewSessionCreation(args: Record<string, unknown>, context: Ap
     return decline(`the session must set expiresInSeconds from ${MIN_SESSION_EXPIRES_IN_SECONDS} to ${bounds.maxExpiresInSeconds} seconds`);
   }
   if (args.profile !== undefined || args.configPath !== undefined) return decline("the session must use the validation connection");
+  // No scenario's user asks for the calibration evaluator; off is the default.
+  if (policy.evaluation !== undefined && policy.evaluation !== "off") {
+    return decline("no scenario asks for the calibration evaluator; leave evaluation off");
+  }
   const grant = record(policy.parameter_updates);
   if (grant !== undefined || (policy.parameter_updates !== undefined && policy.parameter_updates !== null)) {
     const allowed = bounds.updates;
@@ -87,12 +91,15 @@ export function reviewSessionCreation(args: Record<string, unknown>, context: Ap
     }
     if (grant?.apply_backend === true && !allowed.applyBackend) return decline("this scenario approves no backend apply");
     if (policy.autonomy !== "auto") return decline("parameter updates need autonomy auto");
+    // A grant needs no bounds, and no scenario states any: a number the model put in the
+    // policy would be a threshold it authored, so the approver declines it.
     const overrides = record(policy.allowed_overrides) ?? {};
-    for (const name of parameters) {
-      const range = record(overrides[name]);
-      if (typeof range?.minimum !== "number" || typeof range?.maximum !== "number") {
-        return decline(`${name} needs both bounds before its updates are granted`);
-      }
+    const authored = parameters.filter((name) => overrides[name] !== undefined);
+    if (authored.length > 0) {
+      return decline(`no scenario states bounds for ${authored.join(", ")}; grant the parameter without them`);
+    }
+    if (policy.task_quality_gates !== undefined || policy.quality_gates !== undefined) {
+      return decline("no scenario states quality gates");
     }
     return { approve: true, reason: "scope and update grant match the scenario's approved session" };
   }

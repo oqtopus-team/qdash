@@ -8,8 +8,10 @@
 import type { AgentActionType } from './agentActionType';
 import type { AgentAutonomy } from './agentAutonomy';
 import type { AgentSessionPolicyAllowedOverrides } from './agentSessionPolicyAllowedOverrides';
+import type { AgentSessionPolicyEvaluation } from './agentSessionPolicyEvaluation';
 import type { AgentSessionPolicyParameterUpdates } from './agentSessionPolicyParameterUpdates';
 import type { AgentSessionPolicyQualityGates } from './agentSessionPolicyQualityGates';
+import type { AgentSessionPolicyTaskQualityGates } from './agentSessionPolicyTaskQualityGates';
 
 /**
  * Immutable scope authorized by a user for one agent session.
@@ -21,8 +23,12 @@ export interface AgentSessionPolicy {
   allowed_tasks: string[];
   /** @minItems 1 */
   allowed_actions?: AgentActionType[];
+  /** Parameter name -> bounds. A step may override a task input of that name within the bounds, and a task output of that name is an accepted candidate only inside them. Output parameters are bounded here, never in quality gates. Give only bounds a person stated; QDash records them as approved with the session and cannot verify where they came from */
   allowed_overrides?: AgentSessionPolicyAllowedOverrides;
+  /** Legacy session-wide quality gates: metric name -> bounds checked on every candidate of every task. Kept so sessions approved before task_quality_gates keep their exact meaning; a new session must leave it empty and use task_quality_gates. */
   quality_gates?: AgentSessionPolicyQualityGates;
+  /** Task name -> quality metric name -> bounds. A candidate from a result of that task is accepted only when the result records each named metric inside its bounds; a missing metric rejects it. Results of other tasks are not checked against these gates. Each task must be an allowed task, and each metric a quality metric QDash records on task results (currently only r2). */
+  task_quality_gates?: AgentSessionPolicyTaskQualityGates;
   allow_reconfigure?: boolean;
   /**
      * @minimum 1
@@ -39,4 +45,6 @@ export interface AgentSessionPolicy {
   max_rounds_per_target?: number;
   /** Opt-in authority to commit (and optionally apply) passing candidates without a per-update approval; absent means every commit and apply is reviewed */
   parameter_updates?: AgentSessionPolicyParameterUpdates;
+  /** Calibration evaluator use, fixed at approval: off (the agent does not call qcal_evaluate) or required (every autonomous update needs a completed evaluation of its result with a reliable fit and a SUCCESS diagnosis). New sessions record off unless they ask for required; null marks a session approved before this field, which keeps its earlier meaning. In every mode an existing evaluation that is pending, failed, disputed, or negative blocks an update */
+  evaluation?: AgentSessionPolicyEvaluation;
 }

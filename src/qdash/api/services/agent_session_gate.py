@@ -23,6 +23,11 @@ the session document, which MongoDB applies one at a time:
 - A resume reads the in-flight records only while the session is paused, so no new
   operation can pass the gate between that read and the resume update.
 
+A session's end (``completed``, ``cancelled``, ``expired``) is one update guarded by the
+session's current status, and that update also stores the pending Slack end message
+(``end_notification_update``). Only one end update can match, so a session has one logical
+end event, and a crash after the transition leaves a pending delivery, never a lost one.
+
 A reservation that never passed the gate (its request crashed) is released after
 ``ABANDONED_RESERVATION_TIMEOUT``. A confirmed reservation whose request crashed is never
 released automatically, because QDash cannot tell whether the operation started.
@@ -44,6 +49,9 @@ from qdash.datamodel.agent_session import (
     AgentActionDecision,
     AgentActionType,
     AgentAutonomy,
+    AgentNotificationStatus,
+    AgentSessionLifecycleEvent,
+    AgentSessionNotification,
     AgentSessionStatus,
 )
 from qdash.dbmodel.agent_session import (
@@ -89,8 +97,33 @@ def raw_document(doc: Any) -> dict[str, Any]:
 # ---------------------------------------------------------------------- session loading
 
 
-def expire_session_if_due(doc: AgentSessionDocument, *, at: datetime | None = None) -> None:
-    """Expire an active or paused session whose expiry has passed."""
+def end_notification_update(
+    doc: AgentSessionDocument, event: AgentSessionLifecycleEvent, *, actor: str = ""
+) -> dict[str, Any]:
+    """The ``$set`` fields that store a session's end message with the update that ends it.
+
+    A session created before lifecycle messages existed gets none. The end message is pending
+    when the start message was meant to be sent, and disabled when it was not, so a session
+    never announces only its end.
+    """
+    start = doc.start_notification
+    if start is None:
+        return {}
+    enabled = start.status != AgentNotificationStatus.DISABLED
+    notification = AgentSessionNotification(
+        event=event,
+        actor=actor,
+        status=AgentNotificationStatus.PENDING if enabled else AgentNotificationStatus.DISABLED,
+        next_attempt_at=now() if enabled else None,
+    )
+    return {"end_notification": to_bson(notification.model_dump())}
+
+
+def expire_session_if_due(doc: AgentSessionDocument, *, at: datetime | None = None) -> bool:
+    """Expire an active or paused session whose expiry has passed.
+
+    Returns whether this call made the transition; a concurrent one that won leaves False.
+    """
     expires_at = ensure_timezone(doc.expires_at)
     timestamp = at or now()
     if (
@@ -98,16 +131,39 @@ def expire_session_if_due(doc: AgentSessionDocument, *, at: datetime | None = No
         and expires_at is not None
         and expires_at <= timestamp
     ):
-        AgentSessionDocument.get_motor_collection().update_one(
+        ending = end_notification_update(doc, AgentSessionLifecycleEvent.EXPIRED)
+        result = AgentSessionDocument.get_motor_collection().update_one(
             {
                 "project_id": doc.project_id,
                 "session_id": doc.session_id,
                 "status": doc.status.value,
             },
-            {"$set": {"status": AgentSessionStatus.EXPIRED.value, "updated_at": timestamp}},
+            {
+                "$set": {
+                    "status": AgentSessionStatus.EXPIRED.value,
+                    "updated_at": timestamp,
+                    **ending,
+                }
+            },
         )
+        if result.modified_count != 1:
+            # Another update changed the session first; read what it stored.
+            fresh = AgentSessionDocument.find_one(
+                {"project_id": doc.project_id, "session_id": doc.session_id}
+            ).run()
+            if fresh is not None:
+                doc.status = fresh.status
+                doc.updated_at = fresh.updated_at
+                doc.end_notification = fresh.end_notification
+            return False
         doc.status = AgentSessionStatus.EXPIRED
         doc.updated_at = timestamp
+        if ending:
+            doc.end_notification = AgentSessionNotification.model_validate(
+                ending["end_notification"]
+            )
+        return True
+    return False
 
 
 def materialize_pending_intervention(doc: AgentSessionDocument) -> None:

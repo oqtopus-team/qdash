@@ -10,8 +10,11 @@ from pydantic import BaseModel, Field, model_validator
 from qdash.datamodel.agent_session import (
     AgentActionDecision,
     AgentActionType,
+    AgentAppliedQualityGate,
+    AgentCandidateAcceptanceBasis,
     AgentDecisionAssessment,
     AgentDecisionNextAction,
+    AgentEvaluationMode,
     AgentInterventionAttempt,
     AgentInterventionDecision,
     AgentInterventionEvent,
@@ -22,9 +25,11 @@ from qdash.datamodel.agent_session import (
     AgentNotificationStatus,
     AgentPlanCheckpoint,
     AgentResumeOutcomeRecord,
+    AgentSessionLifecycleEvent,
     AgentSessionPolicy,
     AgentSessionStatus,
 )
+from qdash.datamodel.quality_metrics import RECORDED_QUALITY_METRICS
 
 MODEL_FIELD_DESCRIPTION = (
     "The provider and model the client host reports it ran the agent with, read from the "
@@ -57,6 +62,51 @@ class CreateAgentSessionRequest(BaseModel):
     skill_hash: str = Field(default="", max_length=256)
     model: AgentModelIdentity | None = _model_field()
 
+    @model_validator(mode="after")
+    def validate_new_quality_gates(self) -> CreateAgentSessionRequest:
+        """Accept only task-scoped gates on metrics QDash records, before anything is stored.
+
+        A session-wide gate checks results of every task, so a metric only one task reports
+        rejects every other task's candidates. Sessions created before task_quality_gates
+        keep their session-wide gates; a new session states each gate's task.
+        """
+        policy = self.policy
+        if policy.evaluation is None:
+            # A new session records its evaluator use; null is kept for older records only.
+            self.policy = policy = policy.model_copy(update={"evaluation": AgentEvaluationMode.OFF})
+        if policy.quality_gates:
+            names = ", ".join(sorted(policy.quality_gates))
+            raise ValueError(
+                f"quality_gates ({names}) would check results of every task; new sessions "
+                "name each gate's task in task_quality_gates instead, for example "
+                '{"CheckRabi": {"r2": {"minimum": ...}}}'
+            )
+        recorded = ", ".join(sorted(RECORDED_QUALITY_METRICS))
+        for task_name, gates in sorted(policy.task_quality_gates.items()):
+            unknown = sorted(set(gates) - RECORDED_QUALITY_METRICS)
+            if unknown:
+                raise ValueError(
+                    f"task_quality_gates for {task_name} names {', '.join(unknown)}, which "
+                    f"QDash does not record as a quality metric (recorded: {recorded}). A "
+                    "task output such as a fidelity or frequency is bounded in "
+                    "allowed_overrides, and a value of another task is not evidence for "
+                    "this one"
+                )
+        return self
+
+
+class AgentSessionNotificationResponse(BaseModel):
+    """Slack delivery state of one session lifecycle message."""
+
+    event: AgentSessionLifecycleEvent
+    actor: str = ""
+    status: AgentNotificationStatus
+    attempts: int
+    last_error: str
+    last_attempt_at: datetime | None = None
+    next_attempt_at: datetime | None = None
+    sent_at: datetime | None = None
+
 
 class AgentSessionResponse(BaseModel):
     """Authoritative state returned for an agent session."""
@@ -82,6 +132,20 @@ class AgentSessionResponse(BaseModel):
     expires_at: datetime
     active_intervention_id: str | None = Field(
         default=None, description="The intervention the session waits on, if any"
+    )
+    start_notification: AgentSessionNotificationResponse | None = Field(
+        default=None,
+        description=(
+            "Slack delivery of the session's start message; null for a session created "
+            "before lifecycle messages existed"
+        ),
+    )
+    end_notification: AgentSessionNotificationResponse | None = Field(
+        default=None,
+        description=(
+            "Slack delivery of the session's end message, stored by the update that ended "
+            "it; null while the session is open"
+        ),
     )
 
 
@@ -244,6 +308,21 @@ class AgentCandidateResponse(BaseModel):
     unit: str = ""
     value_type: str = "float"
     quality_metrics: dict[str, float] = Field(default_factory=dict)
+    applied_quality_gates: list[AgentAppliedQualityGate] = Field(
+        default_factory=list,
+        description=(
+            "The session's quality gates this result was checked against: its task's gates "
+            "and any legacy session-wide gate. Gates of other tasks are not listed."
+        ),
+    )
+    acceptance_basis: AgentCandidateAcceptanceBasis | None = Field(
+        default=None,
+        description=(
+            "What accepted the candidate: session_bounds (inside numeric bounds approved with "
+            "the session) or task_checks (a parameter the session's update grant names, "
+            "without bounds, accepted on its task's completion checks); null when rejected"
+        ),
+    )
     accepted: bool
     reason: str
     minimum: float | None = None

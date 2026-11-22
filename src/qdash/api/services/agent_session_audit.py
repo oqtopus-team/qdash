@@ -307,6 +307,7 @@ def _gate_rows(
             "error": row.error,
             "unit": row.unit,
             "accepted": row.accepted,
+            "acceptance_basis": row.acceptance_basis.value if row.acceptance_basis else None,
             "reason": _text(row.reason, 300),
             "minimum": row.minimum,
             "maximum": row.maximum,
@@ -362,6 +363,11 @@ def _measurement_facts(
         "outputs": outputs,
         "quality_metrics": metrics,
         "gate": _gate_rows(records.session, action.action_id, result),
+        # The quality gates of the session that apply to this task's result.
+        "applied_quality_gates": [
+            gate.model_dump(mode="json")
+            for gate in records.session.policy.quality_gates_for(result.name)
+        ],
         "artifacts": {
             "task_result_path": f"/tasks/{result.task_id}/result",
             "figures": len(result.figure_path),

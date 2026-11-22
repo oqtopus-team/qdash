@@ -51,7 +51,9 @@ export function AgentSessionPolicyPreview({
   expiresInSeconds?: unknown;
 }) {
   const overrides = Object.entries(record(policy.allowed_overrides) ?? {});
-  const gates = Object.entries(record(policy.quality_gates) ?? {});
+  // Legacy session-wide gates check every task; a new policy names each gate's task.
+  const sessionWideGates = Object.entries(record(policy.quality_gates) ?? {});
+  const taskGates = Object.entries(record(policy.task_quality_gates) ?? {});
   const autonomy = policy.autonomy === "auto" ? "auto" : "confirm_each";
   const updates = record(policy.parameter_updates);
   const maxActions = typeof policy.max_actions === "number" ? policy.max_actions : 100;
@@ -77,11 +79,30 @@ export function AgentSessionPolicyPreview({
             "none"
           )}
         </Row>
-        {gates.length > 0 && (
+        {taskGates.length > 0 && (
           <Row label="Quality gates">
+            <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
+              {taskGates.map(([task, gates]) => (
+                <li key={task}>
+                  <span className="font-mono">
+                    {Object.entries(record(gates) ?? {})
+                      .map(([name, value]) => `${name} ${boundsText(value)}`)
+                      .join("; ")}
+                  </span>{" "}
+                  <span className="text-base-content/60">
+                    only on <span className="font-mono">{task}</span> results
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </Row>
+        )}
+        {sessionWideGates.length > 0 && (
+          <Row label="Session-wide gates">
             <span className="font-mono">
-              {gates.map(([name, value]) => `${name} ${boundsText(value)}`).join("; ")}
-            </span>
+              {sessionWideGates.map(([name, value]) => `${name} ${boundsText(value)}`).join("; ")}
+            </span>{" "}
+            <span className="text-base-content/60">on every task&apos;s results</span>
           </Row>
         )}
         <Row label="Steps">
@@ -90,6 +111,11 @@ export function AgentSessionPolicyPreview({
             : `each action asks you, up to ${maxActions}`}
         </Row>
         <Row label="Expires">{expiry}</Row>
+        <Row label="Evaluation">
+          {policy.evaluation === "required"
+            ? "required: qcal_evaluate must support each result before a commit"
+            : "off: qcal_evaluate is not called"}
+        </Row>
         <Row label="Parameter updates">
           {updates ? (
             <span className="flex flex-wrap items-center gap-1">
@@ -107,11 +133,34 @@ export function AgentSessionPolicyPreview({
         </Row>
       </dl>
       {updates && (
+        <dl
+          className="m-0 grid grid-cols-[fit-content(40%)_minmax(0,1fr)] gap-x-3 gap-y-1 text-xs"
+          data-testid="agent-session-update-criteria"
+        >
+          {strings(updates.parameters).map((name) => {
+            const bounds = record(policy.allowed_overrides)?.[name];
+            return (
+              <Row key={name} label={name}>
+                {bounds ? (
+                  <span className="font-mono">{boundsText(bounds)}</span>
+                ) : (
+                  <span className="text-base-content/60">
+                    no numeric bounds: its task&apos;s own checks decide
+                  </span>
+                )}
+              </Row>
+            );
+          })}
+        </dl>
+      )}
+      {updates && (
         <p className="text-xs text-base-content/60">
           Approving lets the agent commit these parameters
           {updates.apply_backend === true ? " and write them to the backend" : ""} after a result it
-          assesses as pass and QDash&apos;s bounds, quality gates, and task checks hold. A failed,
-          uncertain, or unexplained result stops for a person instead.
+          assesses as pass, its task completed with its own checks passing, and any bounds or
+          quality gates above hold. Bounds are the values in this request; QDash does not verify
+          where they came from. A failed, uncertain, or unexplained result stops for a person
+          instead.
         </p>
       )}
     </div>

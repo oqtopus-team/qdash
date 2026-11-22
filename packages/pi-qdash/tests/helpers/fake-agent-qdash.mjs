@@ -100,6 +100,7 @@ export function startFakeAgentQDash({ username: initialUser = "alice", projectId
       allowed_actions: ["run_task", "request_human", "complete_session"],
       allowed_overrides: {},
       quality_gates: {},
+      task_quality_gates: {},
       allow_reconfigure: false,
       max_actions: 100,
       autonomy: "confirm_each",

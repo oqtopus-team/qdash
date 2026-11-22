@@ -7,19 +7,20 @@ import test from "node:test";
 // and nothing here judges a scientific choice.
 const SKILL = readFileSync(new URL("../skills/qdash-agent-calibration/SKILL.md", import.meta.url), "utf8").replace(/\s+/g, " ");
 
-test("planning explains allowed_overrides as the candidate gate and where output names come from", () => {
-  assert.match(SKILL, /QDash uses `allowed_overrides` for two things: a step may override a task input of that name within the bounds, and a task output of that name becomes an accepted candidate only inside them\./);
-  assert.match(SKILL, /An output that is not a key is staged as rejected and can never be committed from this session/);
-  assert.match(SKILL, /under the output name and in the unit the catalog lists, and nothing the goal does not need: a key is also scope the user grants\./);
+test("planning separates which parameters may update from numeric bounds", () => {
+  assert.match(SKILL, /The grant says which parameters may change; it needs no numeric bounds\./);
+  assert.match(SKILL, /A granted output from a granted task is accepted when its task completed, so the task's own checks \(such as its fit R² threshold\) passed/);
+  assert.match(SKILL, /Without `parameter_updates` an output is a candidate only inside bounds in `allowed_overrides`, and every commit and apply is a separate approval\./);
   assert.match(SKILL, /declared input and output parameters with units from `qdash_get_pipeline_catalog` with `taskNames`/);
 });
 
-test("bounds come from evidence, update authority is part of the session approval, and doubtful results are never committed", () => {
-  assert.match(SKILL, /Take every bound from evidence, never from a habit or a round number/);
-  assert.match(SKILL, /When neither documents a range, do not invent one and do not widen a bound to be safe/);
-  assert.match(SKILL, /ask them for the accepted window, or put a proposed window in the session proposal and say plainly that it is your suggestion with no documented basis/);
-  assert.match(SKILL, /propose `parameter_updates` in the same policy: `parameters` \(exactly the outputs the goal commits\), `tasks` \(only the tasks that measure them\)/);
-  assert.match(SKILL, /Do not ask the user to invent extra thresholds/);
+test("the model never authors thresholds, update authority is part of the session approval, and doubtful results are never committed", () => {
+  assert.match(SKILL, /Never author a scientific threshold\. Do not derive bounds from the current value, a percent window, a round number, or your own reading of the task knowledge, and do not add bounds only to make a grant or a commit possible\./);
+  assert.match(SKILL, /Put numbers in `allowed_overrides` or `task_quality_gates` only when the user stated them in this conversation/);
+  assert.match(SKILL, /a gate never applies to another task, and an output such as `average_gate_fidelity` is not a quality metric/);
+  assert.match(SKILL, /measurement can proceed in the approved scope without it, but nothing can be committed/);
+  assert.doesNotMatch(SKILL, /put a proposed window in the session proposal/);
+  assert.match(SKILL, /propose `parameter_updates`: `parameters` \(exactly the outputs the goal commits, under the output names the catalog lists\), `tasks` \(only the tasks that measure them\)/);
   assert.match(SKILL, /commit it with `qdash_commit_agent_session_update`/);
   assert.match(SKILL, /Never commit a failed, uncertain, rejected, or unexplained result, and never record a pass you do not hold/);
   assert.match(SKILL, /Without a grant for the value, show the accepted candidate and propose `qdash_commit_agent_candidate`/);

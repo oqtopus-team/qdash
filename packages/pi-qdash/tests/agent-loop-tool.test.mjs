@@ -967,3 +967,33 @@ test("a granted backend apply follows the update; it is never requested without 
   assert.deepEqual([apply.body.autonomous, apply.body.push_to_github], [true, false]);
   assert.equal(fake.state.commits.at(-1).backend_authority, "session_policy");
 });
+
+test("the context and approval state the session's evaluator use; off never asks for qcal_evaluate", async () => {
+  const { agentSessionApprovalText } = await import("../.test-dist/lib/agent-loop.js");
+  const now = new Date("2026-11-22T02:00:00Z");
+  const contextWith = (evaluation) =>
+    buildAgentLoopContext({
+      session: {
+        session_id: "s", project_id: "p", chip_id: "c", created_by: "alice", status: "active", state_version: 0, action_count: 0,
+        created_at: "2026-11-22T01:55:00Z", expires_at: "2026-11-22T03:00:00Z", active_intervention_id: null,
+        policy: { qids: ["Q00"], allowed_tasks: ["CheckRabi"], autonomy: "auto", max_actions: 5, max_rounds_per_target: 3, allowed_overrides: {}, ...(evaluation === undefined ? {} : { evaluation }) },
+      },
+      actions: [],
+      interventions: [],
+      now,
+    });
+  const required = contextWith("required");
+  assert.equal(required.session.scope.evaluation, "required");
+  assert.match(required.next, /evaluate each result's figure with qcal_evaluate before you commit it/);
+  const off = contextWith("off");
+  assert.equal(off.session.scope.evaluation, "off");
+  assert.match(off.next, /do not call qcal_evaluate, and do not report an evaluator verdict/);
+  assert.doesNotMatch(off.next, /evaluate each result's figure/);
+  // An older session keeps its earlier meaning: no mode, no new instruction.
+  const legacy = contextWith(undefined);
+  assert.equal(legacy.session.scope.evaluation, null);
+  assert.doesNotMatch(legacy.next, /qcal_evaluate/);
+
+  assert.match(agentSessionApprovalText("c", { qids: ["Q00"], allowed_tasks: ["CheckRabi"], evaluation: "required" }), /- evaluation: required/);
+  assert.match(agentSessionApprovalText("c", { qids: ["Q00"], allowed_tasks: ["CheckRabi"] }), /- evaluation: off/);
+});

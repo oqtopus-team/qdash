@@ -15,6 +15,7 @@ from pydantic import ValidationError
 
 from qdash.api.schemas.agent_session import (
     AgentCandidateReference,
+    AgentCandidateResponse,
     ApplyAgentCandidateRequest,
     CommitAgentCandidateRequest,
     CommitAgentCandidateSetRequest,
@@ -33,7 +34,7 @@ from qdash.datamodel.agent_session import (
     NumericBounds,
 )
 from qdash.datamodel.system_info import SystemInfoModel
-from qdash.dbmodel.agent_session import AgentActionDocument
+from qdash.dbmodel.agent_session import AgentActionDocument, AgentSessionDocument
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.execution_history import ExecutionHistoryDocument
 from qdash.dbmodel.qubit import QubitDocument
@@ -66,22 +67,29 @@ def _create_session(
     *,
     max_actions: int = 10,
     quality_gates: dict[str, NumericBounds] | None = None,
+    task_quality_gates: dict[str, dict[str, NumericBounds]] | None = None,
+    allowed_tasks: list[str] | None = None,
     allowed_overrides: dict[str, NumericBounds] | None = None,
 ):
-    return service.create_session(
+    """Create a session; ``quality_gates`` stores legacy session-wide gates on the record.
+
+    New sessions cannot request session-wide gates, so a test of their legacy meaning writes
+    them to the stored policy the way a session approved before task gates holds them.
+    """
+    session = service.create_session(
         project_id="project-1",
         username="tester",
         body=CreateAgentSessionRequest(
             chip_id="chip-001",
             policy=AgentSessionPolicy(
                 qids=["Q00", "Q01"],
-                allowed_tasks=["CheckQubitSpectroscopy"],
+                allowed_tasks=allowed_tasks or ["CheckQubitSpectroscopy"],
                 allowed_overrides=allowed_overrides
                 or {
                     "drive_amplitude": NumericBounds(minimum=0.01, maximum=0.2),
                     "qubit_frequency": NumericBounds(minimum=3.0, maximum=6.0),
                 },
-                quality_gates=quality_gates or {},
+                task_quality_gates=task_quality_gates or {},
                 max_actions=max_actions,
             ),
             skill_name="single-qubit-bringup",
@@ -90,6 +98,16 @@ def _create_session(
             model=AgentModelIdentity(provider="local", model_id="local-model"),
         ),
     )
+    if quality_gates:
+        _store_legacy_quality_gates(session.session_id, quality_gates)
+    return service.get_session(project_id="project-1", session_id=session.session_id)
+
+
+def _store_legacy_quality_gates(session_id: str, gates: dict[str, NumericBounds]) -> None:
+    doc = AgentSessionDocument.find_one({"session_id": session_id}).run()
+    assert doc is not None
+    doc.policy = doc.policy.model_copy(update={"quality_gates": gates})
+    doc.save()
 
 
 def _run_task_action(
@@ -320,6 +338,7 @@ def _attach_completed_task_result(
     output_parameters: dict[str, object],
     quality_metrics: dict[str, float] | None = None,
     sequence: int = 1,
+    task_name: str = "CheckQubitSpectroscopy",
 ) -> None:
     action = AgentActionDocument.find_one({"session_id": session_id, "action_id": action_id}).run()
     assert action is not None
@@ -332,7 +351,7 @@ def _attach_completed_task_result(
         project_id="project-1",
         username="tester",
         task_id=f"task-result-{sequence}",
-        name="CheckQubitSpectroscopy",
+        name=task_name,
         upstream_id="",
         status="completed",
         message="completed",
@@ -446,6 +465,201 @@ def test_list_action_candidates_applies_session_quality_gates(
     assert candidate.accepted is accepted
     assert reason in candidate.reason
     assert candidate.quality_metrics == quality_metrics
+
+
+def _run_without_overrides(task_name: str, key: str, version: int) -> SubmitAgentActionRequest:
+    return SubmitAgentActionRequest(
+        idempotency_key=key,
+        expected_state_version=version,
+        action_type=AgentActionType.RUN_TASK,
+        task_name=task_name,
+        qids=["Q00"],
+    )
+
+
+RABI_AND_RB = ["CheckRabi", "RandomizedBenchmarking"]
+RABI_AND_RB_BOUNDS = {
+    "maximum_rabi_frequency": NumericBounds(minimum=2000.0, maximum=3000.0),
+    "average_gate_fidelity": NumericBounds(minimum=0.9, maximum=1.0),
+}
+
+
+def _measure_rabi_and_rb(
+    service: AgentSessionService,
+    session_id: str,
+    *,
+    rabi_metrics: dict[str, float],
+    rb_metrics: dict[str, float],
+) -> tuple[AgentCandidateResponse, AgentCandidateResponse]:
+    rabi = service.submit_action(
+        project_id="project-1",
+        session_id=session_id,
+        body=_run_without_overrides("CheckRabi", "rabi", 0),
+    )
+    _attach_completed_task_result(
+        session_id=session_id,
+        action_id=rabi.action_id,
+        output_parameters={"maximum_rabi_frequency": {"value": 2681.29}},
+        quality_metrics=rabi_metrics,
+        task_name="CheckRabi",
+    )
+    rb = service.submit_action(
+        project_id="project-1",
+        session_id=session_id,
+        body=_run_without_overrides("RandomizedBenchmarking", "rb", 1),
+    )
+    _attach_completed_task_result(
+        session_id=session_id,
+        action_id=rb.action_id,
+        output_parameters={"average_gate_fidelity": {"value": 0.995}},
+        quality_metrics=rb_metrics,
+        sequence=2,
+        task_name="RandomizedBenchmarking",
+    )
+
+    def only(action_id: str) -> AgentCandidateResponse:
+        items = service.list_action_candidates(
+            project_id="project-1", session_id=session_id, action_id=action_id
+        ).items
+        assert len(items) == 1
+        return items[0]
+
+    return only(rabi.action_id), only(rb.action_id)
+
+
+def test_task_quality_gate_checks_only_its_own_task(service: AgentSessionService) -> None:
+    """A gate of RandomizedBenchmarking neither rejects nor annotates a CheckRabi result."""
+    session = _create_session(
+        service,
+        allowed_tasks=RABI_AND_RB,
+        allowed_overrides=RABI_AND_RB_BOUNDS,
+        task_quality_gates={"RandomizedBenchmarking": {"r2": NumericBounds(minimum=0.9)}},
+    )
+    rabi, rb = _measure_rabi_and_rb(
+        service, session.session_id, rabi_metrics={"r2": 0.99723}, rb_metrics={"r2": 0.95}
+    )
+
+    assert rabi.accepted, rabi.reason
+    assert rabi.applied_quality_gates == []
+    assert rabi.reason == "candidate passed deterministic bounds gate"
+    assert rb.accepted, rb.reason
+    assert [
+        (g.metric_name, g.scope.value, g.task_name, g.minimum) for g in rb.applied_quality_gates
+    ] == [("r2", "task", "RandomizedBenchmarking", 0.9)]
+    assert rb.reason == "candidate passed deterministic bounds and quality gates"
+
+
+def test_missing_metric_of_an_applicable_task_gate_still_rejects(
+    service: AgentSessionService,
+) -> None:
+    """A task gate fails closed when its own task's result lacks the metric."""
+    session = _create_session(
+        service,
+        allowed_tasks=RABI_AND_RB,
+        allowed_overrides=RABI_AND_RB_BOUNDS,
+        task_quality_gates={
+            "CheckRabi": {"r2": NumericBounds(minimum=0.98)},
+            "RandomizedBenchmarking": {"r2": NumericBounds(minimum=0.9)},
+        },
+    )
+    rabi, rb = _measure_rabi_and_rb(
+        service, session.session_id, rabi_metrics={"r2": 0.97}, rb_metrics={}
+    )
+
+    assert not rabi.accepted
+    assert rabi.reason == (
+        "Quality metric 'r2' for task 'CheckRabi' candidate is below the minimum bound"
+    )
+    assert not rb.accepted
+    assert rb.reason == (
+        "Required quality metric 'r2' for task 'RandomizedBenchmarking' is missing"
+    )
+
+
+def test_legacy_session_wide_gate_keeps_its_approved_meaning(
+    service: AgentSessionService,
+) -> None:
+    """A stored session-wide gate is neither loosened nor narrowed to one task."""
+    session = _create_session(
+        service,
+        allowed_tasks=RABI_AND_RB,
+        allowed_overrides=RABI_AND_RB_BOUNDS,
+        quality_gates={"average_gate_fidelity": NumericBounds(minimum=0.99)},
+    )
+    assert session.policy.quality_gates == {"average_gate_fidelity": NumericBounds(minimum=0.99)}
+    assert session.policy.task_quality_gates == {}
+    rabi, rb = _measure_rabi_and_rb(
+        service, session.session_id, rabi_metrics={"r2": 0.99723}, rb_metrics={"r2": 0.95}
+    )
+
+    for candidate in (rabi, rb):
+        assert not candidate.accepted
+        assert candidate.reason == (
+            "Required quality metric 'average_gate_fidelity' by the session-wide gate is missing"
+        )
+        assert [(g.scope.value, g.task_name) for g in candidate.applied_quality_gates] == [
+            ("all_tasks", None)
+        ]
+
+
+def _create_request(policy: dict[str, object]) -> CreateAgentSessionRequest:
+    return CreateAgentSessionRequest.model_validate(
+        {
+            "chip_id": "chip-001",
+            "policy": {
+                "qids": ["Q00"],
+                "allowed_tasks": RABI_AND_RB,
+                "allowed_overrides": {"maximum_rabi_frequency": {"minimum": 2000, "maximum": 3000}},
+                **policy,
+            },
+        }
+    )
+
+
+def test_new_session_rejects_a_session_wide_quality_gate() -> None:
+    """Creation refuses a gate that would check every task, before anything is stored."""
+    with pytest.raises(ValidationError) as caught:
+        _create_request({"quality_gates": {"average_gate_fidelity": {"minimum": 0.99}}})
+
+    message = str(caught.value)
+    assert "would check results of every task" in message
+    assert "task_quality_gates" in message
+
+
+@pytest.mark.parametrize(
+    ("gates", "expected"),
+    [
+        (
+            {"CheckRabi": {"average_gate_fidelity": {"minimum": 0.99}}},
+            "does not record as a quality metric (recorded: r2)",
+        ),
+        (
+            {"CheckT1": {"r2": {"minimum": 0.9}}},
+            "task_quality_gates tasks must be allowed tasks: CheckT1",
+        ),
+        ({"CheckRabi": {}}, "needs at least one metric for: CheckRabi"),
+    ],
+)
+def test_new_session_rejects_impossible_task_quality_gates(
+    gates: dict[str, object], expected: str
+) -> None:
+    """A gate on an output parameter, an unscoped task, or no metric is refused up front."""
+    with pytest.raises(ValidationError) as caught:
+        _create_request({"task_quality_gates": gates})
+
+    assert expected in str(caught.value)
+
+
+def test_new_session_stores_task_quality_gates(service: AgentSessionService) -> None:
+    """A valid task-scoped gate is stored as approved and read back unchanged."""
+    session = service.create_session(
+        project_id="project-1",
+        username="tester",
+        body=_create_request({"task_quality_gates": {"CheckRabi": {"r2": {"minimum": 0.9}}}}),
+    )
+
+    assert session.policy.task_quality_gates == {"CheckRabi": {"r2": NumericBounds(minimum=0.9)}}
+    assert session.policy.quality_gates == {}
 
 
 def test_commit_action_candidate_revalidates_and_audits_parameter_write(

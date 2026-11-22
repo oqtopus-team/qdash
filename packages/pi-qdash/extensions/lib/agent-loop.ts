@@ -92,6 +92,20 @@ export function parameterUpdateText(grant: AgentParameterUpdateGrant | null): st
   return `Parameter updates: granted for ${grant.parameters.join(", ")} from ${grant.tasks.join(", ")} after a pass assessment and QDash's gates; backend apply ${grant.apply_backend ? "granted (never pushed to GitHub)" : "not granted"}`;
 }
 
+/**
+ * Which numbers decide each granted parameter: the bounds the session holds for it, or none,
+ * when the task's own completion checks alone decide. QDash cannot tell who wrote a bound.
+ */
+export function grantBoundsText(grant: AgentParameterUpdateGrant | null, overrides: unknown): string | null {
+  if (!grant) return null;
+  const bounds = (overrides ?? {}) as Record<string, { minimum?: number | null; maximum?: number | null } | undefined>;
+  const parts = grant.parameters.map((name) => {
+    const b = bounds[name];
+    return b ? `${name} [${b.minimum ?? "-inf"}, ${b.maximum ?? "inf"}]` : `${name} no numeric bounds (its task's own checks decide)`;
+  });
+  return `Update criteria: ${parts.join("; ")}. Bounds shown are values approved with this session; QDash does not verify where they came from.`;
+}
+
 export interface AgentLoopCandidate {
   parameter_name: string;
   value: number;
@@ -164,7 +178,10 @@ export interface AgentLoopContext {
       allowed_tasks: string[];
       allowed_actions: string[];
       allowed_overrides: Record<string, { minimum?: number | null; maximum?: number | null }>;
+      /** Legacy session-wide gates of a session approved before task_quality_gates; they check every task. */
       quality_gates: Record<string, { minimum?: number | null; maximum?: number | null }>;
+      /** Task name -> quality metric -> bounds; a gate checks only results of its own task. */
+      task_quality_gates: Record<string, Record<string, { minimum?: number | null; maximum?: number | null }>>;
       allow_reconfigure: boolean;
       max_rounds_per_target: number;
       /**
@@ -172,6 +189,8 @@ export interface AgentLoopContext {
        * and apply then goes through the reviewed tools and their per-call approval.
        */
       parameter_updates: AgentParameterUpdateGrant | null;
+      /** off, required, or null for a session approved before evaluation modes existed. */
+      evaluation: AgentEvaluationMode;
     };
   };
   state: AgentLoopState;
@@ -230,6 +249,31 @@ export const FAILED_RUN_HINT = (actionIds: readonly string[]): string =>
 /** What a session with update authority expects after each result, stated mechanically. */
 export const UPDATE_GRANT_HINT = (grant: AgentParameterUpdateGrant): string =>
   `The user approved parameter updates for ${grant.parameters.join(", ")} from ${grant.tasks.join(", ")}${grant.apply_backend ? " with backend apply" : ""}: after a result you assess as pass, commit its accepted candidate with qdash_commit_agent_session_update (no per-call approval) before any step that depends on it. For a failed, uncertain, rejected, or unexplained result, or an evaluation that failed or is not a reliable SUCCESS, commit nothing and call qdash_request_agent_human citing it; QDash refuses every further step, commit, and apply of the session, a repeat included, until an expert answers that intervention.`;
+
+/** The session's evaluator use as the user approved it; null for a session approved before it. */
+export type AgentEvaluationMode = "off" | "required" | null;
+
+export function evaluationModeOf(policy: unknown): AgentEvaluationMode {
+  const value = (policy as { evaluation?: unknown } | null | undefined)?.evaluation;
+  return value === "off" || value === "required" ? value : null;
+}
+
+/** What the approved evaluator use asks of the agent after each result, stated mechanically. */
+export function evaluationHint(mode: AgentEvaluationMode): string {
+  if (mode === "required") {
+    return "The session requires an evaluation: evaluate each result's figure with qcal_evaluate before you commit it. QDash refuses a commit without a completed evaluation with a reliable fit and a SUCCESS diagnosis, and waits while one is pending; an evaluation that failed or is not a reliable SUCCESS goes to an expert.";
+  }
+  if (mode === "off") {
+    return "The user approved this session without the calibration evaluator: do not call qcal_evaluate, and do not report an evaluator verdict. Judge results from the task's completion checks, fit values, quality metrics, figures, and task knowledge; an existing evaluation that is not a reliable SUCCESS still blocks an update.";
+  }
+  return "";
+}
+
+/** One approval line for the evaluator use. */
+export function evaluationApprovalText(mode: AgentEvaluationMode): string {
+  if (mode === "required") return "evaluation: required (qcal_evaluate must support each result before a commit)";
+  return "evaluation: off (qcal_evaluate is not called; the task's own checks and any existing evaluation still apply)";
+}
 
 /** An API timestamp as unambiguous text; QDash's naive timestamps are UTC (see `server-time.ts`). */
 function isoOf(value: unknown): string {
@@ -423,6 +467,8 @@ export function buildAgentLoopContext(input: {
 
   const grant = parameterUpdateGrant(policy);
   if (grant && state === "ready") next += ` ${UPDATE_GRANT_HINT(grant)}`;
+  const evaluation = evaluationModeOf(policy);
+  if (state === "ready" && evaluationHint(evaluation)) next += ` ${evaluationHint(evaluation)}`;
 
   const snapshotConsistent = input.snapshotConsistent ?? true;
   if (!snapshotConsistent && state === "ready") {
@@ -468,9 +514,11 @@ export function buildAgentLoopContext(input: {
         allowed_actions: (policy.allowed_actions ?? ["run_task", "request_human", "complete_session"]).map(String),
         allowed_overrides: (policy.allowed_overrides ?? {}) as AgentLoopContext["session"]["scope"]["allowed_overrides"],
         quality_gates: (policy.quality_gates ?? {}) as AgentLoopContext["session"]["scope"]["quality_gates"],
+        task_quality_gates: ((policy as { task_quality_gates?: unknown }).task_quality_gates ?? {}) as AgentLoopContext["session"]["scope"]["task_quality_gates"],
         allow_reconfigure: policy.allow_reconfigure ?? false,
         max_rounds_per_target: policy.max_rounds_per_target ?? 3,
         parameter_updates: parameterUpdateGrant(policy),
+        evaluation: evaluationModeOf(policy),
       },
     },
     state,
@@ -736,15 +784,24 @@ export function agentSessionApprovalText(chipId: string, policy: unknown, expire
     Object.entries((value ?? {}) as Record<string, { minimum?: number | null; maximum?: number | null }>)
       .map(([name, b]) => `${name} [${b?.minimum ?? "-inf"}, ${b?.maximum ?? "inf"}]`)
       .join("; ") || "none";
+  const taskGates = (value: unknown) =>
+    Object.entries((value ?? {}) as Record<string, unknown>)
+      .map(([task, gates]) => `${task}: ${bounds(gates)}`)
+      .join("; ") || "none";
   const auto = p.autonomy === "auto";
   return [
     `Create an agent session on chip ${chipId}:`,
     `- qubits: ${list(p.qids)}`,
     `- tasks: ${list(p.allowed_tasks)}`,
     `- bounds (overrides and candidate gate): ${bounds(p.allowed_overrides)}`,
-    `- quality gates: ${bounds(p.quality_gates)}`,
+    `- quality gates (each checks only its task's results): ${taskGates(p.task_quality_gates)}`,
+    ...(Object.keys((p.quality_gates ?? {}) as object).length
+      ? [`- session-wide quality gates (check every task): ${bounds(p.quality_gates)}`]
+      : []),
     `- steps: ${auto ? "run without asking" : "each action asks"}, up to ${typeof p.max_actions === "number" ? p.max_actions : 100} actions, ${typeof p.max_rounds_per_target === "number" ? p.max_rounds_per_target : 3} runs per task and qubit`,
     `- expires in: ${typeof expiresInSeconds === "number" ? `${expiresInSeconds} s` : "QDash default (6 h)"}`,
+    `- ${evaluationApprovalText(evaluationModeOf(p))}`,
     `- ${parameterUpdateText(parameterUpdateGrant(p))}`,
+    ...[grantBoundsText(parameterUpdateGrant(p), p.allowed_overrides)].filter((line): line is string => line !== null).map((line) => `- ${line}`),
   ].join("\n");
 }

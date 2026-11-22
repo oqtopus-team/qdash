@@ -25,10 +25,12 @@ class AgentSessionPolicy(BaseModel):
     allowed_actions: list[str]
     allowed_overrides: dict[str, dict[str, float | None]]
     quality_gates: dict[str, dict[str, float | None]] = Field(default_factory=dict)
+    task_quality_gates: dict[str, dict[str, dict[str, float | None]]] = Field(default_factory=dict)
     allow_reconfigure: bool = False
     max_actions: int
     autonomy: str = "confirm_each"
     max_rounds_per_target: int = 3
+    evaluation: str | None = None
 
 
 class AgentSessionResponse(BaseModel):

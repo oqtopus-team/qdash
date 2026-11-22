@@ -1268,6 +1268,9 @@ const gitPushConfig = (
 
 /**
  * Create a bounded authorization scope for a user-operated local agent.
+ *
+ * The new session's Slack start message, when agent notifications are on, is sent after
+ * the response; the notification sweeper retries it.
  * @summary Create an agent session
  */
 const createAgentSession = (

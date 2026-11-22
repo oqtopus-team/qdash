@@ -29,7 +29,7 @@ export interface AgentModelIdentity {
      */
   model_id: string;
   /**
-     * The client host that reported the identity, such as pi or qdash-agent
+     * The client host that reported the identity, such as pi or qdash-web-agent
      * @maxLength 64
      * @pattern ^([a-z0-9][a-z0-9._-]*)?$
      */

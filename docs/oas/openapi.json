@@ -2848,7 +2848,7 @@
           "agent-session"
         ],
         "summary": "Create an agent session",
-        "description": "Create a bounded authorization scope for a user-operated local agent.",
+        "description": "Create a bounded authorization scope for a user-operated local agent.\n\nThe new session's Slack start message, when agent notifications are on, is sent after\nthe response; the notification sweeper retries it.",
         "operationId": "createAgentSession",
         "security": [
           {
@@ -20164,6 +20164,58 @@
         "title": "AgentActionType",
         "description": "Actions that a local agent may propose to QDash."
       },
+      "AgentAppliedQualityGate": {
+        "properties": {
+          "metric_name": {
+            "type": "string",
+            "title": "Metric Name"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/AgentQualityGateScope"
+          },
+          "task_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Name",
+            "description": "The gate's task; null for a legacy session-wide gate"
+          },
+          "minimum": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum"
+          },
+          "maximum": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maximum"
+          }
+        },
+        "type": "object",
+        "required": [
+          "metric_name",
+          "scope"
+        ],
+        "title": "AgentAppliedQualityGate",
+        "description": "One quality gate a specific task result was checked against."
+      },
       "AgentAuditEvent": {
         "properties": {
           "event_id": {
@@ -20496,6 +20548,15 @@
         ],
         "title": "AgentAutonomy",
         "description": "How much of a plan the agent may run without a person confirming each step."
+      },
+      "AgentCandidateAcceptanceBasis": {
+        "type": "string",
+        "enum": [
+          "session_bounds",
+          "task_checks"
+        ],
+        "title": "AgentCandidateAcceptanceBasis",
+        "description": "What accepted a candidate."
       },
       "AgentCandidateCommitResponse": {
         "properties": {
@@ -20860,6 +20921,25 @@
             "type": "object",
             "title": "Quality Metrics"
           },
+          "applied_quality_gates": {
+            "items": {
+              "$ref": "#/components/schemas/AgentAppliedQualityGate"
+            },
+            "type": "array",
+            "title": "Applied Quality Gates",
+            "description": "The session's quality gates this result was checked against: its task's gates and any legacy session-wide gate. Gates of other tasks are not listed."
+          },
+          "acceptance_basis": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentCandidateAcceptanceBasis"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What accepted the candidate: session_bounds (inside numeric bounds approved with the session) or task_checks (a parameter the session's update grant names, without bounds, accepted on its task's completion checks); null when rejected"
+          },
           "accepted": {
             "type": "boolean",
             "title": "Accepted"
@@ -21203,6 +21283,15 @@
         ],
         "title": "AgentDecisionResponse",
         "description": "One recorded agent decision with QDash's frozen reading of its evidence."
+      },
+      "AgentEvaluationMode": {
+        "type": "string",
+        "enum": [
+          "off",
+          "required"
+        ],
+        "title": "AgentEvaluationMode",
+        "description": "Whether the session's results are evaluated with the calibration evaluator.\n\nThe evaluator (qcal_evaluate from pi-qcaleval) is optional and separate from the task's\nown completion checks and any numeric gates. In every mode an evaluation that exists for\na result must support an update: a failed, pending, disputed, or negative one blocks it."
       },
       "AgentInterventionAttempt": {
         "properties": {
@@ -21746,7 +21835,7 @@
             "maxLength": 64,
             "pattern": "^([a-z0-9][a-z0-9._-]*)?$",
             "title": "Host",
-            "description": "The client host that reported the identity, such as pi or qdash-agent",
+            "description": "The client host that reported the identity, such as pi or qdash-web-agent",
             "default": ""
           }
         },
@@ -21866,7 +21955,7 @@
             "maxItems": 50,
             "minItems": 1,
             "title": "Parameters",
-            "description": "Calibration parameters the agent may commit; each needs both bounds in allowed_overrides"
+            "description": "Calibration parameters the agent may commit. Numeric bounds are optional: bounds in allowed_overrides, when the session has them, still apply; without them a candidate is accepted on its task's own completion checks"
           },
           "tasks": {
             "items": {
@@ -21891,7 +21980,7 @@
           "tasks"
         ],
         "title": "AgentParameterUpdatePolicy",
-        "description": "Opt-in authority, approved once with the session, to commit passing results.\n\nWithout it (the default, and every session created before it existed) a candidate is\ncommitted or applied only through the reviewed calls a person approves each time. With\nit, the session's creator may let the agent commit a candidate of one of ``parameters``\nfrom a completed measurement of one of ``tasks`` on a session qubit, and with\n``apply_backend`` also write that committed value to the backend, without a per-update\napproval. QDash still requires, for every such update, an explicit ``pass`` assessment\nthe agent recorded for that measurement, the session's candidate bounds and quality\ngates, the task's own completion checks, and the current session and calibration state.\nA failed, uncertain, or unexplained result is never committed this way."
+        "description": "Opt-in authority, approved once with the session, to commit passing results.\n\nWithout it (the default, and every session created before it existed) a candidate is\ncommitted or applied only through the reviewed calls a person approves each time. With\nit, the session's creator may let the agent commit a candidate of one of ``parameters``\nfrom a completed measurement of one of ``tasks`` on a session qubit, and with\n``apply_backend`` also write that committed value to the backend, without a per-update\napproval. QDash still requires, for every such update, an explicit ``pass`` assessment\nthe agent recorded for that measurement, the task's own completion checks (a completed\ntask result, so its fit and validation checks passed), the current session and\ncalibration state, and any numeric bounds or task quality gates the session holds for\nthe parameter and task. The grant names which parameters may change; it does not need\nnumeric bounds, so none has to be made up to authorize it. A failed, uncertain, or\nunexplained result is never committed this way."
       },
       "AgentPlanCheckpoint": {
         "properties": {
@@ -22145,6 +22234,15 @@
         ],
         "title": "AgentPlannerVerdictRecord",
         "description": "One evaluation verdict the planner remembers for its stop rules."
+      },
+      "AgentQualityGateScope": {
+        "type": "string",
+        "enum": [
+          "task",
+          "all_tasks"
+        ],
+        "title": "AgentQualityGateScope",
+        "description": "Which results a quality gate checks."
       },
       "AgentResumeOption": {
         "properties": {
@@ -23220,6 +23318,85 @@
         "title": "AgentSessionGroupSummary",
         "description": "One agent session as a group of the Execution list.\n\n``status`` is the session's own state, not an execution status: a session waiting for an\nexpert, or active between measurements, holds no hardware and is not failed for it."
       },
+      "AgentSessionLifecycleEvent": {
+        "type": "string",
+        "enum": [
+          "started",
+          "completed",
+          "cancelled",
+          "expired"
+        ],
+        "title": "AgentSessionLifecycleEvent",
+        "description": "A session lifecycle event announced in the agent Slack channel."
+      },
+      "AgentSessionNotificationResponse": {
+        "properties": {
+          "event": {
+            "$ref": "#/components/schemas/AgentSessionLifecycleEvent"
+          },
+          "actor": {
+            "type": "string",
+            "title": "Actor",
+            "default": ""
+          },
+          "status": {
+            "$ref": "#/components/schemas/AgentNotificationStatus"
+          },
+          "attempts": {
+            "type": "integer",
+            "title": "Attempts"
+          },
+          "last_error": {
+            "type": "string",
+            "title": "Last Error"
+          },
+          "last_attempt_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Attempt At"
+          },
+          "next_attempt_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Attempt At"
+          },
+          "sent_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sent At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "event",
+          "status",
+          "attempts",
+          "last_error"
+        ],
+        "title": "AgentSessionNotificationResponse",
+        "description": "Slack delivery state of one session lifecycle message."
+      },
       "AgentSessionPolicy": {
         "properties": {
           "qids": {
@@ -23251,14 +23428,27 @@
               "$ref": "#/components/schemas/NumericBounds"
             },
             "type": "object",
-            "title": "Allowed Overrides"
+            "title": "Allowed Overrides",
+            "description": "Parameter name -> bounds. A step may override a task input of that name within the bounds, and a task output of that name is an accepted candidate only inside them. Output parameters are bounded here, never in quality gates. Give only bounds a person stated; QDash records them as approved with the session and cannot verify where they came from"
           },
           "quality_gates": {
             "additionalProperties": {
               "$ref": "#/components/schemas/NumericBounds"
             },
             "type": "object",
-            "title": "Quality Gates"
+            "title": "Quality Gates",
+            "description": "Legacy session-wide quality gates: metric name -> bounds checked on every candidate of every task. Kept so sessions approved before task_quality_gates keep their exact meaning; a new session must leave it empty and use task_quality_gates."
+          },
+          "task_quality_gates": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "$ref": "#/components/schemas/NumericBounds"
+              },
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Task Quality Gates",
+            "description": "Task name -> quality metric name -> bounds. A candidate from a result of that task is accepted only when the result records each named metric inside its bounds; a missing metric rejects it. Results of other tasks are not checked against these gates. Each task must be an allowed task, and each metric a quality metric QDash records on task results (currently only r2)."
           },
           "allow_reconfigure": {
             "type": "boolean",
@@ -23295,6 +23485,17 @@
               }
             ],
             "description": "Opt-in authority to commit (and optionally apply) passing candidates without a per-update approval; absent means every commit and apply is reviewed"
+          },
+          "evaluation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentEvaluationMode"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Calibration evaluator use, fixed at approval: off (the agent does not call qcal_evaluate) or required (every autonomous update needs a completed evaluation of its result with a reliable fit and a SUCCESS diagnosis). New sessions record off unless they ask for required; null marks a session approved before this field, which keeps its earlier meaning. In every mode an existing evaluation that is pending, failed, disputed, or negative blocks an update"
           }
         },
         "type": "object",
@@ -23392,6 +23593,28 @@
             ],
             "title": "Active Intervention Id",
             "description": "The intervention the session waits on, if any"
+          },
+          "start_notification": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentSessionNotificationResponse"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Slack delivery of the session's start message; null for a session created before lifecycle messages existed"
+          },
+          "end_notification": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentSessionNotificationResponse"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Slack delivery of the session's end message, stored by the update that ended it; null while the session is open"
           }
         },
         "type": "object",

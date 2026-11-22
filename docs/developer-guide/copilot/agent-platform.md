@@ -56,9 +56,12 @@ writes.
 
 ## Candidate commit
 
-Task output parameters stay staged until the session's parameter bounds and quality gates accept
-them. The candidate is derived from the authoritative task result; R² is normalised to `r2` and
-persisted as task-result provenance, and a missing required metric rejects the candidate. A
+Task output parameters stay staged until the session accepts them: inside the parameter's
+bounds, or, for a parameter the update grant names without bounds, on its task's own completion
+checks, and in both cases only when the quality gates of that task hold. The candidate is
+derived from the authoritative task result; R² is normalised to `r2` and persisted as
+task-result provenance, and a missing metric a gate of that task requires rejects the
+candidate ([Quality gates](./agentic-calibration.md#quality-gates)). A
 plan ending in `pass` may revalidate the latest accepted candidate per parameter and persist
 the same-qid set with one Qubit save and one audit record. There is no multi-document MongoDB
 transaction behind that save.
@@ -95,8 +98,8 @@ deterministic path; the primary path lets the model choose each step in pi or th
   answers; one already dispatched before the pause continues, and resume waits for it. A resume
   keeps the policy, budget, expiry, and visit counts, and a stopped, completed, or expired
   session is never reactivated.
-- A parameter write-back needs the deterministic bounds and quality gates; a model's proposal
-  alone cannot commit a value. A commit without a per-call approval also needs the session's
+- A parameter write-back needs an accepted candidate (deterministic bounds or the grant's task
+  checks, and the task's quality gates); a model's proposal alone cannot commit a value. A commit without a per-call approval also needs the session's
   `parameter_updates` grant and a recorded `pass` assessment, and is never made from a result
   assessed `fail` or `inconclusive`. A failed or questionable result stops the session's
   autonomous steps, a repeat included, until an expert answers an intervention citing it.

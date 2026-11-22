@@ -109,7 +109,9 @@ actions, no reconfiguration, and an explicit `expiresInSeconds` that is a whole 
 3600. A session without one would get QDash's 6-hour default, so the harness declines it. The
 model sees only that the user declined, not why. A session that proposes `parameter_updates` is
 approved only in `dependent-commit`, only when the grant names exactly `qubit_frequency`, takes
-it only from `CheckChevron`, has both bounds, and includes no backend apply. The harness approves
+it only from `CheckChevron`, adds no bounds or quality gates for it (the scenario's user states
+none, so a number would be one the model authored), keeps `evaluation` off, and includes no
+backend apply. The harness approves
 no commit per call: updates are approved once, with the session. It declines backend applies,
 flows, pipelines, reviewed actions, forum posts, and every other write.
 A dialog that cannot be matched to exactly one pending reviewed write is declined.

@@ -3,9 +3,11 @@
 import React, { memo, useCallback, useEffect, useId, useRef, useState } from "react";
 import {
   AlertTriangle,
+  Bug,
   Check,
   CheckCircle2,
   Copy,
+  ExternalLink,
   GitBranch,
   ImageIcon,
   Pencil,
@@ -33,6 +35,7 @@ import { ImagePreviewDialog } from "@/components/ui/ImagePreviewDialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import { useToast } from "@/components/ui/Toast";
 import { copyText } from "@/lib/utils/clipboard";
+import { BUG_REPORT_URL, buildChatErrorReport, classifyChatError } from "@/lib/chatErrorReport";
 import { answerStartIndex } from "@/lib/copilotChatStream";
 import { answerFeedback } from "@/hooks/useCopilotChat";
 import type {
@@ -446,6 +449,67 @@ export const UserMessage = memo(function UserMessage({
   );
 });
 
+/**
+ * A bug-report draft for the last answer that ended with an application error. The user
+ * reads and copies it and opens the repository's bug form themselves; nothing is sent.
+ */
+function ChatErrorReport({ error }: { error: string }) {
+  const toast = useToast();
+  const [open, setOpen] = useState(false);
+  const draftId = useId();
+  const draft = open
+    ? buildChatErrorReport({ message: error, path: window.location.pathname })
+    : "";
+  const copy = () =>
+    copyText(draft).then(
+      () => toast.success("Report draft copied"),
+      () => toast.error("Failed to copy to clipboard"),
+    );
+  return (
+    <div className="flex w-full flex-col gap-2">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        className="btn btn-ghost btn-sm self-start"
+        aria-expanded={open}
+        aria-controls={draftId}
+      >
+        <Bug data-icon="inline-start" />
+        Report this error
+      </button>
+      {open && (
+        <div id={draftId} className="flex flex-col gap-2">
+          <p className="text-xs text-base-content/60">
+            This looks like an application fault. Review the draft, remove anything private, and
+            post it yourself; QDash does not file issues.
+          </p>
+          <textarea
+            readOnly
+            value={draft}
+            aria-label="Bug report draft"
+            className="textarea textarea-sm h-48 w-full font-mono"
+          />
+          <div className="flex flex-wrap gap-1">
+            <button type="button" onClick={copy} className="btn btn-ghost btn-sm">
+              <Copy data-icon="inline-start" />
+              Copy draft
+            </button>
+            <a
+              href={BUG_REPORT_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-ghost btn-sm"
+            >
+              Open the GitHub bug form
+              <ExternalLink data-icon="inline-end" />
+            </a>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export const AssistantMessage = memo(function AssistantMessage({
   message,
   isLast,
@@ -505,6 +569,10 @@ export const AssistantMessage = memo(function AssistantMessage({
               <RotateCcw data-icon="inline-start" />
               Retry
             </button>
+          )}
+          {/* Only the latest error, and only one that looks like a fault, offers a report. */}
+          {isLast && classifyChatError(message.content.slice("Error: ".length)).reportable && (
+            <ChatErrorReport error={message.content.slice("Error: ".length)} />
           )}
         </div>
       </AssistantRow>

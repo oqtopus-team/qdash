@@ -11,7 +11,9 @@ checks are what keeps that authority narrow:
   measurement, on every existing evaluation of the result being completed with a reliable fit
   and a ``SUCCESS`` diagnosis and no reviewer disagreeing, and on QDash's own mechanical
   gates: the task completed (so its own checks, such as an R² threshold, passed), the
-  candidate is inside the approved bounds, and the session's quality gates hold;
+  candidate is inside the session's numeric bounds when it has any for the parameter, and
+  the quality gates of its task (and any legacy session-wide gate) hold. A grant needs no
+  bounds: without them the task's own checks are the numeric criterion;
 - the stored value must still be the one recorded when the measurement was proposed, and the
   commit writes with a compare-and-set against exactly that value
   (``qdash.dbmodel.agent_parameter_state``).
@@ -56,6 +58,7 @@ from qdash.api.services.agent_session_gate import (
 from qdash.datamodel.agent_session import (
     AgentDecisionAssessment,
     AgentDecisionNextAction,
+    AgentEvaluationMode,
     AgentInterventionDecision,
     AgentInterventionStatus,
     AgentParameterUpdatePolicy,
@@ -82,7 +85,7 @@ if TYPE_CHECKING:
     CandidatesOf = Callable[[str], Sequence[AgentCandidateResponse]]
     EvaluationsOf = Callable[[AgentActionDocument], Sequence[EvaluationDocument]]
 
-EVIDENCE_SCHEMA = "qdash.agent-update-evidence.v2"
+EVIDENCE_SCHEMA = "qdash.agent-update-evidence.v3"
 # Where an autonomous run_task of a granted task records the stored values it measured from.
 BASELINE_METADATA_KEY = "parameter_baseline"
 # Next steps a pass decision may name when it leads to an update.
@@ -109,9 +112,10 @@ RESUMED_INTERVENTION_STATUSES = frozenset(
 LIVE_COMMIT_STATUSES = ("reserving", "committing", "committed")
 EVIDENCE_NOTE = (
     "The pass assessment is the agent's reading of the result. QDash checked task "
-    "completion, the approved bounds, the session's quality gates, and the completion and "
-    "diagnosis of any evaluation of the result; those are mechanical checks, not a "
-    "scientific verdict."
+    "completion, any numeric bounds and quality gates the session holds for this parameter "
+    "and task, and the completion and diagnosis of any evaluation of the result; those are "
+    "mechanical checks, not a scientific verdict. Bounds and gates are the values approved "
+    "with the session; QDash does not verify where they came from."
 )
 
 
@@ -182,6 +186,8 @@ def _evaluation_facts(evaluation: EvaluationDocument) -> dict[str, Any]:
             str(calibration_status).strip().upper()[:64] if calibration_status else None
         ),
         "fallback_model": bool(output.fallback) if output is not None else False,
+        # provider/modelId that judged the plot, as the evaluator reported it.
+        "evaluator_model": (output.model or None) if output is not None else None,
         "reviewer_disagreed": any(verdict.agree is False for verdict in evaluation.verdicts),
         "completed_at": _iso(evaluation.completed_at),
         "provenance": "evaluator_reported",
@@ -606,9 +612,18 @@ def check_commit(
             "a pass assessment"
         )
 
-    # Every existing evaluation of this result must support the update; none is no evidence.
+    # Every existing evaluation of this result must support the update, whatever the
+    # session's evaluation mode; a required mode also needs at least one.
     evaluations = list(evaluations_of(action))
     facts = [_evaluation_facts(evaluation) for evaluation in evaluations]
+    mode = session.policy.evaluation
+    if mode == AgentEvaluationMode.REQUIRED and not facts:
+        raise _conflict(
+            f"The session requires an evaluation of each result before an update, and "
+            f"action {action.action_id} has none. Evaluate its figure with qcal_evaluate "
+            "and commit after a completed evaluation with a reliable fit and a SUCCESS "
+            "diagnosis, or ask a person."
+        )
     for item in facts:
         problem = evaluation_problem(item)
         if problem is None:
@@ -680,21 +695,62 @@ def check_commit(
             "task_result_id": candidate.task_id,
             "candidate_accepted": True,
             "candidate_reason": candidate.reason,
+            # session_bounds, or task_checks for a granted parameter without numeric bounds.
+            "acceptance_basis": (
+                candidate.acceptance_basis.value if candidate.acceptance_basis else None
+            ),
+            # The task definition's own checks, enforced by the workflow before the result
+            # could complete; their numeric thresholds are not part of the task catalog.
+            "task_checks": {"source": "task_definition", "enforced_by": "workflow"},
             "minimum": candidate.minimum,
             "maximum": candidate.maximum,
             "quality_metrics": dict(candidate.quality_metrics),
-            "quality_gates": {
-                name: bounds.model_dump() for name, bounds in session.policy.quality_gates.items()
-            },
+            # Exactly the gates this result was checked against: its task's gates and any
+            # legacy session-wide gate, never another task's.
+            "applied_quality_gates": [
+                gate.model_dump(mode="json") for gate in candidate.applied_quality_gates
+            ],
             "stored_value_unchanged_since_proposal": True,
         },
-        # "none": no evaluation of the result existed; "supported": each one completed with
-        # a reliable fit and a SUCCESS diagnosis and no reviewer disagreed.
-        "evaluation_state": "supported" if facts else "none",
+        # "supported": each one completed with a reliable fit and a SUCCESS diagnosis and no
+        # reviewer disagreed. Without one: "not_requested" when the session's mode is off,
+        # "none" for a session approved before evaluation modes existed.
+        "evaluation_mode": mode.value if mode is not None else None,
+        "evaluation_state": (
+            "supported" if facts else "not_requested" if mode == AgentEvaluationMode.OFF else "none"
+        ),
         "evaluations": facts,
         "note": EVIDENCE_NOTE,
     }
     return CommitGrounds(evidence=evidence, baseline=baseline)
+
+
+def check_required_evaluation(
+    session: AgentSessionDocument,
+    action: AgentActionDocument,
+    evaluations_of: EvaluationsOf,
+) -> None:
+    """Refuse a reviewed commit of a ``required`` session without a supporting evaluation.
+
+    A person approves a reviewed commit, but the approved session still asked for an
+    evaluation of every result before it is committed: a missing, pending, failed, disputed,
+    or negative one refuses the commit. Sessions in other modes are unaffected.
+    """
+    if session.policy.evaluation != AgentEvaluationMode.REQUIRED:
+        return
+    facts = [_evaluation_facts(evaluation) for evaluation in evaluations_of(action)]
+    if not facts:
+        raise _conflict(
+            f"The session requires an evaluation of each result before a commit, and action "
+            f"{action.action_id} has none. Evaluate its figure with qcal_evaluate first."
+        )
+    for item in facts:
+        problem = evaluation_problem(item)
+        if problem is not None:
+            raise _conflict(
+                f"{problem.detail}; the session requires a completed evaluation with a "
+                "reliable fit and a SUCCESS diagnosis before a commit."
+            )
 
 
 # --------------------------------------------------------------------------- applies

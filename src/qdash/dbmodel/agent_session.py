@@ -24,6 +24,7 @@ from qdash.datamodel.agent_session import (
     AgentNotificationDelivery,
     AgentPlanCheckpoint,
     AgentResumeOutcomeRecord,
+    AgentSessionNotification,
     AgentSessionPolicy,
     AgentSessionStatus,
 )
@@ -68,6 +69,12 @@ class AgentSessionDocument(Document):
     # Last time an operation passed the execution gate; the gate update serializes every
     # dispatch against a pause.
     execution_gate_at: datetime | None = None
+    # Slack lifecycle messages. ``start_notification`` is stored with the new session; None
+    # marks a session created before lifecycle messages existed, which never gets an end
+    # message either. ``end_notification`` is stored by the update that ends the session,
+    # and only that update, so a session has at most one end event.
+    start_notification: AgentSessionNotification | None = None
+    end_notification: AgentSessionNotification | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

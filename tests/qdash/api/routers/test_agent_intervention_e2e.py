@@ -43,11 +43,18 @@ OUTPUTS = {"CheckRabi": ("control_amplitude", 0.05), "CheckChevron": ("qubit_fre
 
 
 class FakeSlack:
+    """Records intervention messages in ``calls`` and session start/end in ``session_calls``."""
+
     def __init__(self) -> None:
         self.calls: list[dict[str, Any]] = []
+        self.session_calls: list[dict[str, Any]] = []
 
     def chat_postMessage(self, *, channel: str, **kwargs: Any) -> dict[str, str]:
         kwargs["channel"] = channel
+        lifecycle = str(kwargs.get("text", "")).startswith("Agent session ")
+        if lifecycle:
+            self.session_calls.append(kwargs)
+            return {"channel": kwargs["channel"], "ts": f"{len(self.session_calls)}.500"}
         self.calls.append(kwargs)
         return {"channel": kwargs["channel"], "ts": f"{len(self.calls)}.000"}
 

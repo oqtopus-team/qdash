@@ -30,8 +30,10 @@ from qdash.common.utils.datetime import now
 from qdash.datamodel.agent_session import (
     AgentActionType,
     AgentAutonomy,
+    AgentCandidateAcceptanceBasis,
     AgentDecisionAssessment,
     AgentDecisionNextAction,
+    AgentEvaluationMode,
     AgentInterventionAttempt,
     AgentInterventionDecision,
     AgentInterventionReason,
@@ -94,13 +96,16 @@ def _policy(
     *,
     updates: AgentParameterUpdatePolicy | None = None,
     autonomy: AgentAutonomy = AgentAutonomy.AUTO,
-    quality_gates: dict[str, NumericBounds] | None = None,
+    task_quality_gates: dict[str, dict[str, NumericBounds]] | None = None,
+    overrides: dict[str, NumericBounds] | None = None,
+    evaluation: AgentEvaluationMode | None = None,
 ) -> AgentSessionPolicy:
     return AgentSessionPolicy(
+        evaluation=evaluation,
         qids=["Q00"],
         allowed_tasks=["CheckChevron", "CheckRabi"],
-        allowed_overrides={"qubit_frequency": FREQUENCY},
-        quality_gates=quality_gates or {},
+        allowed_overrides={"qubit_frequency": FREQUENCY} if overrides is None else overrides,
+        task_quality_gates=task_quality_gates or {},
         autonomy=autonomy,
         max_actions=4,
         parameter_updates=updates,
@@ -330,7 +335,11 @@ def _evaluate(
         status=status,
         requested_at=requested_at if requested_at is not None else completed_at,
         completed_at=None if status in ("pending", "running") else completed_at,
-        output=EvaluationOutputModel(diagnosis=diagnosis) if diagnosis is not None else None,
+        output=(
+            EvaluationOutputModel(diagnosis=diagnosis, model="vllm/qcal-vlm")
+            if diagnosis is not None
+            else None
+        ),
         verdicts=(
             [EvaluationVerdictModel(agree=False, username="reviewer", updated_at=completed_at)]
             if disagree
@@ -356,18 +365,21 @@ def test_update_authority_is_opt_in_explicit_and_inside_the_approved_scope() -> 
         _policy(
             updates=AgentParameterUpdatePolicy(parameters=["qubit_frequency"], tasks=["CheckT1"])
         )
-    with pytest.raises(ValidationError, match="needs both minimum and maximum"):
-        _policy(
-            updates=AgentParameterUpdatePolicy(parameters=["drag_amplitude"], tasks=["CheckRabi"])
-        )
+    # A grant names which parameters may change; it needs no numeric bounds to authorize it.
+    unbounded = _policy(
+        updates=AgentParameterUpdatePolicy(parameters=["drag_amplitude"], tasks=["CheckRabi"])
+    )
+    assert "drag_amplitude" not in unbounded.allowed_overrides
     open_ended = AgentSessionPolicy(
         qids=["Q00"],
         allowed_tasks=["CheckChevron"],
         allowed_overrides={"qubit_frequency": NumericBounds(minimum=7.0)},
         autonomy=AgentAutonomy.AUTO,
     )
-    with pytest.raises(ValidationError, match="needs both minimum and maximum"):
-        AgentSessionPolicy.model_validate({**open_ended.model_dump(), "parameter_updates": GRANT})
+    granted = AgentSessionPolicy.model_validate(
+        {**open_ended.model_dump(), "parameter_updates": GRANT}
+    )
+    assert granted.allowed_overrides == {"qubit_frequency": NumericBounds(minimum=7.0)}
     # A session stored before the field existed reads as no authority.
     stored = {
         key: value for key, value in _policy().model_dump().items() if key != "parameter_updates"
@@ -413,6 +425,12 @@ def test_a_passing_measurement_commits_once_without_approval_and_records_its_evi
     assert evidence["assessment"]["assessment"] == "pass"
     assert evidence["gates"]["provenance"] == "server_computed"
     assert evidence["gates"]["minimum"] == 7.0
+    assert evidence["gates"]["applied_quality_gates"] == []
+    assert evidence["gates"]["acceptance_basis"] == "session_bounds"
+    assert evidence["gates"]["task_checks"] == {
+        "source": "task_definition",
+        "enforced_by": "workflow",
+    }
     assert evidence["authority"] == {
         "kind": "session_policy",
         "granted_by": OWNER,
@@ -522,7 +540,9 @@ def test_out_of_scope_tasks_parameters_and_rejected_values_are_refused(
         "does not grant updates from CheckRabi",
     )
 
-    other = _session(service, quality_gates={"r2": NumericBounds(minimum=0.9)})
+    other = _session(
+        service, task_quality_gates={"CheckChevron": {"r2": NumericBounds(minimum=0.9)}}
+    )
     low = _measure(service, other, "CheckChevron", quality={"r2": 0.5})
     _refused(
         lambda: _commit(service, other, low, _decide(other, low)), 409, "Candidate gate rejected"
@@ -535,6 +555,82 @@ def test_out_of_scope_tasks_parameters_and_rejected_values_are_refused(
         "Candidate gate rejected",
     )
     assert _stored_frequency() is None
+
+
+def test_a_grant_without_bounds_commits_on_the_task_checks_and_nothing_else(
+    service: AgentSessionService,
+) -> None:
+    session_id = _session(service, overrides={})
+    chevron = _measure(service, session_id, "CheckChevron", value=7.45)
+    candidates = service.list_action_candidates(
+        project_id=PROJECT, session_id=session_id, action_id=chevron
+    ).items
+    assert [(c.accepted, c.acceptance_basis, c.minimum, c.maximum) for c in candidates] == [
+        (True, AgentCandidateAcceptanceBasis.TASK_CHECKS, None, None)
+    ]
+    committed = _commit(service, session_id, chevron, _decide(session_id, chevron))
+    assert committed.status == "committed"
+    gates = committed.assessment_evidence["gates"]
+    assert gates["acceptance_basis"] == "task_checks"
+    assert (gates["minimum"], gates["maximum"]) == (None, None)
+    assert "no numeric bounds" in gates["candidate_reason"]
+    assert _stored_frequency()["value"] == 7.45
+
+    # The grant covers only its tasks: the same parameter from CheckRabi is not accepted.
+    rabi = _measure(service, session_id, "CheckRabi", value=7.5)
+    from_rabi = service.list_action_candidates(
+        project_id=PROJECT, session_id=session_id, action_id=rabi
+    ).items
+    assert [(c.accepted, c.acceptance_basis) for c in from_rabi] == [(False, None)]
+    assert "not allowed by the session policy" in from_rabi[0].reason
+
+
+def test_a_grant_without_bounds_still_fails_closed_on_its_task_gate(
+    service: AgentSessionService,
+) -> None:
+    session_id = _session(
+        service,
+        overrides={},
+        task_quality_gates={"CheckChevron": {"r2": NumericBounds(minimum=0.9)}},
+    )
+    chevron = _measure(service, session_id, "CheckChevron", value=7.45)
+    (candidate,) = service.list_action_candidates(
+        project_id=PROJECT, session_id=session_id, action_id=chevron
+    ).items
+    assert not candidate.accepted
+    assert candidate.acceptance_basis is None
+    assert candidate.reason == ("Required quality metric 'r2' for task 'CheckChevron' is missing")
+    _refused(
+        lambda: _commit(service, session_id, chevron, _decide(session_id, chevron)),
+        409,
+        "Candidate gate rejected",
+    )
+    assert _stored_frequency() is None
+
+
+def test_update_evidence_records_only_the_task_gates_it_was_checked_against(
+    service: AgentSessionService,
+) -> None:
+    session_id = _session(
+        service,
+        task_quality_gates={
+            "CheckChevron": {"r2": NumericBounds(minimum=0.9)},
+            "CheckRabi": {"r2": NumericBounds(minimum=0.99)},
+        },
+    )
+    chevron = _measure(service, session_id, "CheckChevron", quality={"r2": 0.95})
+    committed = _commit(service, session_id, chevron, _decide(session_id, chevron))
+
+    assert committed.status == "committed"
+    assert committed.assessment_evidence["gates"]["applied_quality_gates"] == [
+        {
+            "metric_name": "r2",
+            "scope": "task",
+            "task_name": "CheckChevron",
+            "minimum": 0.9,
+            "maximum": None,
+        }
+    ]
 
 
 @pytest.mark.parametrize(
@@ -1108,8 +1204,112 @@ def test_evidence_says_whether_an_evaluation_existed(service: AgentSessionServic
     other = _session(service)
     action = _measure(service, other, "CheckChevron")
     unevaluated = _commit(service, other, action, _decide(other, action), key="c2")
-    assert unevaluated.assessment_evidence["evaluation_state"] == "none"
+    # A new session records evaluation off: no evaluation was asked for, none is missing.
+    assert unevaluated.assessment_evidence["evaluation_mode"] == "off"
+    assert unevaluated.assessment_evidence["evaluation_state"] == "not_requested"
     assert unevaluated.assessment_evidence["evaluations"] == []
+    assert supported.assessment_evidence["evaluations"][0]["evaluator_model"] == "vllm/qcal-vlm"
+
+    # A session approved before evaluation modes keeps its record: no mode, state none.
+    QubitDocument.get_motor_collection().update_one({"qid": "Q00"}, {"$set": {"data": {}}})
+    legacy = _session(service)
+    AgentSessionDocument.get_motor_collection().update_one(
+        {"session_id": legacy}, {"$unset": {"policy.evaluation": ""}}
+    )
+    stored = AgentSessionDocument.find_one({"session_id": legacy}).run()
+    assert stored is not None and stored.policy.evaluation is None
+    action = _measure(service, legacy, "CheckChevron")
+    old = _commit(service, legacy, action, _decide(legacy, action), key="c3")
+    assert old.assessment_evidence["evaluation_mode"] is None
+    assert old.assessment_evidence["evaluation_state"] == "none"
+
+
+def test_a_required_evaluation_must_exist_complete_and_support_the_update(
+    service: AgentSessionService,
+) -> None:
+    session_id = _session(service, evaluation=AgentEvaluationMode.REQUIRED)
+    chevron = _measure(service, session_id, "CheckChevron")
+    decision = _decide(session_id, chevron)
+    # No evaluation: refused, and nothing is written.
+    _refused(
+        lambda: _commit(service, session_id, chevron, decision),
+        409,
+        "requires an evaluation of each result before an update",
+    )
+    # A spoofed request field cannot switch the approved mode off.
+    with pytest.raises(HTTPException):
+        service.commit_action_candidate(
+            project_id=PROJECT,
+            session_id=session_id,
+            action_id=chevron,
+            parameter_name="qubit_frequency",
+            username=OWNER,
+            body=CommitAgentCandidateRequest.model_validate(
+                {
+                    "idempotency_key": "spoof",
+                    "expected_state_version": _version(session_id),
+                    "task_id": _task_id(chevron),
+                    "autonomous": True,
+                    "decision_id": decision,
+                    "evaluation": "off",
+                }
+            ),
+        )
+    assert _stored_frequency() is None
+    # A pending evaluation makes the update wait.
+    _evaluate(chevron, status="pending", key="ev-pending")
+    _refused(lambda: _commit(service, session_id, chevron, decision), 409, "wait for it")
+    EvaluationDocument.get_motor_collection().delete_one({"evaluation_id": "ev-pending"})
+
+    _evaluate(chevron, diagnosis=POSITIVE)
+    committed = _commit(service, session_id, chevron, decision)
+    assert committed.status == "committed"
+    evidence = committed.assessment_evidence
+    assert (evidence["evaluation_mode"], evidence["evaluation_state"]) == (
+        "required",
+        "supported",
+    )
+
+
+def test_a_reviewed_commit_of_a_required_session_also_needs_the_evaluation(
+    service: AgentSessionService,
+) -> None:
+    session_id = _session(service, updates=None, evaluation=AgentEvaluationMode.REQUIRED)
+    chevron = _measure(service, session_id, "CheckChevron")
+    _refused(
+        lambda: _commit(service, session_id, chevron, None, autonomous=False),
+        409,
+        "requires an evaluation of each result before a commit",
+    )
+    _evaluate(chevron, status="failed")
+    _refused(
+        lambda: _commit(service, session_id, chevron, None, autonomous=False),
+        409,
+        "requires a completed evaluation",
+    )
+    assert _stored_frequency() is None
+
+
+def test_evaluation_off_still_refuses_an_existing_negative_evaluation(
+    service: AgentSessionService,
+) -> None:
+    session_id = _session(service)
+    stored = AgentSessionDocument.find_one({"session_id": session_id}).run()
+    assert stored is not None and stored.policy.evaluation == AgentEvaluationMode.OFF
+    chevron = _measure(service, session_id, "CheckChevron")
+    _evaluate(
+        chevron,
+        diagnosis={
+            "fit_reliability": {"assessment": "Unreliable"},
+            "calibration_diagnosis": {"status": "SUCCESS"},
+        },
+    )
+    _refused(
+        lambda: _commit(service, session_id, chevron, _decide(session_id, chevron)),
+        409,
+        "judged the fit unreliable",
+    )
+    assert _stored_frequency() is None
 
 
 # --------------------------------------------------------------------------- stored value

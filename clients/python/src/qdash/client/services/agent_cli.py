@@ -147,10 +147,22 @@ def _build_parser() -> argparse.ArgumentParser:
         help='JSON bounds, e.g. {"t1":{"minimum":1,"maximum":500}}',
     )
     start.add_argument(
-        "--quality-gates",
+        "--task-quality-gates",
         type=_json_object,
         default={},
-        help='JSON quality bounds, e.g. {"r2":{"minimum":0.9}}',
+        help=(
+            "JSON quality bounds per task on metrics QDash records (r2), e.g. "
+            '{"CheckRabi":{"r2":{"minimum":0.9}}}; results of other tasks are not checked'
+        ),
+    )
+    start.add_argument(
+        "--evaluation",
+        choices=("off", "required"),
+        default="off",
+        help=(
+            "Calibration evaluator use for the session, fixed at approval: required makes "
+            "every commit wait for a completed qcal_evaluate evaluation that supports it"
+        ),
     )
     start.add_argument("--max-actions", type=int, default=100)
     start.add_argument(
@@ -452,11 +464,12 @@ def run(argv: list[str] | None = None) -> int:
                     "qids": args.qids,
                     "allowed_tasks": args.tasks,
                     "allowed_overrides": args.allowed_overrides,
-                    "quality_gates": args.quality_gates,
+                    "task_quality_gates": args.task_quality_gates,
                     "allow_reconfigure": args.allow_reconfigure,
                     "max_actions": args.max_actions,
                     "autonomy": args.autonomy,
                     "max_rounds_per_target": args.max_rounds_per_target,
+                    "evaluation": args.evaluation,
                 },
                 expires_in_seconds=args.expires_in_seconds,
                 skill_name=args.skill_name,
@@ -464,6 +477,36 @@ def run(argv: list[str] | None = None) -> int:
                 skill_hash=args.skill_hash,
                 model=_reported_model(args.model_provider, args.model_id),
             )
+            if args.task_quality_gates and not session.policy.task_quality_gates:
+                # A server that predates task_quality_gates ignores the field.
+                print(
+                    json.dumps(
+                        {
+                            "error": (
+                                "QDash created the session without its task quality gates; "
+                                "the server predates task_quality_gates. Do not run steps in "
+                                "it: complete it and upgrade QDash first."
+                            ),
+                            "session_id": session.session_id,
+                        },
+                        sort_keys=True,
+                    ),
+                    file=sys.stderr,
+                )
+                return 1
+            if session.policy.evaluation != args.evaluation:
+                print(
+                    json.dumps(
+                        {
+                            "error": "QDash created the session without its approved evaluation mode. "
+                            "Do not run steps in it: complete it and upgrade QDash first.",
+                            "session_id": session.session_id,
+                        },
+                        sort_keys=True,
+                    ),
+                    file=sys.stderr,
+                )
+                return 1
             print(json.dumps(session.model_dump(mode="json"), sort_keys=True))
             return 0
 

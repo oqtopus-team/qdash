@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -238,6 +238,10 @@ describe("ApprovalCard for agent sessions", () => {
     expect(preview.textContent).toContain("no backend apply");
     expect(preview.textContent).toContain("up to 4 actions");
     expect(preview.textContent).toContain("60 min");
+    const criteria = within(screen.getByTestId("agent-session-update-criteria"));
+    expect(
+      criteria.getByText("qubit_frequency", { selector: "dt" }).nextElementSibling?.textContent,
+    ).toBe("[7, 8]");
     // The exact policy stays reviewable as an argument.
     expect(screen.getByText("policy")).toBeTruthy();
   });
@@ -258,6 +262,41 @@ describe("ApprovalCard for agent sessions", () => {
     const preview = screen.getByTestId("agent-session-policy-preview");
     expect(preview.textContent).toContain("not granted: each commit asks you");
     expect(preview.textContent).toContain("QDash default (6 h)");
+    expect(
+      within(preview).getByText("Evaluation", { selector: "dt" }).nextElementSibling?.textContent,
+    ).toBe("off: qcal_evaluate is not called");
+  });
+
+  it("shows each quality gate with the only task whose results it checks", () => {
+    render(
+      <ApprovalCard
+        approval={{
+          id: "call-g",
+          tool: "qdash_create_agent_session",
+          label: "QDash Create Agent Session",
+          args: {
+            chipId: "64Q",
+            policy: {
+              ...policy,
+              allowed_overrides: {},
+              task_quality_gates: { CheckRabi: { r2: { minimum: 0.9 } } },
+              parameter_updates: { parameters: ["qubit_frequency"], tasks: ["CheckChevron"] },
+            },
+          },
+        }}
+        state={state()}
+      />,
+    );
+
+    const preview = screen.getByTestId("agent-session-policy-preview");
+    const gates = within(preview).getByText("Quality gates", { selector: "dt" });
+    expect(gates.nextElementSibling?.textContent).toBe("r2 [0.9, inf] only on CheckRabi results");
+    expect(preview.textContent).not.toContain("Session-wide gates");
+    // A granted parameter without bounds says the task's own checks decide.
+    const criteria = within(screen.getByTestId("agent-session-update-criteria"));
+    expect(
+      criteria.getByText("qubit_frequency", { selector: "dt" }).nextElementSibling?.textContent,
+    ).toBe("no numeric bounds: its task's own checks decide");
   });
 });
 

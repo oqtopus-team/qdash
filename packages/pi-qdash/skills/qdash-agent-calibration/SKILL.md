@@ -40,39 +40,41 @@ it.
    user's per-call approval, or propose a session of your own.
 3. Plan which values the goal must commit. A step measures on the committed calibration state,
    so when a later task needs a value an earlier task of this goal measures (CheckRabi at the
-   frequency CheckChevron just measured), that output has to be committed between them. QDash
-   uses `allowed_overrides` for two things: a step may override a task input of that name
-   within the bounds, and a task output of that name becomes an accepted candidate only inside
-   them. An output that is not a key is staged as rejected and can never be committed from this
-   session, and a session's policy cannot change after approval. So put each output the goal
-   must commit in `allowed_overrides`, under the output name and in the unit the catalog lists,
-   and nothing the goal does not need: a key is also scope the user grants. When the goal
-   commits values, propose `parameter_updates` in the same policy: `parameters` (exactly the
-   outputs the goal commits), `tasks` (only the tasks that measure them), and `apply_backend`
-   only when a later step reads the value from Qubex's configuration files rather than from
-   QDash. Approving the session then lets you commit those values after a result you assess as
-   pass, without asking per update. Without `parameter_updates`, every commit and apply is a
-   separate approval.
-4. Take every bound from evidence, never from a habit or a round number: the range the task
-   knowledge documents for the value, or a window around the current value that the task
-   knowledge or the experiment skill justifies. When neither documents a range, do not invent
-   one and do not widen a bound to be safe; a broad range turns the gate into no gate. Show the
-   user the current value with its unit and ask them for the accepted window, or put a proposed
-   window in the session proposal and say plainly that it is your suggestion with no documented
-   basis, so that approving the session is the user's decision on it. The bound is a
-   deterministic sanity check, not a scientific verdict. Each `parameter_updates` parameter
-   needs both a minimum and a maximum; the task's own completion checks (such as its fit R²
-   threshold) and any `quality_gates` you can justify from the task knowledge apply on top. Do
-   not ask the user to invent extra thresholds: propose only the bounds the goal needs, say
-   where each comes from, and let the approval decide.
+   frequency CheckChevron just measured), that output has to be committed between them. When
+   the goal commits values, propose `parameter_updates`: `parameters` (exactly the outputs the
+   goal commits, under the output names the catalog lists), `tasks` (only the tasks that
+   measure them), and `apply_backend` only when a later step reads the value from Qubex's
+   configuration files rather than from QDash. The grant says which parameters may change; it
+   needs no numeric bounds. A granted output from a granted task is accepted when its task
+   completed, so the task's own checks (such as its fit R² threshold) passed; a session's policy
+   cannot change after approval, so name every output the goal commits. Without
+   `parameter_updates` an output is a candidate only inside bounds in `allowed_overrides`, and
+   every commit and apply is a separate approval.
+4. Never author a scientific threshold. Do not derive bounds from the current value, a percent
+   window, a round number, or your own reading of the task knowledge, and do not add bounds
+   only to make a grant or a commit possible. Put numbers in `allowed_overrides` or
+   `task_quality_gates` only when the user stated them in this conversation, and say they are
+   the user's values; QDash records them as approved with the session and cannot verify where
+   they came from. `allowed_overrides` also bounds the task inputs a step may override (such as
+   `shots`); list an input only with bounds the user gave or the catalog's own input limits,
+   which QDash enforces anyway. `task_quality_gates` names a task and a metric QDash records on
+   that task's results (currently only `r2`); a gate never applies to another task, and an
+   output such as `average_gate_fidelity` is not a quality metric. Without user-stated numbers,
+   the task's own completion checks are the criterion. When the user wants reviewed commits in
+   a `confirm_each` session but gave no bounds, ask them for the accepted window; measurement
+   can proceed in the approved scope without it, but nothing can be committed.
 5. Propose the session with `qdash_create_agent_session`: the qubits, the tasks the goal
-   needs, the `allowed_overrides` from steps 3 and 4 (plus run inputs you expect to vary, such
-   as `shots`), `allow_reconfigure` only when a task needs `Configure`, a small `max_actions`
+   needs, any `allowed_overrides` and `task_quality_gates` the user stated (step 4),
+   `allow_reconfigure` only when a task needs `Configure`, a small `max_actions`
    (the planned steps plus a few recovery rounds), `max_rounds_per_target`,
-   `autonomy: "auto"`, `parameter_updates` from step 3 when the goal commits values, and the
+   `autonomy: "auto"`, `parameter_updates` from step 3 when the goal commits values,
+   `evaluation: "required"` only when the user asked for the calibration evaluator (otherwise
+   `off`, the default; it cannot change during the session), and the
    expiry the user asked for or a few hours. Say in a few sentences what approving it allows:
-   each committable output with its bounds, the tasks that may supply it, whether backend apply
-   is included, and that a failed, uncertain, or unexplained result stops for a person instead
+   each committable output, its bounds if the user gave any (otherwise that its task's own
+   checks decide), the tasks that may supply it, whether backend apply
+   is included, whether the evaluator is required, and that a failed, uncertain, or
+   unexplained result stops for a person instead
    of being committed. The call is a reviewed write: the user's approval of it is the approval
    of every step and every granted update inside that scope, so the loop does not ask again.
    Never create a new session to get around a paused one; QDash refuses an `auto` session for
@@ -97,7 +99,10 @@ it.
    with the execution id.
 5. Observe: the candidates in `qdash_get_agent_session_context`, the result with
    `qdash_get_task_result`, the figures with `qdash_get_task_figures`, and the task knowledge.
-   When the host offers `qcal_evaluate`, evaluate the figure with it. `completed` is an
+   Follow the session's `evaluation` mode, which the context reports: with `required`,
+   evaluate each result's figure with `qcal_evaluate` before you commit it; with `off`, do not
+   call `qcal_evaluate` and do not report an evaluator verdict; for an older session without a
+   mode, evaluate with `qcal_evaluate` when the host offers it. `completed` is an
    execution status, not a verdict; a rejected candidate means the session's bounds or quality
    gates refused the value.
 6. Decide: a result the task knowledge accepts is a pass and moves on to the next task of the

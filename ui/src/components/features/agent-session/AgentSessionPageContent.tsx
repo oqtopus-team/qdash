@@ -22,7 +22,10 @@ import {
   interventionStatusStyle,
   sessionStatusLabel,
 } from "./interventionLabels";
-import { sessionGraphHref } from "@/components/features/execution/agentSessionDisplay";
+import {
+  sessionGraphHref,
+  sessionStatusBadgeClass,
+} from "@/components/features/execution/agentSessionDisplay";
 
 import { AgentSessionAuditTimeline } from "./AgentSessionAuditTimeline";
 import { projectRequest, useLinkedProject } from "./useLinkedProject";
@@ -113,7 +116,11 @@ export function AgentSessionPageContent({ sessionId }: { sessionId: string }) {
       <div className="flex flex-col gap-4">
         <section className="card card-border bg-base-100">
           <div className="card-body grid gap-3 p-4 sm:grid-cols-2 md:grid-cols-4">
-            <Field label="Status">{sessionStatusLabel(data.status)}</Field>
+            <Field label="Status">
+              <span className={`badge badge-soft badge-sm ${sessionStatusBadgeClass(data.status)}`}>
+                {sessionStatusLabel(data.status)}
+              </span>
+            </Field>
             <Field label="Actions used">
               {data.action_count} of {data.policy.max_actions}
             </Field>

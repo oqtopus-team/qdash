@@ -218,9 +218,15 @@ application configuration (`workflow.params_updater.parameter_file_map`).
 
 ### Create a bounded session
 
-A session fixes the chip, qubits, allowed tasks, parameter bounds, quality gates, action budget,
-expiry, skill identity, and hardware-reconfiguration permission. Later actions must stay
-within that scope. `--model-provider` and `--model-id`, given together, report the model your
+A session fixes the chip, qubits, allowed tasks, parameter bounds, quality gates, evaluation
+mode, action budget, expiry, skill identity, and hardware-reconfiguration permission. Later
+actions must stay within that scope. Give only bounds and gates you chose; QDash cannot tell who
+wrote a number and records it as approved with the session. A quality gate names its task and
+a metric QDash records on that task's results, currently only the fit `r2`; a gate never checks
+another task, and an output such as a gate fidelity is bounded with `--allowed-overrides`.
+`--evaluation required` makes every commit wait for a supporting `qcal_evaluate` evaluation;
+the default `off` uses the task's own checks. These choices cannot change during the session;
+to change them, create a new session. `--model-provider` and `--model-id`, given together, report the model your
 agent runs with; QDash records them as reported and does not verify them.
 
 ```bash
@@ -229,7 +235,7 @@ qdash-agent --profile local start-session \
   --qid Q00 \
   --task CheckT1 \
   --allowed-overrides '{"t1":{"minimum":1,"maximum":500}}' \
-  --quality-gates '{"r2":{"minimum":0.9}}' \
+  --task-quality-gates '{"CheckT1":{"r2":{"minimum":0.9}}}' \
   --max-actions 20 \
   --allow-reconfigure \
   --skill-name qdash-agent-calibrator \

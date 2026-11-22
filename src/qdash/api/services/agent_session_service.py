@@ -43,6 +43,7 @@ from qdash.api.services.agent_parameter_update import (
     BASELINE_METADATA_KEY,
     check_apply,
     check_commit,
+    check_required_evaluation,
     downstream_refusal,
     paused_session_overlap,
     record_baseline,
@@ -50,6 +51,7 @@ from qdash.api.services.agent_parameter_update import (
 )
 from qdash.api.services.agent_session_gate import (
     autonomous_session_refusal,
+    end_notification_update,
     expire_session_if_due,
     load_agent_session,
     materialize_pending_action,
@@ -58,6 +60,10 @@ from qdash.api.services.agent_session_gate import (
     raw_document,
     release_abandoned_reservations,
 )
+from qdash.api.services.agent_session_notifications import (
+    AgentSessionNotificationService,
+    initial_start_notification,
+)
 from qdash.api.services.catalog_task_run import resolve_catalog_task, run_catalog_task
 from qdash.common.agent_gate import evaluate_numeric_candidate
 from qdash.common.utils.datetime import now
@@ -65,6 +71,8 @@ from qdash.datamodel.agent_session import (
     AgentActionDecision,
     AgentActionType,
     AgentAutonomy,
+    AgentCandidateAcceptanceBasis,
+    AgentSessionLifecycleEvent,
     AgentSessionStatus,
     model_label,
 )
@@ -132,6 +140,11 @@ class AgentSessionService:
         if self._interventions is None:
             self._interventions = AgentInterventionService()
         return self._interventions
+
+    @property
+    def notifications(self) -> AgentSessionNotificationService:
+        """The session start and end messages, on the interventions' Slack channel."""
+        return AgentSessionNotificationService(self.interventions.notifier)
 
     @staticmethod
     def _session_response(doc: AgentSessionDocument) -> AgentSessionResponse:
@@ -331,6 +344,8 @@ class AgentSessionService:
             expires_at=timestamp + timedelta(seconds=body.expires_in_seconds),
             created_at=timestamp,
             updated_at=timestamp,
+            # Stored with the session, so the start message survives a crash after insert.
+            start_notification=initial_start_notification(self.notifications.enabled),
         )
         doc.insert()
         return self._session_response(doc)
@@ -676,6 +691,13 @@ class AgentSessionService:
         timestamp = now()
         action_id = str(uuid4())
         session_update: dict[str, Any] = {"status": next_status.value, "updated_at": timestamp}
+        if next_status == AgentSessionStatus.COMPLETED:
+            # The end message is stored by the same update that ends the session.
+            session_update |= end_notification_update(
+                session,
+                AgentSessionLifecycleEvent.COMPLETED,
+                actor=username or session.created_by,
+            )
         increments = {"state_version": 1, "action_count": 1}
         intervention = None
         if next_status == AgentSessionStatus.WAITING_FOR_HUMAN:
@@ -798,6 +820,14 @@ class AgentSessionService:
         timeline recomputes it without storing a second copy.
         """
         session_id = session.session_id
+        # Only this task's gates (and legacy session-wide ones) apply to its result.
+        gates = session.policy.quality_gates_for(task_result.name)
+        updates = session.policy.parameter_updates
+        granted = (
+            set(updates.parameters)
+            if updates is not None and task_result.name in updates.tasks
+            else set()
+        )
         items: list[AgentCandidateResponse] = []
         for source_name, raw in sorted(task_result.output_parameters.items()):
             candidate = cls._candidate_parameter(source_name, raw)
@@ -805,11 +835,18 @@ class AgentSessionService:
                 continue
             parameter_name, value, error, unit, value_type = candidate
             bounds = session.policy.allowed_overrides.get(parameter_name)
-            if bounds is None:
+            basis: AgentCandidateAcceptanceBasis | None = None
+            minimum = None
+            maximum = None
+            if bounds is None and parameter_name in granted:
+                # A granted parameter without bounds: only the task's own completion checks
+                # (a completed result) and the quality gates below decide.
+                accepted = True
+                basis = AgentCandidateAcceptanceBasis.TASK_CHECKS
+                reason = "candidate passed its task's completion checks; no numeric bounds"
+            elif bounds is None:
                 accepted = False
                 reason = f"Parameter '{parameter_name}' is not allowed by the session policy"
-                minimum = None
-                maximum = None
             else:
                 decision = evaluate_numeric_candidate(
                     value,
@@ -820,26 +857,42 @@ class AgentSessionService:
                 reason = decision.reason
                 minimum = bounds.minimum
                 maximum = bounds.maximum
+                if accepted:
+                    basis = AgentCandidateAcceptanceBasis.SESSION_BOUNDS
 
             if accepted:
-                for metric_name, metric_bounds in session.policy.quality_gates.items():
-                    metric_value = task_result.quality_metrics.get(metric_name)
+                for gate in gates:
+                    where = (
+                        f"for task '{task_result.name}'"
+                        if gate.task_name is not None
+                        else "by the session-wide gate"
+                    )
+                    metric_value = task_result.quality_metrics.get(gate.metric_name)
                     if metric_value is None:
                         accepted = False
-                        reason = f"Required quality metric '{metric_name}' is missing"
+                        reason = f"Required quality metric '{gate.metric_name}' {where} is missing"
                         break
                     quality_decision = evaluate_numeric_candidate(
                         metric_value,
-                        minimum=metric_bounds.minimum,
-                        maximum=metric_bounds.maximum,
+                        minimum=gate.minimum,
+                        maximum=gate.maximum,
                     )
                     if not quality_decision.accepted:
                         accepted = False
-                        reason = f"Quality metric '{metric_name}' {quality_decision.reason}"
+                        reason = (
+                            f"Quality metric '{gate.metric_name}' {where} {quality_decision.reason}"
+                        )
                         break
                 else:
-                    if session.policy.quality_gates:
-                        reason = "candidate passed deterministic bounds and quality gates"
+                    if gates:
+                        reason = (
+                            "candidate passed deterministic bounds and quality gates"
+                            if basis == AgentCandidateAcceptanceBasis.SESSION_BOUNDS
+                            else "candidate passed its task's completion checks and quality "
+                            "gates; no numeric bounds"
+                        )
+                if not accepted:
+                    basis = None
 
             items.append(
                 AgentCandidateResponse(
@@ -856,6 +909,8 @@ class AgentSessionService:
                     unit=unit,
                     value_type=value_type,
                     quality_metrics=dict(task_result.quality_metrics),
+                    applied_quality_gates=[gate.model_copy() for gate in gates],
+                    acceptance_basis=basis,
                     accepted=accepted,
                     reason=reason,
                     minimum=minimum,
@@ -1080,6 +1135,12 @@ class AgentSessionService:
                 evaluations_of=self._evaluations_of,
             )
             evidence, baseline = grounds.evidence, grounds.baseline
+        else:
+            check_required_evaluation(
+                session,
+                self._get_action_document(project_id, session_id, action_id),
+                self._evaluations_of,
+            )
 
         timestamp = now()
         commit = AgentCandidateCommitDocument(
@@ -1256,6 +1317,11 @@ class AgentSessionService:
                         f"Candidate gate rejected '{candidate.parameter_name}': {candidate.reason}"
                     ),
                 )
+            check_required_evaluation(
+                session,
+                self._get_action_document(project_id, session_id, reference.action_id),
+                self._evaluations_of,
+            )
             resolved.append(candidate)
 
         qids = {candidate.qid for candidate in resolved}

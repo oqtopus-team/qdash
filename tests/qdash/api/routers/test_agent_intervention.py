@@ -20,11 +20,18 @@ from qdash.dbmodel.user import UserDocument
 
 
 class FakeSlack:
+    """Records intervention messages in ``calls`` and session start/end in ``session_calls``."""
+
     def __init__(self) -> None:
         self.calls: list[dict[str, Any]] = []
+        self.session_calls: list[dict[str, Any]] = []
 
     def chat_postMessage(self, *, channel: str, **kwargs: Any) -> dict[str, str]:
         kwargs["channel"] = channel
+        lifecycle = str(kwargs.get("text", "")).startswith("Agent session ")
+        if lifecycle:
+            self.session_calls.append(kwargs)
+            return {"channel": kwargs["channel"], "ts": f"{len(self.session_calls)}.500"}
         self.calls.append(kwargs)
         return {"channel": kwargs["channel"], "ts": f"{len(self.calls)}.000"}
 
@@ -285,3 +292,32 @@ def test_list_sessions_filters_settles_and_keeps_projects_apart(
         "/agent-sessions", headers=_headers("owner-token"), params={"status": "running"}
     )
     assert bad_status.status_code == 422
+
+
+def test_session_start_and_stop_are_announced_for_the_owning_project(
+    test_client, slack: FakeSlack
+) -> None:
+    """The start message follows creation; an editor's stop ends it with a cancel message."""
+    session_id, created = _open_intervention(test_client)
+    assert [call["text"].split(":")[0] for call in slack.session_calls] == ["Agent session started"]
+    title = slack.session_calls[0]["attachments"][0]["blocks"][0]["text"]["text"]
+    assert f"/agent-sessions/{session_id}?project=lab-a" in title
+
+    # A viewer cannot stop it, so nothing ends and nothing more is announced.
+    body = {"idempotency_key": "stop-1", "expected_state_version": 1, "decision": "stop"}
+    path = f"/agent-sessions/{session_id}/interventions/{created['intervention_id']}/respond"
+    assert test_client.post(path, headers=_headers("viewer-token"), json=body).status_code == 403
+    assert len(slack.session_calls) == 1
+
+    state = test_client.get(f"/agent-sessions/{session_id}", headers=_headers("owner-token"))
+    body["expected_state_version"] = state.json()["state_version"]
+    answered = test_client.post(path, headers=_headers("owner-token"), json=body)
+    assert answered.status_code == 200, answered.text
+    assert [call["text"].split(":")[0] for call in slack.session_calls] == [
+        "Agent session started",
+        "Agent session cancelled",
+    ]
+    session = test_client.get(f"/agent-sessions/{session_id}", headers=_headers("owner-token"))
+    assert session.json()["end_notification"]["event"] == "cancelled"
+    assert session.json()["end_notification"]["status"] == "sent"
+    assert session.json()["start_notification"]["status"] == "sent"

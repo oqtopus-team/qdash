@@ -51,10 +51,15 @@ from qdash.api.services.agent_session_audit import (
     MAX_PAGE_SIZE,
     AgentSessionAuditService,
 )
+from qdash.api.services.agent_session_notifications import AgentSessionNotificationService
 from qdash.api.services.agent_session_service import AgentSessionService
 from qdash.api.services.flow_service import FlowService
 from qdash.api.services.task_file_service import TaskFileService
-from qdash.datamodel.agent_session import AgentSessionStatus
+from qdash.datamodel.agent_session import (
+    AgentActionDecision,
+    AgentActionType,
+    AgentSessionStatus,
+)
 
 router = APIRouter(prefix="/agent-sessions")
 
@@ -68,15 +73,24 @@ router = APIRouter(prefix="/agent-sessions")
 )
 def create_agent_session(
     body: CreateAgentSessionRequest,
+    background_tasks: BackgroundTasks,
     ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[AgentSessionService, Depends(get_agent_session_service)],
 ) -> AgentSessionResponse:
-    """Create a bounded authorization scope for a user-operated local agent."""
-    return service.create_session(
+    """Create a bounded authorization scope for a user-operated local agent.
+
+    The new session's Slack start message, when agent notifications are on, is sent after
+    the response; the notification sweeper retries it.
+    """
+    session = service.create_session(
         project_id=ctx.project_id,
         username=ctx.user.username,
         body=body,
     )
+    background_tasks.add_task(
+        service.notifications.deliver, session.session_id, "start_notification"
+    )
+    return session
 
 
 @router.get(
@@ -170,6 +184,11 @@ def submit_agent_action(
         background_tasks.add_task(
             service.interventions.deliver_notification, action.intervention_id
         )
+    if (
+        action.action_type == AgentActionType.COMPLETE_SESSION
+        and action.decision == AgentActionDecision.AUTHORIZED
+    ):
+        background_tasks.add_task(service.notifications.deliver, session_id, "end_notification")
     return action
 
 
@@ -468,6 +487,13 @@ def respond_agent_intervention(
     }.get(result.status.value)
     if text:
         background_tasks.add_task(service.post_update, intervention_id, text)
+    if result.status.value == "stopped":
+        # A stop that ended the session stored its end message; send it now.
+        background_tasks.add_task(
+            AgentSessionNotificationService(service.notifier).deliver,
+            session_id,
+            "end_notification",
+        )
     return result
 
 

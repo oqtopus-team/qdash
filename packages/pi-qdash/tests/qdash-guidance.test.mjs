@@ -256,3 +256,12 @@ test("chat and the pi CLI give the same script and deferred-tool rules", async (
   assert.ok(section.includes(QDASH_SCRIPT_GUIDELINE));
   assert.ok(section.includes(deferredToolsGuideline(["qdash_list_cryostats"])));
 });
+
+test("an unexpected tool failure may be reported by the user; ordinary refusals are not bugs", () => {
+  const rule = QDASH_INVESTIGATION_POLICY.find((item) => item.includes("GitHub bug form"));
+  assert.ok(rule);
+  assert.match(rule, /an HTTP 5xx, or a response the tool could not read/);
+  assert.match(rule, /A refused step, a failed measurement, a rejected candidate or quality gate, a declined approval, or input to correct is not a bug/);
+  assert.match(rule, /Never say an issue was filed\./);
+  assert.match(rule, /without credentials, prompts, or full results/);
+});

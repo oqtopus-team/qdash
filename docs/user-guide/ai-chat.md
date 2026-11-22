@@ -82,6 +82,17 @@ Continue also answers that message. Continue is not offered after a complete ans
 sent during the answer is still being checked, and it is refused while a question, an approval
 card, or a proposed edit waits for you; answer those instead.
 
+When the latest answer ended with a server error, a connection that closed before the answer
+was complete, or another error reported by the chat, **Report this error** shows a bug-report
+draft that you can copy. The draft records the error category, the HTTP status, a known page
+category with private path segments removed, and the time the draft was generated (not the
+error occurrence time). Unrecognized errors have an unclassified source. The draft leaves
+out the error text, which can contain private details, and has places for your steps and hypotheses. Review it, remove anything private, and
+post it yourself with **Open the GitHub bug form**; QDash does not file issues. A refused
+request (an HTTP 4xx answer, such as a sign-in, permission, or input problem) offers no report,
+and neither does a failed measurement, a rejected value, or a declined approval inside an
+answer. The assistant follows the same rule when a tool fails unexpectedly.
+
 ### Branch from an Answer
 
 Use **Branch from here** under a completed answer to try a different direction without changing
@@ -219,7 +230,10 @@ every task result is judged by the same gates as a saved workflow. The execution
 ## Calibrate Qubits Step by Step
 
 Ask for a supervised calibration of named qubits, for example "calibrate Q00 step by step and
-ask an expert if it gets stuck". The assistant proposes a bounded session on an approval card;
+ask an expert if it gets stuck". The assistant proposes a bounded session on an approval card,
+which shows each quality gate with the task it checks, whether the calibration evaluator is
+used (**Evaluation** off or required), and for each value it may update without asking either
+the bounds you gave or that the task's own checks decide;
 once you approve it, it chooses each measurement from the last result without further cards,
 keeps the values as candidates until you approve a commit (it asks before a measurement that
 needs a new value), and asks an expert in QDash when it

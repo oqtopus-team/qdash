@@ -1,5 +1,7 @@
 import type { AgentModelIdentity, AgentSessionGroupSummary } from "@/schemas";
 
+import { getStatusBadgeClass } from "./ExecutionListCard";
+
 /** `provider/model_id` of a host-reported model, or null when the record holds none. */
 export function reportedModelLabel(model?: AgentModelIdentity | null): string | null {
   return model ? `${model.provider}/${model.model_id}` : null;
@@ -10,20 +12,24 @@ export function reportedModelTitle(model: AgentModelIdentity): string {
   return `Reported by ${model.host || "the client"}; QDash does not verify it`;
 }
 
-/** Badge color of an agent session's own state; never an execution status color for failure. */
+/**
+ * The execution status whose color an agent session state shares: an active session reads
+ * like a running execution, and a completed or cancelled one like its execution
+ * counterpart. A session never takes the failed color, and waiting for a person and
+ * expiring have no execution counterpart.
+ */
+const SESSION_EXECUTION_STATUS: Record<string, string> = {
+  active: "running",
+  completed: "completed",
+  cancelled: "cancelled",
+};
+
+/** Badge color of an agent session's own state, from the Execution status palette. */
 export function sessionStatusBadgeClass(status: string): string {
-  switch (status) {
-    case "active":
-      return "badge-info";
-    case "waiting_for_human":
-      return "badge-warning";
-    case "completed":
-      return "badge-success";
-    case "cancelled":
-      return "badge-neutral";
-    default:
-      return "badge-ghost";
-  }
+  const execution = SESSION_EXECUTION_STATUS[status];
+  if (execution) return getStatusBadgeClass(execution);
+  // Waiting for a person keeps the warning color the intervention badges use.
+  return status === "waiting_for_human" ? "badge-warning" : "badge-ghost";
 }
 
 /** What the session is doing right now, from its state and its measurements in flight. */
