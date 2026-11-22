@@ -15,6 +15,7 @@ const setMobileSidebarOpen = vi.fn();
 const toggleSidebar = vi.fn();
 const sidebarState = vi.hoisted(() => ({ isOpen: true, isMobileOpen: false }));
 const projectState = vi.hoisted(() => ({ canEdit: false }));
+const authState = vi.hoisted(() => ({ role: "user" }));
 
 vi.mock("@/contexts/SidebarContext", () => ({
   useSidebar: () => ({
@@ -29,7 +30,7 @@ vi.mock("@/contexts/SidebarContext", () => ({
 
 vi.mock("@/contexts/AuthContext", () => ({
   useAuth: () => ({
-    user: { username: "tester", system_role: "user" },
+    user: { username: "tester", system_role: authState.role },
     logout: vi.fn(),
   }),
 }));
@@ -43,8 +44,8 @@ vi.mock("@/contexts/ThemeContext", () => ({
 }));
 
 /**
- * Pulls the desktop rail and, when open, the mobile drawer dialog out of a render.
- * The drawer is portalled, so it is found by role rather than inside `container`.
+ * Pulls the desktop rail and, when open, the mobile More sheet out of a render.
+ * The sheet is portalled, so it is found by role rather than inside `container`.
  * Throws when the rail is missing so a broken render fails here, not on undefined.
  */
 function getAsides(container: HTMLElement) {
@@ -55,13 +56,13 @@ function getAsides(container: HTMLElement) {
   return {
     desktop,
     get mobile() {
-      return getMobileDrawer();
+      return getMobileSheet();
     },
   };
 }
 
-function getMobileDrawer() {
-  return screen.getByRole("dialog", { name: "Navigation menu" });
+function getMobileSheet() {
+  return screen.getByRole("dialog", { name: "More" });
 }
 
 /** Returns the shared active-row pill of the section that contains `href`. */
@@ -106,23 +107,47 @@ describe("Sidebar", () => {
     sidebarState.isOpen = true;
     sidebarState.isMobileOpen = false;
     projectState.canEdit = false;
+    authState.role = "user";
   });
 
-  it("narrows the mobile drawer to w-56 and drops w-72", () => {
+  it("anchors the mobile More sheet to the bottom edge inside the safe areas", () => {
     sidebarState.isMobileOpen = true;
     render(<Sidebar />);
 
-    const mobile = getMobileDrawer();
+    const sheet = getMobileSheet();
 
-    expect(mobile.className).toContain("w-56");
-    expect(mobile.className).not.toContain("w-72");
-    expect(mobile.className).toContain("lg:hidden");
+    expect(sheet.className).toContain("lg:hidden");
+    expect(sheet.className).toContain("bottom-0");
+    expect(sheet.className).toContain("inset-x-0");
+    expect(sheet.className).toContain("top-auto");
+    expect(sheet.className).toContain("rounded-b-none");
+    // The former left drawer geometry is gone.
+    expect(sheet.className).not.toContain("w-56");
+    expect(sheet.className).not.toContain("h-dvh");
+    expect(sheet.className).not.toContain("top-1/2");
+    expect(sheet.className).not.toContain("-translate-y-1/2");
+    for (const inset of ["bottom", "left", "right"]) {
+      expect(sheet.className).toContain(`env(safe-area-inset-${inset})`);
+    }
+    // The sheet stays below the top of the viewport; long lists scroll in the nav.
+    expect(sheet.className).toContain("max-h-[calc(100dvh-env(safe-area-inset-top)-3rem)]");
+    const nav = within(sheet).getByRole("navigation", { name: "More navigation" });
+    expect(nav.className).toContain("overflow-y-auto");
+    expect(nav.className).toContain("min-h-0");
+  });
+
+  it("titles the mobile More sheet visibly", () => {
+    sidebarState.isMobileOpen = true;
+    render(<Sidebar />);
+
+    const title = within(getMobileSheet()).getByRole("heading", { name: "More" });
+    expect(title.className).not.toContain("sr-only");
   });
 
   it.each([false, true])("marks Dashboards as Beta (mobile: %s)", (mobileOpen) => {
     sidebarState.isMobileOpen = mobileOpen;
     const { container } = render(<Sidebar />);
-    const surface = mobileOpen ? getMobileDrawer() : getAsides(container).desktop;
+    const surface = mobileOpen ? getMobileSheet() : getAsides(container).desktop;
     const link = surface.querySelector('a[href="/dashboards"]');
 
     expect(link).not.toBeNull();
@@ -136,13 +161,13 @@ describe("Sidebar", () => {
     expect(screen.queryByText("Beta")).toBeNull();
   });
 
-  it("mounts the mobile drawer only while it is open", () => {
+  it("mounts the mobile More sheet only while it is open", () => {
     render(<Sidebar />);
 
-    expect(screen.queryByRole("dialog", { name: "Navigation menu" })).toBeNull();
+    expect(screen.queryByRole("dialog", { name: "More" })).toBeNull();
   });
 
-  it("makes the menu rows fill the drawer or rail instead of the widest label", () => {
+  it("makes the menu rows fill the More sheet or rail instead of the widest label", () => {
     sidebarState.isMobileOpen = true;
     const { container } = render(<Sidebar />);
 
@@ -235,7 +260,7 @@ describe("Sidebar", () => {
     expect(desktop.className).not.toContain("w-48");
   });
 
-  it("closes the mobile drawer from the Close menu button", () => {
+  it("closes the mobile More sheet from the Close menu button", () => {
     sidebarState.isMobileOpen = true;
     const { container } = render(<Sidebar />);
 
@@ -245,15 +270,13 @@ describe("Sidebar", () => {
     expect(setMobileSidebarOpen).toHaveBeenCalledWith(false);
   });
 
-  it("pairs the logo with the close button in the mobile drawer header", () => {
+  it("pairs the title with the close button in the mobile More sheet header", () => {
     sidebarState.isMobileOpen = true;
-    const { container } = render(<Sidebar />);
+    render(<Sidebar />);
 
-    const { mobile } = getAsides(container);
-    const home = within(mobile).getByRole("link", { name: "QDash home" });
-    const header = within(home.parentElement as HTMLElement);
+    const title = within(getMobileSheet()).getByRole("heading", { name: "More" });
+    const header = within(title.parentElement as HTMLElement);
 
-    expect(home.textContent).toBe("QDash");
     expect(header.getByRole("button", { name: "Close menu" })).toBeTruthy();
   });
 
@@ -282,29 +305,18 @@ describe("Sidebar", () => {
     expect(within(header).getByRole("button", { name: "Expand sidebar" })).toBeTruthy();
   });
 
-  it("renders exactly one home logo per sidebar and none inside the nav", () => {
+  it("renders one home logo in the desktop rail, none in its nav or the More sheet", () => {
     sidebarState.isMobileOpen = true;
     const { container } = render(<Sidebar />);
 
     const { desktop, mobile } = getAsides(container);
 
-    for (const aside of [desktop, mobile]) {
-      expect(aside.querySelectorAll('a[aria-label="QDash home"]')).toHaveLength(1);
-      expect(aside.querySelector('nav a[aria-label="QDash home"]')).toBeNull();
-    }
+    expect(desktop.querySelectorAll('a[aria-label="QDash home"]')).toHaveLength(1);
+    expect(desktop.querySelector('nav a[aria-label="QDash home"]')).toBeNull();
+    expect(mobile.querySelector('a[aria-label="QDash home"]')).toBeNull();
   });
 
-  it("closes the mobile drawer when the home logo is clicked", () => {
-    sidebarState.isMobileOpen = true;
-    const { container } = render(<Sidebar />);
-
-    const { mobile } = getAsides(container);
-    fireEvent.click(within(mobile as HTMLElement).getByRole("link", { name: "QDash home" }));
-
-    expect(setMobileSidebarOpen).toHaveBeenCalledWith(false);
-  });
-
-  it("closes the mobile drawer when a nav link is clicked", () => {
+  it("closes the mobile More sheet when a nav link is clicked", () => {
     sidebarState.isMobileOpen = true;
     const { container } = render(<Sidebar />);
 
@@ -324,14 +336,14 @@ describe("Sidebar", () => {
     expect(prefectLink.getAttribute("href")).toBe("/prefect/dashboard");
   });
 
-  describe("mobile drawer", () => {
+  describe("mobile More sheet", () => {
     it("lists the destinations the tab bar does not show", () => {
       projectState.canEdit = true;
       sidebarState.isMobileOpen = true;
       render(<Sidebar />);
 
-      const drawer = within(getMobileDrawer());
-      const nav = within(drawer.getByRole("navigation", { name: "Menu navigation" }));
+      const sheet = within(getMobileSheet());
+      const nav = within(sheet.getByRole("navigation", { name: "More navigation" }));
 
       for (const label of ["Overview", "Workflow", "Execution", "Agent"]) {
         expect(nav.queryByRole("link", { name: label })).toBeNull();
@@ -340,13 +352,22 @@ describe("Sidebar", () => {
         expect(nav.getByRole("link", { name: label })).toBeTruthy();
       }
       expect(nav.getByRole("link", { name: "Prefect" })).toBeTruthy();
+      expect(nav.getByRole("link", { name: "Docs" })).toHaveAttribute("target", "_blank");
+    });
+
+    it("shows Admin only to system admins", () => {
+      sidebarState.isMobileOpen = true;
+      authState.role = "admin";
+      render(<Sidebar />);
+
+      expect(within(getMobileSheet()).getByRole("link", { name: "Admin" })).toBeTruthy();
     });
 
     it("keeps the project role visibility rules for menu destinations", () => {
       sidebarState.isMobileOpen = true;
       render(<Sidebar />);
 
-      const nav = within(getMobileDrawer());
+      const nav = within(getMobileSheet());
 
       for (const label of ["Tasks", "Config", "Prefect", "Admin"]) {
         expect(nav.queryByRole("link", { name: label })).toBeNull();
@@ -359,7 +380,7 @@ describe("Sidebar", () => {
       sidebarState.isMobileOpen = true;
       render(<Sidebar />);
 
-      const link = within(getMobileDrawer()).getByRole("link", { name: "Task Results" });
+      const link = within(getMobileSheet()).getByRole("link", { name: "Task Results" });
 
       expect(link.getAttribute("aria-current")).toBe("page");
     });
@@ -368,23 +389,23 @@ describe("Sidebar", () => {
       sidebarState.isMobileOpen = true;
       render(<Sidebar />);
 
-      fireEvent.keyDown(getMobileDrawer(), { key: "Escape" });
+      fireEvent.keyDown(getMobileSheet(), { key: "Escape" });
 
       expect(setMobileSidebarOpen).toHaveBeenCalledWith(false);
     });
 
-    it("moves focus into the drawer when it opens", () => {
+    it("moves focus into the sheet when it opens", () => {
       sidebarState.isMobileOpen = true;
       render(<Sidebar />);
 
-      expect(getMobileDrawer().contains(document.activeElement)).toBe(true);
+      expect(getMobileSheet().contains(document.activeElement)).toBe(true);
     });
 
-    it("keeps the profile actions reachable from the drawer", () => {
+    it("keeps the profile actions reachable from the sheet", () => {
       sidebarState.isMobileOpen = true;
       render(<Sidebar />);
 
-      fireEvent.click(within(getMobileDrawer()).getByRole("button", { name: /tester/ }));
+      fireEvent.click(within(getMobileSheet()).getByRole("button", { name: /tester/ }));
 
       expect(screen.getByRole("dialog", { name: "User profile" })).toBeTruthy();
     });
@@ -477,7 +498,7 @@ describe("Sidebar", () => {
       expect(screen.getByRole("dialog", { name: "User profile" })).toBeTruthy();
     });
 
-    it("never shows rail tooltips inside the mobile drawer", () => {
+    it("never shows rail tooltips inside the mobile More sheet", () => {
       sidebarState.isOpen = false;
       sidebarState.isMobileOpen = true;
       const { container } = render(<Sidebar />);

@@ -12,43 +12,9 @@ import {
 } from "@/components/ui/DropdownMenu";
 import { EnvironmentBadge } from "@/components/ui/EnvironmentBadge";
 import { useProject } from "@/contexts/ProjectContext";
-import { useSidebar } from "@/contexts/SidebarContext";
 import { GlobalCommandPalette } from "@/components/layout/GlobalCommandPalette";
 import { GlobalExecutionIndicator } from "@/components/layout/GlobalExecutionIndicator";
 import { NotificationsMenu } from "@/components/layout/NotificationsMenu";
-
-/** Opens the mobile navigation drawer, which holds the destinations the tab bar omits. */
-function HiddenIcon() {
-  const { isMobileOpen, toggleMobileSidebar } = useSidebar();
-
-  return (
-    <div className="flex items-center gap-2 lg:hidden">
-      <button
-        type="button"
-        onClick={toggleMobileSidebar}
-        className="btn btn-ghost btn-square"
-        aria-label="Open menu"
-        aria-haspopup="dialog"
-        aria-expanded={isMobileOpen}
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          fill="none"
-          viewBox="0 0 24 24"
-          strokeWidth={1.5}
-          stroke="currentColor"
-          className="w-6 h-6"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"
-          />
-        </svg>
-      </button>
-    </div>
-  );
-}
 
 function ProjectSelector() {
   const { currentProject, projects, loading, switchProject } = useProject();
@@ -108,7 +74,6 @@ export function Navbar() {
   return (
     <nav className="navbar z-20 min-h-14 w-full border-b border-base-300 bg-base-100/95 px-3 backdrop-blur-sm sm:px-4">
       <div className="flex flex-1 md:gap-1 lg:gap-2 items-center">
-        <HiddenIcon />
         <ProjectSelector />
         <EnvironmentBadge className="badge-sm sm:badge-md" />
         <Suspense fallback={null}>

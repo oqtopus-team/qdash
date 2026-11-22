@@ -27,12 +27,16 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useProject } from "@/contexts/ProjectContext";
 import { useSidebar } from "@/contexts/SidebarContext";
 import { DARK_THEMES } from "@/constants/themes";
-import { getNavigationSections, withoutMobileTabs } from "@/components/layout/navigation";
+import {
+  getNavigationSections,
+  isNavItemActive,
+  withoutMobileTabs,
+} from "@/components/layout/navigation";
 import type { NavItem, NavSection } from "@/components/layout/navigation";
 
 /**
  * Controlled open state for the rail toggle tooltip. `open` is already false
- * whenever the tooltip is disabled (mobile drawer) or its context is stale.
+ * whenever the tooltip is disabled (mobile More sheet) or its context is stale.
  * Navigation rows and the profile entry carry no tooltip: their accessible names
  * come from the mounted labels, and a hover popup only repeated the destination.
  */
@@ -111,8 +115,7 @@ type ExternalNavItem = {
 };
 
 /**
- * QDash home link shared by the desktop rail and the mobile drawer header: the
- * OQTOPUS mark in an app-icon tile beside the product name. The tile stays white in
+ * QDash home link in the desktop rail header: the OQTOPUS mark in an app-icon tile beside the product name. The tile stays white in
  * every theme so the dark symbol keeps its contrast, and it is the same 36px as the
  * former bare mark, so the header height and icon alignment are unchanged. Its left
  * inset matches the nav rows below so the tile lines up with their icons.
@@ -178,11 +181,6 @@ function SectionHeader({ id, label, visible }: { id: string; label: string; visi
 
 // Rows fill the rail width (no wrapping), so they track it while it animates.
 const MENU_CLASS = "menu w-full flex-nowrap [&>li]:flex-nowrap p-2 py-0";
-
-/** Resolves whether `item` owns the current route, honouring its `match` mode. */
-function isNavItemActive(item: NavItem, pathname: string): boolean {
-  return item.match === "prefix" ? pathname.startsWith(item.href) : pathname === item.href;
-}
 
 type IndicatorPlacement = {
   top: number;
@@ -312,7 +310,7 @@ function SidebarNavSection({
 /**
  * One in-app navigation row. Marks itself active from `pathname` (exact or
  * prefix match per `item.match`), truncates its label so a long entry cannot
- * widen the row, and closes the mobile drawer through `onClick`. The label stays
+ * widen the row, and closes the mobile More sheet through `onClick`. The label stays
  * mounted on the collapsed rail, faded and clipped, so it still names the link.
  * The active background is drawn by the enclosing `SidebarNavSection`.
  */
@@ -395,8 +393,9 @@ function SidebarExternalNavItem({
 
 /**
  * Site navigation sharing one set of nav rows between a desktop rail that
- * expands to `w-48` and collapses to `w-16`, and a mobile drawer dialog (`w-56`)
- * that lists the destinations `MobileTabBar` does not show and closes on navigation.
+ * expands to `w-48` and collapses to `w-16`, and a mobile More sheet: a dialog
+ * anchored to the bottom edge that the last `MobileTabBar` item opens. The sheet
+ * lists the destinations the tabs do not show and closes on navigation.
  */
 export function Sidebar() {
   const pathname = usePathname();
@@ -405,8 +404,8 @@ export function Sidebar() {
   const [logoutPending, setLogoutPending] = useState(false);
   const desktopNavRef = useRef<HTMLElement>(null);
   const mobileNavRef = useRef<HTMLElement>(null);
-  // The drawer opens from the header menu button, outside any Radix trigger, so the
-  // dialog cannot restore focus by itself; it returns to whatever opened it.
+  // The sheet opens from the tab bar's More button, outside any Radix trigger, so
+  // the dialog cannot restore focus by itself; it returns to whatever opened it.
   const mobileMenuOpenerRef = useRef<HTMLElement | null>(null);
   const desktopSidebarId = useId();
   const { isOpen, isMobileOpen, toggleSidebar, setMobileSidebarOpen } = useSidebar();
@@ -421,7 +420,7 @@ export function Sidebar() {
   const isAdmin = user?.system_role === "admin";
   const isDarkTheme = DARK_THEMES.includes(theme as (typeof DARK_THEMES)[number]);
 
-  // Navigation and opening the drawer reveal the current row straight away.
+  // Navigation and opening the sheet reveal the current row straight away.
   useEffect(() => {
     revealActiveRow(isMobileOpen ? mobileNavRef.current : desktopNavRef.current);
   }, [pathname, isMobileOpen]);
@@ -494,14 +493,14 @@ export function Sidebar() {
     },
   });
 
-  // Close mobile sidebar when clicking a link
+  // Close the mobile More sheet when a link is chosen
   const handleLinkClick = () => {
     if (isMobileOpen) {
       setMobileSidebarOpen(false);
     }
   };
 
-  // Mobile sidebar style
+  // Mobile More sheet style
   const linkClass = (active: boolean) =>
     `relative min-h-9 px-3 mx-1 my-0.5 text-sm font-medium flex items-center rounded-lg transition-colors ${
       active ? "text-primary" : "text-base-content/75 hover:bg-base-300 hover:text-base-content"
@@ -756,10 +755,12 @@ export function Sidebar() {
         {renderUserSection()}
       </aside>
 
-      {/* Mobile menu: the header menu button opens it below `lg`. The tab bar covers
-          Overview, Workflow, Execution, and Agent, so the drawer lists every other
-          destination. Radix traps focus, closes on Escape or an outside press, and
-          returns focus to the button that opened it. */}
+      {/* Mobile More sheet: the last tab bar item opens it below `lg`. The tab bar
+          covers Overview, Workflow, Execution, and Agent, so the sheet lists every
+          other destination. It is anchored to the bottom edge, capped below the top
+          of the viewport so long lists scroll inside it, and padded by the safe-area
+          insets. Radix traps focus, closes on Escape or an outside press, and the
+          close handler below returns focus to the More button that opened it. */}
       <Dialog open={isMobileOpen} onOpenChange={setMobileSidebarOpen}>
         <DialogContent
           aria-describedby={undefined}
@@ -775,11 +776,10 @@ export function Sidebar() {
               opener.focus();
             }
           }}
-          className="left-0 top-0 flex h-dvh max-h-none w-56 max-w-none translate-x-0 translate-y-0 flex-col overflow-hidden rounded-none border-0 border-r border-base-300 bg-base-200 p-0 pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pt-[env(safe-area-inset-top)] lg:hidden"
+          className="inset-x-0 top-auto bottom-0 mx-auto flex max-h-[calc(100dvh-env(safe-area-inset-top)-3rem)] w-full translate-x-0 translate-y-0 flex-col overflow-hidden rounded-b-none border-b-0 p-0 pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] lg:hidden"
         >
-          <DialogTitle className="sr-only">Navigation menu</DialogTitle>
-          <div className="flex h-16 flex-shrink-0 items-center gap-1 px-2">
-            <SidebarLogo onClick={handleLinkClick} />
+          <div className="flex h-14 flex-shrink-0 items-center justify-between gap-2 border-b border-base-300 pl-5 pr-3">
+            <DialogTitle className="text-base font-semibold">More</DialogTitle>
             <button
               type="button"
               onClick={() => setMobileSidebarOpen(false)}
@@ -791,8 +791,8 @@ export function Sidebar() {
           </div>
           <nav
             ref={mobileNavRef}
-            aria-label="Menu navigation"
-            className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
+            aria-label="More navigation"
+            className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-2"
           >
             {renderSidebarContent(withoutMobileTabs(navSections))}
           </nav>
