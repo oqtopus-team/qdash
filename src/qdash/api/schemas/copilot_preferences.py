@@ -44,3 +44,16 @@ class CopilotSystemPrompt(BaseModel):
         default_factory=list,
         description="Tools offered to the chat; their descriptions are sent with each request",
     )
+
+
+class CopilotSkill(BaseModel):
+    """A skill the chat can run; the user invokes it with ``/skill:<name>``."""
+
+    name: str = Field(description="Skill name, as typed after /skill:")
+    description: str = Field(default="", description="What the skill is for")
+
+
+class CopilotSkillList(BaseModel):
+    """The skills the Copilot runtime has loaded, for the chat composer's / menu."""
+
+    skills: list[CopilotSkill] = Field(default_factory=list)

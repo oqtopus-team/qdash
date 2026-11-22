@@ -105,3 +105,31 @@ def test_system_prompt_reports_an_unreachable_runtime(test_client, monkeypatch):
     monkeypatch.setattr(pi_chat_service, "system_prompt", down)
 
     assert test_client.get("/copilot/system-prompt", headers=alice).status_code == 503
+
+
+def test_skills_list_what_the_runtime_loaded(test_client, monkeypatch):
+    alice = _user("alice", "alice-token")
+
+    async def fake_skills():
+        return {"skills": [{"name": "qdash-characterization", "description": "Remeasure T1."}]}
+
+    monkeypatch.setattr(pi_chat_service, "skills", fake_skills)
+
+    shown = test_client.get("/copilot/skills", headers=alice)
+
+    assert shown.status_code == 200
+    assert shown.json() == {
+        "skills": [{"name": "qdash-characterization", "description": "Remeasure T1."}]
+    }
+
+
+def test_skills_report_an_unreachable_runtime(test_client, monkeypatch):
+    alice = _user("alice", "alice-token")
+
+    async def down():
+        raise ConnectionError("runtime down")
+
+    monkeypatch.setattr(pi_chat_service, "skills", down)
+
+    assert test_client.get("/copilot/skills", headers=alice).status_code == 503
+    assert test_client.get("/copilot/skills").status_code in {401, 403}

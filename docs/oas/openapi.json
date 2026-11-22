@@ -6231,6 +6231,33 @@
         ]
       }
     },
+    "/copilot/skills": {
+      "get": {
+        "tags": [
+          "copilot"
+        ],
+        "summary": "List the skills a chat message can invoke",
+        "description": "Skills loaded by the Copilot runtime; a message starting ``/skill:<name>`` runs one.",
+        "operationId": "listCopilotSkills",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CopilotSkillList"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/settings": {
       "get": {
         "tags": [
@@ -25759,6 +25786,41 @@
         "type": "object",
         "title": "CopilotPreferencesUpdate",
         "description": "Replace the current user's Copilot instructions; empty clears them."
+      },
+      "CopilotSkill": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Skill name, as typed after /skill:"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "description": "What the skill is for",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "CopilotSkill",
+        "description": "A skill the chat can run; the user invokes it with ``/skill:<name>``."
+      },
+      "CopilotSkillList": {
+        "properties": {
+          "skills": {
+            "items": {
+              "$ref": "#/components/schemas/CopilotSkill"
+            },
+            "type": "array",
+            "title": "Skills"
+          }
+        },
+        "type": "object",
+        "title": "CopilotSkillList",
+        "description": "The skills the Copilot runtime has loaded, for the chat composer's / menu."
       },
       "CopilotSystemPrompt": {
         "properties": {

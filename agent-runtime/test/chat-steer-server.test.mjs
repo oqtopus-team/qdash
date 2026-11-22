@@ -73,6 +73,7 @@ test("steer and continue over HTTP: same open harness, owner and project checks,
       BACKGROUND_CONTEXT,
       SharedRuntime: { create: async () => ({
         listToolNames: () => [],
+        expandSkillCommand: (message) => message,
         storePath: () => path,
         steerReceipt: (owner, session, project, requestId) =>
           readSteerReceipt(path, project, requestId, BACKGROUND_CONTEXT),

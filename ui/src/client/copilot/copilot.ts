@@ -28,6 +28,7 @@ import type {
   CopilotChatSessionResponse,
   CopilotPreferences,
   CopilotPreferencesUpdate,
+  CopilotSkillList,
   CopilotSystemPrompt,
   CreateCopilotChatBranchRequest,
   CreateCopilotChatSessionRequest,
@@ -1152,6 +1153,99 @@ export function useGetCopilotSystemPrompt<TData = Awaited<ReturnType<typeof getC
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetCopilotSystemPromptQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
+ * Skills loaded by the Copilot runtime; a message starting ``/skill:<name>`` runs one.
+ * @summary List the skills a chat message can invoke
+ */
+export const listCopilotSkills = (
+
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<CopilotSkillList>(
+      {url: `/copilot/skills`, method: 'GET', signal
+    },
+      options);
+    }
+
+
+
+
+export const getListCopilotSkillsQueryKey = () => {
+    return [
+    `/copilot/skills`
+    ] as const;
+    }
+
+
+export const getListCopilotSkillsQueryOptions = <TData = Awaited<ReturnType<typeof listCopilotSkills>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCopilotSkills>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListCopilotSkillsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listCopilotSkills>>> = ({ signal }) => listCopilotSkills(requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listCopilotSkills>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListCopilotSkillsQueryResult = NonNullable<Awaited<ReturnType<typeof listCopilotSkills>>>
+export type ListCopilotSkillsQueryError = unknown
+
+
+export function useListCopilotSkills<TData = Awaited<ReturnType<typeof listCopilotSkills>>, TError = unknown>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCopilotSkills>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listCopilotSkills>>,
+          TError,
+          Awaited<ReturnType<typeof listCopilotSkills>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListCopilotSkills<TData = Awaited<ReturnType<typeof listCopilotSkills>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCopilotSkills>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listCopilotSkills>>,
+          TError,
+          Awaited<ReturnType<typeof listCopilotSkills>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListCopilotSkills<TData = Awaited<ReturnType<typeof listCopilotSkills>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCopilotSkills>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List the skills a chat message can invoke
+ */
+
+export function useListCopilotSkills<TData = Awaited<ReturnType<typeof listCopilotSkills>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCopilotSkills>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListCopilotSkillsQueryOptions(options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

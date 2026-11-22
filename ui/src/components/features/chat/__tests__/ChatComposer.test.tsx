@@ -7,6 +7,7 @@ import {
   screen,
   within,
 } from "@testing-library/react";
+import { useState, type ComponentProps } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ChatComposer } from "../ChatComposer";
 
@@ -321,5 +322,147 @@ describe("ChatComposer height", () => {
 
     resizeTo(50);
     expect(textarea.style.height).toBe(`${3 * LINE}px`);
+  });
+});
+
+describe("ChatComposer skill menu", () => {
+  const skills = [
+    { name: "qdash-characterization", description: "Remeasure T1 and T2." },
+    { name: "qdash-one-qubit-calibration", description: "Calibrate single qubits." },
+    { name: "qcaleval", description: "Evaluate calibration plots." },
+  ];
+
+  /** A composer that owns its text, as ChatThread does. */
+  function Controlled(overrides: Partial<ComponentProps<typeof ChatComposer>>) {
+    const [value, setValue] = useState("");
+    return (
+      <ChatComposer {...props()} value={value} onChange={setValue} skills={skills} {...overrides} />
+    );
+  }
+
+  const setup = (overrides: Partial<ComponentProps<typeof ChatComposer>> = {}) => {
+    const onSubmit = vi.fn();
+    render(<Controlled onSubmit={onSubmit} {...overrides} />);
+    const box = screen.getByRole("combobox", { name: "Message" });
+    act(() => box.focus());
+    return { box, onSubmit };
+  };
+  const type = (box: HTMLElement, value: string) => fireEvent.change(box, { target: { value } });
+
+  it("offers the skills with their descriptions after a leading slash", () => {
+    const { box } = setup();
+    expect(screen.queryByRole("listbox")).toBeNull();
+    type(box, "/");
+    const list = screen.getByRole("listbox", { name: "Skills" });
+    expect(within(list).getAllByRole("option")).toHaveLength(3);
+    expect(list).toHaveTextContent("/skill:qdash-characterization");
+    expect(list).toHaveTextContent("Remeasure T1 and T2.");
+    expect(box).toHaveAttribute("aria-expanded", "true");
+    expect(box).toHaveAttribute("aria-activedescendant", screen.getAllByRole("option")[0].id);
+  });
+
+  it("filters as the name is typed and closes once arguments start", () => {
+    const { box } = setup();
+    type(box, "/cal");
+    expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual([
+      expect.stringContaining("qdash-one-qubit-calibration"),
+      expect.stringContaining("qcaleval"),
+    ]);
+    type(box, "/skill:qdash-ch");
+    expect(screen.getAllByRole("option")).toHaveLength(1);
+    type(box, "/skill:qdash-characterization Q0");
+    expect(screen.queryByRole("listbox")).toBeNull();
+    type(box, "/nothing-matches");
+    expect(screen.queryByRole("listbox")).toBeNull();
+  });
+
+  it("moves with the arrow keys and inserts the active skill on Enter without sending", () => {
+    const { box, onSubmit } = setup();
+    type(box, "/");
+    fireEvent.keyDown(box, { key: "ArrowDown" });
+    fireEvent.keyDown(box, { key: "ArrowDown" });
+    expect(screen.getAllByRole("option")[2]).toHaveAttribute("aria-selected", "true");
+    fireEvent.keyDown(box, { key: "ArrowDown" });
+    expect(screen.getAllByRole("option")[0]).toHaveAttribute("aria-selected", "true");
+    fireEvent.keyDown(box, { key: "ArrowUp" });
+    fireEvent.keyDown(box, { key: "Enter" });
+    expect(box).toHaveValue("/skill:qcaleval ");
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(screen.queryByRole("listbox")).toBeNull();
+  });
+
+  it("inserts the active skill on Tab", () => {
+    const { box } = setup();
+    type(box, "/qd");
+    fireEvent.keyDown(box, { key: "Tab" });
+    expect(box).toHaveValue("/skill:qdash-characterization ");
+  });
+
+  it("inserts a skill picked with the mouse and keeps focus in the field", () => {
+    const { box, onSubmit } = setup();
+    type(box, "/");
+    const option = screen.getByRole("option", { name: /qdash-one-qubit-calibration/ });
+    const down = createEvent.mouseDown(option.firstElementChild!);
+    fireEvent(option.firstElementChild!, down);
+    expect(down.defaultPrevented).toBe(true);
+    expect(box).toHaveValue("/skill:qdash-one-qubit-calibration ");
+    expect(box).toHaveFocus();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("dismisses on Escape until the text changes, then Enter sends as usual", () => {
+    const { box, onSubmit } = setup();
+    type(box, "/qd");
+    const escape = createEvent.keyDown(box, { key: "Escape" });
+    fireEvent(box, escape);
+    expect(escape.defaultPrevented).toBe(true);
+    expect(screen.queryByRole("listbox")).toBeNull();
+    fireEvent.keyDown(box, { key: "Enter" });
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    type(box, "/qda");
+    expect(screen.getByRole("listbox")).toBeInTheDocument();
+  });
+
+  it("leaves Enter to the IME while composing", () => {
+    const { box, onSubmit } = setup();
+    type(box, "/");
+    fireEvent.keyDown(box, { key: "Enter", isComposing: true });
+    expect(box).toHaveValue("/");
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("keeps Shift+Enter and plain Enter for ordinary messages", () => {
+    const { box, onSubmit } = setup();
+    type(box, "calibrate Q0");
+    expect(screen.queryByRole("listbox")).toBeNull();
+    const shiftEnter = createEvent.keyDown(box, { key: "Enter", shiftKey: true });
+    fireEvent(box, shiftEnter);
+    expect(shiftEnter.defaultPrevented).toBe(false);
+    fireEvent.keyDown(box, { key: "Enter" });
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+  });
+
+  it("stays closed while the field is unfocused, an answer streams, or the composer is disabled", () => {
+    const first = setup();
+    act(() => first.box.blur());
+    type(first.box, "/");
+    expect(screen.queryByRole("listbox")).toBeNull();
+    cleanup();
+
+    const streaming = setup({ isStreaming: true, steerable: true });
+    type(streaming.box, "/");
+    expect(screen.queryByRole("listbox")).toBeNull();
+    cleanup();
+
+    render(<Controlled disabled />);
+    expect(screen.getByRole("combobox")).toBeDisabled();
+  });
+
+  it("is a plain text field when no skills are loaded", () => {
+    render(<Controlled skills={[]} />);
+    const box = screen.getByRole("textbox", { name: "Message" });
+    act(() => box.focus());
+    type(box, "/");
+    expect(screen.queryByRole("listbox")).toBeNull();
   });
 });

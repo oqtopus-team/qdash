@@ -9,7 +9,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { useGetCopilotPreferences } from "@/client/copilot/copilot";
+import { useGetCopilotPreferences, useListCopilotSkills } from "@/client/copilot/copilot";
 import { ArrowDown, GitBranch, LayoutDashboard } from "lucide-react";
 import { StickToBottom, useStickToBottomContext } from "use-stick-to-bottom";
 import { useChatScrollIntent } from "@/hooks/useChatScrollIntent";
@@ -217,6 +217,10 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
     branchingIndex,
   } = useCopilotChat(sessionId);
   const { data: preferences } = useGetCopilotPreferences({ query: { staleTime: 60_000 } });
+  // Offered after `/` in the composer; without the runtime the menu simply stays closed.
+  const { data: skillList } = useListCopilotSkills({
+    query: { staleTime: 5 * 60_000, retry: false },
+  });
   const [input, setInput] = useState("");
   const { attachments, attach, remove, clear, isStaging, notice, isPending } = useChatAttachments(
     session?.id,
@@ -318,6 +322,7 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
         instructionsActive={Boolean(preferences?.data.instructions)}
         compact={variant !== "page"}
         steerable
+        skills={skillList?.data.skills}
       />
     </>
   );

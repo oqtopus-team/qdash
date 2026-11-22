@@ -208,7 +208,12 @@ class TestStream:
         assert payload["owner_id"] == "alice"
         assert payload["request_id"] == "request-1"
         assert payload["message"] == "Is this result trustworthy?"
-        assert "knowledge-v1" in payload["initial_message"]
+        # The context goes ahead of the message; the runtime appends the message
+        # after expanding a skill command, so it is not folded in here.
+        assert "knowledge-v1" in payload["initial_context"]
+        assert payload["initial_context"].endswith("## Your task\n\n")
+        assert "Is this result trustworthy?" not in payload["initial_context"]
+        assert "initial_message" not in payload
         assert [image["data"] for image in payload["initial_images"]] == [
             "expected-b64",
             "experiment-b64",
@@ -226,8 +231,23 @@ class TestStream:
 
         payload = captured["payload"]
         assert payload["message"] == "Is this result trustworthy?"
-        assert "knowledge-v1" in payload["initial_message"]
+        assert "knowledge-v1" in payload["initial_context"]
         assert payload["initial_images"]
+
+    @pytest.mark.asyncio
+    async def test_skill_command_is_sent_raw_for_the_runtime_to_expand(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        captured, _, _ = await _collect(
+            monkeypatch,
+            stored=[],
+            request=_request(message="/skill:qdash-characterization remeasure T1"),
+        )
+
+        payload = captured["payload"]
+        assert payload["message"] == "/skill:qdash-characterization remeasure T1"
+        assert "/skill:" not in payload["initial_context"]
+        assert "initial_message" not in payload
 
     @pytest.mark.asyncio
     async def test_images_sent_rides_on_the_result_event(

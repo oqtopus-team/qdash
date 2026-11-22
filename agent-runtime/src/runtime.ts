@@ -100,7 +100,13 @@ import { resolveCopilotModelFiles } from "./copilot-profile.ts";
 import { chatCompactionOverrides, missingCredentialMessage, NATIVE_API_KEY_ENV, PROVIDER_ALIASES, supportedThinkingLevel, writeModelsConfig } from "./models-config.ts";
 import type { PageContext } from "./page-context.ts";
 import { buildSystemPrompt, buildUserInstructionsSection } from "./prompt.ts";
-import { buildSkillTool, type SkillSummary } from "./skill-tool.ts";
+import {
+  buildSkillTool,
+  expandSkillCommand,
+  skillCommands,
+  type SkillCommand,
+  type SkillSummary,
+} from "./skill-tool.ts";
 import { extractToolGuide, TOOL_GUIDE_SKILL, toolGuideNames } from "./tool-guide.ts";
 
 const AGENT_DIR = process.env.PI_CODING_AGENT_DIR ?? "/app/.pi-agent";
@@ -251,7 +257,19 @@ export class SharedRuntime {
     /** QDash's system prompt for chats, as built at startup. */
     private readonly systemPrompt: string,
     private readonly modelCompactionOverrides: Readonly<Record<string, CompactionBudget>> = {},
+    /** The skills `read_skill` offers, which the user may also invoke as `/skill:name`. */
+    private readonly skills: readonly SkillSummary[] = [],
   ) {}
+
+  /** The skills the chat composer offers after `/`, with their descriptions. */
+  chatSkills(): SkillCommand[] {
+    return skillCommands(this.skills);
+  }
+
+  /** The user's message with a leading `/skill:name` expanded to that skill. */
+  expandSkillCommand(message: string): string {
+    return expandSkillCommand(message, this.skills);
+  }
 
   /**
    * The system prompt a chat of this user gets, as the model receives it:
@@ -413,6 +431,7 @@ export class SharedRuntime {
       enabledTools,
       systemPrompt,
       modelCompactionOverrides,
+      skills,
     );
   }
 

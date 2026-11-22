@@ -62,6 +62,7 @@ const serverScript = (path, phase) => `
     BACKGROUND_CONTEXT,
     SharedRuntime: { create: async () => ({
       listToolNames: () => [],
+      expandSkillCommand: (message) => message,
       storePath: () => path,
       steerReceipt: (owner, session, project, requestId) =>
         readSteerReceipt(path, project, requestId, BACKGROUND_CONTEXT),
