@@ -25,11 +25,18 @@ task_chat:                 # How a chat about a task result opens
 
 # chat.yaml: the planner models every chat can use; the first is the default
 chat_models:
+  - provider: openai              # pi's bundled catalog; OPENAI_API_KEY authenticates
+    name: gpt-6-sol
+    api_style: responses
+    reasoning_effort: medium
   - provider: openai-compatible-chat
     name: qwen3.8-flash-next
     api_style: completion
     base_url: env:OPENAI_COMPATIBLE_BASE_URL_CHAT
     api_key_env: OPENAI_COMPATIBLE_API_KEY_CHAT
+  - provider: anthropic           # pi's bundled catalog; ANTHROPIC_API_KEY authenticates
+    name: claude-opus-5-5
+    reasoning_effort: medium
 
 # evaluation.yaml: models pi-qcaleval can use to judge calibration plots
 evaluation_models:
@@ -47,6 +54,23 @@ YAML string values support shell-style environment variable references such as
 `${OPENAI_API_KEY}`, so environment-specific or sensitive values come from environment
 variables instead of committed files. The Pi runtime builds its `models.json` from `chat_models`
 and `evaluation_models` at startup.
+
+The default chat model, `openai/gpt-6-sol`, has no `base_url`: Pi serves it from the model
+catalog of the pinned `@earendil-works/pi-ai` (1.6.0), on the Responses API at
+`https://api.openai.com/v1`, with strict tool schemas. Its entry sets no sampling parameters, so
+requests use OpenAI's defaults, and sets `reasoning_effort: medium`, the model's own default;
+`models.json` therefore defines nothing for it. Qwen stays selectable as the second entry.
+
+The third entry, `anthropic/claude-opus-5-5`, is Claude Opus 5.5 from the same catalog, on
+Anthropic's Messages API at `https://api.anthropic.com`, authenticated with `ANTHROPIC_API_KEY`;
+it is the native Anthropic provider, not Bedrock. Its thinking is adaptive and always on, and
+Anthropic's migration guide says to omit `temperature`, `top_p`, and `top_k`, so its entry names
+only `reasoning_effort: medium`, its documented default; pi sends that as the effort of each turn
+and sends no sampling parameters for it. A thinking level the model does not support runs at the
+nearest one it does (`supportedThinkingLevel` in `models-config.ts`): **Off** and **Minimal** run
+at `low` on Opus 5.5, instead of reaching pi without a level, where pi would use `high`.
+`agent-runtime/test/default-chat-model.test.mjs` resolves the committed files offline the way the
+runtime does and checks the request pi builds for Opus 5.5 without sending it.
 
 ## Deployment Profiles
 
@@ -185,9 +209,9 @@ as a key in the generated configuration. Endpoints with different base URLs must
 identifier. The supplied templates use `openai-compatible-chat` and
 `openai-compatible-evaluation`.
 
-The default chat model also appears in `evaluation_models`, which makes its evaluation role
-explicit. When the same endpoint identifier and model name appear in both lists, the runtime keeps
-the full definition from `chat_models`. Qwen reasoning models receive the Qwen chat-template
+A chat model that also judges figures appears in `evaluation_models` too, which makes its
+evaluation role explicit. When the same endpoint identifier and model name appear in both lists,
+the runtime keeps the full definition from `chat_models`. Qwen reasoning models receive the Qwen chat-template
 thinking format on that model only; other models sharing the endpoint keep their own response
 format.
 
@@ -372,7 +396,8 @@ for both API styles and both model roles. Deployment steps are in
 | Variable | Purpose |
 | --- | --- |
 | `QDASH_COPILOT_PROFILE` | [Deployment profile](#deployment-profiles) for chat and evaluation models; unset or empty uses the default files |
-| `OPENAI_API_KEY` | OpenAI API authentication |
+| `OPENAI_API_KEY` | OpenAI API authentication for `provider: openai` models, including the default chat model `openai/gpt-6-sol`; read by the runtime only. A chat on such a model without it is refused before the turn starts, naming the variable (`missingCredentialMessage` in `models-config.ts`); the runtime never substitutes another model |
+| `ANTHROPIC_API_KEY` | Anthropic API authentication for `provider: anthropic` models, such as `anthropic/claude-opus-5-5`; read by the runtime only, and refused the same way when it is missing |
 | `OPENAI_COMPATIBLE_BASE_URL_<SUFFIX>` | OpenAI-compatible API base URL through `/v1`; the suffix is operator-defined |
 | `OPENAI_COMPATIBLE_API_KEY_<SUFFIX>` | API key for the endpoint with the matching suffix; it can be a placeholder for a keyless endpoint |
 | `CLASSIFIER_BASE_URL` / `CLASSIFIER_BASE_URL_<SUFFIX>` | Classifier endpoint base URL through the API version, for `classifier.yaml`; no default. The supplied entry uses `CLASSIFIER_BASE_URL` |

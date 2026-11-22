@@ -28,6 +28,7 @@ from qdash.datamodel.agent_session import (
     AgentSessionLifecycleEvent,
     AgentSessionPolicy,
     AgentSessionStatus,
+    AgentSessionStopRecord,
 )
 from qdash.datamodel.quality_metrics import RECORDED_QUALITY_METRICS
 
@@ -145,6 +146,13 @@ class AgentSessionResponse(BaseModel):
         description=(
             "Slack delivery of the session's end message, stored by the update that ended "
             "it; null while the session is open"
+        ),
+    )
+    stop: AgentSessionStopRecord | None = Field(
+        default=None,
+        description=(
+            "Who stopped the session with a stop request, why, and when; null unless a stop "
+            "request ended it (an expert's stop answer is recorded on its intervention)"
         ),
     )
 
@@ -744,6 +752,58 @@ AgentAuditProvenance = Literal[
 AgentAuditActorKind = Literal["agent", "human", "server", "worker", "unknown"]
 
 
+class StopAgentSessionRequest(BaseModel):
+    """A person's request to end an agent session's authority now."""
+
+    idempotency_key: str = Field(
+        min_length=1,
+        max_length=200,
+        description="Key of this stop; repeating it returns the same outcome",
+    )
+    reason: str = Field(
+        min_length=1, max_length=2000, description="Why the session is stopped, for the audit"
+    )
+
+
+class AgentSessionInFlightOperation(BaseModel):
+    """An operation that passed the session gate before the session ended and has not settled.
+
+    QDash does not cancel it: a measurement keeps running on the hardware and its result
+    is recorded; a commit or backend apply finishes or fails on its own.
+    """
+
+    kind: Literal["measurement", "candidate_commit", "candidate_set_commit", "backend_apply"]
+    id: str = Field(description="The action, commit, or candidate set commit ID")
+    status: str = Field(description="Its status as QDash records it now")
+    execution_id: str | None = Field(
+        default=None, description="The measurement's execution, once QDash knows it"
+    )
+
+
+class StopAgentSessionResponse(BaseModel):
+    """What a stop request did, read back from QDash's records."""
+
+    outcome: Literal["stopped", "already_stopped", "already_ended"] = Field(
+        description=(
+            "stopped: this request ended the session. already_stopped: an earlier request "
+            "with this key stopped it. already_ended: it had already ended another way "
+            "(completed, cancelled, or expired), and this request changed nothing"
+        )
+    )
+    session: AgentSessionResponse
+    in_flight: list[AgentSessionInFlightOperation] = Field(
+        default_factory=list,
+        description=(
+            "Operations that passed the session gate before it ended and have not settled; "
+            "QDash does not cancel them"
+        ),
+    )
+    closed_intervention_ids: list[str] = Field(
+        default_factory=list,
+        description="Open or resume-authorized interventions this stop closed",
+    )
+
+
 class AgentAuditEvent(BaseModel):
     """One entry of a session's experiment audit timeline, built from QDash's own records."""
 
@@ -760,7 +820,8 @@ class AgentAuditEvent(BaseModel):
         description=(
             "session_created, action_proposed, measurement, evaluation, decision, "
             "candidate_commit, candidate_set_commit, backend_apply, intervention_opened, "
-            "intervention_response, intervention_resumed, or resume_outcome"
+            "intervention_response, intervention_resumed, resume_outcome, or "
+            "session_stopped"
         )
     )
     summary: str = Field(description="One readable line about the event")

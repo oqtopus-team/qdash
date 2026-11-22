@@ -1,6 +1,6 @@
 import type { AgentModelIdentity, AgentSessionGroupSummary } from "@/schemas";
 
-import { getStatusBadgeClass } from "./ExecutionListCard";
+import { getStatusBadgeClass, getStatusBorderStyle } from "./ExecutionListCard";
 
 /** `provider/model_id` of a host-reported model, or null when the record holds none. */
 export function reportedModelLabel(model?: AgentModelIdentity | null): string | null {
@@ -30,6 +30,19 @@ export function sessionStatusBadgeClass(status: string): string {
   if (execution) return getStatusBadgeClass(execution);
   // Waiting for a person keeps the warning color the intervention badges use.
   return status === "waiting_for_human" ? "badge-warning" : "badge-ghost";
+}
+
+/**
+ * Left accent of an agent session card, matching the ordinary execution card of the same
+ * state. Waiting for a person takes the warning accent of its badge; expired and unknown
+ * states keep the neutral accent of an execution with no status color.
+ */
+export function sessionStatusBorderStyle(status: string): string {
+  const execution = SESSION_EXECUTION_STATUS[status];
+  if (execution) return getStatusBorderStyle(execution);
+  return status === "waiting_for_human"
+    ? "border-l-4 border-l-warning"
+    : getStatusBorderStyle(status);
 }
 
 /** What the session is doing right now, from its state and its measurements in flight. */

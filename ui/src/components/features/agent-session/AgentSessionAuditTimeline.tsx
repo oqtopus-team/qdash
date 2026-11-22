@@ -35,6 +35,7 @@ const KIND_LABELS: Record<string, string> = {
   intervention_response: "Expert answered",
   intervention_resumed: "Resumed",
   resume_outcome: "Resume outcome",
+  session_stopped: "Session stopped",
 };
 
 const PROVENANCE_LABELS: Record<string, string> = {

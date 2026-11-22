@@ -1,13 +1,23 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 
-import { ROOT_CONVERSATION_ID, UserEntry, type ConversationId, type EntryId, type Submission } from "@earendil-works/pi-durable";
+import {
+  ROOT_CONVERSATION_ID,
+  UserEntry,
+  type ConversationId,
+  type EntryId,
+  type SettledSubmissionRecord,
+  type Submission,
+  type SubmissionId,
+} from "@earendil-works/pi-durable";
 
 import { requestQDashAuth } from "./auth.ts";
 import { BRANCH_REFUSAL_STATUS, BranchError, parseDurableId, unfinishedWork } from "./branch.ts";
 import {
   ActiveChat,
   continueBlocker,
+  readStoredTurn,
   settleChat,
+  storedTurnFinal,
   steerOutcomeOf,
   submissionByRequest,
   type ChatTarget,
@@ -21,6 +31,7 @@ import { hasBearerToken, readJsonBody, RequestError, runtimeToken } from "./http
 import { decisionMessage, type ApprovalRequest } from "./durable-tools.ts";
 import { EvaluationError } from "./evaluate.ts";
 import { COMPACTION_FAILED_MESSAGE, isCompactionFailure } from "./compaction.ts";
+import { TurnFeed } from "./turn-feed.ts";
 import { ViewEventStream } from "./view-events.ts";
 import { claimStore, fenceSteer, steerFenced } from "./store-identity.ts";
 import { stopStoredConversation } from "./stored-stop.ts";
@@ -96,6 +107,12 @@ interface ChatBody extends StoreFields {
    * edit waits for the user.
    */
   continue?: boolean;
+  /**
+   * Reattach to the turn `request_id` started, after its stream dropped: never submit anything. While the turn runs,
+   * the request gets the turn's events from its start (see turn-feed.ts); after it ended, the turn's answer is read
+   * from the store. A request ID the store has never seen is `404` with `reason: "turn_not_found"`.
+   */
+  reattach?: boolean;
 }
 
 interface SteerBody extends StoreFields {
@@ -223,7 +240,7 @@ function toImageContent(images: ImageBody[] | undefined) {
  * store wait for each other (`409`). A steer and a stop reach a turn through its
  * hold only when they name the turn's exact chat (`ActiveChat.runs`).
  */
-type StoreHold = { kind: "chat"; active: ActiveChat } | { kind: "branch" } | { kind: "delete" } | { kind: "stop" };
+type StoreHold = { kind: "chat"; active: ActiveChat; feed: TurnFeed } | { kind: "branch" } | { kind: "delete" } | { kind: "stop" };
 const stores = new Map<string, StoreHold>();
 
 function storeKey(ownerId: string, storeSessionId: string): string {
@@ -342,7 +359,9 @@ async function handleChat(req: IncomingMessage, res: ServerResponse): Promise<vo
   const ownerId = body.owner_id;
   const conversationId = body.conversation_id;
   const continuing = body.continue === true;
-  if (!ownerId || !conversationId || (!continuing && typeof body.message !== "string")) {
+  // A reattach sends nothing: it only names the turn by its request ID.
+  const reattach = body.reattach === true;
+  if (!ownerId || !conversationId || (!continuing && !reattach && typeof body.message !== "string")) {
     sendJson(res, 400, {
       error: "owner_id, conversation_id and message are required",
     });
@@ -366,7 +385,25 @@ async function handleChat(req: IncomingMessage, res: ServerResponse): Promise<vo
     sendJson(res, 400, { error: "store_conversation_id is not a conversation ID" });
     return;
   }
+  if (reattach && !body.request_id) {
+    sendJson(res, 400, { error: "a reattach needs the request_id of the turn" });
+    return;
+  }
   const hold = stores.get(target.key);
+  if (
+    reattach &&
+    hold?.kind === "chat" &&
+    hold.active.runs(target.chat) &&
+    hold.active.turnRequestId === body.request_id
+  ) {
+    // The same user's same chat; the project must match too, as for a steer.
+    if (hold.active.projectId !== auth.projectId) {
+      sendJson(res, 403, { error: "the running answer belongs to another project" });
+      return;
+    }
+    await attachTurn(res, hold.feed);
+    return;
+  }
   if (hold) {
     sendJson(
       res,
@@ -380,7 +417,9 @@ async function handleChat(req: IncomingMessage, res: ServerResponse): Promise<vo
   const active = new ActiveChat(auth.projectId, BACKGROUND_CONTEXT, target.chat, body.request_id, (fenceKey) =>
     steerFenced(target.path, target.chat.conversation, fenceKey),
   );
-  stores.set(target.key, { kind: "chat", active });
+  // Every event the turn writes, for its own response and any request that reattaches.
+  const feed = new TurnFeed();
+  stores.set(target.key, { kind: "chat", active, feed });
   const pageContext = parsePageContext(body.page_context);
 
   let opened;
@@ -389,6 +428,7 @@ async function handleChat(req: IncomingMessage, res: ServerResponse): Promise<vo
     if (claimStore(target.path, target.generation, true) === "stale") {
       active.failed();
       stores.delete(target.key);
+      feed.end();
       sendJson(res, 409, STALE_STORE);
       return;
     }
@@ -411,6 +451,8 @@ async function handleChat(req: IncomingMessage, res: ServerResponse): Promise<vo
   } catch (error) {
     active.failed();
     stores.delete(target.key);
+    // A request that reattached meanwhile learns the turn never started.
+    feed.end();
     if (error instanceof BranchError) {
       sendJson(res, BRANCH_REFUSAL_STATUS[error.reason], { error: error.message, reason: error.reason });
       return;
@@ -440,7 +482,8 @@ async function handleChat(req: IncomingMessage, res: ServerResponse): Promise<vo
     }
 
     let approval: ApprovalRequest | undefined;
-    if (body.approval) {
+    // A reattach decides nothing again: the turn it recovers already carried the decision.
+    if (body.approval && !reattach) {
       approval = body.approval.id
         ? await pendingApproval(conversation, body.approval.id)
         : undefined;
@@ -459,7 +502,40 @@ async function handleChat(req: IncomingMessage, res: ServerResponse): Promise<vo
     // the stream tells this turn's own message from any other by it, exactly.
     let knowOwn!: (submission: Submission | undefined) => void;
     const ownKnown = new Promise<Submission | undefined>((resolve) => (knowOwn = resolve));
-    if (continuing) {
+    // The input entry a recovered turn placed: its stream replays what followed it,
+    // through `replayThrough` when a later turn follows it in the store.
+    let replayFrom: EntryId | undefined;
+    let replayThrough: EntryId | undefined;
+    // The steers the store shows the recovered turn placed, which may have ended it.
+    let storedMembers: SubmissionId[] = [];
+    if (reattach) {
+      // The turn ran in a runtime that is gone, or ended before this request:
+      // recover its submission by request ID and submit nothing.
+      const known = await submissionByRequest(harness, conversation, body.request_id!, BACKGROUND_CONTEXT);
+      if (!known) {
+        sendJson(res, 404, {
+          error: "The assistant has no record of this message; it may never have arrived.",
+          reason: "turn_not_found",
+        });
+        return;
+      }
+      own = known.submission;
+      if (known.record.type === "input" && known.record.entry !== undefined) {
+        // Only this turn is replayed: the store's submissions say where it ends. Where
+        // they do not, nothing is replayed rather than another turn's events under it.
+        const turn = await readStoredTurn(target.path, conversation.id, known.record, BACKGROUND_CONTEXT);
+        if (turn.status === "unknown") {
+          sendJson(res, 409, {
+            error: "Where this message's answer ends is not settled yet; reload the chat in a moment.",
+            reason: "turn_boundary_unknown",
+          });
+          return;
+        }
+        replayFrom = turn.after;
+        replayThrough = turn.through;
+        storedMembers = turn.members.map((member) => member.id);
+      }
+    } else if (continuing) {
       const known = body.request_id
         ? await submissionByRequest(harness, conversation, body.request_id, BACKGROUND_CONTEXT)
         : undefined;
@@ -483,15 +559,18 @@ async function handleChat(req: IncomingMessage, res: ServerResponse): Promise<vo
       "X-Accel-Buffering": "no",
     });
     let connected = true;
-    res.on("close", () => {
-      // A dropped browser connection does not cancel durable work. Retrying with
-      // the same request_id recovers the committed answer instead of paying for
-      // a second model turn.
-      connected = false;
-    });
-    const write = (event: NdjsonEvent): void => {
+    // A dropped browser connection does not cancel durable work. A request with
+    // the same request_id and `reattach` gets the turn's events again from the
+    // feed (or, after the turn, from the store) instead of paying for a second
+    // model turn.
+    const detach = feed.subscribe((event) => {
       if (connected && !res.writableEnded) res.write(encodeLine(event));
-    };
+    });
+    res.on("close", () => {
+      connected = false;
+      detach();
+    });
+    const write = (event: NdjsonEvent): void => feed.write(event);
     const ping = CHAT_PING_MS > 0 ? setInterval(() => write({ type: "ping" }), CHAT_PING_MS) : null;
 
     // Stream what changes in the conversation view; its first value is history.
@@ -505,9 +584,12 @@ async function handleChat(req: IncomingMessage, res: ServerResponse): Promise<vo
       const record = await submission?.status(BACKGROUND_CONTEXT);
       return record?.type === "input" && record.entry !== undefined ? Number(record.entry) : undefined;
     };
+    // A recovered turn replays what followed its own message: the view's first
+    // value then counts only the entries up to that message as history.
+    const initial = replayFrom === undefined ? events.value : { entries: [], docs: {}, before: replayFrom };
     const stream = new ViewEventStream(
       conversation,
-      events.value,
+      initial,
       (event) => writeAgentEvent(event, write),
       BACKGROUND_CONTEXT,
       // A run recovered from a runtime that died with a steer queued places that
@@ -524,7 +606,10 @@ async function handleChat(req: IncomingMessage, res: ServerResponse): Promise<vo
       // plain user message a recovered run places first (an earlier turn's
       // wrap-up) is not it.
       continuing ? undefined : async (entryId) => (await ownEntry()) === entryId,
+      replayThrough === undefined ? undefined : Number(replayThrough),
     );
+    // Replay at once: a turn that already ended commits nothing more to push.
+    if (replayFrom !== undefined) await stream.push(events.value);
     events.start(async (call) => {
       if (call.kind !== "value") return;
       await stream.push(call.value).catch((error: unknown) => {
@@ -589,7 +674,17 @@ async function handleChat(req: IncomingMessage, res: ServerResponse): Promise<vo
           write({ type: "steer", request_id: requestId, status: "withdrawn", reason: outcome.reason });
         }
       }
-      const settled = settlement.final;
+      let settled = settlement.final;
+      if (reattach && storedMembers.length > 0) {
+        // A recovered turn's steers live in the store, not in this request: the one
+        // placed last ended the turn, as for a live one.
+        const members: SettledSubmissionRecord[] = [];
+        for (const id of storedMembers) {
+          const submission = await harness.submission(id, BACKGROUND_CONTEXT);
+          if (submission) members.push(await submission.wait(BACKGROUND_CONTEXT));
+        }
+        settled = storedTurnFinal(settlement.final, members);
+      }
       if (settled.status === "done" && settled.type !== "write") {
         write({
           type: "done",
@@ -632,9 +727,43 @@ async function handleChat(req: IncomingMessage, res: ServerResponse): Promise<vo
       stores.delete(target.key);
       // End the stream only once the conversation is free, so a client that
       // sends its next message as soon as the stream ends is not refused.
+      feed.end();
       if (!res.writableEnded) res.end();
     }
   }
+}
+
+/**
+ * Stream a running turn to a request that reattached to it: the turn's events
+ * so far, then its live ones, until it ends. A turn that ends without having
+ * written a terminal event refused its request before streaming (it submitted
+ * nothing); the reattached stream says so.
+ */
+async function attachTurn(res: ServerResponse, feed: TurnFeed): Promise<void> {
+  res.writeHead(200, {
+    "Content-Type": "application/x-ndjson",
+    "Cache-Control": "no-cache",
+    "X-Accel-Buffering": "no",
+  });
+  let connected = true;
+  const detach = feed.subscribe((event) => {
+    if (connected && !res.writableEnded) res.write(encodeLine(event));
+  });
+  res.on("close", () => {
+    connected = false;
+    detach();
+  });
+  await feed.closed;
+  if (!feed.terminal && connected && !res.writableEnded) {
+    res.write(
+      encodeLine({
+        type: "error",
+        code: "turn_not_started",
+        message: "The message was refused before the assistant started on it; send it again.",
+      }),
+    );
+  }
+  if (!res.writableEnded) res.end();
 }
 
 /** Submit the turn's message: what the user typed, or the outcome of the write call they decided on. */

@@ -32,6 +32,9 @@ export function startFakeAgentQDash({ username: initialUser = "alice", projectId
   let legacy = false;
   /** A release before decision records and the audit: those endpoints answer 404. */
   let noAudit = false;
+  /** A release before stop requests (404), or a stop that fails with this status. */
+  let noStop = false;
+  let stopFault = null;
   /**
    * How the next decision POSTs fail, one entry per request: `{ status, detail }` refuses
    * without storing, `{ status, detail, afterStore: true }` stores and then answers the error,
@@ -170,7 +173,8 @@ export function startFakeAgentQDash({ username: initialUser = "alice", projectId
   function policyRejection(session, body) {
     const policy = session.policy;
     if (!policy.allowed_actions.includes(body.action_type)) return `Action '${body.action_type}' is not allowed by the session policy`;
-    if (body.action_type === "request_human") return null;
+    // Asking for a person or finishing needs no measurement budget.
+    if (body.action_type === "request_human" || body.action_type === "complete_session") return null;
     if (session.action_count >= policy.max_actions) return "Session action limit has been reached";
     if (body.action_type !== "run_task") return null;
     if (!policy.allowed_tasks.includes(body.task_name)) return `Task '${body.task_name}' is not allowed by the session policy`;
@@ -340,6 +344,7 @@ export function startFakeAgentQDash({ username: initialUser = "alice", projectId
     } else {
       session.state_version += 1;
       session.action_count += 1;
+      if (!rejection && body.action_type === "complete_session") session.status = "completed";
     }
     return [201, action];
   }
@@ -603,6 +608,36 @@ export function startFakeAgentQDash({ username: initialUser = "alice", projectId
       if (fault) return fail();
       return send(201, structuredClone(decision));
     }
+    if (parts[2] === "stop" && request.method === "POST") {
+      if (noStop) return send(404, { detail: "Not Found" });
+      if (stopFault) return send(stopFault, { detail: "Internal Server Error" });
+      sessionView(session);
+      const inFlight = () =>
+        own(state.actions)
+          .filter((entry) => entry.decision === "authorized" && ["dispatching", "queued", "running"].includes(entry.execution_status))
+          .map((entry) => ({ kind: "measurement", id: entry.action_id, status: entry.execution_status, execution_id: entry.execution_id }));
+      const closed = [];
+      let outcome;
+      if (session.stop && session.stop.idempotency_key === body.idempotency_key) {
+        if (session.stop.reason !== body.reason) return send(409, { detail: "Idempotency key was already used for a different stop" });
+        outcome = "already_stopped";
+      } else if (session.status !== "active" && session.status !== "waiting_for_human") {
+        outcome = "already_ended";
+      } else {
+        session.stop = { stopped_by: username, stopped_at: clock(), reason: body.reason, idempotency_key: body.idempotency_key, status_before: session.status, state_version: session.state_version + 1 };
+        session.status = "cancelled";
+        session.state_version += 1;
+        session.active_intervention_id = null;
+        for (const item of own(state.interventions)) {
+          if (item.status === "open" || item.status === "resume_authorized") {
+            item.status = "stopped";
+            closed.push(item.intervention_id);
+          }
+        }
+        outcome = "stopped";
+      }
+      return send(200, { outcome, session: sessionView(session), in_flight: inFlight(), closed_intervention_ids: closed });
+    }
     if (parts[2] === "audit") {
       // Pages of one snapshot, as agent_session_audit.py serves them: a cursor names the
       // snapshot, and a page of a snapshot whose records changed is refused with 409.
@@ -753,6 +788,14 @@ export function startFakeAgentQDash({ username: initialUser = "alice", projectId
         /** Set how many decisions one session holds. */
         setDecisionQuota(value) {
           decisionQuota = value;
+        },
+        /** Behave as a QDash release before session stop requests existed. */
+        setNoStopServer(value) {
+          noStop = value;
+        },
+        /** Fail every stop with this status (null: answer). */
+        setStopFault(value) {
+          stopFault = value;
         },
         /** Behave as a QDash release before autonomous checks existed. */
         setLegacyServer(value) {

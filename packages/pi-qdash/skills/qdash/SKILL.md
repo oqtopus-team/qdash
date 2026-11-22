@@ -49,6 +49,7 @@ Prefer the dedicated tool that matches the question. Use `qdash_query` only as a
    - `qdash_list_agent_sessions`, `qdash_get_agent_session_context` — find your sessions and read what one allows now, what ran, and the expert's answer, from QDash
    - `qdash_run_agent_session_step`, `qdash_request_agent_human` — run one measurement or ask an expert inside an approved `auto` session; they need no further approval and refuse anything outside the session
    - `qdash_record_agent_decision` — append your reading of a result and your next step to the audit of a session you created; it changes no session state and needs no approval
+   - `qdash_end_agent_session` — stop (`stopped`) or complete (`completed`) a session when the user asks; a write the user approves, the only tool that ends a session, and it reports the status QDash reads back and what still runs (a measurement already sent is not cancelled)
    - `qdash_commit_agent_session_update` — commit (and, when granted, apply) a candidate of a result you assess as pass, only in a session whose approval granted `parameter_updates` for it; it needs no further approval and QDash refuses anything outside the grant
    - `qdash_get_agent_session_audit` — read a session's chronological experiment audit (read-only)
    - `qdash_wait_agent_intervention` — wait, bounded, for an expert's answer

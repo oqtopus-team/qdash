@@ -53,6 +53,7 @@ import type {
   InvestigationTarget,
   LiveTurn,
   PageContext,
+  TurnConnection,
 } from "@/types/copilotChat";
 
 // ---------------------------------------------------------------------------
@@ -83,6 +84,8 @@ export interface SessionRun {
   turn: LiveTurn;
   /** One-line progress from backends that do not stream deltas. */
   statusMessage: string | null;
+  /** Whether the turn's stream is live, and when the turn last sent something. */
+  connection?: TurnConnection;
 }
 
 export interface SendOptions {
@@ -161,6 +164,50 @@ interface CopilotChatSessionContextValue {
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
 const SESSIONS_PATH = "/copilot/chat/sessions";
+
+/**
+ * How long a turn's stream may stay silent before the chat takes it for dropped.
+ * The runtime sends a heartbeat every 15 seconds (`CHAT_PING_MS`), also while a
+ * tool waits on an expert or a measurement, so silence this long is a connection
+ * a proxy or the network stopped, not a quiet turn.
+ */
+export const STREAM_SILENCE_MS = 60_000;
+/** The abort reason of a stream that went silent; the chat then reattaches. */
+const STALE_STREAM = "stale";
+/** The abort reason when the provider unmounts: nothing is shown or saved any more. */
+const UNMOUNTED = "unmounted";
+/** Answers a proxy or a restarting API gives while the turn may run on. */
+const STREAM_LOST_STATUS = new Set([502, 503, 504]);
+/** Reattach attempts before the chat stops trying and says so (about 10 minutes). */
+const MAX_REATTACH_ATTEMPTS = 25;
+const TURN_NOT_FOUND_MESSAGE =
+  "The connection dropped before the assistant received this message. Send it again.";
+const CONNECTION_LOST_MESSAGE =
+  "Lost the connection to the assistant. It may still be working on this message: reopen the chat later, or stop it before sending again.";
+
+/** Wait before reattach attempt `attempt`: none for the first, then 1, 2, 4, 8, 16, and 30 seconds. */
+function reattachDelay(attempt: number): number {
+  return attempt <= 1 ? 0 : Math.min(30_000, 1_000 * 2 ** (attempt - 2));
+}
+
+/** Resolve after `ms`, or reject with the signal's reason once it aborts. */
+function abortableDelay(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal.aborted) {
+      reject(signal.reason);
+      return;
+    }
+    const timer = setTimeout(() => {
+      signal.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(signal.reason);
+    };
+    signal.addEventListener("abort", onAbort, { once: true });
+  });
+}
 const DEFAULT_TITLE = "New Chat";
 
 function generateId(): string {
@@ -645,6 +692,14 @@ export function CopilotChatSessionProvider({
   // hit a 404 from racing against the create.
   const pendingCreates = useRef<Map<string, Promise<void>>>(new Map());
   const controllers = useRef<Map<string, AbortController>>(new Map());
+  // Unmounted (signed out, layout gone): stop watching every turn, so no stream
+  // keeps reconnecting with nobody to show it. The turns themselves run on.
+  useEffect(() => {
+    const live = controllers.current;
+    return () => {
+      for (const controller of live.values()) controller.abort(UNMOUNTED);
+    };
+  }, []);
 
   const awaitCreate = useCallback(async (sessionId: string) => {
     const promise = pendingCreates.current.get(sessionId);
@@ -1049,10 +1104,16 @@ export function CopilotChatSessionProvider({
       // The live turn is folded locally and mirrored into state, so the final
       // message is built from what was streamed even if renders lag behind.
       let turn: LiveTurn = { steps: [], startedAt: Date.now() };
+      let connection: TurnConnection = { state: "live", lastUpdateAt: turn.startedAt, attempt: 0 };
       setRuns((prev) => ({
         ...prev,
-        [sessionId]: { turn, statusMessage: null },
+        [sessionId]: { turn, statusMessage: null, connection },
       }));
+      const setConnection = (patch: Partial<TurnConnection>) => {
+        connection = { ...connection, ...patch };
+        const next = connection;
+        setRun(sessionId, (run) => ({ ...run, connection: next }));
+      };
       const updateTurn = (fold: (t: LiveTurn) => LiveTurn) => {
         turn = fold(turn);
         const next = turn;
@@ -1166,6 +1227,22 @@ export function CopilotChatSessionProvider({
         toReconcile.current.delete(`${sessionId}\0${requestId}`);
       };
       const placedSteers = new Set<string>();
+      // Where the turn began, for a reattached stream that replays it from there.
+      const turnStart = { shown, userAt };
+
+      /**
+       * A reattached stream replays the turn from its start: fold it again from
+       * there. Steers it places are placed again; nothing is saved until it does.
+       */
+      const restartFold = () => {
+        shown = turnStart.shown;
+        userAt = turnStart.userAt;
+        recoveredAt = null;
+        placedSteers.clear();
+        turn = { steps: [], startedAt: turn.startedAt };
+        const next = turn;
+        setRun(sessionId, (run) => ({ ...run, turn: next, statusMessage: null }));
+      };
 
       /**
        * This turn's own message was placed: what streamed so far was a run
@@ -1210,94 +1287,153 @@ export function CopilotChatSessionProvider({
             continuing,
             turnRequestId,
           );
-          const response = await fetch(url, {
-            method: "POST",
-            headers: buildHeaders(),
-            body: JSON.stringify(body),
-            signal: controller.signal,
-          });
-          if (!response.ok) throw new Error(await readErrorResponse(response));
-          const reader = response.body?.getReader();
-          if (!reader) throw new Error("No response body");
-
-          const decoder = new TextDecoder();
-          let buffer = "";
           let gotResult = false;
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            buffer += decoder.decode(value, { stream: true });
-            const { events, remainder } = consumeSSEEvents(buffer);
-            buffer = remainder;
 
-            for (const evt of events) {
-              const payload = JSON.parse(evt.data);
-              if (evt.event === "delta") {
-                updateTurn((t) => ({
-                  ...t,
-                  steps: appendDelta(t.steps, "text", payload.text),
-                }));
-              } else if (evt.event === "thinking") {
-                updateTurn((t) => ({
-                  ...t,
-                  steps: appendDelta(t.steps, "thinking", payload.text),
-                }));
-              } else if (evt.event === "tool_draft") {
-                updateTurn((t) => ({
-                  ...t,
-                  steps: startDraft(t.steps, payload),
-                }));
-              } else if (evt.event === "tool_args_delta") {
-                updateTurn((t) => ({
-                  ...t,
-                  steps: appendArgsDelta(t.steps, payload),
-                }));
-              } else if (evt.event === "tool_start") {
-                updateTurn((t) => ({
-                  ...t,
-                  steps: startTool(t.steps, payload),
-                }));
-              } else if (evt.event === "tool_end") {
-                updateTurn((t) => ({ ...t, steps: endTool(t.steps, payload) }));
-              } else if (evt.event === "ui") {
-                updateTurn((t) => appendLiveBlock(t, payload));
-              } else if (evt.event === "status") {
-                setRun(sessionId, (run) => ({
-                  ...run,
-                  statusMessage: payload.message ?? null,
-                }));
-              } else if (evt.event === "turn_start") {
-                startTurn(payload);
-              } else if (evt.event === "steer") {
-                if (payload.status === "applied") placeSteer(payload);
-                else if (typeof payload.request_id === "string") {
-                  const requestId = payload.request_id;
-                  updateSteers(sessionId, (list) =>
-                    advanceSteer(list, requestId, "withdrawn", payload.reason || undefined),
-                  );
-                }
-              } else if (evt.event === "noop") {
-                // The last answer was complete: nothing was asked of the model or added.
-                gotResult = true;
-                updateSessionMessages(sessionId, original);
-                setNotices((prev) => ({
-                  ...prev,
-                  [sessionId]: "Nothing to continue: the last answer is complete.",
-                }));
-              } else if (evt.event === "result") {
-                gotResult = true;
-                const { entry_id: entryId, ...result } = payload as Record<string, unknown>;
-                finish(
-                  resultToBlocks(result),
-                  typeof entryId === "string" && entryId ? entryId : undefined,
-                );
-              } else if (evt.event === "error") {
-                throw new Error(payload.detail);
+          /**
+           * One stream of the turn: the request itself, or a reattach after the
+           * last one dropped. Resolves `lost` when the stream ended or went silent
+           * before the turn did, so the turn may still be running; throws for an
+           * answer that failed, and when the user stopped the turn.
+           */
+          const streamOnce = async (reattach: boolean): Promise<"done" | "lost"> => {
+            const attempt = new AbortController();
+            const forward = () => attempt.abort(controller.signal.reason);
+            controller.signal.addEventListener("abort", forward, { once: true });
+            // The runtime sends a heartbeat every few seconds, also while a tool
+            // waits: a stream that stays silent past STREAM_SILENCE_MS is dead.
+            let silence: ReturnType<typeof setTimeout> | undefined;
+            const heard = () => {
+              clearTimeout(silence);
+              silence = setTimeout(() => attempt.abort(STALE_STREAM), STREAM_SILENCE_MS);
+            };
+            const lost = (): "lost" => {
+              if (controller.signal.aborted) throw controller.signal.reason;
+              return "lost";
+            };
+            try {
+              heard();
+              let response: Response;
+              try {
+                response = await fetch(url, {
+                  method: "POST",
+                  headers: buildHeaders(),
+                  body: JSON.stringify(reattach ? { ...body, reattach: true } : body),
+                  signal: attempt.signal,
+                });
+              } catch {
+                return lost();
               }
+              if (!response.ok) {
+                // A proxy or the API restarting: the turn may well run on.
+                if (STREAM_LOST_STATUS.has(response.status)) return lost();
+                throw new Error(await readErrorResponse(response));
+              }
+              const reader = response.body?.getReader();
+              if (!reader) throw new Error("No response body");
+              if (reattach) restartFold();
+              setConnection({ state: "live", attempt: 0 });
+
+              const decoder = new TextDecoder();
+              let buffer = "";
+              while (true) {
+                let chunk: ReadableStreamReadResult<Uint8Array>;
+                try {
+                  chunk = await reader.read();
+                } catch {
+                  return lost();
+                }
+                const { done, value } = chunk;
+                if (done) break;
+                heard();
+                buffer += decoder.decode(value, { stream: true });
+                const { events, remainder } = consumeSSEEvents(buffer);
+                buffer = remainder;
+                // Heartbeats carry no event: only the turn's own events count as an update.
+                if (events.length > 0) setConnection({ lastUpdateAt: Date.now() });
+
+                for (const evt of events) {
+                  const payload = JSON.parse(evt.data);
+                  if (evt.event === "delta") {
+                    updateTurn((t) => ({
+                      ...t,
+                      steps: appendDelta(t.steps, "text", payload.text),
+                    }));
+                  } else if (evt.event === "thinking") {
+                    updateTurn((t) => ({
+                      ...t,
+                      steps: appendDelta(t.steps, "thinking", payload.text),
+                    }));
+                  } else if (evt.event === "tool_draft") {
+                    updateTurn((t) => ({
+                      ...t,
+                      steps: startDraft(t.steps, payload),
+                    }));
+                  } else if (evt.event === "tool_args_delta") {
+                    updateTurn((t) => ({
+                      ...t,
+                      steps: appendArgsDelta(t.steps, payload),
+                    }));
+                  } else if (evt.event === "tool_start") {
+                    updateTurn((t) => ({
+                      ...t,
+                      steps: startTool(t.steps, payload),
+                    }));
+                  } else if (evt.event === "tool_end") {
+                    updateTurn((t) => ({ ...t, steps: endTool(t.steps, payload) }));
+                  } else if (evt.event === "ui") {
+                    updateTurn((t) => appendLiveBlock(t, payload));
+                  } else if (evt.event === "status") {
+                    setRun(sessionId, (run) => ({
+                      ...run,
+                      statusMessage: payload.message ?? null,
+                    }));
+                  } else if (evt.event === "turn_start") {
+                    startTurn(payload);
+                  } else if (evt.event === "steer") {
+                    if (payload.status === "applied") placeSteer(payload);
+                    else if (typeof payload.request_id === "string") {
+                      const requestId = payload.request_id;
+                      updateSteers(sessionId, (list) =>
+                        advanceSteer(list, requestId, "withdrawn", payload.reason || undefined),
+                      );
+                    }
+                  } else if (evt.event === "noop") {
+                    // The last answer was complete: nothing was asked of the model or added.
+                    gotResult = true;
+                    updateSessionMessages(sessionId, original);
+                    setNotices((prev) => ({
+                      ...prev,
+                      [sessionId]: "Nothing to continue: the last answer is complete.",
+                    }));
+                  } else if (evt.event === "result") {
+                    gotResult = true;
+                    const { entry_id: entryId, ...result } = payload as Record<string, unknown>;
+                    finish(
+                      resultToBlocks(result),
+                      typeof entryId === "string" && entryId ? entryId : undefined,
+                    );
+                  } else if (evt.event === "error") {
+                    if (payload.code === "stream_lost") return lost();
+                    if (payload.code === "turn_not_found") throw new Error(TURN_NOT_FOUND_MESSAGE);
+                    throw new Error(payload.detail);
+                  }
+                }
+              }
+              return gotResult ? "done" : lost();
+            } finally {
+              clearTimeout(silence);
+              controller.signal.removeEventListener("abort", forward);
             }
-          }
-          if (!gotResult) {
-            throw new Error("The connection closed before the answer was complete");
+          };
+
+          // Reattach after a dropped stream, never resending: the runtime replays
+          // the turn from its start, or says it never got the message.
+          let reattach = false;
+          for (let attempt = 1; (await streamOnce(reattach)) === "lost"; attempt++) {
+            if (attempt > MAX_REATTACH_ATTEMPTS) throw new Error(CONNECTION_LOST_MESSAGE);
+            setConnection({ state: "reconnecting", attempt });
+            await abortableDelay(reattachDelay(attempt), controller.signal);
+            reattach = true;
           }
         } catch (err) {
           if (controller.signal.aborted) {

@@ -10,6 +10,7 @@ import type { AgentSessionResponseActiveInterventionId } from './agentSessionRes
 import type { AgentSessionResponseEndNotification } from './agentSessionResponseEndNotification';
 import type { AgentSessionResponseModel } from './agentSessionResponseModel';
 import type { AgentSessionResponseStartNotification } from './agentSessionResponseStartNotification';
+import type { AgentSessionResponseStop } from './agentSessionResponseStop';
 import type { AgentSessionStatus } from './agentSessionStatus';
 
 /**
@@ -40,4 +41,6 @@ export interface AgentSessionResponse {
   start_notification?: AgentSessionResponseStartNotification;
   /** Slack delivery of the session's end message, stored by the update that ended it; null while the session is open */
   end_notification?: AgentSessionResponseEndNotification;
+  /** Who stopped the session with a stop request, why, and when; null unless a stop request ended it (an expert's stop answer is recorded on its intervention) */
+  stop?: AgentSessionResponseStop;
 }

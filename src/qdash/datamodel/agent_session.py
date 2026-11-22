@@ -559,7 +559,7 @@ class AgentSessionLifecycleEvent(str, Enum):
 
     STARTED = "started"  # the approved session was created
     COMPLETED = "completed"  # an authorized complete_session ended it
-    CANCELLED = "cancelled"  # an expert stopped it through an intervention
+    CANCELLED = "cancelled"  # a person stopped it: an expert's stop answer or a stop request
     EXPIRED = "expired"  # its expiry passed while it was active or paused
 
 
@@ -572,6 +572,24 @@ class AgentSessionNotification(AgentNotificationDelivery):
 
     event: AgentSessionLifecycleEvent
     actor: str = Field(default="", description="Who caused the event, from QDash's records")
+
+
+class AgentSessionStopRecord(BaseModel):
+    """Who stopped a session with a stop request, why, and when.
+
+    Stored by the one update that moves the session to ``cancelled``. A stop ends the
+    session's authority to start, commit, or apply anything; it does not cancel a
+    measurement, commit, or backend apply that passed the session gate before it.
+    """
+
+    stopped_by: str = Field(..., description="The signed-in account that sent the stop")
+    stopped_at: datetime
+    reason: str = Field(..., description="Why, as the person gave it")
+    idempotency_key: str = Field(..., description="The stop request's key, so a retry is a no-op")
+    status_before: AgentSessionStatus = Field(
+        ..., description="active or waiting_for_human, the status the stop ended"
+    )
+    state_version: int = Field(..., description="The session state version the stop created")
 
 
 class AgentInterventionEvent(BaseModel):

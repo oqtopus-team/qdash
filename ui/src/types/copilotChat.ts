@@ -264,6 +264,20 @@ export type CopilotBlocksResult = BlocksResult & {
   feedback?: AnswerFeedback;
 };
 
+/**
+ * The health of a streaming turn's connection, kept apart from what the turn does.
+ * `live`: the stream is open and its heartbeat arrives. `reconnecting`: the stream
+ * dropped or went silent past its heartbeat, and the chat is attaching to the turn
+ * again; what the assistant does meanwhile is unknown until it is back.
+ */
+export interface TurnConnection {
+  state: "live" | "reconnecting";
+  /** When the turn itself last sent something (text, a step, a status); heartbeats do not count. */
+  lastUpdateAt: number;
+  /** Attempts to attach again since the stream was last live. */
+  attempt: number;
+}
+
 /** The turn that is still streaming. */
 export interface LiveTurn {
   steps: TraceStep[];

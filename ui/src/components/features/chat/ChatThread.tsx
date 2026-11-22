@@ -188,6 +188,7 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
     isStreaming,
     liveTurn,
     statusMessage,
+    connection,
     model,
     thinking,
     send,
@@ -393,7 +394,13 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
                 />
               ),
             )}
-            {liveTurn && <LiveAssistantMessage turn={liveTurn} statusMessage={statusMessage} />}
+            {liveTurn && (
+              <LiveAssistantMessage
+                turn={liveTurn}
+                statusMessage={statusMessage}
+                connection={connection}
+              />
+            )}
             <ChatPendingSteers
               steers={steers}
               isStreaming={isStreaming}

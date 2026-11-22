@@ -43,6 +43,23 @@ chat with **New chat** on the **Agent** page instead. In the sidebar and the flo
 **New chat** keeps the result the current chat is about. The chat does not send a time range;
 name one in your message when it matters.
 
+### Follow an Answer in Progress
+
+While an answer is written, the chat shows what the assistant is doing now, such as a tool it
+runs or **Waiting for the expert's answer** while it waits on QDash. When the assistant has sent
+nothing for 30 seconds, the line under the answer says **Connected · last update 4m 10s ago**: the
+connection is fine, and the assistant is waiting or working without a new step to show. It does
+not mean the assistant is stuck, and a session or execution page that shows progress does not by
+itself mean the chat's answer is still running.
+
+If the connection drops, the line says **Connection lost, reconnecting** with the time of the last
+update, and the chat reconnects to the same answer by itself, without sending your message again.
+Once back, it shows the answer from its start and goes on with it; nothing the assistant did runs
+twice. If the assistant never received the message, the chat says so and asks you to send it
+again. After about 10 minutes without a connection, the chat stops trying and says that the
+assistant may still be working; reloading the page also stops following the answer.
+**Stop** works throughout.
+
 ### Add to an Answer in Progress, or Continue One
 
 You can type while an answer is still being written. Press Enter or the arrow button beside
@@ -170,7 +187,9 @@ return to the window. If your chosen model is no longer offered, chats use the d
 
 The **Thinking** menu next to the model picker sets how much the model reasons before it answers:
 **Auto** (the model's configured default), **Off**, **Low**, **Medium**, or **High**. The choice
-applies from the next message and is remembered in your browser.
+applies from the next message and is remembered in your browser. A model that always reasons,
+such as Claude Opus 5.5, cannot turn it off: its menu omits **Off**. A previously saved
+**Off** choice displays and runs as **Low** for that model.
 
 **Settings → Copilot → Your instructions** holds instructions added to every chat you start, after
 QDash's own rules: language, tone, and formats such as "answer in Japanese, conclusion first" or

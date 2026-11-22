@@ -374,6 +374,23 @@ describe("QDashClient", () => {
     expect(requests[4]!.url.pathname).toBe("/api/agent-sessions/s%201/audit/export");
   });
 
+  it("stops an agent session with the stop's key and reason", async () => {
+    const requests: Array<{ url: URL; body: unknown }> = [];
+    const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const request = new Request(input, init);
+      requests.push({ url: new URL(request.url), body: await request.json() });
+      return jsonResponse({ outcome: "stopped", session: { session_id: "s 1" }, in_flight: [], closed_intervention_ids: [] });
+    });
+    const client = new QDashClient(
+      new QDashConfig({ baseUrl: "https://qdash.example/api", apiToken: "token" }),
+      { fetch },
+    );
+    const result = await client.stopAgentSession("s 1", { idempotencyKey: "stop-1", reason: "The user asked" });
+    expect(result.outcome).toBe("stopped");
+    expect(requests[0]!.url.pathname).toBe("/api/agent-sessions/s%201/stop");
+    expect(requests[0]!.body).toEqual({ idempotency_key: "stop-1", reason: "The user asked" });
+  });
+
   it("lists sessions with repeated status filters and records an intervention", async () => {
     const requests: Request[] = [];
     const bodies: unknown[] = [];

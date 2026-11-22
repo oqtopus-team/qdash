@@ -14,6 +14,7 @@ import {
   sessionActivityLabel,
   sessionGraphHref,
   sessionStatusBadgeClass,
+  sessionStatusBorderStyle,
 } from "./agentSessionDisplay";
 import { AgentActorLabel, recordedUserLabel } from "./ExecutionAttribution";
 import { ExecutionListCard } from "./ExecutionListCard";
@@ -56,7 +57,10 @@ export function AgentSessionGroupRow({
   const title = summary.skill_name || "Agent session";
 
   return (
-    <div className="rounded-box border border-base-200 border-l-4 border-l-base-300 bg-base-100 shadow-sm">
+    <div
+      data-testid="agent-session-card"
+      className={`rounded-box border border-base-200 bg-base-100 shadow-sm ${sessionStatusBorderStyle(summary.status)}`}
+    >
       <div className="flex flex-col gap-2 p-3 sm:flex-row sm:items-start sm:justify-between sm:p-4">
         <button
           type="button"

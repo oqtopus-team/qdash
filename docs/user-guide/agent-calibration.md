@@ -115,12 +115,26 @@ session itself when you do not give its link. It continues within the session yo
 does not repeat a finished measurement unless the results or the guidance call for it.
 
 To continue as soon as the expert answers, ask the agent to wait for the answer. It then waits in
-the same reply for at most an hour. Closing pi, stopping the reply, or ending the chat stops the
+the same reply for at most an hour, and the web Agent shows **Waiting for the expert's answer**;
+see [Follow an Answer in Progress](./ai-chat.md#follow-an-answer-in-progress). Closing pi, stopping the reply, or ending the chat stops the
 wait, and nothing resumes the calibration until you ask again; the answer stays in QDash.
 
 Guidance that needs something outside the session, such as another task or a wider range, leads
 the agent to tell you a new session is needed; approving that session is your decision. A
 stopped, expired, or used-up session is never reactivated.
+
+## Stop a session
+
+To end a session before its goal is reached, open the session page (the agent links it as
+`/agent-sessions/<id>?project=<project>`) and choose **Stop session**, give a reason, and confirm.
+You need editor permission in the session's project. You can also ask the agent to stop it: it
+asks for your approval, then reports the status QDash shows afterwards.
+
+After a stop the session is **cancelled**: the agent cannot run, commit, apply, or resume anything
+in it, and it cannot be restarted. A measurement that was already sent to the hardware is not
+cancelled; QDash lists it as still running and records its result when it finishes, but nothing
+from it is committed. An open expert request on the session is closed. Stopping a session that
+already completed or expired changes nothing.
 
 ## Review and export the audit
 

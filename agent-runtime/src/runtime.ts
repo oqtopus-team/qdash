@@ -97,7 +97,7 @@ import { logDurableReport } from "./durable-report.ts";
 import { examplesOf, fetchKnowledgeDraft, fetchTaskKnowledgeResponse, renderReference } from "./knowledge-context.ts";
 import type { TaskKnowledgeLike } from "./knowledge-context.ts";
 import { resolveCopilotModelFiles } from "./copilot-profile.ts";
-import { chatCompactionOverrides, PROVIDER_ALIASES, writeModelsConfig } from "./models-config.ts";
+import { chatCompactionOverrides, missingCredentialMessage, NATIVE_API_KEY_ENV, PROVIDER_ALIASES, supportedThinkingLevel, writeModelsConfig } from "./models-config.ts";
 import type { PageContext } from "./page-context.ts";
 import { buildSystemPrompt, buildUserInstructionsSection } from "./prompt.ts";
 import { buildSkillTool, type SkillSummary } from "./skill-tool.ts";
@@ -840,6 +840,16 @@ export class SharedRuntime {
       contextWindow,
       maxTokens,
     } = this.resolveModelWithLimits(request.provider, request.modelName);
+    // A native catalog model without its key is refused here, named, never swapped for another.
+    const missing =
+      model.provider in NATIVE_API_KEY_ENV
+        ? missingCredentialMessage(
+            model.provider,
+            model.modelId,
+            (await this.modelRuntime.checkAuth(model.provider)) !== undefined,
+          )
+        : undefined;
+    if (missing) throw new Error(missing);
     const selectedBudget = compactionBudget(contextWindow, maxTokens);
     const opened = await this.openStore(request.ownerId, request.storeSessionId ?? request.sessionId, auth, {
       userInstructions: request.userInstructions,
@@ -857,9 +867,15 @@ export class SharedRuntime {
     });
     const { harness, writeTools, workspace, close } = opened;
     try {
+      // A level the model cannot run (Off on a model whose thinking is always on) runs at the
+      // nearest one it can, not at pi's fallback effort (see supportedThinkingLevel).
+      const thinkingLevel = supportedThinkingLevel(
+        this.modelRuntime.getModel(model.provider, model.modelId),
+        request.thinkingLevel,
+      );
       const agent = {
         model,
-        ...(request.thinkingLevel ? { thinkingLevel: request.thinkingLevel } : {}),
+        ...(thinkingLevel ? { thinkingLevel } : {}),
         // Where the harness builds the workspace environment: a directory of
         // the agent-exec container, not of this one.
         cwd: workspace?.cwd ?? WORK_DIR,

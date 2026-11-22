@@ -641,7 +641,7 @@ export function sessionOwnerRefusal(session: { session_id: string; created_by: s
 }
 
 /** The idempotency key of one tool call: a replay of the call reuses the action it created. */
-export function callIdempotencyKey(kind: "step" | "human" | "decision" | "update" | "apply", sessionId: string, toolCallId: string): string {
+export function callIdempotencyKey(kind: "step" | "human" | "decision" | "update" | "apply" | "stop" | "complete" | "end-decision", sessionId: string, toolCallId: string): string {
   const digest = createHash("sha256").update(`${sessionId}\u0000${toolCallId}`).digest("hex").slice(0, 40);
   return `pi-${kind}-${digest}`;
 }

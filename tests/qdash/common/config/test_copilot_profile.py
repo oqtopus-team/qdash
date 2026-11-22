@@ -419,6 +419,83 @@ def test_committed_default_files_are_unchanged_without_a_profile(
     ]
 
 
+def test_the_default_chat_model_is_native_openai_gpt_6_sol_and_qwen_stays_selectable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The committed default chat runs GPT-6 Sol on OpenAI's own API, from the catalog."""
+    from qdash.api.services import pi_chat_service
+    from qdash.api.services.evaluation_service import planner_model_config
+    from qdash.api.services.pi_chat_service import _request_payload
+    from qdash.copilot.config.settings import select_chat_model
+    from qdash.copilot.contracts.models import ChatRequest
+
+    monkeypatch.setattr(ConfigLoader, "_CONFIG_DIR", REPO_CONFIG)
+    monkeypatch.setattr(pi_chat_service, "user_instructions", lambda _username: "")
+    monkeypatch.delenv(COPILOT_PROFILE_ENV, raising=False)
+    _reset()
+    try:
+        config = load_copilot_config()
+        planner = planner_model_config()
+    finally:
+        _reset()
+
+    default = config.chat_models[0]
+    assert (default.provider, default.name, default.api_style) == (
+        "openai",
+        "gpt-6-sol",
+        "responses",
+    )
+    assert default.reasoning_effort == "medium"
+    # A catalog model: no endpoint of its own, and no sampling copied from another model.
+    # The runtime builds models.json from these YAML keys, not from ModelConfig defaults.
+    raw = yaml.safe_load((REPO_CONFIG / "copilot" / "chat.yaml").read_text())["chat_models"][0]
+    assert raw == {
+        "provider": "openai",
+        "name": "gpt-6-sol",
+        "api_style": "responses",
+        "reasoning_effort": "medium",
+    }
+    assert (config.model.provider, config.model.name) == ("openai", "gpt-6-sol")
+    # Qwen is still offered, unchanged.
+    qwen = [m for m in config.chat_models if m.name == "qwen3.8-flash-next"]
+    assert [(m.provider, m.api_style) for m in qwen] == [("openai-compatible-chat", "completion")]
+
+    # A chat without a choice asks the runtime for exactly openai/gpt-6-sol; a choice of Qwen
+    # asks for Qwen.
+    request = ChatRequest(message="hi", session_id="s1")
+    chosen = config.model_copy(update={"model": select_chat_model(config)})
+    payload = _request_payload(request, chosen, "alice")
+    assert payload["model"] == {"provider": "openai", "name": "gpt-6-sol"}
+    assert payload["thinking_level"] == "medium"
+    qwen_chat = config.model_copy(update={"model": select_chat_model(config, qwen[0])})
+    assert _request_payload(request, qwen_chat, "alice")["model"] == {
+        "provider": "openai-compatible-chat",
+        "name": "qwen3.8-flash-next",
+    }
+    # Claude Opus 5.5 on Anthropic's own API is offered too, with nothing but its effort: no
+    # api_style, sampling, or endpoint copied from the other models.
+    raw_opus = yaml.safe_load((REPO_CONFIG / "copilot" / "chat.yaml").read_text())["chat_models"]
+    assert [(m["provider"], m["name"]) for m in raw_opus] == [
+        ("openai", "gpt-6-sol"),
+        ("openai-compatible-chat", "qwen3.8-flash-next"),
+        ("anthropic", "claude-opus-5-5"),
+    ]
+    assert raw_opus[2] == {
+        "provider": "anthropic",
+        "name": "claude-opus-5-5",
+        "reasoning_effort": "medium",
+    }
+    opus = config.chat_models[2]
+    opus_chat = config.model_copy(update={"model": select_chat_model(config, opus)})
+    opus_payload = _request_payload(request, opus_chat, "alice")
+    assert opus_payload["model"] == {"provider": "anthropic", "name": "claude-opus-5-5"}
+    assert opus_payload["thinking_level"] == "medium"
+
+    # Planner-mode evaluations follow the default chat model; the evaluators do not change.
+    assert planner == ({"provider": "openai", "name": "gpt-6-sol"}, "medium")
+    assert config.evaluation_models[0].name == "nvidia/Ising-Calibration-1.5-31B-NVFP4"
+
+
 def test_profile_model_strings_stay_literal(
     monkeypatch: pytest.MonkeyPatch, config_dir: Path
 ) -> None:

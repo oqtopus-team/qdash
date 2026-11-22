@@ -343,11 +343,58 @@ class AgentInterventionService:
 
     # ------------------------------------------------------------------ settling
 
+    # The statuses a stop request closes: nothing answers or resumes them once it ended.
+    _CLOSED_BY_STOP = (AgentInterventionStatus.OPEN, AgentInterventionStatus.RESUME_AUTHORIZED)
+
+    def _close_for_stop(
+        self, doc: AgentInterventionDocument, session: AgentSessionDocument
+    ) -> bool:
+        """Close one open or resume-authorized record of a session a stop request ended."""
+        stop = session.stop
+        if (
+            stop is None
+            or session.status != AgentSessionStatus.CANCELLED
+            or doc.status not in self._CLOSED_BY_STOP
+        ):
+            return False
+        result = self._collection().update_one(
+            {"intervention_id": doc.intervention_id, "status": doc.status.value},
+            {"$set": {"status": AgentInterventionStatus.STOPPED.value, "updated_at": now()}},
+        )
+        if result.modified_count != 1:
+            return False
+        self._push_event(
+            doc.intervention_id,
+            stop.stopped_by,
+            "session_stopped",
+            f"{stop.stopped_by} stopped the session: {stop.reason}",
+        )
+        return True
+
+    def close_for_stopped_session(self, session: AgentSessionDocument) -> list[str]:
+        """Close the session's open and resume-authorized records after a stop request.
+
+        Idempotent. A record that was being answered when the stop won is rolled back to
+        ``open`` by its response and closed by the next load (``_settle``).
+        """
+        if session.stop is None or session.status != AgentSessionStatus.CANCELLED:
+            return []
+        docs = AgentInterventionDocument.find(
+            {
+                "project_id": session.project_id,
+                "session_id": session.session_id,
+                "status": {"$in": [status.value for status in self._CLOSED_BY_STOP]},
+            }
+        ).run()
+        return [doc.intervention_id for doc in docs if self._close_for_stop(doc, session)]
+
     def _settle(
         self, doc: AgentInterventionDocument, session: AgentSessionDocument
     ) -> AgentInterventionDocument:
         """Finish or roll back a response or claim that a crashed request left half applied."""
         timestamp = now()
+        if self._close_for_stop(doc, session):
+            return self._reload(doc.intervention_id)
         if doc.status == AgentInterventionStatus.RESPONDING and doc.response is not None:
             response = doc.response
             if session.intervention_resolution_id == response.response_id:

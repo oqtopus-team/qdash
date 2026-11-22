@@ -3296,6 +3296,80 @@
         }
       }
     },
+    "/agent-sessions/{session_id}/stop": {
+      "post": {
+        "tags": [
+          "agent-session"
+        ],
+        "summary": "Stop an agent session",
+        "description": "End an active or paused session's authority on a person's request.\n\nAny editor of the project may stop it, as an expert may stop it from an intervention.\nThe session becomes ``cancelled`` and nothing new is dispatched, committed, applied, or\nresumed in it. A measurement, commit, or backend apply that passed the session gate\nbefore the stop is not cancelled; ``in_flight`` lists those still unsettled. A session\nthat already ended is returned unchanged (``already_ended``).",
+        "operationId": "stopAgentSession",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StopAgentSessionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StopAgentSessionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/agent-sessions/{session_id}/actions/{action_id}/candidates": {
       "get": {
         "tags": [
@@ -20242,7 +20316,7 @@
           "kind": {
             "type": "string",
             "title": "Kind",
-            "description": "session_created, action_proposed, measurement, evaluation, decision, candidate_commit, candidate_set_commit, backend_apply, intervention_opened, intervention_response, intervention_resumed, or resume_outcome"
+            "description": "session_created, action_proposed, measurement, evaluation, decision, candidate_commit, candidate_set_commit, backend_apply, intervention_opened, intervention_response, intervention_resumed, resume_outcome, or session_stopped"
           },
           "summary": {
             "type": "string",
@@ -23318,6 +23392,50 @@
         "title": "AgentSessionGroupSummary",
         "description": "One agent session as a group of the Execution list.\n\n``status`` is the session's own state, not an execution status: a session waiting for an\nexpert, or active between measurements, holds no hardware and is not failed for it."
       },
+      "AgentSessionInFlightOperation": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "measurement",
+              "candidate_commit",
+              "candidate_set_commit",
+              "backend_apply"
+            ],
+            "title": "Kind"
+          },
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "The action, commit, or candidate set commit ID"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "Its status as QDash records it now"
+          },
+          "execution_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Execution Id",
+            "description": "The measurement's execution, once QDash knows it"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "id",
+          "status"
+        ],
+        "title": "AgentSessionInFlightOperation",
+        "description": "An operation that passed the session gate before the session ended and has not settled.\n\nQDash does not cancel it: a measurement keeps running on the hardware and its result\nis recorded; a commit or backend apply finishes or fails on its own."
+      },
       "AgentSessionLifecycleEvent": {
         "type": "string",
         "enum": [
@@ -23615,6 +23733,17 @@
               }
             ],
             "description": "Slack delivery of the session's end message, stored by the update that ended it; null while the session is open"
+          },
+          "stop": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentSessionStopRecord"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who stopped the session with a stop request, why, and when; null unless a stop request ended it (an expert's stop answer is recorded on its intervention)"
           }
         },
         "type": "object",
@@ -23648,6 +23777,50 @@
         ],
         "title": "AgentSessionStatus",
         "description": "Lifecycle state of an agent session."
+      },
+      "AgentSessionStopRecord": {
+        "properties": {
+          "stopped_by": {
+            "type": "string",
+            "title": "Stopped By",
+            "description": "The signed-in account that sent the stop"
+          },
+          "stopped_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Stopped At"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "description": "Why, as the person gave it"
+          },
+          "idempotency_key": {
+            "type": "string",
+            "title": "Idempotency Key",
+            "description": "The stop request's key, so a retry is a no-op"
+          },
+          "status_before": {
+            "$ref": "#/components/schemas/AgentSessionStatus",
+            "description": "active or waiting_for_human, the status the stop ended"
+          },
+          "state_version": {
+            "type": "integer",
+            "title": "State Version",
+            "description": "The session state version the stop created"
+          }
+        },
+        "type": "object",
+        "required": [
+          "stopped_by",
+          "stopped_at",
+          "reason",
+          "idempotency_key",
+          "status_before",
+          "state_version"
+        ],
+        "title": "AgentSessionStopRecord",
+        "description": "Who stopped a session with a stop request, why, and when.\n\nStored by the one update that moves the session to ``cancelled``. A stop ends the\nsession's authority to start, commit, or apply anything; it does not cancel a\nmeasurement, commit, or backend apply that passed the session gate before it."
       },
       "AllConfigResponse": {
         "properties": {
@@ -38637,6 +38810,71 @@
         ],
         "title": "SourceSearchMatch",
         "description": "One search hit; ``line`` and ``text`` are null for a path search."
+      },
+      "StopAgentSessionRequest": {
+        "properties": {
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Idempotency Key",
+            "description": "Key of this stop; repeating it returns the same outcome"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Reason",
+            "description": "Why the session is stopped, for the audit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "idempotency_key",
+          "reason"
+        ],
+        "title": "StopAgentSessionRequest",
+        "description": "A person's request to end an agent session's authority now."
+      },
+      "StopAgentSessionResponse": {
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "stopped",
+              "already_stopped",
+              "already_ended"
+            ],
+            "title": "Outcome",
+            "description": "stopped: this request ended the session. already_stopped: an earlier request with this key stopped it. already_ended: it had already ended another way (completed, cancelled, or expired), and this request changed nothing"
+          },
+          "session": {
+            "$ref": "#/components/schemas/AgentSessionResponse"
+          },
+          "in_flight": {
+            "items": {
+              "$ref": "#/components/schemas/AgentSessionInFlightOperation"
+            },
+            "type": "array",
+            "title": "In Flight",
+            "description": "Operations that passed the session gate before it ended and have not settled; QDash does not cancel them"
+          },
+          "closed_intervention_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Closed Intervention Ids",
+            "description": "Open or resume-authorized interventions this stop closed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "outcome",
+          "session"
+        ],
+        "title": "StopAgentSessionResponse",
+        "description": "What a stop request did, read back from QDash's records."
       },
       "SubmitAgentActionRequest": {
         "properties": {

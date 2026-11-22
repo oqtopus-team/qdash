@@ -27,6 +27,7 @@ from qdash.datamodel.agent_session import (
     AgentSessionNotification,
     AgentSessionPolicy,
     AgentSessionStatus,
+    AgentSessionStopRecord,
 )
 
 
@@ -75,6 +76,9 @@ class AgentSessionDocument(Document):
     # and only that update, so a session has at most one end event.
     start_notification: AgentSessionNotification | None = None
     end_notification: AgentSessionNotification | None = None
+    # Set by the update that stopped the session on a stop request; None otherwise (an
+    # expert's stop answer is recorded on its intervention).
+    stop: AgentSessionStopRecord | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

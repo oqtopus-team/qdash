@@ -15,6 +15,7 @@ export type {
   RecordAgentDecisionOptions,
   RecalibrationRecommendationsOptions,
   SearchSourceOptions,
+  StopAgentSessionOptions,
   SubmitAgentActionOptions,
   TaskResultFigureOptions,
   TaskResultsTimeseriesOptions,

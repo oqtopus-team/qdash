@@ -44,6 +44,7 @@ import type {
   ChatMessage as CopilotMessage,
   CopilotBlocksResult,
   LiveTurn,
+  TurnConnection,
 } from "@/types/copilotChat";
 
 // ---------------------------------------------------------------------------
@@ -646,9 +647,12 @@ export const AssistantMessage = memo(function AssistantMessage({
 export function LiveAssistantMessage({
   turn,
   statusMessage,
+  connection = null,
 }: {
   turn: LiveTurn;
   statusMessage: string | null;
+  /** The stream's health, shown apart from what the turn does. */
+  connection?: TurnConnection | null;
 }) {
   const split = answerStartIndex(turn.steps);
   const work = turn.steps.slice(0, split);
@@ -682,6 +686,7 @@ export function LiveAssistantMessage({
         steps={turn.steps}
         startedAt={turn.startedAt}
         statusMessage={statusMessage}
+        connection={connection}
         className={`h-7 gap-2.5 ${idle ? "text-sm" : "mt-1"}`}
       />
     </AssistantRow>

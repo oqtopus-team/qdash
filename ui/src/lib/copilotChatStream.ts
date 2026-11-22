@@ -209,13 +209,24 @@ export function endTool(
     exit_code?: unknown;
   },
 ): TraceStep[] {
-  // Match by call id; fall back to the oldest running call of that tool.
-  const idx =
-    payload.id != null
-      ? steps.findIndex((s) => s.kind === "tool" && s.id === payload.id)
-      : steps.findIndex(
-          (s) => s.kind === "tool" && s.tool === payload.tool && s.status === "running",
-        );
+  // Match by call id, preferring the call of that id still running: a local model
+  // may give every call of a turn the same id. Without an id, the oldest running
+  // call of that tool.
+  let idx = -1;
+  if (payload.id != null) {
+    for (let i = steps.length - 1; i >= 0; i--) {
+      const s = steps[i];
+      if (s.kind === "tool" && s.id === payload.id && s.status === "running") {
+        idx = i;
+        break;
+      }
+    }
+    if (idx === -1) idx = steps.findIndex((s) => s.kind === "tool" && s.id === payload.id);
+  } else {
+    idx = steps.findIndex(
+      (s) => s.kind === "tool" && s.tool === payload.tool && s.status === "running",
+    );
+  }
   const step = steps[idx];
   if (!step || step.kind !== "tool") return steps;
   const figures = Array.isArray(payload.figures)

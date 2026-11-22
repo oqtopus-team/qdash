@@ -5,7 +5,9 @@ QDash runs calibrations without AI endpoints.
 
 | Setting | Needed for | Required |
 | --- | --- | --- |
-| [Chat endpoint](#connect-model-endpoints) | **Agent**, the **Ask Agent** sidebar, and forum AI replies | For chat |
+| [OpenAI API key](#connect-model-endpoints) | The default chat model, OpenAI's GPT-6 Sol: **Agent**, the **Ask Agent** sidebar, and forum AI replies | For chat with the default model |
+| [Chat endpoint](#connect-model-endpoints) | Chat with Qwen, chosen in the chat's model menu | For chat with Qwen |
+| [Anthropic API key](#connect-model-endpoints) | Chat with Claude Opus 5.5, chosen in the chat's model menu | For chat with Claude |
 | [Evaluation endpoint](#connect-model-endpoints) | **AI Evaluations** and **Evaluate** on **Chip** | For evaluations |
 | [Deployment profile](#select-a-deployment-profile) | Chat and evaluation models specific to this deployment | No |
 | [Classifier endpoint](#add-a-classifier) | Fixed result layouts and category judgments in chat | No |
@@ -16,13 +18,20 @@ internal authentication; no AI Compose profile or UI enable flag is needed.
 
 ## Connect Model Endpoints
 
-1. Set the endpoint URL and API key for each AI feature you use in `.env`. Each base URL must end
-   with `/v1`:
+1. Set the API key, or the endpoint URL and API key, for each AI feature you use in `.env`. Each
+   base URL must end with `/v1`:
 
    | Variables | Feature |
    | --- | --- |
-   | `OPENAI_COMPATIBLE_BASE_URL_CHAT` / `OPENAI_COMPATIBLE_API_KEY_CHAT` | Chat |
+   | `OPENAI_API_KEY` | Chat with the default model, `openai/gpt-6-sol`, on OpenAI's API |
+   | `OPENAI_COMPATIBLE_BASE_URL_CHAT` / `OPENAI_COMPATIBLE_API_KEY_CHAT` | Chat with Qwen (`qwen3.8-flash-next`) |
+   | `ANTHROPIC_API_KEY` | Chat with Claude Opus 5.5 (`anthropic/claude-opus-5-5`) on Anthropic's API |
    | `OPENAI_COMPATIBLE_BASE_URL_EVALUATION` / `OPENAI_COMPATIBLE_API_KEY_EVALUATION` | Figure evaluation |
+
+   Only the AI runtime reads `OPENAI_API_KEY` and `ANTHROPIC_API_KEY`; neither is sent to the
+   browser. Without a model's key, a chat on that model stops with a message naming the variable,
+   and the other models still work; QDash never switches models by itself. Planner-mode
+   evaluations also use the default chat model.
 
 2. Select the models in `config/copilot/chat.yaml` and `config/copilot/evaluation.yaml`, or
    [select a deployment profile](#select-a-deployment-profile). The supplied files reference the

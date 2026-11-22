@@ -24,6 +24,7 @@
 export const REVIEWED_WRITE_TOOL_NAMES = [
   "qdash_create_agent_session",
   "qdash_submit_agent_action",
+  "qdash_end_agent_session",
   "qdash_commit_agent_candidate",
   "qdash_execute_agent_action",
   "qdash_commit_agent_candidate_set",
@@ -181,6 +182,7 @@ export const DEFERRED_TOOL_NAMES = [
   "qdash_create_agent_session",
   "qdash_get_agent_session",
   "qdash_submit_agent_action",
+  "qdash_end_agent_session",
   "qdash_execute_agent_action",
   "qdash_get_agent_action",
   "qdash_list_agent_actions",

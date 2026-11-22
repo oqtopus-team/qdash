@@ -381,13 +381,18 @@ def release_abandoned_reservations(
         )
 
 
-def in_flight_blockers(project_id: str, session_id: str) -> list[str]:
-    """Operations that passed the gate and have not settled, as resume blockers."""
+def in_flight_operations(project_id: str, session_id: str) -> list[dict[str, Any]]:
+    """Operations of the session that passed, or may still pass, the gate and have not settled.
+
+    Each is ``{"kind", "id", "status", "execution_id", "operation_id"}``. A measurement
+    still ``dispatching`` may have passed the gate just before a pause or an end and not
+    confirmed yet, so it is listed: whether it starts is not known until it settles.
+    """
     from qdash.api.services.agent_session_service import AgentSessionService
 
     release_abandoned_reservations(project_id, session_id)
     scope = {"project_id": project_id, "session_id": session_id}
-    blockers: list[str] = []
+    operations: list[dict[str, Any]] = []
     actions = cast(
         "list[AgentActionDocument]",
         AgentActionDocument.find(
@@ -403,31 +408,68 @@ def in_flight_blockers(project_id: str, session_id: str) -> list[str]:
         refreshed = AgentSessionService._refresh_action_execution(action)
         if refreshed.execution_status in SETTLED_EXECUTION_STATUSES:
             continue
-        if refreshed.execution_status == "dispatching" and refreshed.operation_id is None:
-            blockers.append(
-                f"A measurement is still running (action {refreshed.action_id} is being "
-                "dispatched; if its request crashed, QDash cannot tell whether it started, "
-                "so stop the session instead)"
-            )
-        else:
-            blockers.append(
-                f"A measurement is still running (action {refreshed.action_id}); "
-                "wait for it to finish"
-            )
-    for model in (AgentCandidateCommitDocument, AgentCandidateSetCommitDocument):
+        operations.append(
+            {
+                "kind": "measurement",
+                "id": refreshed.action_id,
+                "status": refreshed.execution_status,
+                "execution_id": refreshed.execution_id,
+                "operation_id": refreshed.operation_id,
+            }
+        )
+    for kind, model in (
+        ("candidate_commit", AgentCandidateCommitDocument),
+        ("candidate_set_commit", AgentCandidateSetCommitDocument),
+    ):
         commits = model.get_motor_collection().find(
             {**scope, "status": {"$in": list(IN_FLIGHT_COMMIT_STATUSES)}},
-            {"commit_id": 1},
+            {"commit_id": 1, "status": 1},
         )
-        blockers.extend(
-            f"A calibration commit is still being saved (commit {commit['commit_id']})"
+        operations.extend(
+            {
+                "kind": kind,
+                "id": commit["commit_id"],
+                "status": commit["status"],
+                "execution_id": None,
+                "operation_id": None,
+            }
             for commit in commits
         )
     applies = AgentCandidateCommitDocument.get_motor_collection().find(
         {**scope, "backend_status": {"$in": list(IN_FLIGHT_BACKEND_STATUSES)}},
-        {"commit_id": 1},
+        {"commit_id": 1, "backend_status": 1},
     )
-    blockers.extend(
-        f"A backend apply is still in progress (commit {commit['commit_id']})" for commit in applies
+    operations.extend(
+        {
+            "kind": "backend_apply",
+            "id": commit["commit_id"],
+            "status": commit["backend_status"],
+            "execution_id": None,
+            "operation_id": None,
+        }
+        for commit in applies
     )
+    return operations
+
+
+def in_flight_blockers(project_id: str, session_id: str) -> list[str]:
+    """Operations that passed the gate and have not settled, as resume blockers."""
+    blockers: list[str] = []
+    for operation in in_flight_operations(project_id, session_id):
+        kind, operation_id = operation["kind"], operation["id"]
+        if kind == "measurement":
+            if operation["status"] == "dispatching" and operation["operation_id"] is None:
+                blockers.append(
+                    f"A measurement is still running (action {operation_id} is being "
+                    "dispatched; if its request crashed, QDash cannot tell whether it started, "
+                    "so stop the session instead)"
+                )
+            else:
+                blockers.append(
+                    f"A measurement is still running (action {operation_id}); wait for it to finish"
+                )
+        elif kind == "backend_apply":
+            blockers.append(f"A backend apply is still in progress (commit {operation_id})")
+        else:
+            blockers.append(f"A calibration commit is still being saved (commit {operation_id})")
     return blockers

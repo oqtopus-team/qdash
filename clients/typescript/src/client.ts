@@ -62,6 +62,7 @@ import type {
   SaveFlowRequest,
   SaveFlowResponse,
   AgentSessionResponse,
+  StopAgentSessionResponse,
   CandidateGateResponse,
   ChipMetricsResponse,
   ChipResponse,
@@ -248,6 +249,13 @@ export interface CreateAgentInterventionOptions {
    * does not verify it; omit it when the host does not know it.
    */
   model?: AgentModelIdentity;
+}
+
+export interface StopAgentSessionOptions {
+  /** Key of this stop; repeating it returns the same outcome. */
+  idempotencyKey: string;
+  /** Why the session is stopped, for the audit (at most 2000 characters). */
+  reason: string;
 }
 
 export interface RecordAgentDecisionOptions {
@@ -920,6 +928,19 @@ export class QDashClient {
 
   async getAgentSession(sessionId: string): Promise<AgentSessionResponse> {
     return this.get(`/agent-sessions/${pathPart(sessionId)}`);
+  }
+
+  /**
+   * End an active or paused session's authority on a person's request (`POST
+   * /agent-sessions/{id}/stop`). The response is QDash's own account: whether this request
+   * stopped it, and the operations that passed the session gate before and still run;
+   * QDash does not cancel those.
+   */
+  async stopAgentSession(sessionId: string, options: StopAgentSessionOptions): Promise<StopAgentSessionResponse> {
+    return this.post(`/agent-sessions/${pathPart(sessionId)}/stop`, {
+      idempotency_key: options.idempotencyKey,
+      reason: options.reason,
+    });
   }
 
   async evaluateAgentCandidateGate(

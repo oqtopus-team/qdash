@@ -43,6 +43,8 @@ from qdash.api.schemas.agent_session import (
     RecordAgentDecisionRequest,
     RecordAgentResumeOutcomeRequest,
     RespondAgentInterventionRequest,
+    StopAgentSessionRequest,
+    StopAgentSessionResponse,
     SubmitAgentActionRequest,
 )
 from qdash.api.services.agent_intervention_service import AgentInterventionService
@@ -190,6 +192,42 @@ def submit_agent_action(
     ):
         background_tasks.add_task(service.notifications.deliver, session_id, "end_notification")
     return action
+
+
+@router.post(
+    "/{session_id}/stop",
+    response_model=StopAgentSessionResponse,
+    summary="Stop an agent session",
+    operation_id="stopAgentSession",
+)
+def stop_agent_session(
+    session_id: str,
+    body: StopAgentSessionRequest,
+    background_tasks: BackgroundTasks,
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
+    service: Annotated[AgentSessionService, Depends(get_agent_session_service)],
+) -> StopAgentSessionResponse:
+    """End an active or paused session's authority on a person's request.
+
+    Any editor of the project may stop it, as an expert may stop it from an intervention.
+    The session becomes ``cancelled`` and nothing new is dispatched, committed, applied, or
+    resumed in it. A measurement, commit, or backend apply that passed the session gate
+    before the stop is not cancelled; ``in_flight`` lists those still unsettled. A session
+    that already ended is returned unchanged (``already_ended``).
+    """
+    result = service.stop_session(
+        project_id=ctx.project_id,
+        session_id=session_id,
+        username=ctx.user.username,
+        body=body,
+    )
+    if result.outcome != "already_ended":
+        # The stop stored its end message; send it now (a no-op once sent).
+        background_tasks.add_task(service.notifications.deliver, session_id, "end_notification")
+    text = f"{result.session.stop.stopped_by} stopped the session." if result.session.stop else ""
+    for intervention_id in result.closed_intervention_ids:
+        background_tasks.add_task(service.interventions.post_update, intervention_id, text)
+    return result
 
 
 @router.get(

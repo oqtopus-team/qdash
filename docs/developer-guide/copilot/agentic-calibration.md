@@ -686,13 +686,43 @@ can quote request headers or the token; the warning log uses the same summary. A
 that times out after Slack accepted it is indistinguishable from a lost one, so delivery is at
 least once, not exactly once.
 
+### Stopping a session
+
+`POST /agent-sessions/{id}/stop` (`AgentSessionService.stop_session`) ends an active or paused
+session on a person's request, with an `idempotency_key` and a `reason`. Any project editor may
+send it, as any editor may stop a session from an intervention. One compare-and-set on the
+session's status and state version sets `cancelled`, clears `active_intervention_id`, stores
+`stop` (who, when, why, the status it ended, and the state version it created), and stores the
+`cancelled` end message; a write that changed the session first makes it decide again, at most
+five times. From then on the gate refuses every dispatch, commit, backend apply, and resume claim,
+and `submit_action` refuses every action. The stop closes the session's `open` and
+`resume_authorized` interventions as `stopped` with a `session_stopped` event; a response that
+was being recorded when the stop won rolls back to `open`, and the next read closes it. The
+audit shows a `session_stopped` entry.
+
+A stop does not cancel what passed the gate before it, and QDash has no API that cancels a
+measurement already sent to the worker. The response's `in_flight` lists those operations as
+QDash records them after the stop (`in_flight_operations` in `agent_session_gate.py`): a
+measurement still `dispatching`, `queued`, or `running`, a commit being saved, or a backend apply
+in progress. A `dispatching` measurement may have passed the gate just before the stop, so it is
+listed until it settles. Repeating a stop with its key returns `already_stopped`, and a stop of a
+session that already ended (`completed`, `cancelled`, or `expired`) returns `already_ended` and
+changes nothing; an expired session is reported as expired, not stopped.
+
+`complete_session` ends a session whose goal is reached. Like `request_human`, it uses no action
+budget, so a session that used its last action can still be completed. The session page shows
+**Stop session** for an active or paused session, and the agent ends a session only through
+`qdash_end_agent_session`, a reviewed write that reads the session back
+(see [pi-qdash Reference](../../reference/pi-qdash.md)). A decision with `nextAction` `stop` or
+`complete` only records the agent's choice.
+
 ### Session start and end messages
 
 The same channel, bot, and `SLACK_AGENT_NOTIFICATION` toggle also announce when a session starts
 and ends (`src/qdash/api/services/agent_session_notifications.py`). The start message follows
 the creation of an approved session, not a proposal or a chat. The end message follows the
 first and only update that ends it: an authorized `complete_session` (`completed`), an expert's
-stop (`cancelled`), or the expiry (`expired`). A pause for an expert is not an end and keeps
+stop or a stop request (`cancelled`), or the expiry (`expired`). A pause for an expert is not an end and keeps
 only its intervention message.
 
 Each message's delivery state is stored on the session document: `start_notification` by the
@@ -969,7 +999,7 @@ Each layer keeps its own status, and the plan reads them from the outside in.
 
 | Object | Values | Set by |
 | --- | --- | --- |
-| Agent session | `active`, `waiting_for_human`, `completed`, `cancelled`, `expired` | `active` on creation; recording an intervention (directly or with an authorised `request_human`) sets `waiting_for_human`; an expert's resume or a runner's claim sets `active` again, an expert's stop sets `cancelled`; `complete_session` sets `completed`; a read, a list, or the notification sweeper after `expires_at` sets `expired`, paused or not |
+| Agent session | `active`, `waiting_for_human`, `completed`, `cancelled`, `expired` | `active` on creation; recording an intervention (directly or with an authorised `request_human`) sets `waiting_for_human`; an expert's resume or a runner's claim sets `active` again, an expert's stop or a stop request (`POST /agent-sessions/{id}/stop`) sets `cancelled`; `complete_session` sets `completed`; a read, a list, or the notification sweeper after `expires_at` sets `expired`, paused or not |
 | Intervention | `open`, `responding`, `resume_authorized`, `resumed`, `stopped`, `discarded` | See [Human interventions](#human-interventions); current servers no longer set `discarded` |
 | Intervention Slack delivery | `disabled`, `pending`, `sending`, `sent`, `failed` | The API's delivery attempts |
 | Session start and end delivery | The same values, per message, with `event` `started`, `completed`, `cancelled`, or `expired` | The API's delivery attempts |

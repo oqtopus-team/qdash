@@ -10,6 +10,7 @@ import type {
   ToolClassification,
   ToolEvaluation,
   TraceStep,
+  TurnConnection,
 } from "@/types/copilotChat";
 import { ChatMarkdown } from "@/components/features/chat/ChatMarkdown";
 import { FigureStrip, figuresInSteps } from "@/components/features/chat/ChatFigures";
@@ -656,6 +657,28 @@ export function currentActivity(steps: TraceStep[], statusMessage: string | null
   return statusMessage;
 }
 
+/** How long a turn may send nothing before the footer says when it last did. */
+export const QUIET_AFTER_MS = 30_000;
+
+/**
+ * What the footer says about the turn's connection, apart from what the turn
+ * does: that it is reconnecting, or, once the turn has sent nothing for a while,
+ * that the connection is fine and when the last update came. Null while updates
+ * arrive, so a busy turn shows nothing extra. Silence is never shown as progress.
+ */
+export function connectionNote(
+  connection: TurnConnection | null | undefined,
+  now: number,
+): { lost: boolean; text: string } | null {
+  if (!connection) return null;
+  const silent = now - connection.lastUpdateAt;
+  const last = `last update ${formatDuration(silent)} ago`;
+  if (connection.state === "reconnecting") {
+    return { lost: true, text: `Connection lost, reconnecting · ${last}` };
+  }
+  return silent >= QUIET_AFTER_MS ? { lost: false, text: `Connected · ${last}` } : null;
+}
+
 /** Whether a row of the live trace already shows what the turn is doing. */
 function activityShownInTrace(steps: TraceStep[]): boolean {
   return activeTools(steps).length > 0 || isThinking(steps);
@@ -671,38 +694,68 @@ export function TurnActivity({
   steps,
   startedAt,
   statusMessage,
+  connection,
   className,
 }: {
   steps: TraceStep[];
   startedAt: number;
   statusMessage: string | null;
+  /** The stream's health; its note shows even when a trace row shows the activity. */
+  connection?: TurnConnection | null;
   className?: string;
 }) {
   const now = useNow(true);
-  const activity = currentActivity(steps, statusMessage);
+  const note = connectionNote(connection, now);
+  // While reconnecting, what the turn does is unknown: the last activity is not repeated.
+  const activity = note?.lost ? null : currentActivity(steps, statusMessage);
   const inTrace = activityShownInTrace(steps);
   return (
     <div
       className={
-        inTrace
+        inTrace && !note
           ? "sr-only"
           : twMerge("flex min-w-0 items-center gap-2 text-xs text-base-content/50", className)
       }
       data-testid="turn-activity"
       data-in-trace={inTrace}
     >
-      <div role="status" className="flex min-w-0 items-center">
-        {inTrace ? (
-          activity
-        ) : activity ? (
-          <Loader variant="text-shimmer" size="sm" text={activity} className="truncate" />
-        ) : (
-          <Loader variant="typing" size="sm" />
-        )}
-      </div>
-      {!inTrace && (
+      {!inTrace && !note?.lost && (
+        <div role="status" className="flex min-w-0 items-center">
+          {activity ? (
+            <Loader variant="text-shimmer" size="sm" text={activity} className="truncate" />
+          ) : (
+            <Loader variant="typing" size="sm" />
+          )}
+        </div>
+      )}
+      {inTrace && !note?.lost && (
+        <div role="status" className="sr-only">
+          {activity}
+        </div>
+      )}
+      {!inTrace && !note && (
         <span className="shrink-0 tabular-nums" aria-hidden="true">
           {formatDuration(now - startedAt)}
+        </span>
+      )}
+      {/* Announced once when the connection drops; the ticking time is not. */}
+      {note?.lost && (
+        <div role="status" className="sr-only">
+          Connection lost, reconnecting
+        </div>
+      )}
+      {note && (
+        <span
+          className={`flex min-w-0 items-center gap-1.5 ${note.lost ? "text-warning" : ""}`}
+          data-testid="turn-connection"
+          data-state={connection?.state}
+          aria-hidden="true"
+        >
+          <span
+            className={`status status-xs shrink-0 ${note.lost ? "status-warning" : "status-neutral"}`}
+            aria-hidden="true"
+          />
+          <span className="truncate tabular-nums">{note.text}</span>
         </span>
       )}
     </div>

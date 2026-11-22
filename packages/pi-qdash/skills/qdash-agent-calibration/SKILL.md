@@ -123,8 +123,9 @@ it.
    reuses the authorized action), retry once QDash answers, or, when the audit is full, stop
    stepping and report or ask for a person. Never describe a decision the tool says was not
    recorded as recorded. `qdash_request_agent_human` records the escalation the same way. For a
-   decision no step carries (a result you accept before proposing a commit, a qubit you skip,
-   stopping, or finishing), call `qdash_record_agent_decision`. The context lists results
+   decision no step carries (a result you accept before proposing a commit, or a qubit you
+   skip), call `qdash_record_agent_decision`. Stopping or finishing the session is not a
+   decision alone: see Finish. The context lists results
    without a decision. Write conclusions and evidence, not raw arrays, logs, or private
    reasoning; QDash already records the action, its parameters, results, and commits itself.
    To correct a decision, record a new one with `supersedesDecisionId`.
@@ -208,7 +209,15 @@ question, the attempts, the expert's decision and guidance, and what ran since.
 
 ## Finish
 
-Record the final decision (`complete` or `stop`) with `qdash_record_agent_decision`, then read
+End the session with `qdash_end_agent_session`: `outcome: "completed"` when the goal is reached,
+`outcome: "stopped"` when the user asks to stop or the goal is abandoned. It is a write the user
+approves; it records the `complete` or `stop` decision itself and reads the session back. A
+decision with `nextAction` `stop` or `complete` from `qdash_record_agent_decision` changes no
+session state: the session stays active and can start steps until it is ended. Say a session is
+stopped or completed only when this tool reports that status. Stopping ends the session's
+authority; it does not cancel a measurement already sent, and QDash has no API that does:
+report the operations the tool lists as still running, as running. Link the session with the
+page link the tool returns, never a composed path. Then read
 the timeline with `qdash_get_agent_session_audit` (follow its cursor until it says the snapshot
 is complete; when it says the audit changed, discard the pages and read again without a cursor)
 and report from it per qubit: each step with its execution link, the candidates and whether the gates

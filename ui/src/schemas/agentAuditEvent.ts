@@ -33,7 +33,7 @@ export interface AgentAuditEvent {
   at: string;
   /** Session state version the event belongs to: recorded by its source record, or inherited from its action or commit. Orders events that share a timestamp. */
   state_version: number;
-  /** session_created, action_proposed, measurement, evaluation, decision, candidate_commit, candidate_set_commit, backend_apply, intervention_opened, intervention_response, intervention_resumed, or resume_outcome */
+  /** session_created, action_proposed, measurement, evaluation, decision, candidate_commit, candidate_set_commit, backend_apply, intervention_opened, intervention_response, intervention_resumed, resume_outcome, or session_stopped */
   kind: string;
   /** One readable line about the event */
   summary: string;

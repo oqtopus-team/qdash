@@ -28,6 +28,7 @@ import {
 } from "@/components/features/execution/agentSessionDisplay";
 
 import { AgentSessionAuditTimeline } from "./AgentSessionAuditTimeline";
+import { StopAgentSessionButton } from "./StopAgentSessionButton";
 import { projectRequest, useLinkedProject } from "./useLinkedProject";
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
@@ -138,13 +139,31 @@ export function AgentSessionPageContent({ sessionId }: { sessionId: string }) {
             <div className="sm:col-span-2 md:col-span-3">
               <Field label="Allowed tasks">{data.policy.allowed_tasks.join(", ")}</Field>
             </div>
-            <div className="sm:col-span-2 md:col-span-4">
+            {data.stop ? (
+              <div className="sm:col-span-2 md:col-span-4">
+                <Field label="Stopped">
+                  {data.stop.stopped_by} · {formatDateTime(data.stop.stopped_at)}:{" "}
+                  {data.stop.reason}
+                </Field>
+              </div>
+            ) : null}
+            <div className="flex flex-wrap items-center gap-3 sm:col-span-2 md:col-span-4">
               <Link
                 href={sessionGraphHref(data.chip_id, sessionId, projectId)}
                 className="link link-hover text-sm"
               >
                 View the measurements on the Execution page
               </Link>
+              {projectId && (data.status === "active" || data.status === "waiting_for_human") ? (
+                <StopAgentSessionButton
+                  sessionId={sessionId}
+                  projectId={projectId}
+                  onStopped={() => {
+                    void session.refetch();
+                    void interventions.refetch();
+                  }}
+                />
+              ) : null}
             </div>
           </div>
         </section>

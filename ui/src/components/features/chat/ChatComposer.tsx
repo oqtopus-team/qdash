@@ -222,6 +222,12 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
   );
 
   const selected = modelOptions.find((o) => o.key === selectedModelKey) ?? modelOptions[0];
+  const selectedIdentity = selected?.resolvedModel ?? selected?.model;
+  const alwaysThinking = selectedIdentity?.name === "claude-opus-5-5";
+  const displayedThinking = alwaysThinking && thinkingChoice === "off" ? "low" : thinkingChoice;
+  const thinkingChoices = alwaysThinking
+    ? THINKING_CHOICES.filter((choice) => choice.value !== "off")
+    : THINKING_CHOICES;
 
   return (
     <form
@@ -347,16 +353,27 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
                   <Brain data-icon="inline-start" className="shrink-0" />
                   {compact ? (
                     <span className="truncate">
-                      {thinkingLabel(thinkingChoice, thinkingModelDefault ?? null, true)}
+                      {thinkingLabel(
+                        displayedThinking ?? thinkingChoice,
+                        thinkingModelDefault ?? null,
+                        true,
+                      )}
                     </span>
                   ) : (
                     <>
                       {/* The full label needs a wide composer; a phone gets the short one. */}
                       <span className="truncate @md:hidden">
-                        {thinkingLabel(thinkingChoice, thinkingModelDefault ?? null, true)}
+                        {thinkingLabel(
+                          displayedThinking ?? thinkingChoice,
+                          thinkingModelDefault ?? null,
+                          true,
+                        )}
                       </span>
                       <span className="hidden truncate @md:inline">
-                        {thinkingLabel(thinkingChoice, thinkingModelDefault ?? null)}
+                        {thinkingLabel(
+                          displayedThinking ?? thinkingChoice,
+                          thinkingModelDefault ?? null,
+                        )}
                       </span>
                     </>
                   )}
@@ -364,7 +381,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" side="top">
-                {THINKING_CHOICES.map((choice) => (
+                {thinkingChoices.map((choice) => (
                   <DropdownMenuItem
                     key={choice.value}
                     onSelect={() => onThinkingChange(choice.value)}
@@ -376,10 +393,12 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
                           : choice.label}
                       </span>
                       <span className="block text-xs text-base-content/50">
-                        {choice.description}
+                        {alwaysThinking && choice.value === "low"
+                          ? "Brief reasoning; this model always thinks"
+                          : choice.description}
                       </span>
                     </span>
-                    {choice.value === thinkingChoice && (
+                    {choice.value === displayedThinking && (
                       <Check className="w-3.5 h-3.5 text-primary" />
                     )}
                   </DropdownMenuItem>

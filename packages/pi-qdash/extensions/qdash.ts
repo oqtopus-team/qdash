@@ -32,6 +32,7 @@ import { withAbort } from "./lib/abort.js";
 import { WAIT_AGENT_ACTION, WAIT_EXECUTION } from "./lib/waits.js";
 import { qcalContextText, recordedParameters, sweepsOf, type RecordedParameter, type Sweep } from "./lib/qcal-evidence.js";
 import { registerAgentLoopTools } from "./tools/agent-loop.js";
+import { registerAgentSessionEndTool } from "./tools/agent-session-end.js";
 import { registerCalibrationPipelineTools } from "./tools/calibration-pipeline.js";
 import { registerCurrentTimeTool } from "./tools/current-time.js";
 import { registerFlowAuthoringTools } from "./tools/flow-authoring.js";
@@ -1596,6 +1597,7 @@ export default function qdashExtension(host: ExtensionAPI) {
   registerTaskKnowledgeTool(pi, { makeClient });
   registerSourceCodeTools(pi, { makeClient });
   registerAgentLoopTools(pi, { makeClient });
+  registerAgentSessionEndTool(pi, { makeClient });
   registerCalibrationPipelineTools(pi, {
     makeClient,
     resolveChipId: (client, chipId) => defaultChipId(client as QDashClient, chipId),

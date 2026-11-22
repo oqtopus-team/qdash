@@ -730,6 +730,36 @@ class AgentSessionGroupCounts(BaseModel):
     """
 
 
+class Kind2(StrEnum):
+    measurement = "measurement"
+    candidate_commit = "candidate_commit"
+    candidate_set_commit = "candidate_set_commit"
+    backend_apply = "backend_apply"
+
+
+class AgentSessionInFlightOperation(BaseModel):
+    """
+    An operation that passed the session gate before the session ended and has not settled.
+
+    QDash does not cancel it: a measurement keeps running on the hardware and its result
+    is recorded; a commit or backend apply finishes or fails on its own.
+    """
+
+    kind: Annotated[Kind2, Field(title="Kind")]
+    id: Annotated[str, Field(title="Id")]
+    """
+    The action, commit, or candidate set commit ID
+    """
+    status: Annotated[str, Field(title="Status")]
+    """
+    Its status as QDash records it now
+    """
+    execution_id: Annotated[str | None, Field(title="Execution Id")] = None
+    """
+    The measurement's execution, once QDash knows it
+    """
+
+
 class AgentSessionLifecycleEvent(StrEnum):
     """
     A session lifecycle event announced in the agent Slack channel.
@@ -766,6 +796,38 @@ class AgentSessionStatus(StrEnum):
     completed = "completed"
     cancelled = "cancelled"
     expired = "expired"
+
+
+class AgentSessionStopRecord(BaseModel):
+    """
+    Who stopped a session with a stop request, why, and when.
+
+    Stored by the one update that moves the session to ``cancelled``. A stop ends the
+    session's authority to start, commit, or apply anything; it does not cancel a
+    measurement, commit, or backend apply that passed the session gate before it.
+    """
+
+    stopped_by: Annotated[str, Field(title="Stopped By")]
+    """
+    The signed-in account that sent the stop
+    """
+    stopped_at: Annotated[AwareDatetime, Field(title="Stopped At")]
+    reason: Annotated[str, Field(title="Reason")]
+    """
+    Why, as the person gave it
+    """
+    idempotency_key: Annotated[str, Field(title="Idempotency Key")]
+    """
+    The stop request's key, so a retry is a no-op
+    """
+    status_before: AgentSessionStatus
+    """
+    active or waiting_for_human, the status the stop ended
+    """
+    state_version: Annotated[int, Field(title="State Version")]
+    """
+    The session state version the stop created
+    """
 
 
 class ApplyAgentCandidateRequest(BaseModel):
@@ -2058,7 +2120,7 @@ class ExecutionAvailabilityResponse(BaseModel):
     reason: Annotated[str | None, Field(title="Reason")] = None
 
 
-class Kind2(StrEnum):
+class Kind3(StrEnum):
     execution = "execution"
     agent_session = "agent_session"
 
@@ -3511,7 +3573,7 @@ class Result(StrEnum):
     series = "series"
 
 
-class Kind3(StrEnum):
+class Kind4(StrEnum):
     categorical = "categorical"
     continuous = "continuous"
 
@@ -3521,12 +3583,12 @@ class MetricLegend(BaseModel):
     Legend declared by a metric.
     """
 
-    kind: Annotated[Kind3, Field(title="Kind")]
+    kind: Annotated[Kind4, Field(title="Kind")]
     items: Annotated[list[LegendItem] | None, Field(title="Items")] = None
     stops: Annotated[list[LegendStop] | None, Field(title="Stops")] = None
 
 
-class Kind4(StrEnum):
+class Kind5(StrEnum):
     integer = "integer"
     number = "number"
     boolean = "boolean"
@@ -3540,7 +3602,7 @@ class MetricParameterInfo(BaseModel):
 
     default: Annotated[bool | int | float | str, Field(title="Default")]
     label: Annotated[str, Field(title="Label")] = ""
-    kind: Annotated[Kind4, Field(title="Kind")]
+    kind: Annotated[Kind5, Field(title="Kind")]
     min: Annotated[float | None, Field(title="Min")] = None
     max: Annotated[float | None, Field(title="Max")] = None
     step: Annotated[float | None, Field(title="Step")] = None
@@ -5230,6 +5292,31 @@ class SourceSearchMatch(BaseModel):
     text: Annotated[str | None, Field(title="Text")] = None
 
 
+class StopAgentSessionRequest(BaseModel):
+    """
+    A person's request to end an agent session's authority now.
+    """
+
+    idempotency_key: Annotated[str, Field(max_length=200, min_length=1, title="Idempotency Key")]
+    """
+    Key of this stop; repeating it returns the same outcome
+    """
+    reason: Annotated[str, Field(max_length=2000, min_length=1, title="Reason")]
+    """
+    Why the session is stopped, for the audit
+    """
+
+
+class Outcome(StrEnum):
+    """
+    stopped: this request ended the session. already_stopped: an earlier request with this key stopped it. already_ended: it had already ended another way (completed, cancelled, or expired), and this request changed nothing
+    """
+
+    stopped = "stopped"
+    already_stopped = "already_stopped"
+    already_ended = "already_ended"
+
+
 class TaskName1(RootModel[str]):
     root: Annotated[str, Field(max_length=200, title="Task Name")]
 
@@ -6835,7 +6922,7 @@ class AgentAuditEvent(BaseModel):
     """
     kind: Annotated[str, Field(title="Kind")]
     """
-    session_created, action_proposed, measurement, evaluation, decision, candidate_commit, candidate_set_commit, backend_apply, intervention_opened, intervention_response, intervention_resumed, or resume_outcome
+    session_created, action_proposed, measurement, evaluation, decision, candidate_commit, candidate_set_commit, backend_apply, intervention_opened, intervention_response, intervention_resumed, resume_outcome, or session_stopped
     """
     summary: Annotated[str, Field(title="Summary")]
     """
@@ -7224,6 +7311,10 @@ class AgentSessionResponse(BaseModel):
     end_notification: AgentSessionNotificationResponse | None = None
     """
     Slack delivery of the session's end message, stored by the update that ended it; null while the session is open
+    """
+    stop: AgentSessionStopRecord | None = None
+    """
+    Who stopped the session with a stop request, why, and when; null unless a stop request ended it (an expert's stop answer is recorded on its intervention)
     """
 
 
@@ -7993,7 +8084,7 @@ class ExecutionGroupItem(BaseModel):
     One row of the grouped Execution list: an execution, or an agent session.
     """
 
-    kind: Annotated[Kind2, Field(title="Kind")]
+    kind: Annotated[Kind3, Field(title="Kind")]
     sort_at: Annotated[AwareDatetime | None, Field(title="Sort At")] = None
     """
     Time the row is ordered by: the execution start, or the session's latest activity within the day filter
@@ -9087,6 +9178,30 @@ class SeedImportResponse(BaseModel):
     provenance_activity_id: Annotated[str | None, Field(title="Provenance Activity Id")] = None
     """
     Activity ID for provenance tracking
+    """
+
+
+class StopAgentSessionResponse(BaseModel):
+    """
+    What a stop request did, read back from QDash's records.
+    """
+
+    outcome: Annotated[Outcome, Field(title="Outcome")]
+    """
+    stopped: this request ended the session. already_stopped: an earlier request with this key stopped it. already_ended: it had already ended another way (completed, cancelled, or expired), and this request changed nothing
+    """
+    session: AgentSessionResponse
+    in_flight: Annotated[list[AgentSessionInFlightOperation] | None, Field(title="In Flight")] = (
+        None
+    )
+    """
+    Operations that passed the session gate before it ended and have not settled; QDash does not cancel them
+    """
+    closed_intervention_ids: Annotated[list[str] | None, Field(title="Closed Intervention Ids")] = (
+        None
+    )
+    """
+    Open or resume-authorized interventions this stop closed
     """
 
 

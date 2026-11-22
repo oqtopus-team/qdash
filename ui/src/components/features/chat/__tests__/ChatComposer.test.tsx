@@ -68,6 +68,24 @@ describe("ChatComposer thinking menu", () => {
     expect(onThinkingChange).toHaveBeenCalledWith("off");
   });
 
+  it("shows Low for remembered Off on Opus and never offers disabling thinking", async () => {
+    const model = { provider: "anthropic", name: "claude-opus-5-5" };
+    render(
+      <ChatComposer
+        {...props()}
+        modelOptions={[{ key: "opus", label: "Opus", model }]}
+        selectedModelKey="opus"
+        thinkingChoice="off"
+        onThinkingChange={vi.fn()}
+      />,
+    );
+    const trigger = screen.getByRole("button", { name: "Thinking level" });
+    expect(trigger).toHaveTextContent("Thinking: Low");
+    fireEvent.pointerDown(trigger);
+    expect(await screen.findByRole("menuitem", { name: /Low.*always thinks/ })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: /^Off/ })).toBeNull();
+  });
+
   it("is absent where the surface does not offer it", () => {
     render(<ChatComposer {...props()} />);
     expect(screen.queryByRole("button", { name: "Thinking level" })).toBeNull();

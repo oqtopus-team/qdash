@@ -40,6 +40,7 @@ from qdash.datamodel.agent_session import (
     AgentActionDecision,
     AgentActionType,
     AgentModelIdentity,
+    AgentSessionStatus,
     model_label,
 )
 from qdash.dbmodel.agent_session import (
@@ -1101,6 +1102,28 @@ class AgentSessionAuditService:
                         "follow_up_intervention_id": outcome.follow_up_intervention_id,
                     },
                 )
+
+        if session.stop is not None:
+            stop = session.stop
+            add(
+                event_id=f"session_stopped:{session.session_id}",
+                state_version=stop.state_version,
+                at=stop.stopped_at,
+                kind="session_stopped",
+                summary=f"{stop.stopped_by} stopped the session: {_text(stop.reason, 200)}",
+                actor=stop.stopped_by,
+                actor_kind="human",
+                provenance="human_reported",
+                status=AgentSessionStatus.CANCELLED.value,
+                data={
+                    "reason": stop.reason,
+                    "status_before": stop.status_before.value,
+                    "note": (
+                        "The stop ended the session's authority; it did not cancel a "
+                        "measurement, commit, or backend apply already in progress."
+                    ),
+                },
+            )
 
         events.sort(key=_sort_key)
         for index, event in enumerate(events):

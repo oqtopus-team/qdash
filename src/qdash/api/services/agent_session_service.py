@@ -36,6 +36,8 @@ from qdash.api.schemas.agent_session import (
     ListAgentActionsResponse,
     ListAgentCandidatesResponse,
     ListAgentSessionsResponse,
+    StopAgentSessionRequest,
+    StopAgentSessionResponse,
     SubmitAgentActionRequest,
 )
 from qdash.api.services.agent_intervention_service import AgentInterventionService
@@ -53,12 +55,14 @@ from qdash.api.services.agent_session_gate import (
     autonomous_session_refusal,
     end_notification_update,
     expire_session_if_due,
+    in_flight_operations,
     load_agent_session,
     materialize_pending_action,
     materialize_pending_intervention,
     pass_execution_gate,
     raw_document,
     release_abandoned_reservations,
+    to_bson,
 )
 from qdash.api.services.agent_session_notifications import (
     AgentSessionNotificationService,
@@ -74,6 +78,7 @@ from qdash.datamodel.agent_session import (
     AgentCandidateAcceptanceBasis,
     AgentSessionLifecycleEvent,
     AgentSessionStatus,
+    AgentSessionStopRecord,
     model_label,
 )
 from qdash.dbmodel.agent_parameter_state import (
@@ -449,8 +454,9 @@ class AgentSessionService:
     ) -> str | None:
         if body.action_type not in session.policy.allowed_actions:
             return f"Action '{body.action_type.value}' is not allowed by the session policy"
-        if body.action_type == AgentActionType.REQUEST_HUMAN:
-            # Asking for a person never needs measurement budget.
+        if body.action_type in (AgentActionType.REQUEST_HUMAN, AgentActionType.COMPLETE_SESSION):
+            # Asking for a person or ending the session never needs measurement budget: a
+            # session that used its last action can still be finished.
             return None
         if session.action_count >= session.policy.max_actions:
             return "Session action limit has been reached"
@@ -779,6 +785,97 @@ class AgentSessionService:
         if written is None:
             raise HTTPException(status_code=500, detail="Agent action record was not written")
         return self._action_response(written)
+
+    # A stop retries its compare-and-set this often while other writes change the session.
+    _STOP_ATTEMPTS = 5
+
+    def stop_session(
+        self,
+        *,
+        project_id: str,
+        session_id: str,
+        username: str,
+        body: StopAgentSessionRequest,
+    ) -> StopAgentSessionResponse:
+        """End an active or paused session's authority on a person's request.
+
+        One compare-and-set on the session's status and state version moves it to
+        ``cancelled`` and stores who stopped it, why, and the end message, so no operation
+        passes the session gate after it: no measurement is dispatched, no candidate is
+        committed or applied, and no resume is claimed. An operation that passed the gate
+        before the stop is not cancelled; it is reported in ``in_flight``. A session that
+        already ended is left as it is (``already_ended``), and repeating a stop with its
+        key returns ``already_stopped``.
+        """
+        session = self._get_session_document(project_id, session_id)
+        outcome: str | None = None
+        for _ in range(self._STOP_ATTEMPTS):
+            stop = session.stop
+            if stop is not None and stop.idempotency_key == body.idempotency_key:
+                if stop.reason != body.reason or stop.stopped_by != username:
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail="Idempotency key was already used for a different stop",
+                    )
+                outcome = "already_stopped"
+                break
+            if session.status not in (
+                AgentSessionStatus.ACTIVE,
+                AgentSessionStatus.WAITING_FOR_HUMAN,
+            ):
+                outcome = "already_ended"
+                break
+            timestamp = now()
+            record = AgentSessionStopRecord(
+                stopped_by=username,
+                stopped_at=timestamp,
+                reason=body.reason,
+                idempotency_key=body.idempotency_key,
+                status_before=session.status,
+                state_version=session.state_version + 1,
+            )
+            updated = AgentSessionDocument.get_motor_collection().find_one_and_update(
+                {
+                    "project_id": project_id,
+                    "session_id": session_id,
+                    "status": session.status.value,
+                    "state_version": session.state_version,
+                },
+                {
+                    "$set": {
+                        "status": AgentSessionStatus.CANCELLED.value,
+                        "active_intervention_id": None,
+                        "updated_at": timestamp,
+                        "stop": to_bson(record.model_dump()),
+                        # The end message is stored by the same update that ends the session.
+                        **end_notification_update(
+                            session, AgentSessionLifecycleEvent.CANCELLED, actor=username
+                        ),
+                    },
+                    "$inc": {"state_version": 1},
+                },
+                return_document=ReturnDocument.AFTER,
+            )
+            if updated is not None:
+                outcome = "stopped"
+                break
+            # Another write changed the session first; decide again on what it stored.
+            session = self._get_session_document(project_id, session_id)
+        if outcome is None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="The session kept changing while it was being stopped; send the stop again",
+            )
+        session = self._get_session_document(project_id, session_id)
+        closed = self.interventions.close_for_stopped_session(session)
+        return StopAgentSessionResponse.model_validate(
+            {
+                "outcome": outcome,
+                "session": self._session_response(session),
+                "in_flight": in_flight_operations(project_id, session_id),
+                "closed_intervention_ids": closed,
+            }
+        )
 
     @staticmethod
     def _candidate_parameter(

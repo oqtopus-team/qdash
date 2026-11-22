@@ -336,6 +336,15 @@ class ChatRequest(ImageAttachmentsRequest):
             "proposed edit waits for the user."
         ),
     )
+    reattach: bool = Field(
+        default=False,
+        description=(
+            "Reattach to the turn ``request_id`` started after its stream dropped, instead "
+            "of sending ``message``: nothing is submitted. A running turn streams its events "
+            "again from its start; an ended one returns its answer from the store; a request "
+            "ID the runtime has never seen is reported as ``turn_not_found``."
+        ),
+    )
 
 
 def _rebuild_models() -> None:

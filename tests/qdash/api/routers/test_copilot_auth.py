@@ -282,6 +282,98 @@ def test_a_continue_does_not_rebuild_the_opening_context(monkeypatch):
     assert captured[0]["task"] is None
 
 
+def test_a_reattach_builds_no_context_and_records_under_the_turns_request(monkeypatch):
+    """A reattach replays the turn: nothing is rebuilt or sent, and its evaluations are
+    recorded under the turn's admission record, read by the turn's request ID."""
+    from qdash.api.dependencies import get_copilot_investigation_service, get_evaluation_service
+    from qdash.api.services.evaluation_service import ChatTurnRefusedError
+
+    captured = []
+    user = UserInDB(
+        user_id="alice-id",
+        username="alice",
+        access_token="alice-token",
+        hashed_password="unused",
+        default_project_id="default-project",
+    )
+    monkeypatch.setattr(
+        auth, "get_user_by_token", lambda token: user if token == user.access_token else None
+    )
+    monkeypatch.setattr(copilot, "load_copilot_config", lambda: CopilotConfig(enabled=True))
+
+    async def stream(*args, **kwargs):
+        captured.append(kwargs)
+        yield 'event: result\ndata: {"blocks": []}\n\n'
+
+    def refuse(**_kwargs):
+        raise AssertionError("a reattach must not rebuild anything")
+
+    recorders: list[dict[str, object]] = []
+
+    def chat_turn_recorder(**kwargs):
+        recorders.append(kwargs)
+        if kwargs["project_id"] == "other-project":
+            raise ChatTurnRefusedError
+        return SimpleNamespace(**kwargs)
+
+    monkeypatch.setattr(pi_chat_service, "stream", stream)
+    app = FastAPI()
+    app.include_router(copilot.router)
+    app.dependency_overrides[get_copilot_runtime] = lambda: SimpleNamespace(
+        build_task_context=refuse
+    )
+    app.dependency_overrides[get_evaluation_service] = lambda: SimpleNamespace(
+        chat_turn_recorder=chat_turn_recorder
+    )
+    app.dependency_overrides[get_copilot_investigation_service] = lambda: SimpleNamespace(
+        build=refuse
+    )
+    body = {
+        "message": "calibrate Q0",
+        "session_id": "s1",
+        "request_id": "r1",
+        "reattach": True,
+        "task": {
+            "task_name": "CheckRabi",
+            "chip_id": "chip",
+            "qid": "0",
+            "execution_id": "e1",
+            "task_id": "t1",
+        },
+    }
+    headers = {"Authorization": "Bearer alice-token"}
+    with TestClient(app) as client:
+        response = client.post("/chat/stream", json=body, headers=headers)
+        assert response.status_code == 200
+        investigating = {
+            **{k: v for k, v in body.items() if k != "task"},
+            "investigation": {"execution_id": "e1"},
+        }
+        response = client.post("/chat/stream", json=investigating, headers=headers)
+        assert response.status_code == 200
+        # The turn was sent in another project: the reattach is refused, nothing is streamed.
+        response = client.post(
+            "/chat/stream",
+            json=body,
+            headers={**headers, "X-Project-Id": "other-project"},
+        )
+        assert response.status_code == 200
+        assert "wrong_project" in response.text
+    assert len(captured) == 2
+    assert captured[0]["task"] is None
+    assert captured[1]["opening_message"] is None
+    assert [kwargs["recorder"] is not None for kwargs in captured] == [True, True]
+    # The service is told it is a reattach; it reads the turn's own record by these keys.
+    assert [
+        (r["project_id"], r["username"], r["session_id"], r["request_id"], r["reattach"])
+        for r in recorders
+    ] == [
+        ("default-project", "alice", "s1", "r1", True),
+        ("default-project", "alice", "s1", "r1", True),
+        ("other-project", "alice", "s1", "r1", True),
+    ]
+
+
 def test_a_branch_is_made_for_the_users_own_chat_in_a_project_they_can_use(init_db, monkeypatch):
     from fastapi import Header, HTTPException
 

@@ -791,6 +791,38 @@ describe("ExecutionPageContent agent session groups", () => {
     expect(options?.request?.headers["X-Project-Id"]).toBe("project-2");
   });
 
+  it("gives a session card the accent of an execution card in the same state", () => {
+    const sessionCard = (status: string) => {
+      groupedItems = [
+        { ...SESSION_ROW, agent_session: { ...SESSION_ROW.agent_session, status } },
+        MANUAL_ROW,
+      ];
+      const view = render(<ExecutionPageContent />);
+      const card = screen.getByTestId("agent-session-card");
+      const className = card.className;
+      view.unmount();
+      return className;
+    };
+
+    // The manual row is a running execution card.
+    render(<ExecutionPageContent />);
+    const runningCard = screen.getByRole("button", {
+      name: "View Running Execution execution details",
+    });
+    expect(runningCard.className).toContain("border-l-info");
+    cleanup();
+
+    const active = sessionCard("active");
+    expect(active).toContain("border-l-4");
+    expect(active).toContain("border-l-info");
+    expect(sessionCard("completed")).toContain("border-l-success");
+    expect(sessionCard("cancelled")).toContain("border-l-neutral");
+    expect(sessionCard("waiting_for_human")).toContain("border-l-warning");
+    const expired = sessionCard("expired");
+    expect(expired).toContain("border-l-base-300");
+    expect(expired).not.toMatch(/border-l-(info|success|warning|error|neutral)/);
+  });
+
   it("reports a grouped list that cannot be loaded", () => {
     groupedError = true;
     render(<ExecutionPageContent />);

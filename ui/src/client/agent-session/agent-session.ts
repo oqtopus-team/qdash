@@ -52,6 +52,8 @@ import type {
   RecordAgentDecisionRequest,
   RecordAgentResumeOutcomeRequest,
   RespondAgentInterventionRequest,
+  StopAgentSessionRequest,
+  StopAgentSessionResponse,
   SubmitAgentActionRequest
 } from '../../schemas';
 
@@ -561,6 +563,78 @@ export function useListAgentActions<TData = Awaited<ReturnType<typeof listAgentA
 
 
 /**
+ * End an active or paused session's authority on a person's request.
+ *
+ * Any editor of the project may stop it, as an expert may stop it from an intervention.
+ * The session becomes ``cancelled`` and nothing new is dispatched, committed, applied, or
+ * resumed in it. A measurement, commit, or backend apply that passed the session gate
+ * before the stop is not cancelled; ``in_flight`` lists those still unsettled. A session
+ * that already ended is returned unchanged (``already_ended``).
+ * @summary Stop an agent session
+ */
+export const stopAgentSession = (
+    sessionId: string,
+    stopAgentSessionRequest: StopAgentSessionRequest,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<StopAgentSessionResponse>(
+      {url: `/agent-sessions/${sessionId}/stop`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: stopAgentSessionRequest, signal
+    },
+      options);
+    }
+
+
+
+
+export const getStopAgentSessionMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof stopAgentSession>>, TError,{sessionId: string;data: StopAgentSessionRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof stopAgentSession>>, TError,{sessionId: string;data: StopAgentSessionRequest}, TContext> => {
+
+const mutationKey = ['stopAgentSession'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof stopAgentSession>>, {sessionId: string;data: StopAgentSessionRequest}> = (props) => {
+          const {sessionId,data} = props ?? {};
+
+          return  stopAgentSession(sessionId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type StopAgentSessionMutationResult = NonNullable<Awaited<ReturnType<typeof stopAgentSession>>>
+    export type StopAgentSessionMutationBody = StopAgentSessionRequest
+    export type StopAgentSessionMutationError = HTTPValidationError
+
+    /**
+ * @summary Stop an agent session
+ */
+export const useStopAgentSession = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof stopAgentSession>>, TError,{sessionId: string;data: StopAgentSessionRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof stopAgentSession>>,
+        TError,
+        {sessionId: string;data: StopAgentSessionRequest},
+        TContext
+      > => {
+      return useMutation(getStopAgentSessionMutationOptions(options), queryClient);
+    }
+    /**
  * Read candidates and provenance from an action's authoritative task result.
  * @summary List agent action candidates
  */

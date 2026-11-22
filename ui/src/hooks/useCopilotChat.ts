@@ -199,6 +199,8 @@ export function useCopilotChat(sessionId?: string | null) {
     isStreaming: Boolean(run),
     liveTurn: run?.turn ?? null,
     statusMessage: run?.statusMessage ?? null,
+    /** Whether the live turn's stream is connected, and when the turn last sent something. */
+    connection: run?.connection ?? null,
     model,
     thinking,
     send,

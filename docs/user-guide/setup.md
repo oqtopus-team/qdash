@@ -197,7 +197,7 @@ before opening editing to people you would not give shell access.
 When an [agent calibration](./agent-calibration.md#when-the-agent-stops-for-an-expert) stops
 for an expert, QDash can post the request to a Slack channel with a link to its page. The same
 channel also gets a message when an approved agent session starts and when it ends (completed,
-cancelled by an expert, or expired), with links to the session and its graph; a pause for an
+stopped, or expired), with links to the session and its graph; a pause for an
 expert is not an end. It uses the
 bot token of the forum notifications and a channel of its own; the forum channel is unaffected.
 
