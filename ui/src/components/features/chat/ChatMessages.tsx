@@ -7,6 +7,7 @@ import {
   Check,
   CheckCircle2,
   Copy,
+  Download,
   ExternalLink,
   GitBranch,
   ImageIcon,
@@ -37,6 +38,14 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip
 import { useToast } from "@/components/ui/Toast";
 import { copyText } from "@/lib/utils/clipboard";
 import { BUG_REPORT_URL, buildChatErrorReport, classifyChatError } from "@/lib/chatErrorReport";
+import {
+  answerFileName,
+  answerMarkdown,
+  downloadText,
+  hasAnswerMarkdown,
+  writtenFiles,
+  type WrittenFile,
+} from "@/lib/chatDownloads";
 import { answerStartIndex } from "@/lib/copilotChatStream";
 import { answerFeedback } from "@/hooks/useCopilotChat";
 import type {
@@ -261,6 +270,35 @@ function ImageSentBadge({ imagesSent }: { imagesSent: BlocksResult["images_sent"
   );
 }
 
+/**
+ * Downloads of what the answer's `write` calls wrote, from the content the chat
+ * holds. Labeled as the original write: the workspace file may have changed since.
+ */
+function WrittenFiles({ files }: { files: WrittenFile[] }) {
+  return (
+    <div role="group" aria-label="Files written in this answer" className="mt-2">
+      <p className="mb-1 text-xs text-base-content/50">
+        Original write content from this answer. Later changes to these files are not included.
+      </p>
+      <div className="flex flex-wrap gap-1">
+        {files.map((file) => (
+          <button
+            key={file.path}
+            type="button"
+            className="btn btn-ghost btn-sm"
+            title={file.path}
+            aria-label={`Download original write content of ${file.path}`}
+            onClick={() => downloadText(file.fileName, file.content)}
+          >
+            <Download data-icon="inline-start" aria-hidden="true" />
+            <span className="max-w-60 truncate font-mono">{file.fileName}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function BlocksContent({
   blocks,
   interaction,
@@ -269,6 +307,7 @@ function BlocksContent({
   interaction: InteractionState;
 }) {
   const figures = blocks.trace ? figuresInSteps(blocks.trace.steps) : [];
+  const files = writtenFiles(blocks.trace?.steps);
   // Preview only the proposal's target; the dock checks again when applying it.
   const dock = useOptionalChatDock();
   const state: InteractionState = dock?.canApplyCode
@@ -319,6 +358,7 @@ function BlocksContent({
         }
         return null;
       })}
+      {files.length > 0 && <WrittenFiles files={files} />}
       {blocks.stopped && (
         <div className="mt-2 inline-flex items-center gap-1.5 text-xs text-base-content/45">
           <Square className="w-3 h-3" />
@@ -607,6 +647,16 @@ export const AssistantMessage = memo(function AssistantMessage({
         }`}
       >
         <CopyButton text={messageText(message.content)} />
+        {!blocks?.in_progress && !blocks?.stopped && hasAnswerMarkdown(message.content) && (
+          <ActionButton
+            label="Save as Markdown"
+            onClick={() =>
+              downloadText(answerFileName(message.content), answerMarkdown(message.content))
+            }
+          >
+            <Download className="w-3.5 h-3.5" />
+          </ActionButton>
+        )}
         <ActionButton
           label={feedback === "up" ? "Rated helpful" : "Helpful"}
           active={feedback === "up"}

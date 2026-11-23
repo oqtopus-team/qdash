@@ -278,10 +278,10 @@ const DIAGRAM_HEADER = `<div class="flex items-center justify-between border-b b
 const DIAGRAM_FRAME =
   "chat-mermaid not-prose my-3 overflow-hidden rounded-[var(--radius-box)] border border-base-300/70";
 
-/** A code block with a copy button, in the markup the renderer uses for its own. */
+/** A code block with copy and download buttons, in the markup the renderer uses for its own. */
 function codeBlockHtml(code: string, language: string): string {
   const escaped = escapeHtml(code);
-  return `<div data-markdown="code-block" data-language="${language}" data-code="${escaped}"><div data-markdown="code-header"><span>${language}</span><span><button type="button" data-code-action="copy" aria-label="Copy code">Copy</button></span></div><pre dir="ltr"><code data-markdown="code" class="language-${language}"><span data-markdown="code-lines">${escaped}</span></code></pre></div>`;
+  return `<div data-markdown="code-block" data-language="${language}" data-code="${escaped}"><div data-markdown="code-header"><span>${language}</span><span><button type="button" data-code-action="copy" aria-label="Copy code">Copy</button><button type="button" data-code-action="download" aria-label="Download code">Download</button></span></div><pre dir="ltr"><code data-markdown="code" class="language-${language}"><span data-markdown="code-lines">${escaped}</span></code></pre></div>`;
 }
 
 function mermaidDiagramHtml(source: string, svg: string): string {
