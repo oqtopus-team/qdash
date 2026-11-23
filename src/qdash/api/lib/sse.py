@@ -6,10 +6,11 @@ import json
 import math
 from typing import TYPE_CHECKING, Any
 
+import anyio
 from starlette.responses import StreamingResponse
 
 if TYPE_CHECKING:
-    from starlette.types import Receive, Scope, Send
+    from starlette.types import Send
 
 
 def _sanitize_for_json(obj: Any) -> Any:
@@ -53,18 +54,21 @@ def sse_event(event: str, data: dict[str, Any]) -> str:
 
 
 class ClosingStreamingResponse(StreamingResponse):
-    """A streaming response that closes its body iterator as soon as it ends.
+    """A streaming response that closes its async iterator when the response ends.
 
-    Starlette leaves the iterator suspended when a send fails with ``OSError``
-    (how an ASGI 2.4 server reports a closed connection), so its ``finally``
-    blocks wait for garbage collection. Closing it here runs them when the
-    response ends, however it ends.
+    Starlette does not close ``body_iterator``. On an ASGI 2.4 server a client
+    disconnect surfaces as an ``OSError`` from ``send`` while the generator is
+    suspended at ``yield``, so the generator's ``finally`` would only run once
+    the garbage collector finalizes it. Closing it here runs that cleanup as soon
+    as the response ends, whether it finished, failed, or was cancelled.
     """
 
-    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+    async def stream_response(self, send: Send) -> None:
         try:
-            await super().__call__(scope, receive, send)
+            await super().stream_response(send)
         finally:
             aclose = getattr(self.body_iterator, "aclose", None)
             if aclose is not None:
-                await aclose()
+                # Cleanup runs even when an ASGI 2.3 disconnect cancelled the response.
+                with anyio.CancelScope(shield=True):
+                    await aclose()

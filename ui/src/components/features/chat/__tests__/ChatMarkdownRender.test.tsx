@@ -18,11 +18,22 @@ vi.mock("@/contexts/ThemeContext", () => ({
 const copyText = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/utils/clipboard", () => ({ copyText }));
 
+const saveBlob = vi.hoisted(() => vi.fn<(blob: Blob, filename: string) => void>());
+vi.mock("@/lib/utils/download", () => ({ saveBlob }));
+
+/** The file name and text of the only download so far. */
+async function savedFile(): Promise<{ name: string; text: string; type: string }> {
+  expect(saveBlob).toHaveBeenCalledOnce();
+  const [blob, name] = saveBlob.mock.calls[0];
+  return { name, text: await blob.text(), type: blob.type };
+}
+
 beforeEach(() => {
   mermaid.initialize.mockReset();
   mermaid.render.mockReset();
   copyText.mockReset();
   copyText.mockResolvedValue(undefined);
+  saveBlob.mockReset();
   theme.dark = false;
   resetMermaidCache();
 });
@@ -110,7 +121,78 @@ describe("ChatMarkdown streaming", () => {
     fireEvent.click(button);
     expect(copyText).toHaveBeenCalledWith("qdash run\n");
     await waitFor(() => expect(button).toHaveTextContent("Copied"));
-    expect(screen.queryByRole("button", { name: /download/i })).toBeNull();
+    expect(saveBlob).not.toHaveBeenCalled();
+  });
+});
+
+describe("ChatMarkdown code downloads", () => {
+  it("names a download by the fence title, through the shared download helper", async () => {
+    const createObjectURL = vi.fn(() => "blob:renderer");
+    Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() });
+    render(<ChatMarkdown>{'```python title="analysis/fit.py"\nx = 1\n```'}</ChatMarkdown>);
+
+    fireEvent.click(screen.getByRole("button", { name: "Download code" }));
+
+    expect(await savedFile()).toEqual({
+      name: "fit.py",
+      text: "x = 1\n",
+      type: "text/plain;charset=utf-8",
+    });
+    // The renderer's own handler, which would name it `code.python`, does not run.
+    expect(createObjectURL).not.toHaveBeenCalled();
+    expect(copyText).not.toHaveBeenCalled();
+  });
+
+  it("names an untitled block by its language", async () => {
+    render(<ChatMarkdown>{"```yaml\nshots: 1024\n```\n\n```\nplain\n```"}</ChatMarkdown>);
+    const [yaml, plain] = screen.getAllByRole("button", { name: "Download code" });
+
+    fireEvent.click(yaml);
+    expect((await savedFile()).name).toBe("snippet.yaml");
+    saveBlob.mockClear();
+    fireEvent.click(plain);
+    expect(await savedFile()).toMatchObject({ name: "snippet.txt", text: "plain\n" });
+  });
+
+  it("matches repeated code to the right fence and reads nested fences", async () => {
+    const markdown = [
+      "```python",
+      "x = 1",
+      "```",
+      "",
+      "```python title=second.py",
+      "x = 1",
+      "```",
+      "",
+      "- Step:",
+      "",
+      "  ```json filename=config/run.json",
+      '  {"shots": 1}',
+      "  ```",
+    ].join("\n");
+    render(<ChatMarkdown>{markdown}</ChatMarkdown>);
+    const buttons = screen.getAllByRole("button", { name: "Download code" });
+    expect(buttons).toHaveLength(3);
+
+    const names: string[] = [];
+    for (const button of buttons) {
+      saveBlob.mockClear();
+      fireEvent.click(button);
+      names.push((await savedFile()).name);
+    }
+    expect(names).toEqual(["snippet.py", "second.py", "run.json"]);
+  });
+
+  it("does not download a block that is still streaming", () => {
+    const { rerender } = render(<ChatMarkdown streaming>{"```python\nx = 1"}</ChatMarkdown>);
+    const button = screen.getByRole("button", { name: "Download code" });
+    expect(button).toBeDisabled();
+    fireEvent.click(button);
+    expect(saveBlob).not.toHaveBeenCalled();
+
+    rerender(<ChatMarkdown>{"```python\nx = 1\n```"}</ChatMarkdown>);
+    fireEvent.click(screen.getByRole("button", { name: "Download code" }));
+    expect(saveBlob).toHaveBeenCalledOnce();
   });
 });
 
@@ -259,6 +341,9 @@ describe("ChatMarkdown Mermaid diagrams", () => {
     expect(error).toHaveTextContent("Parse error on line 2");
     await waitFor(() => expect(error.querySelector("pre code")).toHaveTextContent("graph TD"));
     expect(within(error).getByRole("button", { name: "Copy code" })).toBeInTheDocument();
+    fireEvent.click(within(error).getByRole("button", { name: "Download code" }));
+    expect(await savedFile()).toMatchObject({ name: "snippet.mmd" });
+    expect((await savedFile()).text).toContain("graph TD");
   });
 
   it("zooms inline, opens fullscreen and copies the source", async () => {

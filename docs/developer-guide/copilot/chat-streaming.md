@@ -258,6 +258,16 @@ answer with its `entry_id`, `Error: <detail>` for a failure, a stopped answer, o
 the runtime to stop, and the in-process task's flag, so the runtime's error after a stop is
 recorded as `stopped`. A write of the end is tried again after 0.5, 1, 2, and 4 seconds.
 
+Both folds bound what a stored trace keeps: 20,000 characters of thinking per answer, the last
+2,000 characters of a tool's output, 12,000 characters of an evaluation prompt, and a call's
+arguments cut to a 4,000-character JSON prefix.
+Finished `write` calls share a further 64,000 characters, counted as `JSON.stringify` length, in
+which their arguments stay whole, so the chat can offer a written file's content after a reload
+(`writtenFiles` in `ui/src/lib/chatDownloads.ts`). A call still running when the turn ended, or
+when `interrupted_content` closes the saved progress of a replaced turn, is stored `done` with
+`interrupted: true`; its arguments are cut as usual and the chat does not offer its content.
+Progress keeps such a call `running`, without `interrupted`.
+
 After the end is written, the task sends an SSE `transcript` event, the last of the stream:
 `saved: true` with the turn's run as stored (`messages`), or `saved: false` when it could not be
 written. When the runtime stream drops (`stream_lost`, `turn_boundary_unknown`), the task

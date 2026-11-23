@@ -580,6 +580,8 @@ async def test_a_turn_that_replaces_an_orphaned_one_marks_its_progress_interrupt
     assert "in_progress" not in kept
     assert kept["interrupted"] is True
     assert [s["status"] for s in kept["trace"]["steps"]] == ["done", "cancelled"]
+    # The wait's end was not seen, so its written content is never offered as finished.
+    assert [s.get("interrupted") for s in kept["trace"]["steps"]] == [True, None]
 
 
 @pytest.mark.asyncio
