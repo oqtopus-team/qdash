@@ -116,6 +116,13 @@ all of its runs. A run belongs to a row only when it was started for that object
 agent session; a run recorded before this grouping existed stays its own row. Turn the switch
 off for the plain list of runs. See [Agent Calibration](./agent-calibration.md#follow-a-session-on-the-execution-page).
 
+The page address keeps the chip, the selected day, the **Group sessions** switch, and the page
+number, so reloading, **Back**, a shared link, and the links back from a run's page or an
+objective's page reopen the same list. Choosing another chip clears the day and returns to the
+first page, and so does switching project. A link without these settings opens the grouped list
+of the latest runs. The activity chart interval, selected details panel, and expanded rows are
+not retained in the address.
+
 Every workflow, pipeline, or task you start belongs to a calibration session, and so does every
 step it runs. When you start one without choosing an objective, QDash creates a session for that run alone,
 marked **Automatic**. A saved workflow with several steps is therefore one row on the
@@ -129,17 +136,26 @@ before this grouping existed are not moved into a session.
 A run shows its objective as a badge on its card. The details panel and the run's page say why
 it belongs there and offer **Open calibration session**; an agent session row offers the same
 link beside **Open session graph**. After you start a workflow in **Workflow**, the confirmation
-offers **Open calibration session**.
+offers **Open calibration session**. The links at the top of a run's page lead to its objective,
+the pipeline run it is a step of, if any, and back to **Execution** with the chip, day, and page
+you opened it from. The pipeline run link opens the objective's page at that run; when the run
+is older than the latest runs the page lists, the page says that it is not listed there.
 
 The card names the user whose sign-in started the run. **Agent** marks a run an agent session
 dispatched. **Agent tool, reported** marks a pipeline the assistant's tool started with your
 approval: the tool reports this itself and QDash does not verify it, so the run stays yours.
 Belonging to an objective does not make a run an agent run.
 
-Select **Calibration sessions** at the top of the **Execution** page to list the objectives on
-the selected chip, newest first. Filter them by **Open** or **Closed**, by origin
-(**Created for an objective** or **Automatic**), or with **Only mine**, and remove the chip
-filter to see every chip. Selecting an objective opens its page.
+The **Execution** page has two views: **Executions**, the list of runs above, and
+**Calibration sessions**, the objectives on the selected chip, newest first. Select a view at the
+top of the page; only the chip carries over, because the views filter differently. Filter the
+objectives by **Open** or **Closed**, by origin (**Created for an objective** or **Automatic**),
+or with **Only mine**, and remove the chip filter to see every chip. Selecting an objective opens
+its page, headed by the objective; an automatic session is headed by what its first run
+launched, such as **Workflow nightly_1q**. The links at the top of the page return to the list
+you came from with its filters and page. If you then open an execution from a session that
+you reached through the Calibration sessions list, its links return to Executions; the session
+list filters are not retained through that extra step.
 
 An objective's page shows **Search progression** when the assistant recorded experiments for it,
 such as a ZX90 gate search: the stages reached (**Baseline**, **Screening**, **Confirmation**), a

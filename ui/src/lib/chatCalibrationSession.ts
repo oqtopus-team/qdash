@@ -16,6 +16,7 @@
  */
 
 import { CREATE_CALIBRATION_SESSION_TOOL } from "@/lib/agentChatStream";
+import { calibrationSessionDetailHref } from "@/lib/executionArea";
 import type { ChatMessage, AgentBlocksResult, TraceStep } from "@/types/agentChat";
 
 /** Tools whose `calibrationSessionId` argument names one calibration session. */
@@ -79,20 +80,7 @@ export function linkedCalibrationSessions(
 
 /** Calibration session page, pinned to the project it belongs to when known. */
 export function calibrationSessionHref(calibrationSessionId: string, projectId?: string | null) {
-  const path = `/calibration-sessions/${encodeURIComponent(calibrationSessionId)}`;
-  return projectId ? `${path}?project=${encodeURIComponent(projectId)}` : path;
-}
-
-/** The calibration session list, optionally for one chip, pinned to a project when known. */
-export function calibrationSessionsHref({
-  chipId,
-  projectId,
-}: { chipId?: string | null; projectId?: string | null } = {}) {
-  const params = new URLSearchParams();
-  if (chipId) params.set("chip", chipId);
-  if (projectId) params.set("project", projectId);
-  const query = params.toString();
-  return query ? `/calibration-sessions?${query}` : "/calibration-sessions";
+  return calibrationSessionDetailHref(calibrationSessionId, projectId);
 }
 
 /** What a run of a calibration session launched, in words. */

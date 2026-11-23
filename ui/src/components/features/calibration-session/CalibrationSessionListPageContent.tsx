@@ -3,7 +3,7 @@
 import Link from "next/link";
 
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
-import { parseAsBoolean, parseAsInteger, parseAsStringLiteral, useQueryState } from "nuqs";
+import { useQueryState } from "nuqs";
 
 import type {
   CalibrationSessionOrigin,
@@ -19,29 +19,38 @@ import {
   projectRequest,
   useLinkedProject,
 } from "@/components/features/agent-session/useLinkedProject";
+import { ExecutionViewSwitch } from "@/components/features/execution/ExecutionAreaNav";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { calibrationSessionHref } from "@/lib/chatCalibrationSession";
+import {
+  SESSION_ORIGIN_FILTERS as ORIGIN_FILTERS,
+  SESSION_STATUS_FILTERS as STATUS_FILTERS,
+  type SessionReturnContext,
+  calibrationSessionDetailHref,
+  sessionListParsers,
+} from "@/lib/executionArea";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
 import { formatDateTime } from "@/lib/utils/datetime";
 
 const PAGE_SIZE = 20;
-const STATUS_FILTERS = ["all", "open", "closed"] as const;
 const STATUS_LABELS: Record<(typeof STATUS_FILTERS)[number], string> = {
   all: "All",
   open: "Open",
   closed: "Closed",
 };
-const ORIGIN_FILTERS = ["all", "manual", "automatic"] as const;
 const ORIGIN_LABELS: Record<(typeof ORIGIN_FILTERS)[number], string> = {
   all: "All origins",
   manual: "Created for an objective",
   automatic: "Automatic",
 };
 
+const DESCRIPTION =
+  "Calibration sessions group the runs and agent sessions started for one objective. A run started without one gets an automatic session.";
+
 /**
  * The project's calibration sessions, newest first: one row per objective, linked to its page.
+ * It is the Execution area's view by objective, next to the list of every execution.
  *
  * A run started without a session gets an automatic one, so the origin filter separates the
  * sessions people or agents created for an objective from those QDash created for single runs.
@@ -50,18 +59,17 @@ const ORIGIN_LABELS: Record<(typeof ORIGIN_FILTERS)[number], string> = {
 export function CalibrationSessionListPageContent() {
   const linked = useLinkedProject();
   const projectId = linked.status === "ready" ? linked.projectId : null;
-  const [statusFilter, setStatusFilter] = useQueryState(
-    "status",
-    parseAsStringLiteral(STATUS_FILTERS).withDefault("all"),
-  );
-  const [originFilter, setOriginFilter] = useQueryState(
-    "origin",
-    parseAsStringLiteral(ORIGIN_FILTERS).withDefault("all"),
-  );
-  const [mine, setMine] = useQueryState("mine", parseAsBoolean.withDefault(false));
-  const [chip, setChip] = useQueryState("chip");
-  const [page, setPage] = useQueryState("page", parseAsInteger.withDefault(1));
+  const [statusFilter, setStatusFilter] = useQueryState("status", sessionListParsers.status);
+  const [originFilter, setOriginFilter] = useQueryState("origin", sessionListParsers.origin);
+  const [mine, setMine] = useQueryState("mine", sessionListParsers.mine);
+  const [chip, setChip] = useQueryState("chip", sessionListParsers.chip);
+  const [page, setPage] = useQueryState("page", sessionListParsers.page);
   const currentPage = Math.max(1, page);
+  // A session page opened from this list links back to it with the same filters and page.
+  const sessionReturn: SessionReturnContext = {
+    from: "sessions",
+    list: { status: statusFilter, origin: originFilter, mine, chip, page: currentPage },
+  };
 
   const params: ListCalibrationSessionsParams = {
     limit: PAGE_SIZE,
@@ -89,7 +97,8 @@ export function CalibrationSessionListPageContent() {
   if (linked.status === "unavailable" || linked.status === "no_project") {
     return (
       <PageContainer maxWidth>
-        <PageHeader title="Calibration sessions" />
+        <PageHeader title="Execution" description={DESCRIPTION} />
+        <ExecutionViewSwitch current="sessions" chipId={chip} className="mb-4" />
         <div role="alert" className="alert alert-error alert-soft">
           <span>
             {linked.status === "unavailable"
@@ -103,9 +112,12 @@ export function CalibrationSessionListPageContent() {
 
   return (
     <PageContainer maxWidth>
-      <PageHeader
-        title="Calibration sessions"
-        description="Objectives that group runs and agent sessions. A run started without one gets an automatic session."
+      <PageHeader title="Execution" description={DESCRIPTION} />
+      <ExecutionViewSwitch
+        current="sessions"
+        chipId={chip}
+        projectId={projectId}
+        className="mb-4"
       />
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <div role="tablist" aria-label="Status" className="tabs tabs-box tabs-sm w-fit">
@@ -202,7 +214,11 @@ export function CalibrationSessionListPageContent() {
               </span>
               <div className="min-w-0">
                 <Link
-                  href={calibrationSessionHref(session.calibration_session_id, projectId)}
+                  href={calibrationSessionDetailHref(
+                    session.calibration_session_id,
+                    projectId,
+                    sessionReturn,
+                  )}
                   className="link link-hover line-clamp-2 text-sm font-medium wrap-anywhere"
                 >
                   {session.objective}

@@ -255,6 +255,16 @@ selected chip. Each run shows its kind (**Workflow**, **Pipeline**, **Task**), a
 session carries an **Automatic** badge. The workflow editor sends a new `idempotency_key` with
 each confirmed run and links to the run's session in its confirmation.
 
+Links between the two lists, a session page, and an execution page carry the list to return to
+as query parameters built and read in `ui/src/lib/executionArea.ts`. The Executions list keeps
+`chip`, `date` (`YYYYMMDD`), `flat=true`, and `page`; the session list keeps `status`, `origin`,
+`mine`, `chip`, and `page`; on a session page `from=executions` says which list `page` belongs
+to. Each value is parsed against its known form and an invalid one reads as the default, and
+every link is built for a fixed route, so a crafted query never leaves the Execution area. The
+view switch carries only the chip. An execution's run crumb points at `#run-<run_id>`; the
+session page marks that run when it is among the runs it lists and otherwise says that the run is
+not listed, since the session detail returns only the latest runs.
+
 ## Reported launch origin
 
 QDash authenticates the user behind a request, not the program that sent it: an agent host
@@ -499,6 +509,8 @@ and `calibration-pipeline-tool.test.mjs`; the UI in
   dialog
 - `ui/src/components/features/execution/ExecutionCalibrationContext.tsx`: badges and notices on
   the Execution page
+- `ui/src/lib/executionArea.ts`, `ui/src/hooks/url-state/useExecutionUrlState.ts`: the links
+  and URL state of the Execution area
 - `ui/src/components/features/chat/ChatCalibrationSessions.tsx`: the chat card
 
 ## Deployment compatibility

@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
   getMobileTabs,
   getNavigationSections,
+  isMobileOverflowActive,
   isMobileTabActive,
+  isNavItemActive,
   isPathWithin,
   withoutMobileTabs,
 } from "@/components/layout/navigation";
@@ -44,6 +46,38 @@ describe("getNavigationSections", () => {
 
   it("keeps Dashboards out of the Overview mobile tab", () => {
     expect(isMobileTabActive(tabFor("/overview"), "/dashboards/abc")).toBe(false);
+  });
+});
+
+describe("the Execution area", () => {
+  const execution = editor
+    .flatMap((section) => section.items)
+    .find((item) => item.href === "/execution");
+  if (!execution) throw new Error("Expected an Execution row");
+
+  it.each([
+    "/execution",
+    "/execution/chip-1/exec-1",
+    "/executions/exec-1",
+    "/calibration-sessions",
+    "/calibration-sessions/cs-1",
+  ])("owns %s on the sidebar and the mobile tab, and nothing in More", (pathname) => {
+    expect(isNavItemActive(execution, pathname)).toBe(true);
+    expect(isMobileTabActive(tabFor("/execution"), pathname)).toBe(true);
+    expect(isMobileOverflowActive(editor, pathname)).toBe(false);
+  });
+
+  it.each(["/calibration-sessionsx", "/executionsx", "/task-results"])(
+    "does not own %s",
+    (pathname) => {
+      expect(isNavItemActive(execution, pathname)).toBe(false);
+      expect(isMobileTabActive(tabFor("/execution"), pathname)).toBe(false);
+    },
+  );
+
+  it("adds no sidebar row for calibration sessions", () => {
+    const hrefs = editor.flatMap((section) => section.items.map((item) => item.href));
+    expect(hrefs.filter((href) => href.startsWith("/calibration"))).toEqual([]);
   });
 });
 

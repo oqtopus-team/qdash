@@ -116,6 +116,8 @@ describe("MobileTabBar", () => {
     ["/workflow/calibrate-all", "Workflow"],
     ["/execution/chip-1/exec-1", "Execution"],
     ["/executions/exec-1", "Execution"],
+    ["/calibration-sessions", "Execution"],
+    ["/calibration-sessions/cs-1", "Execution"],
     ["/chat", "Agent"],
     ["/chat/session-1", "Agent"],
   ])("marks only the owning tab current on %s", (pathname, label) => {

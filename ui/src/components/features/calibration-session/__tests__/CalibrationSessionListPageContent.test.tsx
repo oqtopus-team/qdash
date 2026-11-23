@@ -158,5 +158,38 @@ describe("CalibrationSessionListPageContent", () => {
     renderPage();
     expect(screen.getByRole("alert").textContent).toContain("project lab-z");
     expect(state.calls.every((call) => !call.enabled)).toBe(true);
+    // The view switch does not pin a project the account cannot open.
+    const views = screen.getByRole("navigation", { name: "Execution views" });
+    expect(within(views).getByRole("link", { name: "Executions" }).getAttribute("href")).toBe(
+      "/execution",
+    );
+  });
+
+  it("is the Execution area's session view, switching to Executions on the same chip", () => {
+    renderPage("chip=64Qv3&status=closed");
+    expect(screen.getByRole("heading", { level: 1, name: "Execution" })).toBeTruthy();
+    const views = screen.getByRole("navigation", { name: "Execution views" });
+    const sessions = within(views).getByRole("link", { name: "Calibration sessions" });
+    const executions = within(views).getByRole("link", { name: "Executions" });
+    expect(sessions.getAttribute("aria-current")).toBe("page");
+    expect(executions.getAttribute("aria-current")).toBeNull();
+    // Only the chip and project travel; the session status filter means nothing to Executions.
+    expect(executions.getAttribute("href")).toBe("/execution?chip=64Qv3&project=lab-a");
+  });
+
+  it("links each session page with the list's filters and page, so it can link back", () => {
+    state.response = { items: [SESSION], total: 21, skip: 20, has_more: false };
+    renderPage("chip=64Qv3&status=closed&origin=manual&mine=true&page=2");
+    expect(screen.getByRole("link", { name: "Bring up qubits 0 and 1" }).getAttribute("href")).toBe(
+      "/calibration-sessions/cs-1?project=lab-a&chip=64Qv3&status=closed&origin=manual&mine=true&page=2",
+    );
+  });
+
+  it("reads a list URL with values it does not know as the unfiltered list", () => {
+    renderPage("status=bogus&origin=nope&page=abc");
+    expect(lastParams()).toEqual({ limit: 20, skip: 0 });
+    expect(screen.getByRole("link", { name: "Bring up qubits 0 and 1" }).getAttribute("href")).toBe(
+      "/calibration-sessions/cs-1?project=lab-a",
+    );
   });
 });

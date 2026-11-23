@@ -10,7 +10,7 @@ import type {
   ReportedLaunchOrigin,
 } from "@/schemas";
 
-import { calibrationSessionHref } from "@/lib/chatCalibrationSession";
+import { type SessionReturnContext, calibrationSessionDetailHref } from "@/lib/executionArea";
 
 /**
  * "Agent tool, reported": the caller said an agent tool launched the pipeline. QDash stores the
@@ -74,11 +74,14 @@ export function ExecutionCalibrationNotice({
   link,
   origin,
   projectId,
+  sessionReturn,
   className = "",
 }: {
   link?: ExecutionCalibrationSessionLink | null;
   origin?: ReportedLaunchOrigin | null;
   projectId?: string | null;
+  /** The list the calibration session page links back to. */
+  sessionReturn?: SessionReturnContext;
   className?: string;
 }) {
   if (!link && !origin) return null;
@@ -111,7 +114,7 @@ export function ExecutionCalibrationNotice({
       </div>
       {link ? (
         <Link
-          href={calibrationSessionHref(link.calibration_session_id, projectId)}
+          href={calibrationSessionDetailHref(link.calibration_session_id, projectId, sessionReturn)}
           className="link link-hover whitespace-nowrap"
         >
           Open calibration session
