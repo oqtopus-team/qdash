@@ -5,7 +5,7 @@ import {
   getCalibrationSessionAudit,
   getGetCalibrationSessionAuditQueryKey,
 } from "@/client/calibration-session/calibration-session";
-import { AUDIT_PAGE_SIZE, AuditTimeline } from "@/components/features/agent-session/AuditTimeline";
+import { AUDIT_PAGE_SIZE, AuditTimeline } from "@/components/features/audit/AuditTimeline";
 import { projectRequest } from "@/components/features/agent-session/useLinkedProject";
 import type { CalibrationSessionAuditResponse } from "@/schemas";
 

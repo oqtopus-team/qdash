@@ -7,7 +7,7 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
-from qdash.api.schemas.agent_session import AgentAuditEvent  # noqa: TC001 - pydantic field
+from qdash.api.schemas.audit import AgentAuditEvent  # noqa: TC001 - pydantic field
 from qdash.api.schemas.execution import (  # noqa: TC001 - pydantic field types
     ExecutionResponseSummary,
     PipelineProgress,
