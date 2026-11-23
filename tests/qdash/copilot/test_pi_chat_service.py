@@ -1224,6 +1224,87 @@ async def test_a_refused_steer_status_raises(
     assert raised.value.status_code == expected_status
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("status_code", "body", "expected"),
+    [
+        (
+            200,
+            {
+                "running": True,
+                "request_id": "t1",
+                "continuing": True,
+                "started_at": 1700,
+                "turn_start": {"index": 2, "digest": "0123456789abcdef"},
+            },
+            {
+                "running": True,
+                "turn_request_id": "t1",
+                "continuing": True,
+                "started_at": 1700,
+                "turn_start": {"index": 2, "digest": "0123456789abcdef"},
+            },
+        ),
+        # A turn sent without a well-formed start is reported without one: not followed.
+        (
+            200,
+            {"running": True, "request_id": "t1", "turn_start": {"index": -1, "digest": "x"}},
+            {
+                "running": True,
+                "turn_request_id": "t1",
+                "continuing": False,
+                "started_at": None,
+                "turn_start": None,
+            },
+        ),
+        (200, {"running": True, "other_project": True}, {"running": True, "other_project": True}),
+        (200, {"running": False}, {"running": False}),
+        # Malformed or failed answers report nothing running; the chat asks again later.
+        (200, {"running": True}, {"running": False}),
+        (200, ValueError("not json"), {"running": False}),
+        (401, {"error": "unauthorized"}, {"running": False}),
+        (500, {"error": "internal"}, {"running": False}),
+    ],
+)
+async def test_the_running_turn_is_read_for_the_user_and_project(
+    monkeypatch: pytest.MonkeyPatch, status_code: int, body: Any, expected: dict[str, Any]
+) -> None:
+    from qdash.api.services import pi_chat_service
+
+    sent: list[dict[str, Any]] = []
+    _fake_runtime(monkeypatch, _RuntimeResponse(status_code, body), sent)
+    result = await pi_chat_service.active_runtime_turn(
+        "alice", "s1", auth=pi_chat_service.QDashAuth("alice-token", "p1")
+    )
+
+    assert result == expected
+    assert sent[0]["url"].endswith("/chat/active")
+    # Only names the chat: nothing a lookup sends could start a turn.
+    assert sent[0]["json"] == {
+        "owner_id": "alice",
+        "conversation_id": "s1",
+        "store_session_id": "s1",
+    }
+    assert sent[0]["headers"]["Authorization"] == "Bearer runtime-token"
+    assert sent[0]["headers"]["X-QDash-Token"] == "alice-token"
+    assert sent[0]["headers"]["X-QDash-Project-Id"] == "p1"
+
+
+@pytest.mark.asyncio
+async def test_an_unreachable_runtime_reports_no_running_turn(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import httpx
+
+    from qdash.api.services import pi_chat_service
+
+    monkeypatch.setenv("AGENT_RUNTIME_TOKEN", "runtime-token")
+    _failing_runtime(monkeypatch, httpx.ConnectError("down"))
+    assert await pi_chat_service.active_runtime_turn(
+        "alice", "s1", auth=pi_chat_service.QDashAuth("t", "p1")
+    ) == {"running": False}
+
+
 def _failing_runtime(monkeypatch: pytest.MonkeyPatch, error: Exception) -> None:
     import httpx
 
@@ -1535,3 +1616,33 @@ async def test_a_reattached_stream_replays_the_resumed_turn_to_its_result(
     names = [name for name, _ in events]
     assert names == ["tool_start", "status", "tool_end", "status", "delta", "status", "result"]
     assert events[-1][1]["entry_id"] == "12"
+
+
+def test_a_turns_start_is_forwarded_only_with_the_turn(monkeypatch: pytest.MonkeyPatch) -> None:
+    from pydantic import ValidationError
+
+    from qdash.api.services import pi_chat_service
+    from qdash.copilot.config import CopilotConfig, ModelConfig
+    from qdash.copilot.contracts.models import ChatRequest
+
+    monkeypatch.setattr(pi_chat_service, "user_instructions", lambda _username: None)
+    config = CopilotConfig(model=ModelConfig(provider="vllm", name="m"))
+    start = {"index": 3, "digest": "0123456789abcdef"}
+    sent = ChatRequest.model_validate({"message": "hi", "session_id": "s1", "turn_start": start})
+    assert pi_chat_service._request_payload(sent, config, "alice")["turn_start"] == start
+    # A reattach submits nothing, and so names no start either.
+    reattach = ChatRequest.model_validate(
+        {
+            "message": "",
+            "session_id": "s1",
+            "request_id": "r1",
+            "reattach": True,
+            "turn_start": start,
+        }
+    )
+    assert "turn_start" not in pi_chat_service._request_payload(reattach, config, "alice")
+    plain = ChatRequest.model_validate({"message": "hi", "session_id": "s1"})
+    assert "turn_start" not in pi_chat_service._request_payload(plain, config, "alice")
+    for bad in ({"index": -1, "digest": "0123456789abcdef"}, {"index": 0, "digest": "XYZ"}):
+        with pytest.raises(ValidationError):
+            ChatRequest.model_validate({"message": "hi", "session_id": "s1", "turn_start": bad})

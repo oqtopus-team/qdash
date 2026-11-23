@@ -54,6 +54,14 @@ console.log(metrics.qubit_metrics);
 
 The client provides polling helpers for QDash executions, agent action dispatch, execution linkage, and candidate application.
 
+### List a Chip's Executions
+
+`listExecutions({ chipId, skip, limit, date, timezone })` returns one page of a chip's executions as `{ executions, total }`. `chipId` is required; `limit` is an integer from 1 to 100 and `skip` an integer of 0 or more; `date` is one start day as `YYYYMMDD` in `timezone` (default UTC). `timezone` must be a non-empty string; the API checks that it names an IANA time zone. The API has no flow or status filter, so filter the returned rows instead. A missing or blank `chipId`, an invalid value, or any other option, including `flowName` or `status`, throws `QDashValidationError` before any request. `executionListProblems(options)` returns the same problems for every option except `chipId` as a list of messages, for a caller that checks its input before resolving the chip.
+
+### Read a Target's Task History
+
+`getQubitTaskHistory({ chipId, qid, task })` and `getCouplingTaskHistory({ chipId, couplingId, task })` return every result of one task for one target, newest first, as `{ name, data }` with `data` keyed by task ID. The routes have no date or paging filter: a missing option, a `date`, or any other option throws `QDashValidationError` before any request. For one period, use `listTaskResults` with `qid`, `taskName`, `startFrom` and `startTo`. A body without a string `name` and a `data` object of objects throws `QDashApiError`.
+
 ### Read Task Results in Pages
 
 `listTaskResults` returns one page, newest first, as `{ items, total, skip, limit, status_counts }`. `limit` is an integer from 1 to 100 and `skip` an integer of 0 or more; other values throw `QDashValidationError` before any request instead of returning a smaller page. Filters use the API's names: `startFrom` and `startTo` bound the task start time, and `qid` matches one stored qubit or coupling ID exactly (`"6"`, `"6-7"`).
@@ -69,6 +77,21 @@ const { items, total, truncated } = await client.collectTaskResults({
 ```
 
 It reads at most `Math.ceil(maxItems / pageSize)` pages and stops earlier at `maxItems`, at the last matching row, or at a short page. It sets `truncated` when the last response reports remaining rows or when duplicates prevent confirming a complete read. Duplicate rows can leave fewer than `maxItems` results even when more rows exist. A failed page, a malformed response, or an aborted `signal` rejects the whole call. Pages are offsets, not a snapshot, so rows are deduplicated by `task_id`. The SDK's `qdash.client` is the same client.
+
+## Compare a Target's Latest Results
+
+`qdash.taskResults.compareLatest({ chipId, qid, limit })` in the `@oqtopus-team/qdash-sdk` package (see [Run a Calibration](#run-a-calibration) for installation) compares the two newest results of each task name for one qubit or coupling:
+
+```ts
+const comparison = await qdash.taskResults.compareLatest({ chipId: "64Qv3", qid: "6", limit: 20 });
+for (const item of comparison.compared) {
+  if (item.status === "compared") console.log(item.task, item.changes);
+  else console.log(item.task, "unavailable:", item.error);
+}
+console.log(comparison.insufficient); // [{ task, results: 1 }]
+```
+
+It reads the newest `limit` rows (an integer from 2 to 100, default 20) of `listTaskResults({ chipId, qid })`; `qid` is the exact stored qubit or coupling ID. List rows carry no output parameters, so for each task name with at least two rows it reads both details with `getTaskResult`: the newest row is `after`, the next is `before`. `changes` maps each output parameter whose `value` differs to `{ before, after }`; object key order is ignored, array order is not, and a parameter missing on one side is `undefined` there. A detail that fails, has no `output_parameters` object, or names another task ID, task name or `qid` makes the task `unavailable` with `changes: null` and an `error`, never unchanged. A task with one row is listed in `insufficient`, and `rows` gives `{ read, total }`. Invalid or unknown options throw `QDashValidationError` before any request.
 
 ## Run a Calibration
 

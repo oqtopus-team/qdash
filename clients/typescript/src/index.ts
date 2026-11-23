@@ -1,16 +1,25 @@
-export { QDashClient, TASK_RESULTS_MAX_COLLECT, TASK_RESULTS_MAX_PAGE_SIZE } from "./client.js";
+export {
+  EXECUTIONS_MAX_PAGE_SIZE,
+  executionListProblems,
+  QDashClient,
+  TASK_RESULTS_MAX_COLLECT,
+  TASK_RESULTS_MAX_PAGE_SIZE,
+} from "./client.js";
 export type {
   AgentSessionAuditPageOptions,
   CollectedTaskResults,
   CollectTaskResultsOptions,
+  CouplingTaskHistoryOptions,
   CreateAgentSessionOptions,
   DegradationTrendsOptions,
   DownloadedFile,
   GetSourceFileOptions,
+  ListExecutionsOptions,
   ListTaskResultsOptions,
   PaginationOptions,
   PollOptions,
   QDashClientOptions,
+  QubitTaskHistoryOptions,
   RecentChangesOptions,
   RecordAgentDecisionOptions,
   RecalibrationRecommendationsOptions,

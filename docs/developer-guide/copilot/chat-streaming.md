@@ -6,15 +6,19 @@ by the chat UI.
 ## Responsibility Boundary
 
 The Agent Runtime owns model and tool execution. `pi_chat_service.py` owns the HTTP bridge,
-keepalive handling, event translation, evaluation recording, and the final block response. The
-browser hook owns SSE parsing and live transcript state.
+keepalive handling, event translation, evaluation recording, and the final block response.
+`chat_turn_runs.py` owns each turn's stream in the API and records the turn in its chat session,
+whoever watches it (see [Recording a Turn on the Server](#recording-a-turn-on-the-server)). The
+browser hook owns SSE parsing and the live transcript it shows.
 
 ```text
 Agent Runtime NDJSON
         ↓
 src/qdash/api/services/pi_chat_service.py
         ↓
-QDash SSE endpoint
+src/qdash/api/services/chat_turn_runs.py ──→ copilot_chat_session (recorded turn)
+        ↓
+QDash SSE endpoint (one subscriber per response)
         ↓
 ui/src/hooks/useCopilotChat.ts
 ```
@@ -176,11 +180,14 @@ answer as settling a steer:
   it interrupted was saved as one message, so the steer goes right after it, ordered by `entry_id`
   among the turn's steers and before the next turn. A steer the stream placed is saved with
   `placement: "exact"`. While another stream runs in the session, placing waits for its end.
-- The UI saves a session's transcript one `PATCH` at a time: a newer snapshot waits for the save
-  in flight and replaces any snapshot still waiting, so an older one never commits last. A save is
-  sent only for the user who wrote it. A placed steer keeps its stored receipt (`saving`, out of
-  the pending list) until a save holding it is acknowledged; when saving fails, a reload restores
-  it as applied and places it again.
+- The server saves a steer a stream placed with the turn (see
+  [Recording a Turn on the Server](#recording-a-turn-on-the-server)); the UI drops its receipt once
+  the turn's saved run holds it. When the UI saves its own copy instead, it saves a session's
+  transcript one `PATCH` at a time: a newer snapshot waits for the save in flight and replaces any
+  snapshot still waiting, so an older one never commits last. A save is sent only for the user who
+  wrote it. A placed steer keeps its stored receipt (`saving`, out of the pending list) until a save
+  holding it is acknowledged; when saving fails, a reload restores it as applied and places it
+  again.
 
 A continue is a `/chat` request with `continue: true` (`continue_run` in the API request). The
 runtime submits Pi's `{ type: "continue" }`, which starts a run on the conversation as it is
@@ -191,8 +198,8 @@ an answer (`aborted`, `model_error`, and similar `RunFailureReason`s), and no `a
 `propose_code_edit`, or approval result since the last user message waits for the user. A
 continue that still finds nothing to answer ends in `noop`, not in an error.
 
-The UI's message list and the durable transcript are kept separately: the UI stores what it
-showed, and Retry and Edit send `conversation_history` that the runtime does not replay into the
+The chat session's messages and the durable transcript are kept separately: the session stores
+what the chat shows, and Retry and Edit send `conversation_history` that the runtime does not replay into the
 durable conversation, which keeps every earlier message. Steers and Continue add nothing to that
 divergence: a steer is stored once, where the stream placed it or after the answer it
 interrupted, and a continue adds no user message.
@@ -200,6 +207,109 @@ interrupted, and a continue adds no user message.
 The runtime sends a keepalive every `CHAT_PING_MS` (15 seconds by default) for the whole turn,
 also while a tool is quiet. The API converts them to SSE comments, which preserve the connection
 without creating transcript entries.
+
+## Recording a Turn on the Server
+
+The API records every chat turn in its chat session as the runtime streams it, so the saved chat
+holds the turn's progress and its end whether or not a browser watches it. `chat_stream` in
+`src/qdash/api/routers/copilot.py` passes the request to `stream_turn` in
+`src/qdash/api/services/chat_turn_runs.py`, which runs the turn's stream in a background task
+(`TurnRun`), keyed by user, session, and request ID. The HTTP response only subscribes: it gets
+the turn's events so far, then the live ones. Closing the response, or every window, ends the
+subscription, never the stream or the turn. Another request of the same turn on the same API
+process, a retry or a reattach, subscribes to the running task instead of opening a second
+stream, so nothing runs twice; a request of it from another project gets an SSE `error` with
+`code: "wrong_project"`.
+
+Before anything reaches the runtime, the task claims the turn (`claim_turn` in
+`copilot_chat_session_service.py`). The saved chat must hold the start the window sent the turn
+from (`turn_start`, see [Following a Turn From Another Window](#following-a-turn-from-another-window)):
+`index` messages whose digest, with the turn's own message, is `digest`. The server computes the
+digest as the page does (`transcript_digest` in `src/qdash/api/services/chat_transcript.py`). The
+chat then becomes those messages and the user's message, which the server saves itself, and
+`turn` (`CopilotChatServerTurn`) names the recorded turn: its request ID, project, status
+(`running`, `completed`, `failed`, `stopped`, or `noop`), and start. Each message of the turn
+carries its request ID (`turn_request_id`). When the saved chat does not hold that start, the
+task waits up to about 2.4 seconds for a save still on its way, then answers with an SSE `error`
+with `code: "transcript_conflict"` and sends nothing; the page shows the saved chat and a notice.
+A start that cannot be stored is an SSE `error` too, and the turn is not sent. A request ID the
+chat records already (`same_turn`) is a retry and is not claimed again. While another recorded
+turn of the chat is still `running`, the claim is refused with `code: "turn_running"` and nothing
+is sent, so the running turn keeps its record; when neither this process nor the runtime
+(`/chat/active`) runs that turn any more, for example after the API restarted, the new turn
+replaces it.
+
+The digest counts an answer of a recorded turn by its request ID, not by its text: the server and
+each window fold the same answer with their own timings, and a rating changes its text, so a
+window's copy of the previous answer still matches the server's.
+
+`TurnTranscript` in `chat_transcript.py` folds the turn's SSE events into the turn's run the way
+`runTurn` folds them for display (`ui/src/lib/copilotChatStream.ts`): the same trace steps and
+stored limits, each part of the answer a steer closed off followed by the steer, and the answer.
+Progress is written at most once a second (`PROGRESS_INTERVAL`), and at once for a placed steer,
+as an answer marked `in_progress: true`, without holding up the stream. The end is written as the
+answer with its `entry_id`, `Error: <detail>` for a failure, a stopped answer, or nothing for a
+`noop` or a refused continue. `POST /copilot/chat/stop` sets `turn.stop_requested` before it asks
+the runtime to stop, and the in-process task's flag, so the runtime's error after a stop is
+recorded as `stopped`. A write of the end is tried again after 0.5, 1, 2, and 4 seconds.
+
+Both folds bound what a stored trace keeps: 20,000 characters of thinking per answer, the last
+2,000 characters of a tool's output, 12,000 characters of an evaluation prompt, and a call's
+arguments cut to a 4,000-character JSON prefix.
+Finished `write` calls share a further 64,000 characters, counted as `JSON.stringify` length, in
+which their arguments stay whole, so the chat can offer a written file's content after a reload
+(`writtenFiles` in `ui/src/lib/chatDownloads.ts`). A call still running when the turn ended or a
+progress was taken is stored `done` with `interrupted: true`; its arguments are cut as usual and the
+chat does not offer its content.
+
+After the end is written, the task sends an SSE `transcript` event, the last of the stream:
+`saved: true` with the turn's run as stored (`messages`), or `saved: false` when it could not be
+written. When the runtime stream drops (`stream_lost`, `turn_boundary_unknown`), the task
+attaches to the turn again with `reattach` after 1, 2, 4, 8, 16, and then every 30 seconds, up to
+25 attempts, after which it records the turn as failed with a lost-connection message. It sends
+keepalive comments meanwhile, and a `restart` event before the replay, on which subscribers fold
+the turn again from its start.
+
+Every write of a session's `messages` is conditional on its `revision`, which it bumps; a write
+based on an older copy reads the session again and is merged again. `write_turn` writes only
+while the turn runs, so a late progress write or a second stream of the turn never replaces its
+end. A client save (`PATCH /copilot/chat/sessions/{session_id}`) is merged by
+`merge_saved_messages`. A message that carries the `turn_request_id` of a turn the chat records,
+the latest or an earlier one, is durable; every other message, such as a legacy message, a steer
+the page placed, or a client-only error, is client-owned. The merge keeps these rules for any copy:
+
+- The durable messages are exactly the stored ones, in the stored order, each once. A copy that
+  omits, repeats, reorders, or holds only part of a recorded turn cannot remove, repeat, move, or
+  change one. A new turn sent from an earlier point truncates the chat when `claim_turn` records
+  it.
+- Of a durable message, only an answer's rating (`feedback`) comes from the copy, from the copy's
+  version of the same answer (`_stored_copy`): the answer with the same `entry_id`, else the
+  stored answer it equals without the rating, else the answer at the same place in the turn
+  (before a given steer, before the turn's message, or last). The index in the turn is never
+  used, since the server and each window fold a turn differently. When the copy's versions of an
+  answer disagree, or none is identified, the stored rating stays. A copy of an answer without a
+  rating clears it; the last save wins, also against a rating set in another window.
+- Client-owned messages keep the copy's order, each once, and each follows every durable message
+  that preceded it in the copy. Between two durable messages that the copy holds next to each
+  other, the client-owned messages are the copy's. Where the copy lacks durable messages, such as
+  a save queued before a turn started, it did not see that part of the chat: the stored
+  client-owned messages there that the copy does not hold are kept, a copy's equal message takes
+  the stored one's place, and the copy's other messages go before its next such message or, after
+  the last one, at the end of that part, as a message queued after the turn would.
+- While the latest recorded turn runs, nothing from its start on comes from the copy.
+
+A reattach of a turn the chat records writes only while the turn
+runs, and only for the turn's own project; one that ended reports its stored run in
+`transcript` without writing.
+
+The page (`runTurn`) saves nothing of a turn while it streams. When the stream ends, it shows the
+run the `transcript` event reported over the messages before the turn, keeping this window's
+attachment thumbnails (`withLocalAttachments`), and removes the turn's pointer. Without that event,
+after a Stop, a dropped stream, or `saved: false` (with a notice), the window that sent the turn
+saves its own copy, which the server merges under what it recorded, and loads the saved chat
+again shortly after. The task survives a browser disconnect, not a restart of the API process;
+after one, the next reattach, from the restored pointer or from a following window, starts a task
+that records the turn again.
 
 ## Reattaching to a Turn
 
@@ -291,7 +401,8 @@ credential. The pointer is written before the turn's request goes out, after the
 that holds the user's message is queued. Updates and removals name the turn's request ID, so a
 late one never touches a newer turn's pointer. When the stream ends, the pointer is marked
 `ended` and removed once a transcript save that holds the turn's end is acknowledged
-(`transcriptSeq`); a reload before that replays the turn instead of losing its answer.
+(`transcriptSeq`); a reload before that replays the turn instead of losing its answer. A turn whose
+stream reported the server's saved run removes the pointer at once.
 
 Moving between pages keeps the provider, so a stream goes on whatever surface shows it. When the
 provider mounts again, after a reload or after it unmounted, its restore effect reads the
@@ -324,7 +435,54 @@ turn's activity or its waiting tool, `reconnecting`, a detached turn, or how the
 ended. The closed sidebar's tab shows a dot while any turn runs or is restored, and
 `openGeneralChat` reopens an active task or investigation chat with a turn going instead of
 creating an empty chat. A tab that was closed has no pointers, and a reload in another tab does
-not see this tab's.
+not see this tab's; that tab finds a running turn from the runtime instead (see
+[Following a Turn From Another Window](#following-a-turn-from-another-window)).
+
+### Following a Turn From Another Window
+
+A window or tab that did not start a turn learns about it from the runtime and follows it by
+reattaching; it never submits anything and never saves the turn. The lookup is
+`POST /copilot/chat/active` (`ChatActiveRequest`, `ChatActiveResponse`, not in the OpenAPI
+schema), which `active_runtime_turn` in `pi_chat_service.py` forwards to the runtime's
+`POST /chat/active` (`handleActiveChat` in `agent-runtime/src/server.ts`). The runtime answers from
+its in-memory store holds: it opens no store and starts nothing. `owner_id` is the signed-in user,
+so only that user's own chat is looked up. A turn sent from another project is reported only as
+`other_project`, without its request ID, and a turn that already wrote its last event is not
+reported. When the runtime cannot be reached or answers unexpectedly, the API reports nothing
+running.
+
+The window that starts a turn sends its start in the saved transcript as `turn_start`
+(`ChatTurnStart`): `index`, the number of messages before the turn, and `digest`, a 64-bit hash
+of the role, text, and steer flag of those messages and, unless the turn is a continue, the turn's
+own message (`turnStartOf` and `transcriptDigest` in `ui/src/lib/copilotObservedTurn.ts`); an
+answer of a recorded turn counts by its `turn_request_id` instead of its text. The API claims the
+turn against it before sending it (see
+[Recording a Turn on the Server](#recording-a-turn-on-the-server)). The runtime keeps it with the
+running turn and reports it unchanged; a reattach sends none. The other window places the turn
+only over a saved transcript that holds exactly that start (`observedTurnPlacement`), so the
+replayed answer never appears under an earlier question from a copy loaded before the server saved
+the turn's message. When a loaded copy does not hold the start yet, the window asks again after
+1, 2, and 4 seconds (`FOLLOW_RETRY_DELAYS_MS`), then at the regular checks. A turn reported
+without `turn_start`, sent by an older version of the page, is not followed.
+
+The provider checks the active chat when it opens, when the window is focused or shown again,
+and every `ACTIVE_TURN_POLL_MS` (15 seconds) while the document is visible. It does not check a
+chat that this tab streams, restores, holds a pointer for, or is still creating. A followed turn
+runs as a `TurnPlan` with `observe` set: the stream folds the turn and its steers into the shown
+transcript, as for a reattach, but saves nothing, stores no pointer, and raises no notification;
+the server records the turn, and the starting window notifies. **Stop** in the following window stops the turn it follows.
+`followedTurns` keeps a turn that was followed to its end from being followed again while the
+runtime still reports it.
+
+After a followed turn ends, the window shows the run the stream's `transcript` event reported;
+without one, it loads the saved transcript after 1.5 and 5 seconds
+(`OBSERVED_REFRESH_DELAYS_MS`). While no turn runs, each check also loads the saved transcript
+(`refreshIdle`) and takes it when it differs, so a turn that started and ended between two checks
+still appears. Neither load replaces a copy that holds something unsaved: a stream, a restore, a
+pointer, a queued save, a steer, or a save that was not acknowledged (`transcriptSeq` against
+`savedSeq`). The thumbnails of this window's own attachments are kept on the messages that did
+not change (`withLocalAttachments`). A followed answer no saved copy holds yet is not replaced by
+a shorter saved transcript (`unconfirmedFold`).
 
 ### Chat Notifications
 
@@ -555,8 +713,8 @@ update `ui/src/hooks/useCopilotChat.ts` and its tests for browser behavior.
 Run:
 
 ```bash
-uv run pytest tests/qdash/copilot/test_pi_chat_service.py tests/qdash/api/routers/test_copilot_auth.py tests/qdash/api/services/test_copilot_chat_session_service.py -v
-cd ui && bun run test:run src/hooks/__tests__/useCopilotChat.test.tsx src/hooks/__tests__/useCopilotChatSteerReload.test.tsx
+uv run pytest tests/qdash/copilot/test_pi_chat_service.py tests/qdash/api/routers/test_copilot_auth.py tests/qdash/api/services/test_copilot_chat_session_service.py tests/qdash/api/services/test_chat_turn_runs.py tests/qdash/api/services/test_chat_transcript.py -v
+cd ui && bun run test:run src/hooks/__tests__/useCopilotChat.test.tsx src/hooks/__tests__/useCopilotChatSteerReload.test.tsx src/hooks/__tests__/useCopilotChatServerTranscript.test.tsx
 task ci-agent-runtime
 ```
 
@@ -580,7 +738,33 @@ ended turn restored from its record, `turn_not_found`, an unsaved message, a tur
 followed, switching projects and back, the turn's own project on every reattach and Stop, and
 user isolation and sign-out; `ui/src/lib/__tests__/copilotTurnStore.test.ts` covers the stored
 pointers, and `ChatTurnStatus.test.tsx`, `ChatAgentSessionStatus.test.tsx`, and
-`ui/src/lib/__tests__/chatAgentSession.test.ts` the status shown. The notification events are
+`ui/src/lib/__tests__/chatAgentSession.test.ts` the status shown.
+`ui/src/hooks/__tests__/useCopilotChatObserve.test.tsx` covers following a turn from another
+window: a late lookup, a copy loaded before the turn's message was saved, a continue, a steered
+turn, a turn without its start, the end taken from the `transcript` event or the saved transcript,
+and a turn that ended between checks.
+`tests/qdash/api/services/test_chat_turn_runs.py` covers the recorded turn: a turn whose only
+response closes runs to its end and is saved, with its start and progress saved meanwhile; a
+second request of the turn follows it without a second stream, and another project is refused; a
+stop recorded from another process; a dropped runtime stream attached again; a stale start
+refused unsent; a turn refused while another runs, and a turn left running by a restarted process
+replaced; a stale save that keeps the recorded turn and its rating; a stale save after a later
+turn started, which keeps every recorded turn; a rating of an earlier turn's answer that keeps
+its stored payload; and a reattach after the end that writes nothing.
+`test_chat_session_merge.py` covers the merge itself with exact ordered results: every in-order
+subset and every order of a chat's durable messages, shuffled and repeated copies, a steered turn
+and a continue, legacy messages and a late steer, a rating found by entry or place when folds
+differ, an ambiguous rating, clearing a rating, a running or just-claimed turn, and a client-only
+error. `tests/qdash/api/routers/test_copilot_chat_turn_http.py`
+drives `/copilot/chat/stream` over ASGI: a response that disconnects (ASGI 2.3 and 2.4) leaves the
+turn running with no subscriber, its progress and end are saved, and the owner reads the complete
+chat from the session endpoint while another user cannot; only the owner's Stop ends a
+disconnected turn as stopped, and a request of the turn from another project is refused. `test_chat_transcript.py` covers the fold and the digest's parity with
+the page. `ui/src/hooks/__tests__/useCopilotChatServerTranscript.test.tsx` covers the page taking
+the server's saved run, a `restart`, a failure read past its error, its own save when the server
+could not save, `transcript_conflict`, `turn_running`, and Stop. `ui/src/lib/__tests__/copilotObservedTurn.test.ts` covers the
+start and its placement, and the last two tests of `chat-reattach-server.test.mjs` cover the
+runtime's lookup. The notification events are
 covered in `useCopilotChatRestore.test.tsx` (once per turn across a reattach and a restore,
 approval apart from a final answer, none for history or another project, a failure), and the
 toasts in `ChatNotifier.test.tsx`, `ChatToaster.test.tsx`, and

@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
 
 import httpx
+from pydantic import ValidationError
 
 from qdash.api.lib.sse import sse_event
 from qdash.api.services.copilot_chat_session_service import (
@@ -33,6 +34,7 @@ from qdash.api.services.copilot_chat_session_service import (
 from qdash.api.services.copilot_chat_session_service import (
     runtime_target as _stored_runtime_target,
 )
+from qdash.copilot.contracts.models import ChatTurnStart
 from qdash.copilot.prompts.models import TaskChatPromptOptions
 from qdash.copilot.prompts.task_chat import build_language_instruction, build_task_chat_prompt
 from qdash.dbmodel.copilot_chat_session import CopilotChatSessionDocument
@@ -190,6 +192,58 @@ async def abort_runtime_turn(
         "Pi runtime answered HTTP %s to stopping session %s", response.status_code, session_id
     )
     return "unknown"
+
+
+async def active_runtime_turn(
+    username: str,
+    session_id: str,
+    *,
+    auth: QDashAuth,
+    target: RuntimeTarget | None = None,
+) -> dict[str, Any]:
+    """Which turn runs this chat now, read from the runtime's memory.
+
+    Read-only: it opens no store and starts nothing. The runtime names the turn
+    only for the user's own chat (``owner_id`` is the signed-in user) in the
+    project the turn was sent from. When the runtime cannot be reached or answers
+    unexpectedly, nothing is reported as running: the chat asks again later.
+    """
+    try:
+        async with httpx.AsyncClient(timeout=10, trust_env=False) as client:
+            response = await client.post(
+                f"{RUNTIME_URL}/chat/active",
+                headers={**_runtime_headers(), **auth.headers()},
+                json={
+                    "owner_id": username,
+                    "conversation_id": session_id,
+                    **_target_payload(session_id, target),
+                },
+            )
+        body = response.json() if response.status_code == httpx.codes.OK else None
+    except (httpx.HTTPError, RuntimeError, ValueError):
+        logger.warning("Could not read the running turn of session %s", session_id, exc_info=True)
+        return {"running": False}
+    if not isinstance(body, dict) or body.get("running") is not True:
+        return {"running": False}
+    if body.get("other_project") is True:
+        return {"running": True, "other_project": True}
+    request_id = body.get("request_id")
+    if not isinstance(request_id, str) or not request_id:
+        return {"running": False}
+    started_at = body.get("started_at")
+    try:
+        turn_start = ChatTurnStart.model_validate(body.get("turn_start")).model_dump()
+    except ValidationError:
+        turn_start = None
+    return {
+        "running": True,
+        "turn_request_id": request_id,
+        "continuing": body.get("continuing") is True,
+        "turn_start": turn_start,
+        "started_at": int(started_at)
+        if isinstance(started_at, (int, float)) and not isinstance(started_at, bool)
+        else None,
+    }
 
 
 class SteerRefusedError(Exception):
@@ -527,6 +581,12 @@ def _request_payload(
         **({"continue": True} if request.continue_run else {}),
         # Watch the turn ``request_id`` started again; nothing is sent.
         **({"reattach": True} if request.reattach else {}),
+        # Where the turn starts in the saved transcript, reported to the user's other windows.
+        **(
+            {"turn_start": request.turn_start.model_dump()}
+            if request.turn_start and not request.reattach
+            else {}
+        ),
     }
 
 

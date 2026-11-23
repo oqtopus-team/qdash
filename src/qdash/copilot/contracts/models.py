@@ -152,6 +152,30 @@ class ChatStopResponse(BaseModel):
     stopped: bool
 
 
+class ChatActiveRequest(BaseModel):
+    """Request body for POST /copilot/chat/active: which turn runs a chat now."""
+
+    session_id: str = Field(min_length=1, description="Chat session to look up")
+
+
+class ChatActiveResponse(BaseModel):
+    """The turn running a chat now, so another window can follow it.
+
+    ``turn_request_id`` names the turn only in the project it was sent from; a
+    window can reattach with it, which submits nothing, once its saved transcript
+    holds ``turn_start`` (absent for a turn sent without one: not followed). ``other_project``: a turn
+    runs, sent from another project. ``running`` false: none runs, or the
+    runtime could not say.
+    """
+
+    running: bool
+    turn_request_id: str | None = None
+    continuing: bool = False
+    started_at: int | None = None
+    turn_start: ChatTurnStart | None = None
+    other_project: bool = False
+
+
 class ChatSteerRequest(BaseModel):
     """Request body for POST /copilot/chat/steer: a message sent while an answer is written."""
 
@@ -271,6 +295,24 @@ class PageContext(BaseModel):
     )
 
 
+class ChatTurnStart(BaseModel):
+    """Where a chat turn starts in its saved transcript, as the window that sent it saw it.
+
+    Opaque to the API and the runtime: the runtime keeps it with the running turn and
+    reports it to another window of the same user, which follows the turn only once its
+    saved transcript holds exactly this start.
+    """
+
+    index: int = Field(ge=0, description="How many messages precede the turn")
+    digest: str = Field(
+        pattern=r"^[0-9a-f]{16}$",
+        description=(
+            "Fingerprint of the messages before the turn and, unless it is a continue, "
+            "the turn's own message"
+        ),
+    )
+
+
 class ChatRequest(ImageAttachmentsRequest):
     """Request body for POST /copilot/chat/stream."""
 
@@ -343,6 +385,13 @@ class ChatRequest(ImageAttachmentsRequest):
             "error), instead of sending ``message``: no user message is added. Refused "
             "after an answer, while a run is going, or while a question, an approval or a "
             "proposed edit waits for the user."
+        ),
+    )
+    turn_start: ChatTurnStart | None = Field(
+        default=None,
+        description=(
+            "Where this turn starts in the saved transcript, so another window can follow "
+            "it only from a transcript that holds that start. Ignored on a reattach."
         ),
     )
     reattach: bool = Field(

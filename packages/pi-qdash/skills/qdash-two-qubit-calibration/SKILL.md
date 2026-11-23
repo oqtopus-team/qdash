@@ -33,6 +33,7 @@ Both qubits of a pair need current single-qubit calibration in the same cooldown
 | These pairs in groups and an order they wrote | `two_qubit_manual_rounds` |
 | Couplings among candidate qubits, chosen by QDash | `two_qubit` |
 | Single-qubit and two-qubit calibration of whole MUXes | `full_calibration` or `fast_full_calibration` |
+| A shorter, high-fidelity ZX90 searched adaptively on one directed pair | Ordinary pipelines guided by `qdash-zx90-optimization` |
 
 - `two_qubit_pairs` takes `coupling_pairs`. The scheduler groups them for parallel runs and never
   adds, drops, or reverses a pair. A pair that is not a chip coupling in the written direction
