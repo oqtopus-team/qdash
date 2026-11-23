@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import gc
 import json
 from collections.abc import AsyncGenerator, Awaitable, Callable, MutableMapping
 from types import SimpleNamespace
@@ -163,15 +162,14 @@ class Stream:
         self.gone.set()
 
     async def closed(self) -> None:
-        """Wait for the app to finish the response, and drop it as a server does.
+        """Wait for the app to finish the response, as a server does.
 
-        An ASGI 2.4 app ends with ``ClientDisconnect``; the server logs and drops
-        it, which lets the response's generator be finalized.
+        An ASGI 2.4 app ends with ``ClientDisconnect``, which the server logs and
+        drops. Nothing is garbage-collected here: the response must close its own
+        stream when it ends, not leave that to the generator's finalizer.
         """
         with contextlib.suppress(Exception):
             await asyncio.wait_for(self.task, 5)
-        del self.task
-        gc.collect()
 
 
 def _turn_body(request_id: str, text: str, history: list[dict[str, Any]]) -> dict[str, Any]:
@@ -225,13 +223,9 @@ async def test_a_turn_whose_stream_disconnects_is_saved_complete_for_the_owner(
         await stream.closed()
         run = chat_turn_runs.running("alice", "s1", "r1")
         assert run is not None and run.task is not None
-
-        async def unsubscribed() -> bool:
-            # ASGI 2.4 servers report the disconnect on the next send; the closed
-            # response's generator is finalized after the app returns.
-            return not run.subscribers
-
-        await _until(unsubscribed)
+        # The ended response has unsubscribed: ASGI 2.4 servers report the
+        # disconnect on the next send, ASGI 2.3 servers through ``receive``.
+        assert not run.subscribers
         assert not run.task.done()
 
         # The turn goes on with nobody listening: its progress is saved...
