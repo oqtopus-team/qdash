@@ -52,6 +52,12 @@ import {
   type StoredTurn,
 } from "@/lib/copilotTurnStore";
 import { activitySnapshot, sameActivity } from "@/lib/chatActivity";
+import {
+  observedTurnPlacement,
+  parseTurnStart,
+  type TurnStart,
+  turnStartOf,
+} from "@/lib/copilotObservedTurn";
 import type { CreateCopilotChatBranchRequest } from "@/schemas";
 import type {
   TaskChatContext,
@@ -218,6 +224,18 @@ const TURN_NOT_FOUND_MESSAGE =
   "The connection dropped before the assistant received this message. Send it again.";
 const CONNECTION_LOST_MESSAGE =
   "Lost the connection to the assistant. It may still be working on this message: reopen the chat later, or stop it before sending again.";
+const SERVER_SAVE_FAILED_MESSAGE =
+  "The server could not save this answer. This window saved its own copy; reload later to check it.";
+/** SSE `error` code: the saved chat changed in another window, so nothing was sent. */
+const TRANSCRIPT_CONFLICT = "transcript_conflict";
+/** SSE `error` code: another turn of the chat still runs, so nothing was sent. */
+const TURN_RUNNING = "turn_running";
+
+/**
+ * The server refused the turn before sending it: it was sent from an older copy of the
+ * chat, or another turn of the chat still runs.
+ */
+class TranscriptConflict extends Error {}
 
 /** Where one turn's stream starts, for `runTurn`. */
 interface TurnPlan {
@@ -246,7 +264,23 @@ interface TurnPlan {
   restored: boolean;
   /** Notifications the turn already raised (from its pointer), so a replay raises none again. */
   notified?: ChatEventKind[];
+  /**
+   * A turn another window or tab started, followed here by reattaching: this window
+   * shows it but saves nothing, stores no pointer, and raises no notification. The
+   * server records the turn; this window takes the run it saved when the stream ends.
+   */
+  observe?: boolean;
 }
+
+/** How often the open chat asks whether another window started a turn in it. */
+const ACTIVE_TURN_POLL_MS = 15_000;
+/** When a followed turn ended, how long to wait before each reload of the saved chat. */
+const OBSERVED_REFRESH_DELAYS_MS = [1_500, 5_000];
+/**
+ * When a running turn's start is not saved yet (its window saves it as the turn goes
+ * out), how long to wait before each lookup again; then the next regular check.
+ */
+const FOLLOW_RETRY_DELAYS_MS = [1_000, 2_000, 4_000];
 
 /** Tools whose call means the turn now waits for an expert. */
 const EXPERT_WAIT_TOOL = "qdash_wait_agent_intervention";
@@ -326,6 +360,8 @@ interface ServerMessage {
   } | null;
   /** An assistant answer's runtime entry; only such an answer can be branched from. */
   entry_id?: string | null;
+  /** The turn the message belongs to; the server records that turn's messages itself. */
+  turn_request_id?: string | null;
   created_at?: string | null;
 }
 
@@ -359,6 +395,7 @@ function serverMessageToLocal(m: ServerMessage): ChatMessage {
         }
       : {}),
     ...(m.role === "assistant" && m.entry_id ? { entryId: m.entry_id } : {}),
+    ...(m.turn_request_id ? { turnRequestId: m.turn_request_id } : {}),
   };
 }
 
@@ -400,7 +437,28 @@ function localMessageToServer(m: ChatMessage): ServerMessage {
         }
       : {}),
     ...(m.entryId ? { entry_id: m.entryId } : {}),
+    ...(m.turnRequestId ? { turn_request_id: m.turnRequestId } : {}),
   };
+}
+
+/** Whether two copies of a chat would be saved alike. */
+function sameTranscript(a: ChatMessage[], b: ChatMessage[]): boolean {
+  return (
+    JSON.stringify(a.map(localMessageToServer)) === JSON.stringify(b.map(localMessageToServer))
+  );
+}
+
+/**
+ * The saved `messages`, with the attachment thumbnails `local` shows kept on each message
+ * at the same place with the same role and text: the server stores presence, not bytes.
+ */
+function withLocalAttachments(messages: ChatMessage[], local: ChatMessage[]): ChatMessage[] {
+  return messages.map((m, i) => {
+    const mine = local[i];
+    return mine?.attachments?.length && mine.role === m.role && mine.content === m.content
+      ? { ...m, attachments: mine.attachments }
+      : m;
+  });
 }
 
 /** Split a stored context into the task chat context and the investigation target. */
@@ -458,6 +516,31 @@ async function apiGetSession(sessionId: string): Promise<ServerSessionDetail> {
   });
   if (!res.ok) throw new Error(`Failed to get session: ${res.status}`);
   return (await res.json()) as ServerSessionDetail;
+}
+
+/** The turn running a chat now, as the runtime reports it to its own user. */
+interface ActiveTurnReply {
+  running: boolean;
+  turn_request_id?: string | null;
+  continuing?: boolean;
+  started_at?: number | null;
+  turn_start?: unknown;
+  other_project?: boolean;
+}
+
+/** Which turn runs the chat now, or null when the lookup failed; it never starts one. */
+async function apiActiveTurn(
+  sessionId: string,
+  headers: Record<string, string>,
+): Promise<ActiveTurnReply | null> {
+  const res = await fetch(`${BASE_URL}/copilot/chat/active`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ session_id: sessionId }),
+  });
+  if (!res.ok) return null;
+  const body = (await res.json()) as Partial<ActiveTurnReply> | null;
+  return body && typeof body.running === "boolean" ? (body as ActiveTurnReply) : null;
 }
 
 async function apiCreateSession(session: CopilotChatSession): Promise<void> {
@@ -559,6 +642,7 @@ function buildTurnRequest(
   page?: PageContext | null,
   continueRun = false,
   requestId: string = createRequestId(),
+  turnStart?: TurnStart,
 ): { url: string; body: Record<string, unknown> } {
   const context = session?.context;
   const investigation = session?.investigation;
@@ -635,6 +719,8 @@ function buildTurnRequest(
       model_override: modelOverride,
       ...(thinkingLevel ? { thinking_level: thinkingLevel } : {}),
       ...(continueRun ? { continue_run: true } : {}),
+      // Where the turn starts in the saved transcript, for the user's other windows.
+      ...(turnStart ? { turn_start: turnStart } : {}),
     },
   };
 }
@@ -788,10 +874,22 @@ export function CopilotChatSessionProvider({
   const endedTurns = useRef<Map<string, { requestId: string; seq: number }>>(new Map());
   // How many transcript updates each session had; a save reports the one it holds.
   const transcriptSeq = useRef<Map<string, number>>(new Map());
+  // The newest snapshot of each session whose save was acknowledged (see savedTranscript).
+  const savedSeq = useRef<Map<string, number>>(new Map());
   // Turns of this tab not streamed now (see DetachedTurn).
   const [detachedTurns, setDetachedTurns] = useState<Record<string, DetachedTurn>>({});
   const detachedRef = useRef(detachedTurns);
   detachedRef.current = detachedTurns;
+  // Sessions whose stream follows a turn another window or tab started (TurnPlan.observe).
+  const observed = useRef<Set<string>>(new Set());
+  // The turn of each session this window last followed to its end: never followed again,
+  // also when the runtime still reports it in the moment before it lets go of it.
+  const followedTurns = useRef<Map<string, string>>(new Map());
+  // Sessions showing the end of a followed turn that no saved copy confirmed yet: a
+  // shorter saved copy does not replace it (the server may not have saved its end yet).
+  const unconfirmedFold = useRef<Set<string>>(new Set());
+  // Reload the saved chat once a followed turn ended (set below, where saves are known).
+  const afterObserved = useRef<(sessionId: string) => void>(() => {});
   // Bumped when a detached stream has ended, so the restore runs again.
   const [resumeTick, setResumeTick] = useState(0);
   // Who hears the turns' notable moments (see subscribeChatEvents).
@@ -1208,6 +1306,15 @@ export function CopilotChatSessionProvider({
     (plan: TurnPlan) => {
       const { sessionId, controller, history, continuing, original } = plan;
       const turnRequestId = plan.requestId;
+      // The server records the turn (its messages carry `turnRequestId`): this window shows
+      // what it folds and, once the stream ends, takes the turn's run as the server saved it
+      // (the `transcript` event). Only when the server did not report it does the window that
+      // started the turn save its own copy, which the server merges under what it recorded.
+      // A followed turn is never saved here.
+      const save = !plan.observe;
+      let serverRun: ChatMessage[] | null = null;
+      let serverSaveFailed = false;
+      let savedByServer = false;
       // What precedes the live answer: the history, the user's message, and the parts of
       // the answer that steers closed off, each followed by the steer, in transcript order.
       let shown = plan.shown;
@@ -1241,7 +1348,7 @@ export function CopilotChatSessionProvider({
       let storedActivity: TurnActivitySnapshot | null = null;
       let storedAt = 0;
       const remember = () => {
-        if (typeof owner !== "string" || owner !== ownerRef.current) return;
+        if (plan.observe || typeof owner !== "string" || owner !== ownerRef.current) return;
         const activity = activitySnapshot(turn.steps, statusMessage);
         if (
           sameActivity(activity, storedActivity) &&
@@ -1260,7 +1367,8 @@ export function CopilotChatSessionProvider({
       // turn's events from its start, and the pointer remembers what was raised before.
       const notified = new Set<ChatEventKind>(plan.notified ?? []);
       const notify = (kind: ChatEventKind, detail?: string) => {
-        if (notified.has(kind) || owner !== ownerRef.current) return;
+        // The window that started a followed turn raises its notifications.
+        if (plan.observe || notified.has(kind) || owner !== ownerRef.current) return;
         notified.add(kind);
         if (typeof owner === "string") {
           patchStoredTurn(owner, sessionId, turnRequestId, { notified: [...notified] });
@@ -1308,8 +1416,9 @@ export function CopilotChatSessionProvider({
           content: JSON.stringify(trace ? { ...result, trace } : result),
           // The answer's runtime entry, kept with the message so it can be branched from.
           ...(entryId ? { entryId } : {}),
+          turnRequestId,
         };
-        updateSessionMessages(sessionId, [...shown, assistantMsg]);
+        updateSessionMessages(sessionId, [...shown, assistantMsg], { save: false });
       };
 
       // Where the answer of a run recovered from an earlier request goes: after
@@ -1349,6 +1458,7 @@ export function CopilotChatSessionProvider({
                 {
                   role: "assistant",
                   content: JSON.stringify(trace ? { ...segment, trace } : segment),
+                  turnRequestId,
                 },
               ]
             : [];
@@ -1370,6 +1480,7 @@ export function CopilotChatSessionProvider({
               role: "user",
               content: text,
               steer: { requestId, entryId, placement: "approximate" },
+              turnRequestId,
             };
             shown = [...shown.slice(0, userAt), steerMessage, ...shown.slice(userAt)];
             userAt += 1;
@@ -1389,17 +1500,23 @@ export function CopilotChatSessionProvider({
                 role: "user",
                 content: text,
                 steer: { requestId, entryId, placement: "exact" },
+                turnRequestId,
               },
             ];
           }
         }
-        // Kept, out of sight, until a save holding it is acknowledged.
-        updateSteers(sessionId, (list) =>
-          patchSteer(advanceSteer(list, requestId, "delivered", undefined, entryId), requestId, {
-            saving: true,
-          }),
-        );
-        updateSessionMessages(sessionId, shown);
+        if (save) {
+          // Kept, out of sight, until a save holding it is acknowledged.
+          updateSteers(sessionId, (list) =>
+            patchSteer(advanceSteer(list, requestId, "delivered", undefined, entryId), requestId, {
+              saving: true,
+            }),
+          );
+        } else {
+          // Saved by the server with the turn: shown here, nothing left to place.
+          updateSteers(sessionId, (list) => list.filter((s) => s.requestId !== requestId));
+        }
+        updateSessionMessages(sessionId, shown, { save: false });
         turn = { steps: [], startedAt: now };
         const next = turn;
         setRun(sessionId, (run) => ({ ...run, turn: next }));
@@ -1425,6 +1542,30 @@ export function CopilotChatSessionProvider({
       };
 
       /**
+       * The stream ended: keep the turn. The server's saved run replaces what was folded
+       * here (with this window's attachment thumbnails); without it, the window that
+       * started the turn saves its own copy, which the server merges under what it
+       * recorded, and loads the saved chat again shortly after.
+       */
+      const keep = () => {
+        const local = sessionsRef.current.find((s) => s.id === sessionId)?.messages ?? shown;
+        if (serverRun) {
+          savedByServer = true;
+          const run = serverRun;
+          updateSessionMessages(sessionId, withLocalAttachments([...history, ...run], local), {
+            save: false,
+          });
+          const saved = new Set(run.flatMap((m) => (m.steer ? [m.steer.requestId] : [])));
+          updateSteers(sessionId, (list) => list.filter((s) => !saved.has(s.requestId)));
+          return;
+        }
+        if (serverSaveFailed) {
+          setNotices((prev) => ({ ...prev, [sessionId]: SERVER_SAVE_FAILED_MESSAGE }));
+        }
+        if (save) updateSessionMessages(sessionId, local);
+      };
+
+      /**
        * This turn's own message was placed: what streamed so far was a run
        * recovered from an earlier request, answering a steer of an earlier turn.
        * It is closed off and kept with that turn, before this turn's message.
@@ -1441,11 +1582,12 @@ export function CopilotChatSessionProvider({
         const message: ChatMessage = {
           role: "assistant",
           content: JSON.stringify(trace ? { ...segment, trace } : segment),
+          turnRequestId,
         };
         shown = [...shown.slice(0, into), message, ...shown.slice(into)];
         userAt += 1;
         recoveredAt = null;
-        updateSessionMessages(sessionId, shown);
+        updateSessionMessages(sessionId, shown, { save: false });
         turn = { steps: [], startedAt: now };
         const next = turn;
         setRun(sessionId, (run) => ({ ...run, turn: next }));
@@ -1468,6 +1610,8 @@ export function CopilotChatSessionProvider({
            * answer that failed, and when the user stopped the turn.
            */
           const streamOnce = async (reattach: boolean): Promise<"done" | "lost"> => {
+            // The turn failed: read on, as the server reports what it saved after it.
+            let failure: string | null = null;
             const attempt = new AbortController();
             const forward = () => attempt.abort(controller.signal.reason);
             controller.signal.addEventListener("abort", forward, { once: true });
@@ -1573,10 +1717,19 @@ export function CopilotChatSessionProvider({
                         advanceSteer(list, requestId, "withdrawn", payload.reason || undefined),
                       );
                     }
+                  } else if (evt.event === "restart") {
+                    // The server attached to the turn again: it replays from its start.
+                    restartFold();
+                  } else if (evt.event === "transcript") {
+                    if (payload.saved === true && Array.isArray(payload.messages)) {
+                      serverRun = (payload.messages as ServerMessage[]).map(serverMessageToLocal);
+                    } else {
+                      serverSaveFailed = true;
+                    }
                   } else if (evt.event === "noop") {
                     // The last answer was complete: nothing was asked of the model or added.
                     gotResult = true;
-                    updateSessionMessages(sessionId, original);
+                    updateSessionMessages(sessionId, original, { save: false });
                     setNotices((prev) => ({
                       ...prev,
                       [sessionId]: "Nothing to continue: the last answer is complete.",
@@ -1596,10 +1749,15 @@ export function CopilotChatSessionProvider({
                       return lost();
                     }
                     if (payload.code === "turn_not_found") throw new Error(TURN_NOT_FOUND_MESSAGE);
-                    throw new Error(payload.detail);
+                    if (payload.code === TRANSCRIPT_CONFLICT || payload.code === TURN_RUNNING) {
+                      throw new TranscriptConflict(payload.detail);
+                    }
+                    failure =
+                      typeof payload.detail === "string" ? payload.detail : "Request failed";
                   }
                 }
               }
+              if (failure !== null) throw new Error(failure);
               return gotResult ? "done" : lost();
             } finally {
               clearTimeout(silence);
@@ -1619,15 +1777,18 @@ export function CopilotChatSessionProvider({
             await abortableDelay(reattachDelay(attempt), controller.signal);
             reattach = true;
           }
+          keep();
         } catch (err) {
           if (controller.signal.aborted) {
-            // Keep whatever had streamed, like ChatGPT/Claude do on Stop.
+            // Keep whatever had streamed, like ChatGPT/Claude do on Stop. The server records
+            // the turn's end as stopped too; this copy is replaced by it once loaded.
             if (controller.signal.reason === "stop") {
               finish({
                 blocks: stoppedBlocks(turn),
                 assessment: null,
                 stopped: true,
               });
+              keep();
             } else {
               // Nobody watches here any more (signed out, another project, the
               // provider gone), but the turn runs on: its pointer stays.
@@ -1636,10 +1797,30 @@ export function CopilotChatSessionProvider({
             return;
           }
           const message = err instanceof Error ? err.message : "Request failed";
+          if (err instanceof TranscriptConflict) {
+            // Nothing was sent: the saved chat changed in another window. Show it as saved.
+            outcome = "forget";
+            setNotices((prev) => ({ ...prev, [sessionId]: message }));
+            updateSessionMessages(sessionId, original, { save: false });
+            void apiGetSession(sessionId)
+              .then((detail) => {
+                if (controllers.current.has(sessionId)) return;
+                const local = sessionsRef.current.find((s) => s.id === sessionId)?.messages ?? [];
+                updateSessionMessages(
+                  sessionId,
+                  withLocalAttachments(detail.messages.map(serverMessageToLocal), local),
+                  { save: false },
+                );
+              })
+              .catch(() => {
+                /* the next check loads it */
+              });
+            return;
+          }
           if (message === TURN_NOT_FOUND_MESSAGE) outcome = "not_found";
           if (continuing && turn.steps.length === 0 && shown.length === history.length) {
             // A refused continue changed nothing: show the chat as it was, and why.
-            updateSessionMessages(sessionId, original);
+            updateSessionMessages(sessionId, original, { save: false });
             setNotices((prev) => ({ ...prev, [sessionId]: message }));
             return;
           }
@@ -1654,10 +1835,12 @@ export function CopilotChatSessionProvider({
             }));
             return;
           }
-          updateSessionMessages(sessionId, [
-            ...shown,
-            { role: "assistant", content: `Error: ${message}` },
-          ]);
+          updateSessionMessages(
+            sessionId,
+            [...shown, { role: "assistant", content: `Error: ${message}`, turnRequestId }],
+            { save: false },
+          );
+          keep();
           notify("failed", message);
         } finally {
           if (controllers.current.get(sessionId) === controller) {
@@ -1673,8 +1856,19 @@ export function CopilotChatSessionProvider({
           // connection may have come just after the answer read one. Ask the runtime.
           updateSteers(sessionId, settleOpenSteers);
           afterStream.current(sessionId, controller);
-          if (typeof owner === "string" && owner === ownerRef.current) {
-            if (outcome === "not_found" || outcome === "forget") {
+          if (plan.observe) {
+            observed.current.delete(sessionId);
+            // The server's saved run is shown already; otherwise it replaces what was
+            // folded here once a saved copy holds it.
+            if (!savedByServer) unconfirmedFold.current.add(sessionId);
+            if (outcome !== "watching" && !savedByServer) afterObserved.current(sessionId);
+            // Left unwatched here (another project, signed out): followed again when asked.
+            else if (followedTurns.current.get(sessionId) === turnRequestId) {
+              followedTurns.current.delete(sessionId);
+            }
+          } else if (typeof owner === "string" && owner === ownerRef.current) {
+            if (outcome === "not_found" || outcome === "forget" || savedByServer) {
+              // The server holds the turn's end: a reload has nothing of it left to restore.
               forgetStoredTurn(owner, sessionId, turnRequestId);
             } else if (outcome === "ended") {
               // Forgotten once the transcript holding the turn's end is saved.
@@ -1683,6 +1877,8 @@ export function CopilotChatSessionProvider({
                 requestId: turnRequestId,
                 seq: transcriptSeq.current.get(sessionId) ?? 0,
               });
+              // What the server recorded replaces this window's copy once it is loaded.
+              afterObserved.current(sessionId);
             }
           }
           // Followed again once the user is back in the turn's project.
@@ -1722,6 +1918,7 @@ export function CopilotChatSessionProvider({
       // Only the first turn of a task chat carries the result figures; the
       // user's own attachments go with whichever turn they were staged for.
       const images = options?.images ?? [];
+      const turnRequestId = createRequestId();
       const userMsg: ChatMessage = {
         role: "user",
         content: text,
@@ -1731,11 +1928,12 @@ export function CopilotChatSessionProvider({
         // An empty local list distinguishes server-provided task figures
         // from user attachments whose bytes were lost after a reload.
         attachments: images.map((i) => `data:${i.mimeType};base64,${i.data}`),
+        turnRequestId,
       };
       const shown: ChatMessage[] = continuing ? [...history] : [...history, userMsg];
-      // Saved before the request goes out, so a reload finds the turn's message.
-      updateSessionMessages(sessionId, shown);
-      const turnRequestId = createRequestId();
+      // Shown only: the server saves the turn's message when it starts the turn, after
+      // checking that its saved chat holds the start this window sent the turn from.
+      updateSessionMessages(sessionId, shown, { save: false });
       // Every request of the turn, a reattach included, names the project it was sent from.
       const projectId = buildHeaders()["X-Project-Id"] ?? null;
       const { url, body } = buildTurnRequest(
@@ -1750,6 +1948,7 @@ export function CopilotChatSessionProvider({
         options?.page,
         continuing,
         turnRequestId,
+        turnStartOf(history, continuing ? null : userMsg),
       );
       const startedAt = Date.now();
       const who = ownerRef.current;
@@ -1826,6 +2025,7 @@ export function CopilotChatSessionProvider({
   );
 
   savedTranscript.current = (sessionId, messages, seq) => {
+    if (seq > (savedSeq.current.get(sessionId) ?? 0)) savedSeq.current.set(sessionId, seq);
     // The turn's end is saved: a reload has nothing of it left to restore.
     const ended = endedTurns.current.get(sessionId);
     if (ended && seq >= ended.seq && !controllers.current.has(sessionId)) {
@@ -2040,8 +2240,10 @@ export function CopilotChatSessionProvider({
       if (
         sentFrom !== undefined &&
         sentFrom !== project &&
-        stored[sessionId]?.requestId === turnRequests.current.get(sessionId)
+        (observed.current.has(sessionId) ||
+          stored[sessionId]?.requestId === turnRequests.current.get(sessionId))
       ) {
+        // A followed turn is found again by asking the runtime once back in its project.
         controller.abort(DETACHED);
       }
     }
@@ -2123,6 +2325,209 @@ export function CopilotChatSessionProvider({
       return same ? prev : next;
     });
   }, [owner, project, isLoadingSessions, resumeTick, loadSessionMessages, resumeTurn]);
+
+  // ------- turns another window or tab started -------
+
+  // Sessions whose running turn is being looked up now.
+  const probing = useRef<Set<string>>(new Set());
+  // Per session, the running turn whose start was not saved yet, and how often it was asked again.
+  const followRetries = useRef<Map<string, { turn: string; attempt: number }>>(new Map());
+  const followRef = useRef<(sessionId: string) => Promise<void>>(async () => {});
+
+  /** The chat holds nothing that is not saved, and nothing here works on it. */
+  const idleHere = useCallback((sessionId: string) => {
+    const who = ownerRef.current;
+    return !(
+      controllers.current.has(sessionId) ||
+      resuming.current.has(sessionId) ||
+      pendingCreates.current.has(sessionId) ||
+      saveQueues.current.has(sessionId) ||
+      Boolean(detachedRef.current[sessionId]) ||
+      (steersRef.current[sessionId]?.length ?? 0) > 0 ||
+      (transcriptSeq.current.get(sessionId) ?? 0) !== (savedSeq.current.get(sessionId) ?? 0) ||
+      (typeof who === "string" && Boolean(readStoredTurns(who)[sessionId]))
+    );
+  }, []);
+
+  /**
+   * Take the saved chat when another window changed it while no turn ran here: a turn
+   * that started and ended between two checks is never reported as running. Only over
+   * a copy that holds nothing unsaved; the thumbnails of this window's own attachments
+   * are kept on the messages that did not change.
+   */
+  const refreshIdle = useCallback(
+    async (sessionId: string) => {
+      const before = sessionsRef.current.find((s) => s.id === sessionId);
+      if (!before?.messagesLoaded || !idleHere(sessionId)) return;
+      const detail = await apiGetSession(sessionId);
+      const now = sessionsRef.current.find((s) => s.id === sessionId);
+      if (!now || now.messages !== before.messages || !idleHere(sessionId)) return;
+      const messages = withLocalAttachments(
+        detail.messages.map(serverMessageToLocal),
+        now.messages,
+      );
+      // A followed answer shown here stays until a saved copy holds at least as much.
+      if (unconfirmedFold.current.has(sessionId) && messages.length < now.messages.length) return;
+      unconfirmedFold.current.delete(sessionId);
+      if (sameTranscript(messages, now.messages)) return;
+      updateSessionMessages(sessionId, messages, { save: false });
+    },
+    [idleHere, updateSessionMessages],
+  );
+
+  /**
+   * Follow the turn another window or tab of this user runs in the chat, if one does:
+   * ask the runtime which turn runs (read-only), reload the saved chat, and reattach
+   * with the turn's request ID, which submits nothing. Never for a chat this tab
+   * streams, restores, or holds a pointer for, and only in the project the turn was
+   * sent from; the runtime names no turn of another project. The turn is placed only
+   * over a saved chat that holds the start the turn was sent from (`turn_start`),
+   * which the server saves when it starts the turn; until a load holds it, the lookup
+   * is repeated a few times.
+   */
+  const followElsewhere = useCallback(
+    async (sessionId: string) => {
+      const who = ownerRef.current;
+      const where = projectRef.current;
+      if (who === null || where === null) return;
+      const stale = () =>
+        ownerRef.current !== who ||
+        projectRef.current !== where ||
+        !idleHere(sessionId) ||
+        !sessionsRef.current.some((s) => s.id === sessionId);
+      if (probing.current.has(sessionId) || stale()) return;
+      probing.current.add(sessionId);
+      try {
+        // Every request of the turn names the project it was sent from: the open one.
+        const projectId = buildHeaders()["X-Project-Id"] ?? null;
+        const found = await apiActiveTurn(sessionId, headersFor(projectId));
+        if (!found || stale()) return;
+        if (!found.running) {
+          followRetries.current.delete(sessionId);
+          await refreshIdle(sessionId);
+          return;
+        }
+        if (!found.turn_request_id) return;
+        const turnId = found.turn_request_id;
+        if (followedTurns.current.get(sessionId) === turnId) return;
+        // A turn sent without its start (an older page) cannot be placed: not followed.
+        const start = parseTurnStart(found.turn_start);
+        if (!start) return;
+        const continuing = found.continuing === true;
+        const before = sessionsRef.current.find((s) => s.id === sessionId)?.messages;
+        const detail = await apiGetSession(sessionId);
+        if (stale() || sessionsRef.current.find((s) => s.id === sessionId)?.messages !== before) {
+          return;
+        }
+        const messages = detail.messages.map(serverMessageToLocal);
+        const placement = observedTurnPlacement(messages, continuing, start);
+        if (!placement) {
+          // The other window has not saved the turn's start yet: asked again shortly.
+          const retry = followRetries.current.get(sessionId);
+          const attempt = retry?.turn === turnId ? retry.attempt : 0;
+          if (attempt < FOLLOW_RETRY_DELAYS_MS.length) {
+            followRetries.current.set(sessionId, { turn: turnId, attempt: attempt + 1 });
+            setTimeout(() => void followRef.current(sessionId), FOLLOW_RETRY_DELAYS_MS[attempt]);
+          }
+          return;
+        }
+        followRetries.current.delete(sessionId);
+        messagesFetched.current.add(sessionId);
+        updateSessionMessages(sessionId, placement.shown, { save: false });
+        const controller = new AbortController();
+        controllers.current.set(sessionId, controller);
+        observed.current.add(sessionId);
+        followedTurns.current.set(sessionId, turnId);
+        const now = Date.now();
+        runTurn({
+          sessionId,
+          controller,
+          requestId: turnId,
+          projectId,
+          history: placement.history,
+          shown: placement.shown,
+          userAt: placement.userAt,
+          continuing,
+          original: messages,
+          startedAt: found.started_at ?? now,
+          lastUpdateAt: now,
+          url: `${BASE_URL}/copilot/chat/stream`,
+          body: {
+            session_id: sessionId,
+            request_id: turnId,
+            message: "",
+            conversation_history: [],
+          },
+          reattach: true,
+          restored: false,
+          observe: true,
+        });
+      } catch {
+        // Not reachable now: the next check asks again.
+      } finally {
+        probing.current.delete(sessionId);
+      }
+    },
+    [idleHere, refreshIdle, runTurn, updateSessionMessages],
+  );
+  followRef.current = followElsewhere;
+
+  afterObserved.current = (sessionId) => {
+    const endedWith = sessionsRef.current.find((s) => s.id === sessionId)?.messages;
+    const reload = (attempt: number) => {
+      if (attempt >= OBSERVED_REFRESH_DELAYS_MS.length) return;
+      setTimeout(() => {
+        const local = sessionsRef.current.find((s) => s.id === sessionId);
+        // Changed here since (a new message, a stream, a save): this window's copy wins.
+        if (
+          !local ||
+          local.messages !== endedWith ||
+          controllers.current.has(sessionId) ||
+          saveQueues.current.has(sessionId)
+        ) {
+          return;
+        }
+        apiGetSession(sessionId)
+          .then((detail) => {
+            const now = sessionsRef.current.find((s) => s.id === sessionId);
+            if (!now || now.messages !== endedWith || controllers.current.has(sessionId)) return;
+            const messages = withLocalAttachments(
+              detail.messages.map(serverMessageToLocal),
+              endedWith,
+            );
+            // Not saved there yet (or never, its window gone): keep the answer folded here.
+            if (messages.length < endedWith.length) {
+              reload(attempt + 1);
+              return;
+            }
+            unconfirmedFold.current.delete(sessionId);
+            updateSessionMessages(sessionId, messages, { save: false });
+          })
+          .catch(() => reload(attempt + 1));
+      }, OBSERVED_REFRESH_DELAYS_MS[attempt]);
+    };
+    if (endedWith) reload(0);
+  };
+
+  // Ask whether another window runs a turn in the open chat: when it opens, when this
+  // window is shown or focused again, and every ACTIVE_TURN_POLL_MS while it is shown.
+  useEffect(() => {
+    if (owner === null || isLoadingSessions || project === null || !activeSessionId) return;
+    const sessionId = activeSessionId;
+    const check = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+      void followElsewhere(sessionId);
+    };
+    check();
+    const timer = setInterval(check, ACTIVE_TURN_POLL_MS);
+    window.addEventListener("focus", check);
+    document.addEventListener("visibilitychange", check);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("focus", check);
+      document.removeEventListener("visibilitychange", check);
+    };
+  }, [owner, project, isLoadingSessions, activeSessionId, followElsewhere]);
 
   // Ask where each restored steer stands once its session's messages are loaded and
   // no stream runs there: status only, never sent again. One already in the saved

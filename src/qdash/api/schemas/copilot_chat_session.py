@@ -37,6 +37,14 @@ class CopilotChatMessageSchema(BaseModel):
             "result; the chat can be branched from that answer"
         ),
     )
+    turn_request_id: str | None = Field(
+        default=None,
+        max_length=200,
+        description=(
+            "The chat turn this message belongs to. The server records the latest turn's "
+            "messages itself; a save cannot replace them."
+        ),
+    )
     created_at: datetime | None = Field(default=None)
 
 

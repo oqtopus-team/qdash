@@ -119,6 +119,8 @@ interface ChatBody extends StoreFields {
    * from the store. A request ID the store has never seen is `404` with `reason: "turn_not_found"`.
    */
   reattach?: boolean;
+  /** Where the turn starts in the transcript QDash saves (see TurnStart); reported, never interpreted. */
+  turn_start?: unknown;
 }
 
 interface SteerBody extends StoreFields {
@@ -251,8 +253,35 @@ function toImageContent(images: ImageBody[] | undefined) {
  * store wait for each other (`409`). A steer and a stop reach a turn through its
  * hold only when they name the turn's exact chat (`ActiveChat.runs`).
  */
-type StoreHold = { kind: "chat"; active: ActiveChat; feed: TurnFeed } | { kind: "branch" } | { kind: "delete" } | { kind: "stop" };
+type StoreHold =
+  | {
+      kind: "chat";
+      active: ActiveChat;
+      feed: TurnFeed;
+      /** The turn adds no message of its own: a continue. */
+      continuing: boolean;
+      startedAt: number;
+      /** Where the turn starts in the saved transcript, as its window sent it (see TurnStart). */
+      turnStart: TurnStart | null;
+    }
+  | { kind: "branch" } | { kind: "delete" } | { kind: "stop" };
 const stores = new Map<string, StoreHold>();
+
+/**
+ * Where a chat turn starts in the transcript QDash saves: how many messages precede it,
+ * and a fingerprint the window that sent the turn computed. Opaque here: it is kept with
+ * the running turn and reported to the user's other windows (`/chat/active`), which follow
+ * the turn only from a saved transcript holding that start.
+ */
+type TurnStart = { index: number; digest: string };
+
+function parseTurnStart(raw: unknown): TurnStart | null {
+  if (!raw || typeof raw !== "object") return null;
+  const { index, digest } = raw as { index?: unknown; digest?: unknown };
+  if (typeof index !== "number" || !Number.isInteger(index) || index < 0) return null;
+  if (typeof digest !== "string" || !/^[0-9a-f]{16}$/.test(digest)) return null;
+  return { index, digest };
+}
 
 function storeKey(ownerId: string, storeSessionId: string): string {
   return `${ownerId}\0${storeSessionId}`;
@@ -430,7 +459,14 @@ async function handleChat(req: IncomingMessage, res: ServerResponse): Promise<vo
   );
   // Every event the turn writes, for its own response and any request that reattaches.
   const feed = new TurnFeed();
-  stores.set(target.key, { kind: "chat", active, feed });
+  stores.set(target.key, {
+    kind: "chat",
+    active,
+    feed,
+    continuing,
+    startedAt: Date.now(),
+    turnStart: parseTurnStart(body.turn_start),
+  });
   const pageContext = parsePageContext(body.page_context);
 
   let opened;
@@ -775,6 +811,55 @@ async function attachTurn(res: ServerResponse, feed: TurnFeed): Promise<void> {
     );
   }
   if (!res.writableEnded) res.end();
+}
+
+/**
+ * Which turn, if any, runs exactly this chat now: read-only, from memory, so
+ * another window of the same user's chat can follow it by reattaching with the
+ * turn's request ID (which submits nothing). It opens no store and starts
+ * nothing. It names the turn only to its own user (`owner_id`, set by the API
+ * from the signed-in user) in the project the turn was sent from; for another
+ * project it says only that a turn runs. A turn that already wrote its last
+ * event is not reported: its end is being saved. The turn's start (`turn_start`)
+ * lets that window place it only over a saved transcript that holds the start.
+ */
+async function handleActiveChat(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const body = await readJsonBody<StoreFields & { owner_id?: string; conversation_id?: string }>(
+    req,
+    MAX_BODY_BYTES,
+  );
+  if (!body.owner_id || !body.conversation_id) {
+    sendJson(res, 400, { error: "owner_id and conversation_id are required" });
+    return;
+  }
+  let auth;
+  try {
+    auth = requestQDashAuth(req.headers);
+  } catch {
+    sendJson(res, 401, { error: "QDash user authentication is required" });
+    return;
+  }
+  const target = requestTarget(body.owner_id, body.conversation_id, body);
+  if (!target) {
+    sendJson(res, 400, { error: "store_conversation_id is not a conversation ID" });
+    return;
+  }
+  const hold = stores.get(target.key);
+  if (hold?.kind !== "chat" || !hold.active.runs(target.chat) || !hold.active.turnRequestId || hold.feed.terminal) {
+    sendJson(res, 200, { running: false });
+    return;
+  }
+  if (hold.active.projectId !== auth.projectId) {
+    sendJson(res, 200, { running: true, other_project: true });
+    return;
+  }
+  sendJson(res, 200, {
+    running: true,
+    request_id: hold.active.turnRequestId,
+    continuing: hold.continuing,
+    started_at: hold.startedAt,
+    turn_start: hold.turnStart,
+  });
 }
 
 /** Submit the turn's message: what the user typed, or the outcome of the write call they decided on. */
@@ -1310,6 +1395,14 @@ const server = createServer((req, res) => {
       return;
     }
     sendJson(res, 200, { skills: runtime.chatSkills() });
+    return;
+  }
+  if (req.method === "POST" && req.url === "/chat/active") {
+    if (!authorized(req)) {
+      sendJson(res, 401, { error: "unauthorized" });
+      return;
+    }
+    handleActiveChat(req, res).catch((error: unknown) => handleRouteError(res, error, "active turn"));
     return;
   }
   if (req.method === "POST" && req.url === "/chat/steer/status") {

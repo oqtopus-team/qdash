@@ -43,7 +43,38 @@ class CopilotChatMessage(BaseModel):
             "reported it; a chat can be branched from such an answer only"
         ),
     )
+    turn_request_id: str | None = Field(
+        default=None,
+        description=(
+            "The chat turn this message belongs to (the turn's request ID): its user message "
+            "and everything the server recorded for it"
+        ),
+    )
     created_at: datetime = Field(default_factory=now)
+
+
+TurnStatus = Literal["running", "completed", "failed", "stopped", "noop"]
+
+
+class CopilotChatServerTurn(BaseModel):
+    """The latest chat turn the server records, whoever watches it. Server only.
+
+    The API writes the turn's messages (the user's message, progress, and its end)
+    into ``messages`` as the runtime streams them, each tagged with its
+    ``turn_request_id``; a client save cannot replace those of this or any earlier
+    recorded turn (see ``merge_saved_messages``).
+    """
+
+    request_id: str = Field(..., description="The turn's request ID")
+    project_id: str | None = Field(default=None, description="The project it was sent from")
+    status: TurnStatus = Field(default="running")
+    start_index: int = Field(default=0, description="How many messages precede the turn")
+    continuing: bool = Field(default=False, description="A continue: no user message")
+    stop_requested: bool = Field(default=False, description="The user asked to stop it")
+    error: str | None = Field(default=None, description="Why it failed")
+    started_at: datetime = Field(default_factory=now)
+    updated_at: datetime = Field(default_factory=now)
+    ended_at: datetime | None = Field(default=None)
 
 
 class CopilotChatBranchOrigin(BaseModel):
@@ -109,6 +140,16 @@ class CopilotChatSessionDocument(Document):
             "Set when the user deleted the chat: hidden everywhere, kept only while it is the "
             "last user of its store and the runtime has not yet confirmed removing that store, "
             "or while stopping its turn is unconfirmed"
+        ),
+    )
+    turn: CopilotChatServerTurn | None = Field(
+        default=None, description="The latest turn the server records. Server only."
+    )
+    revision: int = Field(
+        default=0,
+        description=(
+            "Bumped by every write of messages, so a write based on an older copy is "
+            "detected and merged again"
         ),
     )
     stop_pending: bool = Field(

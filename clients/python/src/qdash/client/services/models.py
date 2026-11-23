@@ -1332,6 +1332,13 @@ class EntryId(RootModel[str]):
     """
 
 
+class TurnRequestId(RootModel[str]):
+    root: Annotated[str, Field(max_length=200, title="Turn Request Id")]
+    """
+    The chat turn this message belongs to. The server records the latest turn's messages itself; a save cannot replace them.
+    """
+
+
 class CopilotChatSessionSummary(BaseModel):
     """
     Lightweight session entry used in the session list.
@@ -7512,6 +7519,10 @@ class CopilotChatMessageSchema(BaseModel):
     entry_id: Annotated[EntryId | None, Field(title="Entry Id")] = None
     """
     An assistant answer's entry in the runtime's transcript, from the chat stream's result; the chat can be branched from that answer
+    """
+    turn_request_id: Annotated[TurnRequestId | None, Field(title="Turn Request Id")] = None
+    """
+    The chat turn this message belongs to. The server records the latest turn's messages itself; a save cannot replace them.
     """
     created_at: Annotated[AwareDatetime | None, Field(title="Created At")] = None
 

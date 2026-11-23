@@ -319,6 +319,7 @@ export * from './copilotChatMessageSchemaAttachedImage';
 export * from './copilotChatMessageSchemaCreatedAt';
 export * from './copilotChatMessageSchemaEntryId';
 export * from './copilotChatMessageSchemaSteer';
+export * from './copilotChatMessageSchemaTurnRequestId';
 export * from './copilotChatSessionResponse';
 export * from './copilotChatSessionResponseBranch';
 export * from './copilotChatSessionResponseContext';
