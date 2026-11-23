@@ -54,6 +54,8 @@ class AgentSessionResponse(BaseModel):
     updated_at: AwareDatetime
     expires_at: AwareDatetime
     active_intervention_id: str | None = None
+    calibration_session_id: str | None = None
+    calibration_admission: str | None = None
 
 
 class AgentActionResponse(BaseModel):

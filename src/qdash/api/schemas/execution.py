@@ -7,6 +7,8 @@ from pydantic import BaseModel, Field, field_serializer, field_validator
 
 from qdash.common.utils.datetime import format_elapsed_time, parse_elapsed_time
 from qdash.datamodel.agent_session import AgentSessionStatus
+from qdash.datamodel.calibration_session import CalibrationSessionStatus
+from qdash.datamodel.launch_origin import ReportedLaunchOrigin
 from qdash.datamodel.task import TaskResultInputParameter, TaskResultOutputParameter
 from qdash.datamodel.task_invocation import TaskInvocation
 
@@ -121,6 +123,45 @@ class ExecutionAgentSessionLink(BaseModel):
     )
 
 
+class CalibrationSessionRef(BaseModel):
+    """A calibration session another record belongs to, read in the request's project."""
+
+    calibration_session_id: str
+    chip_id: str
+    objective: str
+    status: CalibrationSessionStatus
+
+
+class ExecutionCalibrationSessionLink(CalibrationSessionRef):
+    """The calibration session an execution belongs to, and the server record that says so.
+
+    ``via`` names the record: ``pipeline_run`` when the execution is a step of a pipeline run
+    recorded in the session (matched by project, chip, and flow run), ``agent_session`` when an
+    action of an admitted agent session of the session dispatched it. Membership says what the
+    work was for; it never says that an agent ran it.
+    """
+
+    via: Literal["pipeline_run", "agent_session"]
+    pipeline_run_id: str | None = Field(
+        default=None, description="The pipeline run, when via is pipeline_run"
+    )
+    agent_session_id: str | None = Field(
+        default=None, description="The agent session, when via is agent_session"
+    )
+
+
+_CALIBRATION_SESSION_DESCRIPTION = (
+    "The calibration session this execution belongs to, from QDash's own records: a pipeline "
+    "run recorded in it, or an action of an agent session admitted to it. Null when no record "
+    "relates it, or when records disagree on the session"
+)
+_REPORTED_ORIGIN_DESCRIPTION = (
+    "How the caller that launched this execution's pipeline said it was started, such as an "
+    "agent tool. Client reported, not verified by QDash; null when nothing was reported. The "
+    "recorded user is still the one whose sign-in started it"
+)
+
+
 class ExecutionResponseSummary(BaseModel):
     """ExecutionResponseSummary is a Pydantic model that represents the summary of an execution response.
 
@@ -156,6 +197,12 @@ class ExecutionResponseSummary(BaseModel):
             "Set only when an action of an agent session dispatched this execution; a tag "
             "alone never sets it"
         ),
+    )
+    calibration_session: ExecutionCalibrationSessionLink | None = Field(
+        default=None, description=_CALIBRATION_SESSION_DESCRIPTION
+    )
+    reported_origin: ReportedLaunchOrigin | None = Field(
+        default=None, description=_REPORTED_ORIGIN_DESCRIPTION
     )
 
     @field_validator("elapsed_time", mode="before")
@@ -253,6 +300,12 @@ class ExecutionResponseDetail(BaseModel):
             "The agent session whose action dispatched this execution, or the session only "
             "its tag names (linked false); null for an execution outside agent sessions"
         ),
+    )
+    calibration_session: ExecutionCalibrationSessionLink | None = Field(
+        default=None, description=_CALIBRATION_SESSION_DESCRIPTION
+    )
+    reported_origin: ReportedLaunchOrigin | None = Field(
+        default=None, description=_REPORTED_ORIGIN_DESCRIPTION
     )
 
     @field_validator("elapsed_time", mode="before")

@@ -50,6 +50,11 @@ from qdash.api.services.agent_execution_links import (
     summary_link,
     utc,
 )
+from qdash.api.services.calibration_session_links import (
+    NO_RELATIONS,
+    agent_session_parents,
+    resolve_execution_relations,
+)
 from qdash.api.services.execution_service import day_window, execution_summary
 from qdash.common.utils.datetime import now
 from qdash.datamodel.agent_session import (
@@ -71,6 +76,7 @@ from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
+    from qdash.api.schemas.execution import CalibrationSessionRef
     from qdash.repository.execution_history import MongoExecutionHistoryRepository
 
 # Executions one session row of the list carries; the graph lists every one.
@@ -193,6 +199,7 @@ def _session_summary(
     unlinked: Mapping[str, UnlinkedAction],
     open_interventions: int,
     decisions: int,
+    calibration_session: CalibrationSessionRef | None = None,
 ) -> AgentSessionGroupSummary:
     """The group header of one session, from its records only."""
     linked_actions = {link.action_id for link in links}
@@ -239,6 +246,7 @@ def _session_summary(
         skill_name=session.skill_name,
         model=session.model,
         model_name=model_label(session.model),
+        calibration_session=calibration_session,
         counts=AgentSessionGroupCounts(
             actions=session.action_count,
             max_actions=session.policy.max_actions,
@@ -554,6 +562,15 @@ class ExecutionGroupService:
             ):
                 decisions[str(doc["session_id"])] += 1
 
+        # Calibration sessions and reported origins of every execution on the page, and the
+        # calibration session of every agent session row, each in batched reads.
+        relations = resolve_execution_relations(
+            project_id,
+            executions.values(),
+            {key: summary_link(links, key) for key in executions},
+        )
+        parents = agent_session_parents(project_id, sessions.values())
+
         items: list[ExecutionGroupItem] = []
         for kind, key, sort_at in page:
             if kind == "execution":
@@ -563,7 +580,11 @@ class ExecutionGroupService:
                         ExecutionGroupItem(
                             kind="execution",
                             sort_at=sort_at,
-                            execution=execution_summary(doc, summary_link(links, key)),
+                            execution=execution_summary(
+                                doc,
+                                summary_link(links, key),
+                                relations.get(key, NO_RELATIONS),
+                            ),
                         )
                     )
                 continue
@@ -594,7 +615,9 @@ class ExecutionGroupService:
                         ),
                         in_filter=in_window(link.start_at),
                         execution=execution_summary(
-                            execution, summary_link(links, link.execution_id)
+                            execution,
+                            summary_link(links, link.execution_id),
+                            relations.get(link.execution_id, NO_RELATIONS),
                         ),
                     )
                 )
@@ -609,6 +632,7 @@ class ExecutionGroupService:
                         unlinked=links.unlinked,
                         open_interventions=open_interventions[key],
                         decisions=decisions[key],
+                        calibration_session=parents.get(key),
                     ),
                     children=children,
                     children_total=len(all_links),

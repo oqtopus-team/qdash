@@ -25,6 +25,8 @@ export interface ScenarioReport {
   execution_ids: string[];
   intervention_ids: string[];
   commit_ids: string[];
+  /** Calibration sessions the scenario created, in a purpose-level scenario. */
+  calibration_session_ids?: string[];
   fault_id?: string;
   transcript?: unknown;
   /** What the model said; a reported interpretation, not evidence. */
@@ -56,7 +58,8 @@ export const NOT_VALIDATED = [
   "Real hardware: every measurement ran on the fake backend's simulator.",
   "Scientific accuracy: the simulator's values are not physical measurements, and no check judges whether a fitted value is correct.",
   "External Slack delivery: the report records the intervention's notification status only.",
-  "The QDash web Agent host: this harness drives the pi CLI host.",
+  "The QDash web Agent host: this harness drives the pi CLI host. The web host runs the same pi-qdash tools, so a pipeline it starts reports the same client-reported origin, but its chat, approval cards, and the web Execution pages are not exercised.",
+  "Verified pipeline provenance: the origin a pipeline reports is client reported; QDash stores and shows it as reported and this run only checks that it is recorded and labeled so.",
 ];
 
 const SECRET_NAME = /(TOKEN|SECRET|PASSWORD|API_KEY|_KEY$|CLIENT_ID|ACCESS)/i;

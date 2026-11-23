@@ -20,6 +20,10 @@ export interface ApprovalContext {
   plan: ApprovalPlan;
   /** Sessions this scenario created; a commit is approved only in one of them. */
   scenarioSessionIds: ReadonlySet<string>;
+  /** Calibration sessions this scenario created, read from QDash; a pipeline must name one. */
+  scenarioCalibrationSessionIds?: ReadonlySet<string>;
+  /** Dialogs of each tool the harness already approved in this scenario. */
+  approvedCounts?: Readonly<Record<string, number>>;
 }
 
 export interface ApprovalDecision {
@@ -106,11 +110,80 @@ export function reviewSessionCreation(args: Record<string, unknown>, context: Ap
   return { approve: true, reason: "scope matches the scenario's approved session" };
 }
 
+/** Whether the calibration session the model proposes stays on the validation chip. */
+export function reviewCalibrationSessionCreation(args: Record<string, unknown>, context: ApprovalContext): ApprovalDecision {
+  const bounds = context.plan.createCalibrationSession;
+  if (!bounds) return decline("this scenario approves no calibration session");
+  if (args.chipId !== context.target.chipId) return decline("the calibration session must name the disposable chip explicitly");
+  if (typeof args.objective !== "string" || args.objective.trim() === "") return decline("the calibration session needs an objective");
+  if (args.profile !== undefined || args.configPath !== undefined) return decline("the calibration session must use the validation connection");
+  const created = Math.max(context.approvedCounts?.qdash_create_calibration_session ?? 0, context.scenarioCalibrationSessionIds?.size ?? 0);
+  if (created >= bounds.max) return decline(`this scenario approves at most ${bounds.max} calibration session(s)`);
+  return { approve: true, reason: "a calibration session on the disposable chip, within the scenario's count" };
+}
+
+/** Task names a pipeline step names explicitly, or undefined when a step relies on defaults. */
+function explicitTasks(step: Record<string, unknown>): string[] | undefined {
+  const tasks = step.tasks;
+  if (!Array.isArray(tasks) || tasks.length === 0) return undefined;
+  const names: string[] = [];
+  for (const task of tasks) {
+    if (typeof task === "string") names.push(task);
+    else if (record(task) && typeof record(task)?.name === "string") names.push(String(record(task)?.name));
+    else return undefined;
+  }
+  return names;
+}
+
+/**
+ * Whether the pipeline the model proposes stays inside the scenario's bounds: the validation
+ * chip, the fake (default) backend, exactly the selected qubit, only explicitly named tasks
+ * from the plan, a bounded number of task calls, and recorded in this scenario's calibration
+ * session. A step that relies on its default tasks is declined: the harness cannot tell from
+ * the spec alone what it would run.
+ */
+export function reviewPipelineRun(args: Record<string, unknown>, context: ApprovalContext): ApprovalDecision {
+  const bounds = context.plan.runPipeline;
+  if (!bounds) return decline("this scenario approves no pipeline run");
+  if (args.chipId !== context.target.chipId) return decline("the pipeline must run on the disposable chip");
+  if (args.backendName !== undefined && args.backendName !== "fake") return decline("the pipeline must run on the fake backend");
+  if (args.profile !== undefined || args.configPath !== undefined) return decline("the pipeline must use the validation connection");
+  if ((context.approvedCounts?.qdash_run_pipeline ?? 0) >= bounds.maxRuns) return decline(`this scenario approves at most ${bounds.maxRuns} pipeline run(s)`);
+  const sessionId = args.calibrationSessionId;
+  if (typeof sessionId !== "string" || !context.scenarioCalibrationSessionIds?.has(sessionId)) {
+    return decline("the pipeline must be recorded in the calibration session this scenario created");
+  }
+  const spec = record(args.spec);
+  if (!spec) return decline("the pipeline has no spec object");
+  const targets = record(spec.targets);
+  const qids = strings(targets?.qids);
+  const muxes = targets?.mux_ids !== undefined && targets?.mux_ids !== null;
+  if (!targets || muxes || (targets.exclude_qids !== undefined && targets.exclude_qids !== null) || !qids || qids.length !== 1 || qids[0] !== context.target.qid) {
+    return decline("the pipeline must target exactly the selected qubit");
+  }
+  const steps = Array.isArray(spec.steps) ? spec.steps : [];
+  if (steps.length === 0) return decline("the pipeline has no steps");
+  let calls = 0;
+  for (const step of steps) {
+    const fields = record(step);
+    const names = fields ? explicitTasks(fields) : undefined;
+    if (!names) return decline("every pipeline step must name its tasks explicitly");
+    if (!names.every((name) => bounds.tasks.includes(name))) return decline(`the pipeline may only run ${bounds.tasks.join(", ")}`);
+    calls += names.length;
+  }
+  if (calls > bounds.maxTaskCalls) return decline(`the pipeline may make at most ${bounds.maxTaskCalls} task call(s)`);
+  return { approve: true, reason: "a bounded pipeline on the disposable qubit, recorded in the scenario's calibration session" };
+}
+
 /** Decide one approval dialog. */
 export function decideApproval(request: ApprovalRequest, context: ApprovalContext): ApprovalDecision {
   switch (request.toolName) {
     case "qdash_create_agent_session":
       return reviewSessionCreation(request.args, context);
+    case "qdash_create_calibration_session":
+      return reviewCalibrationSessionCreation(request.args, context);
+    case "qdash_run_pipeline":
+      return reviewPipelineRun(request.args, context);
     case "qdash_commit_agent_candidate":
     case "qdash_commit_agent_candidate_set":
       // Updates are approved once, with the session; no scenario approves a commit per call.

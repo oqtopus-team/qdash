@@ -12,7 +12,11 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from qdash.api.schemas.execution import ExecutionAgentSessionLink, ExecutionResponseSummary
+from qdash.api.schemas.execution import (
+    CalibrationSessionRef,
+    ExecutionAgentSessionLink,
+    ExecutionResponseSummary,
+)
 from qdash.datamodel.agent_session import AgentModelIdentity, AgentSessionStatus
 
 __all__ = ["ExecutionAgentSessionLink"]
@@ -87,6 +91,13 @@ class AgentSessionGroupSummary(BaseModel):
     )
     model_name: str = Field(
         default="", description="provider/model_id of model; empty when none was reported"
+    )
+    calibration_session: CalibrationSessionRef | None = Field(
+        default=None,
+        description=(
+            "The calibration session the session was admitted to, when it was created in one; "
+            "null for a session created alone, or one not admitted"
+        ),
     )
     counts: AgentSessionGroupCounts
     latest_activity_at: datetime = Field(

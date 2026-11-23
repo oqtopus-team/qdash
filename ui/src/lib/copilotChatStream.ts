@@ -5,6 +5,7 @@
 import type {
   ChatTrace,
   ContentBlock,
+  CreatedCalibrationSession,
   LiveTurn,
   ToolClassification,
   ToolEvaluation,
@@ -202,6 +203,29 @@ function toolClassification(value: unknown): ToolClassification | undefined {
   };
 }
 
+/** Tool whose successful result names the calibration session it created. */
+export const CREATE_CALIBRATION_SESSION_TOOL = "qdash_create_calibration_session";
+const CALIBRATION_SESSION_ID = /^[A-Za-z0-9_.:-]{1,200}$/;
+
+/**
+ * The calibration session of a tool_end payload: only for a successful
+ * `qdash_create_calibration_session` call, and only when well-formed.
+ */
+function createdCalibrationSession(
+  tool: string,
+  isError: boolean,
+  value: unknown,
+): CreatedCalibrationSession | undefined {
+  if (isError || tool !== CREATE_CALIBRATION_SESSION_TOOL) return undefined;
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const { calibration_session_id: id, chip_id: chipId } = value as Record<string, unknown>;
+  if (typeof id !== "string" || !CALIBRATION_SESSION_ID.test(id)) return undefined;
+  return {
+    calibrationSessionId: id,
+    ...(typeof chipId === "string" && chipId ? { chipId } : {}),
+  };
+}
+
 export function endTool(
   steps: TraceStep[],
   payload: {
@@ -211,6 +235,7 @@ export function endTool(
     figures?: unknown;
     evaluation?: unknown;
     classification?: unknown;
+    calibration_session?: unknown;
     output?: unknown;
     exit_code?: unknown;
   },
@@ -240,6 +265,15 @@ export function endTool(
     : [];
   const evaluation = toolEvaluation(payload.evaluation);
   const classification = toolClassification(payload.classification);
+  // Both the call that started and the result must be the create tool's.
+  const calibrationSession =
+    step.tool === payload.tool
+      ? createdCalibrationSession(
+          payload.tool,
+          payload.is_error === true,
+          payload.calibration_session,
+        )
+      : undefined;
   const next = [...steps];
   next[idx] = {
     ...step,
@@ -248,6 +282,7 @@ export function endTool(
     ...(figures.length ? { figures } : {}),
     ...(evaluation ? { evaluation } : {}),
     ...(classification ? { classification } : {}),
+    ...(calibrationSession ? { calibrationSession } : {}),
     ...(typeof payload.output === "string" && payload.output ? { output: payload.output } : {}),
     ...(typeof payload.exit_code === "number" ? { exitCode: payload.exit_code } : {}),
   };

@@ -6,6 +6,7 @@ import type {
   ExecutionResponseDetail,
   PipelineCatalogResponse,
   PipelineTargets,
+  ReportedLaunchOrigin,
   ValidatePipelineResponse,
 } from "@oqtopus-team/qdash-client/models";
 
@@ -24,6 +25,31 @@ export interface PipelineTarget {
   backendName?: string;
 }
 
+/** Where `Pipelines.execute` records a run: a calibration session, under one retry key. */
+export interface PipelineRecording {
+  /**
+   * The calibration session to record the run in: open, on the same chip, and created by
+   * the signed-in user. Grouping grants nothing; the run is still the request itself.
+   */
+  calibrationSessionId: string;
+  /**
+   * A retry with the same key and request returns the recorded run instead of starting
+   * another; a run whose launch outcome is unknown is never launched again with it.
+   */
+  idempotencyKey: string;
+}
+
+/** Options of `Pipelines.execute` beyond the spec, target, and recording. */
+export interface PipelineLaunchOptions {
+  /**
+   * How the caller says it started the run, such as `{ source: "agent_tool", tool:
+   * "qdash_run_pipeline", client: "pi-qdash" }`. QDash stores it as reported and never
+   * verifies it; it grants nothing and the signed-in user stays responsible for the run.
+   * Set it from the calling program, never from model or user input.
+   */
+  reportedOrigin?: ReportedLaunchOrigin;
+}
+
 function request(spec: PipelineSpecInput, target: PipelineTarget) {
   return {
     chip_id: target.chipId,
@@ -32,6 +58,14 @@ function request(spec: PipelineSpecInput, target: PipelineTarget) {
     spec: spec as Record<string, unknown>,
     ...(target.backendName ? { backend_name: target.backendName } : {}),
   };
+}
+
+function recording(options: PipelineRecording | undefined) {
+  if (!options) return {};
+  if (!options.calibrationSessionId || !options.idempotencyKey) {
+    throw new TypeError("calibrationSessionId and idempotencyKey must both be non-empty strings");
+  }
+  return { calibration_session_id: options.calibrationSessionId, idempotency_key: options.idempotencyKey };
 }
 
 /** A dispatched pipeline execution, returned by `Pipelines.execute`. */
@@ -91,10 +125,21 @@ export class Pipelines {
    * validates it again and answers 422 (`QDashValidationError`) with the same
    * problems. The run belongs to the session's project, or to the server's
    * default project for the user when none is configured. Returns once
-   * dispatched; nothing waits.
+   * dispatched; nothing waits. With `recording`, the run is recorded in a
+   * calibration session before it is launched (see `PipelineRecording`);
+   * `options.reportedOrigin` records how the caller says it started the run.
    */
-  async execute(spec: PipelineSpecInput, target: PipelineTarget): Promise<PipelineRun> {
-    const response = await this.client.api.executeCalibrationPipeline(request(spec, target));
+  async execute(
+    spec: PipelineSpecInput,
+    target: PipelineTarget,
+    recordIn?: PipelineRecording,
+    options: PipelineLaunchOptions = {},
+  ): Promise<PipelineRun> {
+    const response = await this.client.api.executeCalibrationPipeline({
+      ...request(spec, target),
+      ...recording(recordIn),
+      ...(options.reportedOrigin ? { reported_origin: options.reportedOrigin } : {}),
+    });
     return new PipelineRun(this.client, response);
   }
 }

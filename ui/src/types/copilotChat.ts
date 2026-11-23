@@ -203,6 +203,12 @@ export interface ToolEvaluation {
  * What the classifier model decided for a `classify` call: the assistant asked
  * it to pick one of the categories it defined. Never the classifier's input.
  */
+/** A calibration session a chat tool call created: its ID and chip. */
+export interface CreatedCalibrationSession {
+  calibrationSessionId: string;
+  chipId?: string;
+}
+
 export interface ToolClassification {
   /** `provider/model` of the classifier model (classifier.yaml). */
   classifier: string;
@@ -254,6 +260,11 @@ export type TraceStep =
       evaluation?: ToolEvaluation;
       /** What the classifier decided (classify). */
       classification?: ToolClassification;
+      /**
+       * The calibration session a successful `qdash_create_calibration_session` call created, as QDash answered it
+       * (the tool's result, relayed by the runtime and the API); never the model's arguments or text.
+       */
+      calibrationSession?: CreatedCalibrationSession;
     }
   | { kind: "text"; text: string };
 

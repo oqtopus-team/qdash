@@ -110,6 +110,21 @@ day selected, a session appears when it was approved or started a run that day, 
 still lists all of its runs. Turn the switch off for the plain list of runs. See
 [Agent Calibration](./agent-calibration.md#follow-a-session-on-the-execution-page).
 
+A run started for a calibration objective shows the objective as a badge on its card: each step
+of a pipeline run recorded in a calibration session, and each run of an agent session started in
+one. The details panel and the run's page say why it belongs there and offer **Open calibration
+session**; an agent session row offers the same link beside **Open session graph**. A run
+without an objective looks as before, and nothing asks you to create one.
+
+The card names the user whose sign-in started the run. **Agent** marks a run an agent session
+dispatched. **Agent tool, reported** marks a pipeline the assistant's tool started with your
+approval: the tool reports this itself and QDash does not verify it, so the run stays yours.
+Belonging to an objective does not make a run an agent run.
+
+Select **Calibration sessions** at the top of the **Execution** page to list the objectives on
+the selected chip, newest first. Filter them by **Open** or **Closed** or with **Only mine**,
+and remove the chip filter to see every chip. Selecting an objective opens its page.
+
 ## Inspect a Result
 
 Open **Task Results** when you know the chip, execution, task, target, or status you want to find.

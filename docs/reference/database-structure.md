@@ -104,6 +104,9 @@ revisions each dashboard pins (`pins`, keyed by `dashboard_id`) and a `version` 
 | `agent_backend_apply_locks` | `AgentBackendApplyLockDocument` | `agent_session.py` |
 | `agent_interventions` | `AgentInterventionDocument` | `agent_session.py` |
 | `agent_decisions` | `AgentDecisionDocument` | `agent_session.py` |
+| `calibration_sessions` | `CalibrationSessionDocument` | `calibration_session.py` |
+| `calibration_pipeline_runs` | `CalibrationPipelineRunDocument` | `calibration_session.py` |
+| `pipeline_launches` | `PipelineLaunchDocument` | `pipeline_launch.py` |
 | `parameter_versions` | `ParameterVersionDocument` | `provenance.py` |
 | `provenance_relations` | `ProvenanceRelationDocument` | `provenance.py` |
 | `provenance_activities` | `ActivityDocument` | `provenance.py` |
@@ -112,6 +115,17 @@ revisions each dashboard pins (`pins`, keyed by `dashboard_id`) and a `version` 
 vocabulary replaced "campaign". The `calibration-migration` container in `compose.yaml` runs
 `python -m qdash.dbmodel.migration run --execute` before the API starts, and that run moves
 the records of an existing deployment into the new collection once.
+
+An `agent_sessions` document created in a calibration session stores its
+`calibration_session_id`, its `calibration_admission` (`pending`, `admitted`, or `rejected`),
+and the `calibration_reservation_id` the admission rests on; older documents have none. A
+`calibration_sessions` document lists the reservations of admitted agent sessions in
+`admitted_reservation_ids`. A `calibration_pipeline_runs` document stores the caller's
+`reported_origin` when one was reported, and a `pipeline_launches` document keeps the same
+report for any dispatched pipeline, keyed by `(project_id, flow_run_id)`; both are client
+reported and never verified.
+[Calibration Sessions](../developer-guide/copilot/calibration-sessions.md) explains these
+collections.
 
 [Provenance Architecture](../developer-guide/architecture/provenance.md) explains version,
 relationship, and activity records.

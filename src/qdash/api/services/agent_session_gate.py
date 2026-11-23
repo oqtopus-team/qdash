@@ -28,6 +28,14 @@ session's current status, and that update also stores the pending Slack end mess
 (``end_notification_update``). Only one end update can match, so a session has one logical
 end event, and a crash after the transition leaves a pending delivery, never a lost one.
 
+A session created in a calibration session is written with ``calibration_admission``
+``pending``, and every gate update and operational check refuses it until the reservation it
+rests on is finalized in the calibration session (``settle_calibration_admission``). The
+outcome is read from the calibration session, where finalizing records the reservation in the
+same update that removes it, so a crash between that update and the session's own admission
+write is recovered by the next load. A session with no admission (created alone) is never
+checked.
+
 A reservation that never passed the gate (its request crashed) is released after
 ``ABANDONED_RESERVATION_TIMEOUT``. A confirmed reservation whose request crashed is never
 released automatically, because QDash cannot tell whether the operation started.
@@ -54,6 +62,7 @@ from qdash.datamodel.agent_session import (
     AgentSessionNotification,
     AgentSessionStatus,
 )
+from qdash.datamodel.calibration_session import CalibrationAdmission
 from qdash.dbmodel.agent_session import (
     AgentActionDocument,
     AgentCandidateCommitDocument,
@@ -61,6 +70,7 @@ from qdash.dbmodel.agent_session import (
     AgentInterventionDocument,
     AgentSessionDocument,
 )
+from qdash.dbmodel.calibration_session import CalibrationSessionDocument
 
 if TYPE_CHECKING:
     from datetime import datetime
@@ -76,6 +86,11 @@ SETTLED_EXECUTION_STATUSES = frozenset(
 )
 IN_FLIGHT_COMMIT_STATUSES = ("reserving", "committing")
 IN_FLIGHT_BACKEND_STATUSES = ("dispatching", "queued", "applying")
+# Admissions that refuse every operation. A missing field (a session created alone, or
+# before admission existed) matches the filter below, so such a session behaves as before.
+UNADMITTED = (CalibrationAdmission.PENDING.value, CalibrationAdmission.REJECTED.value)
+ADMITTED_FILTER: dict[str, Any] = {"calibration_admission": {"$nin": list(UNADMITTED)}}
+OPEN_STATUS_VALUES = (AgentSessionStatus.ACTIVE.value, AgentSessionStatus.WAITING_FOR_HUMAN.value)
 
 
 def to_bson(value: Any) -> Any:
@@ -263,14 +278,133 @@ def materialize_pending_action(doc: AgentSessionDocument) -> None:
     doc.pending_action = None
 
 
+# ---------------------------------------------------------------------- calibration admission
+
+
+def admit_calibration_child(doc: AgentSessionDocument) -> None:
+    """Record that the session's reservation was finalized; only from ``pending``."""
+    timestamp = now()
+    AgentSessionDocument.get_motor_collection().update_one(
+        {
+            "project_id": doc.project_id,
+            "session_id": doc.session_id,
+            "calibration_admission": CalibrationAdmission.PENDING.value,
+        },
+        {"$set": {"calibration_admission": CalibrationAdmission.ADMITTED.value}},
+    )
+    _reread_admission(doc, timestamp)
+
+
+def reject_calibration_child(doc: AgentSessionDocument, *, actor: str = "") -> None:
+    """Reject a session whose reservation was cleared without being finalized.
+
+    Only from ``pending``. An open session is cancelled by the same update, with its end
+    message; one that already ended keeps its status. Either way it never operates.
+    """
+    timestamp = now()
+    collection = AgentSessionDocument.get_motor_collection()
+    scope = {
+        "project_id": doc.project_id,
+        "session_id": doc.session_id,
+        "calibration_admission": CalibrationAdmission.PENDING.value,
+    }
+    collection.update_one(
+        {**scope, "status": {"$in": list(OPEN_STATUS_VALUES)}},
+        {
+            "$set": {
+                "calibration_admission": CalibrationAdmission.REJECTED.value,
+                "status": AgentSessionStatus.CANCELLED.value,
+                "active_intervention_id": None,
+                "updated_at": timestamp,
+                **end_notification_update(doc, AgentSessionLifecycleEvent.CANCELLED, actor=actor),
+            }
+        },
+    )
+    collection.update_one(
+        scope,
+        {"$set": {"calibration_admission": CalibrationAdmission.REJECTED.value}},
+    )
+    _reread_admission(doc, timestamp)
+
+
+def _reread_admission(doc: AgentSessionDocument, timestamp: datetime) -> None:
+    fresh = AgentSessionDocument.find_one(
+        {"project_id": doc.project_id, "session_id": doc.session_id}
+    ).run()
+    if fresh is None:
+        return
+    doc.calibration_admission = fresh.calibration_admission
+    doc.status = fresh.status
+    doc.active_intervention_id = fresh.active_intervention_id
+    doc.end_notification = fresh.end_notification
+    doc.updated_at = fresh.updated_at or timestamp
+
+
+def settle_calibration_admission(doc: AgentSessionDocument) -> None:
+    """Decide a ``pending`` admission from the reservation's outcome in the calibration session.
+
+    Finalizing a reservation removes it and lists it in ``admitted_reservation_ids`` in one
+    update, and a close clears it without listing it. So a reservation that is listed was
+    finalized (the session is admitted), one that is still pending stays undecided, and one
+    that is neither was cleared and can never be finalized (the session is rejected). A
+    calibration session that cannot be read leaves the admission pending, which refuses every
+    operation.
+    """
+    if doc.calibration_admission != CalibrationAdmission.PENDING:
+        return
+    reservation_id = doc.calibration_reservation_id
+    if not reservation_id or not doc.calibration_session_id:
+        return
+    parent = CalibrationSessionDocument.find_one(
+        {"project_id": doc.project_id, "calibration_session_id": doc.calibration_session_id}
+    ).run()
+    if parent is None:
+        return
+    if reservation_id in parent.admitted_reservation_ids:
+        admit_calibration_child(doc)
+    elif all(r.reservation_id != reservation_id for r in parent.pending_children):
+        reject_calibration_child(doc)
+
+
+def admission_refusal(session: AgentSessionDocument) -> None:
+    """Refuse an operation of a session whose calibration admission is not granted.
+
+    Call it, with the status check, wherever an operation is admitted; the gate updates repeat
+    it with ``ADMITTED_FILTER``. A session with no admission passes.
+    """
+    admission = session.calibration_admission
+    if admission == CalibrationAdmission.PENDING:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"Agent session {session.session_id} is not admitted yet: its start in "
+                f"calibration session {session.calibration_session_id} has not been "
+                "finalized, so it cannot operate. Retry after its creation returns."
+            ),
+        )
+    if admission == CalibrationAdmission.REJECTED:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"Agent session {session.session_id} was rejected: calibration session "
+                f"{session.calibration_session_id} was closed before its start was "
+                "finalized, so it never operates. Start a new calibration session."
+            ),
+        )
+
+
 def load_agent_session(project_id: str, session_id: str) -> AgentSessionDocument:
-    """Load a session, finish records a crash left half written, and apply its expiry."""
+    """Load a session, finish records a crash left half written, and apply its expiry.
+
+    A ``pending`` calibration admission is decided first, from the calibration session.
+    """
     doc = AgentSessionDocument.find_one({"project_id": project_id, "session_id": session_id}).run()
     if doc is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Agent session '{session_id}' not found",
         )
+    settle_calibration_admission(doc)
     materialize_pending_action(doc)
     materialize_pending_intervention(doc)
     expire_session_if_due(doc)
@@ -306,6 +440,8 @@ def autonomous_session_refusal(session: AgentSessionDocument, username: str) -> 
 def pass_execution_gate(project_id: str, session_id: str) -> bool:
     """Serialize one operation against the pause; true only while the session is active.
 
+    A session whose calibration admission is ``pending`` or ``rejected`` never passes.
+
     Call it after the operation's own record is marked as reserved: an operation that passes
     is ordered before any later pause, and its reservation is visible to the resume checks.
     """
@@ -314,6 +450,7 @@ def pass_execution_gate(project_id: str, session_id: str) -> bool:
             "project_id": project_id,
             "session_id": session_id,
             "status": AgentSessionStatus.ACTIVE.value,
+            **ADMITTED_FILTER,
         },
         {"$set": {"execution_gate_at": now()}},
         return_document=ReturnDocument.AFTER,

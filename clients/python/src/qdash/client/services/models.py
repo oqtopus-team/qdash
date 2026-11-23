@@ -948,6 +948,56 @@ class BodyUploadForumImage(BaseModel):
     ]
 
 
+class CalibrationAdmission(StrEnum):
+    """
+    Whether an agent session created in a calibration session may operate.
+
+    An agent session created with a calibration session ID is written ``pending`` and can do
+    nothing (no action, measurement, commit, apply, or pause) until its reservation in the
+    calibration session is finalized. Finalizing removes the reservation and records its ID in
+    ``CalibrationSessionDocument.admitted_reservation_ids`` in one update, so the outcome is
+    durable proof in the parent:
+
+    ``admitted``: the reservation was finalized; the session operates under its own policy.
+    ``rejected``: the reservation was cleared without being finalized (the calibration session
+    was closed first). The session is cancelled and never operates.
+
+    A session created alone, or before admission existed, has no admission and keeps the
+    behavior it always had.
+    """
+
+    pending = "pending"
+    admitted = "admitted"
+    rejected = "rejected"
+
+
+class CalibrationChildKind(StrEnum):
+    """
+    What a child of a calibration session is.
+    """
+
+    pipeline_run = "pipeline_run"
+    agent_session = "agent_session"
+
+
+class CalibrationChildReservation(BaseModel):
+    """
+    A child counted in a calibration session before its own record is written.
+
+    The reservation is pushed into the session by the same conditional update that checks the
+    session is open, with the ID the child will have. The request that made it removes it
+    (``finalize``) once the child's record exists, and only then may a pipeline run be
+    launched. Closing the session clears every reservation it accepts; a request whose
+    reservation was cleared undoes its child instead of starting it.
+    """
+
+    reservation_id: Annotated[str, Field(title="Reservation Id")]
+    kind: CalibrationChildKind
+    child_id: Annotated[str, Field(title="Child Id")]
+    reserved_by: Annotated[str, Field(title="Reserved By")]
+    reserved_at: Annotated[AwareDatetime, Field(title="Reserved At")]
+
+
 class Status(StrEnum):
     disabled = "disabled"
     synced = "synced"
@@ -985,6 +1035,38 @@ class CalibrationParameterDeleteResponse(BaseModel):
     qid: Annotated[str, Field(title="Qid")]
     parameter_name: Annotated[str, Field(title="Parameter Name")]
     deleted: Annotated[bool, Field(title="Deleted")] = True
+
+
+class CalibrationPipelineRunStatus(StrEnum):
+    """
+    Dispatch state of one pipeline run requested in a calibration session.
+
+    ``dispatching``: the request was recorded and its launch has not reported back.
+    ``dispatched``: QDash created the pipeline's flow run; its executions carry its
+    ``flow_run_id``.
+    ``rejected``: QDash refused the launch before any flow run was created (the hardware was
+    busy or the worker deployment was missing); a retry with the same key may launch it.
+    ``unknown``: the launch failed in a way that may have created a flow run anyway, or it
+    stayed ``dispatching`` past the time a launch takes. A retry with the same key never
+    launches it again.
+    """
+
+    dispatching = "dispatching"
+    dispatched = "dispatched"
+    rejected = "rejected"
+    unknown = "unknown"
+
+
+class CalibrationSessionStatus(StrEnum):
+    """
+    Whether a calibration session accepts new runs.
+
+    ``closed`` is a person's statement that work on the objective has ended. It says nothing
+    about whether the objective was met and is refused while a child still runs or waits.
+    """
+
+    open = "open"
+    closed = "closed"
 
 
 class CancelExecutionResponse(BaseModel):
@@ -1156,6 +1238,21 @@ class ClaimAgentResumeRequest(BaseModel):
     """
 
     claim_key: Annotated[str, Field(max_length=128, min_length=1, title="Claim Key")]
+
+
+class CloseCalibrationSessionRequest(BaseModel):
+    """
+    End work on a calibration session's objective.
+    """
+
+    closing_note: Annotated[str, Field(max_length=2000, title="Closing Note")] = ""
+    """
+    What the person closing it wants recorded; QDash does not judge the outcome
+    """
+    acknowledge_unknown_runs: Annotated[bool, Field(title="Acknowledge Unknown Runs")] = False
+    """
+    Close although some pipeline runs have an unknown dispatch outcome, or some agent session starts were reserved long ago and never recorded, after checking the Execution list and the agent sessions for them. They are recorded with the closure. Such a pipeline run was admitted: it may be running or may still start after the close, which does not cancel it. Such an agent session was never admitted: if it is recorded later it is rejected and never operates.
+    """
 
 
 class DecisionId(RootModel[str]):
@@ -1506,6 +1603,25 @@ class TaskName(RootModel[str]):
 
 class PreviousInterventionId(RootModel[str]):
     root: Annotated[str, Field(max_length=200, min_length=1, title="Previous Intervention Id")]
+
+
+class CalibrationSessionId(RootModel[str]):
+    root: Annotated[str, Field(max_length=200, min_length=1, title="Calibration Session Id")]
+    """
+    Create the session in this calibration session, which must be open, on the same chip, and created by the signed-in user. It groups the session with the objective's other work and grants nothing beyond the policy.
+    """
+
+
+class CreateCalibrationSessionRequest(BaseModel):
+    """
+    Start a calibration session for one objective on one chip.
+    """
+
+    chip_id: Annotated[str, Field(max_length=200, min_length=1, title="Chip Id")]
+    objective: Annotated[str, Field(max_length=500, min_length=1, title="Objective")]
+    """
+    What the calibration is for, in a person's words; shown with every run
+    """
 
 
 class CreateChipRequest(BaseModel):
@@ -2071,19 +2187,17 @@ class ExecuteFlowResponse(BaseModel):
     """
 
 
-class ExecutePipelineRequest(BaseModel):
+class CalibrationSessionId1(RootModel[str]):
+    root: Annotated[str, Field(max_length=200, min_length=1, title="Calibration Session Id")]
     """
-    Validate, then dispatch the pipeline as one execution.
+    Record the run in this calibration session, which must be open, on this chip, and created by the signed-in user. It groups the run with the session's other work and grants nothing: the run is the request approved here. Requires idempotency_key.
     """
 
-    chip_id: Annotated[str, Field(min_length=1, title="Chip Id")]
-    spec: Annotated[dict[str, Any], Field(title="Spec")]
+
+class IdempotencyKey(RootModel[str]):
+    root: Annotated[str, Field(max_length=128, min_length=1, title="Idempotency Key")]
     """
-    CalibrationPipelineSpec as JSON; see GET /calibration-pipelines/catalog.
-    """
-    backend_name: Annotated[str | None, Field(title="Backend Name")] = None
-    """
-    Defaults to the configured backend.
+    With calibration_session_id: a retry with the same key and request returns the recorded run instead of starting another, and a run whose launch outcome is unknown is never launched again with it.
     """
 
 
@@ -2207,6 +2321,36 @@ class ExecutionAvailabilityResponse(BaseModel):
 
     available: Annotated[bool, Field(title="Available")]
     reason: Annotated[str | None, Field(title="Reason")] = None
+
+
+class Via(StrEnum):
+    pipeline_run = "pipeline_run"
+    agent_session = "agent_session"
+
+
+class ExecutionCalibrationSessionLink(BaseModel):
+    """
+    The calibration session an execution belongs to, and the server record that says so.
+
+    ``via`` names the record: ``pipeline_run`` when the execution is a step of a pipeline run
+    recorded in the session (matched by project, chip, and flow run), ``agent_session`` when an
+    action of an admitted agent session of the session dispatched it. Membership says what the
+    work was for; it never says that an agent ran it.
+    """
+
+    calibration_session_id: Annotated[str, Field(title="Calibration Session Id")]
+    chip_id: Annotated[str, Field(title="Chip Id")]
+    objective: Annotated[str, Field(title="Objective")]
+    status: CalibrationSessionStatus
+    via: Annotated[Via, Field(title="Via")]
+    pipeline_run_id: Annotated[str | None, Field(title="Pipeline Run Id")] = None
+    """
+    The pipeline run, when via is pipeline_run
+    """
+    agent_session_id: Annotated[str | None, Field(title="Agent Session Id")] = None
+    """
+    The agent session, when via is agent_session
+    """
 
 
 class Kind3(StrEnum):
@@ -2338,41 +2482,6 @@ class ExecutionPlanStep(BaseModel):
     unchecked: Annotated[list[str] | None, Field(title="Unchecked")] = None
     """
     Checks that could not run here; the worker runs them before the step
-    """
-
-
-class ExecutionResponseSummary(BaseModel):
-    """
-    ExecutionResponseSummary is a Pydantic model that represents the summary of an execution response.
-
-    Attributes
-    ----------
-        name (str): The name of the execution.
-        execution_id (str): The ID of the execution.
-        status (str): The current status of the execution.
-        start_at (datetime | None): The start time of the execution.
-        end_at (datetime | None): The end time of the execution.
-        elapsed_time (timedelta | None): The total elapsed time of the execution.
-        user_id (str | None): Internal ID of the user who started the execution.
-        username (str): Username snapshot of the user who started the execution.
-        tags (list[str]): Tags associated with the execution.
-        note (dict): Notes for the execution.
-    """
-
-    name: Annotated[str, Field(title="Name")]
-    execution_id: Annotated[str, Field(title="Execution Id")]
-    status: Annotated[str, Field(title="Status")]
-    message: Annotated[str, Field(title="Message")] = ""
-    user_id: Annotated[str | None, Field(title="User Id")] = None
-    username: Annotated[str, Field(title="Username")] = ""
-    start_at: Annotated[AwareDatetime | None, Field(title="Start At")] = None
-    end_at: Annotated[AwareDatetime | None, Field(title="End At")] = None
-    elapsed_time: Annotated[timedelta | None, Field(title="Elapsed Time")] = None
-    tags: Annotated[list[str], Field(title="Tags")]
-    note: Annotated[dict[str, Any], Field(title="Note")]
-    agent_session: ExecutionAgentSessionLink | None = None
-    """
-    Set only when an action of an agent session dispatched this execution; a tag alone never sets it
     """
 
 
@@ -3361,19 +3470,6 @@ class ListDashboardTemplatesResponse(BaseModel):
     """
 
     templates: Annotated[list[DashboardTemplateResponse], Field(title="Templates")]
-
-
-class ListExecutionsResponse(BaseModel):
-    """
-    Response model for listing executions.
-
-    Wraps list of executions for API consistency and future extensibility (e.g., pagination).
-    """
-
-    executions: Annotated[list[ExecutionResponseSummary], Field(title="Executions")]
-    total: Annotated[int | None, Field(title="Total")] = None
-    skip: Annotated[int | None, Field(title="Skip")] = None
-    limit: Annotated[int | None, Field(title="Limit")] = None
 
 
 class ListFlowSchedulesResponse(BaseModel):
@@ -5029,6 +5125,36 @@ class RelativePeriod(BaseModel):
 
     kind: Annotated[Literal["relative"], Field(title="Kind")] = "relative"
     days: Annotated[int, Field(ge=1, le=400, title="Days")] = 14
+
+
+class ReportedLaunchOrigin(BaseModel):
+    """
+    A caller's own account of how a run was started; client reported, not verified.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    source: Annotated[Literal["agent_tool"], Field(title="LaunchSource")]
+    """
+    What a caller reports started a run.
+
+    ``agent_tool``: a tool of an agent host, such as pi-qdash's ``qdash_run_pipeline``, made
+    the request with the user's sign-in after the user approved it.
+    """
+    tool: Annotated[
+        str,
+        Field(max_length=100, min_length=1, pattern="^[A-Za-z0-9_.:-]+$", title="Tool"),
+    ]
+    """
+    The tool that made the request, such as qdash_run_pipeline
+    """
+    client: Annotated[
+        str, Field(max_length=100, pattern="^[A-Za-z0-9_.:@/ -]*$", title="Client")
+    ] = ""
+    """
+    The host or package that reports it, such as pi-qdash; empty when unnamed
+    """
 
 
 class ResolvedPipelineTargets(BaseModel):
@@ -7208,29 +7334,6 @@ class AgentPlanCheckpoint(BaseModel):
     ] = None
 
 
-class AgentSessionChildExecution(BaseModel):
-    """
-    A real execution one action of the session dispatched.
-    """
-
-    action_id: Annotated[str, Field(title="Action Id")]
-    sequence: Annotated[int, Field(title="Sequence")]
-    """
-    1-based dispatch order of the measurement in the session
-    """
-    attempt: Annotated[int, Field(title="Attempt")]
-    """
-    1-based count of measurements of this task on this target so far
-    """
-    task_name: Annotated[str | None, Field(title="Task Name")] = None
-    qid: Annotated[str | None, Field(title="Qid")] = None
-    in_filter: Annotated[bool, Field(title="In Filter")]
-    """
-    Whether the execution matches the list's day filter; true without one
-    """
-    execution: ExecutionResponseSummary
-
-
 class AgentSessionGraphNode(BaseModel):
     """
     One step of the graph. Exactly the field named by ``kind`` is set.
@@ -7268,56 +7371,6 @@ class AgentSessionGraphNode(BaseModel):
     session_action: AgentSessionGraphSessionAction | None = None
     decision: AgentSessionGraphDecision | None = None
     intervention: AgentSessionGraphIntervention | None = None
-
-
-class AgentSessionGroupSummary(BaseModel):
-    """
-    One agent session as a group of the Execution list.
-
-    ``status`` is the session's own state, not an execution status: a session waiting for an
-    expert, or active between measurements, holds no hardware and is not failed for it.
-    """
-
-    session_id: Annotated[str, Field(title="Session Id")]
-    project_id: Annotated[str, Field(title="Project Id")]
-    chip_id: Annotated[str, Field(title="Chip Id")]
-    created_by: Annotated[str, Field(title="Created By")]
-    created_at: Annotated[AwareDatetime, Field(title="Created At")]
-    updated_at: Annotated[AwareDatetime, Field(title="Updated At")]
-    expires_at: Annotated[AwareDatetime, Field(title="Expires At")]
-    status: AgentSessionStatus
-    """
-    The session's state; an active or paused session past its expiry reads as expired even before a write records it
-    """
-    stored_status: AgentSessionStatus
-    """
-    The status the session record holds
-    """
-    active_intervention_id: Annotated[str | None, Field(title="Active Intervention Id")] = None
-    """
-    The intervention the session waits on, when paused
-    """
-    qids: Annotated[list[str], Field(title="Qids")]
-    allowed_tasks: Annotated[list[str], Field(title="Allowed Tasks")]
-    autonomy: Annotated[str, Field(title="Autonomy")]
-    skill_name: Annotated[str, Field(title="Skill Name")] = ""
-    model: AgentModelIdentity | None = None
-    """
-    The model the creating host reported; later steps carry their own. Client reported, not verified by QDash
-    """
-    model_name: Annotated[str, Field(title="Model Name")] = ""
-    """
-    provider/model_id of model; empty when none was reported
-    """
-    counts: AgentSessionGroupCounts
-    latest_activity_at: Annotated[AwareDatetime, Field(title="Latest Activity At")]
-    """
-    The session's latest measurement start, or its creation before the first
-    """
-    missing: Annotated[list[str] | None, Field(title="Missing")] = None
-    """
-    Facts the records do not hold, such as a dispatched execution not found, an execution held by another action, or a record the session has not written yet
-    """
 
 
 class AgentSessionPolicy(BaseModel):
@@ -7409,6 +7462,14 @@ class AgentSessionResponse(BaseModel):
     """
     Who stopped the session with a stop request, why, and when; null unless a stop request ended it (an expert's stop answer is recorded on its intervention)
     """
+    calibration_session_id: Annotated[str | None, Field(title="Calibration Session Id")] = None
+    """
+    The calibration session it was created in; null when it was created alone
+    """
+    calibration_admission: CalibrationAdmission | None = None
+    """
+    Admission in its calibration session: pending (written, start not finalized; every operation is refused), admitted (operates under its policy), or rejected (the calibration session was closed first; cancelled, never operates). Null for a session created alone, which is never checked
+    """
 
 
 class BackendConfigResponse(BaseModel):
@@ -7437,6 +7498,51 @@ class BulkUserImportResult(BaseModel):
     initial_password: Annotated[str | None, Field(title="Initial Password")] = None
     status: Annotated[str, Field(title="Status")]
     message: Annotated[str | None, Field(title="Message")] = None
+
+
+class CalibrationSessionRef(BaseModel):
+    """
+    A calibration session another record belongs to, read in the request's project.
+    """
+
+    calibration_session_id: Annotated[str, Field(title="Calibration Session Id")]
+    chip_id: Annotated[str, Field(title="Chip Id")]
+    objective: Annotated[str, Field(title="Objective")]
+    status: CalibrationSessionStatus
+
+
+class CalibrationSessionResponse(BaseModel):
+    """
+    A calibration session record.
+    """
+
+    calibration_session_id: Annotated[str, Field(title="Calibration Session Id")]
+    project_id: Annotated[str, Field(title="Project Id")]
+    chip_id: Annotated[str, Field(title="Chip Id")]
+    objective: Annotated[str, Field(title="Objective")]
+    created_by: Annotated[str, Field(title="Created By")]
+    """
+    The signed-in user who created it
+    """
+    status: CalibrationSessionStatus
+    created_at: Annotated[AwareDatetime, Field(title="Created At")]
+    updated_at: Annotated[AwareDatetime, Field(title="Updated At")]
+    closed_at: Annotated[AwareDatetime | None, Field(title="Closed At")] = None
+    closed_by: Annotated[str | None, Field(title="Closed By")] = None
+    closing_note: Annotated[str, Field(title="Closing Note")] = ""
+    closed_with_unknown_runs: Annotated[
+        list[str] | None, Field(title="Closed With Unknown Runs")
+    ] = None
+    """
+    Pipeline runs whose dispatch outcome was unknown when it was closed
+    """
+    closed_with_unknown_starts: Annotated[
+        list[CalibrationChildReservation] | None,
+        Field(title="Closed With Unknown Starts"),
+    ] = None
+    """
+    Agent session starts reserved long ago and never recorded when it was closed. One recorded later is rejected (calibration_admission: rejected) and never operates.
+    """
 
 
 class CellAssessment(BaseModel):
@@ -7663,6 +7769,12 @@ class CreateAgentSessionRequest(BaseModel):
     model: AgentModelIdentity | None = None
     """
     The provider and model the client host reports it ran the agent with, read from the host's own runtime, never from the agent's tool arguments. Recorded as reported; QDash does not verify it, and it changes no scope or approval. Omitted when the host does not know it.
+    """
+    calibration_session_id: Annotated[
+        CalibrationSessionId | None, Field(title="Calibration Session Id")
+    ] = None
+    """
+    Create the session in this calibration session, which must be open, on the same chip, and created by the signed-in user. It groups the session with the objective's other work and grants nothing beyond the policy.
     """
 
 
@@ -8152,6 +8264,36 @@ class ExecuteFlowRequest(BaseModel):
     """
 
 
+class ExecutePipelineRequest(BaseModel):
+    """
+    Validate, then dispatch the pipeline as one execution.
+    """
+
+    chip_id: Annotated[str, Field(min_length=1, title="Chip Id")]
+    spec: Annotated[dict[str, Any], Field(title="Spec")]
+    """
+    CalibrationPipelineSpec as JSON; see GET /calibration-pipelines/catalog.
+    """
+    backend_name: Annotated[str | None, Field(title="Backend Name")] = None
+    """
+    Defaults to the configured backend.
+    """
+    calibration_session_id: Annotated[
+        CalibrationSessionId1 | None, Field(title="Calibration Session Id")
+    ] = None
+    """
+    Record the run in this calibration session, which must be open, on this chip, and created by the signed-in user. It groups the run with the session's other work and grants nothing: the run is the request approved here. Requires idempotency_key.
+    """
+    idempotency_key: Annotated[IdempotencyKey | None, Field(title="Idempotency Key")] = None
+    """
+    With calibration_session_id: a retry with the same key and request returns the recorded run instead of starting another, and a run whose launch outcome is unknown is never launched again with it.
+    """
+    reported_origin: ReportedLaunchOrigin | None = None
+    """
+    How the caller says it started the run, such as an agent tool. QDash stores it as given and shows it as reported: it is not verified, does not link the run to an agent session, and grants nothing. The signed-in user stays responsible for the run.
+    """
+
+
 class ExecutionComparisonResponse(BaseModel):
     """
     Response model for execution comparison.
@@ -8180,42 +8322,6 @@ class ExecutionComparisonResponse(BaseModel):
     unchanged_count: Annotated[int, Field(title="Unchanged Count")]
 
 
-class ExecutionGroupItem(BaseModel):
-    """
-    One row of the grouped Execution list: an execution, or an agent session.
-    """
-
-    kind: Annotated[Kind3, Field(title="Kind")]
-    sort_at: Annotated[AwareDatetime | None, Field(title="Sort At")] = None
-    """
-    Time the row is ordered by: the execution start, or the session's latest activity within the day filter
-    """
-    execution: ExecutionResponseSummary | None = None
-    """
-    Set for an execution row
-    """
-    agent_session: AgentSessionGroupSummary | None = None
-    """
-    Set for an agent session row
-    """
-    children: Annotated[list[AgentSessionChildExecution] | None, Field(title="Children")] = None
-    """
-    The session's latest executions in dispatch order; at most children_limit
-    """
-    children_total: Annotated[int, Field(title="Children Total")] = 0
-    """
-    Every execution the session dispatched
-    """
-    children_in_filter: Annotated[int, Field(title="Children In Filter")] = 0
-    """
-    The session's executions that match the day filter
-    """
-    children_omitted: Annotated[int, Field(title="Children Omitted")] = 0
-    """
-    Earlier executions left out of children; the graph lists all
-    """
-
-
 class ExecutionPlanRun(BaseModel):
     """
     One CalibService.run call of the entrypoint.
@@ -8226,6 +8332,49 @@ class ExecutionPlanRun(BaseModel):
     Literal targets of the call; null when computed at run time
     """
     steps: Annotated[list[ExecutionPlanStep], Field(title="Steps")]
+
+
+class ExecutionResponseSummary(BaseModel):
+    """
+    ExecutionResponseSummary is a Pydantic model that represents the summary of an execution response.
+
+    Attributes
+    ----------
+        name (str): The name of the execution.
+        execution_id (str): The ID of the execution.
+        status (str): The current status of the execution.
+        start_at (datetime | None): The start time of the execution.
+        end_at (datetime | None): The end time of the execution.
+        elapsed_time (timedelta | None): The total elapsed time of the execution.
+        user_id (str | None): Internal ID of the user who started the execution.
+        username (str): Username snapshot of the user who started the execution.
+        tags (list[str]): Tags associated with the execution.
+        note (dict): Notes for the execution.
+    """
+
+    name: Annotated[str, Field(title="Name")]
+    execution_id: Annotated[str, Field(title="Execution Id")]
+    status: Annotated[str, Field(title="Status")]
+    message: Annotated[str, Field(title="Message")] = ""
+    user_id: Annotated[str | None, Field(title="User Id")] = None
+    username: Annotated[str, Field(title="Username")] = ""
+    start_at: Annotated[AwareDatetime | None, Field(title="Start At")] = None
+    end_at: Annotated[AwareDatetime | None, Field(title="End At")] = None
+    elapsed_time: Annotated[timedelta | None, Field(title="Elapsed Time")] = None
+    tags: Annotated[list[str], Field(title="Tags")]
+    note: Annotated[dict[str, Any], Field(title="Note")]
+    agent_session: ExecutionAgentSessionLink | None = None
+    """
+    Set only when an action of an agent session dispatched this execution; a tag alone never sets it
+    """
+    calibration_session: ExecutionCalibrationSessionLink | None = None
+    """
+    The calibration session this execution belongs to, from QDash's own records: a pipeline run recorded in it, or an action of an agent session admitted to it. Null when no record relates it, or when records disagree on the session
+    """
+    reported_origin: ReportedLaunchOrigin | None = None
+    """
+    How the caller that launched this execution's pipeline said it was started, such as an agent tool. Client reported, not verified by QDash; null when nothing was reported. The recorded user is still the one whose sign-in started it
+    """
 
 
 class FlowExecutionPlanResponse(BaseModel):
@@ -8539,6 +8688,26 @@ class ListAgentSessionsResponse(BaseModel):
     """
 
 
+class ListCalibrationSessionsResponse(BaseModel):
+    """
+    Calibration sessions of the current project, newest first.
+    """
+
+    items: Annotated[list[CalibrationSessionResponse], Field(title="Items")]
+    total: Annotated[int, Field(title="Total")]
+    """
+    Number of sessions returned, after filters and the limit
+    """
+    skip: Annotated[int, Field(title="Skip")] = 0
+    """
+    Sessions skipped before the first one returned
+    """
+    has_more: Annotated[bool, Field(title="Has More")] = False
+    """
+    True when more sessions match after the ones returned
+    """
+
+
 class ListChipsResponse(BaseModel):
     """
     Response model for listing chips.
@@ -8608,38 +8777,17 @@ class ListEvaluationsResponse(BaseModel):
     evaluations: Annotated[list[EvaluationItem], Field(title="Evaluations")]
 
 
-class ListExecutionGroupsResponse(BaseModel):
+class ListExecutionsResponse(BaseModel):
     """
-    A page of the Execution list with agent sessions grouped on the server.
+    Response model for listing executions.
 
-    Grouping happens before pagination, so a session is one row on one page with all its
-    executions, and no execution appears both in a group and as its own row. ``total`` counts
-    rows; ``total_executions`` counts real executions, the number the ungrouped list reports.
+    Wraps list of executions for API consistency and future extensibility (e.g., pagination).
     """
 
-    items: Annotated[list[ExecutionGroupItem], Field(title="Items")]
-    total: Annotated[int, Field(title="Total")]
-    """
-    Rows: agent sessions plus executions outside a session
-    """
-    total_executions: Annotated[int, Field(title="Total Executions")]
-    """
-    Real executions that match the filter, grouped or not
-    """
-    grouped_executions: Annotated[int, Field(title="Grouped Executions")]
-    """
-    Executions that match the filter and are shown inside a session row
-    """
-    agent_sessions: Annotated[int, Field(title="Agent Sessions")]
-    """
-    Agent session rows that match the filter
-    """
-    skip: Annotated[int, Field(title="Skip")]
-    limit: Annotated[int, Field(title="Limit")]
-    children_limit: Annotated[int, Field(title="Children Limit")]
-    """
-    Most executions one session row lists
-    """
+    executions: Annotated[list[ExecutionResponseSummary], Field(title="Executions")]
+    total: Annotated[int | None, Field(title="Total")] = None
+    skip: Annotated[int | None, Field(title="Skip")] = None
+    limit: Annotated[int | None, Field(title="Limit")] = None
 
 
 class ListForumPostsResponse(BaseModel):
@@ -9648,26 +9796,81 @@ class AgentSessionAuditResponse(BaseModel):
     """
 
 
-class AgentSessionGraphResponse(BaseModel):
+class AgentSessionChildExecution(BaseModel):
     """
-    One agent session as an experiment graph over its real executions.
-
-    A live read of the session's records, collected one after another: statuses can move while
-    it is read, and it is not a snapshot. The full audit, with its consistency check and export,
-    stays on the session's audit endpoints.
+    A real execution one action of the session dispatched.
     """
 
-    generated_at: Annotated[AwareDatetime, Field(title="Generated At")]
-    session: AgentSessionGroupSummary
-    nodes: Annotated[list[AgentSessionGraphNode], Field(title="Nodes")]
-    edges: Annotated[list[AgentSessionGraphEdge], Field(title="Edges")]
-    total_nodes: Annotated[int, Field(title="Total Nodes")]
-    omitted_nodes: Annotated[int, Field(title="Omitted Nodes")]
+    action_id: Annotated[str, Field(title="Action Id")]
+    sequence: Annotated[int, Field(title="Sequence")]
     """
-    Earliest nodes left out to bound the response; the audit holds them all
+    1-based dispatch order of the measurement in the session
     """
-    complete: Annotated[bool, Field(title="Complete")]
-    notes: Annotated[list[str], Field(title="Notes")]
+    attempt: Annotated[int, Field(title="Attempt")]
+    """
+    1-based count of measurements of this task on this target so far
+    """
+    task_name: Annotated[str | None, Field(title="Task Name")] = None
+    qid: Annotated[str | None, Field(title="Qid")] = None
+    in_filter: Annotated[bool, Field(title="In Filter")]
+    """
+    Whether the execution matches the list's day filter; true without one
+    """
+    execution: ExecutionResponseSummary
+
+
+class AgentSessionGroupSummary(BaseModel):
+    """
+    One agent session as a group of the Execution list.
+
+    ``status`` is the session's own state, not an execution status: a session waiting for an
+    expert, or active between measurements, holds no hardware and is not failed for it.
+    """
+
+    session_id: Annotated[str, Field(title="Session Id")]
+    project_id: Annotated[str, Field(title="Project Id")]
+    chip_id: Annotated[str, Field(title="Chip Id")]
+    created_by: Annotated[str, Field(title="Created By")]
+    created_at: Annotated[AwareDatetime, Field(title="Created At")]
+    updated_at: Annotated[AwareDatetime, Field(title="Updated At")]
+    expires_at: Annotated[AwareDatetime, Field(title="Expires At")]
+    status: AgentSessionStatus
+    """
+    The session's state; an active or paused session past its expiry reads as expired even before a write records it
+    """
+    stored_status: AgentSessionStatus
+    """
+    The status the session record holds
+    """
+    active_intervention_id: Annotated[str | None, Field(title="Active Intervention Id")] = None
+    """
+    The intervention the session waits on, when paused
+    """
+    qids: Annotated[list[str], Field(title="Qids")]
+    allowed_tasks: Annotated[list[str], Field(title="Allowed Tasks")]
+    autonomy: Annotated[str, Field(title="Autonomy")]
+    skill_name: Annotated[str, Field(title="Skill Name")] = ""
+    model: AgentModelIdentity | None = None
+    """
+    The model the creating host reported; later steps carry their own. Client reported, not verified by QDash
+    """
+    model_name: Annotated[str, Field(title="Model Name")] = ""
+    """
+    provider/model_id of model; empty when none was reported
+    """
+    calibration_session: CalibrationSessionRef | None = None
+    """
+    The calibration session the session was admitted to, when it was created in one; null for a session created alone, or one not admitted
+    """
+    counts: AgentSessionGroupCounts
+    latest_activity_at: Annotated[AwareDatetime, Field(title="Latest Activity At")]
+    """
+    The session's latest measurement start, or its creation before the first
+    """
+    missing: Annotated[list[str] | None, Field(title="Missing")] = None
+    """
+    Facts the records do not hold, such as a dispatched execution not found, an execution held by another action, or a record the session has not written yet
+    """
 
 
 class AllConfigResponse(BaseModel):
@@ -9690,6 +9893,142 @@ class BulkUserImportResponse(BaseModel):
     skipped: Annotated[int, Field(title="Skipped")]
     failed: Annotated[int, Field(title="Failed")]
     total: Annotated[int, Field(title="Total")]
+
+
+class CalibrationAgentSessionChild(BaseModel):
+    """
+    An agent session created in a calibration session, with the executions it dispatched.
+    """
+
+    session_id: Annotated[str, Field(title="Session Id")]
+    status: AgentSessionStatus
+    """
+    Its own status, with expiry applied
+    """
+    created_by: Annotated[str, Field(title="Created By")]
+    created_at: Annotated[AwareDatetime, Field(title="Created At")]
+    expires_at: Annotated[AwareDatetime, Field(title="Expires At")]
+    autonomy: AgentAutonomy
+    qids: Annotated[list[str], Field(title="Qids")]
+    allowed_tasks: Annotated[list[str], Field(title="Allowed Tasks")]
+    action_count: Annotated[int, Field(title="Action Count")]
+    active_intervention_id: Annotated[str | None, Field(title="Active Intervention Id")] = None
+    model_name: Annotated[str, Field(title="Model Name")] = ""
+    calibration_admission: CalibrationAdmission | None = None
+    """
+    pending until its start is finalized, admitted after, rejected when the session was closed first; it operates only when admitted
+    """
+    executions: Annotated[list[ExecutionResponseSummary] | None, Field(title="Executions")] = None
+    """
+    Executions its actions dispatched, as the agent session links them
+    """
+
+
+class CalibrationPipelineRunResponse(BaseModel):
+    """
+    One pipeline run requested in a calibration session, with its step executions.
+    """
+
+    run_id: Annotated[str, Field(title="Run Id")]
+    calibration_session_id: Annotated[str, Field(title="Calibration Session Id")]
+    chip_id: Annotated[str, Field(title="Chip Id")]
+    idempotency_key: Annotated[str, Field(title="Idempotency Key")]
+    requested_by: Annotated[str, Field(title="Requested By")]
+    reported_origin: ReportedLaunchOrigin | None = None
+    """
+    How the caller said it started the run (client reported, not verified); null when nothing was reported, as for a run requested directly
+    """
+    dispatch_status: CalibrationPipelineRunStatus
+    """
+    Whether QDash launched the run: dispatching, dispatched, rejected (nothing was started), or unknown (it may have started; check the Execution list)
+    """
+    attempts: Annotated[int, Field(title="Attempts")]
+    pipeline_name: Annotated[str, Field(title="Pipeline Name")]
+    backend_name: Annotated[str, Field(title="Backend Name")]
+    flow_run_id: Annotated[str | None, Field(title="Flow Run Id")] = None
+    execution_id: Annotated[str | None, Field(title="Execution Id")] = None
+    """
+    The first step's execution, as returned at dispatch
+    """
+    error: Annotated[str, Field(title="Error")] = ""
+    requested_at: Annotated[AwareDatetime, Field(title="Requested At")]
+    updated_at: Annotated[AwareDatetime, Field(title="Updated At")]
+    pipeline: PipelineProgress | None = None
+    """
+    The run as a whole, from its step executions; null until its first execution exists
+    """
+    executions: Annotated[list[ExecutionResponseSummary] | None, Field(title="Executions")] = None
+    """
+    Every execution of the run's flow run on the chip, oldest first
+    """
+
+
+class CalibrationSessionDetailResponse(BaseModel):
+    """
+    A calibration session with every run started in it.
+    """
+
+    calibration_session_id: Annotated[str, Field(title="Calibration Session Id")]
+    project_id: Annotated[str, Field(title="Project Id")]
+    chip_id: Annotated[str, Field(title="Chip Id")]
+    objective: Annotated[str, Field(title="Objective")]
+    created_by: Annotated[str, Field(title="Created By")]
+    """
+    The signed-in user who created it
+    """
+    status: CalibrationSessionStatus
+    created_at: Annotated[AwareDatetime, Field(title="Created At")]
+    updated_at: Annotated[AwareDatetime, Field(title="Updated At")]
+    closed_at: Annotated[AwareDatetime | None, Field(title="Closed At")] = None
+    closed_by: Annotated[str | None, Field(title="Closed By")] = None
+    closing_note: Annotated[str, Field(title="Closing Note")] = ""
+    closed_with_unknown_runs: Annotated[
+        list[str] | None, Field(title="Closed With Unknown Runs")
+    ] = None
+    """
+    Pipeline runs whose dispatch outcome was unknown when it was closed
+    """
+    closed_with_unknown_starts: Annotated[
+        list[CalibrationChildReservation] | None,
+        Field(title="Closed With Unknown Starts"),
+    ] = None
+    """
+    Agent session starts reserved long ago and never recorded when it was closed. One recorded later is rejected (calibration_admission: rejected) and never operates.
+    """
+    pipeline_runs: Annotated[
+        list[CalibrationPipelineRunResponse] | None, Field(title="Pipeline Runs")
+    ] = None
+    """
+    The most recent pipeline runs (at most 100), oldest first
+    """
+    pipeline_run_total: Annotated[int, Field(title="Pipeline Run Total")] = 0
+    """
+    Every pipeline run requested in it; more than listed when the list is cut
+    """
+    agent_sessions: Annotated[
+        list[CalibrationAgentSessionChild] | None, Field(title="Agent Sessions")
+    ] = None
+    """
+    The most recent agent sessions (at most 100), oldest first
+    """
+    agent_session_total: Annotated[int, Field(title="Agent Session Total")] = 0
+    """
+    Every agent session created in it; more than listed when the list is cut
+    """
+    close_blockers: Annotated[list[str] | None, Field(title="Close Blockers")] = None
+    """
+    Why it cannot be closed now, read from every child (not only the listed ones): runs and agent sessions that still run or wait, operations an ended agent session has not settled, and children being started. Empty when closing is allowed.
+    """
+    unknown_runs: Annotated[list[str] | None, Field(title="Unknown Runs")] = None
+    """
+    Pipeline runs whose dispatch outcome is unknown. Each was admitted, so it may be running or may still start, even after the session is closed
+    """
+    unknown_starts: Annotated[
+        list[CalibrationChildReservation] | None, Field(title="Unknown Starts")
+    ] = None
+    """
+    Agent session starts reserved long ago whose session was never recorded; the request may have stopped or may still record it. One recorded after a close is rejected and never operates
+    """
 
 
 class CreateEvaluationRunResponse(BaseModel):
@@ -9772,6 +10111,54 @@ class ExecutePipelineResponse(BaseModel):
     """
     steps: Annotated[list[ResolvedPipelineStep] | None, Field(title="Steps")] = None
     targets: ResolvedPipelineTargets | None = None
+    calibration_session_id: Annotated[str | None, Field(title="Calibration Session Id")] = None
+    """
+    The calibration session the run is recorded in, if any
+    """
+    pipeline_run_id: Annotated[str | None, Field(title="Pipeline Run Id")] = None
+    """
+    The run's record in that calibration session
+    """
+    replayed: Annotated[bool, Field(title="Replayed")] = False
+    """
+    True when a retry returned the run an earlier request with its key started
+    """
+
+
+class ExecutionGroupItem(BaseModel):
+    """
+    One row of the grouped Execution list: an execution, or an agent session.
+    """
+
+    kind: Annotated[Kind3, Field(title="Kind")]
+    sort_at: Annotated[AwareDatetime | None, Field(title="Sort At")] = None
+    """
+    Time the row is ordered by: the execution start, or the session's latest activity within the day filter
+    """
+    execution: ExecutionResponseSummary | None = None
+    """
+    Set for an execution row
+    """
+    agent_session: AgentSessionGroupSummary | None = None
+    """
+    Set for an agent session row
+    """
+    children: Annotated[list[AgentSessionChildExecution] | None, Field(title="Children")] = None
+    """
+    The session's latest executions in dispatch order; at most children_limit
+    """
+    children_total: Annotated[int, Field(title="Children Total")] = 0
+    """
+    Every execution the session dispatched
+    """
+    children_in_filter: Annotated[int, Field(title="Children In Filter")] = 0
+    """
+    The session's executions that match the day filter
+    """
+    children_omitted: Annotated[int, Field(title="Children Omitted")] = 0
+    """
+    Earlier executions left out of children; the graph lists all
+    """
 
 
 class ExecutionResponseDetail(BaseModel):
@@ -9814,6 +10201,14 @@ class ExecutionResponseDetail(BaseModel):
     """
     The agent session whose action dispatched this execution, or the session only its tag names (linked false); null for an execution outside agent sessions
     """
+    calibration_session: ExecutionCalibrationSessionLink | None = None
+    """
+    The calibration session this execution belongs to, from QDash's own records: a pipeline run recorded in it, or an action of an agent session admitted to it. Null when no record relates it, or when records disagree on the session
+    """
+    reported_origin: ReportedLaunchOrigin | None = None
+    """
+    How the caller that launched this execution's pipeline said it was started, such as an agent tool. Client reported, not verified by QDash; null when nothing was reported. The recorded user is still the one whose sign-in started it
+    """
 
 
 class ImpactResponse(BaseModel):
@@ -9845,6 +10240,40 @@ class ListAgentInterventionsResponse(BaseModel):
 
     items: Annotated[list[AgentInterventionResponse], Field(title="Items")]
     total: Annotated[int, Field(title="Total")]
+
+
+class ListExecutionGroupsResponse(BaseModel):
+    """
+    A page of the Execution list with agent sessions grouped on the server.
+
+    Grouping happens before pagination, so a session is one row on one page with all its
+    executions, and no execution appears both in a group and as its own row. ``total`` counts
+    rows; ``total_executions`` counts real executions, the number the ungrouped list reports.
+    """
+
+    items: Annotated[list[ExecutionGroupItem], Field(title="Items")]
+    total: Annotated[int, Field(title="Total")]
+    """
+    Rows: agent sessions plus executions outside a session
+    """
+    total_executions: Annotated[int, Field(title="Total Executions")]
+    """
+    Real executions that match the filter, grouped or not
+    """
+    grouped_executions: Annotated[int, Field(title="Grouped Executions")]
+    """
+    Executions that match the filter and are shown inside a session row
+    """
+    agent_sessions: Annotated[int, Field(title="Agent Sessions")]
+    """
+    Agent session rows that match the filter
+    """
+    skip: Annotated[int, Field(title="Skip")]
+    limit: Annotated[int, Field(title="Limit")]
+    children_limit: Annotated[int, Field(title="Children Limit")]
+    """
+    Most executions one session row lists
+    """
 
 
 class ListMetricScriptsResponse(BaseModel):
@@ -9927,6 +10356,28 @@ class PipelineCatalogResponse(BaseModel):
     JSON schema of CalibrationPipelineSpec.
     """
     example: Annotated[dict[str, Any] | None, Field(title="Example")] = None
+
+
+class AgentSessionGraphResponse(BaseModel):
+    """
+    One agent session as an experiment graph over its real executions.
+
+    A live read of the session's records, collected one after another: statuses can move while
+    it is read, and it is not a snapshot. The full audit, with its consistency check and export,
+    stays on the session's audit endpoints.
+    """
+
+    generated_at: Annotated[AwareDatetime, Field(title="Generated At")]
+    session: AgentSessionGroupSummary
+    nodes: Annotated[list[AgentSessionGraphNode], Field(title="Nodes")]
+    edges: Annotated[list[AgentSessionGraphEdge], Field(title="Edges")]
+    total_nodes: Annotated[int, Field(title="Total Nodes")]
+    omitted_nodes: Annotated[int, Field(title="Omitted Nodes")]
+    """
+    Earliest nodes left out to bound the response; the audit holds them all
+    """
+    complete: Annotated[bool, Field(title="Complete")]
+    notes: Annotated[list[str], Field(title="Notes")]
 
 
 FileTreeNode.model_rebuild()

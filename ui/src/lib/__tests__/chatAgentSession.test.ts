@@ -61,7 +61,7 @@ const measured = (status: string): AgentActionState => ({
   execution_id: "e1",
 });
 
-describe("what a calibration session waits for", () => {
+describe("what an agent session waits for", () => {
   it("never takes an active session for an agent at work", () => {
     const status = agentSessionStatus({ status: "active" }, null, [measured("completed")]);
     expect(status).toMatchObject({ phase: "next_decision", nextActor: "agent" });

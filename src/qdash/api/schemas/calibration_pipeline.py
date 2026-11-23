@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from qdash.api.schemas.flow import ExecuteFlowResponse
+from qdash.datamodel.launch_origin import ReportedLaunchOrigin  # noqa: TC001 - pydantic field
 from qdash.datamodel.task import TaskDocumentation  # noqa: TC001 - pydantic field type
 from qdash.datamodel.task_call import TaskCall  # noqa: TC001 - pydantic field type
 
@@ -165,12 +166,62 @@ class ValidatePipelineResponse(BaseModel):
 class ExecutePipelineRequest(ValidatePipelineRequest):
     """Validate, then dispatch the pipeline as one execution."""
 
+    calibration_session_id: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=200,
+        description=(
+            "Record the run in this calibration session, which must be open, on this chip, "
+            "and created by the signed-in user. It groups the run with the session's other "
+            "work and grants nothing: the run is the request approved here. Requires "
+            "idempotency_key."
+        ),
+    )
+    idempotency_key: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=128,
+        description=(
+            "With calibration_session_id: a retry with the same key and request returns the "
+            "recorded run instead of starting another, and a run whose launch outcome is "
+            "unknown is never launched again with it."
+        ),
+    )
+
+    reported_origin: ReportedLaunchOrigin | None = Field(
+        default=None,
+        description=(
+            "How the caller says it started the run, such as an agent tool. QDash stores it as "
+            "given and shows it as reported: it is not verified, does not link the run to an "
+            "agent session, and grants nothing. The signed-in user stays responsible for the run."
+        ),
+    )
+
+    @model_validator(mode="after")
+    def validate_calibration_session(self) -> ExecutePipelineRequest:
+        """An idempotency key only means something for a run recorded in a session."""
+        if (self.calibration_session_id is None) != (self.idempotency_key is None):
+            raise ValueError(
+                "calibration_session_id and idempotency_key are given together or not at all"
+            )
+        return self
+
 
 class ExecutePipelineResponse(ExecuteFlowResponse):
     """Dispatch result plus the resolved plan that was started."""
 
     steps: list[ResolvedPipelineStep] = Field(default_factory=list)
     targets: ResolvedPipelineTargets | None = None
+    calibration_session_id: str | None = Field(
+        default=None, description="The calibration session the run is recorded in, if any"
+    )
+    pipeline_run_id: str | None = Field(
+        default=None, description="The run's record in that calibration session"
+    )
+    replayed: bool = Field(
+        default=False,
+        description="True when a retry returned the run an earlier request with its key started",
+    )
 
 
 class PipelineStepTypeInfo(BaseModel):

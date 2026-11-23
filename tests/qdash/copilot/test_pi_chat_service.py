@@ -166,6 +166,43 @@ class TestTranslate:
         assert "classification" not in ends[2]
 
     @pytest.mark.asyncio
+    async def test_tool_end_carries_only_a_created_calibration_session(self) -> None:
+        created = {"calibrationSessionId": "cs-1", "chipId": "64Qv3"}
+        tool = "qdash_create_calibration_session"
+        events = await _collect(
+            {"type": "tool_start", "name": tool, "id": "s1", "args": {"objective": "x"}},
+            {
+                "type": "tool_end",
+                "name": tool,
+                "id": "s1",
+                "isError": False,
+                "calibrationSession": {**created, "objective": "secret"},
+            },
+            # A failed create made nothing.
+            {"type": "tool_end", "name": tool, "isError": True, "calibrationSession": created},
+            # Another tool cannot claim to have created one.
+            {
+                "type": "tool_end",
+                "name": "qdash_get_calibration_session",
+                "isError": False,
+                "calibrationSession": created,
+            },
+            {
+                "type": "tool_end",
+                "name": tool,
+                "isError": False,
+                "calibrationSession": {"calibrationSessionId": "cs 1/.."},
+            },
+            {"type": "done", "text": "ok"},
+        )
+        ends = [data for name, data in events if name == "tool_end"]
+        assert ends[0]["calibration_session"] == {
+            "calibration_session_id": "cs-1",
+            "chip_id": "64Qv3",
+        }
+        assert all("calibration_session" not in end for end in ends[1:])
+
+    @pytest.mark.asyncio
     async def test_tool_end_carries_a_workspace_tools_answer(self) -> None:
         events = await _collect(
             {"type": "tool_start", "name": "bash", "id": "c9"},

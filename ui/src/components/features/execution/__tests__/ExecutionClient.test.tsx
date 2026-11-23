@@ -11,6 +11,9 @@ vi.mock("@/client/execution/execution", () => ({
   useGetExecution: () => ({ data: { data: execution }, isLoading: false, isError: false }),
   useCancelExecution: () => ({ mutate: vi.fn(), isPending: false }),
 }));
+vi.mock("@/contexts/ProjectContext", () => ({
+  useProject: () => ({ projectId: "lab-a" }),
+}));
 vi.mock("@/contexts/ChatDockContext", () => ({
   useOptionalChatDock: () => ({ investigate }),
 }));
@@ -142,5 +145,51 @@ describe("ExecutionDetailClient agent session link", () => {
     execution = { name: "Daily run", status: "completed", chip_id: "64Q", task: [] };
     render(<ExecutionDetailClient chipId="64Q" executionId="exec-1" />);
     expect(screen.queryByRole("note")).toBeNull();
+  });
+});
+
+describe("ExecutionDetailClient calibration session", () => {
+  const member = {
+    calibration_session_id: "cs-1",
+    chip_id: "64Q",
+    objective: "Bring up qubits",
+    status: "closed",
+    via: "pipeline_run",
+    pipeline_run_id: "cpr-1",
+  };
+
+  it("links a manual pipeline step back to its calibration session, without an agent label", () => {
+    execution = {
+      name: "Pipeline step",
+      status: "completed",
+      chip_id: "64Q",
+      username: "carol",
+      task: [],
+      calibration_session: member,
+    };
+    render(<ExecutionDetailClient chipId="64Q" executionId="exec-1" />);
+    const note = screen.getByTestId("execution-calibration-notice");
+    expect(note.textContent).toContain("Bring up qubits (closed)");
+    expect(
+      screen.getByRole("link", { name: "Open calibration session" }).getAttribute("href"),
+    ).toBe("/calibration-sessions/cs-1?project=lab-a");
+    expect(screen.queryByText("Agent")).toBeNull();
+    expect(screen.queryByTestId("reported-origin-badge")).toBeNull();
+  });
+
+  it("keeps the recorded user and marks a reported agent tool origin as reported", () => {
+    execution = {
+      name: "Pipeline step",
+      status: "completed",
+      chip_id: "64Q",
+      username: "carol",
+      task: [],
+      reported_origin: { source: "agent_tool", tool: "qdash_run_pipeline", client: "pi-qdash" },
+    };
+    render(<ExecutionDetailClient chipId="64Q" executionId="exec-1" />);
+    expect(screen.getByText("@carol")).toBeTruthy();
+    expect(screen.getByTestId("reported-origin-badge").textContent).toBe("Agent tool, reported");
+    expect(screen.queryByText("Agent")).toBeNull();
+    expect(screen.queryByRole("link", { name: "Open calibration session" })).toBeNull();
   });
 });

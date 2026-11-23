@@ -76,6 +76,37 @@ docker compose up -d --build api
 
 `task restart-api` is the Go Task shortcut for restarting the API container.
 
+## Upgrade Calibration Session Support
+
+Calibration session support adds collections and indexes without rewriting existing calibration
+history. Keep the existing database and configuration volumes when upgrading.
+
+1. Stop accepting new calibration requests, including requests from external clients and
+   scheduled workflows. Let running work finish before replacing services.
+2. Confirm that the API and workflow worker use the same MongoDB host, port, and database.
+   The execution repository now honors `MONGO_HOST` and, outside the `mongo` Docker hostname,
+   `MONGO_PORT`, matching the other database connections.
+3. Replace all API instances with the new release while requests remain stopped. Do not route
+   requests across old and new API versions: an older API can ignore session association and
+   retry fields and start an unrecorded run. Replace the UI, agent runtime, and workers with
+   the matching release before reopening access.
+4. Check startup logs for database or index errors and verify the service health. Existing
+   executions must remain visible, and **Execution → Calibration sessions** must open.
+5. Resume access, then update independently installed pi-qdash clients and SDKs. A client
+   preflight does not make a mixed API deployment safe.
+
+Before rolling back, stop new requests and running agent conversations while the new API is
+still available. Wait for in-flight measurements, parameter updates, and pipeline runs to
+settle. Resolve every pending agent-session admission and every unknown pipeline outcome;
+closing a calibration session does not cancel a pipeline already accepted for launch. If an
+outcome cannot be established, keep the new API and investigate rather than rolling back.
+An older API does not enforce the new admission checks. Keep requests stopped until all API,
+runtime, UI, and worker instances use the selected release. Retain the added collections and
+indexes; deleting them does not make an unresolved run safe to retry.
+
+The [admission and dispatch records](../developer-guide/copilot/calibration-sessions.md#deployment-compatibility)
+explain which states must be resolved before rollback.
+
 ## Open a Database Shell
 
 MongoDB and PostgreSQL open no host port, so run their clients inside the containers with the
