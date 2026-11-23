@@ -1,140 +1,64 @@
 # AI Evaluations
 
-Use a recorded AI evaluation to judge task-result figures consistently, inspect what the model
-received, and compare evaluation settings.
+Use recorded evaluations to review task figures and compare models or prompts. Verify AI findings
+against the underlying evidence before changing calibration state.
 
-AI output is supporting evidence. Confirm every finding against the figure, raw data, task
-knowledge, and current calibration context before changing parameters or excluding data.
+Starting an evaluation requires Editor or Owner access and configured [AI endpoints](./setup/ai.md).
+If you only have Viewer access, ask an editor to run the evaluation.
 
 ## Prepare the Task Reference
 
-The evaluation uses the selected task's reference in **Knowledge**. Before evaluating a new task
-or failure mode:
-
-1. Open **Knowledge** and select the task.
-2. Review its expected plot, common failures, parameters to extract, and expert-labeled examples
-   (used by **In-context** evaluation).
-3. Open **Evaluation prompts** and select **Preview** to read the prompts the model will receive.
-
-**Knowledge** is read-only. To evaluate with a changed reference or new examples, use a knowledge
-draft as described below.
+Open the task in **Knowledge**. Check its expected plot, failures, and examples. Use
+**Evaluation prompts → Preview** to read the prompt. Knowledge is read-only; test changes as a draft.
 
 ## Start an Evaluation
 
-Use either entry point:
+1. Select **Evaluate** on **Chip**, or **Ask Agent → Evaluate the figure** on a result.
+2. Choose targets that have finished and have figures.
+3. Select the model and settings below, review the request, then confirm.
 
-- On **Chip**, select a task and choose **Evaluate** to judge the displayed results across the
-  topology. Under **Targets**, clear any qubits or couplings you do not want to include.
-- On a task result, select **Ask Agent**, then **Evaluate the figure** to judge that one result.
+| Setting | Choices |
+| --- | --- |
+| **Who prepares the prompt** | **Fixed prompt** for direct evaluation; **Via Agent** for agent preparation |
+| **Examples** | **Zero-shot** for the reference alone; **In-context** to include labeled examples |
 
-A result that is still running or has no figure cannot be selected. After you confirm, the
-result's **AI evaluation** section says an evaluation is on its way until its record appears.
-
-Choose the evaluation settings before confirming:
-
-| Setting | Choice | Use when |
-| --- | --- | --- |
-| **Evaluation model** | Any configured model | Choose which model judges every selected figure. The first configured model is selected initially. |
-| **Who prepares the prompt** | **Fixed prompt** | You need a fast, reproducible prompt built directly by QDash. |
-| | **Via Agent** | You want Agent to summarize the result and call the evaluation model. |
-| **Examples** | **Zero-shot** | The task reference is enough. |
-| | **In-context** | Expert-labeled examples should be shown before the result. |
-
-Review the request summary, including the model name, then confirm. QDash records the selected
-model and targets as one evaluation run. Retrying unfinished evaluations keeps the run's model.
-
-Select **Cancel** on an active run to stop its unfinished evaluations. If a worker stops during
-a run, QDash marks evaluations that remain unfinished for 30 minutes as interrupted. Select
-**Retry unfinished** to run failed, interrupted, or cancelled evaluations again without repeating
-the completed ones.
+Use **Cancel** to stop unfinished evaluations. **Retry unfinished** retries failed, interrupted,
+or cancelled items without repeating completed ones, using the same model.
 
 ## Try a Knowledge Change Before Proposing It
 
-Evaluate against a knowledge draft to see how an edited reference changes the judgments. The
-draft is read only by the run you start with it; **Knowledge** stays the same for everyone.
+1. On **Knowledge**, select **Download zip** for the task.
+2. Edit `task.md` and `examples/`, preserving required headings and identity fields, then zip them.
+3. Start an evaluation and upload the zip under **Knowledge**.
+4. Review warnings and confirm. Drafts use **Fixed prompt**.
+5. Compare with a run using shared knowledge before proposing a repository change.
 
-1. On **Knowledge**, open the task and select **Download zip**. Edit `task.md` and
-   `examples/` in the unzipped folder without changing their YAML frontmatter identity fields,
-   then zip the folder again. The zip holds one task, either
-   at the top or in one folder named after the task. It may contain only `.md`, `.png`, `.jpg`,
-   `.jpeg` and `.webp` files, up to 200 files, 20 MB zipped and 50 MB unpacked.
-2. Start an evaluation of that task as described above.
-3. Drop the zip on **Knowledge**, or select that area to choose the file. The dialog shows the
-   draft's statuses, parameters and example count, and lists any format warnings. A zip for a
-   different task is refused.
-4. Confirm. **Who prepares the prompt** is fixed to **Fixed prompt**, because Agent reads the
-   shared knowledge.
-5. Compare the run with one that used the shared knowledge. The **Knowledge** row shows which
-   run used the draft.
-
-The run's page shows the draft under **Knowledge**. Select **Download zip** there to get the
-zip exactly as it was uploaded, to inspect what the run read, propose it, or start the next
-edit from it.
-
-To read the prompts a draft turns into before evaluating, open the task in **Knowledge**, drop
-the zip on the draft area under **Evaluation prompts**, then select **Preview**. Only project
-editors can upload a draft.
-
-When the draft improves the judgments, propose the change to the task-knowledge repository.
+The zip must contain one task, with only Markdown and PNG/JPEG/WebP images: at most 200 files,
+20 MB zipped, and 50 MB unpacked. Only project editors upload drafts. The draft affects this run
+only; its page retains the original zip for download.
 
 ## Find a Run
 
-**AI Evaluations** lists every run of the current project, newest first, 25 runs per page. Filter
-by **Chip** or **Task** to narrow the list; changing a filter returns to the first page. Use
-**Next** and **Previous** to move through the pages. Every run stays reachable however old it
-is, and the line above the list shows which runs the page holds out of the total that matches
-the filters.
-
-The filters and the page are kept in the address, so reloading, going back, or sharing the link
-opens the same list. A page past the end, for example from an old link after runs were removed,
-opens the last page that has runs.
+Open **AI Evaluations** and filter by **Chip** or **Task**. Use **Next** and **Previous** for older runs.
 
 ## Read a Run
 
-Open **AI Evaluations** and select a run. Each evaluated target shows the model's reading of the
-plot, outcome, significance, fit quality, extracted parameters, and status.
+Open a run to inspect judgments and extracted values. Incomplete answers do not count as
+**Complete**. Expand **Prompt sent to the model** for the actual text and figures used.
 
-An evaluation is complete only when every required answer is present. A missing answer leaves it
-incomplete and excludes it from the run's **Complete** count.
-
-Expand **Prompt sent to the model** to inspect the exact text and figures used for one target. The
-run-level **Prompt** panel summarizes the reference version, example count, and prompt consistency
-across the run. QDash distinguishes requested inputs from inputs actually used, so a missing
-reference or an **In-context** request that found no examples is visible on the evaluation. New
-evaluations keep immutable copies of input figures up to 10 MB each. Older records and larger
-figures fall back to the current result and knowledge figures and warn when their hashes changed.
-
-Each evaluation shows its largest prompt in tokens, images included, and how much of the
-model's context window it filled with the answer; **Tokens** in the **Prompt** panel shows the
-largest across the run. A value marked as close to the context limit means the answer may be cut
-short: evaluate **Zero-shot**, use a draft with fewer examples, or ask the operator for a model
-with a larger window.
+Check warnings about missing examples, changed figures, or context limits. If a prompt is too
+large, use fewer examples, **Zero-shot**, or a model with a larger context window.
 
 ## Record Agreement
 
-Select **Agree** or **Disagree** on each evaluation after checking the underlying result. For a
-disagreement, classify whether the problem is parameter extraction, diagnosis, recommendation,
-insufficient evidence, or another issue. Add a note when the verdict needs context. QDash keeps
-each reviewer's current verdict and the review history. The run's agreement rate uses the most
-recent current verdict on each evaluation, so do not mark agreement based only on whether the
-model reported success.
+After checking the result, select **Agree** or **Disagree**. For a disagreement, choose the issue
+and add useful context. Review history is retained.
 
 ## Compare Two Runs
 
-Use a comparison to measure the effect of a prompt, model, example, or result change:
+1. Select two runs for the same task and choose **Compare**, or use **Compare with…** in a run.
+2. Review setting differences and enable **Only differences** if useful.
+3. Expand a target to compare judgments; use **Prompt A vs B** to inspect inputs.
 
-1. On **AI Evaluations**, select two runs for the same task and choose **Compare**. The runs can
-   be on different pages or under different filters: a picked run stays listed in the bar above
-   the list until you remove it, select **Clear**, or switch to another project, which clears
-   the picks. You can also open one run and select **Compare with…**.
-2. Review the highlighted setting differences and run totals.
-3. Enable **Only differences** to focus on missing or conflicting judgments.
-4. Expand a target to compare both diagnoses and the figure. **Decision differs** means the
-   success, status, fit assessment, or outcome changed. **Content differs** means another diagnosis
-   field, such as an extracted parameter or recommendation, changed.
-5. Open **Prompt A vs B** when the prompt change may explain the outcome.
-
-A row marked as different results means the two runs judged different task results for that
-target. Treat it as a result change, not only as a model disagreement.
-
-How this works: [Calibration Evaluation](../developer-guide/agent/evaluation.md).
+When the runs judged different task results, the difference may come from the measurement rather
+than the model. How this works: [Calibration Evaluation](../developer-guide/agent/evaluation.md).

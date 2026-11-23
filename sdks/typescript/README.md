@@ -20,22 +20,17 @@ const chip = qdash.chip("64Qv3");
 const steps = [customOneQubit({ step_name: "t1", tasks: [{ name: "CheckT1" }] })];
 
 const check = await chip.validateCalibration(qubitTargets(["0", "1"]), steps); // nothing runs
+if (!check.valid) throw new Error("Invalid calibration spec");
 const run = await chip.calibrate(qubitTargets(["0", "1"]), steps); // measures
 const result = await run.wait({ timeoutSeconds: 3600 });
 console.log(run.executionId, result.status);
 ```
 
-`result.status` is the whole pipeline run's status. A timeout throws `QDashTimeoutError` and
-leaves the run going. `qdash.workflows.list()`, `get(name)` and `run(name, { parameters })` reach
-the project's registered workflows; `qdash.scripts` and `qdash.dashboards` save metric scripts
-and dashboards built with `Script` and `Dashboard`. `qdash.taskResults.compareLatest({ chipId, qid })` compares
-the two newest results of each task for one qubit or coupling. The SDK sends requests through the given `QDashClient`, and
-its error classes are the client's own, so `instanceof` works with either import. A session
-without a project uses the client's configuration as it is: when no project is configured
-there, QDash applies the user's default project.
+Check `check.valid` before calling `calibrate()`. The example measures real targets; choose them
+for your deployment. `wait()` returns the whole run's status. A timeout leaves the run active.
 
-The [TypeScript client reference](https://oqtopus-team.github.io/qdash/reference/clients/typescript#run-a-calibration)
-covers configuration and every call.
+See the [TypeScript reference](https://oqtopus-team.github.io/qdash/reference/clients/typescript)
+for configuration, workflows, metrics, and dashboards.
 
 ## Develop the Package
 

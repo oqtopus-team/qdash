@@ -2,6 +2,327 @@ import { defineConfig } from "vitepress";
 import { withMermaid } from "vitepress-plugin-mermaid";
 import { full as emoji } from "markdown-it-emoji";
 
+const userSidebar = [
+  {
+    text: "User Guide",
+    items: [
+      { text: "Overview", link: "/user-guide/" },
+      { text: "What is QDash", link: "/user-guide/what-is-qdash" },
+      {
+        text: "Set Up and Operate",
+        collapsed: true,
+        items: [
+          {
+            text: "Setup",
+            items: [
+              { text: "Install and Sign In", link: "/user-guide/setup" },
+              { text: "Fake Backend", link: "/user-guide/setup/fake-backend" },
+              {
+                text: "Qubex Backend",
+                link: "/user-guide/setup/qubex-backend",
+              },
+              { text: "AI Setup", link: "/user-guide/setup/ai" },
+            ],
+          },
+          { text: "Operations", link: "/user-guide/operations" },
+          { text: "System Updates", link: "/user-guide/system-updates" },
+          { text: "Upgrade MongoDB", link: "/user-guide/mongodb-upgrade" },
+        ],
+      },
+      {
+        text: "Get Started",
+        items: [
+          {
+            text: "Run Your First Calibration",
+            link: "/user-guide/first-calibration",
+          },
+          { text: "Application Tour", link: "/user-guide/application-tour" },
+        ],
+      },
+      {
+        text: "Run Calibrations",
+        items: [
+          {
+            text: "Running Calibrations",
+            link: "/user-guide/running-calibrations",
+          },
+          {
+            text: "Creating Workflows",
+            link: "/user-guide/creating-workflows",
+          },
+          {
+            text: "Manual Execution Rounds",
+            link: "/user-guide/manual-execution-rounds",
+          },
+          { text: "Task Parameters", link: "/user-guide/task-parameters" },
+          {
+            text: "Cryostats and Cool-downs",
+            link: "/user-guide/cryostats-and-cool-downs",
+          },
+        ],
+      },
+      {
+        text: "Review Results",
+        collapsed: true,
+        items: [
+          { text: "Overview", link: "/user-guide/overview" },
+          { text: "Dashboards", link: "/user-guide/dashboards" },
+          { text: "Metric Scripts", link: "/user-guide/metric-scripts" },
+          {
+            text: "Data and Provenance",
+            link: "/user-guide/data-and-provenance",
+          },
+          { text: "Reviewing Results", link: "/user-guide/reviewing-results" },
+        ],
+      },
+      {
+        text: "Collaborate and Manage Access",
+        collapsed: true,
+        items: [
+          {
+            text: "Projects and Data Sharing",
+            link: "/user-guide/projects-and-data-sharing",
+          },
+          {
+            text: "Authentication and Users",
+            link: "/user-guide/authentication-and-users",
+          },
+        ],
+      },
+      {
+        text: "Use AI Assistance",
+        collapsed: true,
+        items: [
+          { text: "Agent", link: "/user-guide/ai-chat" },
+          { text: "AI Evaluations", link: "/user-guide/ai-evaluations" },
+          { text: "Agent Calibration", link: "/user-guide/agent-calibration" },
+        ],
+      },
+    ],
+  },
+];
+
+const developerSidebar = [
+  {
+    text: "Developer Guide",
+    items: [
+      { text: "Overview", link: "/developer-guide/" },
+      { text: "Architecture", link: "/developer-guide/architecture" },
+      { text: "Setup", link: "/developer-guide/setup" },
+      { text: "Codebase", link: "/developer-guide/codebase" },
+      { text: "Commands", link: "/developer-guide/commands" },
+      { text: "Testing", link: "/developer-guide/testing" },
+      { text: "Development Flow", link: "/developer-guide/development-flow" },
+      { text: "Docs Guidelines", link: "/developer-guide/docs-guidelines" },
+      {
+        text: "Conventions",
+        collapsed: true,
+        items: [
+          {
+            text: "Datetime Handling",
+            link: "/developer-guide/conventions/datetime",
+          },
+          { text: "Logging", link: "/developer-guide/conventions/logging" },
+          {
+            text: "Credential Scanning",
+            link: "/developer-guide/conventions/credential-scan",
+          },
+        ],
+      },
+      {
+        text: "API",
+        collapsed: true,
+        items: [
+          { text: "Design Guidelines", link: "/developer-guide/api/design" },
+          { text: "Contracts", link: "/developer-guide/api/contracts" },
+          { text: "Code Structure", link: "/developer-guide/api/structure" },
+          { text: "Testing", link: "/developer-guide/api/testing" },
+        ],
+      },
+      {
+        text: "UI",
+        collapsed: true,
+        items: [
+          { text: "Architecture", link: "/developer-guide/ui/architecture" },
+          { text: "Guidelines", link: "/developer-guide/ui/guidelines" },
+          {
+            text: "API Integration",
+            link: "/developer-guide/ui/api-integration",
+          },
+          { text: "Design Policy", link: "/developer-guide/ui/design-policy" },
+          { text: "Testing", link: "/developer-guide/ui/testing" },
+        ],
+      },
+      {
+        text: "Workflow",
+        collapsed: true,
+        items: [
+          { text: "Quickstart", link: "/developer-guide/workflow/quickstart" },
+          {
+            text: "Engine Architecture",
+            link: "/developer-guide/workflow/engine-architecture",
+          },
+          { text: "Services", link: "/developer-guide/workflow/services" },
+          { text: "Task Calls", link: "/developer-guide/workflow/task-calls" },
+          {
+            text: "Pipeline Specs",
+            link: "/developer-guide/workflow/calibration-pipeline",
+          },
+          {
+            text: "Calibration Data Lifecycle",
+            link: "/developer-guide/workflow/calibration-data-lifecycle",
+          },
+          {
+            text: "Parameter Resolution",
+            link: "/developer-guide/workflow/parameter-resolution",
+          },
+          {
+            text: "Frequency Parameter Policy",
+            link: "/developer-guide/workflow/frequency-parameter-policy",
+          },
+          {
+            text: "Cross-Resonance Tasks",
+            link: "/developer-guide/workflow/cross-resonance-tasks",
+          },
+          { text: "Testing", link: "/developer-guide/workflow/testing" },
+        ],
+      },
+      {
+        text: "Agent",
+        collapsed: true,
+        items: [
+          { text: "Architecture", link: "/developer-guide/agent/architecture" },
+          {
+            text: "Model Configuration",
+            link: "/developer-guide/agent/model-configuration",
+          },
+          { text: "Pi Packages", link: "/developer-guide/agent/packages" },
+          {
+            text: "Pi Extension Design",
+            link: "/developer-guide/agent/extensions",
+          },
+          {
+            text: "Agent Platform",
+            link: "/developer-guide/agent/agent-platform",
+          },
+          {
+            text: "Agentic Calibration",
+            link: "/developer-guide/agent/agentic-calibration",
+          },
+          {
+            text: "Calibration Sessions",
+            link: "/developer-guide/agent/calibration-sessions",
+          },
+          {
+            text: "Calibration Session Audit",
+            link: "/developer-guide/agent/calibration-session-audit",
+          },
+          {
+            text: "Agent Loop Validation",
+            link: "/developer-guide/agent/agent-validation",
+          },
+          {
+            text: "Knowledge Layout",
+            link: "/developer-guide/agent/knowledge-layout",
+          },
+          {
+            text: "Calibration Evaluation",
+            link: "/developer-guide/agent/evaluation",
+          },
+          { text: "Workspace", link: "/developer-guide/agent/workspace" },
+          {
+            text: "Chat Streaming",
+            link: "/developer-guide/agent/chat-streaming",
+          },
+        ],
+      },
+      {
+        text: "Component Design",
+        collapsed: true,
+        items: [
+          {
+            text: "1-Qubit Scheduler",
+            link: "/developer-guide/architecture/one-qubit-scheduler",
+          },
+          {
+            text: "Ordering Strategies",
+            link: "/developer-guide/architecture/one-qubit-ordering-strategies",
+          },
+          {
+            text: "CR Scheduler",
+            link: "/developer-guide/architecture/cr-scheduler",
+          },
+          {
+            text: "Square Lattice",
+            link: "/developer-guide/architecture/square-lattice-topology",
+          },
+          { text: "Notes", link: "/developer-guide/architecture/notes" },
+          {
+            text: "Dashboards",
+            link: "/developer-guide/architecture/dashboards",
+          },
+          {
+            text: "Metric Scripts",
+            link: "/developer-guide/architecture/metric-scripts",
+          },
+          {
+            text: "Provenance",
+            link: "/developer-guide/architecture/provenance",
+          },
+          {
+            text: "Python SDK",
+            link: "/developer-guide/architecture/python-sdk",
+          },
+          {
+            text: "TypeScript SDK",
+            link: "/developer-guide/architecture/typescript-sdk",
+          },
+        ],
+      },
+      {
+        text: "Reference",
+        collapsed: true,
+        items: [
+          { text: "Overview", link: "/reference/" },
+          {
+            text: "Database Collections",
+            link: "/reference/database-structure",
+          },
+          { text: "OpenAPI", link: "/reference/openapi" },
+          { text: "Python Client", link: "/reference/clients/python" },
+          { text: "TypeScript Client", link: "/reference/clients/typescript" },
+          { text: "pi-qdash", link: "/reference/pi-qdash" },
+          { text: "pi-qcaleval", link: "/reference/pi-qcaleval" },
+          {
+            text: "Task Method Sources",
+            link: "/reference/task-method-sources",
+          },
+        ],
+      },
+      {
+        text: "Docs Tooling",
+        collapsed: true,
+        items: [
+          { text: "Demo GIFs", link: "/demos/README" },
+          { text: "Demo Video", link: "/demos/video/README" },
+        ],
+      },
+    ],
+  },
+];
+
+const communitySidebar = [
+  {
+    text: "Community",
+    collapsed: true,
+    items: [
+      { text: "Contributing", link: "/CONTRIBUTING" },
+      { text: "Code of Conduct", link: "/CODE_OF_CONDUCT" },
+      { text: "Security", link: "/SECURITY" },
+    ],
+  },
+];
+
 // Convert emoji to Fluent Emoji (flat SVG)
 function emojiToCodePoints(emoji: string): string {
   return [...emoji]
@@ -100,214 +421,13 @@ export default withMermaid(
         },
       ],
 
-      sidebar: [
-        {
-          text: "User Guide",
-          items: [
-            { text: "Overview", link: "/user-guide/" },
-            { text: "What is QDash", link: "/user-guide/what-is-qdash" },
-            {
-              text: "Set Up and Operate",
-              items: [
-                {
-                  text: "Setup",
-                  items: [
-                    { text: "Install and Sign In", link: "/user-guide/setup" },
-                    { text: "Fake Backend", link: "/user-guide/setup/fake-backend" },
-                    { text: "Qubex Backend", link: "/user-guide/setup/qubex-backend" },
-                    { text: "AI Setup", link: "/user-guide/setup/ai" },
-                  ],
-                },
-                { text: "Operations", link: "/user-guide/operations" },
-                { text: "System Updates", link: "/user-guide/system-updates" },
-                { text: "Upgrade MongoDB", link: "/user-guide/mongodb-upgrade" },
-              ],
-            },
-            {
-              text: "Get Started",
-              items: [
-                { text: "Run Your First Calibration", link: "/user-guide/first-calibration" },
-                { text: "Application Tour", link: "/user-guide/application-tour" },
-              ],
-            },
-            {
-              text: "Run Calibrations",
-              items: [
-                { text: "Running Calibrations", link: "/user-guide/running-calibrations" },
-                { text: "Creating Workflows", link: "/user-guide/creating-workflows" },
-                {
-                  text: "Manual Execution Rounds",
-                  link: "/user-guide/manual-execution-rounds",
-                },
-                { text: "Task Parameters", link: "/user-guide/task-parameters" },
-                {
-                  text: "Cryostats and Cool-downs",
-                  link: "/user-guide/cryostats-and-cool-downs",
-                },
-              ],
-            },
-            {
-              text: "Review Results",
-              items: [
-                { text: "Overview", link: "/user-guide/overview" },
-                { text: "Dashboards", link: "/user-guide/dashboards" },
-                { text: "Metric Scripts", link: "/user-guide/metric-scripts" },
-                { text: "Data and Provenance", link: "/user-guide/data-and-provenance" },
-                { text: "Reviewing Results", link: "/user-guide/reviewing-results" },
-              ],
-            },
-            {
-              text: "Collaborate and Manage Access",
-              items: [
-                {
-                  text: "Projects and Data Sharing",
-                  link: "/user-guide/projects-and-data-sharing",
-                },
-                {
-                  text: "Authentication and Users",
-                  link: "/user-guide/authentication-and-users",
-                },
-              ],
-            },
-            {
-              text: "Use AI Assistance",
-              items: [
-                { text: "Agent", link: "/user-guide/ai-chat" },
-                { text: "AI Evaluations", link: "/user-guide/ai-evaluations" },
-                { text: "Agent Calibration", link: "/user-guide/agent-calibration" },
-              ],
-            },
-          ],
-        },
-        {
-          text: "Developer Guide",
-          items: [
-            { text: "Overview", link: "/developer-guide/" },
-            { text: "Architecture", link: "/developer-guide/architecture" },
-            { text: "Setup", link: "/developer-guide/setup" },
-            { text: "Codebase", link: "/developer-guide/codebase" },
-            { text: "Commands", link: "/developer-guide/commands" },
-            { text: "Testing", link: "/developer-guide/testing" },
-            { text: "Development Flow", link: "/developer-guide/development-flow" },
-            { text: "Docs Guidelines", link: "/developer-guide/docs-guidelines" },
-            {
-              text: "Conventions",
-              collapsed: true,
-              items: [
-                { text: "Datetime Handling", link: "/developer-guide/conventions/datetime" },
-                { text: "Logging", link: "/developer-guide/conventions/logging" },
-                { text: "Credential Scanning", link: "/developer-guide/conventions/credential-scan" },
-              ],
-            },
-            {
-              text: "API",
-              collapsed: true,
-              items: [
-                { text: "Design Guidelines", link: "/developer-guide/api/design" },
-                { text: "Contracts", link: "/developer-guide/api/contracts" },
-                { text: "Code Structure", link: "/developer-guide/api/structure" },
-                { text: "Testing", link: "/developer-guide/api/testing" },
-              ],
-            },
-            {
-              text: "UI",
-              collapsed: true,
-              items: [
-                { text: "Architecture", link: "/developer-guide/ui/architecture" },
-                { text: "Guidelines", link: "/developer-guide/ui/guidelines" },
-                { text: "API Integration", link: "/developer-guide/ui/api-integration" },
-                { text: "Design Policy", link: "/developer-guide/ui/design-policy" },
-                { text: "Testing", link: "/developer-guide/ui/testing" },
-              ],
-            },
-            {
-              text: "Workflow",
-              collapsed: true,
-              items: [
-                { text: "Quickstart", link: "/developer-guide/workflow/quickstart" },
-                { text: "Engine Architecture", link: "/developer-guide/workflow/engine-architecture" },
-                { text: "Services", link: "/developer-guide/workflow/services" },
-                { text: "Task Calls", link: "/developer-guide/workflow/task-calls" },
-                { text: "Calibration Pipeline Spec", link: "/developer-guide/workflow/calibration-pipeline" },
-                { text: "Calibration Data Lifecycle", link: "/developer-guide/workflow/calibration-data-lifecycle" },
-                { text: "Parameter Resolution", link: "/developer-guide/workflow/parameter-resolution" },
-                { text: "Frequency Parameter Policy", link: "/developer-guide/workflow/frequency-parameter-policy" },
-                { text: "Cross-Resonance Tasks", link: "/developer-guide/workflow/cross-resonance-tasks" },
-                { text: "Testing", link: "/developer-guide/workflow/testing" },
-              ],
-            },
-            {
-              text: "Agent",
-              collapsed: true,
-              items: [
-                { text: "Architecture", link: "/developer-guide/agent/architecture" },
-                { text: "Model Configuration", link: "/developer-guide/agent/model-configuration" },
-                { text: "Pi Packages", link: "/developer-guide/agent/packages" },
-                { text: "Pi Extension Design", link: "/developer-guide/agent/extensions" },
-                { text: "Agent Platform", link: "/developer-guide/agent/agent-platform" },
-                { text: "Agentic Calibration", link: "/developer-guide/agent/agentic-calibration" },
-                { text: "Calibration Sessions", link: "/developer-guide/agent/calibration-sessions" },
-                {
-                  text: "Calibration Session Audit",
-                  link: "/developer-guide/agent/calibration-session-audit",
-                },
-                { text: "Agent Loop Validation", link: "/developer-guide/agent/agent-validation" },
-                { text: "Knowledge Layout", link: "/developer-guide/agent/knowledge-layout" },
-                { text: "Calibration Evaluation", link: "/developer-guide/agent/evaluation" },
-                { text: "Workspace", link: "/developer-guide/agent/workspace" },
-                { text: "Chat Streaming", link: "/developer-guide/agent/chat-streaming" },
-              ],
-            },
-            {
-              text: "Architecture Deep Dives",
-              collapsed: true,
-              items: [
-                { text: "1-Qubit Scheduler", link: "/developer-guide/architecture/one-qubit-scheduler" },
-                { text: "Ordering Strategies", link: "/developer-guide/architecture/one-qubit-ordering-strategies" },
-                { text: "CR Scheduler", link: "/developer-guide/architecture/cr-scheduler" },
-                { text: "Square Lattice", link: "/developer-guide/architecture/square-lattice-topology" },
-                { text: "Notes", link: "/developer-guide/architecture/notes" },
-                { text: "Dashboards", link: "/developer-guide/architecture/dashboards" },
-                { text: "Metric Scripts", link: "/developer-guide/architecture/metric-scripts" },
-                { text: "Provenance", link: "/developer-guide/architecture/provenance" },
-                { text: "Python SDK", link: "/developer-guide/architecture/python-sdk" },
-                { text: "TypeScript SDK", link: "/developer-guide/architecture/typescript-sdk" },
-              ],
-            },
-            {
-              text: "Reference",
-              collapsed: true,
-              items: [
-                { text: "Overview", link: "/reference/" },
-                { text: "Database Collections", link: "/reference/database-structure" },
-                { text: "OpenAPI", link: "/reference/openapi" },
-                { text: "Python Client", link: "/reference/clients/python" },
-                { text: "TypeScript Client", link: "/reference/clients/typescript" },
-                { text: "pi-qdash", link: "/reference/pi-qdash" },
-                { text: "pi-qcaleval", link: "/reference/pi-qcaleval" },
-                { text: "Task Method Sources", link: "/reference/task-method-sources" },
-              ],
-            },
-            {
-              text: "Docs Tooling",
-              collapsed: true,
-              items: [
-                { text: "Demo GIFs", link: "/demos/README" },
-                { text: "Demo Video", link: "/demos/video/README" },
-              ],
-            },
-          ],
-        },
-        {
-          text: "Community",
-          collapsed: true,
-          items: [
-            { text: "Contributing", link: "/CONTRIBUTING" },
-            { text: "Code of Conduct", link: "/CODE_OF_CONDUCT" },
-            { text: "Security", link: "/SECURITY" },
-          ],
-        },
-      ],
+      sidebar: {
+        "/user-guide/": userSidebar,
+        "/developer-guide/": developerSidebar,
+        "/reference/": developerSidebar,
+        "/demos/": developerSidebar,
+        "/": communitySidebar,
+      },
 
       socialLinks: [
         { icon: "github", link: "https://github.com/oqtopus-team/qdash" },

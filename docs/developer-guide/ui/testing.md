@@ -1,20 +1,6 @@
 # UI Testing
 
-UI verification combines focused Vitest tests with type, lint, formatting, unused-code, audit,
-and production-build checks.
-
-## Choose the Verification Scope
-
-| Change | Minimum verification |
-| --- | --- |
-| Pure utility or URL-state hook | Focused Vitest file |
-| Component behavior | Focused Testing Library test and `task test-ui` |
-| Generated-client integration | Feature tests, TypeScript, and affected API generation checks |
-| Route, provider, or shared primitive | `task ci-ui` and `task ci-ui-build` |
-| Dependency or build configuration | `task ci-ui`, audit, and production build |
-
-Run broader checks when a shared component, context, navigation rule, or generated contract has
-many consumers.
+Use focused Vitest tests for behavior and the UI checks for shared or production boundaries.
 
 ## Run Tests
 
@@ -26,78 +12,29 @@ task ci-ui
 task ci-ui-build
 ```
 
-From `ui/`, use Vitest directly for a focused loop:
+`ci-ui` includes tests, Next.js type generation, TypeScript, lint, formatting, unused-code checks,
+and dependency audit. The production build is separate. Run it for route, provider, import,
+server/client boundary, or build configuration changes.
+
+For a focused test, run from `ui/`:
 
 ```bash
 bun run test:run src/components/ui/__tests__/Dialog.test.tsx
-bun run test:run src/hooks/url-state/__tests__/useMetricsUrlState.test.ts
-bun run test -- src/components/features/tasks/__tests__/TaskWorkbenchRun.test.tsx
 ```
-
-`task ci-ui` runs unit tests, Next.js type generation, TypeScript, Oxlint, Oxfmt, Knip, and the Bun
-audit. The production build is intentionally separate in `task ci-ui-build`.
-
-### Audit Exceptions
-
-`task ci-ui` runs `bun audit` through `.github/scripts/audit-exceptions.mjs`, which passes each
-exception in `AUDIT_EXCEPTIONS` to Bun as `--ignore=<GHSA ID>`. Bun still exits nonzero for every
-other advisory and for a failed registry request. Once an exception reaches its expiry, the
-wrapper exits nonzero without running the audit, so an exception cannot outlive its approval.
-An exception may last at most 14 days from its approval; extending it needs a new risk assessment
-and approval. The QDash repository maintainers own each exception.
-
-| Advisory | Package | Expires | Remove when |
-| --- | --- | --- | --- |
-| [GHSA-fc5q-39xc-vjpf](https://github.com/advisories/GHSA-fc5q-39xc-vjpf) | `picomatch` | 2026-12-02T00:00:00Z | A patched release is installed, or patterns stop coming only from checked-in configuration |
-
-GHSA-fc5q-39xc-vjpf is a ReDoS through extglob patterns such as `+(*)`, and no patched release
-exists. The UI reaches `picomatch` only through Knip, Vite and Vitest, whose glob patterns come
-from checked-in configuration such as `ui/knip.json` and `ui/vitest.config.mts`. The residual risk
-is a slow or stalled local or CI tool run if a contributor commits a crafted pattern. Next.js bundles
-its own copy of `picomatch`, which `bun audit` does not cover. At runtime that copy compiles only
-the `images.remotePatterns` entry in `ui/next.config.js` (`github.com` and `/**`), and requests
-supply only the strings matched against it.
-
-## Place Tests Beside Their Layer
-
-Component tests live in a sibling `__tests__/` directory. Hook tests live under
-`ui/src/hooks/__tests__/` or `ui/src/hooks/url-state/__tests__/`. Name a test file after the module
-or user-visible behavior it protects.
-
-`ui/vitest.config.mts` uses jsdom and loads `ui/vitest.setup.ts`. The setup provides jest-dom,
-`ResizeObserver`, `scrollIntoView`, and `matchMedia`; do not recreate those mocks in each test.
 
 ## Test Observable Behavior
 
-Render the component, perform the user action, and assert the resulting screen or request. Prefer
-queries by role, label, or visible text over class selectors and implementation details.
+Place tests in a sibling `__tests__/` directory. Reuse `ui/vitest.setup.ts` browser mocks.
+Render, act, and assert by role, label, or visible text. Cover the states the component owns:
+loading, empty, error, success, pending actions, validation, keyboard behavior, and URL changes.
+Use `findBy*` or `waitFor`, never fixed sleeps.
 
-Cover the states the component owns:
-
-- loading, empty, error, and success;
-- enabled, disabled, and pending actions;
-- validation and destructive confirmation;
-- keyboard interaction and focus for shared primitives;
-- URL updates for shareable filters;
-- query invalidation or navigation after a successful mutation.
-
-Use `waitFor` or `findBy*` for observable asynchronous completion. Do not use fixed sleeps.
-
-## Mock at the Boundary
-
-Mock generated client hooks when testing feature composition. Keep request-shape assertions in
-the feature that builds the request. Mock browser APIs only when `vitest.setup.ts` does not already
-provide them.
-
-Reset spies and mutable globals between tests. Avoid mocking the component under test or private
-helpers whose behavior is visible through the public interaction.
-
-For TanStack Query behavior, create a fresh `QueryClient` for each test and disable retries when a
-failure is part of the scenario. Wrap only the providers the test requires.
+Mock generated hooks for feature composition, not the component under test. For query behavior,
+use a fresh query client with retries disabled for expected failures. Reset spies and globals.
 
 ## Check Types and Static Rules
 
-Use these focused commands from `ui/` when diagnosing a failure:
+From `ui/`:
 
 ```bash
 bunx next typegen
@@ -107,15 +44,15 @@ bun run fmt:check
 bun run knip
 ```
 
-Do not silence a type or lint error with `any`, an unused-variable rename, or a blanket disable
-until the code proves the value is intentionally unconstrained or unused. Keep a narrow disable
-next to the unavoidable case and explain why.
+Fix the cause rather than adding blanket type or lint suppressions.
 
-## Verify the Production Boundary
+## Audit Exceptions
 
-`task ci-ui-build` runs the Next.js production build. Run it for route changes, dynamic imports,
-provider changes, server/client boundary changes, and configuration that can behave differently
-outside Vitest.
+`.github/scripts/audit-exceptions.mjs` allows only approved advisory IDs in `AUDIT_EXCEPTIONS`.
+Other advisories and failed registry requests fail the check. Exceptions expire within 14 days;
+renewal needs a new assessment and maintainer approval.
 
-Frontend CI runs `task ci-ui` before the build job. A local focused test is not a substitute for
-those checks when the change affects a shared boundary.
+The current `picomatch` exception, GHSA-fc5q-39xc-vjpf, expires on 2026-12-02 at 00:00 UTC.
+Its extglob ReDoS risk is limited to patterns from checked-in tooling configuration; a malicious
+pattern could stall a tool run. Next.js's bundled copy uses the fixed `images.remotePatterns`
+configuration. Remove the exception when a patched version is installed or this exposure changes.

@@ -1,102 +1,67 @@
 # Development Flow
 
-Develop changes on branches from `develop`; release from `main`.
+Branch from `develop`, test your change, and open a pull request back to `develop`.
+Releases go from `develop` to `main`.
 
 ## Branch Strategy
 
-Create feature, bug-fix, and hotfix branches from `develop`, which contains the latest merged code.
+Use `feature/<topic>`, `bugfix/<topic>`, or `hotfix/<topic>`. From a clean checkout:
 
-<Diagram name="development-flow" caption="Work branches off develop and returns by squash-merged PR; releases go from develop to main through the release PR and a version tag." />
+```bash
+git fetch origin develop
+git switch -c feature/your-topic origin/develop
+```
 
-### Branch Naming
+If the checkout has work in progress, commit or stash it before switching branches.
 
-Use `feature/<topic>`, `bugfix/<topic>`, or `hotfix/<topic>`.
+<a id="commit-message-format"></a>
 
 ## Conventional Commits
 
-Use `<type>(<scope>): <summary>` with a short English summary and no trailing period, following
-[Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/). Use `api`, `workflow`,
-`ui`, `docs`, `infra`, or `repo` as the scope when applicable.
-
-### Commit Message Format
-
-Enable the repository template locally:
-
-```bash
-git config --local commit.template .gitmessage
-```
-
-The template opens in your Git editor when you commit. For example:
+Write `<type>(<scope>): <summary>` with a short English summary and no trailing period:
 
 ```text
 docs(docs): simplify workflow authoring guide
 ```
 
-On the host, commit with `nix develop -c git commit` so hooks use the pinned scanner; see
-[Before Pushing](#before-pushing).
-
-## Correspondence between Commit Messages and Labels
-
-When creating a PR to the `main` branch, labels are automatically assigned based on the commit messages.
-Below is the correspondence between prefixes and labels:
-
-| Prefix | Label | Description |
-| --- | --- | --- |
-| feat: | `feature` | Adding a new feature |
-| fix: | `bugfix` | Bug fixes |
-| docs: | `documentation` | Documentation only changes |
-| style: | `style` | Changes that do not affect the meaning of the code (white-space, formatting, missing semi-colons, etc) |
-| refactor: | `refactor` | Code changes that neither fix a bug nor add a feature |
-| test: | `test` | Adding or correcting existing tests |
-| ci: | `ci` | Adding or updating CI configuration and scripts |
-| chore: | `chore` | Minor changes or maintenance tasks |
-
-## Secret Scanning
-
-Betterleaks runs on every commit via a Lefthook-managed pre-commit hook and blocks the commit on any finding. Trufflehog scans git history in CI for verified leaks. See [Credential Scanning](./conventions/credential-scan.md) for tool roles, output reading, and false-positive handling.
-
-`task check` includes the local leak scan. See
-[Credential Scanning](./conventions/credential-scan.md#running-locally) for scan commands,
-file coverage, and target-branch configuration.
+Types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `ci`, `chore`.
+Scopes: `api`, `workflow`, `ui`, `docs`, `infra`, or `repo` when applicable.
+Set the optional template with `git config --local commit.template .gitmessage`.
 
 ## Pull Requests
 
-Open pull requests against `develop` unless the release process requires another base branch.
-Use the repository pull request template and keep the description focused on the behavior change,
-important implementation notes, and verification performed.
+Use `.github/pull_request_template.md`. Describe the problem, changed behavior, and verification.
+Keep the PR focused on one change. After the check below passes, stage and review the intended
+diff, commit inside Nix or the DevContainer, and push your branch. On GitHub, choose `develop`
+as the PR base. Contributors without repository write access push to their own fork instead.
+A submitted PR should show the intended files and a recorded successful check command.
 
 ### Before Pushing
 
-Every push requires a successful `task check` on the content being pushed, including
-documentation-only changes and updates to existing PRs. Focused tests during development,
-pre-commit hooks, and CI supplement this gate.
+Every push requires a successful full `task check`, including docs-only changes and PR updates.
+Focused tests and CI do not replace this gate.
 
-On the host, run `task check` and commits inside the Nix shell, which provides the
-pinned Betterleaks release. In the DevContainer, run the same commands directly.
-`task check` first runs `task check-betterleaks-version` and stops if the `betterleaks`
-on `PATH` is a different release; see
-[scanner version](./conventions/credential-scan.md#scanner-version).
+1. Stage intended new files so the leak scan includes them.
+2. Fetch the PR target and run the checks from the repository root:
 
-Stage intended new files so the leak scan includes them. Fetch the PR target branch
-to refresh its local reference, then run the check from the repository root:
+   ```bash
+   git fetch origin develop
+   nix develop -c task check
+   ```
 
-```bash
-git fetch origin develop
-nix develop -c task check
-```
+   For another target, fetch it and set `LEAKS_BASE`, for example:
 
-For a different PR target, fetch that branch and set `LEAKS_BASE`, for example:
+   ```bash
+   git fetch origin main
+   nix develop -c task check LEAKS_BASE=origin/main
+   ```
 
-```bash
-git fetch origin main
-nix develop -c task check LEAKS_BASE=origin/main
-```
+3. Review auto-fixes and include intended changes. If you edit afterward, rerun the check.
+4. Require exit status 0 before pushing. Fix failures; never bypass them.
+5. Record the command and result in the PR and handoff.
 
-Commit with `nix develop -c git commit` so the pre-commit hook uses the same scanner.
+## Secret Scanning
 
-`task check` runs auto-fixing linters. Review the resulting diff and include intended
-fixes in the commit. If you edit files after the check, rerun it before pushing.
-Require exit status 0; if the check fails or cannot run, resolve the failure before
-pushing. Report the failed command and reason if blocked, and do not push.
-
-Record the check command and result in the PR description and the agent's final handoff.
+On the host, run checks and commits inside Nix (`nix develop -c git commit`). Inside the
+DevContainer, run them directly. Both provide the pinned Betterleaks release required by the
+pre-commit hook. See [Credential Scanning](./conventions/credential-scan.md) for failures and findings.

@@ -1,114 +1,55 @@
 # Reviewing and Sharing Results
 
-Use **Task Results** to find one measurement, inspect its evidence, record context, and involve the
-project when follow-up is needed.
+Use **Task Results** to inspect a measurement, record findings, and share the next decision.
 
 ## Find a Result
 
 1. Open **Task Results**.
 2. Filter by chip, execution, task, target, or status.
-3. Select a row to preview its figure, message, and parameters.
-4. Open the full result when you need artifacts, history, notes, discussion, or re-execution.
+3. Select a row for a preview, then open the full result if needed.
 
-Start from **Execution** instead when task dependencies or run-wide progress matter. Start from
-**Chip** when you want the latest result for one task across the topology.
-
-If the list cannot load, select **Try Again**. If a later refresh fails, the rows already shown
-stay in place under a warning that they may be out of date; select **Retry** to load them again.
-Changing a filter or page never shows the rows of the previous one while the new list loads.
+Use **Execution** for run-wide progress or **Chip** for the latest task results across the device.
 
 ## Inspect the Evidence
 
-Review the status and message first, then compare the input, run, and output parameters. Open the
-figure and download raw data when the task produced it. Check the execution and target before
-comparing this result with another run.
-
-<!-- MEDIA PLACEHOLDER
-File: /images/guides/task-result-detail.gif
-Start: Task Results filtered to one completed result with a figure.
-Sequence: Open the result, inspect its figure and parameters, then scroll to AI evaluation, New thread, and Note.
-Alt: Task Result detail showing its status, evidence, evaluation, discussion, and note sections.
--->
-
-Use [Calibration Data and Provenance](./data-and-provenance.md) when you need parameter history or
-the lineage of a saved value.
+Check the status, message, parameters, and figure. Download raw data when available. For a saved
+value's origin or history, follow [data and provenance](./data-and-provenance.md).
 
 ## Record Result Context
 
-Add a result note for context that belongs to this measurement, such as an anomaly or the reason
-for a parameter choice. Use a pinned dashboard summary when the context should remain visible for
-a chip, qubit, or coupling in a selected cool-down or time range.
-
-Notes are shared with the project. Write what another member needs to interpret the result, not a
-private reminder that lacks the chip, target, or decision context.
+Add a result note for an anomaly, interpretation, or parameter choice. Use a pinned chip or
+target summary for context that should remain visible across measurements. Notes are shared.
 
 ## Start a Discussion
 
-Select **New thread** from the result when a finding needs a decision or follow-up. QDash fills in
-the result, chip, and target so the discussion links back to its evidence.
-
-Use **Forum** to reply, mention another member, update the thread status, and close the thread when
-the work is resolved. Create a standalone forum thread for topics that span multiple results or
-concern project-wide policy.
+Select **New thread** on the result to keep the discussion linked to its evidence. Use **Forum**
+for replies, mentions, and project-wide discussions; close a thread when resolved.
 
 ## Reuse the Finding
 
-Move a conclusion into the task's knowledge when it should guide future analysis of the same
-task. **Knowledge** is read-only: changes go through the task-knowledge repository, so one person's
-edit does not change what everyone else's evaluations and chats read.
+**Knowledge** is read-only. To improve a task reference:
 
-1. On **Knowledge**, open the task and select **Download zip**.
-2. Update the task background, expected plot, common failures, parameters to extract, or
-   examples in the unzipped `task.md` and `examples/`. Keep the task title and required section
-   headings unchanged, and preserve the YAML frontmatter identity fields.
-3. Zip the folder again and evaluate with it as a knowledge draft; see
-   [Try a Knowledge Change Before Proposing It](./ai-evaluations.md#try-a-knowledge-change-before-proposing-it).
-4. Propose the change as a pull request to the task-knowledge repository. After it merges, the
-   operator runs `task knowledge-pull` to update the deployment.
+1. Select **Download zip** on the task.
+2. Edit its reference and examples, preserving required headings and identity fields.
+3. Test it as an [evaluation draft](./ai-evaluations.md#try-a-knowledge-change-before-proposing-it).
+4. Propose the change to the task-knowledge repository. After merge, ask the operator to update
+   the deployment's knowledge.
 
 ## Request an AI Review
 
-Select **Ask Agent** on one result to start a recorded evaluation or open a chat with that result's
-context. Select **Evaluate** on **Chip** to evaluate the displayed task across eligible targets.
-
-AI output is supporting evidence, not an automatic calibration decision. Confirm it against the
-figure, raw data, task knowledge, and current calibration context. See
-[AI Evaluations](./ai-evaluations.md) for the complete workflow.
+Select **Ask Agent** on one result or **Evaluate** on **Chip**. Check the judgment against the
+actual evidence before changing calibration state. See [AI Evaluations](./ai-evaluations.md).
 
 ## Follow Notifications
 
-Mentions, replies, and system events arrive at the bell in the top bar, which shows the unread
-count. Select the bell to preview the five newest notifications and open one, or select **View
-all** to open **Inbox** with every notification, newest first. Open the linked record to recover
-its project and result context.
-
-On **Inbox**, select **Unread only** to hide notifications you have read, or **All** to show them
-again. The inbox shows 50 notifications per page; use **Previous** and **Next** to move between
-pages. The filter and page are part of the page address, so reloading, going back, or sharing the
-link returns to the same view. Changing the filter returns to the first page. The unread count
-covers every page, not only the one shown.
-
-Opening a notification marks it read; **Mark all read** marks every unread notification read,
-on every page. When marking read leaves the current page of **Unread only** empty, the inbox
-moves to the last page that still has notifications. If marking read fails, an error message
-appears and the notifications stay unread; open the notification or select **Mark all read**
-again to retry.
+Select the bell for recent notifications or **View all** for **Inbox**. Use **Unread only** to
+focus on new items. Opening one marks it read; **Mark all read** affects every page.
 
 ## Share and Hand Off a Result
 
-Confirm that the recipient [belongs to the project](./projects-and-data-sharing.md#share-results)
-before sharing a link.
+1. Confirm that the recipient [belongs to the project](./projects-and-data-sharing.md#share-results).
+2. Share the result link or its forum thread.
+3. Record the chip, target, evidence, and next decision.
 
-When another member will continue the calibration:
-
-1. Confirm the active project and chip.
-2. Open **Task Results** and share the result link or start a forum thread from the result.
-3. Record the execution, target, evidence, and next decision in the result note or thread.
-4. Ask the recipient to confirm the same project and chip before starting the next task or
-   workflow.
-
-Saved calibrated outputs become the current state for later tasks in the same project. An
-exploratory run with **Update calibration values** turned off remains available for review,
-but later tasks do not use its outputs as current values. See
-[Task Parameters](./task-parameters.md#decide-whether-to-update-calibration-values) for that
-choice.
+Runs made with **Update calibration values** off remain in history but do not supply current
+values to later tasks. See [Task Parameters](./task-parameters.md).
