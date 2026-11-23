@@ -7,6 +7,9 @@ gates, expiry, and pause (see [Agentic Calibration](./agentic-calibration.md)); 
 keeps the approval of its exact request and the execution lock (see
 [Calibration Pipeline Spec](../workflow/calibration-pipeline.md)).
 
+Its history (decisions, requests, dispatch outcomes, and executions in one timeline) is described
+in [Calibration Session Audit](./calibration-session-audit.md).
+
 The UI calls the record a **Calibration session** and keeps **Agent session** for one bounded
 session inside it. An `auto` agent session is shown as **Autonomous calibration**. The API
 names stay `calibration-sessions` and `agent-sessions`.
@@ -124,7 +127,10 @@ The resolver batches its reads over a page: at most four queries (pipeline runs,
 origins, agent sessions, calibration sessions) whatever the number of rows, shared by
 `GET /executions`, `GET /executions/groups`, and `GET /executions/{id}`. No Prefect state is
 read for it. A grouped agent session row carries `calibration_session` (`CalibrationSessionRef`)
-for an admitted session through `agent_session_parents`.
+for an admitted session through `agent_session_parents`. `GET /executions/groups` makes the
+calibration session the display parent: its row holds its runs' step executions and its admitted
+agent sessions, grouped before paging (see
+[Projections](./calibration-session-audit.md#projections)).
 
 The UI shows the objective as a plain badge on list cards, which are buttons themselves, and a
 link back in the details panel, the execution page, and the agent session row
@@ -248,7 +254,8 @@ QDash does not find there shows nothing. A session comes from one of two kinds o
   trace. A failed, refused, or cancelled call carries none, and neither the model's arguments
   nor its text are read.
 - A call that names a session in its `calibrationSessionId` argument
-  (`qdash_get_calibration_session`, `qdash_run_pipeline`, `qdash_create_agent_session`).
+  (`qdash_get_calibration_session`, `qdash_get_calibration_session_audit`,
+  `qdash_record_calibration_decision`, `qdash_run_pipeline`, `qdash_create_agent_session`).
  One chat can name
 several sessions, another chat can continue a session by its ID, and deleting or branching a
 chat changes no record. `created_by` and `requested_by` come from the request's authentication,
@@ -265,8 +272,11 @@ listed in the [pi-qdash reference](../../reference/pi-qdash.md).
 | --- | --- | --- |
 | `POST /calibration-sessions` | editor | Create a session for `chip_id` and `objective` |
 | `GET /calibration-sessions` | viewer | List the project's sessions, newest first; filters `chip_id`, `status`, `mine`; pages with `limit`, `skip`, and `has_more` |
-| `GET /calibration-sessions/{id}` | viewer | The session with its latest 100 pipeline runs and agent sessions, `pipeline_run_total`, `agent_session_total`, `close_blockers`, `unknown_runs`, and `unknown_starts` |
+| `GET /calibration-sessions/{id}` | viewer | The session with its latest 100 pipeline runs and agent sessions, `pipeline_run_total`, `agent_session_total`, `close_blockers`, `unknown_runs`, `unknown_starts`, and the audit's `experiments`, `decisions`, `recommendation`, and `latest_requested_run` (the latest requested run and its recorded execution outcome, never a hardware state) |
 | `POST /calibration-sessions/{id}/close` | editor, creator only | Close the session |
+
+The decision and audit endpoints are listed in
+[Calibration Session Audit](./calibration-session-audit.md#endpoints).
 
 ## Testing
 

@@ -5894,6 +5894,299 @@
         }
       }
     },
+    "/calibration-sessions/{calibration_session_id}/decisions": {
+      "post": {
+        "tags": [
+          "calibration-session"
+        ],
+        "summary": "Record a decision in a calibration session's audit",
+        "description": "Append a decision, as an agent session decision is appended to its audit.\n\nOnly the session's creator records, in any status. Every cited pipeline run and decision\nmust belong to the session and every cited task result must be on its chip (409 otherwise);\nQDash freezes what its records say about them. ``experiment`` proposes a run, which is then\nstarted with this decision's ID; ``conclusion`` states a recommendation that must rest on\nthe cited evidence of its candidate (422 otherwise). A decision changes no calibration and\nstarts nothing. A retry with the same key and request returns the same record.",
+        "operationId": "recordCalibrationDecision",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "calibration_session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Calibration Session Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordCalibrationDecisionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalibrationDecisionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "calibration-session"
+        ],
+        "summary": "List a calibration session's decisions",
+        "description": "The session's decisions, oldest first, with the runs that carried each out.",
+        "operationId": "listCalibrationDecisions",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "calibration_session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Calibration Session Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListCalibrationDecisionsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/calibration-sessions/{calibration_session_id}/audit": {
+      "get": {
+        "tags": [
+          "calibration-session"
+        ],
+        "summary": "Read a calibration session's audit timeline",
+        "description": "The session's chronological audit, a page at a time, with the agent session audit's\nevent schema; an admitted agent session's events are included.",
+        "operationId": "getCalibrationSessionAudit",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "calibration_session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Calibration Session Id"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 1000
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalibrationSessionAuditResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/calibration-sessions/{calibration_session_id}/audit/export": {
+      "get": {
+        "tags": [
+          "calibration-session"
+        ],
+        "summary": "Export a calibration session's audit timeline",
+        "description": "The whole audit as versioned JSON; refused rather than cut short when too long.",
+        "operationId": "exportCalibrationSessionAudit",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "calibration_session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Calibration Session Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalibrationSessionAuditResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/agent/config": {
       "get": {
         "tags": [
@@ -20689,7 +20982,7 @@
           "kind": {
             "type": "string",
             "title": "Kind",
-            "description": "session_created, action_proposed, measurement, evaluation, decision, candidate_commit, candidate_set_commit, backend_apply, intervention_opened, intervention_response, intervention_resumed, resume_outcome, or session_stopped"
+            "description": "session_created, action_proposed, measurement, evaluation, decision, candidate_commit, candidate_set_commit, backend_apply, intervention_opened, intervention_response, intervention_resumed, resume_outcome, or session_stopped; a calibration session's audit adds pipeline_requested, pipeline_dispatch, agent_session_linked, and session_closed"
           },
           "summary": {
             "type": "string",
@@ -20727,10 +21020,11 @@
               "server_computed",
               "agent_reported",
               "human_reported",
-              "evaluator_reported"
+              "evaluator_reported",
+              "client_reported"
             ],
             "title": "Provenance",
-            "description": "server_record: QDash recorded it; server_computed: derived at read time from immutable records; agent_reported, human_reported, evaluator_reported: text that party supplied, recorded as given"
+            "description": "server_record: QDash recorded it; server_computed: derived at read time from immutable records; agent_reported, human_reported, evaluator_reported: text that party supplied, recorded as given; client_reported: text a client sent without saying whether an agent or a person wrote it"
           },
           "status": {
             "anyOf": [
@@ -20848,6 +21142,30 @@
               }
             ],
             "title": "Decision Id"
+          },
+          "pipeline_run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pipeline Run Id",
+            "description": "The calibration session pipeline run the event belongs to, if any"
+          },
+          "agent_session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Session Id",
+            "description": "In a calibration session's audit: the agent session an event comes from. Always null in an agent session's own audit"
           },
           "model": {
             "anyOf": [
@@ -25215,6 +25533,65 @@
         "title": "CalibrationAgentSessionChild",
         "description": "An agent session created in a calibration session, with the executions it dispatched."
       },
+      "CalibrationAuditSessionHeader": {
+        "properties": {
+          "calibration_session_id": {
+            "type": "string",
+            "title": "Calibration Session Id"
+          },
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          },
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id"
+          },
+          "objective": {
+            "type": "string",
+            "title": "Objective"
+          },
+          "created_by": {
+            "type": "string",
+            "title": "Created By"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CalibrationSessionStatus"
+          },
+          "pipeline_run_total": {
+            "type": "integer",
+            "title": "Pipeline Run Total"
+          },
+          "agent_session_total": {
+            "type": "integer",
+            "title": "Agent Session Total"
+          },
+          "decision_total": {
+            "type": "integer",
+            "title": "Decision Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "calibration_session_id",
+          "project_id",
+          "chip_id",
+          "objective",
+          "created_by",
+          "created_at",
+          "status",
+          "pipeline_run_total",
+          "agent_session_total",
+          "decision_total"
+        ],
+        "title": "CalibrationAuditSessionHeader",
+        "description": "Who and what a calibration session's audit belongs to."
+      },
       "CalibrationChildKind": {
         "type": "string",
         "enum": [
@@ -25258,6 +25635,444 @@
         "title": "CalibrationChildReservation",
         "description": "A child counted in a calibration session before its own record is written.\n\nThe reservation is pushed into the session by the same conditional update that checks the\nsession is open, with the ID the child will have. The request that made it removes it\n(``finalize``) once the child's record exists, and only then may a pipeline run be\nlaunched. Closing the session clears every reservation it accepts; a request whose\nreservation was cleared undoes its child instead of starting it."
       },
+      "CalibrationConclusionModel": {
+        "properties": {
+          "outcome": {
+            "$ref": "#/components/schemas/CalibrationDecisionOutcome"
+          },
+          "recommended_candidate_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_.:-]{1,64}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recommended Candidate Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "outcome"
+        ],
+        "title": "CalibrationConclusionModel",
+        "description": "A final recommendation; a statement of its recorder, never implied by closing."
+      },
+      "CalibrationDecisionOutcome": {
+        "type": "string",
+        "enum": [
+          "recommend_candidate",
+          "keep_baseline",
+          "inconclusive"
+        ],
+        "title": "CalibrationDecisionOutcome",
+        "description": "What a final decision recommends; a statement of the person or agent recording it.\n\n``recommend_candidate``: a candidate other than the baseline, backed by its confirmation\nexperiments. ``keep_baseline``: the baseline candidate stays the recommendation.\n``inconclusive``: the evidence supports no recommendation."
+      },
+      "CalibrationDecisionResponse": {
+        "properties": {
+          "decision_id": {
+            "type": "string",
+            "title": "Decision Id"
+          },
+          "calibration_session_id": {
+            "type": "string",
+            "title": "Calibration Session Id"
+          },
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          },
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id"
+          },
+          "idempotency_key": {
+            "type": "string",
+            "title": "Idempotency Key"
+          },
+          "recorded_by": {
+            "type": "string",
+            "title": "Recorded By"
+          },
+          "recorded_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Recorded At"
+          },
+          "session_status_at_record": {
+            "type": "string",
+            "title": "Session Status At Record"
+          },
+          "assessment": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentDecisionAssessment"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "interpretation": {
+            "type": "string",
+            "title": "Interpretation"
+          },
+          "next_action": {
+            "$ref": "#/components/schemas/AgentDecisionNextAction"
+          },
+          "next_detail": {
+            "type": "string",
+            "title": "Next Detail",
+            "default": ""
+          },
+          "evidence_run_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Evidence Run Ids"
+          },
+          "evidence_task_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Evidence Task Ids"
+          },
+          "evidence_decision_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Evidence Decision Ids"
+          },
+          "supersedes_decision_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supersedes Decision Id"
+          },
+          "experiment": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalibrationExperimentPlanModel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "conclusion": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalibrationConclusionModel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "evidence_snapshot": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Evidence Snapshot",
+            "description": "What QDash's records said about the cited evidence when it was recorded"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentModelIdentity"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "carried_out_by_run_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Carried Out By Run Ids",
+            "description": "Pipeline runs that named this decision when they were started"
+          },
+          "superseded_by_decision_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Superseded By Decision Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "decision_id",
+          "calibration_session_id",
+          "project_id",
+          "chip_id",
+          "idempotency_key",
+          "recorded_by",
+          "recorded_at",
+          "session_status_at_record",
+          "interpretation",
+          "next_action"
+        ],
+        "title": "CalibrationDecisionResponse",
+        "description": "One recorded decision with QDash's frozen reading of its evidence."
+      },
+      "CalibrationExperimentMeasurement": {
+        "properties": {
+          "evidence_status": {
+            "type": "string",
+            "enum": [
+              "complete",
+              "partial",
+              "running",
+              "failed",
+              "unavailable",
+              "not_run"
+            ],
+            "title": "Evidence Status"
+          },
+          "pipeline_dispatch_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalibrationPipelineRunStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "execution_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Execution Ids"
+          },
+          "tasks": {
+            "items": {
+              "$ref": "#/components/schemas/CalibrationMeasuredTask"
+            },
+            "type": "array",
+            "title": "Tasks"
+          },
+          "gate_time_ns": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalibrationMeasuredValue"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "zx90_gate_time of the latest completed task that published it"
+          },
+          "cr_duration_ns": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalibrationMeasuredValue"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cr_amplitude": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalibrationMeasuredValue"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "gate_fidelity": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalibrationMeasuredValue"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "zx90_gate_fidelity, with the benchmark's error"
+          },
+          "task_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Seconds",
+            "description": "Sum of the target's task durations; null when none ended"
+          },
+          "execution_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Execution Seconds",
+            "description": "From the first execution start to the last end; null until all ended"
+          }
+        },
+        "type": "object",
+        "required": [
+          "evidence_status"
+        ],
+        "title": "CalibrationExperimentMeasurement",
+        "description": "What QDash's task results say an experiment measured; never the recorder's statement.\n\n``evidence_status``: ``complete`` when every task on the target completed, ``running``\nwhile an execution or task still runs, ``failed`` when none completed and one failed,\n``partial`` when some completed and others failed or were cancelled, ``unavailable`` when\nno task result on the target was found, ``not_run`` when no run carries the decision out\n(never dispatched, declined, or refused before it started). It never says whether the\nexperiment succeeded scientifically."
+      },
+      "CalibrationExperimentPlanModel": {
+        "properties": {
+          "candidate_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_.:-]{1,64}$",
+            "title": "Candidate Id",
+            "description": "The recorder's name for the condition, such as incumbent or c03"
+          },
+          "stage": {
+            "$ref": "#/components/schemas/CalibrationExperimentStage"
+          },
+          "target": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_]{1,32}(-[A-Za-z0-9_]{1,32})?$",
+            "title": "Target",
+            "description": "The qubit (0) or directed coupling (0-1) measured"
+          },
+          "requested_changes": {
+            "items": {
+              "$ref": "#/components/schemas/RequestedParameterChangeModel"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Requested Changes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "candidate_id",
+          "stage",
+          "target"
+        ],
+        "title": "CalibrationExperimentPlanModel",
+        "description": "The experiment a decision proposes before its run is dispatched."
+      },
+      "CalibrationExperimentRow": {
+        "properties": {
+          "sequence": {
+            "type": "integer",
+            "title": "Sequence",
+            "description": "1-based order among the rows"
+          },
+          "decision_id": {
+            "type": "string",
+            "title": "Decision Id"
+          },
+          "stage": {
+            "$ref": "#/components/schemas/CalibrationExperimentStage"
+          },
+          "candidate_id": {
+            "type": "string",
+            "title": "Candidate Id"
+          },
+          "target": {
+            "type": "string",
+            "title": "Target"
+          },
+          "requested_changes": {
+            "items": {
+              "$ref": "#/components/schemas/RequestedParameterChangeModel"
+            },
+            "type": "array",
+            "title": "Requested Changes"
+          },
+          "rationale": {
+            "type": "string",
+            "title": "Rationale",
+            "description": "The decision's interpretation; recorder's statement"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentModelIdentity"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "recorded_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Recorded At"
+          },
+          "pipeline_run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pipeline Run Id"
+          },
+          "parameter_checks": {
+            "items": {
+              "$ref": "#/components/schemas/CalibrationParameterCheck"
+            },
+            "type": "array",
+            "title": "Parameter Checks"
+          },
+          "measured": {
+            "$ref": "#/components/schemas/CalibrationExperimentMeasurement"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sequence",
+          "decision_id",
+          "stage",
+          "candidate_id",
+          "target",
+          "rationale",
+          "recorded_at",
+          "measured"
+        ],
+        "title": "CalibrationExperimentRow",
+        "description": "One experiment of the search: a proposing decision and one run that carried it out.\n\nA decision carried out by several runs gives a row per run; one carried out by none gives a\nrow without a run. Built from the audit's records; nothing here is stored."
+      },
+      "CalibrationExperimentStage": {
+        "type": "string",
+        "enum": [
+          "baseline",
+          "screening",
+          "confirmation"
+        ],
+        "title": "CalibrationExperimentStage",
+        "description": "Where one experiment stands in an optimization search.\n\n``baseline``: the incumbent's evidence the search starts from.\n``screening``: a candidate condition measured to decide whether it is worth confirming.\n``confirmation``: a whole-arm rerun of a candidate or the incumbent, used for the final\ncomparison. Only confirmation evidence may back a recommendation of a new candidate."
+      },
       "CalibrationGitHubSync": {
         "properties": {
           "status": {
@@ -25290,6 +26105,381 @@
         "type": "object",
         "title": "CalibrationGitHubSync",
         "description": "GitHub synchronization result, independent of the applied calibration values."
+      },
+      "CalibrationGroupAgentSession": {
+        "properties": {
+          "agent_session": {
+            "$ref": "#/components/schemas/AgentSessionGroupSummary"
+          },
+          "children": {
+            "items": {
+              "$ref": "#/components/schemas/AgentSessionChildExecution"
+            },
+            "type": "array",
+            "title": "Children"
+          },
+          "children_total": {
+            "type": "integer",
+            "title": "Children Total",
+            "default": 0
+          },
+          "children_in_filter": {
+            "type": "integer",
+            "title": "Children In Filter",
+            "default": 0
+          },
+          "children_omitted": {
+            "type": "integer",
+            "title": "Children Omitted",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "agent_session"
+        ],
+        "title": "CalibrationGroupAgentSession",
+        "description": "An admitted agent session nested in a calibration session row."
+      },
+      "CalibrationGroupCounts": {
+        "properties": {
+          "pipeline_runs": {
+            "type": "integer",
+            "title": "Pipeline Runs",
+            "description": "Pipeline runs recorded in the session"
+          },
+          "agent_sessions": {
+            "type": "integer",
+            "title": "Agent Sessions",
+            "description": "Admitted agent sessions on the chip in the session"
+          },
+          "executions": {
+            "type": "integer",
+            "title": "Executions",
+            "description": "Executions of its runs and agent sessions, every day"
+          },
+          "executions_in_filter": {
+            "type": "integer",
+            "title": "Executions In Filter",
+            "description": "Of those, the ones matching the day filter"
+          },
+          "running": {
+            "type": "integer",
+            "title": "Running",
+            "description": "Executions scheduled, running, or cancelling"
+          },
+          "failed": {
+            "type": "integer",
+            "title": "Failed",
+            "description": "Executions that failed"
+          },
+          "unknown_dispatch": {
+            "type": "integer",
+            "title": "Unknown Dispatch",
+            "description": "Runs whose dispatch outcome is unknown; they may be running",
+            "default": 0
+          },
+          "decisions": {
+            "type": "integer",
+            "title": "Decisions",
+            "description": "Decisions recorded in the session's audit",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "pipeline_runs",
+          "agent_sessions",
+          "executions",
+          "executions_in_filter",
+          "running",
+          "failed"
+        ],
+        "title": "CalibrationGroupCounts",
+        "description": "What a calibration session row holds, counted from its explicit records."
+      },
+      "CalibrationGroupPipelineRun": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "pipeline_name": {
+            "type": "string",
+            "title": "Pipeline Name",
+            "default": ""
+          },
+          "dispatch_status": {
+            "type": "string",
+            "title": "Dispatch Status"
+          },
+          "requested_by": {
+            "type": "string",
+            "title": "Requested By"
+          },
+          "requested_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Requested At"
+          },
+          "decision_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision Id",
+            "description": "The decision the run carries out, as its request named it"
+          },
+          "targets": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Targets"
+          },
+          "executions": {
+            "items": {
+              "$ref": "#/components/schemas/ExecutionResponseSummary"
+            },
+            "type": "array",
+            "title": "Executions"
+          },
+          "executions_total": {
+            "type": "integer",
+            "title": "Executions Total",
+            "default": 0
+          },
+          "executions_in_filter": {
+            "type": "integer",
+            "title": "Executions In Filter",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "run_id",
+          "dispatch_status",
+          "requested_by",
+          "requested_at"
+        ],
+        "title": "CalibrationGroupPipelineRun",
+        "description": "One pipeline run of a calibration session row, with its step executions."
+      },
+      "CalibrationLatestRequestedRun": {
+        "properties": {
+          "pipeline_run_id": {
+            "type": "string",
+            "title": "Pipeline Run Id"
+          },
+          "requested_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Requested At"
+          },
+          "dispatch_status": {
+            "$ref": "#/components/schemas/CalibrationPipelineRunStatus"
+          },
+          "execution_outcome": {
+            "type": "string",
+            "enum": [
+              "refused",
+              "unknown",
+              "no_execution",
+              "running",
+              "failed",
+              "partial",
+              "completed"
+            ],
+            "title": "Execution Outcome"
+          },
+          "decision_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision Id",
+            "description": "The decision the request named; never inferred"
+          },
+          "candidate_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Candidate Id",
+            "description": "The candidate of the decision the run carries out; null when it names none"
+          },
+          "execution_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Execution Ids"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At",
+            "description": "When the last of its executions ended; null while any is open"
+          },
+          "candidate_is_recommended": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Candidate Is Recommended",
+            "description": "Whether the run's requested candidate is the recommended candidate, comparing the two records only; null when either is unknown. It says nothing about the hardware"
+          },
+          "missing": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing",
+            "description": "Facts QDash does not record and this view therefore cannot state"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pipeline_run_id",
+          "requested_at",
+          "dispatch_status",
+          "execution_outcome"
+        ],
+        "title": "CalibrationLatestRequestedRun",
+        "description": "The session's most recently requested pipeline run and its recorded execution outcome.\n\n\"Latest\" is the order QDash recorded the requests in (``requested_at``), not the order runs\nfinished or wrote: a run requested earlier may complete later. QDash keeps no authoritative\nrecord of hardware writes, so this never states the current or last written hardware state.\n\n``execution_outcome``, from QDash's dispatch and execution records only: ``refused``: QDash\nrefused the launch and created no flow run. ``unknown``: the launch is still being reported\nor its outcome is unknown. ``no_execution``: the flow run was created and QDash holds no\nexecution record for it. ``running``: an execution is still open. ``failed``: every\nexecution ended and none completed. ``partial``: some executions completed and others\nfailed or were cancelled. ``completed``: every execution completed. Runs outside the\nsession are not considered."
+      },
+      "CalibrationMeasuredTask": {
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "title": "Task Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "execution_id": {
+            "type": "string",
+            "title": "Execution Id"
+          },
+          "start_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start At"
+          },
+          "end_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End At"
+          },
+          "elapsed_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Elapsed Seconds"
+          }
+        },
+        "type": "object",
+        "required": [
+          "task_id",
+          "name",
+          "status",
+          "execution_id"
+        ],
+        "title": "CalibrationMeasuredTask",
+        "description": "A task result on the experiment's target, with its actual timing."
+      },
+      "CalibrationMeasuredValue": {
+        "properties": {
+          "value": {
+            "type": "number",
+            "title": "Value"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error",
+            "description": "The task's reported error, if any"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit",
+            "default": ""
+          },
+          "task_id": {
+            "type": "string",
+            "title": "Task Id"
+          },
+          "task_name": {
+            "type": "string",
+            "title": "Task Name"
+          },
+          "execution_id": {
+            "type": "string",
+            "title": "Execution Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "value",
+          "task_id",
+          "task_name",
+          "execution_id"
+        ],
+        "title": "CalibrationMeasuredValue",
+        "description": "One output parameter of a task result, read from QDash's task result history."
       },
       "CalibrationNoteResponse": {
         "properties": {
@@ -25332,6 +26522,114 @@
         ],
         "title": "CalibrationNoteResponse",
         "description": "CalibrationNote is a subclass of BaseModel."
+      },
+      "CalibrationParameterCheck": {
+        "properties": {
+          "task_name": {
+            "type": "string",
+            "title": "Task Name"
+          },
+          "call_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Call Id"
+          },
+          "parameter": {
+            "type": "string",
+            "title": "Parameter"
+          },
+          "requested": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested"
+          },
+          "in_spec": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "In Spec"
+          },
+          "executed": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Executed"
+          },
+          "consistent": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consistent"
+          },
+          "missing": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing"
+          }
+        },
+        "type": "object",
+        "required": [
+          "task_name",
+          "parameter"
+        ],
+        "title": "CalibrationParameterCheck",
+        "description": "One requested change, compared with the exact request and with what the task used.\n\n``requested`` is the decision's statement; ``in_spec`` is the run's stored spec (server\nrecord); ``executed`` is the task result's run parameter (server record). ``consistent`` is\nnull when either record is missing."
       },
       "CalibrationParameterDeleteResponse": {
         "properties": {
@@ -25497,6 +26795,109 @@
         "title": "CalibrationPipelineRunStatus",
         "description": "Dispatch state of one pipeline run requested in a calibration session.\n\n``dispatching``: the request was recorded and its launch has not reported back.\n``dispatched``: QDash created the pipeline's flow run; its executions carry its\n``flow_run_id``.\n``rejected``: QDash refused the launch before any flow run was created (the hardware was\nbusy or the worker deployment was missing); a retry with the same key may launch it.\n``unknown``: the launch failed in a way that may have created a flow run anyway, or it\nstayed ``dispatching`` past the time a launch takes. A retry with the same key never\nlaunches it again."
       },
+      "CalibrationRecommendationRef": {
+        "properties": {
+          "decision_id": {
+            "type": "string",
+            "title": "Decision Id"
+          },
+          "outcome": {
+            "type": "string",
+            "title": "Outcome"
+          },
+          "recommended_candidate_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recommended Candidate Id"
+          },
+          "recorded_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Recorded At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "decision_id",
+          "outcome",
+          "recorded_at"
+        ],
+        "title": "CalibrationRecommendationRef",
+        "description": "The session's current recommendation: a decision's conclusion, never a status."
+      },
+      "CalibrationSessionAuditResponse": {
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "const": "qdash.calibration-session-audit.v1",
+            "title": "Schema Version",
+            "default": "qdash.calibration-session-audit.v1"
+          },
+          "generated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Generated At"
+          },
+          "snapshot_id": {
+            "type": "string",
+            "title": "Snapshot Id"
+          },
+          "calibration_session": {
+            "$ref": "#/components/schemas/CalibrationAuditSessionHeader"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/AgentAuditEvent"
+            },
+            "type": "array",
+            "title": "Events"
+          },
+          "total_events": {
+            "type": "integer",
+            "title": "Total Events"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "complete": {
+            "type": "boolean",
+            "title": "Complete"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "generated_at",
+          "snapshot_id",
+          "calibration_session",
+          "events",
+          "total_events",
+          "complete",
+          "notes"
+        ],
+        "title": "CalibrationSessionAuditResponse",
+        "description": "A page of one snapshot of a calibration session's audit, or all of it.\n\nThe events have the same schema and semantics as an agent session's audit, and an admitted\nagent session's events appear inside it with ``agent_session_id`` set. A snapshot is two\nmatching projected reads, not an atomic database view."
+      },
       "CalibrationSessionDetailResponse": {
         "properties": {
           "calibration_session_id": {
@@ -25628,6 +27029,50 @@
             "type": "array",
             "title": "Unknown Starts",
             "description": "Agent session starts reserved long ago whose session was never recorded; the request may have stopped or may still record it. One recorded after a close is rejected and never operates"
+          },
+          "experiments": {
+            "items": {
+              "$ref": "#/components/schemas/CalibrationExperimentRow"
+            },
+            "type": "array",
+            "title": "Experiments",
+            "description": "Experiments of the search, oldest first, from decisions that proposed one and the runs that named them (latest 200 decisions)"
+          },
+          "decisions": {
+            "items": {
+              "$ref": "#/components/schemas/CalibrationDecisionResponse"
+            },
+            "type": "array",
+            "title": "Decisions",
+            "description": "The most recent decisions (at most 200), oldest first"
+          },
+          "decision_total": {
+            "type": "integer",
+            "title": "Decision Total",
+            "description": "Every decision recorded in it",
+            "default": 0
+          },
+          "recommendation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalibrationDecisionResponse"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The latest decision with a conclusion that no later decision supersedes; null when none was recorded. Closing records none"
+          },
+          "latest_requested_run": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalibrationLatestRequestedRun"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The most recently requested pipeline run and its recorded execution outcome; null without a run. Not the current or last written hardware state"
           }
         },
         "type": "object",
@@ -25643,6 +27088,98 @@
         ],
         "title": "CalibrationSessionDetailResponse",
         "description": "A calibration session with every run started in it."
+      },
+      "CalibrationSessionGroupSummary": {
+        "properties": {
+          "calibration_session_id": {
+            "type": "string",
+            "title": "Calibration Session Id"
+          },
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          },
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id"
+          },
+          "objective": {
+            "type": "string",
+            "title": "Objective"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CalibrationSessionStatus"
+          },
+          "created_by": {
+            "type": "string",
+            "title": "Created By"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "closed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closed At"
+          },
+          "targets": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Targets",
+            "description": "Qubits the session's records name: resolved pipeline targets, agent session policies, and experiment targets of its decisions; empty when none is recorded"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/CalibrationGroupCounts"
+          },
+          "first_activity_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "First Activity At",
+            "description": "Its creation or earliest execution start"
+          },
+          "latest_activity_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Latest Activity At",
+            "description": "Its latest execution start or end, nested agent activity, or creation"
+          },
+          "recommendation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalibrationRecommendationRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "calibration_session_id",
+          "project_id",
+          "chip_id",
+          "objective",
+          "status",
+          "created_by",
+          "created_at",
+          "counts",
+          "first_activity_at",
+          "latest_activity_at"
+        ],
+        "title": "CalibrationSessionGroupSummary",
+        "description": "One calibration session as the display parent of the work started in it.\n\n``status`` is open or closed; neither says whether the objective was met."
       },
       "CalibrationSessionRef": {
         "properties": {
@@ -29810,6 +31347,20 @@
             "title": "Idempotency Key",
             "description": "With calibration_session_id: a retry with the same key and request returns the recorded run instead of starting another, and a run whose launch outcome is unknown is never launched again with it."
           },
+          "decision_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision Id",
+            "description": "With calibration_session_id: the decision of that session this run carries out, recorded before dispatch with an experiment. QDash checks it belongs to the session and records the link on the run; it grants nothing."
+          },
           "reported_origin": {
             "anyOf": [
               {
@@ -29966,6 +31517,18 @@
             ],
             "title": "Pipeline Run Id",
             "description": "The run's record in that calibration session"
+          },
+          "decision_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision Id",
+            "description": "The decision the recorded run carries out, as QDash linked it; null when the request named none. A client that sent a decision checks it is echoed here"
           },
           "replayed": {
             "type": "boolean",
@@ -30340,7 +31903,8 @@
             "type": "string",
             "enum": [
               "execution",
-              "agent_session"
+              "agent_session",
+              "calibration_session"
             ],
             "title": "Kind"
           },
@@ -30404,6 +31968,44 @@
             "title": "Children Omitted",
             "description": "Earlier executions left out of children; the graph lists all",
             "default": 0
+          },
+          "calibration_session": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalibrationSessionGroupSummary"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Set for a calibration session row"
+          },
+          "pipeline_runs": {
+            "items": {
+              "$ref": "#/components/schemas/CalibrationGroupPipelineRun"
+            },
+            "type": "array",
+            "title": "Pipeline Runs",
+            "description": "The row's latest pipeline runs (at most 20), oldest first"
+          },
+          "pipeline_runs_omitted": {
+            "type": "integer",
+            "title": "Pipeline Runs Omitted",
+            "description": "Earlier runs left out",
+            "default": 0
+          },
+          "nested_agent_sessions": {
+            "items": {
+              "$ref": "#/components/schemas/CalibrationGroupAgentSession"
+            },
+            "type": "array",
+            "title": "Nested Agent Sessions",
+            "description": "The row's latest admitted agent sessions (at most 20), oldest first"
+          },
+          "nested_agent_sessions_omitted": {
+            "type": "integer",
+            "title": "Nested Agent Sessions Omitted",
+            "default": 0
           }
         },
         "type": "object",
@@ -30411,7 +32013,7 @@
           "kind"
         ],
         "title": "ExecutionGroupItem",
-        "description": "One row of the grouped Execution list: an execution, or an agent session."
+        "description": "One row of the grouped Execution list: an execution, an agent session, or a\ncalibration session with the runs and agent sessions started in it."
       },
       "ExecutionIdResponse": {
         "properties": {
@@ -33239,6 +34841,28 @@
         "title": "ListBackendsResponse",
         "description": "Response model for listing all backends.\n\nWraps list of backends for API consistency and future extensibility."
       },
+      "ListCalibrationDecisionsResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CalibrationDecisionResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "ListCalibrationDecisionsResponse",
+        "description": "Decisions of one calibration session, oldest first."
+      },
       "ListCalibrationSessionsResponse": {
         "properties": {
           "items": {
@@ -33528,7 +35152,7 @@
           "total": {
             "type": "integer",
             "title": "Total",
-            "description": "Rows: agent sessions plus executions outside a session"
+            "description": "Rows: calibration sessions, agent sessions outside one, and executions outside both"
           },
           "total_executions": {
             "type": "integer",
@@ -33544,6 +35168,12 @@
             "type": "integer",
             "title": "Agent Sessions",
             "description": "Agent session rows that match the filter"
+          },
+          "calibration_sessions": {
+            "type": "integer",
+            "title": "Calibration Sessions",
+            "description": "Calibration session rows that match the filter",
+            "default": 0
           },
           "skip": {
             "type": "integer",
@@ -33571,7 +35201,7 @@
           "children_limit"
         ],
         "title": "ListExecutionGroupsResponse",
-        "description": "A page of the Execution list with agent sessions grouped on the server.\n\nGrouping happens before pagination, so a session is one row on one page with all its\nexecutions, and no execution appears both in a group and as its own row. ``total`` counts\nrows; ``total_executions`` counts real executions, the number the ungrouped list reports."
+        "description": "A page of the Execution list with calibration and agent sessions grouped on the server.\n\nGrouping happens before pagination, so a session is one row on one page with all its\nexecutions, and no execution appears both in a group and as its own row. An agent session\nadmitted to a calibration session is nested in that session's row. ``total`` counts\nrows; ``total_executions`` counts real executions, the number the ungrouped list reports."
       },
       "ListExecutionsResponse": {
         "properties": {
@@ -39088,6 +40718,128 @@
         "title": "RecordAgentResumeOutcomeRequest",
         "description": "The resumed runner reports how its run ended."
       },
+      "RecordCalibrationDecisionRequest": {
+        "properties": {
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Idempotency Key"
+          },
+          "assessment": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentDecisionAssessment"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How the recorder judged the evidence; omitted when not stated"
+          },
+          "interpretation": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Interpretation",
+            "description": "Concise reasoning for the decision, citing the evidence"
+          },
+          "next_action": {
+            "$ref": "#/components/schemas/AgentDecisionNextAction"
+          },
+          "next_detail": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Next Detail",
+            "default": ""
+          },
+          "evidence_run_ids": {
+            "items": {
+              "type": "string",
+              "maxLength": 200,
+              "minLength": 1
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Evidence Run Ids",
+            "description": "Pipeline runs of this session"
+          },
+          "evidence_task_ids": {
+            "items": {
+              "type": "string",
+              "maxLength": 200,
+              "minLength": 1
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "Evidence Task Ids",
+            "description": "Task results on the session's chip"
+          },
+          "evidence_decision_ids": {
+            "items": {
+              "type": "string",
+              "maxLength": 200,
+              "minLength": 1
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "Evidence Decision Ids",
+            "description": "Earlier decisions of this session"
+          },
+          "supersedes_decision_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supersedes Decision Id"
+          },
+          "experiment": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalibrationExperimentPlanModel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "conclusion": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalibrationConclusionModel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentModelIdentity"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The model the client host reports for this record; client reported, not verified"
+          }
+        },
+        "type": "object",
+        "required": [
+          "idempotency_key",
+          "interpretation",
+          "next_action"
+        ],
+        "title": "RecordCalibrationDecisionRequest",
+        "description": "Record a decision in a calibration session's audit, as an agent session decision is.\n\nThe text fields are the recorder's statements, recorded as given. QDash checks that every\ncited pipeline run and decision belongs to the session and every cited task result is on\nits chip (and on the experiment's target), and freezes what its records say about them.\nRecord ``experiment`` before dispatching the run it proposes, then start the run with this\ndecision's ID. ``conclusion`` needs next_action complete or stop."
+      },
       "RelativePeriod": {
         "properties": {
           "kind": {
@@ -39138,6 +40890,85 @@
         ],
         "title": "ReportedLaunchOrigin",
         "description": "A caller's own account of how a run was started; client reported, not verified."
+      },
+      "RequestedParameterChangeModel": {
+        "properties": {
+          "task_name": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_]+$",
+            "title": "Task Name"
+          },
+          "call_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Call Id",
+            "description": "The task call the change is for, when a step calls the task more than once"
+          },
+          "parameter": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.]+$",
+            "title": "Parameter"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "previous": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous",
+            "description": "The value before the change, when the recorder knows it"
+          }
+        },
+        "type": "object",
+        "required": [
+          "task_name",
+          "parameter"
+        ],
+        "title": "RequestedParameterChangeModel",
+        "description": "One run parameter a decision asks a task to use, as the recorder states it."
       },
       "ResolvedPipelineStep": {
         "properties": {

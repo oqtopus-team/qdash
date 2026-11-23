@@ -35,7 +35,11 @@ Every operation belongs to one phase, and no phase starts the next one implicitl
 
 `Pipelines.execute` also takes `calibration_session_id` and `idempotency_key`, given together, to
 record the run in a calibration session before it is launched; a retry with the same key returns
-the recorded run. See [Calibration Sessions](../agent/calibration-sessions.md).
+the recorded run. With them, an optional `decision_id` names the session's decision the run
+carries out; without `calibration_session_id` it raises `ValueError` before any request. A
+response that does not echo the `decision_id` raises `RuntimeError` instead of returning, since
+the run may have started without the link: reconcile it in the session audit, never retry with a
+new key. See [Calibration Sessions](../agent/calibration-sessions.md).
 
 `Chip` is a front door over `Pipelines`, not a second implementation:
 `validate_calibration` and `calibrate` build a `Pipeline` from `targets`, `steps` and the

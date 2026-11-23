@@ -100,15 +100,21 @@ a partially filled block holds fewer. Hover over or focus a column for exact cou
 to filter the list to that day, even in the six-hour view; select the same day again to clear
 the filter.
 
-With **Group agent sessions** on (the default), each agent calibration session is one row of the
-list, holding the runs the agent started. The row shows the session's own state, such as
-**Active** or **Paused for an expert**, not the state of its last run: a session waiting between
-measurements or for an expert is not failed. Expand the row to list its runs and open one in the
-same details panel as any other run; select **Open session graph** to see every step. The count above
-the list gives runs and rows separately, because one session row can hold several runs. With a
-day selected, a session appears when it was approved or started a run that day, and its row
-still lists all of its runs. Turn the switch off for the plain list of runs. See
-[Agent Calibration](./agent-calibration.md#follow-a-session-on-the-execution-page).
+With **Group sessions** on (the default), each calibration objective and each agent calibration
+session is one row of the list, holding the runs started for it. A calibration objective's row
+shows the objective, its targets, how many pipeline runs and runs it holds and how many are
+running or failed, the time from its first to its latest activity, and the recommendation when
+one was recorded. **Open** or **Closed** says only whether it accepts new work, never whether the
+objective was met. Expand it to list each pipeline run with its step runs, and each agent
+session started in it as its own nested row. An agent session row shows the session's own state,
+such as **Active** or **Paused for an expert**, not the state of its last run: a session waiting
+between measurements or for an expert is not failed. Expand the row to list its runs and open one
+in the same details panel as any other run; select **Open session graph** to see every step. The
+count above the list gives runs and rows separately, because one row can hold several runs. With
+a day selected, a row appears when it was created or started a run that day, and it still lists
+all of its runs. A run belongs to a row only when it was started for that objective or by that
+agent session; runs started any other way stay their own rows. Turn the switch off for the plain
+list of runs. See [Agent Calibration](./agent-calibration.md#follow-a-session-on-the-execution-page).
 
 A run started for a calibration objective shows the objective as a badge on its card: each step
 of a pipeline run recorded in a calibration session, and each run of an agent session started in
@@ -124,6 +130,19 @@ Belonging to an objective does not make a run an agent run.
 Select **Calibration sessions** at the top of the **Execution** page to list the objectives on
 the selected chip, newest first. Filter them by **Open** or **Closed** or with **Only mine**,
 and remove the chip filter to see every chip. Selecting an objective opens its page.
+
+An objective's page shows **Search progression** when the assistant recorded experiments for it,
+such as a ZX90 gate search: the stages reached (**Baseline**, **Screening**, **Confirmation**), a
+comparison of each candidate's requested change with its measured gate time, fidelity with its
+error, CR duration, and hardware time, the recorded recommendation, and the latest requested run
+with how its executions ended. Measured values come from the runs' task results; the rationale
+and the recommendation are statements of whoever recorded them. When the latest requested run's
+candidate is not the recommended candidate, the page says so. It never shows which calibration
+is on the hardware: QDash does not record hardware writes, and a run requested earlier can
+finish later. **Audit** below lists every
+decision, pipeline request, launch outcome, run, and agent session step in order, with what
+QDash never received (such as an approval given in the chat) marked **Not recorded**; select
+**Export JSON** to download it.
 
 ## Inspect a Result
 

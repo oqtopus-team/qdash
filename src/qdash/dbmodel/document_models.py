@@ -14,6 +14,7 @@ from qdash.dbmodel.agent_session import (
 from qdash.dbmodel.backend import BackendDocument
 from qdash.dbmodel.calibration_note import CalibrationNoteDocument
 from qdash.dbmodel.calibration_session import (
+    CalibrationDecisionDocument,
     CalibrationPipelineRunDocument,
     CalibrationSessionDocument,
 )
@@ -75,6 +76,7 @@ def document_models() -> list[Any]:
         AgentInterventionDocument,
         CalibrationSessionDocument,
         CalibrationPipelineRunDocument,
+        CalibrationDecisionDocument,
         PipelineLaunchDocument,
         ExecutionHistoryDocument,
         TaskResultHistoryDocument,

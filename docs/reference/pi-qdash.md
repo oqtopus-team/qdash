@@ -111,15 +111,17 @@ Set `QDASH_WEB_URL` when the web UI is not at the API base URL minus `/api`.
 
 ## Calibration session tools
 
-A calibration session records one calibration objective on one chip and groups the pipeline runs and agent sessions started with its ID; it grants nothing. All three tools are deferred. See [Calibration Sessions](../developer-guide/agent/calibration-sessions.md).
+A calibration session records one calibration objective on one chip and groups the pipeline runs and agent sessions started with its ID; it grants nothing. All five tools are deferred. See [Calibration Sessions](../developer-guide/agent/calibration-sessions.md) and [Calibration Session Audit](../developer-guide/agent/calibration-session-audit.md).
 
 | Tool | Result or limit |
 | --- | --- |
 | `qdash_create_calibration_session` (confirmation-gated) | Create a session for `objective` (at most 500 characters) on `chipId` or the default chip and return its ID. The confirmation says that it starts and grants nothing. |
-| `qdash_get_calibration_session` | One session: objective, status, each pipeline run with its dispatch status, who requested it and any reported launch origin, and every step execution, each agent session with its status and executions, and what still runs or waits. Read-only. |
+| `qdash_get_calibration_session` | One session: objective, status, each pipeline run with its dispatch status, who requested it and any reported launch origin, and every step execution, each agent session with its status and executions, and what still runs or waits; then the recorded experiments with measured gate time, fidelity, CR duration and amplitude, and hardware time, requested changes the task did not execute, the recommendation, and the latest requested run with its recorded execution outcome and whether its requested candidate is the recommended one; it never states the hardware state, since QDash records no authoritative hardware write. Read-only. |
+| `qdash_record_calibration_decision` (session-granted) | Append a decision to the session's audit: optional `assessment`, `interpretation` (2000 characters), `nextAction` (the agent decision values), optional `nextDetail`, `evidenceRunIds`, `evidenceTaskIds`, `evidenceDecisionIds`, `supersedesDecisionId`, an `experiment` (`candidateId`, `stage`, `target`, `requestedChanges` with `taskName`, `parameter`, `value`, optional `previous` and `callId`) with `next_task`, `repeat`, or `adjust_and_retry`, or a `conclusion` (`outcome`, `recommendedCandidateId`) with `complete` or `stop`. QDash records it only for the session's creator, in any status, and checks every reference; the model comes from the host. The idempotency key derives from the tool call id, so a replayed call returns the same record. Starts nothing. |
+| `qdash_get_calibration_session_audit` | One page of a snapshot of the session's audit (default 100 events, at most 500) as numbered lines with each event's kind, source, and facts not recorded, and the cursor of the next page. Read-only. |
 | `qdash_list_calibration_sessions` | Sessions of the current project, newest first; `chipId`, `mine`, `openOnly`, and `limit` (default 20, at most 100) narrow it. Read-only. |
 
-`qdash_run_pipeline` and `qdash_create_agent_session` take an optional `calibrationSessionId`; QDash accepts it only for an open session on the same chip that the signed-in user created.
+`qdash_run_pipeline` and `qdash_create_agent_session` take an optional `calibrationSessionId`; QDash accepts it only for an open session on the same chip that the signed-in user created. `qdash_run_pipeline` also takes `decisionId`, only with `calibrationSessionId`: the decision of that session the run carries out, shown in its confirmation. QDash refuses a decision whose coupling target (such as `0-1`) has no two-qubit step in the spec, or no manual round measuring that pair in that direction.
 
 ## Pipeline and flow operations
 

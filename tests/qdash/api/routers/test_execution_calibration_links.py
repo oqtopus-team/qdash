@@ -158,12 +158,17 @@ class TestPipelineMembership:
             assert rows[execution_id]["reported_origin"] is None
             assert _detail(test_client, execution_id)["calibration_session"] == link
 
-        grouped = {
-            item["execution"]["execution_id"]: item["execution"]
-            for item in _groups(test_client)
-            if item["kind"] == "execution"
-        }
-        assert grouped["step-3"]["calibration_session"]["pipeline_run_id"] == run_id
+        # The grouped list holds every step inside the calibration session's row, not as rows.
+        items = _groups(test_client)
+        assert [i for i in items if i["kind"] == "execution"] == []
+        [row] = items
+        assert row["kind"] == "calibration_session"
+        assert row["calibration_session"]["calibration_session_id"] == session_id
+        [run] = row["pipeline_runs"]
+        assert run["run_id"] == run_id
+        steps = {e["execution_id"]: e for e in run["executions"]}
+        assert set(steps) == {first, "step-3"}
+        assert steps["step-3"]["calibration_session"]["pipeline_run_id"] == run_id
 
     def test_other_chip_project_or_flow_run_is_not_a_member(self, test_client):
         session_id = _create_session(test_client)
@@ -286,12 +291,18 @@ class TestAgentSessionMembership:
             _detail(test_client, "agent-exec")["calibration_session"] == row["calibration_session"]
         )
 
-        [group] = [i for i in _groups(test_client) if i["kind"] == "agent_session"]
+        # The admitted agent session is nested in its calibration session's row.
+        items = _groups(test_client)
+        assert [i for i in items if i["kind"] == "agent_session"] == []
+        [parent] = [i for i in items if i["kind"] == "calibration_session"]
+        [group] = parent["nested_agent_sessions"]
         assert group["agent_session"]["calibration_session"]["calibration_session_id"] == (
             session_id
         )
         [child] = group["children"]
         assert child["execution"]["calibration_session"] == row["calibration_session"]
+        assert parent["calibration_session"]["counts"]["agent_sessions"] == 1
+        assert parent["calibration_session"]["counts"]["executions"] == 1
 
         detail = test_client.get(f"/calibration-sessions/{session_id}", headers=_headers()).json()
         [listed] = detail["agent_sessions"]

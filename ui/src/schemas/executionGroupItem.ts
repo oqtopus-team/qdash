@@ -6,13 +6,17 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { AgentSessionChildExecution } from './agentSessionChildExecution';
+import type { CalibrationGroupAgentSession } from './calibrationGroupAgentSession';
+import type { CalibrationGroupPipelineRun } from './calibrationGroupPipelineRun';
 import type { ExecutionGroupItemAgentSession } from './executionGroupItemAgentSession';
+import type { ExecutionGroupItemCalibrationSession } from './executionGroupItemCalibrationSession';
 import type { ExecutionGroupItemExecution } from './executionGroupItemExecution';
 import type { ExecutionGroupItemKind } from './executionGroupItemKind';
 import type { ExecutionGroupItemSortAt } from './executionGroupItemSortAt';
 
 /**
- * One row of the grouped Execution list: an execution, or an agent session.
+ * One row of the grouped Execution list: an execution, an agent session, or a
+ * calibration session with the runs and agent sessions started in it.
  */
 export interface ExecutionGroupItem {
   kind: ExecutionGroupItemKind;
@@ -30,4 +34,13 @@ export interface ExecutionGroupItem {
   children_in_filter?: number;
   /** Earlier executions left out of children; the graph lists all */
   children_omitted?: number;
+  /** Set for a calibration session row */
+  calibration_session?: ExecutionGroupItemCalibrationSession;
+  /** The row's latest pipeline runs (at most 20), oldest first */
+  pipeline_runs?: CalibrationGroupPipelineRun[];
+  /** Earlier runs left out */
+  pipeline_runs_omitted?: number;
+  /** The row's latest admitted agent sessions (at most 20), oldest first */
+  nested_agent_sessions?: CalibrationGroupAgentSession[];
+  nested_agent_sessions_omitted?: number;
 }

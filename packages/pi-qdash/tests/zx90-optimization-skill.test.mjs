@@ -96,7 +96,8 @@ test("a continued loop ends only for a stated reason, never for an arbitrary cou
   assert.match(SKILL, /running out of budget and stopping is the intended end, not a failure/);
   assert.match(SKILL, /the budget minus the reserve cannot pay for the next experiment/);
   assert.match(SKILL, /Before each run, post: the experiment number, the key and its change \(from, to\), the evidence that motivates it/);
-  assert.match(SKILL, /Post the measured evidence, the decision, the incumbent's values, and the pair's actual current stored state/);
+  assert.match(SKILL, /Post the\s+measured evidence, the decision, and the incumbent's values/);
+  assert.match(SKILL, /never state the\s+current stored state as known/);
 });
 
 test("a stop while hardware runs, and a resume, never re-dispatch an uncertain experiment", () => {
@@ -120,9 +121,30 @@ test("a rejected fit fails the task, but an accepted run is never a sandbox", ()
   assert.match(SKILL, /`update_calibration_parameters: false` is not a sandbox: an accepted result still updates and saves the qubex calibration note/);
 });
 
-test("the final state is the last run's recalibration, reported truthfully", () => {
+test("the final state is never claimed from request order or a completed execution", () => {
   assert.match(SKILL, /do not rerun it afterwards to "restore" it, since rerunning recalibrates/);
-  assert.match(SKILL, /the actual last stored pair state with the execution that wrote it/);
-  assert.match(SKILL, /If that run failed or its evidence is incomplete, report the state as unverified\./);
+  assert.match(SKILL, /the session's latest requested run \(`latest_requested_run`\)/);
+  assert.match(SKILL, /QDash records no\s+authoritative hardware write/);
+  assert.match(SKILL, /Never report the current or last\s+written pair state as known/);
+  assert.doesNotMatch(SKILL, /last_hardware_write|actual last stored pair state/);
   assert.match(SKILL, /Repeated, uncorrected comparisons carry no significance claim\./);
+});
+
+test("the search keeps its history in one calibration session's audit, recorded before each run", () => {
+  const names = registeredToolNames();
+  for (const tool of ["qdash_create_calibration_session", "qdash_record_calibration_decision", "qdash_get_calibration_session_audit", "qdash_get_calibration_session"]) {
+    assert.ok(names.has(tool), tool);
+    assert.match(SKILL, new RegExp(`\`${tool}\``));
+  }
+  // Recording appends history only; every run stays a reviewed write.
+  assert.ok(SESSION_GRANTED_WRITE_TOOL_NAMES.includes("qdash_record_calibration_decision"));
+  assert.ok(REVIEWED_WRITE_TOOL_NAMES.includes("qdash_create_calibration_session"));
+  assert.match(SKILL, /Use that one session for the whole search, including the final comparison; never start a second one for the same search\./);
+  assert.match(SKILL, /Record the experiment before dispatching it/);
+  assert.match(SKILL, /call `qdash_run_pipeline` with `calibrationSessionId` and the returned `decisionId`/);
+  assert.match(SKILL, /When the user declines a run's approval or QDash refuses it, record a decision that says so/);
+  assert.match(SKILL, /Closing the session records no conclusion; never let a status stand in for one\./);
+  assert.match(SKILL, /rebuild the state from QDash, not from memory/);
+  assert.match(SKILL, /it groups coupling pipelines and records history, and grants no run, bound, or budget/);
+  assert.match(SKILL, /agent sessions on couplings \(agent sessions target qubits\)/);
 });

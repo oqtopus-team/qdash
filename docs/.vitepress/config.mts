@@ -247,6 +247,10 @@ export default withMermaid(
                 { text: "Agent Platform", link: "/developer-guide/agent/agent-platform" },
                 { text: "Agentic Calibration", link: "/developer-guide/agent/agentic-calibration" },
                 { text: "Calibration Sessions", link: "/developer-guide/agent/calibration-sessions" },
+                {
+                  text: "Calibration Session Audit",
+                  link: "/developer-guide/agent/calibration-session-audit",
+                },
                 { text: "Agent Loop Validation", link: "/developer-guide/agent/agent-validation" },
                 { text: "Knowledge Layout", link: "/developer-guide/agent/knowledge-layout" },
                 { text: "Calibration Evaluation", link: "/developer-guide/agent/evaluation" },

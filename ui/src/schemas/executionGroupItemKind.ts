@@ -12,4 +12,5 @@ export type ExecutionGroupItemKind = typeof ExecutionGroupItemKind[keyof typeof 
 export const ExecutionGroupItemKind = {
   execution: 'execution',
   agent_session: 'agent_session',
+  calibration_session: 'calibration_session',
 } as const;

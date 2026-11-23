@@ -865,6 +865,7 @@ class QDashClient:
         backend_name: str | None = None,
         calibration_session_id: str | None = None,
         idempotency_key: str | None = None,
+        decision_id: str | None = None,
     ) -> ExecutePipelineResponse:
         """Validate a pipeline spec on the server and dispatch it as one execution.
 
@@ -872,9 +873,17 @@ class QDashClient:
         the server's problem list; nothing is dispatched. With ``calibration_session_id`` and
         ``idempotency_key`` (given together), the run is recorded in that calibration session
         before it is launched, and a retry with the same key returns the recorded run.
+        ``decision_id`` names the decision of that session the run carries out; it needs
+        ``calibration_session_id``. A response that does not echo the decision means the link
+        may be lost, so it raises instead of returning, and the run must be reconciled.
         """
         if (calibration_session_id is None) != (idempotency_key is None):
             raise ValueError("calibration_session_id and idempotency_key are given together")
+        if decision_id is not None:
+            if calibration_session_id is None:
+                raise ValueError("decision_id needs calibration_session_id")
+            if not decision_id.strip():
+                raise ValueError("decision_id must be non-empty")
         if calibration_session_id is not None:
             if not idempotency_key or not idempotency_key.strip():
                 raise ValueError("idempotency_key must be non-empty")
@@ -888,6 +897,7 @@ class QDashClient:
                 backend_name=backend_name,
                 calibration_session_id=calibration_session_id,
                 idempotency_key=idempotency_key,
+                decision_id=decision_id,
             ),
         )
         if calibration_session_id is not None:
@@ -902,6 +912,12 @@ class QDashClient:
                     "Pipeline result unknown: the execution may have started without its "
                     "association. Do not retry automatically or use a new key; "
                     "reconcile the execution first."
+                )
+            if decision_id is not None and data.get("decision_id") != decision_id:
+                raise RuntimeError(
+                    "Pipeline result unknown: the run may have been recorded without its "
+                    f"decision {decision_id!r}. Do not retry automatically or use a new key; "
+                    "reconcile the run in the calibration session audit first."
                 )
         return self._validate_model_payload(ExecutePipelineResponse, response.data)
 

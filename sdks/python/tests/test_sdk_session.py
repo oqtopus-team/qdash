@@ -169,6 +169,80 @@ def test_execute_then_wait_follows_the_whole_pipeline() -> None:
     assert ("POST", "/calibration-pipelines/validate") not in server.paths()
 
 
+def _recorded_server(execute: dict[str, Any]) -> Server:
+    return Server(
+        {
+            ("GET", "/calibration-sessions/cs-1"): [
+                httpx.Response(200, json={"calibration_session_id": "cs-1", "chip_id": CHIP})
+            ],
+            ("POST", "/calibration-pipelines/execute"): [httpx.Response(202, json=execute)],
+        }
+    )
+
+
+def test_execute_forwards_the_decision_a_recorded_run_carries_out() -> None:
+    linked = {
+        **execute_body(),
+        "calibration_session_id": "cs-1",
+        "pipeline_run_id": "cpr-1",
+        "decision_id": "cd-1",
+    }
+    server = _recorded_server(linked)
+    with QDash(server.client()) as qdash:
+        run = qdash.pipelines.execute(
+            pipeline(),
+            chip_id=CHIP,
+            calibration_session_id="cs-1",
+            idempotency_key="key-1",
+            decision_id="cd-1",
+        )
+    body = json.loads(server.requests[-1].content)
+    assert body["decision_id"] == "cd-1"
+    assert body["calibration_session_id"] == "cs-1"
+    assert body["idempotency_key"] == "key-1"
+    assert run.response.decision_id == "cd-1"
+
+
+def test_execute_without_a_decision_sends_none() -> None:
+    server = _recorded_server(
+        {**execute_body(), "calibration_session_id": "cs-1", "pipeline_run_id": "cpr-1"}
+    )
+    with QDash(server.client()) as qdash:
+        qdash.pipelines.execute(
+            pipeline(), chip_id=CHIP, calibration_session_id="cs-1", idempotency_key="key-1"
+        )
+    assert "decision_id" not in json.loads(server.requests[-1].content)
+
+
+def test_a_dropped_decision_link_is_unknown_and_not_retried() -> None:
+    # A server that ignores decision_id records the run without its intent.
+    server = _recorded_server(
+        {**execute_body(), "calibration_session_id": "cs-1", "pipeline_run_id": "cpr-1"}
+    )
+    with (
+        QDash(server.client()) as qdash,
+        pytest.raises(RuntimeError, match=r"without its decision 'cd-1'.*Do not retry"),
+    ):
+        qdash.pipelines.execute(
+            pipeline(),
+            chip_id=CHIP,
+            calibration_session_id="cs-1",
+            idempotency_key="key-1",
+            decision_id="cd-1",
+        )
+    assert server.paths().count(("POST", "/calibration-pipelines/execute")) == 1
+
+
+def test_a_decision_needs_a_calibration_session() -> None:
+    server = Server()
+    with (
+        QDash(server.client()) as qdash,
+        pytest.raises(ValueError, match="decision_id needs calibration_session_id"),
+    ):
+        qdash.pipelines.execute(pipeline(), chip_id=CHIP, decision_id="cd-1")
+    assert server.requests == []
+
+
 def test_wait_times_out_without_cancelling_the_run() -> None:
     server = Server(
         {

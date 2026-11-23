@@ -117,10 +117,22 @@ class PipelineDispatch:
     replayed: bool
 
 
-def pipeline_request_hash(chip_id: str, spec: dict[str, Any], backend_name: str | None) -> str:
-    """Hash of what a retry must repeat to reuse a pipeline run's idempotency key."""
+def pipeline_request_hash(
+    chip_id: str,
+    spec: dict[str, Any],
+    backend_name: str | None,
+    decision_id: str | None = None,
+) -> str:
+    """Hash of what a retry must repeat to reuse a pipeline run's idempotency key.
+
+    ``decision_id`` enters the hash only when given, so a request without one hashes as it
+    always did.
+    """
+    fields: dict[str, Any] = {"chip_id": chip_id, "spec": spec, "backend_name": backend_name}
+    if decision_id is not None:
+        fields["decision_id"] = decision_id
     payload = json.dumps(
-        {"chip_id": chip_id, "spec": spec, "backend_name": backend_name},
+        fields,
         sort_keys=True,
         separators=(",", ":"),
         default=str,
@@ -459,6 +471,7 @@ class CalibrationSessionService:
         dispatch: Callable[[Any], Awaitable[ExecuteFlowResponse]],
         response: Callable[[Any, ExecuteFlowResponse], dict[str, Any]],
         reported_origin: ReportedLaunchOrigin | None = None,
+        decision_id: str | None = None,
     ) -> PipelineDispatch:
         """Launch a pipeline run in the session at most once per idempotency key.
 
@@ -473,7 +486,7 @@ class CalibrationSessionService:
         # A run left dispatching by a request that stopped before launching it is rejected
         # here, so the same key may launch it.
         self._recover_pipeline_reservations(session)
-        request_hash = pipeline_request_hash(chip_id, spec, backend_name)
+        request_hash = pipeline_request_hash(chip_id, spec, backend_name, decision_id)
         existing = self._find_run(project_id, calibration_session_id, idempotency_key)
         if existing is not None:
             replay = self._replay(existing, request_hash)
@@ -481,6 +494,16 @@ class CalibrationSessionService:
                 return replay
 
         validated = validate()
+        if decision_id is not None:
+            # Imported here: the audit reads agent sessions, whose service imports this module.
+            from qdash.api.services.calibration_session_audit import check_run_decision
+
+            check_run_decision(
+                session,
+                decision_id,
+                getattr(validated, "targets", None),
+                getattr(validated, "spec", None),
+            )
         run_id = existing.run_id if existing is not None else f"cpr-{uuid4()}"
         reservation = self.reserve_child(
             project_id=project_id,
@@ -503,6 +526,8 @@ class CalibrationSessionService:
                 username=username,
                 pipeline_name=str(spec.get("name") or ""),
                 reported_origin=reported_origin,
+                spec=getattr(validated, "spec", None) or spec,
+                decision_id=decision_id,
             )
             # Only an attempt that removes its own reservation may launch: a close that
             # cleared it meanwhile has already counted this run as never started.
@@ -650,6 +675,8 @@ class CalibrationSessionService:
         username: str,
         pipeline_name: str,
         reported_origin: ReportedLaunchOrigin | None = None,
+        spec: dict[str, Any] | None = None,
+        decision_id: str | None = None,
     ) -> CalibrationPipelineRunDocument:
         """Record the launch before it happens: a new run, or a new attempt of a refused one."""
         token = str(uuid4())
@@ -667,6 +694,8 @@ class CalibrationSessionService:
                 reported_origin=reported_origin,
                 dispatch_token=token,
                 pipeline_name=pipeline_name,
+                spec=spec,
+                decision_id=decision_id,
                 requested_at=timestamp,
                 updated_at=timestamp,
             )
@@ -690,6 +719,7 @@ class CalibrationSessionService:
                     "dispatch_token": token,
                     "reservation_id": reservation_id,
                     "error": "",
+                    "spec": spec,
                     "updated_at": timestamp,
                 },
                 "$inc": {"attempts": 1},
@@ -707,6 +737,7 @@ class CalibrationSessionService:
                 "reservation_id": reservation_id,
                 "attempts": existing.attempts + 1,
                 "error": "",
+                "spec": spec,
             }
         )
         return claimed
@@ -742,8 +773,16 @@ class CalibrationSessionService:
         self, doc: CalibrationSessionDocument, blockers: CloseBlockers
     ) -> CalibrationSessionDetailResponse:
         scope = {"project_id": doc.project_id, "calibration_session_id": doc.calibration_session_id}
+        from qdash.api.services.calibration_session_audit import CalibrationSessionAuditService
+
+        search = CalibrationSessionAuditService().search(doc)
         return CalibrationSessionDetailResponse(
             **_response(doc).model_dump(),
+            experiments=search.experiments,
+            decisions=search.decisions,
+            decision_total=search.decision_total,
+            recommendation=search.recommendation,
+            latest_requested_run=search.latest_requested_run,
             pipeline_runs=[self._run_response(run) for run in self._recent_runs(doc)],
             pipeline_run_total=CalibrationPipelineRunDocument.find(scope).count(),
             agent_sessions=self._agent_children(doc),

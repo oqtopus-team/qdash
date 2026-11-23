@@ -18,10 +18,11 @@ from qdash.api.schemas.execution import (
     ExecutionResponseSummary,
 )
 from qdash.datamodel.agent_session import AgentModelIdentity, AgentSessionStatus
+from qdash.datamodel.calibration_session import CalibrationSessionStatus
 
 __all__ = ["ExecutionAgentSessionLink"]
 
-ExecutionGroupItemKind = Literal["execution", "agent_session"]
+ExecutionGroupItemKind = Literal["execution", "agent_session", "calibration_session"]
 
 
 class AgentSessionGroupCounts(BaseModel):
@@ -128,8 +129,89 @@ class AgentSessionChildExecution(BaseModel):
     execution: ExecutionResponseSummary
 
 
+class CalibrationGroupCounts(BaseModel):
+    """What a calibration session row holds, counted from its explicit records."""
+
+    pipeline_runs: int = Field(description="Pipeline runs recorded in the session")
+    agent_sessions: int = Field(description="Admitted agent sessions on the chip in the session")
+    executions: int = Field(description="Executions of its runs and agent sessions, every day")
+    executions_in_filter: int = Field(description="Of those, the ones matching the day filter")
+    running: int = Field(description="Executions scheduled, running, or cancelling")
+    failed: int = Field(description="Executions that failed")
+    unknown_dispatch: int = Field(
+        default=0, description="Runs whose dispatch outcome is unknown; they may be running"
+    )
+    decisions: int = Field(default=0, description="Decisions recorded in the session's audit")
+
+
+class CalibrationRecommendationRef(BaseModel):
+    """The session's current recommendation: a decision's conclusion, never a status."""
+
+    decision_id: str
+    outcome: str
+    recommended_candidate_id: str | None = None
+    recorded_at: datetime
+
+
+class CalibrationSessionGroupSummary(BaseModel):
+    """One calibration session as the display parent of the work started in it.
+
+    ``status`` is open or closed; neither says whether the objective was met.
+    """
+
+    calibration_session_id: str
+    project_id: str
+    chip_id: str
+    objective: str
+    status: CalibrationSessionStatus
+    created_by: str
+    created_at: datetime
+    closed_at: datetime | None = None
+    targets: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Qubits the session's records name: resolved pipeline targets, agent session "
+            "policies, and experiment targets of its decisions; empty when none is recorded"
+        ),
+    )
+    counts: CalibrationGroupCounts
+    first_activity_at: datetime = Field(description="Its creation or earliest execution start")
+    latest_activity_at: datetime = Field(
+        description="Its latest execution start or end, nested agent activity, or creation"
+    )
+    recommendation: CalibrationRecommendationRef | None = None
+
+
+class CalibrationGroupPipelineRun(BaseModel):
+    """One pipeline run of a calibration session row, with its step executions."""
+
+    run_id: str
+    pipeline_name: str = ""
+    dispatch_status: str
+    requested_by: str
+    requested_at: datetime
+    decision_id: str | None = Field(
+        default=None, description="The decision the run carries out, as its request named it"
+    )
+    targets: list[str] = Field(default_factory=list)
+    executions: list[ExecutionResponseSummary] = Field(default_factory=list)
+    executions_total: int = 0
+    executions_in_filter: int = 0
+
+
+class CalibrationGroupAgentSession(BaseModel):
+    """An admitted agent session nested in a calibration session row."""
+
+    agent_session: AgentSessionGroupSummary
+    children: list[AgentSessionChildExecution] = Field(default_factory=list)
+    children_total: int = 0
+    children_in_filter: int = 0
+    children_omitted: int = 0
+
+
 class ExecutionGroupItem(BaseModel):
-    """One row of the grouped Execution list: an execution, or an agent session."""
+    """One row of the grouped Execution list: an execution, an agent session, or a
+    calibration session with the runs and agent sessions started in it."""
 
     kind: ExecutionGroupItemKind
     sort_at: datetime | None = Field(
@@ -156,18 +238,35 @@ class ExecutionGroupItem(BaseModel):
     children_omitted: int = Field(
         default=0, description="Earlier executions left out of children; the graph lists all"
     )
+    calibration_session: CalibrationSessionGroupSummary | None = Field(
+        default=None, description="Set for a calibration session row"
+    )
+    pipeline_runs: list[CalibrationGroupPipelineRun] = Field(
+        default_factory=list,
+        description="The row's latest pipeline runs (at most 20), oldest first",
+    )
+    pipeline_runs_omitted: int = Field(default=0, description="Earlier runs left out")
+    nested_agent_sessions: list[CalibrationGroupAgentSession] = Field(
+        default_factory=list,
+        description="The row's latest admitted agent sessions (at most 20), oldest first",
+    )
+    nested_agent_sessions_omitted: int = 0
 
 
 class ListExecutionGroupsResponse(BaseModel):
-    """A page of the Execution list with agent sessions grouped on the server.
+    """A page of the Execution list with calibration and agent sessions grouped on the server.
 
     Grouping happens before pagination, so a session is one row on one page with all its
-    executions, and no execution appears both in a group and as its own row. ``total`` counts
+    executions, and no execution appears both in a group and as its own row. An agent session
+    admitted to a calibration session is nested in that session's row. ``total`` counts
     rows; ``total_executions`` counts real executions, the number the ungrouped list reports.
     """
 
     items: list[ExecutionGroupItem]
-    total: int = Field(description="Rows: agent sessions plus executions outside a session")
+    total: int = Field(
+        description="Rows: calibration sessions, agent sessions outside one, and executions "
+        "outside both"
+    )
     total_executions: int = Field(
         description="Real executions that match the filter, grouped or not"
     )
@@ -175,6 +274,9 @@ class ListExecutionGroupsResponse(BaseModel):
         description="Executions that match the filter and are shown inside a session row"
     )
     agent_sessions: int = Field(description="Agent session rows that match the filter")
+    calibration_sessions: int = Field(
+        default=0, description="Calibration session rows that match the filter"
+    )
     skip: int
     limit: int
     children_limit: int = Field(description="Most executions one session row lists")

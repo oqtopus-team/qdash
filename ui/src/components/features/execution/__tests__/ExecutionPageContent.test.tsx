@@ -70,7 +70,12 @@ function flatExecutions({ skip, chip_id, date }: ListArgs) {
 
 // Rows the grouped list returns; null means "the flat rows, none grouped".
 let groupedItems: Record<string, unknown>[] | null = null;
-let groupedSummary = { total: 0, total_executions: 0, grouped_executions: 0, agent_sessions: 0 };
+let groupedSummary: Record<string, number> = {
+  total: 0,
+  total_executions: 0,
+  grouped_executions: 0,
+  agent_sessions: 0,
+};
 let groupedError = false;
 let currentProjectId = "project-1";
 const mockListExecutions = vi.fn();
@@ -711,6 +716,140 @@ const MANUAL_ROW = {
   children: [],
 };
 
+const CALIBRATION_ROW = {
+  kind: "calibration_session",
+  sort_at: "2026-06-05T00:00:00Z",
+  calibration_session: {
+    calibration_session_id: "cs-1",
+    project_id: "project-1",
+    chip_id: "chip-1",
+    objective: "Shorten the 0-1 ZX90",
+    status: "closed",
+    created_by: "alice",
+    created_at: "2026-06-04T00:00:00Z",
+    closed_at: "2026-06-05T02:00:00Z",
+    targets: ["0", "1", "0-1"],
+    counts: {
+      pipeline_runs: 2,
+      agent_sessions: 1,
+      executions: 3,
+      executions_in_filter: 3,
+      running: 0,
+      failed: 1,
+      unknown_dispatch: 0,
+      decisions: 5,
+    },
+    first_activity_at: "2026-06-04T00:00:00Z",
+    latest_activity_at: "2026-06-05T00:00:00Z",
+    recommendation: null,
+  },
+  pipeline_runs: [
+    {
+      run_id: "cpr-1",
+      pipeline_name: "zx90_q0_q1_c03",
+      dispatch_status: "dispatched",
+      requested_by: "alice",
+      requested_at: "2026-06-04T01:00:00Z",
+      decision_id: "cd-12345678",
+      targets: ["0", "1"],
+      executions: [
+        {
+          execution_id: "pipe-exec-1",
+          name: "zx90_q0_q1_c03_step1",
+          status: "failed",
+          start_at: "2026-06-04T01:00:00Z",
+          tags: [],
+          note: {},
+        },
+      ],
+      executions_total: 1,
+      executions_in_filter: 1,
+    },
+    {
+      run_id: "cpr-2",
+      pipeline_name: "zx90_q0_q1_c04",
+      dispatch_status: "rejected",
+      requested_by: "alice",
+      requested_at: "2026-06-04T02:00:00Z",
+      decision_id: null,
+      targets: [],
+      executions: [],
+      executions_total: 0,
+      executions_in_filter: 0,
+    },
+  ],
+  pipeline_runs_omitted: 0,
+  nested_agent_sessions: [
+    {
+      agent_session: SESSION_ROW.agent_session,
+      children: SESSION_ROW.children,
+      children_total: 2,
+      children_in_filter: 2,
+      children_omitted: 0,
+    },
+  ],
+  nested_agent_sessions_omitted: 0,
+  children: [],
+};
+
+describe("ExecutionPageContent calibration session groups", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    loadingNextPage = false;
+    executionDetail = DEFAULT_DETAIL;
+    currentProjectId = "project-1";
+    groupedError = false;
+    groupedItems = [CALIBRATION_ROW, MANUAL_ROW];
+    groupedSummary = {
+      total: 2,
+      total_executions: 4,
+      grouped_executions: 3,
+      agent_sessions: 0,
+      calibration_sessions: 1,
+    };
+  });
+
+  afterEach(() => {
+    cleanup();
+    groupedItems = null;
+  });
+
+  it("shows the objective, its records' counts, and links in the open project", () => {
+    render(<ExecutionPageContent />);
+    expect(screen.getByText("Shorten the 0-1 ZX90")).toBeTruthy();
+    expect(
+      screen.getByText("4 executions, 3 of them in 1 calibration session; 2 rows"),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(/2 pipeline runs · 1 agent session · 3 executions · 1 failed · 5 decisions/),
+    ).toBeTruthy();
+    expect(screen.getByText("Targets 0, 1, 0-1")).toBeTruthy();
+    // Closed says nothing about the objective; no recommendation was recorded, so none is shown.
+    expect(screen.getByText("Closed")).toBeTruthy();
+    expect(screen.queryByText(/Recommends/)).toBeNull();
+    expect(
+      screen.getByRole("link", { name: "Open calibration session" }).getAttribute("href"),
+    ).toBe("/calibration-sessions/cs-1?project=project-1");
+    expect(screen.queryByText("zx90_q0_q1_c03_step1")).toBeNull();
+  });
+
+  it("expands to every run with its step executions and the nested agent session", () => {
+    render(<ExecutionPageContent />);
+    fireEvent.click(screen.getByRole("button", { expanded: false, name: /Shorten the 0-1 ZX90/ }));
+    expect(screen.getByText("zx90_q0_q1_c03_step1")).toBeTruthy();
+    expect(screen.getByText(/Carries out decision cd-12345/)).toBeTruthy();
+    expect(screen.getByText("Refused before it started; nothing ran.")).toBeTruthy();
+    // The nested agent session keeps its own row and does not repeat the parent link.
+    expect(screen.getByText("qdash-one-qubit-calibration")).toBeTruthy();
+    expect(screen.queryAllByRole("link", { name: /Calibration session:/ })).toHaveLength(0);
+    fireEvent.click(screen.getByRole("button", { expanded: false, name: /qdash-one-qubit/ }));
+    fireEvent.click(screen.getByText("zx90_q0_q1_c03_step1"));
+    const panel = screen.getByRole("complementary", { name: "Execution details" });
+    // Browsing covers the run's step, the agent session's two children, and the manual run.
+    expect(within(panel).getByText("1 of 4 on this page")).toBeTruthy();
+  });
+});
+
 describe("ExecutionPageContent agent session groups", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -787,7 +926,7 @@ describe("ExecutionPageContent agent session groups", () => {
 
   it("switches to the flat list without grouping", () => {
     render(<ExecutionPageContent />);
-    fireEvent.click(screen.getByRole("checkbox", { name: "Group agent sessions" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Group sessions" }));
 
     expect(latestCall(mockListExecutions)?.[1].query.enabled).toBe(true);
     expect(latestCall(mockListGroups)?.[1].query.enabled).toBe(false);

@@ -67,12 +67,19 @@ export const REVIEWED_WRITE_TOOL_NAMES = [
  * `qdash_record_agent_decision` only appends the agent's own reading of a
  * result to the audit of a session the signed-in user created; it changes no
  * session state, so it needs neither autonomy `auto` nor an active session.
+ *
+ * `qdash_record_calibration_decision` is its counterpart for a calibration
+ * session: it only appends a decision to the audit of a calibration session the
+ * signed-in user created (QDash checks the creator and every cited record). It
+ * starts no run and changes no calibration; each pipeline run stays a reviewed
+ * `qdash_run_pipeline` call.
  */
 export const SESSION_GRANTED_WRITE_TOOL_NAMES = [
   "qdash_run_agent_session_step",
   "qdash_request_agent_human",
   "qdash_record_agent_decision",
   "qdash_commit_agent_session_update",
+  "qdash_record_calibration_decision",
 ] as const;
 
 /**
@@ -100,6 +107,7 @@ export const NESTED_READ_TOOL_NAMES = [
   "qdash_get_agent_session_audit",
   "qdash_get_agent_session_context",
   "qdash_get_calibration_session",
+  "qdash_get_calibration_session_audit",
   "qdash_get_chip_metrics",
   "qdash_get_cooldown_wiring",
   "qdash_get_default_chip",
@@ -184,6 +192,8 @@ export const DEFERRED_TOOL_NAMES = [
   // Calibration sessions: one objective and the runs started for it.
   "qdash_create_calibration_session",
   "qdash_get_calibration_session",
+  "qdash_get_calibration_session_audit",
+  "qdash_record_calibration_decision",
   "qdash_list_calibration_sessions",
   // Scoped agent workflow state and actions.
   "qdash_create_agent_session",

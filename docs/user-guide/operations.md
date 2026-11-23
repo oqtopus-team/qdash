@@ -95,6 +95,10 @@ history. Keep the existing database and configuration volumes when upgrading.
 5. Resume access, then update independently installed pi-qdash clients and SDKs. A client
    preflight does not make a mixed API deployment safe.
 
+Releases that add the calibration session audit add the `calibration_decisions` collection and
+two optional fields on recorded pipeline runs. Existing runs keep working and show their
+missing request details as not recorded; nothing is backfilled.
+
 Before rolling back, stop new requests and running agent conversations while the new API is
 still available. Wait for in-flight measurements, parameter updates, and pipeline runs to
 settle. Resolve every pending agent-session admission and every unknown pipeline outcome;

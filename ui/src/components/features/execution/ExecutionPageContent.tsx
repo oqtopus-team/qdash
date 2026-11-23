@@ -21,6 +21,11 @@ import { getApiErrorMessage } from "@/lib/utils/apiError";
 import { DEFAULT_TIMEZONE, formatDateTime } from "@/lib/utils/datetime";
 
 import { AgentSessionGroupRow } from "./AgentSessionGroupRow";
+import {
+  CalibrationSessionGroupRow,
+  calibrationRowExecutions,
+  calibrationRowKey,
+} from "./CalibrationSessionGroupRow";
 import { pluralize } from "./agentSessionDisplay";
 import {
   type ActivityWindow,
@@ -118,6 +123,15 @@ function PaginationControls({
   );
 }
 
+/** "2 calibration sessions and 1 agent session", naming only the kinds present. */
+function groupedLabel(calibrationSessions: number, agentSessions: number): string {
+  const parts = [
+    calibrationSessions > 0 ? pluralize(calibrationSessions, "calibration session") : "",
+    agentSessions > 0 ? pluralize(agentSessions, "agent session") : "",
+  ].filter(Boolean);
+  return parts.join(" and ") || "sessions";
+}
+
 /**
  * Execution history page listing workflow runs with task results and cancellation controls
  */
@@ -131,7 +145,7 @@ export function ExecutionPageContent() {
   const [selectedDate, setSelectedDate] = useState<string>("latest");
 
   const { projectId } = useProject();
-  // Agent sessions are grouped on the server; the flat list stays available.
+  // Calibration and agent sessions are grouped on the server; the flat list stays available.
   const [groupSessions, setGroupSessions] = useState(true);
   const [expandedSessions, setExpandedSessions] = useState<ReadonlySet<string>>(new Set());
   const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(null);
@@ -230,6 +244,12 @@ export function ExecutionPageContent() {
     if (!groupSessions) return executionData?.data?.executions ?? [];
     return (groupData?.items ?? []).flatMap((item) => {
       if (item.kind === "execution") return item.execution ? [item.execution] : [];
+      if (item.kind === "calibration_session") {
+        const id = item.calibration_session?.calibration_session_id;
+        return id && expandedSessions.has(calibrationRowKey(id))
+          ? calibrationRowExecutions(item, expandedSessions)
+          : [];
+      }
       const sessionId = item.agent_session?.session_id;
       return sessionId && expandedSessions.has(sessionId)
         ? (item.children ?? []).map((child) => child.execution)
@@ -438,7 +458,7 @@ export function ExecutionPageContent() {
                 checked={groupSessions}
                 onChange={(event) => handleGroupingChange(event.target.checked)}
               />
-              <span>Group agent sessions</span>
+              <span>Group sessions</span>
             </label>
           </PageFiltersBar.Item>
         </PageFiltersBar.Group>
@@ -462,8 +482,10 @@ export function ExecutionPageContent() {
           </h2>
           <p className="text-sm text-base-content/60">
             {groupSessions && groupData
-              ? groupData.agent_sessions > 0
-                ? `${pluralize(groupData.total_executions, "execution")}, ${groupData.grouped_executions} of them in ${pluralize(groupData.agent_sessions, "agent session")}; ${pluralize(groupData.total, "row")}`
+              ? groupData.grouped_executions > 0 ||
+                groupData.agent_sessions > 0 ||
+                (groupData.calibration_sessions ?? 0) > 0
+                ? `${pluralize(groupData.total_executions, "execution")}, ${groupData.grouped_executions} of them in ${groupedLabel(groupData.calibration_sessions ?? 0, groupData.agent_sessions)}; ${pluralize(groupData.total, "row")}`
                 : pluralize(groupData.total_executions, "execution")
               : total != null
                 ? `${total} execution${total === 1 ? "" : "s"}`
@@ -481,7 +503,20 @@ export function ExecutionPageContent() {
         <div className="grid grid-cols-1 gap-2">
           {groupSessions
             ? (groupData?.items ?? []).map((item) =>
-                item.kind === "agent_session" && item.agent_session ? (
+                item.kind === "calibration_session" && item.calibration_session ? (
+                  <CalibrationSessionGroupRow
+                    key={`calibration:${item.calibration_session.calibration_session_id}`}
+                    item={item}
+                    projectId={projectId}
+                    expanded={expandedSessions}
+                    onToggle={toggleSession}
+                    selectedExecutionId={selectedExecutionId}
+                    isPanelOpen={isSidebarOpen}
+                    onOpenExecution={handleCardClick}
+                    registerCard={registerCard}
+                    hasDayFilter={selectedDate !== "latest"}
+                  />
+                ) : item.kind === "agent_session" && item.agent_session ? (
                   <AgentSessionGroupRow
                     key={`session:${item.agent_session.session_id}`}
                     item={item}

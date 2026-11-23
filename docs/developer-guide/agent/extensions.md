@@ -24,11 +24,13 @@ described instead of implying parity.
   passing the approval for that call id and tool in the extension context
   (`QDashWriteTools.runApproved` in `agent-runtime/src/durable-tools.ts`). The one exception is
   the session-granted writes `qdash_run_agent_session_step`, `qdash_request_agent_human`,
-  `qdash_record_agent_decision`, and `qdash_commit_agent_session_update`
+  `qdash_record_agent_decision`, `qdash_commit_agent_session_update`, and
+  `qdash_record_calibration_decision`
   (`SESSION_GRANTED_WRITE_TOOL_NAMES`): neither host asks. The step and request tools act in an
   agent session the user approved with `autonomy: auto` when it was created, a reviewed write;
   the update tool acts only when that approval also granted `parameter_updates`; the decision
-  tool only appends to the audit of a session the user created. Each call re-reads the
+  tools only append to the audit of a session (agent or calibration) the user created. Each
+  agent tool call re-reads the
   session and refuses anything outside it before QDash checks it again; see
   [The model-driven loop](./agentic-calibration.md#the-model-driven-loop).
 - **Results.** A tool returns readable text in `content` and reusable structured data in

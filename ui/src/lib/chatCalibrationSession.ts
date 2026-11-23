@@ -21,6 +21,8 @@ import type { ChatMessage, AgentBlocksResult, TraceStep } from "@/types/agentCha
 /** Tools whose `calibrationSessionId` argument names one calibration session. */
 const CALIBRATION_SESSION_TOOLS = new Set([
   "qdash_get_calibration_session",
+  "qdash_get_calibration_session_audit",
+  "qdash_record_calibration_decision",
   "qdash_run_pipeline",
   "qdash_create_agent_session",
 ]);

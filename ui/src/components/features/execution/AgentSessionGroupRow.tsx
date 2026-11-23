@@ -30,6 +30,8 @@ interface AgentSessionGroupRowProps {
   onOpenExecution: (execution: ExecutionResponseSummary) => void;
   registerCard: (executionId: string, element: HTMLDivElement | null) => void;
   hasDayFilter: boolean;
+  /** Set when the row is nested in its calibration session's row, which already links it. */
+  hideCalibrationLink?: boolean;
 }
 
 /**
@@ -47,6 +49,7 @@ export function AgentSessionGroupRow({
   onOpenExecution,
   registerCard,
   hasDayFilter,
+  hideCalibrationLink = false,
 }: AgentSessionGroupRowProps) {
   const summary = item.agent_session;
   if (!summary) return null;
@@ -107,7 +110,7 @@ export function AgentSessionGroupRow({
           </span>
         </button>
         <div className="flex shrink-0 flex-wrap gap-1">
-          {summary.calibration_session ? (
+          {summary.calibration_session && !hideCalibrationLink ? (
             <Link
               href={calibrationSessionHref(
                 summary.calibration_session.calibration_session_id,

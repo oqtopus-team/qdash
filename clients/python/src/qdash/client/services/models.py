@@ -92,7 +92,7 @@ class ActorKind(StrEnum):
 
 class Provenance(StrEnum):
     """
-    server_record: QDash recorded it; server_computed: derived at read time from immutable records; agent_reported, human_reported, evaluator_reported: text that party supplied, recorded as given
+    server_record: QDash recorded it; server_computed: derived at read time from immutable records; agent_reported, human_reported, evaluator_reported: text that party supplied, recorded as given; client_reported: text a client sent without saying whether an agent or a person wrote it
     """
 
     server_record = "server_record"
@@ -100,6 +100,7 @@ class Provenance(StrEnum):
     agent_reported = "agent_reported"
     human_reported = "human_reported"
     evaluator_reported = "evaluator_reported"
+    client_reported = "client_reported"
 
 
 class AgentAutonomy(StrEnum):
@@ -1176,6 +1177,48 @@ class CalibrationChildReservation(BaseModel):
     reserved_at: Annotated[AwareDatetime, Field(title="Reserved At")]
 
 
+class RecommendedCandidateId(RootModel[str]):
+    root: Annotated[str, Field(pattern="^[A-Za-z0-9_.:-]{1,64}$", title="Recommended Candidate Id")]
+
+
+class CalibrationDecisionOutcome(StrEnum):
+    """
+    What a final decision recommends; a statement of the person or agent recording it.
+
+    ``recommend_candidate``: a candidate other than the baseline, backed by its confirmation
+    experiments. ``keep_baseline``: the baseline candidate stays the recommendation.
+    ``inconclusive``: the evidence supports no recommendation.
+    """
+
+    recommend_candidate = "recommend_candidate"
+    keep_baseline = "keep_baseline"
+    inconclusive = "inconclusive"
+
+
+class EvidenceStatus(StrEnum):
+    complete = "complete"
+    partial = "partial"
+    running = "running"
+    failed = "failed"
+    unavailable = "unavailable"
+    not_run = "not_run"
+
+
+class CalibrationExperimentStage(StrEnum):
+    """
+    Where one experiment stands in an optimization search.
+
+    ``baseline``: the incumbent's evidence the search starts from.
+    ``screening``: a candidate condition measured to decide whether it is worth confirming.
+    ``confirmation``: a whole-arm rerun of a candidate or the incumbent, used for the final
+    comparison. Only confirmation evidence may back a recommendation of a new candidate.
+    """
+
+    baseline = "baseline"
+    screening = "screening"
+    confirmation = "confirmation"
+
+
 class Status1(StrEnum):
     disabled = "disabled"
     synced = "synced"
@@ -1192,6 +1235,85 @@ class CalibrationGitHubSync(BaseModel):
     message: Annotated[str, Field(title="Message")] = ""
 
 
+class CalibrationGroupCounts(BaseModel):
+    """
+    What a calibration session row holds, counted from its explicit records.
+    """
+
+    pipeline_runs: Annotated[int, Field(title="Pipeline Runs")]
+    """
+    Pipeline runs recorded in the session
+    """
+    agent_sessions: Annotated[int, Field(title="Agent Sessions")]
+    """
+    Admitted agent sessions on the chip in the session
+    """
+    executions: Annotated[int, Field(title="Executions")]
+    """
+    Executions of its runs and agent sessions, every day
+    """
+    executions_in_filter: Annotated[int, Field(title="Executions In Filter")]
+    """
+    Of those, the ones matching the day filter
+    """
+    running: Annotated[int, Field(title="Running")]
+    """
+    Executions scheduled, running, or cancelling
+    """
+    failed: Annotated[int, Field(title="Failed")]
+    """
+    Executions that failed
+    """
+    unknown_dispatch: Annotated[int, Field(title="Unknown Dispatch")] = 0
+    """
+    Runs whose dispatch outcome is unknown; they may be running
+    """
+    decisions: Annotated[int, Field(title="Decisions")] = 0
+    """
+    Decisions recorded in the session's audit
+    """
+
+
+class ExecutionOutcome(StrEnum):
+    refused = "refused"
+    unknown = "unknown"
+    no_execution = "no_execution"
+    running = "running"
+    failed = "failed"
+    partial = "partial"
+    completed = "completed"
+
+
+class CalibrationMeasuredTask(BaseModel):
+    """
+    A task result on the experiment's target, with its actual timing.
+    """
+
+    task_id: Annotated[str, Field(title="Task Id")]
+    name: Annotated[str, Field(title="Name")]
+    status: Annotated[str, Field(title="Status")]
+    execution_id: Annotated[str, Field(title="Execution Id")]
+    start_at: Annotated[AwareDatetime | None, Field(title="Start At")] = None
+    end_at: Annotated[AwareDatetime | None, Field(title="End At")] = None
+    elapsed_seconds: Annotated[float | None, Field(title="Elapsed Seconds")] = None
+
+
+class CalibrationMeasuredValue(BaseModel):
+    """
+    One output parameter of a task result, read from QDash's task result history.
+    """
+
+    value: Annotated[float, Field(title="Value")]
+    error: Annotated[float | None, Field(title="Error")] = None
+    """
+    The task's reported error, if any
+    """
+    unit: Annotated[str, Field(title="Unit")] = ""
+    task_id: Annotated[str, Field(title="Task Id")]
+    task_name: Annotated[str, Field(title="Task Name")]
+    execution_id: Annotated[str, Field(title="Execution Id")]
+
+
 class CalibrationNoteResponse(BaseModel):
     """
     CalibrationNote is a subclass of BaseModel.
@@ -1202,6 +1324,25 @@ class CalibrationNoteResponse(BaseModel):
     task_id: Annotated[str, Field(title="Task Id")]
     note: Annotated[dict[str, Any], Field(title="Note")]
     timestamp: Annotated[AwareDatetime | None, Field(title="Timestamp")] = None
+
+
+class CalibrationParameterCheck(BaseModel):
+    """
+    One requested change, compared with the exact request and with what the task used.
+
+    ``requested`` is the decision's statement; ``in_spec`` is the run's stored spec (server
+    record); ``executed`` is the task result's run parameter (server record). ``consistent`` is
+    null when either record is missing.
+    """
+
+    task_name: Annotated[str, Field(title="Task Name")]
+    call_id: Annotated[str | None, Field(title="Call Id")] = None
+    parameter: Annotated[str, Field(title="Parameter")]
+    requested: Annotated[bool | int | float | str | None, Field(title="Requested")] = None
+    in_spec: Annotated[bool | int | float | str | None, Field(title="In Spec")] = None
+    executed: Annotated[bool | int | float | str | None, Field(title="Executed")] = None
+    consistent: Annotated[bool | None, Field(title="Consistent")] = None
+    missing: Annotated[list[str] | None, Field(title="Missing")] = None
 
 
 class CalibrationParameterDeleteResponse(BaseModel):
@@ -1233,6 +1374,17 @@ class CalibrationPipelineRunStatus(StrEnum):
     dispatched = "dispatched"
     rejected = "rejected"
     unknown = "unknown"
+
+
+class CalibrationRecommendationRef(BaseModel):
+    """
+    The session's current recommendation: a decision's conclusion, never a status.
+    """
+
+    decision_id: Annotated[str, Field(title="Decision Id")]
+    outcome: Annotated[str, Field(title="Outcome")]
+    recommended_candidate_id: Annotated[str | None, Field(title="Recommended Candidate Id")] = None
+    recorded_at: Annotated[AwareDatetime, Field(title="Recorded At")]
 
 
 class CalibrationSessionStatus(StrEnum):
@@ -2201,6 +2353,13 @@ class IdempotencyKey(RootModel[str]):
     """
 
 
+class DecisionId1(RootModel[str]):
+    root: Annotated[str, Field(max_length=200, min_length=1, title="Decision Id")]
+    """
+    With calibration_session_id: the decision of that session this run carries out, recorded before dispatch with an experiment. QDash checks it belongs to the session and records the link on the run; it grants nothing.
+    """
+
+
 class ExecutionActivityDay(BaseModel):
     """
     Executions started in one bucket (a calendar day or a 6-hour slot), counted by status.
@@ -2356,6 +2515,7 @@ class ExecutionCalibrationSessionLink(BaseModel):
 class Kind3(StrEnum):
     execution = "execution"
     agent_session = "agent_session"
+    calibration_session = "calibration_session"
 
 
 class ExecutionIdResponse(BaseModel):
@@ -5118,6 +5278,22 @@ class RecordAgentResumeOutcomeRequest(BaseModel):
     ] = None
 
 
+class EvidenceRunId(RootModel[str]):
+    root: Annotated[str, Field(max_length=200, min_length=1)]
+
+
+class EvidenceTaskId(RootModel[str]):
+    root: Annotated[str, Field(max_length=200, min_length=1)]
+
+
+class EvidenceDecisionId(RootModel[str]):
+    root: Annotated[str, Field(max_length=200, min_length=1)]
+
+
+class SupersedesDecisionId1(RootModel[str]):
+    root: Annotated[str, Field(max_length=200, min_length=1, title="Supersedes Decision Id")]
+
+
 class RelativePeriod(BaseModel):
     """
     The last ``days`` days, resolved to ``[now - days, now]`` at evaluation.
@@ -5154,6 +5330,37 @@ class ReportedLaunchOrigin(BaseModel):
     ] = ""
     """
     The host or package that reports it, such as pi-qdash; empty when unnamed
+    """
+
+
+class CallId(RootModel[str]):
+    root: Annotated[str, Field(max_length=100, title="Call Id")]
+    """
+    The task call the change is for, when a step calls the task more than once
+    """
+
+
+class RequestedParameterChangeModel(BaseModel):
+    """
+    One run parameter a decision asks a task to use, as the recorder states it.
+    """
+
+    task_name: Annotated[
+        str,
+        Field(max_length=100, min_length=1, pattern="^[A-Za-z0-9_]+$", title="Task Name"),
+    ]
+    call_id: Annotated[CallId | None, Field(title="Call Id")] = None
+    """
+    The task call the change is for, when a step calls the task more than once
+    """
+    parameter: Annotated[
+        str,
+        Field(max_length=100, min_length=1, pattern="^[A-Za-z0-9_.]+$", title="Parameter"),
+    ]
+    value: Annotated[bool | int | float | str | None, Field(title="Value")] = None
+    previous: Annotated[bool | int | float | str | None, Field(title="Previous")] = None
+    """
+    The value before the change, when the recorder knows it
     """
 
 
@@ -5673,7 +5880,7 @@ class OutputParameters2(BaseModel):
     database_updates: Annotated[list[DatabaseUpdate] | None, Field(title="Database Updates")] = None
 
 
-class CallId(RootModel[str]):
+class CallId1(RootModel[str]):
     root: Annotated[str, Field(pattern="^[A-Za-z][A-Za-z0-9_.-]{0,63}$", title="Call Id")]
     """
     Identifier of this call, unique within its step. Defaults to the task name; required on every occurrence of a task that appears more than once.
@@ -5701,7 +5908,7 @@ class TaskCall(BaseModel):
     """
     Registered task name, e.g. "CheckRamsey".
     """
-    call_id: Annotated[CallId | None, Field(title="Call Id")] = None
+    call_id: Annotated[CallId1 | None, Field(title="Call Id")] = None
     """
     Identifier of this call, unique within its step. Defaults to the task name; required on every occurrence of a task that appears more than once.
     """
@@ -6741,7 +6948,7 @@ class Step(RootModel[str]):
     """
 
 
-class CallId1(RootModel[str]):
+class CallId2(RootModel[str]):
     root: Annotated[str, Field(pattern="^[A-Za-z][A-Za-z0-9_.-]{0,63}$", title="Call Id")]
     """
     call_id within `step` to read; requires `step`.
@@ -6760,7 +6967,7 @@ class FilterByMetricStep(BaseModel):
     """
     step_id of an earlier one-qubit step to read. Omitted: the latest of OneQubitFineTune and OneQubitCheck, as in version 1.
     """
-    call_id: Annotated[CallId1 | None, Field(title="Call Id")] = None
+    call_id: Annotated[CallId2 | None, Field(title="Call Id")] = None
     """
     call_id within `step` to read; requires `step`.
     """
@@ -6787,7 +6994,7 @@ class FilterByStatusStep(BaseModel):
     """
     step_id of an earlier one-qubit step to read. Omitted: the latest of OneQubitFineTune and OneQubitCheck, as in version 1.
     """
-    call_id: Annotated[CallId1 | None, Field(title="Call Id")] = None
+    call_id: Annotated[CallId2 | None, Field(title="Call Id")] = None
     """
     call_id within `step` to read; requires `step`.
     """
@@ -7137,7 +7344,7 @@ class AgentAuditEvent(BaseModel):
     """
     kind: Annotated[str, Field(title="Kind")]
     """
-    session_created, action_proposed, measurement, evaluation, decision, candidate_commit, candidate_set_commit, backend_apply, intervention_opened, intervention_response, intervention_resumed, resume_outcome, or session_stopped
+    session_created, action_proposed, measurement, evaluation, decision, candidate_commit, candidate_set_commit, backend_apply, intervention_opened, intervention_response, intervention_resumed, resume_outcome, or session_stopped; a calibration session's audit adds pipeline_requested, pipeline_dispatch, agent_session_linked, and session_closed
     """
     summary: Annotated[str, Field(title="Summary")]
     """
@@ -7150,7 +7357,7 @@ class AgentAuditEvent(BaseModel):
     actor_kind: Annotated[ActorKind, Field(title="Actor Kind")] = ActorKind.unknown
     provenance: Annotated[Provenance, Field(title="Provenance")]
     """
-    server_record: QDash recorded it; server_computed: derived at read time from immutable records; agent_reported, human_reported, evaluator_reported: text that party supplied, recorded as given
+    server_record: QDash recorded it; server_computed: derived at read time from immutable records; agent_reported, human_reported, evaluator_reported: text that party supplied, recorded as given; client_reported: text a client sent without saying whether an agent or a person wrote it
     """
     status: Annotated[str | None, Field(title="Status")] = None
     """
@@ -7169,6 +7376,14 @@ class AgentAuditEvent(BaseModel):
     evaluation_id: Annotated[str | None, Field(title="Evaluation Id")] = None
     intervention_id: Annotated[str | None, Field(title="Intervention Id")] = None
     decision_id: Annotated[str | None, Field(title="Decision Id")] = None
+    pipeline_run_id: Annotated[str | None, Field(title="Pipeline Run Id")] = None
+    """
+    The calibration session pipeline run the event belongs to, if any
+    """
+    agent_session_id: Annotated[str | None, Field(title="Agent Session Id")] = None
+    """
+    In a calibration session's audit: the agent session an event comes from. Always null in an agent session's own audit
+    """
     model: AgentModelIdentity | None = None
     """
     The model the client host reported for the record behind an agent event: the session's creation, an action proposal, a decision, an agent's intervention request, or a commit made under session authority (the model of the decision it rests on). Client reported, not verified by QDash; null when none was reported, and then named in missing
@@ -7545,6 +7760,221 @@ class BulkUserImportResult(BaseModel):
     initial_password: Annotated[str | None, Field(title="Initial Password")] = None
     status: Annotated[str, Field(title="Status")]
     message: Annotated[str | None, Field(title="Message")] = None
+
+
+class CalibrationAuditSessionHeader(BaseModel):
+    """
+    Who and what a calibration session's audit belongs to.
+    """
+
+    calibration_session_id: Annotated[str, Field(title="Calibration Session Id")]
+    project_id: Annotated[str, Field(title="Project Id")]
+    chip_id: Annotated[str, Field(title="Chip Id")]
+    objective: Annotated[str, Field(title="Objective")]
+    created_by: Annotated[str, Field(title="Created By")]
+    created_at: Annotated[AwareDatetime, Field(title="Created At")]
+    status: CalibrationSessionStatus
+    pipeline_run_total: Annotated[int, Field(title="Pipeline Run Total")]
+    agent_session_total: Annotated[int, Field(title="Agent Session Total")]
+    decision_total: Annotated[int, Field(title="Decision Total")]
+
+
+class CalibrationConclusionModel(BaseModel):
+    """
+    A final recommendation; a statement of its recorder, never implied by closing.
+    """
+
+    outcome: CalibrationDecisionOutcome
+    recommended_candidate_id: Annotated[
+        RecommendedCandidateId | None, Field(title="Recommended Candidate Id")
+    ] = None
+
+
+class CalibrationExperimentMeasurement(BaseModel):
+    """
+    What QDash's task results say an experiment measured; never the recorder's statement.
+
+    ``evidence_status``: ``complete`` when every task on the target completed, ``running``
+    while an execution or task still runs, ``failed`` when none completed and one failed,
+    ``partial`` when some completed and others failed or were cancelled, ``unavailable`` when
+    no task result on the target was found, ``not_run`` when no run carries the decision out
+    (never dispatched, declined, or refused before it started). It never says whether the
+    experiment succeeded scientifically.
+    """
+
+    evidence_status: Annotated[EvidenceStatus, Field(title="Evidence Status")]
+    pipeline_dispatch_status: CalibrationPipelineRunStatus | None = None
+    execution_ids: Annotated[list[str] | None, Field(title="Execution Ids")] = None
+    tasks: Annotated[list[CalibrationMeasuredTask] | None, Field(title="Tasks")] = None
+    gate_time_ns: CalibrationMeasuredValue | None = None
+    """
+    zx90_gate_time of the latest completed task that published it
+    """
+    cr_duration_ns: CalibrationMeasuredValue | None = None
+    cr_amplitude: CalibrationMeasuredValue | None = None
+    gate_fidelity: CalibrationMeasuredValue | None = None
+    """
+    zx90_gate_fidelity, with the benchmark's error
+    """
+    task_seconds: Annotated[float | None, Field(title="Task Seconds")] = None
+    """
+    Sum of the target's task durations; null when none ended
+    """
+    execution_seconds: Annotated[float | None, Field(title="Execution Seconds")] = None
+    """
+    From the first execution start to the last end; null until all ended
+    """
+
+
+class CalibrationExperimentPlanModel(BaseModel):
+    """
+    The experiment a decision proposes before its run is dispatched.
+    """
+
+    candidate_id: Annotated[str, Field(pattern="^[A-Za-z0-9_.:-]{1,64}$", title="Candidate Id")]
+    """
+    The recorder's name for the condition, such as incumbent or c03
+    """
+    stage: CalibrationExperimentStage
+    target: Annotated[
+        str, Field(pattern="^[A-Za-z0-9_]{1,32}(-[A-Za-z0-9_]{1,32})?$", title="Target")
+    ]
+    """
+    The qubit (0) or directed coupling (0-1) measured
+    """
+    requested_changes: Annotated[
+        list[RequestedParameterChangeModel] | None,
+        Field(max_length=20, title="Requested Changes"),
+    ] = None
+
+
+class CalibrationExperimentRow(BaseModel):
+    """
+    One experiment of the search: a proposing decision and one run that carried it out.
+
+    A decision carried out by several runs gives a row per run; one carried out by none gives a
+    row without a run. Built from the audit's records; nothing here is stored.
+    """
+
+    sequence: Annotated[int, Field(title="Sequence")]
+    """
+    1-based order among the rows
+    """
+    decision_id: Annotated[str, Field(title="Decision Id")]
+    stage: CalibrationExperimentStage
+    candidate_id: Annotated[str, Field(title="Candidate Id")]
+    target: Annotated[str, Field(title="Target")]
+    requested_changes: Annotated[
+        list[RequestedParameterChangeModel] | None, Field(title="Requested Changes")
+    ] = None
+    rationale: Annotated[str, Field(title="Rationale")]
+    """
+    The decision's interpretation; recorder's statement
+    """
+    model: AgentModelIdentity | None = None
+    recorded_at: Annotated[AwareDatetime, Field(title="Recorded At")]
+    pipeline_run_id: Annotated[str | None, Field(title="Pipeline Run Id")] = None
+    parameter_checks: Annotated[
+        list[CalibrationParameterCheck] | None, Field(title="Parameter Checks")
+    ] = None
+    measured: CalibrationExperimentMeasurement
+
+
+class CalibrationLatestRequestedRun(BaseModel):
+    """
+    The session's most recently requested pipeline run and its recorded execution outcome.
+
+    "Latest" is the order QDash recorded the requests in (``requested_at``), not the order runs
+    finished or wrote: a run requested earlier may complete later. QDash keeps no authoritative
+    record of hardware writes, so this never states the current or last written hardware state.
+
+    ``execution_outcome``, from QDash's dispatch and execution records only: ``refused``: QDash
+    refused the launch and created no flow run. ``unknown``: the launch is still being reported
+    or its outcome is unknown. ``no_execution``: the flow run was created and QDash holds no
+    execution record for it. ``running``: an execution is still open. ``failed``: every
+    execution ended and none completed. ``partial``: some executions completed and others
+    failed or were cancelled. ``completed``: every execution completed. Runs outside the
+    session are not considered.
+    """
+
+    pipeline_run_id: Annotated[str, Field(title="Pipeline Run Id")]
+    requested_at: Annotated[AwareDatetime, Field(title="Requested At")]
+    dispatch_status: CalibrationPipelineRunStatus
+    execution_outcome: Annotated[ExecutionOutcome, Field(title="Execution Outcome")]
+    decision_id: Annotated[str | None, Field(title="Decision Id")] = None
+    """
+    The decision the request named; never inferred
+    """
+    candidate_id: Annotated[str | None, Field(title="Candidate Id")] = None
+    """
+    The candidate of the decision the run carries out; null when it names none
+    """
+    execution_ids: Annotated[list[str] | None, Field(title="Execution Ids")] = None
+    finished_at: Annotated[AwareDatetime | None, Field(title="Finished At")] = None
+    """
+    When the last of its executions ended; null while any is open
+    """
+    candidate_is_recommended: Annotated[bool | None, Field(title="Candidate Is Recommended")] = None
+    """
+    Whether the run's requested candidate is the recommended candidate, comparing the two records only; null when either is unknown. It says nothing about the hardware
+    """
+    missing: Annotated[list[str] | None, Field(title="Missing")] = None
+    """
+    Facts QDash does not record and this view therefore cannot state
+    """
+
+
+class CalibrationSessionAuditResponse(BaseModel):
+    """
+    A page of one snapshot of a calibration session's audit, or all of it.
+
+    The events have the same schema and semantics as an agent session's audit, and an admitted
+    agent session's events appear inside it with ``agent_session_id`` set. A snapshot is two
+    matching projected reads, not an atomic database view.
+    """
+
+    schema_version: Annotated[
+        Literal["qdash.calibration-session-audit.v1"], Field(title="Schema Version")
+    ] = "qdash.calibration-session-audit.v1"
+    generated_at: Annotated[AwareDatetime, Field(title="Generated At")]
+    snapshot_id: Annotated[str, Field(title="Snapshot Id")]
+    calibration_session: CalibrationAuditSessionHeader
+    events: Annotated[list[AgentAuditEvent], Field(title="Events")]
+    total_events: Annotated[int, Field(title="Total Events")]
+    next_cursor: Annotated[str | None, Field(title="Next Cursor")] = None
+    complete: Annotated[bool, Field(title="Complete")]
+    notes: Annotated[list[str], Field(title="Notes")]
+
+
+class CalibrationSessionGroupSummary(BaseModel):
+    """
+    One calibration session as the display parent of the work started in it.
+
+    ``status`` is open or closed; neither says whether the objective was met.
+    """
+
+    calibration_session_id: Annotated[str, Field(title="Calibration Session Id")]
+    project_id: Annotated[str, Field(title="Project Id")]
+    chip_id: Annotated[str, Field(title="Chip Id")]
+    objective: Annotated[str, Field(title="Objective")]
+    status: CalibrationSessionStatus
+    created_by: Annotated[str, Field(title="Created By")]
+    created_at: Annotated[AwareDatetime, Field(title="Created At")]
+    closed_at: Annotated[AwareDatetime | None, Field(title="Closed At")] = None
+    targets: Annotated[list[str] | None, Field(title="Targets")] = None
+    """
+    Qubits the session's records name: resolved pipeline targets, agent session policies, and experiment targets of its decisions; empty when none is recorded
+    """
+    counts: CalibrationGroupCounts
+    first_activity_at: Annotated[AwareDatetime, Field(title="First Activity At")]
+    """
+    Its creation or earliest execution start
+    """
+    latest_activity_at: Annotated[AwareDatetime, Field(title="Latest Activity At")]
+    """
+    Its latest execution start or end, nested agent activity, or creation
+    """
+    recommendation: CalibrationRecommendationRef | None = None
 
 
 class CalibrationSessionRef(BaseModel):
@@ -8287,6 +8717,10 @@ class ExecutePipelineRequest(BaseModel):
     idempotency_key: Annotated[IdempotencyKey | None, Field(title="Idempotency Key")] = None
     """
     With calibration_session_id: a retry with the same key and request returns the recorded run instead of starting another, and a run whose launch outcome is unknown is never launched again with it.
+    """
+    decision_id: Annotated[DecisionId1 | None, Field(title="Decision Id")] = None
+    """
+    With calibration_session_id: the decision of that session this run carries out, recorded before dispatch with an experiment. QDash checks it belongs to the session and records the link on the run; it grants nothing.
     """
     reported_origin: ReportedLaunchOrigin | None = None
     """
@@ -9307,6 +9741,58 @@ class RecalibrationRecommendationResponse(BaseModel):
     """
 
 
+class RecordCalibrationDecisionRequest(BaseModel):
+    """
+    Record a decision in a calibration session's audit, as an agent session decision is.
+
+    The text fields are the recorder's statements, recorded as given. QDash checks that every
+    cited pipeline run and decision belongs to the session and every cited task result is on
+    its chip (and on the experiment's target), and freezes what its records say about them.
+    Record ``experiment`` before dispatching the run it proposes, then start the run with this
+    decision's ID. ``conclusion`` needs next_action complete or stop.
+    """
+
+    idempotency_key: Annotated[str, Field(max_length=128, min_length=1, title="Idempotency Key")]
+    assessment: AgentDecisionAssessment | None = None
+    """
+    How the recorder judged the evidence; omitted when not stated
+    """
+    interpretation: Annotated[str, Field(max_length=2000, min_length=1, title="Interpretation")]
+    """
+    Concise reasoning for the decision, citing the evidence
+    """
+    next_action: AgentDecisionNextAction
+    next_detail: Annotated[str, Field(max_length=500, title="Next Detail")] = ""
+    evidence_run_ids: Annotated[
+        list[EvidenceRunId] | None, Field(max_length=20, title="Evidence Run Ids")
+    ] = None
+    """
+    Pipeline runs of this session
+    """
+    evidence_task_ids: Annotated[
+        list[EvidenceTaskId] | None, Field(max_length=50, title="Evidence Task Ids")
+    ] = None
+    """
+    Task results on the session's chip
+    """
+    evidence_decision_ids: Annotated[
+        list[EvidenceDecisionId] | None,
+        Field(max_length=50, title="Evidence Decision Ids"),
+    ] = None
+    """
+    Earlier decisions of this session
+    """
+    supersedes_decision_id: Annotated[
+        SupersedesDecisionId1 | None, Field(title="Supersedes Decision Id")
+    ] = None
+    experiment: CalibrationExperimentPlanModel | None = None
+    conclusion: CalibrationConclusionModel | None = None
+    model: AgentModelIdentity | None = None
+    """
+    The model the client host reports for this record; client reported, not verified
+    """
+
+
 class ResolvedPipelineStep(BaseModel):
     """
     A step as it will run: effective calls filled in from the catalog defaults.
@@ -9924,6 +10410,77 @@ class CalibrationAgentSessionChild(BaseModel):
     """
 
 
+class CalibrationDecisionResponse(BaseModel):
+    """
+    One recorded decision with QDash's frozen reading of its evidence.
+    """
+
+    decision_id: Annotated[str, Field(title="Decision Id")]
+    calibration_session_id: Annotated[str, Field(title="Calibration Session Id")]
+    project_id: Annotated[str, Field(title="Project Id")]
+    chip_id: Annotated[str, Field(title="Chip Id")]
+    idempotency_key: Annotated[str, Field(title="Idempotency Key")]
+    recorded_by: Annotated[str, Field(title="Recorded By")]
+    recorded_at: Annotated[AwareDatetime, Field(title="Recorded At")]
+    session_status_at_record: Annotated[str, Field(title="Session Status At Record")]
+    assessment: AgentDecisionAssessment | None = None
+    interpretation: Annotated[str, Field(title="Interpretation")]
+    next_action: AgentDecisionNextAction
+    next_detail: Annotated[str, Field(title="Next Detail")] = ""
+    evidence_run_ids: Annotated[list[str] | None, Field(title="Evidence Run Ids")] = None
+    evidence_task_ids: Annotated[list[str] | None, Field(title="Evidence Task Ids")] = None
+    evidence_decision_ids: Annotated[list[str] | None, Field(title="Evidence Decision Ids")] = None
+    supersedes_decision_id: Annotated[str | None, Field(title="Supersedes Decision Id")] = None
+    experiment: CalibrationExperimentPlanModel | None = None
+    conclusion: CalibrationConclusionModel | None = None
+    evidence_snapshot: Annotated[dict[str, Any] | None, Field(title="Evidence Snapshot")] = None
+    """
+    What QDash's records said about the cited evidence when it was recorded
+    """
+    model: AgentModelIdentity | None = None
+    carried_out_by_run_ids: Annotated[list[str] | None, Field(title="Carried Out By Run Ids")] = (
+        None
+    )
+    """
+    Pipeline runs that named this decision when they were started
+    """
+    superseded_by_decision_id: Annotated[str | None, Field(title="Superseded By Decision Id")] = (
+        None
+    )
+
+
+class CalibrationGroupAgentSession(BaseModel):
+    """
+    An admitted agent session nested in a calibration session row.
+    """
+
+    agent_session: AgentSessionGroupSummary
+    children: Annotated[list[AgentSessionChildExecution] | None, Field(title="Children")] = None
+    children_total: Annotated[int, Field(title="Children Total")] = 0
+    children_in_filter: Annotated[int, Field(title="Children In Filter")] = 0
+    children_omitted: Annotated[int, Field(title="Children Omitted")] = 0
+
+
+class CalibrationGroupPipelineRun(BaseModel):
+    """
+    One pipeline run of a calibration session row, with its step executions.
+    """
+
+    run_id: Annotated[str, Field(title="Run Id")]
+    pipeline_name: Annotated[str, Field(title="Pipeline Name")] = ""
+    dispatch_status: Annotated[str, Field(title="Dispatch Status")]
+    requested_by: Annotated[str, Field(title="Requested By")]
+    requested_at: Annotated[AwareDatetime, Field(title="Requested At")]
+    decision_id: Annotated[str | None, Field(title="Decision Id")] = None
+    """
+    The decision the run carries out, as its request named it
+    """
+    targets: Annotated[list[str] | None, Field(title="Targets")] = None
+    executions: Annotated[list[ExecutionResponseSummary] | None, Field(title="Executions")] = None
+    executions_total: Annotated[int, Field(title="Executions Total")] = 0
+    executions_in_filter: Annotated[int, Field(title="Executions In Filter")] = 0
+
+
 class CalibrationPipelineRunResponse(BaseModel):
     """
     One pipeline run requested in a calibration session, with its step executions.
@@ -10029,6 +10586,26 @@ class CalibrationSessionDetailResponse(BaseModel):
     """
     Agent session starts reserved long ago whose session was never recorded; the request may have stopped or may still record it. One recorded after a close is rejected and never operates
     """
+    experiments: Annotated[list[CalibrationExperimentRow] | None, Field(title="Experiments")] = None
+    """
+    Experiments of the search, oldest first, from decisions that proposed one and the runs that named them (latest 200 decisions)
+    """
+    decisions: Annotated[list[CalibrationDecisionResponse] | None, Field(title="Decisions")] = None
+    """
+    The most recent decisions (at most 200), oldest first
+    """
+    decision_total: Annotated[int, Field(title="Decision Total")] = 0
+    """
+    Every decision recorded in it
+    """
+    recommendation: CalibrationDecisionResponse | None = None
+    """
+    The latest decision with a conclusion that no later decision supersedes; null when none was recorded. Closing records none
+    """
+    latest_requested_run: CalibrationLatestRequestedRun | None = None
+    """
+    The most recently requested pipeline run and its recorded execution outcome; null without a run. Not the current or last written hardware state
+    """
 
 
 class CreateEvaluationRunResponse(BaseModel):
@@ -10119,6 +10696,10 @@ class ExecutePipelineResponse(BaseModel):
     """
     The run's record in that calibration session
     """
+    decision_id: Annotated[str | None, Field(title="Decision Id")] = None
+    """
+    The decision the recorded run carries out, as QDash linked it; null when the request named none. A client that sent a decision checks it is echoed here
+    """
     replayed: Annotated[bool, Field(title="Replayed")] = False
     """
     True when a retry returned the run an earlier request with its key started
@@ -10127,7 +10708,8 @@ class ExecutePipelineResponse(BaseModel):
 
 class ExecutionGroupItem(BaseModel):
     """
-    One row of the grouped Execution list: an execution, or an agent session.
+    One row of the grouped Execution list: an execution, an agent session, or a
+    calibration session with the runs and agent sessions started in it.
     """
 
     kind: Annotated[Kind3, Field(title="Kind")]
@@ -10159,6 +10741,27 @@ class ExecutionGroupItem(BaseModel):
     """
     Earlier executions left out of children; the graph lists all
     """
+    calibration_session: CalibrationSessionGroupSummary | None = None
+    """
+    Set for a calibration session row
+    """
+    pipeline_runs: Annotated[
+        list[CalibrationGroupPipelineRun] | None, Field(title="Pipeline Runs")
+    ] = None
+    """
+    The row's latest pipeline runs (at most 20), oldest first
+    """
+    pipeline_runs_omitted: Annotated[int, Field(title="Pipeline Runs Omitted")] = 0
+    """
+    Earlier runs left out
+    """
+    nested_agent_sessions: Annotated[
+        list[CalibrationGroupAgentSession] | None, Field(title="Nested Agent Sessions")
+    ] = None
+    """
+    The row's latest admitted agent sessions (at most 20), oldest first
+    """
+    nested_agent_sessions_omitted: Annotated[int, Field(title="Nested Agent Sessions Omitted")] = 0
 
 
 class ExecutionResponseDetail(BaseModel):
@@ -10242,19 +10845,29 @@ class ListAgentInterventionsResponse(BaseModel):
     total: Annotated[int, Field(title="Total")]
 
 
+class ListCalibrationDecisionsResponse(BaseModel):
+    """
+    Decisions of one calibration session, oldest first.
+    """
+
+    items: Annotated[list[CalibrationDecisionResponse], Field(title="Items")]
+    total: Annotated[int, Field(title="Total")]
+
+
 class ListExecutionGroupsResponse(BaseModel):
     """
-    A page of the Execution list with agent sessions grouped on the server.
+    A page of the Execution list with calibration and agent sessions grouped on the server.
 
     Grouping happens before pagination, so a session is one row on one page with all its
-    executions, and no execution appears both in a group and as its own row. ``total`` counts
+    executions, and no execution appears both in a group and as its own row. An agent session
+    admitted to a calibration session is nested in that session's row. ``total`` counts
     rows; ``total_executions`` counts real executions, the number the ungrouped list reports.
     """
 
     items: Annotated[list[ExecutionGroupItem], Field(title="Items")]
     total: Annotated[int, Field(title="Total")]
     """
-    Rows: agent sessions plus executions outside a session
+    Rows: calibration sessions, agent sessions outside one, and executions outside both
     """
     total_executions: Annotated[int, Field(title="Total Executions")]
     """
@@ -10267,6 +10880,10 @@ class ListExecutionGroupsResponse(BaseModel):
     agent_sessions: Annotated[int, Field(title="Agent Sessions")]
     """
     Agent session rows that match the filter
+    """
+    calibration_sessions: Annotated[int, Field(title="Calibration Sessions")] = 0
+    """
+    Calibration session rows that match the filter
     """
     skip: Annotated[int, Field(title="Skip")]
     limit: Annotated[int, Field(title="Limit")]

@@ -32,6 +32,8 @@ import type {
   ExecutionResponseSummary,
 } from "@/schemas";
 
+import { CalibrationSearchProgress } from "./CalibrationSearchProgress";
+import { CalibrationSessionAuditTimeline } from "./CalibrationSessionAuditTimeline";
 import { CloseCalibrationSessionButton } from "./CloseCalibrationSessionButton";
 
 /** How often an open session is read again while the page shows it. */
@@ -291,6 +293,7 @@ export function CalibrationSessionPageContent({
             <Field label="Pipeline runs">{runTotal}</Field>
             <Field label="Agent sessions">{agentTotal}</Field>
             <Field label="Still running or waiting">{blockers.length}</Field>
+            <Field label="Decisions">{data.decision_total ?? 0}</Field>
             {!isOpen ? (
               <div className="sm:col-span-2 md:col-span-4">
                 <Field label="Closed">
@@ -317,6 +320,13 @@ export function CalibrationSessionPageContent({
             ) : null}
           </div>
         </section>
+
+        <CalibrationSearchProgress
+          experiments={data.experiments ?? []}
+          recommendation={data.recommendation}
+          latestRun={data.latest_requested_run}
+          executionHref={(executionId) => executionHref(data.chip_id, executionId, projectId)}
+        />
 
         <section className="card card-border bg-base-100" aria-label="Pipeline runs">
           <div className="card-body gap-1 p-4">
@@ -362,6 +372,12 @@ export function CalibrationSessionPageContent({
             )}
           </div>
         </section>
+        {projectId ? (
+          <CalibrationSessionAuditTimeline
+            calibrationSessionId={calibrationSessionId}
+            projectId={projectId}
+          />
+        ) : null}
       </div>
     </PageContainer>
   );

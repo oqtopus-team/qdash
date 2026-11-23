@@ -778,7 +778,9 @@ every read from the records QDash already keeps. It is not a second store: raw d
 mutable state stay in their own records, and the timeline references them by ID. It keeps the
 intent, parameters, result IDs, fitted values, figure and raw-data references, decision, and
 next action of each step, so a person can review a run and a later skill revision can be
-written from it.
+written from it. The snapshot, cursor, export, and decision-quota mechanisms live in
+`src/qdash/api/services/audit_timeline.py`, which the
+[calibration session audit](./calibration-session-audit.md) shares with the same event schema.
 
 | Event `kind` | Source record | What it adds |
 | --- | --- | --- |
@@ -843,7 +845,7 @@ with 409 and a detail that says the audit is full. The quota check and the recor
 insert, so the bound holds without a transaction on a standalone MongoDB: each record takes the
 next `quota_slot` (one past the session's highest), and unique indexes on (session,
 `quota_slot`) and (session, idempotency key) make MongoDB refuse a second record for a slot or
-a key. A refused insert means a concurrent recording won; `_insert_in_free_slot` then returns
+a key. A refused insert means a concurrent recording won; `DecisionLedger.insert` then returns
 that record when it carries the same key and body, or tries the next slot, up to
 `MAX_SLOT_ATTEMPTS` times before it answers 503. Nothing is reserved apart from the record
 itself, so a crash before the insert holds no slot, and a crash after it leaves a complete

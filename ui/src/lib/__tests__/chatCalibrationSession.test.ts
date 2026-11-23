@@ -130,4 +130,14 @@ describe("the calibration sessions a chat's work belongs to", () => {
     });
     expect(dispatchStatusStyle("other").label).toBe("other");
   });
+
+  it("finds a session named by the audit and decision tools", () => {
+    const messages = [
+      answer([
+        tool("qdash_record_calibration_decision", "done", "cs-audit"),
+        tool("qdash_get_calibration_session_audit", "done", "cs-read"),
+      ]),
+    ];
+    expect(linkedCalibrationSessions(messages, [])).toEqual(["cs-audit", "cs-read"]);
+  });
 });

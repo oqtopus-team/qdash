@@ -7,6 +7,7 @@
  */
 import type { ExecutePipelineRequestBackendName } from './executePipelineRequestBackendName';
 import type { ExecutePipelineRequestCalibrationSessionId } from './executePipelineRequestCalibrationSessionId';
+import type { ExecutePipelineRequestDecisionId } from './executePipelineRequestDecisionId';
 import type { ExecutePipelineRequestIdempotencyKey } from './executePipelineRequestIdempotencyKey';
 import type { ExecutePipelineRequestReportedOrigin } from './executePipelineRequestReportedOrigin';
 import type { ExecutePipelineRequestSpec } from './executePipelineRequestSpec';
@@ -25,6 +26,8 @@ export interface ExecutePipelineRequest {
   calibration_session_id?: ExecutePipelineRequestCalibrationSessionId;
   /** With calibration_session_id: a retry with the same key and request returns the recorded run instead of starting another, and a run whose launch outcome is unknown is never launched again with it. */
   idempotency_key?: ExecutePipelineRequestIdempotencyKey;
+  /** With calibration_session_id: the decision of that session this run carries out, recorded before dispatch with an experiment. QDash checks it belongs to the session and records the link on the run; it grants nothing. */
+  decision_id?: ExecutePipelineRequestDecisionId;
   /** How the caller says it started the run, such as an agent tool. QDash stores it as given and shows it as reported: it is not verified, does not link the run to an agent session, and grants nothing. The signed-in user stays responsible for the run. */
   reported_origin?: ExecutePipelineRequestReportedOrigin;
 }

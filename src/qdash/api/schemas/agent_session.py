@@ -784,6 +784,7 @@ AgentAuditProvenance = Literal[
     "agent_reported",
     "human_reported",
     "evaluator_reported",
+    "client_reported",
 ]
 AgentAuditActorKind = Literal["agent", "human", "server", "worker", "unknown"]
 
@@ -857,7 +858,8 @@ class AgentAuditEvent(BaseModel):
             "session_created, action_proposed, measurement, evaluation, decision, "
             "candidate_commit, candidate_set_commit, backend_apply, intervention_opened, "
             "intervention_response, intervention_resumed, resume_outcome, or "
-            "session_stopped"
+            "session_stopped; a calibration session's audit adds pipeline_requested, "
+            "pipeline_dispatch, agent_session_linked, and session_closed"
         )
     )
     summary: str = Field(description="One readable line about the event")
@@ -867,7 +869,8 @@ class AgentAuditEvent(BaseModel):
         description=(
             "server_record: QDash recorded it; server_computed: derived at read time from "
             "immutable records; agent_reported, human_reported, evaluator_reported: text "
-            "that party supplied, recorded as given"
+            "that party supplied, recorded as given; client_reported: text a client sent "
+            "without saying whether an agent or a person wrote it"
         )
     )
     status: str | None = Field(default=None, description="Status of the source record")
@@ -884,6 +887,17 @@ class AgentAuditEvent(BaseModel):
     evaluation_id: str | None = None
     intervention_id: str | None = None
     decision_id: str | None = None
+    pipeline_run_id: str | None = Field(
+        default=None,
+        description="The calibration session pipeline run the event belongs to, if any",
+    )
+    agent_session_id: str | None = Field(
+        default=None,
+        description=(
+            "In a calibration session's audit: the agent session an event comes from. Always "
+            "null in an agent session's own audit"
+        ),
+    )
     model: AgentModelIdentity | None = Field(
         default=None,
         description=(

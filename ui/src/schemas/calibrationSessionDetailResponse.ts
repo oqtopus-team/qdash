@@ -7,9 +7,13 @@
  */
 import type { CalibrationAgentSessionChild } from './calibrationAgentSessionChild';
 import type { CalibrationChildReservation } from './calibrationChildReservation';
+import type { CalibrationDecisionResponse } from './calibrationDecisionResponse';
+import type { CalibrationExperimentRow } from './calibrationExperimentRow';
 import type { CalibrationPipelineRunResponse } from './calibrationPipelineRunResponse';
 import type { CalibrationSessionDetailResponseClosedAt } from './calibrationSessionDetailResponseClosedAt';
 import type { CalibrationSessionDetailResponseClosedBy } from './calibrationSessionDetailResponseClosedBy';
+import type { CalibrationSessionDetailResponseLatestRequestedRun } from './calibrationSessionDetailResponseLatestRequestedRun';
+import type { CalibrationSessionDetailResponseRecommendation } from './calibrationSessionDetailResponseRecommendation';
 import type { CalibrationSessionStatus } from './calibrationSessionStatus';
 
 /**
@@ -46,4 +50,14 @@ export interface CalibrationSessionDetailResponse {
   unknown_runs?: string[];
   /** Agent session starts reserved long ago whose session was never recorded; the request may have stopped or may still record it. One recorded after a close is rejected and never operates */
   unknown_starts?: CalibrationChildReservation[];
+  /** Experiments of the search, oldest first, from decisions that proposed one and the runs that named them (latest 200 decisions) */
+  experiments?: CalibrationExperimentRow[];
+  /** The most recent decisions (at most 200), oldest first */
+  decisions?: CalibrationDecisionResponse[];
+  /** Every decision recorded in it */
+  decision_total?: number;
+  /** The latest decision with a conclusion that no later decision supersedes; null when none was recorded. Closing records none */
+  recommendation?: CalibrationSessionDetailResponseRecommendation;
+  /** The most recently requested pipeline run and its recorded execution outcome; null without a run. Not the current or last written hardware state */
+  latest_requested_run?: CalibrationSessionDetailResponseLatestRequestedRun;
 }

@@ -37,6 +37,12 @@ export interface PipelineRecording {
    * another; a run whose launch outcome is unknown is never launched again with it.
    */
   idempotencyKey: string;
+  /**
+   * The decision of that calibration session the run carries out: one recorded before the
+   * dispatch with an experiment. QDash checks it belongs to the session and records the link
+   * on the run, so its audit correlates intent and execution. It grants nothing.
+   */
+  decisionId?: string;
 }
 
 /** Options of `Pipelines.execute` beyond the spec, target, and recording. */
@@ -65,7 +71,11 @@ function recording(options: PipelineRecording | undefined) {
   if (!options.calibrationSessionId || !options.idempotencyKey) {
     throw new TypeError("calibrationSessionId and idempotencyKey must both be non-empty strings");
   }
-  return { calibration_session_id: options.calibrationSessionId, idempotency_key: options.idempotencyKey };
+  return {
+    calibration_session_id: options.calibrationSessionId,
+    idempotency_key: options.idempotencyKey,
+    ...(options.decisionId ? { decision_id: options.decisionId } : {}),
+  };
 }
 
 /** A dispatched pipeline execution, returned by `Pipelines.execute`. */

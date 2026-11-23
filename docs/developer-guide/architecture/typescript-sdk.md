@@ -91,9 +91,11 @@ A workflow name other than letters, digits and underscores throws `TypeError` be
 request, as in the Python SDK.
 
 `qdash.pipelines.execute(spec, target, recordIn)` takes an optional third argument,
-`{ calibrationSessionId, idempotencyKey }`, that records the run in a calibration session before
-it is launched; a retry with the same key returns the recorded run. Either field empty throws
-`TypeError` before any request. A fourth argument, `{ reportedOrigin }`, sends the caller's
+`{ calibrationSessionId, idempotencyKey, decisionId? }`, that records the run in a calibration
+session before it is launched; a retry with the same key returns the recorded run, and
+`decisionId` names the session's decision the run carries out. An empty session ID or key throws
+`TypeError` before any request. The client throws when the response does not echo the
+`decision_id` it sent, because the run may have started without the link. A fourth argument, `{ reportedOrigin }`, sends the caller's
 `reported_origin`; set it from the calling program, never from model or user input. See
 [Calibration Sessions](../agent/calibration-sessions.md).
 

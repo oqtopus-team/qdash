@@ -96,6 +96,7 @@ class Pipelines:
         backend_name: str | None = None,
         calibration_session_id: str | None = None,
         idempotency_key: str | None = None,
+        decision_id: str | None = None,
     ) -> PipelineRun:
         """Dispatch a pipeline as one execution and return its run handle.
 
@@ -107,9 +108,16 @@ class Pipelines:
         ``calibration_session_id`` and ``idempotency_key``, given together, record the run in
         that calibration session before it is launched; a retry with the same key returns the
         recorded run instead of starting another. Grouping grants nothing.
+
+        ``decision_id`` names the recorded decision of that session the run carries out, so
+        the session's audit links the intent to the run; it needs ``calibration_session_id``.
+        A response that does not echo it raises ``RuntimeError``: the run may have started
+        without the link, so reconcile it instead of retrying.
         """
         if (calibration_session_id is None) != (idempotency_key is None):
             raise ValueError("calibration_session_id and idempotency_key are given together")
+        if decision_id is not None and calibration_session_id is None:
+            raise ValueError("decision_id needs calibration_session_id")
         if not self._client.config.project_id:
             raise QDashConfigError(
                 "running a calibration pipeline needs a project: set QDASH_PROJECT_ID, "
@@ -121,5 +129,6 @@ class Pipelines:
             backend_name=backend_name,
             calibration_session_id=calibration_session_id,
             idempotency_key=idempotency_key,
+            decision_id=decision_id,
         )
         return PipelineRun(self._client, response)
