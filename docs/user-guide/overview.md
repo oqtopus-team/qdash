@@ -1,64 +1,33 @@
 # Overview
 
-Use **Overview** to scan every configured metric for one chip, then open a target when a value
-needs investigation or context. To keep a chosen set of metric maps and the results of your own
-[metric scripts](./metric-scripts.md), such as a median over a period per coupling or the
-collision checks, in your own layout and share it with the project, use
-[Dashboards](./dashboards.md).
+Use **Overview** to check chip health across all configured metrics.
 
 ## Select the Data Scope
 
-1. Open **Overview** and select a chip.
-2. Select a relative or absolute time range, or choose a cool-down.
-3. Set **Value selection** to latest, best, or average.
+1. Select a chip.
+2. Choose a time range or cool-down.
+3. Choose **Latest**, **Best**, or **Average** under **Value selection**.
 
-The selected time range and value mode apply to the summary and every metric section. Include
-them when sharing an observation because another scope can show a different record.
-
-<!-- MEDIA PLACEHOLDER
-File: /images/guides/dashboard-scope-and-metrics.gif
-Start: Overview for a populated chip with the default scope visible.
-Sequence: Select a cool-down, change Value selection, and expand one populated metric.
-Alt: Overview scope controls above the chip summary and expanded metric topology.
--->
+Include this scope when sharing findings.
 
 ## Scan Chip Health
 
-Start with the collapsed all-metrics summary. It shows coverage, median, minimum, and maximum for
-each metric in the selected scope.
+The summary shows coverage, median, minimum, and maximum for each metric. Expand **Qubit Metrics**
+or **Coupling Metrics** to inspect the topology and distribution. Missing metrics are grouped
+separately.
 
-Continue to **Qubit Metrics** and **Coupling Metrics** for topology and distribution views. Each
-metric shows its own coverage. Metrics without data stay grouped separately so missing data does
-not obscure the populated metrics.
-
-Drag the **Color range** handles above a metric topology to narrow the interval the colors span.
-Values outside the interval keep the end colors, so a single outlier no longer flattens the rest of
-the chip. Type exact bounds in the fields beside the slider. The range is remembered for the chip
-in this browser and also applies on **Metrics**; **Reset** returns to the default, which comes from
-the deployment's metric configuration or, without one, from the data's minimum and maximum.
+Adjust **Color range** to see differences hidden by outliers; **Reset** restores the default.
+This setting is remembered for the chip in your browser and also applies on **Metrics**.
 
 ## Investigate a Target
 
-Select a qubit or coupling in a metric to open its history. Use the history and selected task
-result to decide whether the value is an isolated measurement, part of a trend, or related to
-another target.
-
-Open **Metrics** when the investigation starts from one metric across many targets. Open
-**Task Results** when it starts from a specific measurement or failure.
+Select a qubit or coupling to open its history and results. Use **Metrics** for one metric across
+targets, or **Task Results** for a specific measurement. See [data and provenance](./data-and-provenance.md).
 
 ## Record Context
 
-Use a pinned summary for context that should remain visible with a chip, qubit, or coupling in
-the selected cool-down or time range. Use a task-result note for context about one measurement,
-such as an anomaly or the reason for a parameter choice.
+Use the chip note or a target's pinned summary for context that belongs to the selected scope.
+Use a task-result note for one measurement. Notes are shared with the project; older per-metric
+notes remain read-only.
 
-1. Edit the chip note above the target summaries for chip-wide context.
-2. Select a qubit or coupling to edit its pinned summary.
-3. Select a task result in the history view to add a note about that measurement.
-
-The notes summary gathers the notes visible in the current scope. Select a target summary to
-return to its overview, or select a task-result note to open the result. Notes are shared
-with the project, and QDash records the last editor.
-
-Existing per-metric notes remain visible as read-only context. Add new context as a pinned summary
-or a forum discussion. How this works: [Notes architecture](../developer-guide/architecture/notes.md).
+For a custom arrangement of metrics and notes, create a [dashboard](./dashboards.md).

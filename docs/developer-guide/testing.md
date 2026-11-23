@@ -1,56 +1,21 @@
-# Developer Testing
+# Testing
 
-Prefer focused tests for the code you changed. Broaden only when changing shared behavior,
-runtime paths, API contracts, generated clients, or UI routing.
+Run the checks for the area you changed, then the full check before every push.
 
-## Python
+| Changed area | Command | Details |
+| --- | --- | --- |
+| API | `task test-api` | [API tests](./api/testing.md) |
+| Workflow | `task test-workflow` | [Workflow tests](./workflow/testing.md) |
+| UI | `task test-ui` | [UI tests](./ui/testing.md) |
+| Python client / SDK | `task test-client` / `task test-sdk` | [Client](../reference/clients/python.md) |
+| TypeScript client / SDK | `task test-client-ts` / `task test-sdk-ts` | [Client](../reference/clients/typescript.md) |
+| Pi extensions | `task ci-pi-packages` | [Packages](./agent/packages.md) |
+| Agent runtime | `task ci-agent-runtime` | [Architecture](./agent/architecture.md) |
+| Docs | `task build-docs`, `task check-docs-links` | [Writing guidelines](./docs-guidelines.md) |
 
-```bash
-task test-fast
-task test-api
-task test-workflow
-uv run pytest path/to/test_file.py -v
-```
+For a focused Python test, use `uv run pytest path/to/test_file.py -v`.
+API contract changes also require `task generate` and tests for affected clients.
+Mermaid changes require `task check-docs-mermaid`.
 
-## UI
-
-```bash
-task test-ui
-cd ui && bunx tsc --noEmit
-cd ui && bun run lint
-cd ui && bun run fmt:check
-```
-
-## TypeScript Workspace
-
-For changes to the client, pi extensions, or their runtime integration:
-
-```bash
-task test-client-ts
-task ci-pi-packages
-task ci-agent-runtime
-```
-
-Install workspace dependencies from the repository root. See
-[Pi Packages](./agent/packages.md) for setup and local pi CLI checks.
-Before every push, run the full `task check` as required by the
-[development flow](./development-flow.md#before-pushing).
-
-## API Contract Changes
-
-If backend route schemas or generated clients change:
-
-```bash
-task generate
-task test-api
-task test-ui
-```
-
-## Workflow Changes
-
-For workflow engine, scheduler, deployment service, or task execution changes:
-
-```bash
-task test-workflow
-uv run pytest tests/qdash/workflow/engine -v
-```
+Before pushing, follow [Development Flow](./development-flow.md#before-pushing):
+run `nix develop -c task check` on the host, or `task check` in the DevContainer.
