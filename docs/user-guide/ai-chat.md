@@ -100,15 +100,13 @@ your answer**, **Stopped**, **Interrupted**, or **Failed**. While the sidebar is
 a dot on **Ask Agent** shows that an answer is running, and **Ask Agent** opens that chat rather
 than a new one.
 
-A notification at the top of the page tells you when an answer is ready, needs your approval or
-your answer, proposed a change, waits for an expert, or failed, unless that chat is already on
-screen in a visible tab. Each happens once per answer, also after a reconnect or a reload, and
-only for the project you have open. **Open chat** shows that chat; nothing is sent for you.
-Notifications that need your input stay until you dismiss them or open the chat; press Escape to
-dismiss one, or Alt+T to move to it. The notification goes, but the chat's header keeps saying
-where the answer stands. Notifications play no sound unless you turn on **Settings → Agent →
-Chat notifications → Play a sound**; set its **Volume** and try it with **Preview**. The setting
-applies to this browser only.
+A notification at the top right of the page tells you when an answer is ready, needs your
+approval or your answer, proposed a change, waits for an expert, or failed, unless that chat is
+already on screen in a visible tab. Each happens once per answer, also after a reconnect or a
+reload, and only for the project you have open. **Open chat** shows that chat; nothing is sent
+for you. Notifications that need your input, and failures, stay until you dismiss them with their
+close button or open the chat; press Alt+T to move to them. The notification goes, but the chat's
+header keeps saying where the answer stands. Notifications make no sound.
 
 ### Add to an Answer in Progress, or Continue One
 

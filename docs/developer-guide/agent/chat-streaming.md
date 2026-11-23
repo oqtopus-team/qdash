@@ -557,22 +557,17 @@ Closing the sidebar or the floating window only unmounts that surface; the turn'
 to `AgentChatSessionProvider` in `AppLayout`, and that is also when `ChatNotifier` starts
 showing toasts for it.
 
-`ChatNotifier` (mounted in `AppLayout` inside `ChatDockProvider`) turns an event into a Ding
-toast (`@yusufceng1z/ding-react`, pinned in `ui/package.json`) with the ID
-`chat:<request_id>:<kind>`, so a repeat updates the toast instead of adding one. It drops an
-event of another owner or project, and one whose chat is on screen in a visible tab (the
-**Agent** page, or the sidebar or floating window showing the active chat), and closes a chat's
-toasts once that chat comes on screen. **Open chat** switches to the chat and opens the sidebar
-off the **Agent** page; it checks the owner and that the chat still exists, and sends nothing.
-Input needed (`approval`, `question`) and `failed` stay until dismissed.
-
-`ChatToaster` (`ui/src/components/ui/Toast/ChatToaster.tsx`), mounted once by `ToastContainer`
-beside the app's Sonner toaster, renders only chat notifications, at the top center. Its colors
-come from the DaisyUI theme (`body .tst-viewport` in `globals.css`); Ding handles reduced motion,
-Escape, and Alt+T. Sound is Ding's `toast.configure({ sound, volume })` from
-`ui/src/lib/chatNotificationSettings.ts`: off by default and kept per browser in local storage,
-set under **Settings → Agent** (`ChatNotificationSettings`, whose **Preview** plays Ding's
-`chime`).
+`ChatNotifier` (mounted in `AppLayout` inside `ChatDockProvider`) turns an event into a toast
+on the app's Sonner toaster (`ToastContainer` in `ui/src/components/ui/Toast/`, top right, the
+same toaster and DaisyUI styling as every other toast) with the ID `chat:<request_id>:<kind>`,
+so a repeat updates the toast instead of adding one. It drops an event of another owner or
+project, and one whose chat is on screen in a visible tab (the **Agent** page, or the sidebar or
+floating window showing the active chat), and dismisses a chat's toasts once that chat comes on
+screen. **Open chat** switches to the chat and opens the sidebar off the **Agent** page; it
+checks the owner and that the chat still exists, and sends nothing. Sonner then dismisses the
+toast. Input needed (`approval`, `question`) and `failed` use `duration: Infinity` and stay
+until dismissed; Sonner reads a duration of 0 as its default, so 0 would close them after a few
+seconds. Chat notifications play no sound.
 
 ### Calibration Session State in the Chat
 
@@ -836,6 +831,6 @@ start and its placement, and the last two tests of `chat-reattach-server.test.mj
 runtime's lookup. The notification events are
 covered in `useAgentChatRestore.test.tsx` (once per turn across a reattach and a restore,
 approval apart from a final answer, none for history or another project, a failure), and the
-toasts in `ChatNotifier.test.tsx`, `ChatToaster.test.tsx`, and
-`ChatNotificationSettings.test.tsx` (sound off by default). Run
+toasts in `ChatNotifier.test.tsx` and `ChatNotifierToaster.test.tsx` (the real Sonner toaster:
+**Open chat**, an update in place, and input-needed toasts that stay). Run
 the complete `task test-ui` suite when event rendering changes.

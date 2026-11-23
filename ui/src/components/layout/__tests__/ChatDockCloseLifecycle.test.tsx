@@ -49,7 +49,7 @@ vi.mock("@/client/agent/agent", () => ({
   useListAgentSkills: () => ({ data: undefined }),
 }));
 vi.mock("@/hooks/useChatSuggestions", () => ({ useChatSuggestions: () => [] }));
-vi.mock("@yusufceng1z/ding-react", () => {
+vi.mock("sonner", () => {
   const record = (title: string, options?: { id?: string }) => {
     toasts.calls.push({ title, id: options?.id });
     if (toasts.failOn === title) throw new Error("toast renderer failed");
@@ -60,7 +60,7 @@ vi.mock("@yusufceng1z/ding-react", () => {
       error: record,
       warning: record,
       info: record,
-      close: vi.fn(),
+      dismiss: vi.fn(),
     }),
     Toaster: () => null,
   };

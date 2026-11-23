@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
-import { toast } from "@yusufceng1z/ding-react";
+import { toast } from "sonner";
 
 import { useChatDock } from "@/contexts/ChatDockContext";
 import { useAgentChatSessionContext } from "@/contexts/AgentChatSessionContext";
@@ -12,14 +12,17 @@ const CHAT_PAGE = "/chat";
 
 type ToastKind = "success" | "error" | "warning" | "info";
 
-/** What each notable moment says, how it looks, and how long it stays (0: until dismissed). */
+/**
+ * What each notable moment says, how it looks, and how long it stays in milliseconds
+ * (`Infinity`: until dismissed; Sonner falls back to its default for 0).
+ */
 const NOTICES: Record<ChatEventKind, { title: string; type: ToastKind; duration: number }> = {
   answer: { title: "Answer ready", type: "success", duration: 8000 },
-  approval: { title: "Approval needed", type: "warning", duration: 0 },
-  question: { title: "The assistant asked you a question", type: "warning", duration: 0 },
+  approval: { title: "Approval needed", type: "warning", duration: Infinity },
+  question: { title: "The assistant asked you a question", type: "warning", duration: Infinity },
   edit: { title: "The assistant proposed a change", type: "info", duration: 8000 },
   expert: { title: "Waiting for the expert's answer", type: "info", duration: 8000 },
-  failed: { title: "The answer failed", type: "error", duration: 0 },
+  failed: { title: "The answer failed", type: "error", duration: Infinity },
 };
 
 /** The toast of one moment of one turn: the same ID updates it instead of adding another. */
@@ -36,6 +39,7 @@ export function chatToastId(event: Pick<ChatTurnEvent, "requestId" | "kind">): s
  * A toast is shown only for the signed-in user and the open project the turn belongs to, and
  * not while that chat is on screen in a visible tab. Its **Open chat** action shows that chat;
  * nothing is switched or sent on its own. The chat's own status line stays the lasting record.
+ * Toasts go through the app's Sonner toaster (`ToastContainer`) like every other notice.
  */
 export function ChatNotifier({
   owner,
@@ -110,6 +114,7 @@ export function ChatNotifier({
         id,
         description: event.detail ? `${event.chatTitle}: ${event.detail}` : event.chatTitle,
         duration: notice.duration,
+        // Sonner dismisses the toast after the action runs.
         action: { label: "Open chat", onClick: () => openChat(event) },
       });
     });
@@ -125,7 +130,7 @@ export function ChatNotifier({
     const ids = shown.current.get(visibleSession);
     if (!ids) return;
     shown.current.delete(visibleSession);
-    for (const id of ids) toast.close(id);
+    for (const id of ids) toast.dismiss(id);
   }, [visibleSession]);
 
   return null;
