@@ -84,7 +84,9 @@ For example, `extensions/lib/figure-analysis.ts` summarizes Plotly JSON;
 `skills/qdash-two-qubit-calibration/` decides from that evidence which two-qubit step to rerun.
 The experiment-flow skills (`qdash-chip-bringup`, `qdash-one-qubit-calibration`,
 `qdash-two-qubit-calibration`, and `qdash-characterization`) compose the flow templates toward a
-goal and leave task physics to task knowledge. The runtime's `read_skill` returns only a skill's
+goal and leave task physics to task knowledge. `qdash-zx90-optimization` composes ordinary
+pipelines into an adaptive search that the model drives only within active chat turns; no
+QDash service runs or resumes it. The runtime's `read_skill` returns only a skill's
 `SKILL.md`, so these skills keep their instructions in that file and retrieve templates and task
 documentation through tools. Both hosts list each skill's description before the model loads it,
 so a description states the goal it serves in the user's terms and the requests it does not
@@ -170,8 +172,11 @@ is not blocked.
 
 The pipeline tools and `qdash_execute_flow` reach QDash through the
 [TypeScript SDK](../architecture/typescript-sdk.md) package `@oqtopus-team/qdash-sdk`
-(`qdash.pipelines` and `qdash.workflows.run`), which builds the requests; other
-tools use `@oqtopus-team/qdash-client` directly. A profile without a project keeps
+(`qdash.pipelines` and `qdash.workflows.run`), which builds the requests, and
+`qdash_compare_calibration` compares results with `qdash.taskResults.compareLatest`; other
+tools use `@oqtopus-team/qdash-client` directly. A tool resolves the default chip and target
+from its context and adapts its arguments; the SDK or client owns the comparison and the input
+checks other callers also need. A profile without a project keeps
 running on the server's default project. Confirmation, input checks, the 422 and
 503 handling and the structured results stay in the tools. A run tool returns the execution ID as soon as QDash
 accepts the run and never calls the SDK's `wait()`; `qdash_wait_execution` follows

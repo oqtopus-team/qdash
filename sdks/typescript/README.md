@@ -28,7 +28,8 @@ console.log(run.executionId, result.status);
 `result.status` is the whole pipeline run's status. A timeout throws `QDashTimeoutError` and
 leaves the run going. `qdash.workflows.list()`, `get(name)` and `run(name, { parameters })` reach
 the project's registered workflows; `qdash.scripts` and `qdash.dashboards` save metric scripts
-and dashboards built with `Script` and `Dashboard`. The SDK sends requests through the given `QDashClient`, and
+and dashboards built with `Script` and `Dashboard`. `qdash.taskResults.compareLatest({ chipId, qid })` compares
+the two newest results of each task for one qubit or coupling. The SDK sends requests through the given `QDashClient`, and
 its error classes are the client's own, so `instanceof` works with either import. A session
 without a project uses the client's configuration as it is: when no project is configured
 there, QDash applies the user's default project.

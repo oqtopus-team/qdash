@@ -272,6 +272,102 @@ def test_a_steer_status_is_read_for_the_current_user_and_project(monkeypatch):
         )
 
 
+def test_the_running_turn_is_looked_up_for_the_current_user_and_project(monkeypatch):
+    captured = []
+    user = UserInDB(
+        user_id="alice-id",
+        username="alice",
+        access_token="alice-token",
+        hashed_password="unused",
+        default_project_id="default-project",
+    )
+    monkeypatch.setattr(
+        auth, "get_user_by_token", lambda token: user if token == user.access_token else None
+    )
+
+    async def active(username, session_id, **kwargs):
+        captured.append({"username": username, "session_id": session_id, **kwargs})
+        if kwargs["auth"].project_id == "other-project":
+            return {"running": True, "other_project": True}
+        return {
+            "running": True,
+            "turn_request_id": "t1",
+            "continuing": False,
+            "started_at": 5,
+            "turn_start": {"index": 1, "digest": "0123456789abcdef"},
+        }
+
+    async def never(*_args, **_kwargs):
+        raise AssertionError("a lookup must not send, stop, or steer anything")
+
+    monkeypatch.setattr(pi_chat_service, "active_runtime_turn", active)
+    monkeypatch.setattr(pi_chat_service, "stream", never)
+    monkeypatch.setattr(pi_chat_service, "abort_runtime_turn", never)
+    monkeypatch.setattr(pi_chat_service, "steer_runtime_turn", never)
+    app = FastAPI()
+    app.include_router(copilot.router)
+    headers = {"Authorization": "Bearer alice-token", "X-Project-Id": "p1"}
+    with TestClient(app) as client:
+        response = client.post("/chat/active", json={"session_id": "s1"}, headers=headers)
+        assert response.status_code == 200
+        assert response.json() == {
+            "running": True,
+            "turn_request_id": "t1",
+            "continuing": False,
+            "started_at": 5,
+            "turn_start": {"index": 1, "digest": "0123456789abcdef"},
+            "other_project": False,
+        }
+        # The user is the signed-in one, never one the request names.
+        assert captured[0]["username"] == "alice"
+        assert captured[0]["session_id"] == "s1"
+        assert captured[0]["auth"] == pi_chat_service.QDashAuth("alice-token", "p1")
+        assert captured[0]["target"] == RuntimeTarget("s1")
+        other = client.post(
+            "/chat/active",
+            json={"session_id": "s1"},
+            headers={"Authorization": "Bearer alice-token", "X-Project-Id": "other-project"},
+        )
+        assert other.json()["turn_request_id"] is None
+        assert other.json()["other_project"] is True
+        assert client.post("/chat/active", json={"session_id": "s1"}).status_code in (401, 403)
+        assert client.post("/chat/active", json={}, headers=headers).status_code == 422
+
+
+def test_a_chat_that_cannot_run_reports_no_running_turn(monkeypatch):
+    from qdash.api.services.copilot_chat_session_service import ChatUnavailableError
+
+    user = UserInDB(
+        user_id="alice-id",
+        username="alice",
+        access_token="alice-token",
+        hashed_password="unused",
+        default_project_id="default-project",
+    )
+    monkeypatch.setattr(
+        auth, "get_user_by_token", lambda token: user if token == user.access_token else None
+    )
+
+    async def unavailable(_username, _session_id):
+        raise ChatUnavailableError(404, "gone")
+
+    async def never(*_args, **_kwargs):
+        raise AssertionError("an unavailable chat is not looked up in the runtime")
+
+    monkeypatch.setattr(pi_chat_service, "runtime_target", unavailable)
+    monkeypatch.setattr(pi_chat_service, "active_runtime_turn", never)
+    app = FastAPI()
+    app.include_router(copilot.router)
+    with TestClient(app) as client:
+        response = client.post(
+            "/chat/active",
+            json={"session_id": "s1"},
+            headers={"Authorization": "Bearer alice-token"},
+        )
+    assert response.status_code == 200
+    assert response.json()["running"] is False
+
+
 def test_a_continue_does_not_rebuild_the_opening_context(monkeypatch):
     captured = []
     user = UserInDB(

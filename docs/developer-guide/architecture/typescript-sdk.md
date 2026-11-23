@@ -1,8 +1,8 @@
 # TypeScript SDK
 
 `@oqtopus-team/qdash-sdk` lets a TypeScript application validate or start a calibration on a chip,
-run the workflows registered in a project, and save metric scripts and dashboards, through
-the QDash API. It is a separate npm
+run the workflows registered in a project, save metric scripts and dashboards, and compare a
+target's latest task results, through the QDash API. It is a separate npm
 package in `sdks/typescript/`, built on `@oqtopus-team/qdash-client`; the user-facing example is
 in the [TypeScript Client reference](../../reference/clients/typescript.md#run-a-calibration).
 Its calls are modelled on the [Python SDK](./python-sdk.md), with one difference in how a
@@ -12,8 +12,9 @@ missing project is handled, described below.
 
 | Layer | Owns | Leaves to others |
 | --- | --- | --- |
-| `@oqtopus-team/qdash-client` (`QDashClient`) | Configuration and profiles, authentication, `X-Project-Id`, HTTP transport, retries, error classes, one method per route, generated types, `withProject`, `waitForExecution` | Building request bodies from domain calls |
-| `@oqtopus-team/qdash-sdk` | The `QDash` session, `Chip`, `Workflows`, `Pipelines`, the target, step and sweep helpers, the run handles, the `Script` and `Dashboard` definitions and their saved handles | Transport, auth, retries, any check that needs server data |
+| `@oqtopus-team/qdash-client` (`QDashClient`) | Configuration and profiles, authentication, `X-Project-Id`, HTTP transport, retries, error classes, one method per route, generated types, `withProject`, `waitForExecution`, input checks that need no server data (such as `executionListProblems`) and response-shape checks of a route | Building request bodies from domain calls, operations over several routes |
+| `@oqtopus-team/qdash-sdk` | The `QDash` session, `Chip`, `Workflows`, `Pipelines`, `TaskResults`, the target, step and sweep helpers, the run handles, the `Script` and `Dashboard` definitions and their saved handles, operations that combine several client calls, such as `compareLatest` | Transport, auth, retries, any check that needs server data |
+| A host such as pi-qdash | Default chip and target from its context, tool argument schemas and their wording, approvals, rendering | Comparison and validation logic other SDK callers also need |
 | API | Authentication, project authorization, the step and task catalog, preflight, dispatch | Anything on the caller's machine |
 
 The client does not depend on the SDK and exports no SDK entry point. The SDK depends on the
@@ -35,6 +36,7 @@ The SDK adds no transport, retries or caches; each call delegates to the client:
 | `qdash.dashboards.list`, `get`, `create`, `update` | `client.listDashboards`, `getDashboard` (also before an update by ID), `createDashboard`, `updateDashboard` |
 | `run.wait()` | `client.waitForExecution` with `wholePipeline: true` and `notFoundAsPending: true` |
 | `run.get()` | `client.getExecution` |
+| `qdash.taskResults.compareLatest` | `client.listTaskResults`, then `client.getTaskResult` for the two newest rows of each task name, at most four tasks at a time |
 | `new QDash(client, { projectId })` | `client.withProject`, a new client with the same transport options |
 
 Targets, steps and task calls are the generated types from `ui/src/schemas/`, written in the
@@ -109,7 +111,8 @@ before pi-qdash. [Pi Packages](../copilot/packages.md#distribution) describes th
 | --- | --- |
 | `sdks/typescript/tests/sdk.test.ts` | Request bodies and `X-Project-Id` through a recording `fetch`, dispatch without a project, no wait on dispatch, whole-run status, pending 404 and timeout, 422 propagation, name checks before any request, keys against `docs/oas/openapi.json`, error identity with the built client |
 | `sdks/typescript/tests/dashboards.test.ts` | Text-only `Script.fromFile`, panel IDs, layouts, hops and config, revision binding and `MetricScriptError`, request bodies, `expected_revision` and `expected_version`, 409 propagation |
-| `clients/typescript/tests/client.test.ts` | `waitForExecution` with and without `notFoundAsPending`, `withProject` |
+| `sdks/typescript/tests/results.test.ts` | `compareLatest` with fixtures checked against the `TaskResultListItem` and `TaskResultResponse` schemas of `docs/oas/openapi.json`: list query parameters, detail reads, newest-first pairing, changed and unchanged values, key order and array order, `unavailable` and `insufficient`, identity mismatches, option checks before any request |
+| `clients/typescript/tests/client.test.ts` | `waitForExecution` with and without `notFoundAsPending`, `withProject`, `listExecutions` and the task-history methods against the route parameters of `docs/oas/openapi.json` |
 | `packages/pi-qdash/tests/qdash-sdk-package.test.mjs` | pi-qdash, the SDK and the built client resolve to one client copy; the client has no SDK subpath |
 | `.github/scripts/sdk-package-release.test.mjs` | Stable and beta manifests, the client pin, publish tags and the job order in the release pipeline |
 | `.github/scripts/sdk-package-smoke.mjs` | Run in CI against an npm install of the SDK and client tarballs: dependencies, one client copy, no bundled client, error identity, and a `nodenext` typecheck of the declarations |
@@ -120,6 +123,7 @@ before pi-qdash. [Pi Packages](../copilot/packages.md#distribution) describes th
 - `sdks/typescript/src/pipelines.ts`: `Pipelines`, `PipelineRun`, `Chip`, `CalibrationRun`.
 - `sdks/typescript/src/workflows.ts`: `Workflows`, `Workflow`, `WorkflowRun`.
 - `sdks/typescript/src/runs.ts`: `RunResult`, `runStatus`, the wait options.
+- `sdks/typescript/src/results.ts`: `TaskResults`, `compareLatest`.
 - `sdks/typescript/src/definitions.ts`: target, step and sweep helpers, `calibrationSpec`.
 - `sdks/typescript/src/dashboards.ts`: `Script`, `Dashboard`, `ScriptMetric`, `Scripts`, `SavedScript`, `Dashboards`, `SavedDashboard`.
 - `clients/typescript/src/client.ts`: `withProject` and `waitForExecution`.

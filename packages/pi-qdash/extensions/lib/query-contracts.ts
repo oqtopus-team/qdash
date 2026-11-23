@@ -134,3 +134,17 @@ export function checkQueryResponse(action: ContractedAction, data: unknown): unk
     `QDash returned a ${action} response that does not match its documented shape (${lines.join("; ")}). This is not empty data; report it instead of treating it as no results.`,
   );
 }
+
+/**
+ * Why a `qubit_history` or `coupling_history` query cannot be sent, or null
+ * when it can. The history routes take no date, and the client's
+ * `getQubitTaskHistory` and `getCouplingTaskHistory` refuse one for every
+ * caller. `qdash_query` shares one `date` argument across actions, so this host
+ * check refuses it first, before the default chip is resolved, with advice in
+ * tool terms.
+ */
+export function targetHistoryProblem(params: { action: "qubit_history" | "coupling_history"; date?: unknown }): string | null {
+  if (params.date === undefined) return null;
+  const target = params.action === "qubit_history" ? "qid" : "couplingId";
+  return `date cannot filter ${params.action}: it returns every result of the task for one target, newest first, with no date filter. Omit date to read the whole history, or use the task_results action (or qdash_list_task_results) with ${target}, taskName, startFrom and startTo for one period. No request was sent.`;
+}

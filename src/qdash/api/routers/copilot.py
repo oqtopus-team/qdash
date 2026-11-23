@@ -51,7 +51,7 @@ from qdash.api.schemas.copilot_source import (
     SourceRootResponse,
     SourceSearchMatch,
 )
-from qdash.api.services import pi_chat_service
+from qdash.api.services import chat_turn_runs, pi_chat_service
 from qdash.api.services.copilot_chat_session_service import (
     ChatUnavailableError,
     CopilotChatSessionService,
@@ -60,6 +60,7 @@ from qdash.api.services.copilot_chat_session_service import (
     RuntimeTarget,
     StopChat,
     StopOutcome,
+    request_turn_stop,
 )
 from qdash.api.services.copilot_investigation_service import (
     CopilotInvestigationService,
@@ -73,6 +74,8 @@ from qdash.copilot.config import (
     select_chat_model,
 )
 from qdash.copilot.contracts import (
+    ChatActiveRequest,
+    ChatActiveResponse,
     ChatRequest,
     ChatSteerRequest,
     ChatSteerResponse,
@@ -181,6 +184,17 @@ async def chat_stop(
         target = await pi_chat_service.runtime_target(current_user.username, request.session_id)
     except ChatUnavailableError:
         return ChatStopResponse(stopped=False)
+    # Noted before the runtime stops it, so the turn's recorded end says stopped, not failed.
+    chat_turn_runs.note_stop(current_user.username, request.session_id, request.turn_request_id)
+    try:
+        await asyncio.to_thread(
+            request_turn_stop,
+            current_user.username,
+            request.session_id,
+            request.turn_request_id,
+        )
+    except Exception:
+        logger.warning("Could not note the stop of session %s", request.session_id, exc_info=True)
     outcome = await pi_chat_service.abort_runtime_turn(
         current_user.username,
         request.session_id,
@@ -188,6 +202,33 @@ async def chat_stop(
         turn_request_id=request.turn_request_id,
     )
     return ChatStopResponse(stopped=outcome == "stopped")
+
+
+@router.post("/chat/active", include_in_schema=False)
+async def chat_active(
+    request: ChatActiveRequest,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer_scheme)],
+    project_id: Annotated[str | None, Depends(get_project_id_from_header)],
+) -> ChatActiveResponse:
+    """Which turn runs a chat session now, so another window can follow it.
+
+    Read-only: it never sends a message or starts a run. Only the current user's
+    own chat is looked up, and the turn is named only in the project it was sent
+    from; the window then reattaches with that request ID, which submits nothing.
+    """
+    try:
+        target = await pi_chat_service.runtime_target(current_user.username, request.session_id)
+    except ChatUnavailableError:
+        return ChatActiveResponse(running=False)
+    auth = pi_chat_service.QDashAuth(
+        access_token=credentials.credentials,
+        project_id=project_id or current_user.default_project_id,
+    )
+    result = await pi_chat_service.active_runtime_turn(
+        current_user.username, request.session_id, auth=auth, target=target
+    )
+    return ChatActiveResponse(**result)
 
 
 @router.post("/chat/steer", include_in_schema=False)
@@ -325,7 +366,7 @@ async def chat_stream(
             ) from exc
         investigation_message = investigation.opening_message
 
-    async def event_generator() -> AsyncGenerator[str, None]:
+    async def event_generator(request: ChatRequest) -> AsyncGenerator[str, None]:
         config = load_copilot_config()
         if not config.enabled:
             yield sse_event("error", {"step": "init", "detail": "Copilot is not enabled"})
@@ -406,8 +447,31 @@ async def chat_stream(
         ):
             yield event
 
+    async def turn_running() -> bool:
+        """Whether the runtime runs a turn of this chat now (read-only)."""
+        if not request.session_id:
+            return False
+        active = await pi_chat_service.active_runtime_turn(
+            current_user.username,
+            request.session_id,
+            auth=pi_chat_service.QDashAuth(
+                access_token=credentials.credentials,
+                project_id=project_id or current_user.default_project_id,
+            ),
+            target=target,
+        )
+        return active.get("running") is True
+
+    # The turn's stream runs in the API apart from this response: closing it, or every
+    # window, never ends the turn or what the server records of it.
     return ClosingStreamingResponse(
-        event_generator(),
+        chat_turn_runs.stream_turn(
+            request,
+            username=current_user.username,
+            project_id=project_id or current_user.default_project_id,
+            source=event_generator,
+            turn_running=turn_running,
+        ),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )

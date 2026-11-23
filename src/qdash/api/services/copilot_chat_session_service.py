@@ -45,11 +45,13 @@ created again under the same ID.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import timedelta
+from itertools import pairwise
 from typing import Any, Literal
 
 from fastapi import HTTPException, status
@@ -67,12 +69,15 @@ from qdash.api.schemas.copilot_chat_session import (
     ListCopilotChatSessionsResponse,
     UpdateCopilotChatSessionRequest,
 )
+from qdash.api.services.chat_transcript import to_json, transcript_digest
 from qdash.common.utils.datetime import now
 from qdash.dbmodel.copilot_chat_session import (
     CopilotChatBranchOrigin,
     CopilotChatMessage,
+    CopilotChatServerTurn,
     CopilotChatSessionDocument,
     CopilotChatSteer,
+    TurnStatus,
 )
 
 logger = logging.getLogger(__name__)
@@ -85,6 +90,8 @@ _LIVE: dict[str, Any] = {"deleted_at": None}
 _TOMBSTONE: dict[str, Any] = {"deleted_at": {"$ne": None}}
 
 BRANCH_LEASE = timedelta(minutes=2)
+# How often a write of messages is tried again after another write landed first.
+_WRITE_ATTEMPTS = 8
 """How long a branch request holds its pending branch: longer than its runtime fork call."""
 
 RECLAIM_LIMIT = 20
@@ -104,6 +111,7 @@ def _to_doc_message(msg: CopilotChatMessageSchema) -> CopilotChatMessage:
         attached_image=msg.attached_image,
         steer=CopilotChatSteer(**msg.steer.model_dump()) if msg.steer else None,
         entry_id=msg.entry_id,
+        turn_request_id=msg.turn_request_id,
         created_at=msg.created_at or now(),
     )
 
@@ -115,6 +123,7 @@ def _to_schema_message(msg: CopilotChatMessage) -> CopilotChatMessageSchema:
         attached_image=msg.attached_image,
         steer=CopilotChatSteerSchema(**msg.steer.model_dump()) if msg.steer else None,
         entry_id=msg.entry_id,
+        turn_request_id=msg.turn_request_id,
         created_at=msg.created_at,
     )
 
@@ -465,22 +474,41 @@ class CopilotChatSessionService:
         session_id: str,
         request: UpdateCopilotChatSessionRequest,
     ) -> CopilotChatSessionResponse:
-        doc = self._require_session(username=username, session_id=session_id)
-        changes: dict[str, Any] = {"updated_at": now()}
-        if request.title is not None:
-            changes["title"] = request.title
-        if request.context is not None:
-            changes["context"] = request.context
-        if request.messages is not None:
-            changes["messages"] = [_to_doc_message(m).model_dump() for m in request.messages]
-        # Never a whole-document save: a save racing a delete would bring the chat back.
-        result = _collection().update_one({"_id": doc.id, **_VISIBLE}, {"$set": changes})
-        if result.matched_count == 0:
+        incoming = (
+            [_to_doc_message(m) for m in request.messages] if request.messages is not None else None
+        )
+        for _ in range(_WRITE_ATTEMPTS):
+            doc = self._require_session(username=username, session_id=session_id)
+            changes: dict[str, Any] = {"updated_at": now()}
+            if request.title is not None:
+                changes["title"] = request.title
+            if request.context is not None:
+                changes["context"] = request.context
+            query: dict[str, Any] = {"_id": doc.id, **_VISIBLE}
+            update: dict[str, Any] = {"$set": changes}
+            if incoming is not None:
+                # The messages of the turn the server records are its own: a save made
+                # from an older copy keeps them, and is merged again if a server write
+                # lands in between (``revision``).
+                merged = merge_saved_messages(doc, incoming)
+                changes["messages"] = [m.model_dump() for m in merged]
+                query.update(_at_revision(doc.revision))
+                update["$inc"] = {"revision": 1}
+            # Never a whole-document save: a save racing a delete would bring the chat back.
+            result = _collection().update_one(query, update)
+            if result.matched_count:
+                return _to_response(_reload(doc.id))
+            if self._find(username, session_id) is None:
+                break
+        else:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Chat session {session_id} not found",
+                status_code=status.HTTP_409_CONFLICT,
+                detail="The chat changed while it was saved; try again",
             )
-        return _to_response(_reload(doc.id))
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Chat session {session_id} not found",
+        )
 
     async def delete_session(
         self,
@@ -983,3 +1011,462 @@ def _same_branch(
         and doc.branch.source_conversation_id == source.conversation_id
         and store_of(doc) == store_of(source)
     )
+
+
+# ---------------------------------------------------------------------------
+# Server-recorded chat turns
+# ---------------------------------------------------------------------------
+#
+# The API records a chat turn's messages itself as the runtime streams them, so
+# the saved chat holds the turn's progress and its end whether or not a browser
+# watches it. ``turn`` names the latest such turn; the messages of every recorded
+# turn carry its request ID (``turn_request_id``), and the latest turn's sit
+# together from ``turn.start_index``. A client save keeps all of them, in the
+# stored order (``merge_saved_messages``). Every write of ``messages`` is
+# conditional on ``revision`` and bumps it, so a write based on an older copy is
+# merged again rather than replacing a newer one.
+
+
+def _at_revision(revision: int) -> dict[str, Any]:
+    """Match a document still at ``revision`` (a missing field is revision 0)."""
+    return {"revision": revision} if revision else {"revision": {"$in": [0, None]}}
+
+
+def _run_bounds(messages: list[CopilotChatMessage], request_id: str) -> tuple[int, int] | None:
+    """Where the messages of turn ``request_id`` are: [start, end), or None."""
+    tagged = [i for i, m in enumerate(messages) if m.turn_request_id == request_id]
+    return (tagged[0], tagged[-1] + 1) if tagged else None
+
+
+def _feedback_of(content: str) -> tuple[bool, Any, dict[str, Any] | None]:
+    """(has feedback, the feedback, the payload without it) of a blocks message."""
+    try:
+        payload = json.loads(content)
+    except ValueError:
+        return False, None, None
+    if not isinstance(payload, dict) or not isinstance(payload.get("blocks"), list):
+        return False, None, None
+    has = "feedback" in payload
+    feedback = payload.pop("feedback", None)
+    return has, feedback, payload
+
+
+def _with_feedback(server: CopilotChatMessage, state: tuple[bool, Any]) -> CopilotChatMessage:
+    """The server's answer with the rating ``state`` (has a rating, the rating).
+
+    Only the ``feedback`` key changes: the answer itself (its blocks, trace,
+    entry ID, and timestamps) stays the server's.
+    """
+    had, previous, payload = _feedback_of(server.content)
+    if payload is None or state == (had, previous):
+        return server
+    if state[0]:
+        payload["feedback"] = state[1]
+    return server.model_copy(update={"content": to_json(payload)})
+
+
+_Key = tuple[str, str]
+
+
+@dataclass(frozen=True)
+class _Keyed:
+    """A message of a recorded turn's run, with what identifies it within the turn.
+
+    ``intrinsic``: the turn's own user message, a steer (its request ID), or an
+    answer with a runtime entry. ``positional``, for an answer: the message that
+    follows it in the run (a steer, the turn's user message) or ``last``; None
+    when an answer follows it.
+    """
+
+    at: int
+    message: CopilotChatMessage
+    intrinsic: _Key | None
+    positional: _Key | None
+
+
+def _keyed_run(run: list[tuple[int, CopilotChatMessage]]) -> list[_Keyed]:
+    """Key each message of one turn's run (as one copy orders it)."""
+    keyed: list[_Keyed] = []
+    for i, (at, m) in enumerate(run):
+        rid = m.turn_request_id or ""
+        if m.role == "user":
+            intrinsic: _Key | None = ("steer", m.steer.request_id) if m.steer else ("user", rid)
+            keyed.append(_Keyed(at, m, intrinsic, None))
+            continue
+        nxt = run[i + 1][1] if i + 1 < len(run) else None
+        positional: _Key | None
+        if nxt is None:
+            positional = ("last", rid)
+        elif nxt.role == "user":
+            positional = (
+                ("before-steer", nxt.steer.request_id) if nxt.steer else ("before-user", rid)
+            )
+        else:
+            positional = None
+        keyed.append(_Keyed(at, m, ("entry", m.entry_id) if m.entry_id else None, positional))
+    return keyed
+
+
+def _stored_copy(run: list[_Keyed], client: _Keyed) -> _Keyed | None:
+    """The stored message of a recorded turn's ``run`` that ``client`` is a copy of.
+
+    Known by, in order: the turn's user message or a steer by what it is; an
+    answer by its runtime entry, else by being equal to one stored answer
+    (without the rating), else by its place in the turn (before a steer, before
+    the turn's message, or last), never by its index, which differs between
+    folds. Two answers with different entries are never the same. None when no
+    stored message, or more than one, fits.
+    """
+    m = client.message
+    same_role = [s for s in run if s.message.role == m.role]
+    if m.role == "user":
+        found = [s for s in same_role if s.intrinsic == client.intrinsic]
+    elif m.entry_id and any(s.message.entry_id == m.entry_id for s in same_role):
+        found = [s for s in same_role if s.message.entry_id == m.entry_id]
+    else:
+        unlike = [s for s in same_role if not (s.message.entry_id and m.entry_id)]
+        found = [s for s in unlike if _comparable(s.message) == _comparable(m)]
+        if len(found) != 1:
+            found = [
+                s for s in unlike if s.positional is not None and s.positional == client.positional
+            ]
+    return found[0] if len(found) == 1 else None
+
+
+def _comparable(m: CopilotChatMessage) -> tuple[Any, ...]:
+    """A client-owned message without its rating, to find it in another copy.
+
+    A plain-text answer and the blocks form the page wraps it in to rate it
+    compare equal.
+    """
+    content: str = m.content
+    _, _, payload = _feedback_of(m.content)
+    if payload is not None:
+        blocks = payload["blocks"]
+        block = blocks[0] if len(blocks) == 1 else None
+        if (
+            set(payload) <= {"blocks", "assessment"}
+            and payload.get("assessment") is None
+            and isinstance(block, dict)
+            and set(block) <= {"type", "content", "chart"}
+            and block.get("type") == "text"
+            and block.get("chart") is None
+            and isinstance(block.get("content"), str)
+        ):
+            content = block["content"]
+        else:
+            content = to_json(payload)
+    return (m.role, content, m.steer.request_id if m.steer else None, m.turn_request_id)
+
+
+def merge_saved_messages(
+    doc: CopilotChatSessionDocument, incoming: list[CopilotChatMessage]
+) -> list[CopilotChatMessage]:
+    """What a client save of ``incoming`` stores, keeping every server-recorded turn.
+
+    A message is durable when it carries the request ID (``turn_request_id``) of
+    a turn the chat records; every other message is client-owned. The result
+    keeps these invariants, whatever the copy holds:
+
+    1. The durable messages are exactly the stored ones, in stored order, each
+       once. A copy that omits, repeats, reorders, or holds part of a recorded
+       turn cannot remove, repeat, move, or change one: to change the
+       conversation from an earlier point, a new turn is sent from there, which
+       truncates the chat when it is claimed (``claim_turn``).
+    2. Of a durable message, only an answer's rating (``feedback``) comes from
+       the client, from the client's copy of that same answer
+       (``_stored_copy``: its runtime entry, an equal stored answer, or its
+       place in the turn, never its index). When the client's copies of it
+       disagree, or none is known, the stored rating stays. A copy of it without
+       a rating clears it: the last save wins, as for every client change.
+    3. Client-owned messages keep the copy's order, each at most once, and each
+       follows every durable message that preceded it in the copy (a durable
+       copy repeated or out of order moves nothing; one not known anchors at
+       the end of its turn). Between two durable messages the copy holds next
+       to each other in the chat, the client-owned messages are the copy's.
+       Where the copy lacks durable messages in between (a copy saved before a
+       turn, or one that dropped it), it did not see that part of the chat:
+       the stored client-owned messages there that the copy does not hold
+       (equal by role, text without rating, steer, and request ID) are kept;
+       a copy's message equal to one of them takes its place, and the copy's
+       others go before the next such message or at the end of that part.
+    4. While the latest recorded turn runs, nothing from its start on comes from
+       the client.
+    """
+    turn = doc.turn
+    running = turn.request_id if turn is not None and turn.status == "running" else None
+    recorded = {m.turn_request_id for m in doc.messages if m.turn_request_id is not None}
+    if running is not None:
+        recorded.add(running)
+    if not recorded:
+        return incoming
+
+    # The stored chat, with a marker (None) where a running turn that has no
+    # message yet (a continue just claimed) starts. The marker is durable.
+    items: list[CopilotChatMessage | None] = list(doc.messages)
+    if running is not None and not any(m.turn_request_id == running for m in doc.messages):
+        items.insert(min(turn.start_index if turn else 0, len(items)), None)
+
+    def durable(x: CopilotChatMessage | None) -> bool:
+        return x is None or x.turn_request_id in recorded
+
+    def runs(messages: list[CopilotChatMessage | None]) -> dict[str, list[_Keyed]]:
+        grouped: dict[str, list[tuple[int, CopilotChatMessage]]] = {}
+        for at, m in enumerate(messages):
+            if m is not None and m.turn_request_id in recorded:
+                grouped.setdefault(m.turn_request_id, []).append((at, m))
+        return {rid: _keyed_run(run) for rid, run in grouped.items()}
+
+    server_runs = runs(items)
+    ends = {rid: run[-1].at for rid, run in server_runs.items()}
+    if None in items:
+        ends[running or ""] = items.index(None)
+
+    # Where each durable copy is stored, and the client's copies of each stored message.
+    stored_at: dict[int, int] = {}
+    copies: dict[int, list[CopilotChatMessage]] = {}
+    for rid, client_run in runs(list(incoming)).items():
+        for c in client_run:
+            found = _stored_copy(server_runs.get(rid, []), c)
+            if found is not None:
+                stored_at[c.at] = found.at
+                copies.setdefault(found.at, []).append(c.message)
+            else:
+                # Not known: it stands for somewhere in its turn, so it anchors at its end.
+                stored_at[c.at] = ends[rid]
+
+    def emit(at: int) -> CopilotChatMessage | None:
+        m = items[at]
+        if m is None or m.role != "assistant":
+            return m
+        states: list[tuple[bool, Any]] = []
+        for c in copies.get(at, []):
+            has, feedback, payload = _feedback_of(c.content)
+            if payload is not None and (has, feedback) not in states:
+                states.append((has, feedback))
+        return _with_feedback(m, states[0]) if len(states) == 1 else m
+
+    # The durable messages the copy holds in stored order, and the client-owned
+    # messages that follow each of them (-1: before any).
+    anchors = [-1]
+    owned: dict[int, list[int]] = {}
+    for i, m in enumerate(incoming):
+        if m.turn_request_id in recorded:
+            if stored_at[i] > anchors[-1]:
+                anchors.append(stored_at[i])
+        else:
+            owned.setdefault(anchors[-1], []).append(i)
+    anchors.append(len(items))
+
+    # Which stored client-owned message each client-owned message of the copy is:
+    # the first equal one not taken yet.
+    unmatched: dict[tuple[Any, ...], list[int]] = {}
+    for at, x in enumerate(items):
+        if x is not None and not durable(x):
+            unmatched.setdefault(_comparable(x), []).append(at)
+    in_copy: dict[int, int] = {}
+    for i, m in enumerate(incoming):
+        if m.turn_request_id not in recorded and (equal := unmatched.get(_comparable(m))):
+            in_copy[equal.pop(0)] = i
+
+    merged: list[CopilotChatMessage | None] = []
+    for held, following in pairwise(anchors):
+        if held >= 0:
+            merged.append(emit(held))
+        theirs = owned.get(held, [])
+        part = range(held + 1, following)
+        if not any(durable(items[at]) for at in part):
+            # The copy saw this part of the chat as the server has it: it is the copy's.
+            merged.extend(incoming[i] for i in theirs)
+            continue
+        # The copy lacks durable messages here: keep the stored ones and the stored
+        # client-owned messages the copy does not hold, with the copy's in between.
+        place = {i: k for k, i in enumerate(theirs)}
+        taken = 0
+        for at in part:
+            x = items[at]
+            if durable(x):
+                merged.append(emit(at))
+            elif at not in in_copy:
+                merged.append(x)
+            elif in_copy[at] in place:
+                upto = place[in_copy[at]] + 1
+                merged.extend(incoming[i] for i in theirs[taken:upto])
+                taken = max(taken, upto)
+        merged.extend(incoming[i] for i in theirs[taken:])
+
+    if running is not None:
+        # The running turn and its place are the server's until it ends.
+        first = next(i for i, m in enumerate(merged) if m is None or m.turn_request_id == running)
+        merged[first:] = [emit(s.at) for s in server_runs.get(running, [])]
+    return [m for m in merged if m is not None]
+
+
+ClaimOutcome = Literal["claimed", "same_turn", "conflict", "busy", "gone"]
+
+
+def claim_turn(
+    username: str,
+    session_id: str,
+    *,
+    request_id: str,
+    project_id: str | None,
+    start_index: int,
+    digest: str,
+    user_message: CopilotChatMessage | None,
+    replace_running: bool = False,
+) -> ClaimOutcome:
+    """Record that turn ``request_id`` starts, before anything is sent to the runtime.
+
+    The saved chat must hold the start the client sent the turn from: the
+    ``start_index`` messages before it, whose digest with the turn's own message
+    (``user_message``, None for a continue) is ``digest``. The chat then becomes
+    those messages and the user's message, which the server saves itself, and
+    the turn its recorded turn. ``conflict``: the saved chat differs (a stale
+    window, or a save still on its way); nothing is written. ``same_turn``: the
+    turn was recorded before (a retried request). ``busy``: another recorded turn
+    still runs; with ``replace_running`` (the caller found that it no longer runs,
+    for example after the API restarted) it is replaced.
+    """
+    for _ in range(_WRITE_ATTEMPTS):
+        doc = CopilotChatSessionDocument.find_one(
+            {"username": username, "session_id": session_id, **_VISIBLE}
+        ).run()
+        if doc is None:
+            return "gone"
+        if doc.turn is not None and doc.turn.request_id == request_id:
+            return "same_turn"
+        if doc.turn is not None and doc.turn.status == "running" and not replace_running:
+            return "busy"
+        if len(doc.messages) < start_index:
+            return "conflict"
+        prefix = doc.messages[:start_index]
+        if transcript_digest([*prefix, *([user_message] if user_message else [])]) != digest:
+            return "conflict"
+        timestamp = now()
+        turn = CopilotChatServerTurn(
+            request_id=request_id,
+            project_id=project_id,
+            start_index=start_index,
+            continuing=user_message is None,
+            started_at=timestamp,
+            updated_at=timestamp,
+        )
+        changes: dict[str, Any] = {
+            "messages": [
+                m.model_dump() for m in [*prefix, *([user_message] if user_message else [])]
+            ],
+            "turn": turn.model_dump(),
+            "updated_at": timestamp,
+        }
+        if user_message is not None and doc.title == "New Chat" and user_message.content:
+            changes["title"] = user_message.content[:50]
+        result = _collection().update_one(
+            {"_id": doc.id, **_VISIBLE, **_at_revision(doc.revision)},
+            {"$set": changes, "$inc": {"revision": 1}},
+        )
+        if result.matched_count:
+            return "claimed"
+    return "conflict"
+
+
+@dataclass(frozen=True)
+class RecordedTurn:
+    """The recorded turn of a chat and its messages, as stored."""
+
+    turn: CopilotChatServerTurn
+    messages: list[CopilotChatMessage]
+
+
+def recorded_turn(username: str, session_id: str, request_id: str) -> RecordedTurn | None:
+    """Turn ``request_id`` when it is the chat's recorded turn, with its messages."""
+    doc = CopilotChatSessionDocument.find_one(
+        {"username": username, "session_id": session_id, **_VISIBLE}
+    ).run()
+    if doc is None or doc.turn is None or doc.turn.request_id != request_id:
+        return None
+    bounds = _run_bounds(doc.messages, request_id)
+    return RecordedTurn(
+        turn=doc.turn, messages=doc.messages[bounds[0] : bounds[1]] if bounds else []
+    )
+
+
+@dataclass(frozen=True)
+class TurnWrite:
+    """What writing a turn's messages did.
+
+    ``saved``: written. ``ended``: the turn had already ended; ``messages`` are
+    its stored ones. ``gone``: the chat was deleted or records another turn now.
+    """
+
+    outcome: Literal["saved", "ended", "gone"]
+    messages: list[CopilotChatMessage]
+
+
+def write_turn(
+    username: str,
+    session_id: str,
+    request_id: str,
+    run: list[CopilotChatMessage],
+    *,
+    status: TurnStatus = "running",
+    error: str | None = None,
+) -> TurnWrite:
+    """Store ``run`` as the messages of the running turn ``request_id``.
+
+    With a ``status`` other than ``running`` the turn ends: an ended turn is
+    never written again, so a write that arrives late (a second stream of the
+    same turn, a progress write) cannot replace its end. Raises the database's
+    errors, so the caller can try again.
+    """
+    for _ in range(_WRITE_ATTEMPTS):
+        doc = CopilotChatSessionDocument.find_one(
+            {"username": username, "session_id": session_id, **_VISIBLE}
+        ).run()
+        if doc is None or doc.turn is None or doc.turn.request_id != request_id:
+            return TurnWrite("gone", [])
+        bounds = _run_bounds(doc.messages, request_id)
+        if doc.turn.status != "running":
+            return TurnWrite("ended", doc.messages[bounds[0] : bounds[1]] if bounds else [])
+        start = bounds[0] if bounds else min(doc.turn.start_index, len(doc.messages))
+        timestamp = now()
+        changes: dict[str, Any] = {
+            "messages": [m.model_dump() for m in [*doc.messages[:start], *run]],
+            "turn.start_index": start,
+            "turn.updated_at": timestamp,
+            "updated_at": timestamp,
+        }
+        if status != "running":
+            changes.update({"turn.status": status, "turn.ended_at": timestamp, "turn.error": error})
+        result = _collection().update_one(
+            {
+                "_id": doc.id,
+                **_VISIBLE,
+                **_at_revision(doc.revision),
+                "turn.request_id": request_id,
+                "turn.status": "running",
+            },
+            {"$set": changes, "$inc": {"revision": 1}},
+        )
+        if result.matched_count:
+            return TurnWrite("saved", run)
+    raise RuntimeError(f"Could not write turn {request_id}: the chat kept changing")
+
+
+def request_turn_stop(username: str, session_id: str, turn_request_id: str | None) -> None:
+    """Note that the user stopped the running recorded turn, so it ends as stopped."""
+    query: dict[str, Any] = {
+        "username": username,
+        "session_id": session_id,
+        **_VISIBLE,
+        "turn.status": "running",
+    }
+    if turn_request_id is not None:
+        query["turn.request_id"] = turn_request_id
+    _collection().update_one(query, {"$set": {"turn.stop_requested": True}})
+
+
+def turn_stop_requested(username: str, session_id: str, request_id: str) -> bool:
+    """Whether the user stopped turn ``request_id``, from any window or API process."""
+    recorded = recorded_turn(username, session_id, request_id)
+    return recorded is not None and recorded.turn.stop_requested

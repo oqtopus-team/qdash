@@ -605,6 +605,7 @@ const EXPERIMENT_SKILLS = [
   "qdash-characterization",
   "qdash-one-qubit-calibration",
   "qdash-two-qubit-calibration",
+  "qdash-zx90-optimization",
   "qdash-chip-bringup",
   "qdash-agent-calibration",
   "qdash-rabi-after-configure",

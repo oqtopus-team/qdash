@@ -4,14 +4,17 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 
 import type { ExtensionAPI, Theme } from "@earendil-works/pi-coding-agent";
 import {
+  EXECUTIONS_MAX_PAGE_SIZE,
   QDashClient,
   defaultConfigPath,
+  executionListProblems,
   type CooldownResponse,
   type DownloadedFile,
   type TaskResultFigureOptions,
 } from "@oqtopus-team/qdash-client";
 import { Text, truncateToWidth } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
+import { QDash, type TaskResultComparison } from "@oqtopus-team/qdash-sdk";
 
 import { analyzePlotlyFigure, figureAnalysisText } from "./lib/figure-analysis.js";
 import { fetchFigureDetails, figureComponent, figureResultText, mediaTypeForPath, type FigureDetails } from "./lib/figures.js";
@@ -46,7 +49,7 @@ import { installQDashToolPolicy } from "./lib/script-policy.js";
 import { installQcalHydration } from "./lib/qcal-hydration-hook.js";
 import type { TaskKnowledgeLike } from "./lib/qcal-hydration.js";
 import { registerTimeseriesComparisonTool } from "./tools/timeseries.js";
-import { checkQueryResponse, isContractedAction, QUERY_CONTRACTS, taskResultPageProblem } from "./lib/query-contracts.js";
+import { checkQueryResponse, isContractedAction, QUERY_CONTRACTS, TASK_RESULTS_PAGE_LIMIT, targetHistoryProblem, taskResultPageProblem } from "./lib/query-contracts.js";
 import { analyzeWiringMarkdown, wiringInsightLines, type WiringInsights } from "./lib/wiring-analysis.js";
 
 type QDashQueryParams = {
@@ -119,6 +122,7 @@ type QDashQueryParams = {
   parameterName?: string;
   tag?: string;
   date?: string;
+  timezone?: string;
   backend?: string;
   status?: string;
   username?: string;
@@ -372,7 +376,7 @@ const querySchema = Type.Object({
   cooldownId: Type.Optional(Type.String()),
   taskId: Type.Optional(Type.String()),
   taskName: Type.Optional(Type.String()),
-  task: Type.Optional(Type.String({ description: "Task parameter used by latest/history endpoints." })),
+  task: Type.Optional(Type.String({ description: "Task name for qubit_latest, coupling_latest, qubit_history and coupling_history (taskName is accepted too)." })),
   projectId: Type.Optional(Type.String()),
   path: Type.Optional(Type.String({ description: "file_content only: a file path relative to the calibration config directory. Not source code; read QDash or qubex source with qdash_read_source. files_tree takes no path." })),
   flowName: Type.Optional(Type.String()),
@@ -385,9 +389,10 @@ const querySchema = Type.Object({
   parameter: Type.Optional(Type.String({ description: "Metric/parameter name for timeseries." })),
   parameterName: Type.Optional(Type.String()),
   tag: Type.Optional(Type.String()),
-  date: Type.Optional(Type.String({ description: "History date, usually YYYYMMDD." })),
+  date: Type.Optional(Type.String({ description: "executions only: only executions started on this day, YYYYMMDD. qubit_history and coupling_history take no date and return the whole history." })),
+  timezone: Type.Optional(Type.String({ description: "executions only: IANA time zone that defines the day for date. Defaults to UTC." })),
   backend: Type.Optional(Type.String()),
-  status: Type.Optional(Type.String()),
+  status: Type.Optional(Type.String({ description: "task_results or forum_posts status filter. executions has no status filter." })),
   username: Type.Optional(Type.String()),
   messageContains: Type.Optional(Type.String()),
   startAt: Type.Optional(Type.String()),
@@ -395,8 +400,8 @@ const querySchema = Type.Object({
   startFrom: Type.Optional(Type.String()),
   startTo: Type.Optional(Type.String()),
   withinHours: Type.Optional(Type.Number()),
-  limit: Type.Optional(Type.Number({ description: "Page size. task_results: an integer from 1 to 100." })),
-  skip: Type.Optional(Type.Number({ description: "Rows to skip. task_results: an integer of 0 or more." })),
+  limit: Type.Optional(Type.Number({ description: "Page size. task_results and executions: an integer from 1 to 100." })),
+  skip: Type.Optional(Type.Number({ description: "Rows to skip. task_results and executions: an integer of 0 or more." })),
   offset: Type.Optional(Type.Number()),
 });
 
@@ -509,10 +514,6 @@ function qcalEvidenceText(evidence: CalibrationEvidence, include: { inputs?: boo
 
 function cleanQuery(values: Record<string, unknown> = {}): Record<string, unknown> {
   return Object.fromEntries(Object.entries(values).filter(([, value]) => value !== undefined && value !== null));
-}
-
-function pathPart(value: string): string {
-  return encodeURIComponent(value);
 }
 
 function requireValue(value: string | undefined, name: string): string {
@@ -822,8 +823,9 @@ function recentCalibrationSummaryComponent(summary: RecentCalibrationSummary, th
 type CalibrationComparison = {
   context: { profile?: string; chipId: string; webBaseUrl: string };
   target: { kind: "qubit" | "coupling"; id: string; label: string };
-  compared: Array<{ task: string; before: Record<string, unknown>; after: Record<string, unknown>; changes: Record<string, { before: unknown; after: unknown }> }>;
-};
+  /** List rows read, and how many matched in total. */
+  rows: { read: number; total: number };
+} & Pick<TaskResultComparison, "compared" | "insufficient">;
 
 async function buildCalibrationComparison(params: { profile?: string; configPath?: string; useEnv?: boolean; chipId?: string; qid?: string; couplingId?: string; limit?: number; withinHours?: number }): Promise<CalibrationComparison> {
   params = applyQDashContext(params);
@@ -834,48 +836,36 @@ async function buildCalibrationComparison(params: { profile?: string; configPath
   if (!qid && !couplingId) throw new Error("qid or couplingId is required (or select one with /qdash-use-target)");
   const kind = qid ? "qubit" : "coupling";
   const id = (qid ?? couplingId) as string;
-  const results = await client.listTaskResults({ chipId, qid: id, limit: Math.max(2, Math.min(100, params.limit ?? 20)) });
-  const items = arrayFromPayload(results).filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object");
-  const groups = new Map<string, Record<string, unknown>[]>();
-  for (const item of items) {
-    const task = firstString(item, ["task_name", "name"]) ?? "task";
-    groups.set(task, [...(groups.get(task) ?? []), item]);
-  }
-  const compared = [...groups.entries()].flatMap(([task, entries]) => {
-    if (entries.length < 2) return [];
-    const after = entries[0];
-    const before = entries[1];
-    const beforeParams = (before.output_parameters ?? {}) as Record<string, unknown>;
-    const afterParams = (after.output_parameters ?? {}) as Record<string, unknown>;
-    const changes: Record<string, { before: unknown; after: unknown }> = {};
-    for (const name of new Set([...Object.keys(beforeParams), ...Object.keys(afterParams)])) {
-      const beforeValue = parameterValue(beforeParams[name]);
-      const afterValue = parameterValue(afterParams[name]);
-      if (JSON.stringify(beforeValue) !== JSON.stringify(afterValue)) changes[name] = { before: beforeValue, after: afterValue };
-    }
-    return [{ task, before, after, changes }];
-  });
-  return { context: { profile: params.profile ?? currentContext.profile, chipId, webBaseUrl: qdashWebBaseUrl(client) }, target: { kind, id, label: kind === "qubit" ? `q${id}` : `c${id}` }, compared };
-}
-
-function parameterValue(value: unknown): unknown {
-  if (value && typeof value === "object" && "value" in value) return (value as { value?: unknown }).value;
-  return value;
+  const limit = Math.max(2, Math.min(TASK_RESULTS_PAGE_LIMIT, Math.trunc(params.limit ?? 20)));
+  // The SDK selects, reads and compares the results; this tool adapts arguments and presents them.
+  const { rows, compared, insufficient } = await new QDash(client).taskResults.compareLatest({ chipId, qid: id, limit });
+  return {
+    context: { profile: params.profile ?? currentContext.profile, chipId, webBaseUrl: qdashWebBaseUrl(client) },
+    target: { kind, id, label: kind === "qubit" ? `q${id}` : `c${id}` },
+    rows,
+    compared,
+    insufficient,
+  };
 }
 
 function calibrationComparisonLines(comparison: CalibrationComparison, color = false): string[] {
   const accent = (text: string) => color ? ansi("1;36", text) : text;
   const muted = (text: string) => color ? ansi("90", text) : text;
   const lines = [`profile ${comparison.context.profile ?? "env/default"}  chip ${comparison.context.chipId}`, `target ${comparison.target.label}`, ""];
-  if (comparison.compared.length === 0) lines.push(muted("Not enough repeated task results to compare."));
+  if (comparison.compared.length === 0) lines.push(muted(`Not enough repeated task results to compare among the ${comparison.rows.read} newest of ${comparison.rows.total}.`));
   for (const item of comparison.compared) {
     lines.push(accent(item.task));
-    const beforeId = firstString(item.before, ["task_id", "id"]) ?? "before";
-    const afterId = firstString(item.after, ["task_id", "id"]) ?? "after";
-    lines.push(`  before ${shortId(beforeId, 18)}  after ${shortId(afterId, 18)}`);
+    lines.push(`  before ${shortId(item.before.task_id, 18)}  after ${shortId(item.after.task_id, 18)}`);
+    if (item.status !== "compared" || !item.changes) {
+      lines.push(`  comparison unavailable: ${item.error ?? "the results could not be read"}`);
+      continue;
+    }
     const changes = Object.entries(item.changes);
     if (changes.length === 0) lines.push(`  ${muted("no output-parameter changes")}`);
     else for (const [name, change] of changes) lines.push(`  ${name}: ${JSON.stringify(change.before)} → ${JSON.stringify(change.after)}`);
+  }
+  if (comparison.insufficient.length > 0) {
+    lines.push(muted(`single result, not compared: ${comparison.insufficient.map((entry) => entry.task).join(", ")}`));
   }
   return boxed("QDash Calibration Comparison", lines, color);
 }
@@ -1491,6 +1481,16 @@ async function executeQuery(params: QDashQueryParams) {
     const problem = taskResultPageProblem(params);
     if (problem) throw new Error(`task_results: ${problem}`);
   }
+  if (params.action === "executions") {
+    // The client's own check, run before the default chip is resolved so a bad call sends nothing.
+    const { flowName, status, skip, limit, date, timezone } = params;
+    const problems = executionListProblems({ flowName, status, skip, limit, date, timezone });
+    if (problems.length > 0) throw new Error(`executions: ${problems.join("; ")}. No request was sent.`);
+  }
+  if (params.action === "qubit_history" || params.action === "coupling_history") {
+    const problem = targetHistoryProblem({ action: params.action, date: params.date });
+    if (problem) throw new Error(`${params.action}: ${problem}`);
+  }
   const data = await dispatchQuery(params);
   return isContractedAction(params.action) ? checkQueryResponse(params.action, data) : data;
 }
@@ -1518,9 +1518,9 @@ async function dispatchQuery(params: QDashQueryParams) {
     case "task_result": return client.getTaskResult(requireValue(params.taskId, "taskId"));
     case "task_note": return client.api.getTaskNote(requireValue(params.taskId, "taskId"));
     case "qubit_latest": return client.api.getLatestQubitTaskResults({ chip_id: await defaultChipId(client, params.chipId), task: requireValue(params.task ?? params.taskName, "task") });
-    case "qubit_history": return rawGet(client, `/task-results/qubits/${pathPart(requireValue(params.qid, "qid"))}/history`, { chip_id: await defaultChipId(client, params.chipId), task: requireValue(params.task ?? params.taskName, "task"), date: requireValue(params.date, "date") });
+    case "qubit_history": return client.getQubitTaskHistory({ chipId: await defaultChipId(client, params.chipId), qid: requireValue(params.qid, "qid"), task: requireValue(params.task ?? params.taskName, "task") });
     case "coupling_latest": return client.api.getLatestCouplingTaskResults({ chip_id: await defaultChipId(client, params.chipId), task: requireValue(params.task ?? params.taskName, "task") });
-    case "coupling_history": return rawGet(client, `/task-results/couplings/${pathPart(requireValue(params.couplingId, "couplingId"))}/history`, { chip_id: await defaultChipId(client, params.chipId), task: requireValue(params.task ?? params.taskName, "task"), date: requireValue(params.date, "date") });
+    case "coupling_history": return client.getCouplingTaskHistory({ chipId: await defaultChipId(client, params.chipId), couplingId: requireValue(params.couplingId, "couplingId"), task: requireValue(params.task ?? params.taskName, "task") });
     case "tasks": return client.listTasks(params.backend);
     case "task_knowledge": return params.taskName ? client.getTaskKnowledge(params.taskName) : client.listTaskKnowledge();
     case "task_knowledge_markdown": return client.getTaskKnowledgeMarkdown(requireValue(params.taskName, "taskName"));
@@ -1535,7 +1535,7 @@ async function dispatchQuery(params: QDashQueryParams) {
     case "flow_template": return client.getFlowTemplate(requireValue(params.templateId, "templateId"));
     case "flow_helper_files": return client.api.listFlowHelperFiles();
     case "flow_helper_file": return client.api.getFlowHelperFile(requireValue(params.filename, "filename"));
-    case "executions": return rawGet(client, "/executions", { chip_id: params.chipId, flow_name: params.flowName, status: params.status, skip: params.skip, limit: params.limit });
+    case "executions": return client.listExecutions({ chipId: await defaultChipId(client, params.chipId), skip: params.skip, limit: params.limit, date: params.date, timezone: params.timezone });
     case "execution": return client.getExecution(requireValue(params.executionId, "executionId"));
     case "forum_posts": return client.listForumPosts({ status: params.status, chipId: params.chipId, limit: params.limit, skip: params.skip });
     case "provenance_stats": return client.getProvenanceStats();
@@ -1916,10 +1916,17 @@ export default function qdashExtension(host: ExtensionAPI) {
   registerQueryTool({
     name: "qdash_list_executions",
     label: "QDash List Executions",
-    description: "List QDash executions with optional chip, flow, status, and pagination filters.",
-    promptSnippet: "List QDash executions",
+    description: "List one chip's QDash executions, newest first, as { executions, total }. chipId defaults to the active/default chip. Filters are page (skip, limit) and start day (date, timezone) only; there is no flow or status filter, so filter the returned rows by flow_name or status.",
+    promptSnippet: "List a chip's QDash executions",
     action: "executions",
-    parameters: Type.Object({ ...connectionParams, chipId: Type.Optional(Type.String()), flowName: Type.Optional(Type.String()), status: Type.Optional(Type.String()), limit: Type.Optional(Type.Number()), skip: Type.Optional(Type.Number()) }),
+    parameters: Type.Object({
+      ...connectionParams,
+      ...chipScopedParams,
+      limit: Type.Optional(Type.Integer({ minimum: 1, maximum: EXECUTIONS_MAX_PAGE_SIZE, description: `Rows to return, from 1 to ${EXECUTIONS_MAX_PAGE_SIZE}. Defaults to 20.` })),
+      skip: Type.Optional(Type.Integer({ minimum: 0, description: "Rows to skip before this page." })),
+      date: Type.Optional(Type.String({ pattern: "^\\d{8}$", description: "Only executions started on this day, YYYYMMDD." })),
+      timezone: Type.Optional(Type.String({ description: "IANA time zone that defines the day for date. Defaults to UTC." })),
+    }),
   });
 
   pi.registerTool({

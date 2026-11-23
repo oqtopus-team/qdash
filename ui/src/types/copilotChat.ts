@@ -61,6 +61,11 @@ export interface ChatMessage {
    * result. Only such an answer can be branched from; older answers have none.
    */
   entryId?: string;
+  /**
+   * The turn this message belongs to (its request ID). The server records a turn's
+   * messages itself; a save of this window's copy cannot replace them.
+   */
+  turnRequestId?: string;
 }
 
 /** Where a branched chat came from. */
@@ -271,6 +276,11 @@ export type CopilotBlocksResult = BlocksResult & {
   trace?: ChatTrace;
   /** The user stopped the turn; the blocks hold whatever had streamed. */
   stopped?: boolean;
+  /**
+   * Saved by the server while the turn still ran: the answer so far. Replaced by the
+   * answer's end once the turn ends.
+   */
+  in_progress?: boolean;
   /** The user's rating of this answer, kept with it for later evaluation. */
   feedback?: AnswerFeedback;
 };

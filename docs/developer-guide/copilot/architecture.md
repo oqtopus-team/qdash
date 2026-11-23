@@ -36,7 +36,9 @@ only in what they open with:
 | `src/qdash/copilot/` | Shared Copilot runtime used outside the API process |
 | `agent-runtime/src/codemode.ts` | `codemode` scripts, `tool_search`, and the hooks that keep scripts to audited read-only tools and internal tools to their callers ([Code Mode and deferred tools](#code-mode-and-deferred-tools)) |
 | `agent-runtime/src/branch.ts` | Branching a chat at an answer: the Pi fork, its checks, and the `qdash.branches` receipts ([Branches](./chat-streaming.md#branches)) |
-| `src/qdash/api/services/copilot_chat_session_service.py` | Chat sessions, the store each one uses, branch creation, and store cleanup with the last session |
+| `src/qdash/api/services/copilot_chat_session_service.py` | Chat sessions, the store each one uses, branch creation, store cleanup with the last session, and the recorded turn's writes ([Recording a Turn on the Server](./chat-streaming.md#recording-a-turn-on-the-server)) |
+| `src/qdash/api/services/chat_turn_runs.py` | Each chat turn's stream as a background task the HTTP responses subscribe to, which records the turn |
+| `src/qdash/api/services/chat_transcript.py` | The server's fold of a turn's SSE events into stored messages, and the transcript digest |
 | `agent-runtime/src/chat-registry.ts` | Per-session chat registry: QDash tools, copilot tools, preferences, page context, workspace tools, and Code Mode |
 | `agent-runtime/src/compaction.ts` | Compaction summaries sized to the chat's model, and the compaction failure message |
 | `agent-runtime/src/allowed-tools.ts` | Which pi-qdash tools the chat offers, which need approval, which scripts may call, and which are deferred |
