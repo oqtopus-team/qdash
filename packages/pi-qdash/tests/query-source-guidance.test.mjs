@@ -25,7 +25,7 @@ async function fakeQDash(t, { fileContentStatus } = {}) {
       if (path.startsWith("/")) return send(400, { detail: "Path outside allowed directory" });
       return send(404, { detail: `File not found: ${path}` });
     }
-    if (url.pathname === "/copilot/source/file") {
+    if (url.pathname === "/agent/source/file") {
       if (url.searchParams.get("path") !== EXECUTOR) return send(404, { detail: "Could not tell which source root the path belongs to; pass root" });
       return send(200, {
         root: "qdash",
@@ -38,7 +38,7 @@ async function fakeQDash(t, { fileContentStatus } = {}) {
         revision: null,
       });
     }
-    if (url.pathname === "/copilot/source/search") {
+    if (url.pathname === "/agent/source/search") {
       const path = "workflow/new_location/executor.py";
       const query = url.searchParams.get("query");
       const prefix = url.searchParams.get("path_prefix") ?? "";
@@ -46,7 +46,7 @@ async function fakeQDash(t, { fileContentStatus } = {}) {
         matches: path.startsWith(prefix) && path.includes(query)
           ? [{ root: "qdash", path, line: null, text: null }] : [] });
     }
-    if (url.pathname === "/copilot/source/roots") return send(200, { roots: [], missing_dependencies: ["qubex"], execution_revision_recorded: false });
+    if (url.pathname === "/agent/source/roots") return send(200, { roots: [], missing_dependencies: ["qubex"], execution_revision_recorded: false });
     return send(404, { detail: "unexpected" });
   });
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));

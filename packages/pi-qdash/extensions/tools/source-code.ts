@@ -124,7 +124,7 @@ function sourceRefusal(error: unknown): string | undefined {
   const message = String(value.message ?? `HTTP ${status}`);
   // A bare FastAPI-style 404 can indicate an unavailable route or proxy mismatch.
   if (status === 404 && /:\s*Not Found$/.test(message)) {
-    return `${message}. The /copilot/source endpoint may be unavailable. Check API routing/proxy configuration and update the API image if it predates source access.`;
+    return `${message}. The /agent/source endpoint may be unavailable. Check API routing/proxy configuration and update the API image if it predates source access.`;
   }
   return message;
 }

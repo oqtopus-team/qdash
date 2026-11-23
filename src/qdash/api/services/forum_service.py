@@ -411,7 +411,7 @@ class ForumService:
         Falls back to a JSON code block when the conversion returns empty.
         Returns ``None`` only if even the fallback fails.
         """
-        from qdash.copilot.blocks import blocks_to_markdown
+        from qdash.agent.blocks import blocks_to_markdown
 
         markdown_content = blocks_to_markdown(result)
         if markdown_content:

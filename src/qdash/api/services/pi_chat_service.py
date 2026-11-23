@@ -1,4 +1,4 @@
-"""Bridge between the Copilot chat SSE endpoint and the Pi Agent Runtime.
+"""Bridge between the Agent chat SSE endpoint and the Pi Agent Runtime.
 
 The runtime speaks NDJSON; this module owns the translation into QDash's SSE
 contract. Pi owns its durable execution state; MongoDB owns the user-facing
@@ -21,8 +21,11 @@ from typing import TYPE_CHECKING, Any, Protocol
 import httpx
 from pydantic import ValidationError
 
+from qdash.agent.contracts.models import ChatTurnStart
+from qdash.agent.prompts.models import TaskChatPromptOptions
+from qdash.agent.prompts.task_chat import build_language_instruction, build_task_chat_prompt
 from qdash.api.lib.sse import sse_event
-from qdash.api.services.copilot_chat_session_service import (
+from qdash.api.services.agent_chat_session_service import (
     BranchRefusedError,
     ForkedBranch,
     ForkSettledError,
@@ -31,20 +34,17 @@ from qdash.api.services.copilot_chat_session_service import (
     store_generation,
     store_in_use,
 )
-from qdash.api.services.copilot_chat_session_service import (
+from qdash.api.services.agent_chat_session_service import (
     runtime_target as _stored_runtime_target,
 )
-from qdash.copilot.contracts.models import ChatTurnStart
-from qdash.copilot.prompts.models import TaskChatPromptOptions
-from qdash.copilot.prompts.task_chat import build_language_instruction, build_task_chat_prompt
-from qdash.dbmodel.copilot_chat_session import CopilotChatSessionDocument
+from qdash.dbmodel.agent_chat_session import AgentChatSessionDocument
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, AsyncIterable
 
-    from qdash.copilot.config import CopilotConfig
-    from qdash.copilot.contracts import ChatRequest, TaskContextBundle
-    from qdash.copilot.contracts.models import ApprovalDecision
+    from qdash.agent.config import AgentConfig
+    from qdash.agent.contracts import ChatRequest, TaskContextBundle
+    from qdash.agent.contracts.models import ApprovalDecision
 
 logger = logging.getLogger(__name__)
 
@@ -86,17 +86,17 @@ def tool_label(name: str) -> str:
     return name.removeprefix("qdash_").replace("_", " ").capitalize() or name
 
 
-def thinking_level(config: CopilotConfig) -> str | None:
+def thinking_level(config: AgentConfig) -> str | None:
     """Map the configured model's reasoning effort onto a Pi thinking level."""
     effort = config.model.reasoning_effort
     return _THINKING_LEVELS.get(effort.lower()) if effort else None
 
 
-def _find_session(username: str, session_id: str) -> CopilotChatSessionDocument | None:
+def _find_session(username: str, session_id: str) -> AgentChatSessionDocument | None:
     """Find one persisted session from synchronous Bunnet code."""
-    return CopilotChatSessionDocument.find_one(
-        CopilotChatSessionDocument.username == username,
-        CopilotChatSessionDocument.session_id == session_id,
+    return AgentChatSessionDocument.find_one(
+        AgentChatSessionDocument.username == username,
+        AgentChatSessionDocument.session_id == session_id,
     ).run()
 
 
@@ -110,7 +110,7 @@ def _ensure_agent_session(username: str, session_id: str) -> None:
     from pymongo.errors import DuplicateKeyError
 
     try:
-        CopilotChatSessionDocument(
+        AgentChatSessionDocument(
             username=username,
             session_id=session_id,
             title="Analysis",
@@ -549,17 +549,17 @@ async def skills() -> dict[str, Any]:
 
 
 def user_instructions(username: str) -> str | None:
-    """The user's own Copilot instructions, when they set any (chat only)."""
+    """The user's own Agent instructions, when they set any (chat only)."""
     from qdash.dbmodel.user import UserDocument
 
     user = UserDocument.find_one({"username": username}).run()
-    text = (getattr(user, "copilot_instructions", None) or "").strip() if user else ""
+    text = (getattr(user, "agent_instructions", None) or "").strip() if user else ""
     return text or None
 
 
 def _request_payload(
     request: ChatRequest,
-    config: CopilotConfig,
+    config: AgentConfig,
     username: str,
     target: RuntimeTarget | None = None,
 ) -> dict[str, Any]:
@@ -642,7 +642,7 @@ def collect_task_figures(bundle: TaskContextBundle) -> list[dict[str, str]]:
 def task_opening_context(
     *,
     bundle: TaskContextBundle,
-    config: CopilotConfig,
+    config: AgentConfig,
     language_instruction: str,
 ) -> str:
     """The context that opens a chat about one task result, up to the user's message.
@@ -678,7 +678,7 @@ def task_opening_context(
 def task_opening_message(
     *,
     bundle: TaskContextBundle,
-    config: CopilotConfig,
+    config: AgentConfig,
     user_message: str,
     language_instruction: str,
 ) -> str:
@@ -696,7 +696,7 @@ def task_opening_message(
 
 async def stream(
     request: ChatRequest,
-    config: CopilotConfig,
+    config: AgentConfig,
     *,
     username: str,
     auth: QDashAuth,
@@ -1317,7 +1317,7 @@ async def thread_reply(
     *,
     username: str,
     auth: QDashAuth,
-    config: CopilotConfig,
+    config: AgentConfig,
     scope: str,
     instruction: str,
     history: list[dict[str, str]],
@@ -1367,7 +1367,7 @@ async def complete_once(
     *,
     username: str,
     auth: QDashAuth,
-    config: CopilotConfig,
+    config: AgentConfig,
     scope: str,
     prompt: str,
 ) -> str:

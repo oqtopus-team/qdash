@@ -5894,14 +5894,14 @@
         }
       }
     },
-    "/copilot/config": {
+    "/agent/config": {
       "get": {
         "tags": [
-          "copilot"
+          "agent"
         ],
-        "summary": "Get Copilot configuration",
-        "description": "Get Copilot configuration for the metrics assistant.\n\nRetrieves the Copilot configuration from YAML, including:\n- enabled: Whether Copilot is enabled\n- chat_models: The planner models the UI offers\n- evaluation_models: The calibration evaluation model\n\nReturns\n-------\ndict[str, Any]\n    Copilot configuration dictionary",
-        "operationId": "getCopilotConfig",
+        "summary": "Get Agent configuration",
+        "description": "Get Agent configuration for the metrics assistant.\n\nRetrieves the Agent configuration from YAML, including:\n- enabled: Whether Agent is enabled\n- chat_models: The planner models the UI offers\n- evaluation_models: The calibration evaluation model\n\nReturns\n-------\ndict[str, Any]\n    Agent configuration dictionary",
+        "operationId": "getAgentConfig",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -5910,7 +5910,7 @@
                 "schema": {
                   "additionalProperties": true,
                   "type": "object",
-                  "title": "Response Getcopilotconfig"
+                  "title": "Response Getagentconfig"
                 }
               }
             }
@@ -5923,21 +5923,21 @@
         ]
       }
     },
-    "/copilot/chat/sessions": {
+    "/agent/chat/sessions": {
       "get": {
         "tags": [
-          "copilot"
+          "agent"
         ],
         "summary": "List the current user's chat sessions",
         "description": "Return all persisted chat sessions owned by the current user.\n\nFirst cleans up, best effort, what failed requests of the user left: a\nbranch still pending after its request's lease, and a deleted chat's store\nthe runtime could not remove yet.",
-        "operationId": "listCopilotChatSessions",
+        "operationId": "listAgentChatSessions",
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ListCopilotChatSessionsResponse"
+                  "$ref": "#/components/schemas/ListAgentChatSessionsResponse"
                 }
               }
             }
@@ -5951,16 +5951,16 @@
       },
       "post": {
         "tags": [
-          "copilot"
+          "agent"
         ],
         "summary": "Create a new chat session",
         "description": "Create a new chat session owned by the current user.",
-        "operationId": "createCopilotChatSession",
+        "operationId": "createAgentChatSession",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateCopilotChatSessionRequest"
+                "$ref": "#/components/schemas/CreateAgentChatSessionRequest"
               }
             }
           },
@@ -5972,7 +5972,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CopilotChatSessionResponse"
+                  "$ref": "#/components/schemas/AgentChatSessionResponse"
                 }
               }
             }
@@ -5995,14 +5995,14 @@
         ]
       }
     },
-    "/copilot/chat/sessions/{session_id}": {
+    "/agent/chat/sessions/{session_id}": {
       "get": {
         "tags": [
-          "copilot"
+          "agent"
         ],
         "summary": "Get a chat session with messages",
         "description": "Return one chat session including the full message list.\n\nThe session's ``turn`` is named only in the project it was sent from, like\n``/chat/active``: the project the request names (``X-Project-Id``, else the\nuser's default), and only one the user may read. Elsewhere it is null. As the\nreply depends on that project, no cache keeps it for a request from another.",
-        "operationId": "getCopilotChatSession",
+        "operationId": "getAgentChatSession",
         "security": [
           {
             "HTTPBearer": []
@@ -6041,7 +6041,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CopilotChatSessionResponse"
+                  "$ref": "#/components/schemas/AgentChatSessionResponse"
                 }
               }
             }
@@ -6060,11 +6060,11 @@
       },
       "patch": {
         "tags": [
-          "copilot"
+          "agent"
         ],
         "summary": "Update a chat session",
         "description": "Update title, context, or messages of an existing chat session.",
-        "operationId": "updateCopilotChatSession",
+        "operationId": "updateAgentChatSession",
         "security": [
           {
             "HTTPBearer": []
@@ -6086,7 +6086,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/UpdateCopilotChatSessionRequest"
+                "$ref": "#/components/schemas/UpdateAgentChatSessionRequest"
               }
             }
           }
@@ -6097,7 +6097,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CopilotChatSessionResponse"
+                  "$ref": "#/components/schemas/AgentChatSessionResponse"
                 }
               }
             }
@@ -6116,11 +6116,11 @@
       },
       "delete": {
         "tags": [
-          "copilot"
+          "agent"
         ],
         "summary": "Delete a chat session",
         "description": "Delete a chat session owned by the current user.\n\nThe chat's own running turn is stopped; a turn of another branch is not.\nIts runtime store and workspace are removed with the last session that uses\nthem: a chat and its branches share one, so it stays while one is left.\nWhen the runtime cannot remove the store yet, the deleted chat is kept,\nhidden, and the removal is retried by deleting it again or by the next\nlisting of the user's chats.",
-        "operationId": "deleteCopilotChatSession",
+        "operationId": "deleteAgentChatSession",
         "security": [
           {
             "HTTPBearer": []
@@ -6147,7 +6147,7 @@
                   "additionalProperties": {
                     "type": "boolean"
                   },
-                  "title": "Response Deletecopilotchatsession"
+                  "title": "Response Deleteagentchatsession"
                 }
               }
             }
@@ -6165,14 +6165,14 @@
         }
       }
     },
-    "/copilot/chat/sessions/{session_id}/branches": {
+    "/agent/chat/sessions/{session_id}/branches": {
       "post": {
         "tags": [
-          "copilot"
+          "agent"
         ],
         "summary": "Branch a chat session from one of its answers",
         "description": "Start a new chat session from a saved answer of one of the user's chats.\n\nThe new session continues the conversation as it was at that answer, in the\nsame runtime store: it shares the chat's current workspace files, and the\nchat and its branches answer one at a time. Only a completed answer the chat\nsaved with its runtime entry ID qualifies, and only while nothing runs in\nthe chat or its branches. The same request again returns the same session.",
-        "operationId": "branchCopilotChatSession",
+        "operationId": "branchAgentChatSession",
         "security": [
           {
             "HTTPBearer": []
@@ -6210,7 +6210,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateCopilotChatBranchRequest"
+                "$ref": "#/components/schemas/CreateAgentChatBranchRequest"
               }
             }
           }
@@ -6221,7 +6221,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CopilotChatSessionResponse"
+                  "$ref": "#/components/schemas/AgentChatSessionResponse"
                 }
               }
             }
@@ -6239,14 +6239,14 @@
         }
       }
     },
-    "/copilot/source/roots": {
+    "/agent/source/roots": {
       "get": {
         "tags": [
-          "copilot"
+          "agent"
         ],
-        "summary": "List the source trees the Copilot can read",
+        "summary": "List the source trees the Agent can read",
         "description": "QDash and allowlisted dependency source served read-only, with known revisions.",
-        "operationId": "listCopilotSourceRoots",
+        "operationId": "listAgentSourceRoots",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -6266,14 +6266,14 @@
         ]
       }
     },
-    "/copilot/source/search": {
+    "/agent/source/search": {
       "get": {
         "tags": [
-          "copilot"
+          "agent"
         ],
-        "summary": "Search the source the Copilot can read",
+        "summary": "Search the source the Agent can read",
         "description": "Literal search in file contents or file paths; read-only and size-limited.",
-        "operationId": "searchCopilotSource",
+        "operationId": "searchAgentSource",
         "security": [
           {
             "HTTPBearer": []
@@ -6383,14 +6383,14 @@
         }
       }
     },
-    "/copilot/source/file": {
+    "/agent/source/file": {
       "get": {
         "tags": [
-          "copilot"
+          "agent"
         ],
         "summary": "Read a line range of a source file",
         "description": "Read up to 400 numbered lines; without ``root`` the path is matched as a traceback prints it.",
-        "operationId": "getCopilotSourceFile",
+        "operationId": "getAgentSourceFile",
         "security": [
           {
             "HTTPBearer": []
@@ -6478,21 +6478,21 @@
         }
       }
     },
-    "/copilot/preferences": {
+    "/agent/preferences": {
       "get": {
         "tags": [
-          "copilot"
+          "agent"
         ],
-        "summary": "Get the current user's Copilot preferences",
+        "summary": "Get the current user's Agent preferences",
         "description": "The instructions this user added to their chats.",
-        "operationId": "getCopilotPreferences",
+        "operationId": "getAgentPreferences",
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CopilotPreferences"
+                  "$ref": "#/components/schemas/AgentPreferences"
                 }
               }
             }
@@ -6506,16 +6506,16 @@
       },
       "put": {
         "tags": [
-          "copilot"
+          "agent"
         ],
-        "summary": "Update the current user's Copilot preferences",
+        "summary": "Update the current user's Agent preferences",
         "description": "Replace this user's chat instructions; an empty text clears them.",
-        "operationId": "updateCopilotPreferences",
+        "operationId": "updateAgentPreferences",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CopilotPreferencesUpdate"
+                "$ref": "#/components/schemas/AgentPreferencesUpdate"
               }
             }
           },
@@ -6527,7 +6527,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CopilotPreferences"
+                  "$ref": "#/components/schemas/AgentPreferences"
                 }
               }
             }
@@ -6550,21 +6550,21 @@
         ]
       }
     },
-    "/copilot/system-prompt": {
+    "/agent/system-prompt": {
       "get": {
         "tags": [
-          "copilot"
+          "agent"
         ],
         "summary": "Show what QDash tells the chat model",
         "description": "QDash's chat system prompt and this user's instructions as appended to it (read-only).",
-        "operationId": "getCopilotSystemPrompt",
+        "operationId": "getAgentSystemPrompt",
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CopilotSystemPrompt"
+                  "$ref": "#/components/schemas/AgentSystemPrompt"
                 }
               }
             }
@@ -6577,21 +6577,21 @@
         ]
       }
     },
-    "/copilot/skills": {
+    "/agent/skills": {
       "get": {
         "tags": [
-          "copilot"
+          "agent"
         ],
         "summary": "List the skills a chat message can invoke",
-        "description": "Skills loaded by the Copilot runtime; a message starting ``/skill:<name>`` runs one.",
-        "operationId": "listCopilotSkills",
+        "description": "Skills loaded by the Agent runtime; a message starting ``/skill:<name>`` runs one.",
+        "operationId": "listAgentSkills",
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CopilotSkillList"
+                  "$ref": "#/components/schemas/AgentSkillList"
                 }
               }
             }
@@ -21551,6 +21551,339 @@
         "title": "AgentCandidateSetCommitResponse",
         "description": "Audited all-at-once QDash commit of the final candidate set."
       },
+      "AgentChatBranchSchema": {
+        "properties": {
+          "source_session_id": {
+            "type": "string",
+            "title": "Source Session Id",
+            "description": "The chat session it was branched from"
+          },
+          "source_entry_id": {
+            "type": "string",
+            "title": "Source Entry Id",
+            "description": "The answer it was branched at"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_session_id",
+          "source_entry_id"
+        ],
+        "title": "AgentChatBranchSchema",
+        "description": "Where a branched chat came from."
+      },
+      "AgentChatMessageSchema": {
+        "properties": {
+          "role": {
+            "type": "string",
+            "title": "Role",
+            "description": "\"user\" or \"assistant\""
+          },
+          "content": {
+            "type": "string",
+            "title": "Content",
+            "description": "Message content"
+          },
+          "attached_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attached Image"
+          },
+          "steer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentChatSteerSchema"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Set on a user message sent while an answer was written"
+          },
+          "entry_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9]{1,15}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entry Id",
+            "description": "An assistant answer's entry in the runtime's transcript, from the chat stream's result; the chat can be branched from that answer"
+          },
+          "turn_request_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Request Id",
+            "description": "The chat turn this message belongs to. The server records the latest turn's messages itself; a save cannot replace them."
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "role",
+          "content"
+        ],
+        "title": "AgentChatMessageSchema",
+        "description": "One message inside an agent chat session."
+      },
+      "AgentChatSessionResponse": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "context": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context"
+          },
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/AgentChatMessageSchema"
+            },
+            "type": "array",
+            "title": "Messages"
+          },
+          "branch": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentChatBranchSchema"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "turn": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentChatTurnSchema"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The latest turn the server records for the chat"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "title",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "AgentChatSessionResponse",
+        "description": "Full session payload returned to the client."
+      },
+      "AgentChatSessionSummary": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "context": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context"
+          },
+          "message_count": {
+            "type": "integer",
+            "title": "Message Count",
+            "default": 0
+          },
+          "branch": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentChatBranchSchema"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "title",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "AgentChatSessionSummary",
+        "description": "Lightweight session entry used in the session list."
+      },
+      "AgentChatSteerSchema": {
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Request Id"
+          },
+          "entry_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entry Id"
+          },
+          "placement": {
+            "type": "string",
+            "enum": [
+              "exact",
+              "approximate"
+            ],
+            "title": "Placement",
+            "description": "exact: the chat saw where it landed. approximate: it was confirmed after the answer it interrupted was saved as one message, and follows that message.",
+            "default": "exact"
+          }
+        },
+        "type": "object",
+        "required": [
+          "request_id"
+        ],
+        "title": "AgentChatSteerSchema",
+        "description": "Where a user message sent while an answer was written landed in the conversation."
+      },
+      "AgentChatTurnSchema": {
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "title": "Request Id",
+            "description": "The turn's request ID"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id",
+            "description": "The project it was sent from"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "running",
+              "completed",
+              "failed",
+              "stopped",
+              "noop"
+            ],
+            "title": "Status",
+            "description": "Whether the turn still runs, or how it ended"
+          },
+          "start_index": {
+            "type": "integer",
+            "title": "Start Index",
+            "description": "How many messages precede the turn"
+          },
+          "continuing": {
+            "type": "boolean",
+            "title": "Continuing",
+            "description": "A continue: no user message",
+            "default": false
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "request_id",
+          "status",
+          "start_index"
+        ],
+        "title": "AgentChatTurnSchema",
+        "description": "The latest turn the server records for a chat, as a reloaded page needs it.\n\nA page that reattaches to a turn, or follows one another window started, finds\nthe turn's messages by ``request_id`` (each carries it as ``turn_request_id``)\nand uses ``status`` to tell a running turn from one whose end is saved."
+      },
       "AgentCheckpointCandidate": {
         "properties": {
           "action_id": {
@@ -22702,6 +23035,39 @@
         ],
         "title": "AgentPlannerVerdictRecord",
         "description": "One evaluation verdict the planner remembers for its stop rules."
+      },
+      "AgentPreferences": {
+        "properties": {
+          "instructions": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "Instructions",
+            "description": "Instructions added to every chat of this user (style, language, formats). They apply to chat only, not to evaluations or forum replies, and cannot override the approval of write operations.",
+            "default": ""
+          },
+          "max_instructions_chars": {
+            "type": "integer",
+            "title": "Max Instructions Chars",
+            "description": "Longest instructions accepted",
+            "default": 2000
+          }
+        },
+        "type": "object",
+        "title": "AgentPreferences",
+        "description": "The current user's Agent preferences."
+      },
+      "AgentPreferencesUpdate": {
+        "properties": {
+          "instructions": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "Instructions",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "AgentPreferencesUpdate",
+        "description": "Replace the current user's Agent instructions; empty clears them."
       },
       "AgentQualityGateScope": {
         "type": "string",
@@ -24250,6 +24616,76 @@
         "title": "AgentSessionStopRecord",
         "description": "Who stopped a session with a stop request, why, and when.\n\nStored by the one update that moves the session to ``cancelled``. A stop ends the\nsession's authority to start, commit, or apply anything; it does not cancel a\nmeasurement, commit, or backend apply that passed the session gate before it."
       },
+      "AgentSkill": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Skill name, as typed after /skill:"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "description": "What the skill is for",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "AgentSkill",
+        "description": "A skill the chat can run; the user invokes it with ``/skill:<name>``."
+      },
+      "AgentSkillList": {
+        "properties": {
+          "skills": {
+            "items": {
+              "$ref": "#/components/schemas/AgentSkill"
+            },
+            "type": "array",
+            "title": "Skills"
+          }
+        },
+        "type": "object",
+        "title": "AgentSkillList",
+        "description": "The skills the Agent runtime has loaded, for the chat composer's / menu."
+      },
+      "AgentSystemPrompt": {
+        "properties": {
+          "system_prompt": {
+            "type": "string",
+            "title": "System Prompt",
+            "description": "QDash's system prompt for chats, set by the application"
+          },
+          "user_preferences": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Preferences",
+            "description": "This user's instructions as they are appended to it, or None when unset"
+          },
+          "tools": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tools",
+            "description": "Tools offered to the chat; their descriptions are sent with each request"
+          }
+        },
+        "type": "object",
+        "required": [
+          "system_prompt"
+        ],
+        "title": "AgentSystemPrompt",
+        "description": "What QDash tells the chat model, read-only: its system prompt and this user's part."
+      },
       "AllConfigResponse": {
         "properties": {
           "ui": {
@@ -24260,10 +24696,10 @@
             "type": "object",
             "title": "Metrics"
           },
-          "copilot": {
+          "agent": {
             "additionalProperties": true,
             "type": "object",
-            "title": "Copilot"
+            "title": "Agent"
           }
         },
         "type": "object",
@@ -26472,442 +26908,6 @@
         "title": "CooldownWiringEventResponse",
         "description": "One wiring-history entry for a cool-down."
       },
-      "CopilotChatBranchSchema": {
-        "properties": {
-          "source_session_id": {
-            "type": "string",
-            "title": "Source Session Id",
-            "description": "The chat session it was branched from"
-          },
-          "source_entry_id": {
-            "type": "string",
-            "title": "Source Entry Id",
-            "description": "The answer it was branched at"
-          }
-        },
-        "type": "object",
-        "required": [
-          "source_session_id",
-          "source_entry_id"
-        ],
-        "title": "CopilotChatBranchSchema",
-        "description": "Where a branched chat came from."
-      },
-      "CopilotChatMessageSchema": {
-        "properties": {
-          "role": {
-            "type": "string",
-            "title": "Role",
-            "description": "\"user\" or \"assistant\""
-          },
-          "content": {
-            "type": "string",
-            "title": "Content",
-            "description": "Message content"
-          },
-          "attached_image": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Attached Image"
-          },
-          "steer": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/CopilotChatSteerSchema"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Set on a user message sent while an answer was written"
-          },
-          "entry_id": {
-            "anyOf": [
-              {
-                "type": "string",
-                "pattern": "^[0-9]{1,15}$"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Entry Id",
-            "description": "An assistant answer's entry in the runtime's transcript, from the chat stream's result; the chat can be branched from that answer"
-          },
-          "turn_request_id": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 200
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Turn Request Id",
-            "description": "The chat turn this message belongs to. The server records the latest turn's messages itself; a save cannot replace them."
-          },
-          "created_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Created At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "role",
-          "content"
-        ],
-        "title": "CopilotChatMessageSchema",
-        "description": "One message inside a copilot chat session."
-      },
-      "CopilotChatSessionResponse": {
-        "properties": {
-          "session_id": {
-            "type": "string",
-            "title": "Session Id"
-          },
-          "title": {
-            "type": "string",
-            "title": "Title"
-          },
-          "context": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Context"
-          },
-          "messages": {
-            "items": {
-              "$ref": "#/components/schemas/CopilotChatMessageSchema"
-            },
-            "type": "array",
-            "title": "Messages"
-          },
-          "branch": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/CopilotChatBranchSchema"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "turn": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/CopilotChatTurnSchema"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "The latest turn the server records for the chat"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          },
-          "updated_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Updated At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "session_id",
-          "title",
-          "created_at",
-          "updated_at"
-        ],
-        "title": "CopilotChatSessionResponse",
-        "description": "Full session payload returned to the client."
-      },
-      "CopilotChatSessionSummary": {
-        "properties": {
-          "session_id": {
-            "type": "string",
-            "title": "Session Id"
-          },
-          "title": {
-            "type": "string",
-            "title": "Title"
-          },
-          "context": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Context"
-          },
-          "message_count": {
-            "type": "integer",
-            "title": "Message Count",
-            "default": 0
-          },
-          "branch": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/CopilotChatBranchSchema"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          },
-          "updated_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Updated At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "session_id",
-          "title",
-          "created_at",
-          "updated_at"
-        ],
-        "title": "CopilotChatSessionSummary",
-        "description": "Lightweight session entry used in the session list."
-      },
-      "CopilotChatSteerSchema": {
-        "properties": {
-          "request_id": {
-            "type": "string",
-            "maxLength": 200,
-            "minLength": 1,
-            "title": "Request Id"
-          },
-          "entry_id": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 64
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Entry Id"
-          },
-          "placement": {
-            "type": "string",
-            "enum": [
-              "exact",
-              "approximate"
-            ],
-            "title": "Placement",
-            "description": "exact: the chat saw where it landed. approximate: it was confirmed after the answer it interrupted was saved as one message, and follows that message.",
-            "default": "exact"
-          }
-        },
-        "type": "object",
-        "required": [
-          "request_id"
-        ],
-        "title": "CopilotChatSteerSchema",
-        "description": "Where a user message sent while an answer was written landed in the conversation."
-      },
-      "CopilotChatTurnSchema": {
-        "properties": {
-          "request_id": {
-            "type": "string",
-            "title": "Request Id",
-            "description": "The turn's request ID"
-          },
-          "project_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Project Id",
-            "description": "The project it was sent from"
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "running",
-              "completed",
-              "failed",
-              "stopped",
-              "noop"
-            ],
-            "title": "Status",
-            "description": "Whether the turn still runs, or how it ended"
-          },
-          "start_index": {
-            "type": "integer",
-            "title": "Start Index",
-            "description": "How many messages precede the turn"
-          },
-          "continuing": {
-            "type": "boolean",
-            "title": "Continuing",
-            "description": "A continue: no user message",
-            "default": false
-          },
-          "started_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Started At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "request_id",
-          "status",
-          "start_index"
-        ],
-        "title": "CopilotChatTurnSchema",
-        "description": "The latest turn the server records for a chat, as a reloaded page needs it.\n\nA page that reattaches to a turn, or follows one another window started, finds\nthe turn's messages by ``request_id`` (each carries it as ``turn_request_id``)\nand uses ``status`` to tell a running turn from one whose end is saved."
-      },
-      "CopilotPreferences": {
-        "properties": {
-          "instructions": {
-            "type": "string",
-            "maxLength": 2000,
-            "title": "Instructions",
-            "description": "Instructions added to every chat of this user (style, language, formats). They apply to chat only, not to evaluations or forum replies, and cannot override the approval of write operations.",
-            "default": ""
-          },
-          "max_instructions_chars": {
-            "type": "integer",
-            "title": "Max Instructions Chars",
-            "description": "Longest instructions accepted",
-            "default": 2000
-          }
-        },
-        "type": "object",
-        "title": "CopilotPreferences",
-        "description": "The current user's Copilot preferences."
-      },
-      "CopilotPreferencesUpdate": {
-        "properties": {
-          "instructions": {
-            "type": "string",
-            "maxLength": 2000,
-            "title": "Instructions",
-            "default": ""
-          }
-        },
-        "type": "object",
-        "title": "CopilotPreferencesUpdate",
-        "description": "Replace the current user's Copilot instructions; empty clears them."
-      },
-      "CopilotSkill": {
-        "properties": {
-          "name": {
-            "type": "string",
-            "title": "Name",
-            "description": "Skill name, as typed after /skill:"
-          },
-          "description": {
-            "type": "string",
-            "title": "Description",
-            "description": "What the skill is for",
-            "default": ""
-          }
-        },
-        "type": "object",
-        "required": [
-          "name"
-        ],
-        "title": "CopilotSkill",
-        "description": "A skill the chat can run; the user invokes it with ``/skill:<name>``."
-      },
-      "CopilotSkillList": {
-        "properties": {
-          "skills": {
-            "items": {
-              "$ref": "#/components/schemas/CopilotSkill"
-            },
-            "type": "array",
-            "title": "Skills"
-          }
-        },
-        "type": "object",
-        "title": "CopilotSkillList",
-        "description": "The skills the Copilot runtime has loaded, for the chat composer's / menu."
-      },
-      "CopilotSystemPrompt": {
-        "properties": {
-          "system_prompt": {
-            "type": "string",
-            "title": "System Prompt",
-            "description": "QDash's system prompt for chats, set by the application"
-          },
-          "user_preferences": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "User Preferences",
-            "description": "This user's instructions as they are appended to it, or None when unset"
-          },
-          "tools": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Tools",
-            "description": "Tools offered to the chat; their descriptions are sent with each request"
-          }
-        },
-        "type": "object",
-        "required": [
-          "system_prompt"
-        ],
-        "title": "CopilotSystemPrompt",
-        "description": "What QDash tells the chat model, read-only: its system prompt and this user's part."
-      },
       "Coupling": {
         "properties": {
           "control": {
@@ -26989,6 +26989,69 @@
         ],
         "title": "CouplingResponse",
         "description": "Response model for a single coupling."
+      },
+      "CreateAgentChatBranchRequest": {
+        "properties": {
+          "entry_id": {
+            "type": "string",
+            "pattern": "^[0-9]{1,15}$",
+            "title": "Entry Id",
+            "description": "The saved answer to branch at: its runtime entry ID"
+          },
+          "target_session_id": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Target Session Id",
+            "description": "Client-generated ID of the new chat session; sending the same request again returns the same branch"
+          }
+        },
+        "type": "object",
+        "required": [
+          "entry_id",
+          "target_session_id"
+        ],
+        "title": "CreateAgentChatBranchRequest",
+        "description": "Body for POST /agent/chat/sessions/{session_id}/branches."
+      },
+      "CreateAgentChatSessionRequest": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "title": "Session Id",
+            "description": "Client-generated session identifier"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "default": "New Chat"
+          },
+          "context": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context"
+          },
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/AgentChatMessageSchema"
+            },
+            "type": "array",
+            "title": "Messages"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id"
+        ],
+        "title": "CreateAgentChatSessionRequest",
+        "description": "Body for POST /agent/chat/sessions."
       },
       "CreateAgentInterventionRequest": {
         "properties": {
@@ -27327,69 +27390,6 @@
         ],
         "title": "CreateChipResponse",
         "description": "A created chip plus what happened to its configuration directory."
-      },
-      "CreateCopilotChatBranchRequest": {
-        "properties": {
-          "entry_id": {
-            "type": "string",
-            "pattern": "^[0-9]{1,15}$",
-            "title": "Entry Id",
-            "description": "The saved answer to branch at: its runtime entry ID"
-          },
-          "target_session_id": {
-            "type": "string",
-            "maxLength": 200,
-            "minLength": 1,
-            "title": "Target Session Id",
-            "description": "Client-generated ID of the new chat session; sending the same request again returns the same branch"
-          }
-        },
-        "type": "object",
-        "required": [
-          "entry_id",
-          "target_session_id"
-        ],
-        "title": "CreateCopilotChatBranchRequest",
-        "description": "Body for POST /copilot/chat/sessions/{session_id}/branches."
-      },
-      "CreateCopilotChatSessionRequest": {
-        "properties": {
-          "session_id": {
-            "type": "string",
-            "title": "Session Id",
-            "description": "Client-generated session identifier"
-          },
-          "title": {
-            "type": "string",
-            "title": "Title",
-            "default": "New Chat"
-          },
-          "context": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Context"
-          },
-          "messages": {
-            "items": {
-              "$ref": "#/components/schemas/CopilotChatMessageSchema"
-            },
-            "type": "array",
-            "title": "Messages"
-          }
-        },
-        "type": "object",
-        "required": [
-          "session_id"
-        ],
-        "title": "CreateCopilotChatSessionRequest",
-        "description": "Body for POST /copilot/chat/sessions."
       },
       "CreateEvaluationRunRequest": {
         "properties": {
@@ -33138,6 +33138,23 @@
         "title": "ListAgentCandidatesResponse",
         "description": "Task-result candidates and their deterministic gate decisions."
       },
+      "ListAgentChatSessionsResponse": {
+        "properties": {
+          "sessions": {
+            "items": {
+              "$ref": "#/components/schemas/AgentChatSessionSummary"
+            },
+            "type": "array",
+            "title": "Sessions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sessions"
+        ],
+        "title": "ListAgentChatSessionsResponse",
+        "description": "Response for GET /agent/chat/sessions."
+      },
       "ListAgentDecisionsResponse": {
         "properties": {
           "items": {
@@ -33353,23 +33370,6 @@
           "cooldowns"
         ],
         "title": "ListCooldownsResponse"
-      },
-      "ListCopilotChatSessionsResponse": {
-        "properties": {
-          "sessions": {
-            "items": {
-              "$ref": "#/components/schemas/CopilotChatSessionSummary"
-            },
-            "type": "array",
-            "title": "Sessions"
-          }
-        },
-        "type": "object",
-        "required": [
-          "sessions"
-        ],
-        "title": "ListCopilotChatSessionsResponse",
-        "description": "Response for GET /copilot/chat/sessions."
       },
       "ListCouplingsResponse": {
         "properties": {
@@ -40188,7 +40188,7 @@
           "kind"
         ],
         "title": "SourceRootResponse",
-        "description": "One source tree the Copilot can search and read."
+        "description": "One source tree the Agent can search and read."
       },
       "SourceSearchMatch": {
         "properties": {
@@ -42911,6 +42911,50 @@
         "title": "UnreadNotificationCountResponse",
         "description": "Unread notification count."
       },
+      "UpdateAgentChatSessionRequest": {
+        "properties": {
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "context": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context"
+          },
+          "messages": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/AgentChatMessageSchema"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Messages"
+          }
+        },
+        "type": "object",
+        "title": "UpdateAgentChatSessionRequest",
+        "description": "Body for PATCH /agent/chat/sessions/{session_id}."
+      },
       "UpdateChipRequest": {
         "properties": {
           "topology_id": {
@@ -42956,50 +43000,6 @@
         "type": "object",
         "title": "UpdateChipRequest",
         "description": "Body for updating chip metadata. All fields optional."
-      },
-      "UpdateCopilotChatSessionRequest": {
-        "properties": {
-          "title": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Title"
-          },
-          "context": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Context"
-          },
-          "messages": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/CopilotChatMessageSchema"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Messages"
-          }
-        },
-        "type": "object",
-        "title": "UpdateCopilotChatSessionRequest",
-        "description": "Body for PATCH /copilot/chat/sessions/{session_id}."
       },
       "UpdateScheduleRequest": {
         "properties": {

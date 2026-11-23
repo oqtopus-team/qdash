@@ -45,7 +45,7 @@ import {
   type FormatRun,
   type FormatterEditor,
 } from "@/lib/pythonFormatter";
-import type { MetricScriptEditorContext } from "@/types/copilotChat";
+import type { MetricScriptEditorContext } from "@/types/agentChat";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
 
 import { describeMetricError } from "./errors";

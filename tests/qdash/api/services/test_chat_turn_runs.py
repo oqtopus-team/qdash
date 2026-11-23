@@ -12,21 +12,21 @@ from typing import Any
 
 import pytest
 
+from qdash.agent.contracts import ChatRequest, ChatTurnStart
 from qdash.api.lib.sse import sse_event
-from qdash.api.schemas.copilot_chat_session import (
-    CopilotChatMessageSchema,
-    CreateCopilotChatSessionRequest,
-    UpdateCopilotChatSessionRequest,
+from qdash.api.schemas.agent_chat_session import (
+    AgentChatMessageSchema,
+    CreateAgentChatSessionRequest,
+    UpdateAgentChatSessionRequest,
 )
+from qdash.api.services import agent_chat_session_service as sessions
 from qdash.api.services import chat_turn_runs
-from qdash.api.services import copilot_chat_session_service as sessions
-from qdash.api.services.chat_transcript import TurnTranscript, transcript_digest
-from qdash.api.services.copilot_chat_session_service import (
-    CopilotChatSessionService,
+from qdash.api.services.agent_chat_session_service import (
+    AgentChatSessionService,
     request_turn_stop,
 )
-from qdash.copilot.contracts import ChatRequest, ChatTurnStart
-from qdash.dbmodel.copilot_chat_session import CopilotChatMessage, CopilotChatSessionDocument
+from qdash.api.services.chat_transcript import TurnTranscript, transcript_digest
+from qdash.dbmodel.agent_chat_session import AgentChatMessage, AgentChatSessionDocument
 
 USER = "alice"
 SESSION = "s1"
@@ -44,13 +44,13 @@ def _fast(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(chat_turn_runs, "END_WRITE_DELAYS", (0, 0))
 
 
-def _session(messages: list[dict[str, str]] = HISTORY) -> CopilotChatSessionService:
-    service = CopilotChatSessionService()
+def _session(messages: list[dict[str, str]] = HISTORY) -> AgentChatSessionService:
+    service = AgentChatSessionService()
     service.create_session(
         username=USER,
-        request=CreateCopilotChatSessionRequest(
+        request=CreateAgentChatSessionRequest(
             session_id=SESSION,
-            messages=[CopilotChatMessageSchema.model_validate(m) for m in messages],
+            messages=[AgentChatMessageSchema.model_validate(m) for m in messages],
         ),
     )
     return service
@@ -63,8 +63,8 @@ def _request(
     **fields: Any,
 ) -> ChatRequest:
     history = HISTORY if history is None else history
-    prefix = [CopilotChatMessage.model_validate(m) for m in history]
-    own = [CopilotChatMessage(role="user", content=text)]
+    prefix = [AgentChatMessage.model_validate(m) for m in history]
+    own = [AgentChatMessage(role="user", content=text)]
     return ChatRequest.model_validate(
         {
             "message": text,
@@ -78,8 +78,8 @@ def _request(
     )
 
 
-def _stored() -> CopilotChatSessionDocument:
-    doc = CopilotChatSessionDocument.find_one({"username": USER, "session_id": SESSION}).run()
+def _stored() -> AgentChatSessionDocument:
+    doc = AgentChatSessionDocument.find_one({"username": USER, "session_id": SESSION}).run()
     assert doc is not None
     return doc
 
@@ -318,8 +318,8 @@ async def test_a_stale_save_cannot_replace_the_recorded_turn_but_keeps_its_ratin
     service.update_session(
         username=USER,
         session_id=SESSION,
-        request=UpdateCopilotChatSessionRequest(
-            messages=[CopilotChatMessageSchema.model_validate(m) for m in HISTORY]
+        request=UpdateAgentChatSessionRequest(
+            messages=[AgentChatMessageSchema.model_validate(m) for m in HISTORY]
         ),
     )
     assert [m.turn_request_id for m in _stored().messages][2:] == ["r1", "r1"]
@@ -336,11 +336,11 @@ async def test_a_stale_save_cannot_replace_the_recorded_turn_but_keeps_its_ratin
     service.update_session(
         username=USER,
         session_id=SESSION,
-        request=UpdateCopilotChatSessionRequest(
+        request=UpdateAgentChatSessionRequest(
             messages=[
-                *[CopilotChatMessageSchema.model_validate(m) for m in HISTORY],
-                CopilotChatMessageSchema(role="user", content="What is T1?", turn_request_id="r1"),
-                CopilotChatMessageSchema(
+                *[AgentChatMessageSchema.model_validate(m) for m in HISTORY],
+                AgentChatMessageSchema(role="user", content="What is T1?", turn_request_id="r1"),
+                AgentChatMessageSchema(
                     role="assistant", content=json.dumps(own), turn_request_id="r1"
                 ),
             ]
@@ -406,8 +406,8 @@ async def _complete_turn(request_id: str, text: str, answer: str) -> None:
     await task
 
 
-def _schema(message: CopilotChatMessage) -> CopilotChatMessageSchema:
-    return CopilotChatMessageSchema.model_validate(message.model_dump())
+def _schema(message: AgentChatMessage) -> AgentChatMessageSchema:
+    return AgentChatMessageSchema.model_validate(message.model_dump())
 
 
 @pytest.mark.asyncio
@@ -449,12 +449,12 @@ async def test_a_stale_save_after_a_later_turn_started_keeps_every_recorded_turn
     for copy in (
         stale,
         stale[:2],
-        [*stale, CopilotChatMessage(role="user", content="queued")],
+        [*stale, AgentChatMessage(role="user", content="queued")],
     ):
         service.update_session(
             username=USER,
             session_id=SESSION,
-            request=UpdateCopilotChatSessionRequest(messages=[_schema(m) for m in copy]),
+            request=UpdateAgentChatSessionRequest(messages=[_schema(m) for m in copy]),
         )
         stored = _stored().messages
         assert stored[2:4] == first_turn
@@ -473,10 +473,8 @@ async def test_a_stale_save_after_a_later_turn_started_keeps_every_recorded_turn
     service.update_session(
         username=USER,
         session_id=SESSION,
-        request=UpdateCopilotChatSessionRequest(
-            messages=[
-                _schema(m) for m in [*stale, CopilotChatMessage(role="user", content="queued")]
-            ]
+        request=UpdateAgentChatSessionRequest(
+            messages=[_schema(m) for m in [*stale, AgentChatMessage(role="user", content="queued")]]
         ),
     )
     after = _stored().messages
@@ -502,7 +500,7 @@ async def test_rating_an_earlier_turn_keeps_its_recorded_answer(init_db) -> None
     service.update_session(
         username=USER,
         session_id=SESSION,
-        request=UpdateCopilotChatSessionRequest(
+        request=UpdateAgentChatSessionRequest(
             messages=[_schema(m) for m in [*recorded[:3], rated, *recorded[4:]]]
         ),
     )
@@ -521,7 +519,7 @@ async def test_rating_an_earlier_turn_keeps_its_recorded_answer(init_db) -> None
         service.update_session(
             username=USER,
             session_id=SESSION,
-            request=UpdateCopilotChatSessionRequest(
+            request=UpdateAgentChatSessionRequest(
                 messages=[_schema(m) for m in [*recorded[:3], copy, *recorded[4:]]]
             ),
         )

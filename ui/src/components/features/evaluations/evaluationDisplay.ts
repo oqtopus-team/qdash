@@ -172,12 +172,12 @@ export function questionLabel(key: string): string {
 
 /**
  * Who prepared the prompt: QDash, the same fixed prompt every time (`direct`),
- * or Copilot, the chat planner, summarising the result and calling the
+ * or Agent, the chat planner, summarising the result and calling the
  * evaluation itself (`planner`). Independent of whether labeled examples were
  * shown (see `examplesLabel`).
  */
 export function modeLabel(mode: string): string {
-  return mode === "planner" ? "Via Copilot" : "Fixed prompt";
+  return mode === "planner" ? "Via Agent" : "Fixed prompt";
 }
 
 /** Which knowledge a run read: the task's shared knowledge, or an uploaded draft by file name. */

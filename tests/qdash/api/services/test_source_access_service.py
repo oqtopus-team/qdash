@@ -1,4 +1,4 @@
-"""The Copilot's source access serves text source inside fixed roots and nothing else."""
+"""The Agent's source access serves text source inside fixed roots and nothing else."""
 
 from pathlib import Path
 

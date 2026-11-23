@@ -1,4 +1,4 @@
-import type { TraceStep, TurnActivitySnapshot } from "@/types/copilotChat";
+import type { TraceStep, TurnActivitySnapshot } from "@/types/agentChat";
 
 const MAX_LABEL = 120;
 

@@ -20,7 +20,7 @@ npm install @oqtopus-team/qdash-client@beta
 takes the client's exact version and pins that client, and pi-qdash pins the client and SDK
 built in the same run. Earlier client versions under the `pi` dist-tag came from
 the former independent pi-qdash releases, which no longer exist. See
-[Pi packages](../../developer-guide/copilot/packages.md) for local development
+[Pi packages](../../developer-guide/agent/packages.md) for local development
 and release ordering.
 
 ## Connect to a Deployment

@@ -1,9 +1,9 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { appendArgsDelta, endTool, startDraft, startTool } from "@/lib/copilotChatStream";
+import { appendArgsDelta, endTool, startDraft, startTool } from "@/lib/agentChatStream";
 
-import type { TraceStep } from "@/types/copilotChat";
+import type { TraceStep } from "@/types/agentChat";
 
 import { ChatTraceSummary, LiveTrace, TurnActivity, currentActivity } from "../ChatTrace";
 import { commandName } from "../ToolStepDetails";

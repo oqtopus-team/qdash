@@ -19,8 +19,8 @@ from qdash.api.services.pi_evaluation_service import EvaluationRuntimeError
 from qdash.datamodel.note import NoteModel
 from qdash.datamodel.project import ProjectRole
 from qdash.datamodel.system_info import SystemInfoModel
+from qdash.dbmodel.agent_chat_turn import AgentChatTurnDocument
 from qdash.dbmodel.chip import ChipDocument
-from qdash.dbmodel.copilot_chat_turn import CopilotChatTurnDocument
 from qdash.dbmodel.evaluation import EvaluationDocument
 from qdash.dbmodel.evaluation_run import EvaluationRunDocument
 from qdash.dbmodel.project import ProjectDocument
@@ -261,14 +261,14 @@ def test_run_queues_the_latest_evaluable_result_per_qubit(test_client, service):
 
 
 def test_execution_records_the_judging_models_context_window(test_client, service, monkeypatch):
-    from qdash.copilot.config.settings import CopilotConfig, ModelConfig
+    from qdash.agent.config.settings import AgentConfig, ModelConfig
 
-    config = CopilotConfig(
+    config = AgentConfig(
         evaluation_models=[
             ModelConfig(provider="vllm", name="nvidia/Ising-Calibration", num_ctx=16384)
         ]
     )
-    monkeypatch.setattr("qdash.api.services.evaluation_service.load_copilot_config", lambda: config)
+    monkeypatch.setattr("qdash.api.services.evaluation_service.load_agent_config", lambda: config)
     _task_result(task_id="task-q0-new", qid="0", end_at=datetime(2026, 1, 2, tzinfo=UTC))
     run_id = test_client.post(
         "/evaluations/runs", headers=HEADERS, json={"chip_id": "chip-1", "task": "CheckRabi"}
@@ -283,14 +283,14 @@ def test_execution_records_the_judging_models_context_window(test_client, servic
 def test_a_configured_evaluation_model_is_selected_and_an_unknown_one_is_rejected(
     test_client, service, monkeypatch
 ):
-    from qdash.copilot.config.settings import CopilotConfig, ModelConfig
+    from qdash.agent.config.settings import AgentConfig, ModelConfig
 
-    config = CopilotConfig(
+    config = AgentConfig(
         evaluation_models=[
             ModelConfig(provider="openai-compatible-chat", name="qwen3.8-flash-next")
         ]
     )
-    monkeypatch.setattr("qdash.api.services.evaluation_service.load_copilot_config", lambda: config)
+    monkeypatch.setattr("qdash.api.services.evaluation_service.load_agent_config", lambda: config)
     _task_result(task_id="task-q0-new", qid="0", end_at=datetime(2026, 1, 2, tzinfo=UTC))
     selected = {
         "provider": "openai-compatible-chat",
@@ -1119,7 +1119,7 @@ def test_a_reattach_with_another_model_and_task_files_the_call_as_the_turn_was_s
     retry = _translate(turn, _turn_recorder(service, reattach=False, **tampered))
     assert _tool_end_ids(retry) == [(run_id, evaluation_id)]
     assert EvaluationDocument.find_all().count() == 1
-    [admitted] = CopilotChatTurnDocument.find_all().to_list()
+    [admitted] = AgentChatTurnDocument.find_all().to_list()
     assert (admitted.planner_model, admitted.task_id, admitted.project_id) == (
         "openai-compatible/qwen",
         "task-q0-new",
@@ -1170,7 +1170,7 @@ def test_a_turn_is_never_filed_from_another_project_or_without_its_record(servic
     # A reattach to a turn with no admission record (sent before records were kept)
     # files nothing: what it was sent with is not known.
     assert _turn_recorder(service, reattach=True, request_id="r-legacy") is None
-    assert CopilotChatTurnDocument.find_all().count() == 1
+    assert AgentChatTurnDocument.find_all().count() == 1
     assert EvaluationDocument.find_all().count() == 0
     # The record outlives the API process: a new service reads it.
     fresh = EvaluationService(MongoChipRepository(), MongoTaskResultHistoryRepository())

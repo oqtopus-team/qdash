@@ -209,7 +209,7 @@ instead of a saved revision, and the page says that **Save** adds the shared scr
 registers the draft with the Agent dock
 (`dashboardDraft.ts` writes and checks it) so the Agent can propose a new draft that the user
 applies and saves; see
-[Page context and editor edits](../copilot/architecture.md#page-context-and-editor-edits).
+[Page context and editor edits](../agent/architecture.md#page-context-and-editor-edits).
 `panelConfig.ts` reads and writes panel configs;
 `metricChoices.ts` flattens the configured chip metrics and the catalogs of the visible scripts
 into the grouped **Show** list of `PanelEditorDialog`, from which the panel type follows.
@@ -226,7 +226,7 @@ tooltip; targets without values are listed under the chart with their status. `t
 parses typed targets the way the API normalizes them. `panels/MetricScriptPanel.tsx` evaluates a panel's pinned revision with
 `POST /metric-scripts/{id}/evaluate` and renders it with `MetricResultView`. The editor registers
 its page with the Agent dock so the Agent can propose edits; see
-[Page context and editor edits](../copilot/architecture.md#page-context-and-editor-edits).
+[Page context and editor edits](../agent/architecture.md#page-context-and-editor-edits).
 
 ## Extending
 

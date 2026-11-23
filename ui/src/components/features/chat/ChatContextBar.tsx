@@ -4,7 +4,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { ExternalLink, FlaskConical, LocateFixed, PanelTop } from "lucide-react";
 import type { PageContextSummary } from "@/contexts/ChatDockContext";
-import type { InvestigationTarget, TaskChatContext } from "@/types/copilotChat";
+import type { InvestigationTarget, TaskChatContext } from "@/types/agentChat";
 
 /** The execution page for an execution; the id-only route forwards to the chip's page. */
 function executionHref(executionId: string, chipId?: string | null): string {

@@ -6,7 +6,7 @@ import { Bot, LoaderCircle } from "lucide-react";
 
 import { useListEvaluations } from "@/client/evaluation/evaluation";
 import { useGetTaskResult } from "@/client/task/task";
-import type { TaskChatContext } from "@/types/copilotChat";
+import type { TaskChatContext } from "@/types/agentChat";
 
 import { AskAiButton } from "./AskAiButton";
 import { EvaluationCard } from "./EvaluationCard";
@@ -26,7 +26,7 @@ interface TaskResultEvaluationsProps {
  * The AI evaluations of one task result, newest first, with the "Ask Agent"
  * entry to request another or chat about the result. A single result's
  * evaluation takes the same path, with the same choices (model only or via
- * Copilot, labeled examples, a question), and leaves the same record as a
+ * Agent, labeled examples, a question), and leaves the same record as a
  * bulk run from the chip page.
  */
 export function TaskResultEvaluations({

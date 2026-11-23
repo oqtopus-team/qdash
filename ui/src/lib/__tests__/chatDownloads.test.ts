@@ -12,7 +12,7 @@ import {
   safeFileName,
   writtenFiles,
 } from "@/lib/chatDownloads";
-import type { TraceStep } from "@/types/copilotChat";
+import type { TraceStep } from "@/types/agentChat";
 
 function blocks(...items: object[]): string {
   return JSON.stringify({ blocks: items, assessment: null });

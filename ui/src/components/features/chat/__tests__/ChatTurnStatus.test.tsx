@@ -2,8 +2,8 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ChatStatusLine, chatStatus } from "@/components/features/chat/ChatTurnStatus";
-import type { SessionRun } from "@/contexts/CopilotChatSessionContext";
-import type { ChatMessage } from "@/types/copilotChat";
+import type { SessionRun } from "@/contexts/AgentChatSessionContext";
+import type { ChatMessage } from "@/types/agentChat";
 
 const NOW = 1_800_000_000_000;
 

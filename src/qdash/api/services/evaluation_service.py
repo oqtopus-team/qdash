@@ -26,6 +26,7 @@ from bunnet import SortDirection
 from fastapi import HTTPException, status
 from pymongo.errors import DuplicateKeyError
 
+from qdash.agent.config import load_agent_config
 from qdash.api.schemas.evaluation import (
     EvaluationItem,
     EvaluationRunDetailResponse,
@@ -37,7 +38,6 @@ from qdash.api.services.pi_evaluation_service import (
     evaluate_task_result,
 )
 from qdash.common.utils.datetime import end_of_day, ensure_timezone, now, parse_date, start_of_day
-from qdash.copilot.config import load_copilot_config
 from qdash.datamodel.evaluation import (
     EvaluationCallModel,
     EvaluationExampleModel,
@@ -49,7 +49,7 @@ from qdash.datamodel.evaluation import (
     EvaluationVerdictModel,
     EvaluatorModel,
 )
-from qdash.dbmodel.copilot_chat_turn import CopilotChatTurnDocument
+from qdash.dbmodel.agent_chat_turn import AgentChatTurnDocument
 from qdash.dbmodel.evaluation import EvaluationDocument
 from qdash.dbmodel.evaluation_asset import EvaluationAssetDocument
 from qdash.dbmodel.evaluation_run import EvaluationRunDocument
@@ -84,7 +84,7 @@ MODES = frozenset({"direct", "planner"})
 
 def planner_model_config() -> tuple[dict[str, str], str | None]:
     """The chat planner the UI would use, as the runtime wants it, with its thinking level."""
-    config = load_copilot_config()
+    config = load_agent_config()
     model = config.chat_models[0] if config.chat_models else config.model
     return (
         {"provider": model.provider, "name": model.name},
@@ -94,7 +94,7 @@ def planner_model_config() -> tuple[dict[str, str], str | None]:
 
 def evaluation_model_config(requested: dict[str, str] | None) -> dict[str, str] | None:
     """Resolve a requested evaluator against the configured evaluation model list."""
-    candidates = load_copilot_config().evaluation_models
+    candidates = load_agent_config().evaluation_models
     if not candidates:
         if requested is not None:
             raise HTTPException(
@@ -302,9 +302,9 @@ def _context_window(model: Any) -> int | None:
     if not isinstance(model, str) or not model:
         return None
     try:
-        config = load_copilot_config()
+        config = load_agent_config()
     except Exception:
-        logger.warning("copilot config unavailable; context window of %s unknown", model)
+        logger.warning("agent config unavailable; context window of %s unknown", model)
         return None
     for candidate in [*config.evaluation_models, *config.chat_models, config.model]:
         if f"{candidate.provider}/{candidate.name}" == model:
@@ -845,7 +845,7 @@ class EvaluationService:
         """The recorder for one chat turn, filed under what the turn was admitted with.
 
         The turn's first request (not a reattach) stores its project, planner model
-        and task once (`CopilotChatTurnDocument`); a later request of the same turn,
+        and task once (`AgentChatTurnDocument`); a later request of the same turn,
         a retry or a reattach, reads that record and never what it says itself, so
         a call first reported by a replay is filed exactly as the original stream
         would have filed it. A reattach whose turn has no record (it was admitted
@@ -865,10 +865,10 @@ class EvaluationService:
                 task_id=task_id,
             )
         if reattach:
-            turn = CopilotChatTurnDocument.find_one(
-                CopilotChatTurnDocument.username == username,
-                CopilotChatTurnDocument.session_id == session_id,
-                CopilotChatTurnDocument.request_id == request_id,
+            turn = AgentChatTurnDocument.find_one(
+                AgentChatTurnDocument.username == username,
+                AgentChatTurnDocument.session_id == session_id,
+                AgentChatTurnDocument.request_id == request_id,
             ).run()
             if turn is None:
                 logger.warning(
@@ -908,9 +908,9 @@ class EvaluationService:
         request_id: str,
         planner_model: str,
         task_id: str | None,
-    ) -> CopilotChatTurnDocument:
+    ) -> AgentChatTurnDocument:
         """Store what the turn is admitted with, or read what its first request stored."""
-        turn = CopilotChatTurnDocument(
+        turn = AgentChatTurnDocument(
             username=username,
             session_id=session_id,
             request_id=request_id,
@@ -921,10 +921,10 @@ class EvaluationService:
         try:
             turn.insert()
         except DuplicateKeyError:
-            stored = CopilotChatTurnDocument.find_one(
-                CopilotChatTurnDocument.username == username,
-                CopilotChatTurnDocument.session_id == session_id,
-                CopilotChatTurnDocument.request_id == request_id,
+            stored = AgentChatTurnDocument.find_one(
+                AgentChatTurnDocument.username == username,
+                AgentChatTurnDocument.session_id == session_id,
+                AgentChatTurnDocument.request_id == request_id,
             ).run()
             if stored is None:
                 raise

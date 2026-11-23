@@ -2,8 +2,8 @@ import { cleanup, fireEvent, render, screen, within } from "@testing-library/rea
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { TooltipProvider } from "@/components/ui/Tooltip";
-import { endTool, startTool, toPersistedTrace } from "@/lib/copilotChatStream";
-import type { TraceStep } from "@/types/copilotChat";
+import { endTool, startTool, toPersistedTrace } from "@/lib/agentChatStream";
+import type { TraceStep } from "@/types/agentChat";
 import { AssistantMessage } from "../ChatMessages";
 
 vi.mock("@/components/features/chat/ChatPlotlyChart", () => ({ ChatPlotlyChart: () => null }));

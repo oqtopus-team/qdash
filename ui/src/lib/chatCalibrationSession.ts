@@ -15,8 +15,8 @@
  * calls it copied, without copying anything in QDash.
  */
 
-import { CREATE_CALIBRATION_SESSION_TOOL } from "@/lib/copilotChatStream";
-import type { ChatMessage, CopilotBlocksResult, TraceStep } from "@/types/copilotChat";
+import { CREATE_CALIBRATION_SESSION_TOOL } from "@/lib/agentChatStream";
+import type { ChatMessage, AgentBlocksResult, TraceStep } from "@/types/agentChat";
 
 /** Tools whose `calibrationSessionId` argument names one calibration session. */
 const CALIBRATION_SESSION_TOOLS = new Set([
@@ -47,7 +47,7 @@ function calibrationSessionIdOf(step: TraceStep): string | null {
 function traceSteps(message: ChatMessage): TraceStep[] {
   if (message.role !== "assistant" || !message.content.startsWith("{")) return [];
   try {
-    const parsed = JSON.parse(message.content) as CopilotBlocksResult;
+    const parsed = JSON.parse(message.content) as AgentBlocksResult;
     return Array.isArray(parsed.trace?.steps) ? parsed.trace.steps : [];
   } catch {
     return [];

@@ -109,9 +109,9 @@ describe("EvaluationCard", () => {
     fireEvent(details, new Event("toggle"));
     expect(screen.getByText(/Reference for this experiment/)).toBeTruthy();
     expect(screen.getByText("System prompt")).toBeTruthy();
-    expect(screen.getByText("What Copilot did")).toBeTruthy();
+    expect(screen.getByText("What Agent did")).toBeTruthy();
     expect(screen.getByText("qdash_build_qcal_evidence")).toBeTruthy();
-    expect(screen.getByText("via Copilot")).toBeTruthy();
+    expect(screen.getByText("via Agent")).toBeTruthy();
   });
 
   it("keeps a prose answer readable and marks it", () => {
@@ -130,7 +130,7 @@ describe("EvaluationCard", () => {
     expect(screen.getByLabelText("incomplete evaluation")).toBeTruthy();
     expect(screen.getByText("fallback model")).toBeTruthy();
     expect(screen.getByText("The oscillation decays as expected.")).toBeTruthy();
-    expect(screen.queryByText("What Copilot did")).toBeNull();
+    expect(screen.queryByText("What Agent did")).toBeNull();
   });
 
   it("marks a diagnosis that lacks keys and keeps the answer as returned", () => {

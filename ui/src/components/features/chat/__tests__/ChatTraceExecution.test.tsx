@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { TraceStep } from "@/types/copilotChat";
+import type { TraceStep } from "@/types/agentChat";
 
 import { LiveTrace } from "../ChatTrace";
 import { ChatLinkPreviewContext } from "../ChatPreviewLink";

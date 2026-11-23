@@ -11,7 +11,7 @@ import type { SourceRootResponseRevisionSource } from './sourceRootResponseRevis
 import type { SourceRootResponseVersion } from './sourceRootResponseVersion';
 
 /**
- * One source tree the Copilot can search and read.
+ * One source tree the Agent can search and read.
  */
 export interface SourceRootResponse {
   /** Root name used by search and read, such as qdash or qubex */

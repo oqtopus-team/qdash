@@ -17,7 +17,7 @@ import { FirstCalibrationBanner } from "@/components/features/first-calibration/
 import { FirstCalibrationCoachmarks } from "@/components/features/first-calibration/FirstCalibrationCoachmarks";
 import { SidebarProvider } from "@/contexts/SidebarContext";
 import { ChatDockProvider } from "@/contexts/ChatDockContext";
-import { CopilotChatSessionProvider } from "@/contexts/CopilotChatSessionContext";
+import { AgentChatSessionProvider } from "@/contexts/AgentChatSessionContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProject } from "@/contexts/ProjectContext";
 
@@ -109,7 +109,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   // Authenticated pages - render with sidebar and navbar
   return (
     <SidebarProvider>
-      <CopilotChatSessionProvider owner={username ?? null} project={projectId ?? null}>
+      <AgentChatSessionProvider owner={username ?? null} project={projectId ?? null}>
         <ChatDockProvider>
           <ChatNotifier owner={username ?? null} project={projectId ?? null} />
           {/* `h-dvh` tracks the visible viewport on mobile browsers, so the tab bar at the
@@ -138,7 +138,7 @@ export function AppLayout({ children }: AppLayoutProps) {
             </Suspense>
           )}
         </ChatDockProvider>
-      </CopilotChatSessionProvider>
+      </AgentChatSessionProvider>
     </SidebarProvider>
   );
 }

@@ -114,7 +114,7 @@ regardless of change size, including documentation-only changes.
 - Start docs with a direct context sentence.
 - Do not add manual tables of contents, summary sections, empty checklists, future-enhancement sections, or emoji.
 - Link relevant docs inline instead of adding broad related-document lists.
-- Do not restructure `docs/task-knowledge/`; those files have a fixed template consumed by the copilot system.
+- Do not restructure `docs/task-knowledge/`; those files have a fixed template consumed by the agent system.
 
 ## Git And PR Conventions
 

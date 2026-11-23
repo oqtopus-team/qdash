@@ -734,11 +734,11 @@ test("every exported artifact is redacted with the model credentials loaded from
   // A checkout whose chat model reads its key and Access credentials from an env file under
   // names the secret-name pattern alone would not catch. Values are built at run time.
   const root = mkdtempSync(join(tmpdir(), "fake-loop-secrets-"));
-  mkdirSync(join(root, "config/copilot"), { recursive: true });
-  writeFileSync(join(root, "config/copilot/config.yaml"), "language: {}\n");
-  writeFileSync(join(root, "config/copilot/evaluation.yaml"), "evaluation_models: []\n");
+  mkdirSync(join(root, "config/agent"), { recursive: true });
+  writeFileSync(join(root, "config/agent/config.yaml"), "language: {}\n");
+  writeFileSync(join(root, "config/agent/evaluation.yaml"), "evaluation_models: []\n");
   writeFileSync(
-    join(root, "config/copilot/chat.yaml"),
+    join(root, "config/agent/chat.yaml"),
     ["chat_models:", "  - provider: openai-compatible-chat", "    name: test-model", "    base_url: env:LLM_ENDPOINT_CHAT", "    api_key_env: LLM_CREDENTIAL_CHAT", ""].join("\n"),
   );
   const credential = ["model", "credential", "x".repeat(12)].join("-");
@@ -747,7 +747,7 @@ test("every exported artifact is redacted with the model credentials loaded from
   const envFile = join(root, "validation.env");
   writeFileSync(envFile, [`LLM_ENDPOINT_CHAT=http://127.0.0.1:9/v1`, `LLM_CREDENTIAL_CHAT=${credential}`, `CF_ACCESS_CLIENT_ID=${accessId}`, `CF_ACCESS_CLIENT_SECRET=${accessSecret}`, ""].join("\n"));
   const apiToken = "q".repeat(20);
-  const shell = { QDASH_API_TOKEN: apiToken, COPILOT_CONFIG_PATH: join(root, "config/copilot/config.yaml") };
+  const shell = { QDASH_API_TOKEN: apiToken, AGENT_CONFIG_PATH: join(root, "config/agent/config.yaml") };
   const plan = prepareLocalCli(["--mode", "rpc", "--env-file", envFile, "--agent-dir", join(root, "pi-agent")], shell, root);
   assert.equal(plan.env.LLM_CREDENTIAL_CHAT, credential);
   const secrets = effectiveSecrets(shell, plan);

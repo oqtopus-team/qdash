@@ -3,7 +3,7 @@
 import { Bot } from "lucide-react";
 
 import { useOptionalChatDock, type InvestigationSurface } from "@/contexts/ChatDockContext";
-import type { InvestigationTarget } from "@/types/copilotChat";
+import type { InvestigationTarget } from "@/types/agentChat";
 
 interface InvestigateWithAiButtonProps {
   /** The failure; without an execution there is nothing to investigate and nothing renders. */

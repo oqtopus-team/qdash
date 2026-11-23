@@ -9,7 +9,7 @@
  * another project is not found there, and nothing is shown for it.
  */
 
-import type { ChatMessage, CopilotBlocksResult, TraceStep } from "@/types/copilotChat";
+import type { ChatMessage, AgentBlocksResult, TraceStep } from "@/types/agentChat";
 
 /** Agent tools whose `sessionId` names the one session they act on. */
 const SESSION_TOOLS = new Set([
@@ -38,7 +38,7 @@ function sessionIdOf(step: TraceStep): string | null {
 function traceSteps(message: ChatMessage): TraceStep[] {
   if (message.role !== "assistant" || !message.content.startsWith("{")) return [];
   try {
-    const parsed = JSON.parse(message.content) as CopilotBlocksResult;
+    const parsed = JSON.parse(message.content) as AgentBlocksResult;
     return Array.isArray(parsed.trace?.steps) ? parsed.trace.steps : [];
   } catch {
     return [];

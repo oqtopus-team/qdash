@@ -5,6 +5,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, UploadFile, status
 
+from qdash.agent.config import clear_agent_config_cache
 from qdash.api.dependencies import get_admin_service
 from qdash.api.lib.auth import get_admin_user
 from qdash.api.schemas.admin import (
@@ -22,7 +23,6 @@ from qdash.api.schemas.auth import User
 from qdash.api.services.admin_service import AdminService
 from qdash.common.config.loader import ConfigLoader
 from qdash.common.config.metrics import clear_metrics_config_cache
-from qdash.copilot.config import clear_copilot_config_cache
 
 logger = logging.getLogger(__name__)
 
@@ -45,14 +45,14 @@ def reload_config_caches(
     logger.debug(f"Admin {admin.username} reloading config caches")
     ConfigLoader.clear_cache()
     clear_metrics_config_cache()
-    clear_copilot_config_cache()
+    clear_agent_config_cache()
     return ConfigReloadResponse(
         cleared=[
             "app/settings.yaml",
             "domain/metrics.yaml",
-            "copilot/config.yaml",
-            "copilot/chat.yaml",
-            "copilot/evaluation.yaml",
+            "agent/config.yaml",
+            "agent/chat.yaml",
+            "agent/evaluation.yaml",
             "app/backend.yaml",
             "app/workflow.yaml",
         ]

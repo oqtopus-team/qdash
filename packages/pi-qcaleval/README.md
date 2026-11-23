@@ -19,7 +19,7 @@ on: the six questions of
 them.
 
 The extension has no QDash dependency, so it works from the pi CLI and from the
-QDash Copilot runtime alike.
+QDash Agent runtime alike.
 
 ## Features
 
@@ -73,13 +73,13 @@ for model configuration and tool inputs.
 
 The [pi-qcaleval reference](https://oqtopus-team.github.io/qdash/reference/pi-qcaleval)
 lists tool inputs, outputs, model selection, and the six questions. The
-[pi extension design guide](https://oqtopus-team.github.io/qdash/developer-guide/copilot/extensions)
+[pi extension design guide](https://oqtopus-team.github.io/qdash/developer-guide/agent/extensions)
 shows standalone model configuration. The
-[QDash evaluation guide](https://oqtopus-team.github.io/qdash/developer-guide/copilot/evaluation)
+[QDash evaluation guide](https://oqtopus-team.github.io/qdash/developer-guide/agent/evaluation)
 explains how the runtime supplies figures and task knowledge.
 
 This package lives in the [QDash monorepo](https://github.com/oqtopus-team/qdash/tree/develop/packages/pi-qcaleval).
-Follow the [package development and release guide](https://oqtopus-team.github.io/qdash/developer-guide/copilot/packages)
+Follow the [package development and release guide](https://oqtopus-team.github.io/qdash/developer-guide/agent/packages)
 for workspace setup, checks, local pi CLI testing, and npm releases, which share QDash's version.
 Open pull requests against QDash's `develop` branch and report bugs in
 [QDash issues](https://github.com/oqtopus-team/qdash/issues).

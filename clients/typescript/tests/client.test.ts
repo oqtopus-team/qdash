@@ -58,7 +58,7 @@ describe("QDashClient", () => {
     expect(requests[0]?.headers.get("CF-Access-Client-Secret")).toBe("client-secret");
   });
 
-  it("reads Copilot source through bounded query parameters", async () => {
+  it("reads Agent source through bounded query parameters", async () => {
     const requests: Request[] = [];
     const fetch = vi.fn(async (input: RequestInfo | URL) => {
       requests.push(new Request(input));
@@ -74,9 +74,9 @@ describe("QDashClient", () => {
     await client.getSourceFile({ path: "/app/qdash/workflow/x.py", startLine: 10 });
     const urls = requests.map((request) => new URL(request.url));
     expect(urls.map((url) => url.pathname)).toEqual([
-      "/api/copilot/source/roots",
-      "/api/copilot/source/search",
-      "/api/copilot/source/file",
+      "/api/agent/source/roots",
+      "/api/agent/source/search",
+      "/api/agent/source/file",
     ]);
     expect(Object.fromEntries(urls[1]!.searchParams)).toEqual({
       query: "KeyError",

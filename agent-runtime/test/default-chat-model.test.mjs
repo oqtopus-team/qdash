@@ -10,9 +10,9 @@ import { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { buildModelsConfig, missingCredentialMessage, NATIVE_API_KEY_ENV, supportedThinkingLevel } from "../src/models-config.ts";
 
 // The committed default chat model, resolved the way the runtime resolves it: models.json
-// built from config/copilot/*.yaml, then pi's bundled catalog. Offline: no model is called,
+// built from config/agent/*.yaml, then pi's bundled catalog. Offline: no model is called,
 // no catalog is fetched, and the key is a placeholder that is never sent anywhere.
-const CONFIG = new URL("../../config/copilot/", import.meta.url);
+const CONFIG = new URL("../../config/agent/", import.meta.url);
 const chatYaml = readFileSync(new URL("chat.yaml", CONFIG), "utf8");
 const evaluationYaml = readFileSync(new URL("evaluation.yaml", CONFIG), "utf8");
 

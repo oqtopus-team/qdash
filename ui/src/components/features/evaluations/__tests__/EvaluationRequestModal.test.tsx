@@ -14,8 +14,8 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
 vi.mock("@/components/ui/Toast", () => ({ useToast: () => toast }));
 
-vi.mock("@/client/copilot/copilot", () => ({
-  useGetCopilotConfig: () => ({
+vi.mock("@/client/agent/agent", () => ({
+  useGetAgentConfig: () => ({
     data: {
       data: {
         evaluation_models: [
@@ -148,15 +148,15 @@ describe("EvaluationRequestModal", () => {
     expect(modelSelect.className).toContain("min-w-0");
     expect(screen.getByRole("option", { name: "qwen" })).toBeTruthy();
     expect(screen.queryByText(/qwen \(openai-compatible-chat\)/)).toBeNull();
-    fireEvent.click(screen.getByLabelText(/Via Copilot/));
+    fireEvent.click(screen.getByLabelText(/Via Agent/));
     fireEvent.click(screen.getByLabelText(/In-context/));
-    expect(screen.getByTestId("request-summary").textContent).toContain("Via Copilot · In-context");
+    expect(screen.getByTestId("request-summary").textContent).toContain("Via Agent · In-context");
     fireEvent.click(screen.getByLabelText(/Zero-shot/));
     fireEvent.change(modelSelect, {
       target: { value: "evaluation-openai-compatible-chat:qwen" },
     });
     expect(screen.getByTestId("request-summary").textContent).toContain(
-      "all qubits on 64Qv3 with Via Copilot · Zero-shot",
+      "all qubits on 64Qv3 with Via Agent · Zero-shot",
     );
     expect(screen.getByTestId("request-summary").textContent).toContain("using qwen");
     fireEvent.click(screen.getByRole("button", { name: /^Evaluate$/ }));
@@ -173,7 +173,7 @@ describe("EvaluationRequestModal", () => {
       },
     });
     expect(toast.success).toHaveBeenCalledWith(
-      "Evaluation started (Via Copilot · Zero-shot): 2 task results queued",
+      "Evaluation started (Via Agent · Zero-shot): 2 task results queued",
       expect.objectContaining({ description: "1 skipped (no evaluable result)" }),
     );
     const options = toast.success.mock.calls[0][1] as { action: { onClick: () => void } };
@@ -195,7 +195,7 @@ describe("EvaluationRequestModal", () => {
     expect(screen.getByText("Request AI evaluation")).toBeTruthy();
     expect(screen.getByText("Who prepares the prompt")).toBeTruthy();
     expect(screen.queryByText("What to do")).toBeNull();
-    expect(screen.queryByLabelText(/Chat with Copilot/)).toBeNull();
+    expect(screen.queryByLabelText(/Chat with Agent/)).toBeNull();
     unmount();
 
     const onChat = vi.fn();
@@ -213,7 +213,7 @@ describe("EvaluationRequestModal", () => {
     );
     expect(screen.getByText("What to do")).toBeTruthy();
     expect(screen.getByText("Who prepares the prompt")).toBeTruthy();
-    fireEvent.click(screen.getByLabelText(/Chat with Copilot/));
+    fireEvent.click(screen.getByLabelText(/Chat with Agent/));
     expect(screen.queryByText("Who prepares the prompt")).toBeNull();
     expect(screen.getByTestId("request-summary").textContent).toContain(
       "Will open a chat about CheckRabi · Q05",
@@ -239,15 +239,15 @@ describe("EvaluationRequestModal", () => {
       </QueryClientProvider>,
     );
     const fixed = screen.getByRole("radio", { name: /Fixed prompt/ }) as HTMLInputElement;
-    const viaCopilot = screen.getByRole("radio", { name: /Via Copilot/ }) as HTMLInputElement;
-    expect(fixed.name).toBe(viaCopilot.name);
+    const viaAgent = screen.getByRole("radio", { name: /Via Agent/ }) as HTMLInputElement;
+    expect(fixed.name).toBe(viaAgent.name);
     expect(fixed.checked).toBe(true);
 
     // The description text is part of the label, so it is a click target too.
     fireEvent.click(screen.getByText(/summarises the result and calls the evaluation itself/));
-    expect(viaCopilot.checked).toBe(true);
+    expect(viaAgent.checked).toBe(true);
     expect(fixed.checked).toBe(false);
-    expect(viaCopilot.closest("label")?.className).toContain("choice-field");
+    expect(viaAgent.closest("label")?.className).toContain("choice-field");
   });
 
   it("lets the person narrow a chip-wide run to some entities", async () => {
@@ -346,7 +346,7 @@ describe("EvaluationRequestModal", () => {
         />
       </QueryClientProvider>,
     );
-    fireEvent.click(screen.getByLabelText(/Via Copilot/));
+    fireEvent.click(screen.getByLabelText(/Via Agent/));
 
     const file = new File(["zip"], "rabi.zip", { type: "application/zip" });
     fireEvent.change(screen.getByTestId("knowledge-draft-input"), { target: { files: [file] } });
@@ -356,9 +356,9 @@ describe("EvaluationRequestModal", () => {
     expect(draft.textContent).toContain("rabi.zip");
     expect(draft.textContent).toContain("SUCCESS, LOW_CONTRAST");
     expect(draft.textContent).toContain("must be one of expected");
-    // Copilot reads the shared knowledge, so a draft runs with the fixed prompt.
+    // Agent reads the shared knowledge, so a draft runs with the fixed prompt.
     expect((screen.getByLabelText(/Fixed prompt/) as HTMLInputElement).checked).toBe(true);
-    expect((screen.getByLabelText(/Via Copilot/) as HTMLInputElement).disabled).toBe(true);
+    expect((screen.getByLabelText(/Via Agent/) as HTMLInputElement).disabled).toBe(true);
     expect(screen.getByTestId("request-summary").textContent).toContain(
       "against the knowledge draft rabi.zip",
     );

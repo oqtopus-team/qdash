@@ -7,7 +7,7 @@ import { parse } from "yaml";
 import { CF_ACCESS_ENV, PROVIDER_ALIASES, resolveBaseUrl, usesCloudflareAccess } from "./models-config.ts";
 
 /**
- * The classifier models of config/copilot/classifier.yaml, set up on pi's
+ * The classifier models of config/agent/classifier.yaml, set up on pi's
  * model runtime.
  *
  * `classifier_models` lists the models a QDash feature may ask to classify,

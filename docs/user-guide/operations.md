@@ -15,7 +15,7 @@ docker compose up -d --build
 ```
 
 If Go Task is installed, `task deploy-local` runs this command and also pulls the optional
-Copilot knowledge repository configured by `KNOWLEDGE_REPO_URL`.
+Agent knowledge repository configured by `KNOWLEDGE_REPO_URL`.
 
 The `agent-runtime`, `agent-exec` and `metric-runner` services start by default. Compose
 generates and preserves internal authentication in the `agent-runtime-auth` volume. For a remote
@@ -104,7 +104,7 @@ An older API does not enforce the new admission checks. Keep requests stopped un
 runtime, UI, and worker instances use the selected release. Retain the added collections and
 indexes; deleting them does not make an unresolved run safe to retry.
 
-The [admission and dispatch records](../developer-guide/copilot/calibration-sessions.md#deployment-compatibility)
+The [admission and dispatch records](../developer-guide/agent/calibration-sessions.md#deployment-compatibility)
 explain which states must be resolved before rollback.
 
 ## Open a Database Shell

@@ -70,12 +70,12 @@ describe("TaskResultEvaluations", () => {
     // The chip page's modal, plus the chat as a third way to ask.
     expect(screen.getByText("Ask Agent", { selector: "h2, [role=heading], div" })).toBeTruthy();
     expect(screen.getByLabelText(/Fixed prompt/)).toBeTruthy();
-    expect(screen.getByLabelText(/Via Copilot/)).toBeTruthy();
-    expect(screen.getByLabelText(/Chat with Copilot/)).toBeTruthy();
+    expect(screen.getByLabelText(/Via Agent/)).toBeTruthy();
+    expect(screen.getByLabelText(/Chat with Agent/)).toBeTruthy();
     expect(screen.getAllByText(/CheckRabi · Q05/).length).toBeGreaterThan(0);
 
     // Choosing the chat opens it about this result, with the dock by default.
-    fireEvent.click(screen.getByLabelText(/Chat with Copilot/));
+    fireEvent.click(screen.getByLabelText(/Chat with Agent/));
     fireEvent.click(screen.getByRole("button", { name: /Open chat/ }));
     expect(openTaskChat).toHaveBeenCalledWith({
       taskName: "CheckRabi",
@@ -98,7 +98,7 @@ describe("TaskResultEvaluations", () => {
       onChat,
     });
     fireEvent.click(screen.getByRole("button", { name: /Ask Agent/ }));
-    fireEvent.click(screen.getByLabelText(/Chat with Copilot/));
+    fireEvent.click(screen.getByLabelText(/Chat with Agent/));
     fireEvent.click(screen.getByRole("button", { name: /Open chat/ }));
     expect(onChat).toHaveBeenCalled();
     expect(openTaskChat).not.toHaveBeenCalled();

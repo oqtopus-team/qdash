@@ -9,12 +9,12 @@ import {
   useRef,
   useState,
 } from "react";
-import { useGetCopilotPreferences, useListCopilotSkills } from "@/client/copilot/copilot";
+import { useGetAgentPreferences, useListAgentSkills } from "@/client/agent/agent";
 import { ArrowDown, GitBranch, LayoutDashboard } from "lucide-react";
 import { StickToBottom, useStickToBottomContext } from "use-stick-to-bottom";
 import { useChatScrollIntent } from "@/hooks/useChatScrollIntent";
 import { useChatSuggestions, type ChatSuggestion } from "@/hooks/useChatSuggestions";
-import { replyAfter, useCopilotChat } from "@/hooks/useCopilotChat";
+import { replyAfter, useAgentChat } from "@/hooks/useAgentChat";
 import { useChatAttachments } from "@/hooks/useChatAttachments";
 import { useChatGreeting } from "@/hooks/useChatGreeting";
 import { useAuth } from "@/contexts/AuthContext";
@@ -35,7 +35,7 @@ import {
   LiveAssistantMessage,
   UserMessage,
 } from "@/components/features/chat/ChatMessages";
-import type { TaskChatContext } from "@/types/copilotChat";
+import type { TaskChatContext } from "@/types/agentChat";
 
 /**
  * - page: the /chat page, roomy, greeting centered with the composer
@@ -217,10 +217,10 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
     branchFrom,
     canBranchAt,
     branchingIndex,
-  } = useCopilotChat(sessionId);
-  const { data: preferences } = useGetCopilotPreferences({ query: { staleTime: 60_000 } });
+  } = useAgentChat(sessionId);
+  const { data: preferences } = useGetAgentPreferences({ query: { staleTime: 60_000 } });
   // Offered after `/` in the composer; without the runtime the menu simply stays closed.
-  const { data: skillList } = useListCopilotSkills({
+  const { data: skillList } = useListAgentSkills({
     query: { staleTime: 5 * 60_000, retry: false },
   });
   const [input, setInput] = useState("");

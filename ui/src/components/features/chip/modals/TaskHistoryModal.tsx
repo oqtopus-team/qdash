@@ -23,7 +23,7 @@ import { LineageButton } from "@/components/features/provenance/ParameterLineage
 import { TaskResultEvaluations } from "@/components/features/evaluations/TaskResultEvaluations";
 import { TaskResultThreads } from "@/components/features/forum/TaskResultThreads";
 import { TaskResultMemo } from "@/components/features/metrics/TaskResultMemo";
-import type { TaskChatContext } from "@/types/copilotChat";
+import type { TaskChatContext } from "@/types/agentChat";
 import { useChatDock } from "@/contexts/ChatDockContext";
 import { DockedChatPanel } from "@/components/features/chat/DockedChatPanel";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
