@@ -21,7 +21,8 @@ Load the `qdash` skill first for execution paths and approval scope, and use
 | Available | Not available |
 | --- | --- |
 | `qdash_plan_pipeline` and `qdash_run_pipeline` with a `CustomTwoQubit` step in `manual` mode for the one pair | A QDash optimizer, flow, or scheduler that runs this search; anything that acts after your turn ends or the runtime stops |
-| `CheckCrossResonance` run keys `adiabatic_safe_factor`, `max_amplitude`, `max_time_range` | qubex arguments QDash does not pass: CheckCR `cr_amplitude`, `ramptime`, `time_range`, `n_iterations`, `tolerance`; CreateZX90 `duration`, `amplitude_range`, `adiabatic_safe_factor`, `max_amplitude`, `rotary_multiple`, `duration_buffer` |
+| `CheckCrossResonance` run keys `adiabatic_safe_factor`, `max_amplitude`, `max_time_range` as the search keys | qubex arguments QDash does not pass: CheckCR `cr_amplitude`, `time_range`, `n_iterations`, `tolerance`; CreateZX90 `initial_state`, `degree`, `n_repetitions`, `duration_unit` |
+| Other CR controls this search leaves unset: CheckCR `ramptime`; CreateZX90 `duration`, `ramptime`, `amplitude_range`, `adiabatic_safe_factor`, `max_amplitude`, `rotary_multiple`, `duration_buffer` | A search over those controls; it needs its own approved scope and design |
 | `qdash_wait_execution`, `qdash_get_execution`, `qdash_list_executions`, task results, figures, task knowledge | A tool that cancels an execution; restoring an earlier pair state; saving a candidate without making it the current calibration |
 | `ZX90InterleavedRandomizedBenchmarking` per arm | Paired multi-arm IRB and its paired statistics; agent calibration sessions on couplings (sessions target qubits) |
 
@@ -65,49 +66,51 @@ exact spec instead of asking again in prose. A declined approval is a stop.
   iteration. The second is stagnation, not success; check the coefficient history figure.
 - CheckCR writes `cr_duration = 0`; that is not a gate length. The ZX frequency is
   `zx_rotation_rate x cr_amplitude`.
-- CreateZX90 sets the CR duration to `1.05 / (8 x zx_rotation_rate x cr_amplitude) + cr_ramptime`
+- With its run keys unset, CreateZX90 keeps the qubex duration behavior: from `cr_duration = 0`
+  it sets the CR duration to `1.05 / (8 x zx_rotation_rate x cr_amplitude) + cr_ramptime`
   (ns, GHz), rounded up to 16 ns, then fits the amplitude at that duration. When the rough fit
-  finds no root it retries once with a longer duration; when the final fit finds no root it
-  stores `cr_amplitude = 1.0`, which passes QDash's finite-value check. Treat that as a failure.
-  It recomputes rotary amplitude and DRAG betas from defaults.
+  finds no root it retries once with a longer duration; the task result does not flag the
+  retry, so compare the published `cr_duration` with that formula. It uses the CheckCR
+  `cr_ramptime` and recomputes rotary amplitude and DRAG betas from defaults.
+- CreateZX90 accepts only a fitted root inside its scanned range and at or below its cap. When
+  the final fit finds no root, qubex stores `cr_amplitude = 1.0`; QDash rejects that, the task
+  fails, and the pair's qubex CR note entry is put back to the entry from just before the
+  CreateZX90 call, which is this step's CheckCR result, not the incumbent. Later tasks in the
+  step then do not run for the pair.
 - A stored nonzero `cr_duration` is reused by a CreateZX90 that runs without a CheckCR before
   it, so always run the two together in one step.
 - Completed tasks write the pair's calibration. `update_calibration_parameters: false` is not a
-  sandbox: the qubex calibration note is still updated. Every arm, the incumbent included, is
-  recalibrated when rerun, not restored, and the last arm run is the pair's state.
+  sandbox: an accepted result still updates and saves the qubex calibration note. Every arm,
+  the incumbent included, is recalibrated when rerun, not restored, and the last arm run is the
+  pair's state.
 - The benchmark's reference RB is built with the candidate's own ZX90, so two independent IRB
   runs are not paired measurements.
 
 ### Scan check before every dispatch
 
-CreateZX90 does not inherit the CheckCR cap: QDash calls it without `adiabatic_safe_factor` or
-`max_amplitude`, so it uses qubex's own 0.75 and 1.0. Its sweeps are clipped to
-`C = min(amplitude for 0.75 x |f_control - f_target|, 1.0)` and reach at most
-`min(C, 2.4 x a)`, where `a` is the CheckCR amplitude (at most the requested `max_amplitude`).
-Its final amplitude lies in the swept range, except for the 1.0 fallback. QDash enforces no
-user bound on any of this. B concerns the control CR amplitude; the target's cancel and rotary
-amplitudes are derived from it and bounded by no exposed key.
+CreateZX90 inherits the CheckCR bounds: CheckCR publishes the `adiabatic_safe_factor` and
+`max_amplitude` it used as `cr_adiabatic_safe_factor` and `cr_max_amplitude`, and a CreateZX90
+with those run keys unset uses them. Its cap is
+`C = min(max_amplitude, amplitude for adiabatic_safe_factor x |f_control - f_target|)`, the
+same formula that fixes the CheckCR drive, so in one step with unchanged frequencies `C` equals
+the realized CheckCR `cr_amplitude`. qubex clips every CreateZX90 sweep, retry included, to `C`,
+and QDash rejects a root above `C`. B concerns the control CR amplitude; the target's cancel
+and rotary amplitudes are derived from it and bounded by no exposed key.
 
-Dispatch only when you can show from the scope record, before the run, that:
-
-1. the CheckCR drive stays within B: the requested `max_amplitude` is at most B, or a known
-   factor-limited amplitude is; and
-2. the whole CreateZX90 scan, retry included, stays within B: B is at least 1.0, or at least
-   `2.4 x` the requested `max_amplitude`, or at least an established `C`. `C` is established
-   only by a same-cooldown CheckCR at factor 0.75 whose realized amplitude stayed below its
-   `max_amplitude`, with unchanged qubit frequencies and control drive calibration since.
-
-If neither holds, do not dispatch: say which bound is missing and what evidence would establish
-it. When B is below 1.0, the fallback leaves an out-of-bound stored amplitude that later tasks
-would drive, so end a screening step with CreateZX90 and advance a candidate in a separate step
-only after reading its stored `cr_amplitude` at or below B. A post-run check alone is not
-enough.
+Dispatch only when you can show from the scope record, before the run, that the CheckCR drive
+stays within B: the requested `max_amplitude` is at most B, or a known factor-limited
+amplitude is. CreateZX90's scan and accepted amplitude then stay within B as well. Keep
+CheckCR and CreateZX90 in the same step so CreateZX90 reads this run's bounds; a CreateZX90
+without a CheckCR before it reads the stored bounds, or 0.75 and 1.0 for a pair whose CheckCR
+predates them. If the check fails, do not dispatch: say which bound is missing and what
+evidence would establish it. A post-run check alone is not enough.
 
 ## Parameter contract
 
 Change only these CheckCR `run` keys. Everything else stays at its stored value or task default:
 frequencies, 1Q and readout parameters, ramp time, betas, rotary, `interval`, and
-`readout_duration`.
+`readout_duration`. Leave every CreateZX90 `run` key except the stage's `shots` unset, so it
+inherits this CheckCR's bounds and ramp time and keeps the qubex duration behavior.
 
 | Key | Type | Role | Code default |
 | --- | --- | --- | --- |
@@ -115,7 +118,6 @@ frequencies, 1Q and readout parameters, ramp time, betas, rotary, `interval`, an
 | `max_amplitude` | float | Drive: caps the amplitude | 1.0 |
 | `max_time_range` | int, ns | Tomography measurement window; not the gate length | 4096 |
 
-CreateZX90's run keys are `readout_duration`, `shots`, and `interval`; none shapes the gate.
 In this strategy `cr_amplitude`, `cr_duration`, `zx90_gate_time`, and `zx_rotation_rate` are
 measured outputs: do not set them in a call's `run` or `input`. That is a strategy boundary,
 not a claim that QDash has no input overrides.
@@ -157,10 +159,11 @@ not a claim that QDash has no input overrides.
 4. **Read and report.** From CheckCR read the realized amplitude, `zx_rotation_rate`, the
    coefficient history (IX, IY, IZ, ZX, ZY, ZZ) and how it stopped, and the fits
    (`qdash_get_task_figures`, `qdash_analyze_figure_json`, `qdash_get_task_knowledge`). From
-   CreateZX90 read `cr_duration`, `zx90_gate_time`, and the amplitude fit; reject a 1.0
-   fallback, a final amplitude above B, or a retried, longer duration. Post the measured
-   evidence, the decision, the incumbent's values, and the pair's actual current stored state,
-   which is now this run's result, not the incumbent.
+   CreateZX90 read `cr_duration`, `zx90_gate_time`, and the amplitude fit. QDash has already
+   failed a run with no root or a root above the cap; report that failure as the result.
+   Reject a candidate whose `cr_duration` exceeds the formula's, which means a retry. Post the
+   measured evidence, the decision, the incumbent's values, and the pair's actual current
+   stored state, which is now this run's result, not the incumbent.
 5. **Decide** one of: a nearby allowed candidate; a repeat of an uncertain condition (within
    the cap); advance a candidate whose realized gate time is shorter than the incumbent's to
    `CheckZX90`, the Bell checks, `Check2QGateCoherenceLimit`, and the benchmark; revisit 1Q or
@@ -220,8 +223,8 @@ unconfirmed. Repeated, uncorrected comparisons carry no significance claim.
 
 Run keys must come from `qdash_get_pipeline_catalog` for these tasks. Here the factor was the
 binding cap, the user allowed 0.70 to 0.80 in steps of 0.05, B is 1.0, and the other keys stay
-at defaults. Because 0.8 exceeds CreateZX90's internal factor of 0.75, check its amplitude fit
-closely.
+at defaults. CreateZX90 sets no run keys, so it inherits factor 0.8 and cap 1.0 from this
+CheckCR.
 
 ```json
 {
@@ -243,11 +246,9 @@ closely.
 }
 ```
 
-To advance a candidate with B at least 1.0, append `CheckZX90`, `CheckBellState`,
-`CheckBellStateTomography`, `Check2QGateCoherenceLimit`, and
-`ZX90InterleavedRandomizedBenchmarking` (with the stage's `shots` and `n_trials`) to the same
-step, keeping its CheckCR run values. With B below 1.0, run them as a separate step after the
-stored-amplitude check.
+To advance a candidate, append `CheckZX90`, `CheckBellState`, `CheckBellStateTomography`,
+`Check2QGateCoherenceLimit`, and `ZX90InterleavedRandomizedBenchmarking` (with the stage's
+`shots` and `n_trials`) to the same step, keeping its CheckCR run values.
 
 ## Decision record
 

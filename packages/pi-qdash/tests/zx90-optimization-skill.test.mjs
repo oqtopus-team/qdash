@@ -106,10 +106,18 @@ test("a stop while hardware runs, and a resume, never re-dispatch an uncertain e
 });
 
 test("an unverifiable amplitude bound stops the run before dispatch, not after", () => {
-  assert.match(SKILL, /CreateZX90 does not inherit the CheckCR cap/);
-  assert.match(SKILL, /QDash enforces no user bound on any of this\./);
-  assert.match(SKILL, /If neither holds, do not dispatch: say which bound is missing and what evidence would establish it\./);
+  // CreateZX90 inherits the CheckCR bounds; the qubex side is pinned in test_zx90_skill_example.py.
+  assert.doesNotMatch(SKILL, /does not inherit the CheckCR cap|QDash enforces no user bound/);
+  assert.match(SKILL, /CreateZX90 inherits the CheckCR bounds/);
+  assert.match(SKILL, /Dispatch only when you can show from the scope record, before the run, that the CheckCR drive stays within B/);
+  assert.match(SKILL, /If the check fails, do not dispatch: say which bound is missing and what evidence would establish it\./);
   assert.match(SKILL, /A post-run check alone is not enough\./);
+});
+
+test("a rejected fit fails the task, but an accepted run is never a sandbox", () => {
+  assert.match(SKILL, /qubex stores `cr_amplitude = 1\.0`; QDash rejects that, the task fails/);
+  assert.match(SKILL, /which is this step's CheckCR result, not the incumbent/);
+  assert.match(SKILL, /`update_calibration_parameters: false` is not a sandbox: an accepted result still updates and saves the qubex calibration note/);
 });
 
 test("the final state is the last run's recalibration, reported truthfully", () => {
