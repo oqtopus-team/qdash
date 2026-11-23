@@ -333,3 +333,84 @@ test("a reattach to a finished turn replays that turn only, not the turns after 
     assert.deepEqual(await users(), ["calibrate Q0", "calibrate Q1"]);
   `);
 });
+
+test("another window finds the running turn, follows it as a second subscriber, and sees it end", { timeout: 90_000 }, () => {
+  runScenario(`
+    const active = (body = {}, h = headers()) => post("/chat/active", { owner_id: "alice", conversation_id: "c1", ...body }, h);
+    // Nothing runs yet.
+    let response = await active();
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { running: false });
+
+    // The first window starts a turn that parks on the expert.
+    const original = lineReader(
+      await post("/chat", {
+        ...turn,
+        request_id: "t1",
+        message: "calibrate Q0",
+        turn_start: { index: 0, digest: "0123456789abcdef" },
+      }),
+    );
+    await original.until((l) => l.type === "tool_start" && l.name === "wait_expert");
+
+    // The internal credential and the user's credentials are both required.
+    response = await post("/chat/active", { owner_id: "alice", conversation_id: "c1" }, { "Content-Type": "application/json" });
+    assert.equal(response.status, 401);
+    await response.body?.cancel();
+    response = await active({}, { "Content-Type": "application/json", Authorization: "Bearer test-runtime-token" });
+    assert.equal(response.status, 401);
+    await response.body?.cancel();
+    // Another user's chat of the same ID, and another branch, run nothing.
+    response = await post("/chat/active", { owner_id: "bob", conversation_id: "c1" });
+    assert.deepEqual(await response.json(), { running: false });
+    response = await active({ store_conversation_id: "7" });
+    assert.deepEqual(await response.json(), { running: false });
+    // Another project learns only that a turn runs, not which.
+    response = await active({}, headers("p2"));
+    assert.deepEqual(await response.json(), { running: true, other_project: true });
+
+    // A second window opened late learns the turn and reattaches with it: the turn so far
+    // is replayed, including the wait it is parked on, and nothing is submitted again.
+    response = await active();
+    const found = await response.json();
+    assert.equal(found.running, true);
+    assert.equal(found.request_id, "t1");
+    assert.equal(found.continuing, false);
+    assert.equal(typeof found.started_at, "number");
+    // Where the turn starts in the saved transcript, as its window sent it.
+    assert.deepEqual(found.turn_start, { index: 0, digest: "0123456789abcdef" });
+    const second = lineReader(await post("/chat", { ...turn, request_id: found.request_id, reattach: true }));
+    await second.until((l) => l.type === "tool_start" && l.name === "wait_expert");
+    assert.equal(modelCalls, 1);
+    assert.deepEqual(await users(), ["calibrate Q0"]);
+
+    // The expert answers: both windows see the same rest of the turn and its end.
+    expertAnswer = "use 5.1 GHz";
+    const [a, b] = await Promise.all([original.rest(), second.rest()]);
+    for (const out of [a, b]) {
+      assert.equal(out.at(-1).type, "done", JSON.stringify(out));
+      assert.deepEqual(tools(out, "tool_end"), ["wait_expert", "run_step"]);
+    }
+    assert.equal(a.at(-1).text, b.at(-1).text);
+    assert.equal(stepRuns, 1);
+
+    // Once the turn ended, nothing is reported as running.
+    response = await active();
+    assert.deepEqual(await response.json(), { running: false });
+    assert.deepEqual(await users(), ["calibrate Q0"]);
+  `);
+});
+
+test("a turn sent without a well-formed start is reported without one", { timeout: 90_000 }, () => {
+  runScenario(`
+    const original = lineReader(
+      await post("/chat", { ...turn, request_id: "t1", message: "calibrate Q0", turn_start: { index: -1, digest: "x" } }),
+    );
+    await original.until((l) => l.type === "tool_start" && l.name === "wait_expert");
+    const found = await (await post("/chat/active", { owner_id: "alice", conversation_id: "c1" })).json();
+    assert.equal(found.request_id, "t1");
+    assert.equal(found.turn_start, null);
+    expertAnswer = "use 5.1 GHz";
+    await original.rest();
+  `);
+});

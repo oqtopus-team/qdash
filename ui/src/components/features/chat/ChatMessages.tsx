@@ -10,6 +10,7 @@ import {
   ExternalLink,
   GitBranch,
   ImageIcon,
+  LoaderCircle,
   Pencil,
   RotateCcw,
   Square,
@@ -322,6 +323,12 @@ function BlocksContent({
         <div className="mt-2 inline-flex items-center gap-1.5 text-xs text-base-content/45">
           <Square className="w-3 h-3" />
           Stopped
+        </div>
+      )}
+      {blocks.in_progress && !blocks.stopped && (
+        <div className="mt-2 inline-flex items-center gap-1.5 text-xs text-base-content/45">
+          <LoaderCircle className="w-3 h-3" />
+          Answer in progress, saved by the server
         </div>
       )}
     </>

@@ -77,6 +77,15 @@ beforeEach(() => {
       const method = init?.method ?? "GET";
       calls.push({ url, method, body, project: headers["X-Project-Id"] });
       if (url.endsWith("/stream")) {
+        // The API saves the turn's message when it starts the turn, as the server does.
+        const start = body.turn_start as { index: number } | undefined;
+        const sessionId = String(body.session_id);
+        if (!body.reattach && start && !body.continue_run) {
+          saved[sessionId] = [
+            ...(saved[sessionId] ?? []).slice(0, start.index),
+            { role: "user", content: String(body.message), turn_request_id: body.request_id },
+          ] as Message[];
+        }
         const stream = controllableStream();
         streams.push(stream);
         init?.signal?.addEventListener("abort", () => stream.abort(init.signal!.reason));
@@ -150,7 +159,7 @@ async function startWaitingTurn(hook: Awaited<ReturnType<typeof renderChat>>) {
   await waitFor(() =>
     expect(tools(hook.result.current.chat.liveTurn?.steps)).toEqual([`${WAIT}:running`]),
   );
-  // The user's message is saved before anything else.
+  // The server saved the user's message when it started the turn.
   await waitFor(() => expect(saved.s1[saved.s1.length - 1]?.content).toBe("Calibrate Q0"));
   return streamCalls()[0].body.request_id as string;
 }
