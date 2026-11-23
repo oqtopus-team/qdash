@@ -20,13 +20,25 @@ from qdash.workflow.calibtasks.qubex.base import (
     readout_duration_run_parameter,
     required_rabi_normalization_inputs,
 )
+from qdash.workflow.calibtasks.qubex.two_qubit.cr_controls import (
+    copy_cr_entry,
+    cr_pair_label,
+    put_back_cr_entry,
+    require_fresh_cr_entry,
+    validate_fraction,
+    validate_ramptime,
+)
 from qdash.workflow.calibtasks.qubex.validation import finite_value_error, first_validation_error
 from qdash.workflow.engine.backend.qubex import QubexBackend
 from qdash.workflow.engine.progress import ProgressPlan
 
 
 class CheckCrossResonance(QubexTask):
-    """Task to check the cross resonance pulse (obtain_cr_params)."""
+    """Task to check the cross resonance pulse (obtain_cr_params).
+
+    A run that fails or whose result is rejected puts the pair's Qubex CR note entry
+    back to the entry the run started from and does not save the note file.
+    """
 
     name: str = "CheckCrossResonance"
     task_type: str = "coupling"
@@ -80,6 +92,15 @@ class CheckCrossResonance(QubexTask):
             value_type="int",
             default=4096,
             description="Maximum CR pulse search duration",
+        ),
+        "ramptime": RunParameterSpec(
+            unit="ns",
+            value_type="float",
+            default=None,
+            description=(
+                "CR pulse ramp time. Unset uses the Qubex default (16 ns, or 32 ns when the "
+                "control f_ge is at or above the target f_ef)."
+            ),
         ),
     }
 
@@ -197,7 +218,20 @@ class CheckCrossResonance(QubexTask):
         "cr_ramptime": OutputParameterSpec(
             qid_role="coupling", unit="ns", description="CR pulse ramp time."
         ),
+        "cr_max_amplitude": OutputParameterSpec(
+            qid_role="coupling",
+            unit="a.u.",
+            description="CR amplitude cap approved for this pair; CreateZX90 inherits it.",
+        ),
+        "cr_adiabatic_safe_factor": OutputParameterSpec(
+            qid_role="coupling",
+            unit="a.u.",
+            description="Adiabatic safety factor approved for this pair; CreateZX90 inherits it.",
+        ),
     }
+
+    # The pair's CR note entry before this run's fit, put back when the fit is rejected.
+    _previous_cr_entry: dict[str, Any] | None = None
 
     def get_progress_plan(self) -> ProgressPlan:
         """Return the progress range emitted by Qubex CR calibration."""
@@ -226,9 +260,7 @@ class CheckCrossResonance(QubexTask):
         self, backend: QubexBackend, execution_id: str, run_result: RunResult, qid: str
     ) -> PostProcessResult:
         exp = self.get_experiment(backend)
-        label = "-".join(
-            [exp.get_qubit_label(int(q)) for q in qid.split("-")]
-        )  # e.g., "0-1" → "Q00-Q01"
+        label = cr_pair_label(exp, qid)  # e.g., "0-1" → "Q00-Q01"
         result = run_result.raw_result
         self.output_parameters["cr_duration"].value = result["cr_duration"]
         self.output_parameters["cr_amplitude"].value = result["cr_amplitude"]
@@ -240,6 +272,8 @@ class CheckCrossResonance(QubexTask):
         self.output_parameters["rotary_amplitude"].value = result["rotary_amplitude"]
         self.output_parameters["zx_rotation_rate"].value = result["zx_rotation_rate"]
         self.output_parameters["cr_ramptime"].value = result["cr_ramptime"]
+        self.output_parameters["cr_max_amplitude"].value = result["max_amplitude"]
+        self.output_parameters["cr_adiabatic_safe_factor"].value = result["adiabatic_safe_factor"]
 
         output_parameters = self.attach_execution_id(execution_id)
         fig = self._plot_coeffs_history(result["coeffs_history"], label=label)
@@ -291,6 +325,11 @@ class CheckCrossResonance(QubexTask):
                 f"CheckCrossResonance cr_ramptime for {label}",
             ),
         )
+        if validation_error is None:
+            self.save_calibration(backend)
+        else:
+            # Keep the rejected fit out of the Qubex note before the executor records it.
+            put_back_cr_entry(exp.calib_note, label, self._previous_cr_entry)
         return PostProcessResult(
             output_parameters=output_parameters,
             figures=figures,
@@ -299,10 +338,18 @@ class CheckCrossResonance(QubexTask):
         )
 
     def run(self, backend: QubexBackend, qid: str) -> RunResult:
+        adiabatic_safe_factor = validate_fraction(
+            self.run_parameters["adiabatic_safe_factor"].get_value(), "adiabatic_safe_factor"
+        )
+        max_amplitude = validate_fraction(
+            self.run_parameters["max_amplitude"].get_value(), "max_amplitude"
+        )
+        ramptime = self.run_parameters["ramptime"].value
+        optional: dict[str, Any] = {}
+        if ramptime is not None:
+            optional["ramptime"] = validate_ramptime(ramptime)
         exp = self.get_experiment(backend)
-        label = "-".join(
-            [exp.get_qubit_label(int(q)) for q in qid.split("-")]
-        )  # e.g., "0-1" → "Q00-Q01"
+        label = cr_pair_label(exp, qid)  # e.g., "0-1" → "Q00-Q01"
         control, target = (
             exp.get_qubit_label(int(q)) for q in qid.split("-")
         )  # e.g., "0-1" → "Q00","Q01"
@@ -316,20 +363,31 @@ class CheckCrossResonance(QubexTask):
             control: exp.drag_hpi_pulse[control],
             target: exp.drag_hpi_pulse[target],
         }
-        raw_result = exp.obtain_cr_params(
-            control,
-            target,
-            x90=x90,
-            n_shots=self.run_parameters["shots"].get_value(),
-            shot_interval=self.run_parameters["interval"].get_value(),
-            adiabatic_safe_factor=self.run_parameters["adiabatic_safe_factor"].get_value(),
-            max_amplitude=self.run_parameters["max_amplitude"].get_value(),
-            max_time_range=self.run_parameters["max_time_range"].get_value(),
-        )
-        fit_result = exp.calib_note.get_cr_param(label)
-        if fit_result is None:
-            error_message = "Fit result is None."
-            raise ValueError(error_message)
+        previous = copy_cr_entry(exp.calib_note, label)
+        self._previous_cr_entry = previous
+        try:
+            raw_result = exp.obtain_cr_params(
+                control,
+                target,
+                x90=x90,
+                n_shots=self.run_parameters["shots"].get_value(),
+                shot_interval=self.run_parameters["interval"].get_value(),
+                adiabatic_safe_factor=adiabatic_safe_factor,
+                max_amplitude=max_amplitude,
+                max_time_range=self.run_parameters["max_time_range"].get_value(),
+                **optional,
+            )
+            # Qubex stores every tomography iteration; this checks only that the stored
+            # entry was written during this run, not that it is the last iteration.
+            fit_result = require_fresh_cr_entry(previous, exp.calib_note.get_cr_param(label), label)
+            if ramptime is not None and fit_result["ramptime"] != optional["ramptime"]:
+                raise RuntimeError(
+                    f"Qubex stored ramptime {fit_result['ramptime']} for {label}, not the "
+                    f"requested {optional['ramptime']}"
+                )
+        except BaseException:
+            put_back_cr_entry(exp.calib_note, label, previous)
+            raise
         result = {
             "cr_duration": fit_result["duration"],
             "cr_amplitude": fit_result["cr_amplitude"],
@@ -343,6 +401,7 @@ class CheckCrossResonance(QubexTask):
             "cr_ramptime": fit_result["ramptime"],
             "coeffs_history": raw_result["coeffs_history"],
             "figs_history": raw_result.data["figs_history"],
+            "max_amplitude": max_amplitude,
+            "adiabatic_safe_factor": adiabatic_safe_factor,
         }
-        self.save_calibration(backend)
         return RunResult(raw_result=result)

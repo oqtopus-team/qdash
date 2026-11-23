@@ -232,6 +232,7 @@ export default withMermaid(
                 { text: "Calibration Data Lifecycle", link: "/developer-guide/workflow/calibration-data-lifecycle" },
                 { text: "Parameter Resolution", link: "/developer-guide/workflow/parameter-resolution" },
                 { text: "Frequency Parameter Policy", link: "/developer-guide/workflow/frequency-parameter-policy" },
+                { text: "Cross-Resonance Tasks", link: "/developer-guide/workflow/cross-resonance-tasks" },
                 { text: "Testing", link: "/developer-guide/workflow/testing" },
               ],
             },
