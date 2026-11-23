@@ -75,6 +75,7 @@ from qdash.api.services.agent_session_notifications import (
 )
 from qdash.api.services.calibration_session_service import CalibrationSessionService
 from qdash.api.services.catalog_task_run import resolve_catalog_task, run_catalog_task
+from qdash.api.services.run_ledger import RunLedger
 from qdash.common.agent_gate import evaluate_numeric_candidate
 from qdash.common.utils.datetime import now
 from qdash.datamodel.agent_session import (
@@ -399,6 +400,7 @@ class AgentSessionService:
                 # Written unadmitted: no operation passes until the reservation is finalized.
                 calibration_admission=CalibrationAdmission.PENDING,
                 calibration_reservation_id=reservation.reservation_id,
+                records_runs=True,
             )
         except BaseException:
             calibration.release_child(
@@ -2059,15 +2061,19 @@ class AgentSessionService:
         run_claim = None
         try:
             identity = None
-            if (
+            admitted_parent = (
                 session.calibration_session_id
+                if session.calibration_session_id
                 and session.calibration_admission == CalibrationAdmission.ADMITTED
-            ):
-                # The run of this dispatch, in the calibration session the agent session was
-                # admitted to, recorded before the launch so the worker stamps it.
-                run_claim, identity = CalibrationSessionService.begin_agent_action_run(
+                else None
+            )
+            if admitted_parent is not None or session.records_runs:
+                # The run of this dispatch, recorded before the launch so the worker stamps it:
+                # in the calibration session the agent session was admitted to, or in none.
+                # The agent session's gates above admitted it; the run only records it.
+                run_claim, identity = RunLedger.begin_agent_action_run(
                     project_id=project_id,
-                    calibration_session_id=session.calibration_session_id,
+                    calibration_session_id=admitted_parent,
                     chip_id=session.chip_id,
                     agent_session_id=session_id,
                     action_id=action_id,
@@ -2090,13 +2096,13 @@ class AgentSessionService:
                 execution_name=f"agent:{action.task_name}",
                 tags=[f"agent-session:{session_id}"],
                 calibration_run=identity,
-                # A session started before automatic sessions existed keeps its executions to
-                # itself: its runs are not recorded in a session it never had.
+                # A session created alone before agent actions recorded runs keeps its
+                # executions to itself: no run is recorded for them.
                 ungrouped=identity is None,
             )
         except Exception as exc:
             if run_claim is not None:
-                CalibrationSessionService.settle_agent_action_run(run_claim, error=exc)
+                RunLedger.settle_agent_action_run(run_claim, error=exc)
             actions.update_one(
                 reservation,
                 {
@@ -2109,7 +2115,7 @@ class AgentSessionService:
             raise
 
         if run_claim is not None:
-            CalibrationSessionService.settle_agent_action_run(run_claim, dispatched=operation)
+            RunLedger.settle_agent_action_run(run_claim, dispatched=operation)
         queued: dict[str, Any] = {
             "execution_status": "queued",
             "operation_id": operation.flow_run_id,

@@ -43,9 +43,9 @@ const ORIGIN_LABELS: Record<(typeof ORIGIN_FILTERS)[number], string> = {
 /**
  * The project's calibration sessions, newest first: one row per objective, linked to its page.
  *
- * Every run belongs to one. A run started without a session gets an automatic one, so the
- * origin filter separates the sessions people or agents created for an objective from those
- * QDash created for single runs. This page starts nothing.
+ * A run started without a session gets an automatic one, so the origin filter separates the
+ * sessions people or agents created for an objective from those QDash created for single runs.
+ * This page starts nothing.
  */
 export function CalibrationSessionListPageContent() {
   const linked = useLinkedProject();

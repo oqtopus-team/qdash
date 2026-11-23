@@ -1103,7 +1103,7 @@ class BodyLogin(BaseModel):
 class CalibrationSessionId(RootModel[str]):
     root: Annotated[str, Field(max_length=200, min_length=1, title="Calibration Session Id")]
     """
-    Add the run to this calibration session (open, on the task's chip, created by the signed-in user). Without it, QDash creates an automatic session.
+    Add the run to this calibration session (open, on the task's chip, created by the signed-in user); otherwise the request is refused before anything starts. Without it, the run joins an automatic session created for it.
     """
 
 
@@ -1133,7 +1133,7 @@ class BodyReExecuteTaskResult(BaseModel):
         CalibrationSessionId | None, Field(title="Calibration Session Id")
     ] = None
     """
-    Add the run to this calibration session (open, on the task's chip, created by the signed-in user). Without it, QDash creates an automatic session.
+    Add the run to this calibration session (open, on the task's chip, created by the signed-in user); otherwise the request is refused before anything starts. Without it, the run joins an automatic session created for it.
     """
     idempotency_key: Annotated[IdempotencyKey | None, Field(title="Idempotency Key")] = None
     """
@@ -1382,13 +1382,13 @@ class CalibrationParameterDeleteResponse(BaseModel):
 
 class CalibrationPipelineRunStatus(StrEnum):
     """
-    Dispatch state of one run requested in a calibration session, whatever its kind.
+    Dispatch state of one run, whatever its kind.
 
     ``dispatching``: the request was recorded and its launch has not reported back.
-    ``dispatched``: QDash created the pipeline's flow run; its executions carry its
-    ``flow_run_id``.
+    ``dispatched``: QDash created the run's flow run; its executions carry its ``run_id``.
     ``rejected``: QDash refused the launch before any flow run was created (the hardware was
-    busy or the worker deployment was missing); a retry with the same key may launch it.
+    busy, the worker deployment was missing, or the attempt was never admitted); a retry with
+    the same key may launch it.
     ``unknown``: the launch failed in a way that may have created a flow run anyway, or it
     stayed ``dispatching`` past the time a launch takes. A retry with the same key never
     launches it again.
@@ -1413,7 +1413,7 @@ class CalibrationRecommendationRef(BaseModel):
 
 class CalibrationRunKind(StrEnum):
     """
-    What one run of a calibration session launched.
+    What one run launched.
 
     ``pipeline``: a calibration pipeline spec (every run recorded before other kinds existed).
     ``workflow``: a saved workflow (flow). ``task``: one catalog task, from the Task Workbench
@@ -1844,7 +1844,7 @@ class PreviousInterventionId(RootModel[str]):
 class CalibrationSessionId1(RootModel[str]):
     root: Annotated[str, Field(max_length=200, min_length=1, title="Calibration Session Id")]
     """
-    Create the session in this calibration session, which must be open, on the same chip, and created by the signed-in user. It groups the session with the objective's other work and grants nothing beyond the policy.
+    Create the session in this calibration session, which must be open, on the same chip, and created by the signed-in user. It groups the session with the objective's other work and grants nothing beyond the policy. Without it, the session joins an automatic calibration session created for it.
     """
 
 
@@ -2382,7 +2382,7 @@ class ExecuteAgentActionRequest(BaseModel):
 class CalibrationSessionId2(RootModel[str]):
     root: Annotated[str, Field(max_length=200, min_length=1, title="Calibration Session Id")]
     """
-    Add the run to this calibration session, which must be open, on the run's chip, and created by the signed-in user. It groups the run with the session's other work and grants nothing. Without it, QDash creates an automatic session for the run.
+    Add the run to this calibration session, which must exist, be open, be on the run's chip, and be created by the signed-in user; otherwise the request is refused before anything starts. It groups the run with the session's other work and grants nothing. Without it, the run joins an automatic session created for it.
     """
 
 
@@ -2420,11 +2420,11 @@ class ExecuteFlowResponse(BaseModel):
     """
     calibration_session_id: Annotated[str | None, Field(title="Calibration Session Id")] = None
     """
-    The calibration session the run is recorded in: the one the request named, or the automatic session QDash created for it
+    The calibration session the run joined: the one the request named, or an automatic one; null when the run joined none
     """
     calibration_run_id: Annotated[str | None, Field(title="Calibration Run Id")] = None
     """
-    The run's record in that session; every step execution carries it
+    The run QDash recorded for the launch; every step execution carries it. Null only for a run the worker records when it starts (a saved flow with no chip)
     """
     replayed: Annotated[bool, Field(title="Replayed")] = False
     """
@@ -5006,7 +5006,7 @@ class QuickRunTaskRequest(BaseModel):
         CalibrationSessionId2 | None, Field(title="Calibration Session Id")
     ] = None
     """
-    Add the run to this calibration session, which must be open, on the run's chip, and created by the signed-in user. It groups the run with the session's other work and grants nothing. Without it, QDash creates an automatic session for the run.
+    Add the run to this calibration session, which must exist, be open, be on the run's chip, and be created by the signed-in user; otherwise the request is refused before anything starts. It groups the run with the session's other work and grants nothing. Without it, the run joins an automatic session created for it.
     """
     idempotency_key: Annotated[IdempotencyKey1 | None, Field(title="Idempotency Key")] = None
     """
@@ -8315,7 +8315,7 @@ class CreateAgentSessionRequest(BaseModel):
         CalibrationSessionId1 | None, Field(title="Calibration Session Id")
     ] = None
     """
-    Create the session in this calibration session, which must be open, on the same chip, and created by the signed-in user. It groups the session with the objective's other work and grants nothing beyond the policy.
+    Create the session in this calibration session, which must be open, on the same chip, and created by the signed-in user. It groups the session with the objective's other work and grants nothing beyond the policy. Without it, the session joins an automatic calibration session created for it.
     """
 
 
@@ -8793,7 +8793,7 @@ class ExecuteFlowRequest(BaseModel):
         CalibrationSessionId2 | None, Field(title="Calibration Session Id")
     ] = None
     """
-    Add the run to this calibration session, which must be open, on the run's chip, and created by the signed-in user. It groups the run with the session's other work and grants nothing. Without it, QDash creates an automatic session for the run.
+    Add the run to this calibration session, which must exist, be open, be on the run's chip, and be created by the signed-in user; otherwise the request is refused before anything starts. It groups the run with the session's other work and grants nothing. Without it, the run joins an automatic session created for it.
     """
     idempotency_key: Annotated[IdempotencyKey1 | None, Field(title="Idempotency Key")] = None
     """
@@ -8819,7 +8819,7 @@ class ExecutePipelineRequest(BaseModel):
         CalibrationSessionId2 | None, Field(title="Calibration Session Id")
     ] = None
     """
-    Add the run to this calibration session, which must be open, on the run's chip, and created by the signed-in user. It groups the run with the session's other work and grants nothing. Without it, QDash creates an automatic session for the run.
+    Add the run to this calibration session, which must exist, be open, be on the run's chip, and be created by the signed-in user; otherwise the request is refused before anything starts. It groups the run with the session's other work and grants nothing. Without it, the run joins an automatic session created for it.
     """
     idempotency_key: Annotated[IdempotencyKey1 | None, Field(title="Idempotency Key")] = None
     """
@@ -10825,11 +10825,11 @@ class ExecutePipelineResponse(BaseModel):
     """
     calibration_session_id: Annotated[str | None, Field(title="Calibration Session Id")] = None
     """
-    The calibration session the run is recorded in: the one the request named, or the automatic session QDash created for it
+    The calibration session the run joined: the one the request named, or an automatic one; null when the run joined none
     """
     calibration_run_id: Annotated[str | None, Field(title="Calibration Run Id")] = None
     """
-    The run's record in that session; every step execution carries it
+    The run QDash recorded for the launch; every step execution carries it. Null only for a run the worker records when it starts (a saved flow with no chip)
     """
     replayed: Annotated[bool, Field(title="Replayed")] = False
     """
@@ -10839,7 +10839,7 @@ class ExecutePipelineResponse(BaseModel):
     targets: ResolvedPipelineTargets | None = None
     pipeline_run_id: Annotated[str | None, Field(title="Pipeline Run Id")] = None
     """
-    The run's record in its calibration session
+    The run QDash recorded for the launch (calibration_run_id)
     """
     decision_id: Annotated[str | None, Field(title="Decision Id")] = None
     """

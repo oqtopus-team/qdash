@@ -37,7 +37,7 @@ from qdash.api.services.calibration_session_service import CalibrationSessionSer
 from qdash.api.services.flow_schedule_service import FlowScheduleService
 from qdash.api.services.flow_service import FlowService
 from qdash.api.services.source_format_service import format_source
-from qdash.datamodel.calibration_session import CalibrationRunKind
+from qdash.datamodel.run import RunKind
 
 router = APIRouter()
 logger = getLogger("uvicorn.app")
@@ -296,10 +296,11 @@ async def execute_flow(
 ) -> ExecuteFlowResponse:
     """Execute a Flow via Prefect deployment, as one run of a calibration session.
 
-    The run is recorded before it is launched: in ``calibration_session_id`` when given,
-    otherwise in an automatic session QDash creates for it. Every step execution of the run
-    carries the session and run IDs. ``idempotency_key`` makes a retry return the recorded
-    run instead of starting another.
+    The run is recorded before it is launched. It joins ``calibration_session_id`` when given
+    (refused before launch if that session cannot take it); otherwise an automatic session
+    created for it. Every step execution of the run
+    carries the run ID, and the session ID when it has one. ``idempotency_key`` makes a retry
+    return the recorded run instead of starting another.
     """
     prepared = service.prepare_flow_run(name, request, ctx.user.username, ctx.project_id)
     return await launch_run(
@@ -307,7 +308,7 @@ async def execute_flow(
         project_id=ctx.project_id,
         username=ctx.user.username,
         chip_id=prepared.chip_id,
-        kind=CalibrationRunKind.WORKFLOW,
+        kind=RunKind.WORKFLOW,
         run_name=name,
         request={
             "flow_name": name,

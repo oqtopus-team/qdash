@@ -54,12 +54,9 @@ from qdash.api.services.manual_round_checks import load_chip_round_model
 from qdash.common.manual_rounds import MANUAL_TARGET_OVERRIDE_REASON
 from qdash.common.mux_mapping import resolve_topology_mux_mapping
 from qdash.config import get_settings
-from qdash.datamodel.calibration_session import (
-    CALIBRATION_RUN_CONTEXT_KEY,
-    CalibrationRunIdentity,
-)
 from qdash.datamodel.flow_targets import TARGET_CONTEXT_KEY, FlowTargetOverride
-from qdash.repository.calibration_run import NOTE_RUN_KEY, NOTE_SESSION_KEY, UNGROUPED_MARKER
+from qdash.datamodel.run import RUN_CONTEXT_KEY, RunIdentity
+from qdash.repository.run_ledger import NOTE_RUN_KEY, NOTE_SESSION_KEY, UNGROUPED_MARKER
 
 if TYPE_CHECKING:
     from uuid import UUID
@@ -363,7 +360,7 @@ class FlowService:
         request: ExecuteFlowRequest,
         username: str,
         project_id: str,
-        calibration_run: CalibrationRunIdentity | None = None,
+        calibration_run: RunIdentity | None = None,
     ) -> ExecuteFlowResponse:
         """Execute a saved flow through its Prefect deployment."""
         prepared = self.prepare_flow_run(name, request, username, project_id)
@@ -444,7 +441,7 @@ class FlowService:
     async def dispatch_flow_run(
         self,
         prepared: PreparedFlowRun,
-        calibration_run: CalibrationRunIdentity | None = None,
+        calibration_run: RunIdentity | None = None,
     ) -> ExecuteFlowResponse:
         """Launch a prepared saved-flow run, handing the worker its calibration run."""
         name = prepared.name
@@ -566,7 +563,7 @@ class FlowService:
         backend_name: str | None = None,
         default_run_parameters: dict[str, Any] | None = None,
         task_run_parameters: dict[str, dict[str, Any]] | None = None,
-        calibration_run: CalibrationRunIdentity | None = None,
+        calibration_run: RunIdentity | None = None,
         ungrouped: bool = False,
     ) -> ExecuteFlowResponse:
         """Execute one task for one qubit through the system single-task deployment.
@@ -604,7 +601,7 @@ class FlowService:
 
         try:
             context: dict[str, Any] = (
-                {CALIBRATION_RUN_CONTEXT_KEY: {UNGROUPED_MARKER: True}}
+                {RUN_CONTEXT_KEY: {UNGROUPED_MARKER: True}}
                 if ungrouped and calibration_run is None
                 else with_calibration_run({}, calibration_run)
             )
@@ -644,7 +641,7 @@ class FlowService:
         backend_name: str | None = None,
         flow_name: str | None = None,
         tags: list[str] | None = None,
-        calibration_run: CalibrationRunIdentity | None = None,
+        calibration_run: RunIdentity | None = None,
     ) -> ExecuteFlowResponse:
         """Run a validated pipeline spec through the system pipeline deployment.
 
@@ -830,28 +827,28 @@ class PreparedFlowRun:
 
 
 def with_calibration_run(
-    context: dict[str, Any], calibration_run: CalibrationRunIdentity | None
+    context: dict[str, Any], calibration_run: RunIdentity | None
 ) -> dict[str, Any]:
     """The flow-run context with the run identity the worker stamps on every step."""
     if calibration_run is None:
         return dict(context)
-    return {**context, CALIBRATION_RUN_CONTEXT_KEY: calibration_run.model_dump()}
+    return {**context, RUN_CONTEXT_KEY: calibration_run.model_dump()}
 
 
-def calibration_note_of(calibration_run: CalibrationRunIdentity | None) -> dict[str, str]:
+def calibration_note_of(calibration_run: RunIdentity | None) -> dict[str, str]:
     """The note keys of the execution QDash pre-creates for a run."""
     if calibration_run is None:
         return {}
-    return {
-        NOTE_SESSION_KEY: calibration_run.calibration_session_id,
-        NOTE_RUN_KEY: calibration_run.run_id,
-    }
+    note = {NOTE_RUN_KEY: calibration_run.run_id}
+    if calibration_run.calibration_session_id is not None:
+        note[NOTE_SESSION_KEY] = calibration_run.calibration_session_id
+    return note
 
 
 def _execute_response(
     result: DispatchResult,
     message: str,
-    calibration_run: CalibrationRunIdentity | None = None,
+    calibration_run: RunIdentity | None = None,
 ) -> ExecuteFlowResponse:
     """Map a dispatched run onto the API response, falling back to the flow run ID."""
     return ExecuteFlowResponse(

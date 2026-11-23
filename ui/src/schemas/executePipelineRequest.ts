@@ -22,7 +22,7 @@ export interface ExecutePipelineRequest {
   spec: ExecutePipelineRequestSpec;
   /** Defaults to the configured backend. */
   backend_name?: ExecutePipelineRequestBackendName;
-  /** Add the run to this calibration session, which must be open, on the run's chip, and created by the signed-in user. It groups the run with the session's other work and grants nothing. Without it, QDash creates an automatic session for the run. */
+  /** Add the run to this calibration session, which must exist, be open, be on the run's chip, and be created by the signed-in user; otherwise the request is refused before anything starts. It groups the run with the session's other work and grants nothing. Without it, the run joins an automatic session created for it. */
   calibration_session_id?: ExecutePipelineRequestCalibrationSessionId;
   /** A retry with the same key and request returns the recorded run instead of starting another, and a run whose launch outcome is unknown is never launched again with it. Without a key, every request starts a new run. */
   idempotency_key?: ExecutePipelineRequestIdempotencyKey;

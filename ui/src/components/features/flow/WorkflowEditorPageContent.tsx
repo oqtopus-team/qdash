@@ -366,7 +366,8 @@ export function WorkflowEditorPageContent() {
         chipId: typeof runChipId === "string" ? runChipId : "",
         username: String(variables.data.parameters?.username ?? ""),
       });
-      // Every run is recorded in a calibration session: the one named, or an automatic one.
+      // The run's calibration session: an automatic one, or none when the server does not
+      // group runs automatically.
       const calibrationSessionId = response.data.calibration_session_id;
       toast.success(`Flow execution started! Execution ID: ${execId || "N/A"}`, {
         ...(calibrationSessionId

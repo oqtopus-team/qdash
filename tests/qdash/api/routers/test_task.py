@@ -13,7 +13,7 @@ from qdash.api.schemas.flow import ExecuteFlowResponse
 from qdash.api.schemas.task import QuickRunTaskRequest
 from qdash.api.schemas.task_file import ListTaskInfoResponse, TaskInfo
 from qdash.api.services.calibration_session_service import PipelineDispatch
-from qdash.datamodel.calibration_session import CalibrationRunIdentity
+from qdash.datamodel.run import RunIdentity
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 
 PLACEHOLDER = ExecuteFlowResponse(
@@ -26,9 +26,12 @@ PLACEHOLDER = ExecuteFlowResponse(
 
 
 class _Sessions:
-    """Records nothing: validates, then dispatches with a fixed run identity."""
+    """Records nothing: validates, then dispatches with a fixed run identity.
 
-    identity = CalibrationRunIdentity(calibration_session_id="cs-test", run_id="cpr-test")
+    Stands in for the run ledger, which ``launch_run`` builds from the sessions it is given.
+    """
+
+    identity = RunIdentity(calibration_session_id="cs-test", run_id="cpr-test")
 
     async def launch(self, *, validate: Any, dispatch: Any, **_: Any) -> PipelineDispatch:
         dispatched = await dispatch(validate(), self.identity)
@@ -39,6 +42,16 @@ class _Sessions:
             replayed=False,
             calibration_session_id=self.identity.calibration_session_id,
         )
+
+
+@pytest.fixture(autouse=True)
+def _ledger_is_the_fake(monkeypatch: pytest.MonkeyPatch) -> None:
+    from qdash.api.services.run_ledger import RunLedger
+
+    monkeypatch.setattr(
+        "qdash.api.services.calibration_run_launch.RunLedger",
+        lambda sessions: sessions if isinstance(sessions, _Sessions) else RunLedger(sessions),
+    )
 
 
 def _project_context() -> SimpleNamespace:

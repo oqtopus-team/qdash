@@ -47,6 +47,7 @@ if "prefect" not in sys.modules:
 
 import mongomock
 import pytest
+from pymongo import IndexModel
 from pymongo.database import Database
 
 # Configure pytest-asyncio
@@ -112,6 +113,32 @@ def _patched_command(self: Any, command: dict[str, Any] | str, **kwargs: Any) ->
     return {"ok": 1.0}
 
 
+def _patched_create_indexes(self: Any, indexes: list[IndexModel], session: Any = None) -> list[str]:
+    """Create IndexModel indexes as MongoDB does, keeping ``partialFilterExpression``.
+
+    mongomock's own ``create_indexes`` drops the partial filter, which turns a unique partial
+    index into a unique index over every document.
+    """
+    names: list[str] = []
+    for index in indexes:
+        document = index.document
+        options = {
+            key: document[key]
+            for key in ("expireAfterSeconds", "partialFilterExpression", "name")
+            if key in document
+        }
+        names.append(
+            self.create_index(
+                list(document["key"].items()),
+                session=session,
+                unique=document.get("unique", False),
+                sparse=document.get("sparse", False),
+                **options,
+            )
+        )
+    return names
+
+
 @pytest.fixture
 def init_db() -> Generator[Database[Any], None, None]:
     """Initialize Bunnet with in-memory mongomock database.
@@ -136,7 +163,10 @@ def init_db() -> Generator[Database[Any], None, None]:
     db_name = "qdash_test"
 
     # Patch mongomock's command method to support Bunnet
-    with patch.object(mongomock.Database, "command", _patched_command):
+    with (
+        patch.object(mongomock.Database, "command", _patched_command),
+        patch.object(mongomock.Collection, "create_indexes", _patched_create_indexes),
+    ):
         set_test_client(client, db_name=db_name)
         db = client[db_name]
         yield db

@@ -1,4 +1,4 @@
-"""Records as QDash wrote them before automatic calibration sessions existed.
+"""Records as QDash wrote them before automatic calibration sessions and run recording existed.
 
 An agent session created without a calibration session now gets an automatic one. Tests of
 behavior that legacy records keep (a standalone agent session row, an agent session that
@@ -23,7 +23,9 @@ def make_standalone_agent_session(project_id: str, session_id: str) -> None:
                 "calibration_session_id": None,
                 "calibration_admission": None,
                 "calibration_reservation_id": None,
-            }
+            },
+            # Written before agent actions recorded runs: the field did not exist.
+            "$unset": {"records_runs": ""},
         },
     )
     if parent:

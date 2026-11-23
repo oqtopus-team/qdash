@@ -7,7 +7,7 @@
  */
 
 /**
- * What one run of a calibration session launched.
+ * What one run launched.
  *
  * ``pipeline``: a calibration pipeline spec (every run recorded before other kinds existed).
  * ``workflow``: a saved workflow (flow). ``task``: one catalog task, from the Task Workbench

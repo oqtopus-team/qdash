@@ -112,7 +112,7 @@ revisions each dashboard pins (`pins`, keyed by `dashboard_id`) and a `version` 
 | `agent_interventions` | `AgentInterventionDocument` | `agent_session.py` |
 | `agent_decisions` | `AgentDecisionDocument` | `agent_session.py` |
 | `calibration_sessions` | `CalibrationSessionDocument` | `calibration_session.py` |
-| `calibration_pipeline_runs` | `CalibrationPipelineRunDocument` | `calibration_session.py` |
+| `calibration_pipeline_runs` | `RunDocument` (alias `CalibrationPipelineRunDocument`) | `run.py` |
 | `calibration_decisions` | `CalibrationDecisionDocument` | `calibration_session.py` |
 | `pipeline_launches` | `PipelineLaunchDocument` | `pipeline_launch.py` |
 | `parameter_versions` | `ParameterVersionDocument` | `provenance.py` |
@@ -133,8 +133,13 @@ run started without a session ID, `manual` (or no field, for older documents) ot
 `calibration_pipeline_runs` document is one run of any kind: `run_kind` (`pipeline`, `workflow`,
 `task`, or `agent_action`; older documents have none and are pipelines), `run_name`, `trigger`
 (`api`, `schedule`, or `worker`), and, for an agent action, `agent_session_id` and `action_id`.
-An `execution_history` document of a run's step stores `note.calibration_session_id` and
-`note.calibration_run_id`; older executions have neither. A `calibration_pipeline_runs` document
+It also stores `idempotency_scope` (unique per project through `run_idempotency_scope_unique`),
+`admission` (`pending` or `admitted`), and `association` (`explicit`, `automatic`,
+`agent_session`, or `none`); older documents have none of them. `calibration_session_id` is null
+for a run in no session. An `agent_sessions` document stores `records_runs` when its actions
+record runs; older documents have none. An `execution_history` document of a run's step stores
+`note.calibration_run_id`, and `note.calibration_session_id` when the run has a session; older
+executions have neither. A `calibration_pipeline_runs` document
 also stores the caller's
 `reported_origin` when one was reported, the normalized `spec` it validated, and the
 `decision_id` of the decision it carries out when the request named one; older runs have

@@ -214,7 +214,7 @@ class ExecutePipelineResponse(ExecuteFlowResponse):
     steps: list[ResolvedPipelineStep] = Field(default_factory=list)
     targets: ResolvedPipelineTargets | None = None
     pipeline_run_id: str | None = Field(
-        default=None, description="The run's record in its calibration session"
+        default=None, description="The run QDash recorded for the launch (calibration_run_id)"
     )
     decision_id: str | None = Field(
         default=None,

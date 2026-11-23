@@ -207,8 +207,11 @@ def resolve_execution_relations(
         stamped_run = stamped.get(_run_id(execution) or "")
         flow_run_id = _flow_run_id(execution)
         if stamped_run is not None:
-            # The worker named the run: that record alone, on the execution's chip.
-            if stamped_run.get("chip_id") == execution.chip_id:
+            # The worker named the run: that record alone, on the execution's chip. A run
+            # without a calibration session relates the execution to none.
+            if stamped_run.get("chip_id") == execution.chip_id and stamped_run.get(
+                "calibration_session_id"
+            ):
                 found.append(
                     (
                         str(stamped_run["calibration_session_id"]),
@@ -218,6 +221,8 @@ def resolve_execution_relations(
                 )
         elif flow_run_id is not None:
             for run in runs.get((execution.chip_id, flow_run_id), []):
+                if not run.get("calibration_session_id"):
+                    continue
                 found.append(
                     (str(run["calibration_session_id"]), "pipeline_run", str(run["run_id"]))
                 )

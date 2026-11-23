@@ -1,4 +1,8 @@
-"""Persistence models for calibration sessions and the runs requested in them."""
+"""Persistence models for calibration sessions and their decisions.
+
+Runs are ``qdash.dbmodel.run.RunDocument``; ``CalibrationPipelineRunDocument`` is its earlier
+name, kept for the code and tests that use it.
+"""
 
 from __future__ import annotations
 
@@ -19,20 +23,17 @@ from qdash.datamodel.calibration_session import (
     CalibrationChildReservation,
     CalibrationDecisionOutcome,
     CalibrationExperimentStage,
-    CalibrationPipelineRunStatus,
-    CalibrationRunKind,
-    CalibrationRunTrigger,
     CalibrationSessionOrigin,
     CalibrationSessionStatus,
 )
-from qdash.datamodel.launch_origin import ReportedLaunchOrigin  # noqa: TC001 - Bunnet field
+from qdash.dbmodel.run import RunDocument
 
 
 class CalibrationSessionDocument(Document):
     """One calibration objective on one chip.
 
-    Agent sessions name it in ``AgentSessionDocument.calibration_session_id``; runs are
-    ``CalibrationPipelineRunDocument`` records. Neither is copied here, so the session record
+    Agent sessions name it in ``AgentSessionDocument.calibration_session_id``; runs name it
+    in ``RunDocument.calibration_session_id``. Neither is copied here, so the session record
     changes only when it is closed.
     """
 
@@ -96,96 +97,8 @@ class CalibrationSessionDocument(Document):
         ]
 
 
-class CalibrationPipelineRunDocument(Document):
-    """One run requested in a calibration session, recorded before it is launched.
-
-    The collection keeps its original name; ``run_kind`` says what the run launched (a
-    record without one is a pipeline run, the only kind that existed then). The record is
-    inserted against its unique ``(project_id, calibration_session_id, idempotency_key)``
-    before the flow run is created, so a retry finds it instead of launching again.
-    ``dispatch_token`` names the attempt that holds the launch; only that attempt settles it.
-    Once dispatched, the run's step executions are the executions of the project and chip
-    whose ``note.calibration_run_id`` is ``run_id``, or, for runs recorded before that note
-    existed, whose ``note.flow_run_id`` is ``flow_run_id``.
-
-    A run the worker found unrecorded (a scheduled flow run) is inserted by the worker when
-    the flow starts, already ``dispatched``, with IDs derived from its flow run, so a Prefect
-    retry of the same flow run finds it instead of adding another.
-    """
-
-    run_id: str
-    project_id: str
-    calibration_session_id: str
-    chip_id: str
-    run_kind: CalibrationRunKind = CalibrationRunKind.PIPELINE
-    trigger: CalibrationRunTrigger = CalibrationRunTrigger.API
-    # What the run launched: the workflow name, the pipeline name, or the task and target.
-    run_name: str = ""
-    # For an agent action's run: the agent session and the action that dispatched it.
-    agent_session_id: str | None = None
-    action_id: str | None = None
-    idempotency_key: str
-    request_hash: str
-    requested_by: str
-    # How the caller said it started the run (client reported, never verified); None when it
-    # reported nothing. ``requested_by`` stays the user the request authenticated.
-    reported_origin: ReportedLaunchOrigin | None = None
-    status: CalibrationPipelineRunStatus = CalibrationPipelineRunStatus.DISPATCHING
-    dispatch_token: str
-    # The calibration session reservation of the attempt that holds ``dispatch_token``. The
-    # attempt launches only after removing that reservation, so a run still ``dispatching``
-    # whose reservation is pending or was cleared by a close was never launched.
-    reservation_id: str | None = None
-    attempts: int = 1
-    # Only for ``run_kind`` ``pipeline``; ``run_name`` names every kind.
-    pipeline_name: str = ""
-    backend_name: str = ""
-    flow_run_id: str | None = None
-    # The execution QDash pre-created for the first step; None when pre-creation failed.
-    execution_id: str | None = None
-    # The dispatch response, returned unchanged to a retry of the same request.
-    response: dict[str, Any] | None = None
-    error: str = ""
-    # The normalized spec QDash validated for the attempt that holds the launch: the exact
-    # request, so the audit can compare requested and executed run parameters. None for runs
-    # recorded before it was stored.
-    spec: dict[str, Any] | None = None
-    # The decision of the session this run carries out, named by the request; None when the
-    # request named none (every run recorded before decisions existed).
-    decision_id: str | None = None
-    requested_at: datetime = Field(default_factory=now)
-    updated_at: datetime = Field(default_factory=now)
-
-    model_config = ConfigDict(from_attributes=True)
-
-    class Settings:
-        """MongoDB collection settings."""
-
-        name = "calibration_pipeline_runs"
-        indexes: ClassVar = [
-            IndexModel([("run_id", ASCENDING)], unique=True),
-            IndexModel(
-                [
-                    ("project_id", ASCENDING),
-                    ("calibration_session_id", ASCENDING),
-                    ("idempotency_key", ASCENDING),
-                ],
-                unique=True,
-            ),
-            IndexModel(
-                [
-                    ("project_id", ASCENDING),
-                    ("calibration_session_id", ASCENDING),
-                    ("requested_at", ASCENDING),
-                ]
-            ),
-            # The Execution list finds the run a step execution belongs to by its flow run.
-            IndexModel([("project_id", ASCENDING), ("flow_run_id", ASCENDING)]),
-            IndexModel(
-                [("project_id", ASCENDING), ("agent_session_id", ASCENDING)],
-                sparse=True,
-            ),
-        ]
+# The run record, under the name it had when every run was a pipeline run.
+CalibrationPipelineRunDocument = RunDocument
 
 
 class RequestedParameterChange(BaseModel):

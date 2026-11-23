@@ -15,7 +15,6 @@ from qdash.dbmodel.backend import BackendDocument
 from qdash.dbmodel.calibration_note import CalibrationNoteDocument
 from qdash.dbmodel.calibration_session import (
     CalibrationDecisionDocument,
-    CalibrationPipelineRunDocument,
     CalibrationSessionDocument,
 )
 from qdash.dbmodel.chip import ChipDocument
@@ -55,6 +54,7 @@ from qdash.dbmodel.provenance import (
 )
 from qdash.dbmodel.qubit import QubitDocument
 from qdash.dbmodel.qubit_history import QubitHistoryDocument
+from qdash.dbmodel.run import RunDocument
 from qdash.dbmodel.slack_forum_thread import SlackForumThreadDocument
 from qdash.dbmodel.tag import TagDocument
 from qdash.dbmodel.target_note import TargetNoteDocument
@@ -75,7 +75,7 @@ def document_models() -> list[Any]:
         AgentDecisionDocument,
         AgentInterventionDocument,
         CalibrationSessionDocument,
-        CalibrationPipelineRunDocument,
+        RunDocument,
         CalibrationDecisionDocument,
         PipelineLaunchDocument,
         ExecutionHistoryDocument,

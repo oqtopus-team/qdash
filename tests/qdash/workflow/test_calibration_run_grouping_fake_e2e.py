@@ -323,6 +323,142 @@ class TestSavedWorkflowRun:
         assert [r["executions_total"] for r in row["pipeline_runs"]] == [2, 2]
 
 
+def _without_session(run_id: str, dispatched: dict[str, Any]) -> None:
+    """Remove a launched run's session, as a run recorded without one has none."""
+    record = CalibrationPipelineRunDocument.find_one({"run_id": run_id}).run()
+    assert record is not None and record.calibration_session_id is not None
+    CalibrationSessionDocument.get_motor_collection().delete_one(
+        {"calibration_session_id": record.calibration_session_id}
+    )
+    CalibrationPipelineRunDocument.get_motor_collection().update_one(
+        {"run_id": run_id},
+        {"$set": {"calibration_session_id": None, "association": "none"}},
+    )
+    dispatched["context"]["qdash_calibration_run"]["calibration_session_id"] = None
+
+
+@pytest.mark.usefixtures("saved")
+class TestRunsWithoutASession:
+    """A run recorded without a calibration session keeps every guarantee.
+
+    QDash gives every launch that names no session an automatic one, so a run without a
+    session is history (or an action of an agent session that has none). The test launches
+    normally and then removes the run's session from its record, the session record itself,
+    and the identity handed to the worker, before the worker runs.
+    """
+
+    def test_a_run_without_a_session_is_still_one_bound_replayable_run(
+        self,
+        test_client: TestClient,
+        coordinator: _RecordingCoordinator,  # noqa: F811
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        response = test_client.post(
+            f"/flows/{FLOW_NAME}/execute", headers=HEADERS, json={"idempotency_key": "click-1"}
+        )
+        assert response.status_code == 200, response.text
+        body = response.json()
+        run_id = body["calibration_run_id"]
+        [run] = coordinator.runs
+        handed = run["context"]["qdash_calibration_run"]
+        assert handed["dispatch_token"] and handed["dispatch_token"] not in response.text
+        _without_session(run_id, run)
+
+        _run_as_worker(run, monkeypatch, flow_run_id="flow-run-1")
+
+        steps = _steps_of("flow-run-1")
+        assert sorted(step.note["step_name"] for step in steps) == ["bringup", "second"]
+        assert all(step.status == "completed" for step in steps), [s.status for s in steps]
+        for step in steps:
+            assert step.note["calibration_run_id"] == run_id
+            assert "calibration_session_id" not in step.note
+        assert CalibrationSessionDocument.find_all().count() == 0
+        [recorded] = CalibrationPipelineRunDocument.find_all().to_list()
+        assert (recorded.run_id, recorded.flow_run_id) == (run_id, "flow-run-1")
+        assert recorded.association == "none" and recorded.admission == "admitted"
+
+        # The Execution list shows the steps as ordinary executions, related to no session.
+        groups = test_client.get(
+            "/executions/groups", headers=HEADERS, params={"chip_id": CHIP_ID}
+        ).json()
+        assert {row["kind"] for row in groups["items"]} == {"execution"}
+        assert groups["grouped_executions"] == 0
+        for step in steps:
+            link = test_client.get(f"/executions/{step.execution_id}", headers=HEADERS).json()
+            assert link["calibration_session"] is None
+
+        again = test_client.post(
+            f"/flows/{FLOW_NAME}/execute", headers=HEADERS, json={"idempotency_key": "click-1"}
+        )
+        assert again.status_code == 200, again.text
+        assert (again.json()["calibration_run_id"], again.json()["replayed"]) == (run_id, True)
+        assert len(coordinator.runs) == 1
+
+    def test_a_closed_named_session_refuses_before_anything_is_dispatched(
+        self,
+        test_client: TestClient,
+        coordinator: _RecordingCoordinator,  # noqa: F811
+    ) -> None:
+        created = test_client.post(
+            "/calibration-sessions",
+            headers=HEADERS,
+            json={"chip_id": CHIP_ID, "objective": "Tune qubit 0"},
+        )
+        session_id = created.json()["calibration_session_id"]
+        closed = test_client.post(
+            f"/calibration-sessions/{session_id}/close", headers=HEADERS, json={}
+        )
+        assert closed.status_code == 200, closed.text
+        for named in (session_id, "cs-does-not-exist"):
+            response = test_client.post(
+                f"/flows/{FLOW_NAME}/execute",
+                headers=HEADERS,
+                json={"calibration_session_id": named, "idempotency_key": f"k-{named}"},
+            )
+            assert response.status_code in (404, 409), response.text
+        assert coordinator.runs == []
+        assert CalibrationPipelineRunDocument.find_all().count() == 0
+        # Refused, never turned into a run of an automatic session.
+        assert CalibrationSessionDocument.find_all().count() == 1
+
+    def test_grouped_runs_and_runs_without_a_session_read_side_by_side(
+        self,
+        test_client: TestClient,
+        coordinator: _RecordingCoordinator,  # noqa: F811
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        grouped = test_client.post(
+            f"/flows/{FLOW_NAME}/execute", headers=HEADERS, json={"idempotency_key": "before"}
+        ).json()
+        _run_as_worker(coordinator.runs[-1], monkeypatch, flow_run_id="flow-run-1")
+        from qdash.workflow.service._internal import run_identity
+
+        run_identity._resolved.clear()
+        ungrouped = test_client.post(
+            f"/flows/{FLOW_NAME}/execute", headers=HEADERS, json={"idempotency_key": "after"}
+        ).json()
+        _without_session(ungrouped["calibration_run_id"], coordinator.runs[-1])
+        _run_as_worker(coordinator.runs[-1], monkeypatch, flow_run_id="flow-run-2")
+        recorded = CalibrationPipelineRunDocument.find_one(
+            {"run_id": ungrouped["calibration_run_id"]}
+        ).run()
+        assert recorded is not None and recorded.calibration_session_id is None
+
+        session_id = grouped["calibration_session_id"]
+        detail = test_client.get(f"/calibration-sessions/{session_id}", headers=HEADERS).json()
+        [listed] = detail["pipeline_runs"]
+        assert listed["run_id"] == grouped["calibration_run_id"]
+        assert len(listed["executions"]) == 2
+        rows = test_client.get(
+            "/executions/groups", headers=HEADERS, params={"chip_id": CHIP_ID}
+        ).json()["items"]
+        assert sorted(row["kind"] for row in rows) == [
+            "calibration_session",
+            "execution",
+            "execution",
+        ]
+
+
 @pytest.mark.usefixtures("saved")
 class TestScheduledRun:
     def test_a_cron_run_is_recorded_by_the_worker_once_per_flow_run(

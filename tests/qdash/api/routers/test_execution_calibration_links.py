@@ -199,7 +199,12 @@ class TestPipelineMembership:
             assert _execute(test_client, session_id=first).status_code == 202
         [run] = CalibrationPipelineRunDocument.find_all().run()
         clash = run.model_copy(
-            update={"id": None, "run_id": "cpr-clash", "calibration_session_id": second}
+            update={
+                "id": None,
+                "run_id": "cpr-clash",
+                "calibration_session_id": second,
+                "idempotency_scope": "key:clash",
+            }
         )
         clash.insert()
         _step_execution("step-1", "flow-a", 1, "completed")

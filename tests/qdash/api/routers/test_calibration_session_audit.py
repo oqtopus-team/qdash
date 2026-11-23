@@ -291,6 +291,7 @@ class TestGroupedList:
                 "run_id": "cpr-clash",
                 "calibration_session_id": other,
                 "idempotency_key": "x",
+                "idempotency_scope": "key:x",
             }
         ).insert()
         _step_execution(executed["execution_id"], "flow-a", 1, "completed")
