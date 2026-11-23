@@ -13,7 +13,8 @@ degree-3 polynomial fit as the ZX90 amplitude.
 
 ## Run parameters
 
-A workflow sets these through the task's `run` entry.
+A workflow sets these through each `TaskCall`'s `run` entry, as described in
+[Task Calls](./task-calls.md#settings).
 
 | Parameter | Task | Accepted values | When unset |
 | --- | --- | --- | --- |
@@ -30,14 +31,18 @@ of 0 lets Qubex derive the duration. Both tasks fail when the ramp time Qubex st
 from the requested one. A ramp time is a pulse-shape choice; no value is safe for every pair.
 
 ```python
-from qdash.workflow import sweep
+from qdash.workflow import TaskCall, sweep
 
-task_parameters={
-    "CheckCrossResonance": {"run": {"ramptime": 24.0, "max_amplitude": 0.6}},
-    "CreateZX90": {
-        "run": {"duration": 208.0, "amplitude_range": sweep.linspace(0.2, 0.5, 50)},
-    },
-}
+tasks = [
+    TaskCall(
+        name="CheckCrossResonance",
+        run={"ramptime": 24.0, "max_amplitude": 0.6},
+    ),
+    TaskCall(
+        name="CreateZX90",
+        run={"duration": 208.0, "amplitude_range": sweep.linspace(0.2, 0.5, 50)},
+    ),
+]
 ```
 
 ## Amplitude caps
