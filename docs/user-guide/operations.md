@@ -108,6 +108,13 @@ An older API does not enforce the new admission checks. Keep requests stopped un
 runtime, UI, and worker instances use the selected release. Retain the added collections and
 indexes; deleting them does not make an unresolved run safe to retry.
 
+Releases that record every run in a calibration session add fields to the same collections and
+an index on executions; existing records keep their meaning and are not moved into a session.
+Upgrade the API and the workflow worker together: the worker records scheduled runs itself, and
+an older API ignores the session and retry fields of a workflow or task launch. Rolling back
+follows the steps above; sessions and runs recorded meanwhile stay in the database and remain
+readable after a later upgrade.
+
 The [admission and dispatch records](../developer-guide/agent/calibration-sessions.md#deployment-compatibility)
 explain which states must be resolved before rollback.
 

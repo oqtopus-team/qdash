@@ -7,6 +7,6 @@
  */
 
 /**
- * The calibration session the run is recorded in, if any
+ * The calibration session the run is recorded in: the one the request named, or the automatic session QDash created for it
  */
 export type ExecutePipelineResponseCalibrationSessionId = string | null;

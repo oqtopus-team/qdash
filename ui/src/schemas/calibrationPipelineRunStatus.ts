@@ -7,7 +7,7 @@
  */
 
 /**
- * Dispatch state of one pipeline run requested in a calibration session.
+ * Dispatch state of one run requested in a calibration session, whatever its kind.
  *
  * ``dispatching``: the request was recorded and its launch has not reported back.
  * ``dispatched``: QDash created the pipeline's flow run; its executions carry its

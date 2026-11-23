@@ -1,4 +1,4 @@
-"""API schemas for calibration sessions: one objective, its pipeline runs and agent sessions."""
+"""API schemas for calibration sessions: one objective, its runs and agent sessions."""
 
 from __future__ import annotations
 
@@ -25,6 +25,9 @@ from qdash.datamodel.calibration_session import (
     CalibrationDecisionOutcome,
     CalibrationExperimentStage,
     CalibrationPipelineRunStatus,
+    CalibrationRunKind,
+    CalibrationRunTrigger,
+    CalibrationSessionOrigin,
     CalibrationSessionStatus,
 )
 from qdash.datamodel.launch_origin import ReportedLaunchOrigin  # noqa: TC001 - pydantic field
@@ -71,6 +74,13 @@ class CalibrationSessionResponse(BaseModel):
     objective: str
     created_by: str = Field(description="The signed-in user who created it")
     status: CalibrationSessionStatus
+    origin: CalibrationSessionOrigin = Field(
+        default=CalibrationSessionOrigin.MANUAL,
+        description=(
+            "manual when a person or agent created it for an objective; automatic when QDash "
+            "created it for a run started without a session ID (a later run may name it)"
+        ),
+    )
     created_at: datetime
     updated_at: datetime
     closed_at: datetime | None = None
@@ -101,11 +111,31 @@ class ListCalibrationSessionsResponse(BaseModel):
 
 
 class CalibrationPipelineRunResponse(BaseModel):
-    """One pipeline run requested in a calibration session, with its step executions."""
+    """One run requested in a calibration session, with its step executions."""
 
     run_id: str
     calibration_session_id: str
     chip_id: str
+    run_kind: CalibrationRunKind = Field(
+        default=CalibrationRunKind.PIPELINE,
+        description="What the run launched: a pipeline, a saved workflow, a task, or an agent action",
+    )
+    trigger: CalibrationRunTrigger = Field(
+        default=CalibrationRunTrigger.API,
+        description=(
+            "api when a signed-in request recorded it before launch; schedule or worker when "
+            "the worker recorded a flow run QDash had not launched (a schedule) as it started"
+        ),
+    )
+    run_name: str = Field(
+        default="", description="The workflow or pipeline name, or the task the run launched"
+    )
+    agent_session_id: str | None = Field(
+        default=None, description="For an agent action's run, the agent session that ran it"
+    )
+    action_id: str | None = Field(
+        default=None, description="For an agent action's run, the action that dispatched it"
+    )
     idempotency_key: str
     requested_by: str
     reported_origin: ReportedLaunchOrigin | None = Field(
@@ -139,7 +169,10 @@ class CalibrationPipelineRunResponse(BaseModel):
     )
     executions: list[ExecutionResponseSummary] = Field(
         default_factory=list,
-        description="Every execution of the run's flow run on the chip, oldest first",
+        description=(
+            "Every step execution of the run on the chip, oldest first: those the worker "
+            "stamped with the run, or, for older runs, those of its flow run"
+        ),
     )
 
 

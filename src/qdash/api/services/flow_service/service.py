@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -53,7 +54,12 @@ from qdash.api.services.manual_round_checks import load_chip_round_model
 from qdash.common.manual_rounds import MANUAL_TARGET_OVERRIDE_REASON
 from qdash.common.mux_mapping import resolve_topology_mux_mapping
 from qdash.config import get_settings
+from qdash.datamodel.calibration_session import (
+    CALIBRATION_RUN_CONTEXT_KEY,
+    CalibrationRunIdentity,
+)
 from qdash.datamodel.flow_targets import TARGET_CONTEXT_KEY, FlowTargetOverride
+from qdash.repository.calibration_run import NOTE_RUN_KEY, NOTE_SESSION_KEY, UNGROUPED_MARKER
 
 if TYPE_CHECKING:
     from uuid import UUID
@@ -357,8 +363,24 @@ class FlowService:
         request: ExecuteFlowRequest,
         username: str,
         project_id: str,
+        calibration_run: CalibrationRunIdentity | None = None,
     ) -> ExecuteFlowResponse:
         """Execute a saved flow through its Prefect deployment."""
+        prepared = self.prepare_flow_run(name, request, username, project_id)
+        return await self.dispatch_flow_run(prepared, calibration_run)
+
+    def prepare_flow_run(
+        self,
+        name: str,
+        request: ExecuteFlowRequest,
+        username: str,
+        project_id: str,
+    ) -> PreparedFlowRun:
+        """Check a saved flow can run and resolve what its launch sends, launching nothing.
+
+        Every refusal of the request (an unknown flow, no deployment, a target override the
+        flow cannot take) is raised here, before a run is recorded or a flow run created.
+        """
         flow = self._flow_repo.find_by_project_and_name(project_id, name)
         if not flow:
             raise HTTPException(status_code=404, detail=f"Flow '{name}' not found")
@@ -408,24 +430,43 @@ class FlowService:
                 parameters.update(
                     {key: value for key, value in override.items() if key in accepted}
                 )
+        return PreparedFlowRun(
+            name=name,
+            project_id=project_id,
+            username=username,
+            chip_id=chip_id,
+            deployment_id=str(flow.deployment_id),
+            parameters=parameters,
+            tags=list(parameters.get("tags") or flow.tags or []),
+            context=run_context,
+        )
 
+    async def dispatch_flow_run(
+        self,
+        prepared: PreparedFlowRun,
+        calibration_run: CalibrationRunIdentity | None = None,
+    ) -> ExecuteFlowResponse:
+        """Launch a prepared saved-flow run, handing the worker its calibration run."""
+        name = prepared.name
+        context = with_calibration_run(prepared.context, calibration_run)
         logger.info(
             f"Executing flow '{name}' "
-            f"(deployment={flow.deployment_id}) "
-            f"with parameters: {parameters}"
+            f"(deployment={prepared.deployment_id}) "
+            f"with parameters: {prepared.parameters}"
         )
 
         try:
             result = await self._coordinator.dispatch_run(
-                project_id=project_id,
-                username=username,
-                chip_id=chip_id,
+                project_id=prepared.project_id,
+                username=prepared.username,
+                chip_id=prepared.chip_id,
                 name=name,
-                deployment_id=flow.deployment_id,
-                parameters=parameters,
-                tags=parameters.get("tags") or flow.tags,
+                deployment_id=prepared.deployment_id,
+                parameters=prepared.parameters,
+                tags=prepared.tags,
                 workflow=True,
-                **({"context": run_context} if run_context else {}),
+                note=calibration_note_of(calibration_run),
+                context=context or None,
             )
         except FlowDispatchError as exc:
             logger.error(f"Failed to execute flow: {exc}")
@@ -435,7 +476,9 @@ class FlowService:
             ) from exc
 
         logger.info(f"Flow run created: {result.flow_run_id}")
-        return _execute_response(result, f"Flow '{name}' execution started successfully")
+        return _execute_response(
+            result, f"Flow '{name}' execution started successfully", calibration_run
+        )
 
     async def get_execution_plan(
         self, name: str, username: str, project_id: str, chip_id: str | None
@@ -523,6 +566,8 @@ class FlowService:
         backend_name: str | None = None,
         default_run_parameters: dict[str, Any] | None = None,
         task_run_parameters: dict[str, dict[str, Any]] | None = None,
+        calibration_run: CalibrationRunIdentity | None = None,
+        ungrouped: bool = False,
     ) -> ExecuteFlowResponse:
         """Execute one task for one qubit through the system single-task deployment.
 
@@ -558,6 +603,11 @@ class FlowService:
         )
 
         try:
+            context: dict[str, Any] = (
+                {CALIBRATION_RUN_CONTEXT_KEY: {UNGROUPED_MARKER: True}}
+                if ungrouped and calibration_run is None
+                else with_calibration_run({}, calibration_run)
+            )
             result = await self._coordinator.dispatch_run(
                 project_id=project_id,
                 username=username,
@@ -566,6 +616,8 @@ class FlowService:
                 deployment_id=deployment_id,
                 parameters=parameters,
                 tags=tags,
+                note=calibration_note_of(calibration_run),
+                context=context or None,
             )
         except FlowDispatchError as exc:
             logger.error(f"Failed to execute single task: {exc}")
@@ -579,6 +631,7 @@ class FlowService:
             result,
             f"Single task '{task_name}' (qid={qid}) "
             f"re-execution started from snapshot {source_execution_id}",
+            calibration_run,
         )
 
     async def execute_calibration_pipeline(
@@ -591,6 +644,7 @@ class FlowService:
         backend_name: str | None = None,
         flow_name: str | None = None,
         tags: list[str] | None = None,
+        calibration_run: CalibrationRunIdentity | None = None,
     ) -> ExecuteFlowResponse:
         """Run a validated pipeline spec through the system pipeline deployment.
 
@@ -632,6 +686,8 @@ class FlowService:
                 parameters=parameters,
                 tags=all_tags,
                 workflow=True,
+                note=calibration_note_of(calibration_run),
+                context=with_calibration_run({}, calibration_run) or None,
             )
         except FlowDispatchError as exc:
             logger.error(f"Failed to execute calibration pipeline: {exc}")
@@ -641,7 +697,7 @@ class FlowService:
             ) from exc
 
         logger.info(f"Pipeline flow run created: {result.flow_run_id}")
-        return _execute_response(result, f"Calibration pipeline '{name}' started")
+        return _execute_response(result, f"Calibration pipeline '{name}' started", calibration_run)
 
     async def execute_agent_candidate_apply(
         self,
@@ -759,7 +815,44 @@ def _flow_exists(name: str) -> HTTPException:
     )
 
 
-def _execute_response(result: DispatchResult, message: str) -> ExecuteFlowResponse:
+@dataclass(frozen=True)
+class PreparedFlowRun:
+    """What the launch of a checked saved-flow request sends to Prefect."""
+
+    name: str
+    project_id: str
+    username: str
+    chip_id: str
+    deployment_id: str
+    parameters: dict[str, Any]
+    tags: list[str]
+    context: dict[str, Any] = field(default_factory=dict)
+
+
+def with_calibration_run(
+    context: dict[str, Any], calibration_run: CalibrationRunIdentity | None
+) -> dict[str, Any]:
+    """The flow-run context with the run identity the worker stamps on every step."""
+    if calibration_run is None:
+        return dict(context)
+    return {**context, CALIBRATION_RUN_CONTEXT_KEY: calibration_run.model_dump()}
+
+
+def calibration_note_of(calibration_run: CalibrationRunIdentity | None) -> dict[str, str]:
+    """The note keys of the execution QDash pre-creates for a run."""
+    if calibration_run is None:
+        return {}
+    return {
+        NOTE_SESSION_KEY: calibration_run.calibration_session_id,
+        NOTE_RUN_KEY: calibration_run.run_id,
+    }
+
+
+def _execute_response(
+    result: DispatchResult,
+    message: str,
+    calibration_run: CalibrationRunIdentity | None = None,
+) -> ExecuteFlowResponse:
     """Map a dispatched run onto the API response, falling back to the flow run ID."""
     return ExecuteFlowResponse(
         execution_id=result.execution_id or result.flow_run_id,
@@ -767,4 +860,8 @@ def _execute_response(result: DispatchResult, message: str) -> ExecuteFlowRespon
         flow_run_url=result.flow_run_url,
         qdash_ui_url=result.qdash_ui_url,
         message=message,
+        calibration_session_id=(
+            calibration_run.calibration_session_id if calibration_run is not None else None
+        ),
+        calibration_run_id=calibration_run.run_id if calibration_run is not None else None,
     )

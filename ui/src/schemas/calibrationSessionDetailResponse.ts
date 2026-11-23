@@ -14,6 +14,7 @@ import type { CalibrationSessionDetailResponseClosedAt } from './calibrationSess
 import type { CalibrationSessionDetailResponseClosedBy } from './calibrationSessionDetailResponseClosedBy';
 import type { CalibrationSessionDetailResponseLatestRequestedRun } from './calibrationSessionDetailResponseLatestRequestedRun';
 import type { CalibrationSessionDetailResponseRecommendation } from './calibrationSessionDetailResponseRecommendation';
+import type { CalibrationSessionOrigin } from './calibrationSessionOrigin';
 import type { CalibrationSessionStatus } from './calibrationSessionStatus';
 
 /**
@@ -27,6 +28,8 @@ export interface CalibrationSessionDetailResponse {
   /** The signed-in user who created it */
   created_by: string;
   status: CalibrationSessionStatus;
+  /** manual when a person or agent created it for an objective; automatic when QDash created it for a run started without a session ID (a later run may name it) */
+  origin?: CalibrationSessionOrigin;
   created_at: string;
   updated_at: string;
   closed_at?: CalibrationSessionDetailResponseClosedAt;

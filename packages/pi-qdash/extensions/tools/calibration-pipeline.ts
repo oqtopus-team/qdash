@@ -86,9 +86,9 @@ export type PipelineExecution = {
 };
 
 /**
- * The idempotency key of a pipeline run recorded in a calibration session: one per tool
- * call, so a replayed or retried call returns the run it started instead of starting
- * another. The call id comes from the host, never from the model's arguments.
+ * The idempotency key of a pipeline run: one per tool call, so a replayed or retried call
+ * returns the run it started instead of starting another, whether it is recorded in a named
+ * calibration session or in the automatic one QDash creates. The call id comes from the host, never from the model's arguments.
  */
 export function pipelineRunKey(toolCallId: string): string {
   const key = `qdash_run_pipeline:${toolCallId}`;
@@ -435,7 +435,7 @@ export function registerCalibrationPipelineTools(pi: Pick<ExtensionAPI, "registe
     promptSnippet: "Run a validated QDash calibration pipeline spec",
     promptGuidelines: [
       "Use qdash_run_pipeline only for a spec that qdash_plan_pipeline reported valid.",
-      "When the run serves a calibration objective, pass that objective's calibrationSessionId (from qdash_create_calibration_session or the user) so QDash records the run, with all its step executions, in it. It grants nothing: the user still approves this exact run.",
+      "When the run serves a calibration objective, pass that objective's calibrationSessionId (from qdash_create_calibration_session or the user) so QDash records the run, with all its step executions, in it. Without it QDash records the run in an automatic session of its own. It grants nothing: the user still approves this exact run.",
       "When the run carries out an experiment you recorded with qdash_record_calibration_decision, pass that decision's decisionId too, so the session's audit links your intent to this run. Record the decision first; never pass a decision of another session.",
       "If QDash reports that a run's launch outcome is unknown, do not start it again: check qdash_list_executions and tell the user.",
       "Tell the user before running that completed tasks update calibrated parameters in QDash directly.",
@@ -467,9 +467,13 @@ export function registerCalibrationPipelineTools(pi: Pick<ExtensionAPI, "registe
       const qdash = new QDash(client);
       try {
         // Dispatch only: the run handle's wait() is deliberately not called here.
-        const recording = params.calibrationSessionId
-          ? { calibrationSessionId: params.calibrationSessionId, idempotencyKey: pipelineRunKey(toolCallId), ...(params.decisionId ? { decisionId: params.decisionId } : {}) }
-          : undefined;
+        // Every run is recorded before it starts: in the named calibration session, or in an
+        // automatic one QDash creates. The key ties this tool call to that one run.
+        const recording = {
+          idempotencyKey: pipelineRunKey(toolCallId),
+          ...(params.calibrationSessionId ? { calibrationSessionId: params.calibrationSessionId } : {}),
+          ...(params.decisionId ? { decisionId: params.decisionId } : {}),
+        };
         // The origin is this tool's own constant, never the model's arguments: QDash shows it as
         // reported, so a run started here is told apart from one the user started directly.
         const run = await qdash.pipelines.execute(params.spec, { chipId: params.chipId, backendName: params.backendName }, recording, { reportedOrigin: PIPELINE_TOOL_ORIGIN });
@@ -498,7 +502,7 @@ export function registerCalibrationPipelineTools(pi: Pick<ExtensionAPI, "registe
           throw new Error("QDash cannot run pipelines right now: the worker has not registered the calibration-pipeline deployment. Ask an operator to restart the worker, then try again.");
         }
         const detail = errorDetail(error);
-        if (params.calibrationSessionId && detail && /unknown|may have started|being dispatched/i.test(detail)) {
+        if (detail && /unknown|may have started|being dispatched/i.test(detail)) {
           // Never retried with a new call: the first launch may be running.
           throw new Error(`${detail} Do not start this run again; check qdash_list_executions and tell the user.`);
         }

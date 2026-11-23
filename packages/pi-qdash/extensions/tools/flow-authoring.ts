@@ -46,7 +46,20 @@ export type FlowExecution = {
   flow_run_url: string;
   qdash_ui_url: string;
   message: string;
+  calibration_session_id?: string | null;
+  calibration_run_id?: string | null;
+  replayed?: boolean;
 };
+
+/**
+ * The idempotency key of a saved-flow run: one per tool call, so a replayed or retried call
+ * returns the run it started instead of starting another. The call id comes from the host,
+ * never from the model's arguments.
+ */
+export function flowRunKey(toolCallId: string): string {
+  const key = `qdash_execute_flow:${toolCallId}`;
+  return key.length <= 128 ? key : `qdash_execute_flow:${toolCallId.slice(-100)}`;
+}
 
 /** The client these tools use; tests pass a stub with `saveFlow`, `executeFlow` and `config`. */
 export type FlowClient = QDashClient;
@@ -93,9 +106,13 @@ export function formatSavedFlow(result: SaveFlowResult, chipId: string, url: str
 }
 
 export function formatFlowExecution(result: FlowExecution, name: string): string {
+  const recorded = result.calibration_session_id
+    ? [`Recorded in calibration session ${result.calibration_session_id} as run ${result.calibration_run_id ?? "(unknown)"}${result.replayed ? " (this call had already started it; nothing new was started)" : ""}; every step execution of the run belongs to it.`]
+    : [];
   return [
-    `${result.message || `Flow '${name}' started.`}`,
+    `${result.replayed ? "Already started" : result.message || `Flow '${name}' started.`}`,
     `Execution: ${result.execution_id}`,
+    ...recorded,
     `QDash: ${result.qdash_ui_url}`,
     `Prefect: ${result.flow_run_url}`,
     "Follow it with qdash_wait_execution; completed tasks write their calibrated parameters to QDash directly.",
@@ -205,9 +222,11 @@ export function registerFlowAuthoringTools(pi: Pick<ExtensionAPI, "registerTool"
       // The names a flow can be saved under; pi rejects others before confirmation.
       name: Type.String({ pattern: "^[A-Za-z0-9_]+$", description: "The saved flow's name: letters, digits and underscores." }),
       parameters: Type.Optional(Type.Object({}, { additionalProperties: true, description: "Flow function parameters; override the flow's default_parameters." })),
+      calibrationSessionId: Type.Optional(Type.String({ description: "Record the run in this calibration session (open, on the flow's chip, created by the user). Without it QDash records the run in an automatic session of its own. Grants nothing." })),
     }),
-    async execute(toolCallId, params: ConnectionParams & { name: string; parameters?: Record<string, unknown> }, _signal, _onUpdate, ctx) {
-      await requireWriteApproval("qdash_execute_flow", toolCallId, params, ctx, { title: "Run QDash flow?", message: `This starts flow '${params.name}' on the workflow worker. Completed tasks update calibrated parameters in QDash directly.` });
+    async execute(toolCallId, params: ConnectionParams & { name: string; parameters?: Record<string, unknown>; calibrationSessionId?: string }, _signal, _onUpdate, ctx) {
+      const recordedIn = params.calibrationSessionId ? ` It is recorded in calibration session ${params.calibrationSessionId}, which groups it and grants nothing.` : "";
+      await requireWriteApproval("qdash_execute_flow", toolCallId, params, ctx, { title: "Run QDash flow?", message: `This starts flow '${params.name}' on the workflow worker. Completed tasks update calibrated parameters in QDash directly.${recordedIn}` });
       const client = await deps.makeClient(params);
       // A paused agent session's targets must not be measured around its pause.
       const flowChip = typeof params.parameters?.chip_id === "string" ? params.parameters.chip_id : undefined;
@@ -219,13 +238,20 @@ export function registerFlowAuthoringTools(pi: Pick<ExtensionAPI, "registerTool"
         return toTextToolResult(conflict, { blocked: true }, { tool: "qdash_execute_flow", flowName: params.name, started: false, blockedByPausedSession: true });
       }
       const qdash = new QDash(client);
-      const run = await qdash.workflows.run(params.name, { parameters: params.parameters });
+      // Recorded under this call's key: a replayed call returns the run it started.
+      const run = await qdash.workflows.run(params.name, {
+        parameters: params.parameters,
+        idempotencyKey: flowRunKey(toolCallId),
+        ...(params.calibrationSessionId ? { calibrationSessionId: params.calibrationSessionId } : {}),
+      });
       const result = run.response as FlowExecution;
       return toTextToolResult(formatFlowExecution(result, params.name), result, {
         tool: "qdash_execute_flow",
         flowName: params.name,
         executionId: result.execution_id,
         started: true,
+        ...(result.calibration_session_id ? { calibrationSessionId: result.calibration_session_id, calibrationRunId: result.calibration_run_id ?? undefined } : {}),
+        ...(result.replayed ? { replayed: true } : {}),
       });
     },
   });

@@ -123,10 +123,10 @@ not the objective itself.
   agent session, create a calibration session for that goal with
   `qdash_create_calibration_session`, or reuse the one the user names. The chat shows a
   session once it is created; there is no need to read it again for that.
-- Pass its ID as `calibrationSessionId` to every `qdash_run_pipeline` and
-  `qdash_create_agent_session` call for that goal. QDash records the run before it starts; a
-  pipeline run is one record that covers all its step executions. A run started without the ID
-  is not part of the session, and nothing moves it there later.
+- Pass its ID as `calibrationSessionId` to every `qdash_run_pipeline`, `qdash_execute_flow`, and
+  `qdash_create_agent_session` call for that goal. QDash records the run before it starts; one
+  run covers all its step executions. A run started without the ID goes to an automatic session
+  of its own, not to the objective's, and nothing moves it there later.
 - The session grants nothing. Each pipeline run is still the exact request the user approves,
   and an agent session is still bounded by its own policy, gates, expiry, and pause. Never
   present the session as permission, and never use it to skip an approval.

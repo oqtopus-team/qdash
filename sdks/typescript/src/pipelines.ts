@@ -25,13 +25,17 @@ export interface PipelineTarget {
   backendName?: string;
 }
 
-/** Where `Pipelines.execute` records a run: a calibration session, under one retry key. */
+/**
+ * Where `Pipelines.execute` records a run, under one retry key: a calibration session, or,
+ * without one, the automatic session the server creates for the run.
+ */
 export interface PipelineRecording {
   /**
    * The calibration session to record the run in: open, on the same chip, and created by
    * the signed-in user. Grouping grants nothing; the run is still the request itself.
+   * Without it, the server records the run in an automatic session of its own.
    */
-  calibrationSessionId: string;
+  calibrationSessionId?: string;
   /**
    * A retry with the same key and request returns the recorded run instead of starting
    * another; a run whose launch outcome is unknown is never launched again with it.
@@ -68,11 +72,14 @@ function request(spec: PipelineSpecInput, target: PipelineTarget) {
 
 function recording(options: PipelineRecording | undefined) {
   if (!options) return {};
-  if (!options.calibrationSessionId || !options.idempotencyKey) {
-    throw new TypeError("calibrationSessionId and idempotencyKey must both be non-empty strings");
+  if (!options.idempotencyKey || options.calibrationSessionId === "") {
+    throw new TypeError("idempotencyKey, and calibrationSessionId when given, must be non-empty strings");
+  }
+  if (options.decisionId && !options.calibrationSessionId) {
+    throw new TypeError("decisionId needs calibrationSessionId");
   }
   return {
-    calibration_session_id: options.calibrationSessionId,
+    ...(options.calibrationSessionId ? { calibration_session_id: options.calibrationSessionId } : {}),
     idempotency_key: options.idempotencyKey,
     ...(options.decisionId ? { decision_id: options.decisionId } : {}),
   };

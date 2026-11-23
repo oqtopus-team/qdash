@@ -64,7 +64,8 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
 /**
  * Record one calibration objective on a chip.
  *
- * Pipeline runs and agent sessions started with its ID are grouped under it. It grants no
+ * Runs (saved workflows, pipelines, tasks) and agent sessions started with its ID are grouped
+ * under it. A run started without one gets an automatic session instead. It grants no
  * operation: each run is still approved, gated, and locked on its own.
  * @summary Create a calibration session
  */

@@ -724,15 +724,44 @@ class QDashClient:
         name: str,
         *,
         parameters: dict[str, Any] | None = None,
+        calibration_session_id: str | None = None,
+        idempotency_key: str | None = None,
     ) -> ExecuteFlowResponse:
-        """Run a saved flow; ``parameters`` override its saved defaults for this run only."""
+        """Run a saved flow; ``parameters`` override its saved defaults for this run only.
+
+        The run is recorded in ``calibration_session_id`` when given, otherwise in an
+        automatic calibration session the server creates for it; the response names both the
+        session and the run. ``idempotency_key`` makes a retry return the recorded run
+        instead of starting another; without one every call starts a new run.
+        """
+        for label, value in (
+            ("calibration_session_id", calibration_session_id),
+            ("idempotency_key", idempotency_key),
+        ):
+            if value is not None and not value.strip():
+                raise ValueError(f"{label} must be non-empty")
         # The request's parameters are an object; null is rejected, so None sends {}.
-        response = self._request(
-            "POST",
-            f"/flows/{name}/execute",
-            json={"parameters": parameters if parameters is not None else {}},
-        )
-        return self._validate_model_payload(ExecuteFlowResponse, response.data)
+        body: dict[str, Any] = {"parameters": parameters if parameters is not None else {}}
+        if calibration_session_id is not None:
+            body["calibration_session_id"] = calibration_session_id
+        if idempotency_key is not None:
+            body["idempotency_key"] = idempotency_key
+        response = self._request("POST", f"/flows/{name}/execute", json=body)
+        data = response.data
+        if calibration_session_id is not None or idempotency_key is not None:
+            # A server that predates run recording ignores both fields and starts the flow
+            # anyway, so a missing echo means the run started without them.
+            recorded = isinstance(data, dict) and isinstance(data.get("calibration_run_id"), str)
+            named = calibration_session_id is None or (
+                isinstance(data, dict)
+                and data.get("calibration_session_id") == calibration_session_id
+            )
+            if not (recorded and named):
+                raise RuntimeError(
+                    "Workflow result unknown: the run may have started without its calibration "
+                    "session or key. Do not retry automatically; reconcile the execution first."
+                )
+        return self._validate_model_payload(ExecuteFlowResponse, data)
 
     def schedule_flow(
         self,
@@ -870,23 +899,22 @@ class QDashClient:
         """Validate a pipeline spec on the server and dispatch it as one execution.
 
         A spec with problems raises :class:`QDashValidationError` (422) whose ``payload`` holds
-        the server's problem list; nothing is dispatched. With ``calibration_session_id`` and
-        ``idempotency_key`` (given together), the run is recorded in that calibration session
-        before it is launched, and a retry with the same key returns the recorded run.
+        the server's problem list; nothing is dispatched. The run is recorded before it is
+        launched: in ``calibration_session_id`` when given, otherwise in an automatic session
+        the server creates for it. A retry with the same ``idempotency_key`` returns the
+        recorded run; without a key every call starts a new run.
         ``decision_id`` names the decision of that session the run carries out; it needs
         ``calibration_session_id``. A response that does not echo the decision means the link
         may be lost, so it raises instead of returning, and the run must be reconciled.
         """
-        if (calibration_session_id is None) != (idempotency_key is None):
-            raise ValueError("calibration_session_id and idempotency_key are given together")
         if decision_id is not None:
             if calibration_session_id is None:
                 raise ValueError("decision_id needs calibration_session_id")
             if not decision_id.strip():
                 raise ValueError("decision_id must be non-empty")
+        if idempotency_key is not None and not idempotency_key.strip():
+            raise ValueError("idempotency_key must be non-empty")
         if calibration_session_id is not None:
-            if not idempotency_key or not idempotency_key.strip():
-                raise ValueError("idempotency_key must be non-empty")
             self._preflight_calibration_session(calibration_session_id, chip_id)
         response = self._request(
             "POST",
@@ -1541,10 +1569,11 @@ class QDashClient:
             update_params=update_params,
             reconfigure=reconfigure,
         )
+        # Only what was given: the server records the run in an automatic session.
         response = self._request(
             "POST",
             f"/task-results/{task_id}/re-execute",
-            json=body.model_dump(mode="json"),
+            json=body.model_dump(mode="json", exclude_unset=True),
         )
         return self._validate_model_payload(ExecuteFlowResponse, response.data)
 

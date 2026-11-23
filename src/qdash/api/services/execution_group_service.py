@@ -73,7 +73,12 @@ from qdash.datamodel.agent_session import (
     AgentInterventionStatus,
     model_label,
 )
-from qdash.datamodel.calibration_session import CalibrationSessionStatus
+from qdash.datamodel.calibration_session import (
+    CalibrationRunKind,
+    CalibrationRunTrigger,
+    CalibrationSessionOrigin,
+    CalibrationSessionStatus,
+)
 from qdash.dbmodel.agent_session import (
     AgentActionDocument,
     AgentDecisionDocument,
@@ -863,6 +868,9 @@ class ExecutionGroupService:
             chip_id=str(doc["chip_id"]),
             objective=str(doc.get("objective") or ""),
             status=CalibrationSessionStatus(status_value),
+            origin=CalibrationSessionOrigin(
+                str(doc.get("origin") or CalibrationSessionOrigin.MANUAL.value)
+            ),
             created_by=str(doc.get("created_by") or ""),
             created_at=created,
             closed_at=utc(doc.get("closed_at")),
@@ -888,6 +896,13 @@ class ExecutionGroupService:
             pipeline_runs.append(
                 CalibrationGroupPipelineRun(
                     run_id=run_id,
+                    run_kind=CalibrationRunKind(
+                        str(run.get("run_kind") or CalibrationRunKind.PIPELINE.value)
+                    ),
+                    run_name=str(run.get("run_name") or run.get("pipeline_name") or ""),
+                    trigger=CalibrationRunTrigger(
+                        str(run.get("trigger") or CalibrationRunTrigger.API.value)
+                    ),
                     pipeline_name=str(run.get("pipeline_name") or ""),
                     dispatch_status=_run_dispatch(run),
                     requested_by=str(run.get("requested_by") or ""),

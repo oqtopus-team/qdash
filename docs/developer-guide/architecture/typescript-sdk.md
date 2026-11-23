@@ -91,10 +91,16 @@ A workflow name other than letters, digits and underscores throws `TypeError` be
 request, as in the Python SDK.
 
 `qdash.pipelines.execute(spec, target, recordIn)` takes an optional third argument,
-`{ calibrationSessionId, idempotencyKey, decisionId? }`, that records the run in a calibration
-session before it is launched; a retry with the same key returns the recorded run, and
-`decisionId` names the session's decision the run carries out. An empty session ID or key throws
-`TypeError` before any request. The client throws when the response does not echo the
+`{ idempotencyKey, calibrationSessionId?, decisionId? }`. The server records every run before it
+is launched, in the named calibration session or in an automatic one; a retry with the same key
+returns the recorded run, and `decisionId`, which needs `calibrationSessionId`, names the
+session's decision the run carries out. `qdash.workflows.run(name, { calibrationSessionId?,
+idempotencyKey? })` does the same for a saved workflow, and `WorkflowRun` exposes
+`calibrationSessionId` and `calibrationRunId`. An empty session ID or key throws `TypeError`
+before any request, and a keyed or named launch whose response does not name the recorded run
+throws, since an older server may have started it without them. A keyed or named run of a
+workflow without a resolvable chip (no `chip_id` parameter and no saved chip) is refused with 400
+before launch; pass `chip_id` in its parameters. The client throws when the response does not echo the
 `decision_id` it sent, because the run may have started without the link. A fourth argument, `{ reportedOrigin }`, sends the caller's
 `reported_origin`; set it from the calling program, never from model or user input. See
 [Calibration Sessions](../agent/calibration-sessions.md).

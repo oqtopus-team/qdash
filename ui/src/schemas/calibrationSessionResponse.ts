@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { CalibrationChildReservation } from './calibrationChildReservation';
+import type { CalibrationSessionOrigin } from './calibrationSessionOrigin';
 import type { CalibrationSessionResponseClosedAt } from './calibrationSessionResponseClosedAt';
 import type { CalibrationSessionResponseClosedBy } from './calibrationSessionResponseClosedBy';
 import type { CalibrationSessionStatus } from './calibrationSessionStatus';
@@ -21,6 +22,8 @@ export interface CalibrationSessionResponse {
   /** The signed-in user who created it */
   created_by: string;
   status: CalibrationSessionStatus;
+  /** manual when a person or agent created it for an objective; automatic when QDash created it for a run started without a session ID (a later run may name it) */
+  origin?: CalibrationSessionOrigin;
   created_at: string;
   updated_at: string;
   closed_at?: CalibrationSessionResponseClosedAt;

@@ -18,7 +18,12 @@ from qdash.api.schemas.execution import (
     ExecutionResponseSummary,
 )
 from qdash.datamodel.agent_session import AgentModelIdentity, AgentSessionStatus
-from qdash.datamodel.calibration_session import CalibrationSessionStatus
+from qdash.datamodel.calibration_session import (
+    CalibrationRunKind,
+    CalibrationRunTrigger,
+    CalibrationSessionOrigin,
+    CalibrationSessionStatus,
+)
 
 __all__ = ["ExecutionAgentSessionLink"]
 
@@ -164,6 +169,10 @@ class CalibrationSessionGroupSummary(BaseModel):
     chip_id: str
     objective: str
     status: CalibrationSessionStatus
+    origin: CalibrationSessionOrigin = Field(
+        default=CalibrationSessionOrigin.MANUAL,
+        description="automatic when QDash created it for a run started without a session ID",
+    )
     created_by: str
     created_at: datetime
     closed_at: datetime | None = None
@@ -183,9 +192,12 @@ class CalibrationSessionGroupSummary(BaseModel):
 
 
 class CalibrationGroupPipelineRun(BaseModel):
-    """One pipeline run of a calibration session row, with its step executions."""
+    """One run of a calibration session row, whatever it launched, with its step executions."""
 
     run_id: str
+    run_kind: CalibrationRunKind = CalibrationRunKind.PIPELINE
+    run_name: str = Field(default="", description="The workflow, pipeline, or task it launched")
+    trigger: CalibrationRunTrigger = CalibrationRunTrigger.API
     pipeline_name: str = ""
     dispatch_status: str
     requested_by: str

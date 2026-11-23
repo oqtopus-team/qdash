@@ -8,6 +8,7 @@
 import type { CalibrationGroupCounts } from './calibrationGroupCounts';
 import type { CalibrationSessionGroupSummaryClosedAt } from './calibrationSessionGroupSummaryClosedAt';
 import type { CalibrationSessionGroupSummaryRecommendation } from './calibrationSessionGroupSummaryRecommendation';
+import type { CalibrationSessionOrigin } from './calibrationSessionOrigin';
 import type { CalibrationSessionStatus } from './calibrationSessionStatus';
 
 /**
@@ -21,6 +22,8 @@ export interface CalibrationSessionGroupSummary {
   chip_id: string;
   objective: string;
   status: CalibrationSessionStatus;
+  /** automatic when QDash created it for a run started without a session ID */
+  origin?: CalibrationSessionOrigin;
   created_by: string;
   created_at: string;
   closed_at?: CalibrationSessionGroupSummaryClosedAt;

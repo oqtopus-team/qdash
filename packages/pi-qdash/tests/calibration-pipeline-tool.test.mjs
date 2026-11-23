@@ -178,7 +178,8 @@ test("run requires confirmation, then reports the execution", async () => {
   assert.equal(calls.length, 0);
 
   const result = await run.execute("t", { chipId: "64Qv3", spec: SPEC }, undefined, undefined, approved("t"));
-  assert.deepEqual(calls, [{ chip_id: "64Qv3", spec: SPEC, reported_origin: TOOL_ORIGIN }]);
+  // Recorded under the tool call's key even without a session: QDash then creates one.
+  assert.deepEqual(calls, [{ chip_id: "64Qv3", spec: SPEC, idempotency_key: "qdash_run_pipeline:t", reported_origin: TOOL_ORIGIN }]);
   assert.equal(result.details.started, true);
   assert.equal(result.details.executionId, "20261006-012");
   assert.match(result.content[0].text, /execution_id 20261006-012/);
@@ -283,7 +284,8 @@ test("without a project every tool keeps the server's default: the run is still 
   }
   await tools.get("qdash_plan_pipeline").execute("t", { spec: SPEC });
   await tools.get("qdash_get_pipeline_catalog").execute("t", {});
-  assert.deepEqual(calls, [{ chip_id: "64Qv3", spec: SPEC, reported_origin: TOOL_ORIGIN }, { chip_id: "64Qv3", spec: SPEC, reported_origin: TOOL_ORIGIN }, { chip_id: "64Qv3", spec: SPEC }, undefined]);
+  const sent = { chip_id: "64Qv3", spec: SPEC, idempotency_key: "qdash_run_pipeline:t", reported_origin: TOOL_ORIGIN };
+  assert.deepEqual(calls, [sent, sent, { chip_id: "64Qv3", spec: SPEC }, undefined]);
 });
 
 test("run turns a 422 with problems into a readable rejection and nothing else into an error", async () => {

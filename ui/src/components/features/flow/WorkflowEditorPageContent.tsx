@@ -90,8 +90,10 @@ import { WorkflowExecutionHelpDialog } from "@/components/features/flow/Workflow
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { WorkflowEditorPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { isExecutionTerminal } from "@/lib/executionStatus";
+import { calibrationSessionHref } from "@/lib/chatCalibrationSession";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
 import { formatDateTime } from "@/lib/utils/datetime";
+import { createRequestId } from "@/lib/utils/requestId";
 import { monoFontFamily, remeasureMonacoFontsWhenLoaded } from "@/lib/fonts";
 import {
   attachPythonFormatter,
@@ -364,7 +366,18 @@ export function WorkflowEditorPageContent() {
         chipId: typeof runChipId === "string" ? runChipId : "",
         username: String(variables.data.parameters?.username ?? ""),
       });
-      toast.success(`Flow execution started! Execution ID: ${execId || "N/A"}`);
+      // Every run is recorded in a calibration session: the one named, or an automatic one.
+      const calibrationSessionId = response.data.calibration_session_id;
+      toast.success(`Flow execution started! Execution ID: ${execId || "N/A"}`, {
+        ...(calibrationSessionId
+          ? {
+              action: {
+                label: "Open calibration session",
+                onClick: () => router.push(calibrationSessionHref(calibrationSessionId, null)),
+              },
+            }
+          : {}),
+      });
       // The guide's run opens on its execution page, where the guide follows its progress.
       if (followedByJourney && execId && typeof runChipId === "string") {
         router.push(executionHref(runChipId, execId));
@@ -2193,6 +2206,11 @@ export function WorkflowEditorPageContent() {
                 name: execDoc.name,
                 context: captureJourneyContext(),
                 data: {
+                  // One key per confirmed run: a resent request returns this run instead of
+                  // starting another. QDash refuses a key for a run whose chip it cannot tell
+                  // before the launch, so a run without a chip sends none and is recorded by
+                  // the worker when it starts.
+                  ...(execDoc.chipId ? { idempotency_key: createRequestId() } : {}),
                   target_override: targetOverride,
                   parameters: {
                     username: execDoc.username,

@@ -15,6 +15,7 @@ from qdash.datamodel.calibration_session import (
     CalibrationAdmission,
     CalibrationChildKind,
     CalibrationPipelineRunStatus,
+    CalibrationRunKind,
 )
 from qdash.datamodel.project import ProjectRole
 from qdash.datamodel.system_info import SystemInfoModel
@@ -245,23 +246,77 @@ class TestSessions:
 
 
 class TestPipelineRuns:
-    def test_unassociated_pipeline_keeps_its_behavior(self, test_client, lab):
+    def test_pipeline_without_session_gets_an_automatic_one(self, test_client, lab):
         with prefect(["flow-run-plain"]) as create:
             response = _run(test_client, None, key=None)
         assert response.status_code == 202, response.text
         body = response.json()
         assert body["flow_run_id"] == "flow-run-plain"
-        assert body["calibration_session_id"] is None
-        assert body["pipeline_run_id"] is None
+        session_id = body["calibration_session_id"]
+        assert session_id.startswith("cs-auto-")
+        assert body["pipeline_run_id"] == body["calibration_run_id"]
         assert create.await_count == 1
-        assert CalibrationPipelineRunDocument.find_all().count() == 0
+        [record] = CalibrationPipelineRunDocument.find_all().to_list()
+        assert record.calibration_session_id == session_id
+        assert record.run_kind == CalibrationRunKind.PIPELINE
+        assert record.status == CalibrationPipelineRunStatus.DISPATCHED
+        # The worker receives the run before it starts, and the pre-created step names it.
+        assert create.await_args is not None
+        context = create.await_args.kwargs["context"]
+        # With the launch's dispatch token, which only this flow run receives.
+        assert context["qdash_calibration_run"] == {
+            "calibration_session_id": session_id,
+            "run_id": record.run_id,
+            "dispatch_token": record.dispatch_token,
+        }
+        assert record.dispatch_token not in response.text
+        execution = ExecutionHistoryDocument.find_one({"execution_id": body["execution_id"]}).run()
+        assert execution is not None
+        assert execution.note["calibration_session_id"] == session_id
+        assert execution.note["calibration_run_id"] == record.run_id
+        session = test_client.get(f"/calibration-sessions/{session_id}", headers=_headers())
+        assert session.json()["origin"] == "automatic"
+        assert session.json()["created_by"] == "owner"
 
-    def test_key_and_session_go_together(self, test_client, lab):
+    def test_unkeyed_requests_are_new_runs_and_a_key_replays_one(self, test_client, lab):
+        with prefect(["flow-run-a", "flow-run-b", "flow-run-c"]) as create:
+            first = _run(test_client, None, key=None)
+            _release_locks()
+            second = _run(test_client, None, key=None)
+            _release_locks()
+            keyed = _run(test_client, None, key="k")
+            _release_locks()
+            again = _run(test_client, None, key="k")
+        assert {r.status_code for r in (first, second, keyed, again)} == {202}
+        # Without a key every request is a new run in a new automatic session.
+        assert first.json()["calibration_session_id"] != second.json()["calibration_session_id"]
+        # A keyed retry reaches the same session and run and launches nothing.
+        assert again.json()["calibration_session_id"] == keyed.json()["calibration_session_id"]
+        assert again.json()["calibration_run_id"] == keyed.json()["calibration_run_id"]
+        assert again.json()["replayed"] is True
+        assert create.await_count == 3
+        assert CalibrationSessionDocument.find_all().count() == 3
+
+    def test_a_named_session_takes_a_server_key_and_a_decision_needs_one(self, test_client, lab):
+        session_id = _create_session(test_client)
+        with prefect(["flow-run-a"]) as create:
+            response = _run(test_client, session_id, key=None)
+            assert response.status_code == 202, response.text
+            assert response.json()["calibration_session_id"] == session_id
+            body = {"chip_id": CHIP, "spec": good_spec(), "decision_id": "d-1"}
+            refused = test_client.post(
+                "/calibration-pipelines/execute", headers=_headers(), json=body
+            )
+            assert refused.status_code == 422
+        assert create.await_count == 1
+
+    def test_an_invalid_spec_leaves_no_automatic_session(self, test_client, lab):
         with prefect() as create:
-            assert _run(test_client, None, key="k").status_code == 422
-            session_id = _create_session(test_client)
-            assert _run(test_client, session_id, key=None).status_code == 422
+            response = _run(test_client, None, key="k", spec={"name": "x", "steps": "no"})
+        assert response.status_code == 422
         create.assert_not_awaited()
+        assert CalibrationSessionDocument.find_all().count() == 0
+        assert CalibrationPipelineRunDocument.find_all().count() == 0
 
     def test_one_run_groups_every_step_execution_of_its_flow_run(self, test_client, lab):
         session_id = _create_session(test_client)
@@ -356,14 +411,18 @@ class TestPipelineRuns:
             assert _run(test_client, None, key=None).status_code == 202
             refused = _run(test_client, session_id)
             assert refused.status_code == 409
-            [record] = CalibrationPipelineRunDocument.find_all().to_list()
+            [record] = CalibrationPipelineRunDocument.find(
+                {"calibration_session_id": session_id}
+            ).to_list()
             assert record.status == CalibrationPipelineRunStatus.REJECTED
             _release_locks()
             retried = _run(test_client, session_id)
         assert retried.status_code == 202, retried.text
         assert retried.json()["flow_run_id"] == "flow-run-a"
         assert create.await_count == 2
-        [record] = CalibrationPipelineRunDocument.find_all().to_list()
+        [record] = CalibrationPipelineRunDocument.find(
+            {"calibration_session_id": session_id}
+        ).to_list()
         assert record.status == CalibrationPipelineRunStatus.DISPATCHED
         assert record.attempts == 2
 
@@ -441,7 +500,13 @@ class TestAccess:
         assert create(cs="cs-unknown").status_code == 404
         plain = create(cs=None)
         assert plain.status_code == 201
-        assert plain.json()["calibration_session_id"] is None
+        # Started alone, it gets an automatic session of its own and is admitted to it.
+        automatic = plain.json()["calibration_session_id"]
+        assert automatic.startswith("cs-auto-") and automatic != session_id
+        assert plain.json()["calibration_admission"] == "admitted"
+        auto_doc = CalibrationSessionDocument.find_one({"calibration_session_id": automatic}).run()
+        assert auto_doc is not None and auto_doc.origin == "automatic"
+        assert auto_doc.created_by == "owner" and auto_doc.chip_id == CHIP
         attached = create()
         assert attached.status_code == 201, attached.text
         assert attached.json()["calibration_session_id"] == session_id
@@ -717,7 +782,7 @@ class TestPipelineStartReservation:
         assert response.status_code == 202, response.text
         assert create.await_count == 1
         [refusal] = refusals
-        assert "pipeline run" in str(refusal.detail) and "being started" in str(refusal.detail)
+        assert "run cpr-" in str(refusal.detail) and "being started" in str(refusal.detail)
         assert _session_doc(session_id).status == "open"
         assert _session_doc(session_id).pending_children == []
 
@@ -1038,9 +1103,7 @@ class TestAgentAdmission:
         ]
         return [response.status_code for response in responses]
 
-    def test_an_admitted_session_is_admitted_and_one_created_alone_is_never_checked(
-        self, test_client, lab
-    ):
+    def test_an_attached_session_and_one_created_alone_are_both_admitted(self, test_client, lab):
         from qdash.api.services.agent_session_gate import pass_execution_gate
 
         session_id = _create_session(test_client)
@@ -1054,7 +1117,13 @@ class TestAgentAdmission:
         plain = test_client.post(
             "/agent-sessions", headers=_headers(), json={"chip_id": CHIP, "policy": POLICY}
         )
-        assert plain.json()["calibration_admission"] is None
+        # Created alone, it is admitted to its own automatic session through the same steps.
+        assert plain.json()["calibration_admission"] == "admitted"
+        automatic = _session_doc(plain.json()["calibration_session_id"])
+        assert automatic.origin == "automatic"
+        assert automatic.admitted_reservation_ids == [
+            _agent_doc(plain.json()["session_id"]).calibration_reservation_id
+        ]
         doc = _session_doc(session_id)
         assert doc.pending_children == []
         assert doc.admitted_reservation_ids == [

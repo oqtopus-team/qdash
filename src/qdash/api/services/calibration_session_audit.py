@@ -82,6 +82,9 @@ from qdash.datamodel.calibration_session import (
     CalibrationDecisionOutcome,
     CalibrationExperimentStage,
     CalibrationPipelineRunStatus,
+    CalibrationRunKind,
+    CalibrationRunTrigger,
+    CalibrationSessionOrigin,
     CalibrationSessionStatus,
 )
 from qdash.dbmodel.agent_session import AgentSessionDocument
@@ -309,10 +312,11 @@ class _Records:
         project_id, chip_id = session.project_id, session.chip_id
         scope = {"project_id": project_id, "calibration_session_id": session.calibration_session_id}
         self.session = session
+        # An agent action's run is audited through its agent session.
         self.runs = cast(
             "list[CalibrationPipelineRunDocument]",
             CalibrationPipelineRunDocument.find(
-                scope,
+                {**scope, "run_kind": {"$ne": CalibrationRunKind.AGENT_ACTION.value}},
                 sort=[
                     ("requested_at", SortDirection.ASCENDING),
                     ("run_id", SortDirection.ASCENDING),
@@ -339,15 +343,24 @@ class _Records:
                 ],
             ).run(),
         )
-        flow_run_ids = sorted({run.flow_run_id for run in self.runs if run.flow_run_id})
+        # Step executions of each run: those the worker stamped with the run, or, for a run
+        # recorded before the stamp existed, those of its flow run.
+        by_id = {run.run_id: run for run in self.runs}
+        by_flow = {run.flow_run_id: run for run in self.runs if run.flow_run_id}
         self.flows: dict[str, list[dict[str, Any]]] = defaultdict(list)
-        if flow_run_ids:
+        if by_id:
+            run_clauses: list[dict[str, Any]] = [
+                {"note.calibration_run_id": {"$in": sorted(by_id)}}
+            ]
+            if by_flow:
+                run_clauses.append(
+                    {
+                        "note.flow_run_id": {"$in": sorted(by_flow)},
+                        "note.calibration_run_id": {"$exists": False},
+                    }
+                )
             for doc in ExecutionHistoryDocument.get_motor_collection().find(
-                {
-                    "project_id": project_id,
-                    "chip_id": chip_id,
-                    "note.flow_run_id": {"$in": flow_run_ids},
-                },
+                {"project_id": project_id, "chip_id": chip_id, "$or": run_clauses},
                 {
                     "_id": 0,
                     "execution_id": 1,
@@ -355,10 +368,20 @@ class _Records:
                     "start_at": 1,
                     "end_at": 1,
                     "note.flow_run_id": 1,
+                    "note.calibration_run_id": 1,
                     "note.step_index": 1,
                 },
             ):
-                self.flows[str(doc["note"]["flow_run_id"])].append(doc)
+                note = doc.get("note") or {}
+                # The stamp names the run; only an execution without one is found by its flow run.
+                stamp = note.get("calibration_run_id")
+                run = (
+                    by_id.get(str(stamp))
+                    if stamp
+                    else by_flow.get(str(note.get("flow_run_id") or ""))
+                )
+                if run is not None:
+                    self.flows[run.run_id].append(doc)
         for docs in self.flows.values():
             docs.sort(key=lambda doc: (utc(doc.get("start_at")) or _EPOCH, doc["execution_id"]))
         execution_ids = sorted(
@@ -382,7 +405,7 @@ class _Records:
                 self.tasks_by_execution[str(task.get("execution_id"))].append(task)
 
     def executions_of(self, run: CalibrationPipelineRunDocument) -> list[dict[str, Any]]:
-        return list(self.flows.get(run.flow_run_id, [])) if run.flow_run_id else []
+        return list(self.flows.get(run.run_id, []))
 
     def run_tasks(self, run: CalibrationPipelineRunDocument) -> list[dict[str, Any]]:
         return [
@@ -1012,16 +1035,27 @@ class CalibrationSessionAuditService:
             fields.setdefault("state_version", 0)
             events.append(AgentAuditEvent(sequence=0, **fields))
 
+        automatic = session.origin == CalibrationSessionOrigin.AUTOMATIC
         add(
             event_id=f"session_created:{session.calibration_session_id}",
             at=session.created_at,
             kind="session_created",
-            summary=f"{session.created_by} opened '{bounded_text(session.objective, 200)}' on "
-            f"{session.chip_id}",
+            summary=(
+                f"QDash opened an automatic session for {session.created_by}'s run "
+                f"'{bounded_text(session.objective, 200)}' on {session.chip_id}"
+                if automatic
+                else f"{session.created_by} opened '{bounded_text(session.objective, 200)}' on "
+                f"{session.chip_id}"
+            ),
             actor=session.created_by,
-            actor_kind="human",
+            # An automatic session was created by QDash for the run, not stated by a person.
+            actor_kind="server" if automatic else "human",
             provenance="server_record",
-            data={"objective": session.objective, "chip_id": session.chip_id},
+            data={
+                "objective": session.objective,
+                "chip_id": session.chip_id,
+                "origin": session.origin.value,
+            },
         )
 
         for decision in records.decisions:
@@ -1154,28 +1188,46 @@ class CalibrationSessionAuditService:
         origin = run.reported_origin
         agent_tool = origin is not None and origin.source == "agent_tool"
         missing: list[str] = []
-        if run.spec is None:
+        kind = run.run_kind
+        # Only a pipeline run is requested with a spec; other kinds have none to record.
+        if run.spec is None and kind == CalibrationRunKind.PIPELINE:
             missing.append("requested_spec")
         if agent_tool:
             missing.append("host_approval")
             if run.decision_id is None:
                 missing.append("decision")
+        run_label = run.run_name or run.pipeline_name or run.run_id
+        trigger_text = "a scheduled" if run.trigger == CalibrationRunTrigger.SCHEDULE else "an"
         add(
             event_id=f"pipeline_requested:{run.run_id}",
             at=run.requested_at,
             kind="pipeline_requested",
             summary=(
-                f"{run.requested_by} requested pipeline '{run.pipeline_name or run.run_id}'"
+                (
+                    f"{run.requested_by} requested {kind.value.replace('_', ' ')} '{run_label}'"
+                    if run.trigger == CalibrationRunTrigger.API
+                    else f"The worker recorded {trigger_text} {kind.value.replace('_', ' ')} "
+                    f"'{run_label}' for {run.requested_by}"
+                )
                 + (f" for decision {run.decision_id}" if run.decision_id else "")
                 + (f" (reported: {origin.tool})" if origin else "")
             ),
             actor=run.requested_by,
-            actor_kind="agent" if agent_tool else "unknown",
+            actor_kind=(
+                "agent"
+                if agent_tool
+                else "unknown"
+                if run.trigger == CalibrationRunTrigger.API
+                else "server"
+            ),
             provenance="server_record",
             pipeline_run_id=run.run_id,
             decision_id=run.decision_id,
             missing=missing,
             data={
+                "run_kind": kind.value,
+                "run_name": run.run_name or run.pipeline_name,
+                "trigger": run.trigger.value,
                 "idempotency_key": run.idempotency_key,
                 "pipeline_name": run.pipeline_name,
                 "backend_name": run.backend_name,
@@ -1210,7 +1262,7 @@ class CalibrationSessionAuditService:
             event_id=f"pipeline_dispatch:{run.run_id}",
             at=run.updated_at,
             kind="pipeline_dispatch",
-            summary=f"Dispatch of {run.pipeline_name or run.run_id}: {dispatch.value}",
+            summary=f"Dispatch of {run_label}: {dispatch.value}",
             actor=None,
             actor_kind="server",
             provenance="server_record",
@@ -1275,7 +1327,9 @@ class CalibrationSessionAuditService:
             created_by=session.created_by,
             created_at=cast("datetime", utc(session.created_at)),
             status=session.status,
-            pipeline_run_total=CalibrationPipelineRunDocument.find(scope).count(),
+            pipeline_run_total=CalibrationPipelineRunDocument.find(
+                {**scope, "run_kind": {"$ne": CalibrationRunKind.AGENT_ACTION.value}}
+            ).count(),
             agent_session_total=AgentSessionDocument.find(scope).count(),
             decision_total=CalibrationDecisionDocument.find(scope).count(),
         )

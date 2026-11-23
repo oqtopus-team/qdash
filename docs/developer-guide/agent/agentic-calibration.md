@@ -15,8 +15,10 @@ performs it, judges it, and records it. Two agent-side drivers use the same QDas
   compatible with existing scripts.
 
 The operator's procedure for both is in [Agent Calibration](../../user-guide/agent-calibration.md).
-An agent session can be created in a calibration session, which groups it with the pipeline runs
-for the same objective and grants nothing; see [Calibration Sessions](./calibration-sessions.md).
+An agent session belongs to a calibration session, which groups it with the other runs for the
+same objective and grants nothing: the one named at creation, or an automatic one created with
+it. Each action's dispatch is recorded as a run of that session, and the agent session's policy
+stays the only authority; see [Calibration Sessions](./calibration-sessions.md).
 
 ## The model-driven loop
 

@@ -6,6 +6,8 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { QuickRunTaskRequestBackendName } from './quickRunTaskRequestBackendName';
+import type { QuickRunTaskRequestCalibrationSessionId } from './quickRunTaskRequestCalibrationSessionId';
+import type { QuickRunTaskRequestIdempotencyKey } from './quickRunTaskRequestIdempotencyKey';
 import type { QuickRunTaskRequestInputParameterOverrides } from './quickRunTaskRequestInputParameterOverrides';
 import type { QuickRunTaskRequestPersistOutputParameters } from './quickRunTaskRequestPersistOutputParameters';
 import type { QuickRunTaskRequestRunParameterOverrides } from './quickRunTaskRequestRunParameterOverrides';
@@ -27,6 +29,10 @@ export interface QuickRunTaskRequest {
   /** Replace the current calibration values with the task's validated outputs. When false, the run still saves its task history, figures and raw data. */
   update_calibration_parameters?: boolean;
   update_params?: boolean;
+  /** Add the run to this calibration session, which must be open, on the run's chip, and created by the signed-in user. It groups the run with the session's other work and grants nothing. Without it, QDash creates an automatic session for the run. */
+  calibration_session_id?: QuickRunTaskRequestCalibrationSessionId;
+  /** A retry with the same key and request returns the recorded run instead of starting another, and a run whose launch outcome is unknown is never launched again with it. Without a key, every request starts a new run. */
+  idempotency_key?: QuickRunTaskRequestIdempotencyKey;
   /**
      * Deprecated alias of update_calibration_parameters; it will be removed. A value that differs from update_calibration_parameters is rejected.
      * @deprecated

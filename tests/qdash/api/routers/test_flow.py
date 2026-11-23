@@ -397,6 +397,148 @@ class TestFlowExecution:
         assert parameters["project_id"] == "test_project"
 
 
+class TestFlowExecutionRunRecording:
+    """A run is recorded before its launch only when its chip is known before it."""
+
+    @pytest.fixture
+    def chipless_flow(self, test_project):
+        flow = FlowDocument(
+            project_id="test_project",
+            name="chipless_flow",
+            username="test_user",
+            chip_id="",
+            flow_function_name="run_chipless_flow",
+            default_parameters={"qids": ["0"]},
+            file_path="/app/flows/test_user/chipless_flow.py",
+            deployment_id="chipless-deployment-id",
+        )
+        flow.insert()
+        return flow
+
+    @staticmethod
+    def _recorded() -> tuple[int, int]:
+        from qdash.dbmodel.calibration_session import (
+            CalibrationPipelineRunDocument,
+            CalibrationSessionDocument,
+        )
+
+        return (
+            CalibrationSessionDocument.find({"project_id": "test_project"}).count(),
+            CalibrationPipelineRunDocument.find({"project_id": "test_project"}).count(),
+        )
+
+    @pytest.mark.parametrize(
+        "options",
+        [
+            {"idempotency_key": "tool-call-1"},
+            {"calibration_session_id": "cs-anything"},
+            {"idempotency_key": "tool-call-1", "calibration_session_id": "cs-anything"},
+        ],
+    )
+    def test_chipless_flow_with_session_or_key_is_refused_before_launch(
+        self, test_client, auth_headers, chipless_flow, options
+    ):
+        create_flow_run = AsyncMock(return_value="never")
+        with patch(
+            "qdash.api.services.flow_service.prefect_gateway.PrefectGateway.create_flow_run",
+            new=create_flow_run,
+        ):
+            response = test_client.post(
+                "/flows/chipless_flow/execute",
+                headers=auth_headers,
+                json={"parameters": {}, **options},
+            )
+
+        assert response.status_code == 400
+        detail = response.json()["detail"]
+        assert "names no chip" in detail
+        assert "Nothing was started" in detail
+        assert "parameters.chip_id" in detail
+        create_flow_run.assert_not_awaited()
+        assert self._recorded() == (0, 0)
+
+    def test_chipless_flow_with_chip_parameter_is_recorded(
+        self, test_client, auth_headers, chipless_flow
+    ):
+        create_flow_run = AsyncMock(return_value="flow-run-1")
+        with patch(
+            "qdash.api.services.flow_service.prefect_gateway.PrefectGateway.create_flow_run",
+            new=create_flow_run,
+        ):
+            response = test_client.post(
+                "/flows/chipless_flow/execute",
+                headers=auth_headers,
+                json={"parameters": {"chip_id": "chip-a"}, "idempotency_key": "tool-call-1"},
+            )
+
+        assert response.status_code == 200
+        assert response.json()["calibration_run_id"]
+        create_flow_run.assert_awaited_once()
+        assert self._recorded() == (1, 1)
+
+    def test_chipless_flow_without_options_defers_recording_to_the_worker(
+        self, test_client, auth_headers, chipless_flow
+    ):
+        from qdash.datamodel.calibration_session import CALIBRATION_RUN_CONTEXT_KEY
+
+        create_flow_run = AsyncMock(return_value="flow-run-2")
+        with patch(
+            "qdash.api.services.flow_service.prefect_gateway.PrefectGateway.create_flow_run",
+            new=create_flow_run,
+        ):
+            response = test_client.post(
+                "/flows/chipless_flow/execute", headers=auth_headers, json={"parameters": {}}
+            )
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["calibration_run_id"] is None
+        assert body["calibration_session_id"] is None
+        create_flow_run.assert_awaited_once()
+        context = create_flow_run.call_args.kwargs.get("context") or {}
+        assert CALIBRATION_RUN_CONTEXT_KEY not in context
+        assert self._recorded() == (0, 0)
+
+    def test_known_chip_flow_with_key_is_recorded_and_replayed(
+        self, test_client, auth_headers, sample_flow
+    ):
+        create_flow_run = AsyncMock(return_value="flow-run-3")
+        with patch(
+            "qdash.api.services.flow_service.prefect_gateway.PrefectGateway.create_flow_run",
+            new=create_flow_run,
+        ):
+            first = test_client.post(
+                "/flows/test_flow/execute",
+                headers=auth_headers,
+                json={"parameters": {}, "idempotency_key": "tool-call-2"},
+            )
+            second = test_client.post(
+                "/flows/test_flow/execute",
+                headers=auth_headers,
+                json={"parameters": {}, "idempotency_key": "tool-call-2"},
+            )
+
+        assert first.status_code == second.status_code == 200
+        assert first.json()["calibration_run_id"] == second.json()["calibration_run_id"]
+        assert second.json()["replayed"] is True
+        create_flow_run.assert_awaited_once()
+
+        from qdash.datamodel.calibration_session import CALIBRATION_RUN_CONTEXT_KEY
+        from qdash.dbmodel.calibration_session import CalibrationPipelineRunDocument
+
+        # Only the flow run QDash created receives the launch's dispatch token, and no
+        # response carries it.
+        run = CalibrationPipelineRunDocument.find_one(
+            {"run_id": first.json()["calibration_run_id"]}
+        ).run()
+        assert run is not None
+        handed = create_flow_run.call_args.kwargs["context"][CALIBRATION_RUN_CONTEXT_KEY]
+        assert handed["run_id"] == run.run_id
+        assert handed["dispatch_token"] == run.dispatch_token
+        assert run.dispatch_token not in first.text
+        assert run.dispatch_token not in second.text
+
+
 class TestFlowTemplates:
     """Tests for flow template endpoints."""
 

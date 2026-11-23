@@ -33,12 +33,19 @@ from qdash.datamodel.agent_session import (
     AgentSessionPolicy,
     NumericBounds,
 )
+from qdash.datamodel.calibration_session import (
+    CalibrationPipelineRunStatus,
+    CalibrationRunIdentity,
+    CalibrationRunKind,
+)
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.agent_session import AgentActionDocument, AgentSessionDocument
+from qdash.dbmodel.calibration_session import CalibrationPipelineRunDocument
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.execution_history import ExecutionHistoryDocument
 from qdash.dbmodel.qubit import QubitDocument
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
+from tests.qdash.api._legacy_records import make_standalone_agent_session
 
 
 @pytest.fixture
@@ -1215,6 +1222,97 @@ async def test_execute_authorized_action_runs_like_the_task_workbench(
         service.get_session(project_id="project-1", session_id=session.session_id).state_version
         == 1
     )
+    # The dispatch is a run of the session's automatic calibration session, recorded before
+    # the launch and handed to the worker, which stamps it on the execution.
+    run_id = f"cpr-action-{action.action_id}"
+    assert sent["ungrouped"] is False
+    run = CalibrationPipelineRunDocument.find_one({"run_id": run_id}).run()
+    assert run is not None
+    # The flow run receives the dispatch token of the run's launch, its proof of the run.
+    assert sent["calibration_run"] == CalibrationRunIdentity(
+        calibration_session_id=session.calibration_session_id,
+        run_id=run_id,
+        dispatch_token=run.dispatch_token,
+    )
+    assert run.run_kind == CalibrationRunKind.AGENT_ACTION
+    assert (run.agent_session_id, run.action_id) == (session.session_id, action.action_id)
+    assert run.status == CalibrationPipelineRunStatus.DISPATCHED
+    assert run.flow_run_id == "operation-1"
+    assert run.requested_by == session.created_by
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("status_code", "outcome"),
+    [
+        (409, CalibrationPipelineRunStatus.REJECTED),
+        (500, CalibrationPipelineRunStatus.UNKNOWN),
+    ],
+)
+async def test_a_failed_action_launch_settles_its_run_like_any_run(
+    service: AgentSessionService,
+    monkeypatch: pytest.MonkeyPatch,
+    status_code: int,
+    outcome: CalibrationPipelineRunStatus,
+) -> None:
+    session = _create_session(service)
+    action = service.submit_action(
+        project_id="project-1", session_id=session.session_id, body=_run_task_action()
+    )
+
+    class FailingFlowService:
+        async def execute_single_task_from_snapshot(self, **kwargs: object) -> object:
+            raise HTTPException(status_code=status_code, detail="refused")
+
+    with pytest.raises(HTTPException):
+        await service.execute_action(
+            project_id="project-1",
+            session_id=session.session_id,
+            action_id=action.action_id,
+            body=ExecuteAgentActionRequest(),
+            flow_service=cast("FlowService", FailingFlowService()),
+            task_file_service=_catalog(monkeypatch),
+        )
+    run = CalibrationPipelineRunDocument.find_one(
+        {"run_id": f"cpr-action-{action.action_id}"}
+    ).run()
+    assert run is not None and run.status == outcome
+    # The action itself failed and is never dispatched again.
+    stored = AgentActionDocument.find_one({"action_id": action.action_id}).run()
+    assert stored is not None and stored.execution_status == "failed"
+
+
+@pytest.mark.asyncio
+async def test_an_action_of_a_legacy_session_stays_out_of_any_calibration_session(
+    service: AgentSessionService,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = _create_session(service)
+    make_standalone_agent_session("project-1", session.session_id)
+    action = service.submit_action(
+        project_id="project-1", session_id=session.session_id, body=_run_task_action()
+    )
+    sent: dict[str, object] = {}
+
+    class FakeFlowService:
+        async def execute_single_task_from_snapshot(self, **kwargs: object) -> object:
+            sent.update(kwargs)
+            return type(
+                "Operation", (), {"execution_id": "20260713-002", "flow_run_id": "operation-1"}
+            )()
+
+    await service.execute_action(
+        project_id="project-1",
+        session_id=session.session_id,
+        action_id=action.action_id,
+        body=ExecuteAgentActionRequest(),
+        flow_service=cast("FlowService", FakeFlowService()),
+        task_file_service=_catalog(monkeypatch),
+    )
+    assert sent["calibration_run"] is None
+    # The worker is told not to record it in an automatic session of its own either.
+    assert sent["ungrouped"] is True
+    assert CalibrationPipelineRunDocument.find_all().count() == 0
 
 
 @pytest.mark.asyncio

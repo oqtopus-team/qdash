@@ -6,6 +6,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query
 
 from qdash.api.dependencies import (
+    get_calibration_session_service,
     get_flow_schedule_service,
     get_flow_service,
 )
@@ -31,9 +32,12 @@ from qdash.api.schemas.flow import (
     UpdateScheduleResponse,
 )
 from qdash.api.schemas.source_format import FormatSourceRequest, FormatSourceResponse
+from qdash.api.services.calibration_run_launch import launch_run
+from qdash.api.services.calibration_session_service import CalibrationSessionService
 from qdash.api.services.flow_schedule_service import FlowScheduleService
 from qdash.api.services.flow_service import FlowService
 from qdash.api.services.source_format_service import format_source
+from qdash.datamodel.calibration_session import CalibrationRunKind
 
 router = APIRouter()
 logger = getLogger("uvicorn.app")
@@ -288,9 +292,37 @@ async def execute_flow(
     request: ExecuteFlowRequest,
     ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[FlowService, Depends(get_flow_service)],
+    sessions: Annotated[CalibrationSessionService, Depends(get_calibration_session_service)],
 ) -> ExecuteFlowResponse:
-    """Execute a Flow via Prefect deployment."""
-    return await service.execute_flow(name, request, ctx.user.username, ctx.project_id)
+    """Execute a Flow via Prefect deployment, as one run of a calibration session.
+
+    The run is recorded before it is launched: in ``calibration_session_id`` when given,
+    otherwise in an automatic session QDash creates for it. Every step execution of the run
+    carries the session and run IDs. ``idempotency_key`` makes a retry return the recorded
+    run instead of starting another.
+    """
+    prepared = service.prepare_flow_run(name, request, ctx.user.username, ctx.project_id)
+    return await launch_run(
+        sessions,
+        project_id=ctx.project_id,
+        username=ctx.user.username,
+        chip_id=prepared.chip_id,
+        kind=CalibrationRunKind.WORKFLOW,
+        run_name=name,
+        request={
+            "flow_name": name,
+            "parameters": request.parameters,
+            "target_override": (
+                request.target_override.model_dump(mode="json")
+                if request.target_override is not None
+                else None
+            ),
+        },
+        calibration_session_id=request.calibration_session_id,
+        idempotency_key=request.idempotency_key,
+        validate=lambda: prepared,
+        dispatch=service.dispatch_flow_run,
+    )
 
 
 @router.patch(
