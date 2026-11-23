@@ -24,7 +24,8 @@ export interface WorkflowRunOptions {
   parameters?: Record<string, unknown>;
   /**
    * Add the run to this calibration session (open, on the run's chip, created by the
-   * signed-in user). Without it, the server records the run in an automatic session.
+   * signed-in user). Without it, the run joins an automatic session when the server groups
+   * runs automatically, or none.
    */
   calibrationSessionId?: string;
   /** A retry with the same key returns the recorded run instead of starting another. */
@@ -44,7 +45,7 @@ export class WorkflowRun {
     return this.response.execution_id;
   }
 
-  /** The calibration session the run is recorded in: the one named, or an automatic one. */
+  /** The run's calibration session: the one named, an automatic one, or null. */
   get calibrationSessionId(): string | null {
     return this.response.calibration_session_id ?? null;
   }

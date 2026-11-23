@@ -1,9 +1,10 @@
-"""Launch a saved workflow or a single task as a run of a calibration session.
+"""Launch a saved workflow or a single task as a run.
 
-Every launch path the API offers records its run before the flow run is created, in the
-session the request names or in an automatic session created for it, so the worker can stamp
-the session and run on every step execution. A pipeline launch does the same through its own
-router, which also records decisions and the requested spec.
+Every launch path the API offers records its run before the flow run is created, so the
+worker can stamp the run (and its calibration session, if it has one) on every step
+execution. The run joins the session the request names, an automatic session while automatic
+grouping is on, or none. A pipeline launch does the same through its own router, which also
+records decisions and the requested spec.
 """
 
 from __future__ import annotations
@@ -13,13 +14,13 @@ from typing import TYPE_CHECKING, Any
 from fastapi import HTTPException, status
 
 from qdash.api.schemas.flow import ExecuteFlowResponse
-from qdash.api.services.calibration_session_service import run_request_hash
+from qdash.api.services.run_ledger import RunLedger, run_request_hash
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
     from qdash.api.services.calibration_session_service import CalibrationSessionService
-    from qdash.datamodel.calibration_session import CalibrationRunIdentity, CalibrationRunKind
+    from qdash.datamodel.run import RunIdentity, RunKind
 
 
 async def launch_run(
@@ -28,20 +29,20 @@ async def launch_run(
     project_id: str,
     username: str,
     chip_id: str,
-    kind: CalibrationRunKind,
+    kind: RunKind,
     run_name: str,
     request: dict[str, Any],
     calibration_session_id: str | None,
     idempotency_key: str | None,
     validate: Callable[[], Any],
-    dispatch: Callable[[Any, CalibrationRunIdentity | None], Awaitable[ExecuteFlowResponse]],
+    dispatch: Callable[[Any, RunIdentity | None], Awaitable[ExecuteFlowResponse]],
 ) -> ExecuteFlowResponse:
-    """Record and launch one run, returning the launch response with its session and run.
+    """Record and launch one run, returning the launch response with its run and session.
 
     A request whose chip QDash cannot tell before the launch (a saved flow with no
     ``chip_id`` parameter and no saved chip) cannot be recorded against one. Without
     ``calibration_session_id`` or ``idempotency_key`` it is launched without an identity, and
-    the worker records it in an automatic session on the chip it calibrates when it starts.
+    the worker records its run on the chip it calibrates when it starts.
     With either, it is refused before anything is launched: neither the session nor the
     replay by key could be honored, and QDash never guesses the chip.
     """
@@ -60,7 +61,7 @@ async def launch_run(
         validated = validate()
         return await dispatch(validated, None)
 
-    recorded = await sessions.launch(
+    recorded = await RunLedger(sessions).launch(
         project_id=project_id,
         username=username,
         chip_id=chip_id,

@@ -7,6 +7,6 @@
  */
 
 /**
- * The run's record in its calibration session
+ * The run QDash recorded for the launch (calibration_run_id)
  */
 export type ExecutePipelineResponsePipelineRunId = string | null;

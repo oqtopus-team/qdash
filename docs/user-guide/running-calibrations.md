@@ -117,14 +117,18 @@ agent session; a run recorded before this grouping existed stays its own row. Tu
 off for the plain list of runs. See [Agent Calibration](./agent-calibration.md#follow-a-session-on-the-execution-page).
 
 Every workflow, pipeline, or task you start belongs to a calibration session, and so does every
-step it runs. When you start one without choosing an objective, QDash creates a session for that
-run alone, marked **Automatic**. A saved workflow with several steps is therefore one row on the
+step it runs, unless your administrator turned automatic grouping off (see
+[Turn Off Automatic Calibration Session Grouping](./operations.md#turn-off-automatic-calibration-session-grouping)).
+When you start one without choosing an objective, QDash creates a session for that run alone,
+marked **Automatic**. A saved workflow with several steps is therefore one row on the
 grouped list, with each step listed under the run, and running it again adds another session
 with its own run. Scheduled workflow runs are grouped the same way, one session per scheduled
 run. Each run is labeled **Workflow**, **Pipeline**, or **Task**, and a scheduled one is marked
 **Scheduled**. To collect several runs toward one goal, such as an agent's optimization trials,
 start them in the same calibration session; the assistant does this for you. Runs recorded
-before this grouping existed are not moved into a session.
+before this grouping existed are not moved into a session. With automatic grouping off, a run
+started without an objective is an ordinary row on the list, and a run started in a calibration
+session is grouped as before.
 
 A run shows its objective as a badge on its card. The details panel and the run's page say why
 it belongs there and offer **Open calibration session**; an agent session row offers the same

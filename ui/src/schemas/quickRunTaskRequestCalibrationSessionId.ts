@@ -7,6 +7,6 @@
  */
 
 /**
- * Add the run to this calibration session, which must be open, on the run's chip, and created by the signed-in user. It groups the run with the session's other work and grants nothing. Without it, QDash creates an automatic session for the run.
+ * Add the run to this calibration session, which must exist, be open, be on the run's chip, and be created by the signed-in user; otherwise the request is refused before anything starts. It groups the run with the session's other work and grants nothing. Without it, the run joins an automatic session when the server groups runs automatically (the default), or no session when it does not.
  */
 export type QuickRunTaskRequestCalibrationSessionId = string | null;

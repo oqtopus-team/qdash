@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     from qdash.api.schemas.task_file import TaskInfo
     from qdash.api.services.flow_service import FlowService
     from qdash.api.services.task_file_service import TaskFileService
-    from qdash.datamodel.calibration_session import CalibrationRunIdentity
+    from qdash.datamodel.run import RunIdentity
 
 
 def matches_parameter_type(value: object, value_type: object) -> bool:
@@ -165,7 +165,7 @@ async def run_catalog_task(
     execution_name: str,
     source_task_id: str | None = None,
     tags: list[str] | None = None,
-    calibration_run: CalibrationRunIdentity | None = None,
+    calibration_run: RunIdentity | None = None,
     ungrouped: bool = False,
 ) -> ExecuteFlowResponse:
     """Start one catalog run of ``task`` after checking the overrides.

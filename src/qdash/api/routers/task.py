@@ -50,7 +50,7 @@ from qdash.api.services.pi_evaluation_service import (
 )
 from qdash.api.services.task_file_service import TaskFileService
 from qdash.api.services.task_service import TaskService
-from qdash.datamodel.calibration_session import CalibrationRunIdentity, CalibrationRunKind
+from qdash.datamodel.run import RunIdentity, RunKind
 from qdash.datamodel.task_knowledge import get_task_knowledge as lookup_task_knowledge
 
 router = APIRouter()
@@ -106,8 +106,9 @@ async def quick_run_task(
 ) -> ExecuteFlowResponse:
     """Execute one task without requiring a previous execution snapshot.
 
-    The run is recorded in ``calibration_session_id`` when given, otherwise in an automatic
-    calibration session QDash creates for it, before it is launched.
+    The run is recorded before it is launched. It joins ``calibration_session_id`` when given;
+    otherwise an automatic calibration session when the server groups runs automatically, or
+    none.
     """
     task, backend_name = resolve_catalog_task(task_file_service, task_name, body.backend_name)
 
@@ -123,7 +124,7 @@ async def quick_run_task(
                 status_code=400, detail="Source task does not match the task and target"
             )
 
-    async def dispatch(_: object, identity: CalibrationRunIdentity | None) -> ExecuteFlowResponse:
+    async def dispatch(_: object, identity: RunIdentity | None) -> ExecuteFlowResponse:
         return await run_catalog_task(
             flow_service=flow_service,
             task=task,
@@ -148,7 +149,7 @@ async def quick_run_task(
         project_id=ctx.project_id,
         username=ctx.user.username,
         chip_id=body.chip_id,
-        kind=CalibrationRunKind.TASK,
+        kind=RunKind.TASK,
         run_name=f"{task_name} on {body.qid}",
         request={
             "task_name": task_name,

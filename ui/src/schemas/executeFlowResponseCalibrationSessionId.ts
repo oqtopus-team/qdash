@@ -7,6 +7,6 @@
  */
 
 /**
- * The calibration session the run is recorded in: the one the request named, or the automatic session QDash created for it
+ * The calibration session the run joined: the one the request named, or an automatic one; null when the run joined none
  */
 export type ExecuteFlowResponseCalibrationSessionId = string | null;

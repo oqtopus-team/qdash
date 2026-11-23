@@ -761,10 +761,10 @@ class TestPipelineStartReservation:
     def test_close_while_a_run_is_being_claimed_is_refused(self, test_client, lab):
         from fastapi import HTTPException
 
-        from qdash.api.services.calibration_session_service import CalibrationSessionService
+        from qdash.api.services.run_ledger import RunLedger
 
         session_id = _create_session(test_client)
-        original = CalibrationSessionService._claim_run
+        original = RunLedger._claim
         refusals: list[HTTPException] = []
 
         def close_then_claim(**kwargs):
@@ -775,7 +775,7 @@ class TestPipelineStartReservation:
             return original(**kwargs)
 
         with (
-            patch.object(CalibrationSessionService, "_claim_run", staticmethod(close_then_claim)),
+            patch.object(RunLedger, "_claim", staticmethod(close_then_claim)),
             prefect(["flow-run-a"]) as create,
         ):
             response = _run(test_client, session_id)
@@ -787,10 +787,10 @@ class TestPipelineStartReservation:
         assert _session_doc(session_id).pending_children == []
 
     def test_a_request_whose_reservation_a_close_cleared_never_launches(self, test_client, lab):
-        from qdash.api.services.calibration_session_service import CalibrationSessionService
+        from qdash.api.services.run_ledger import RunLedger
 
         session_id = _create_session(test_client)
-        original = CalibrationSessionService._claim_run
+        original = RunLedger._claim
 
         def stall_past_a_close(**kwargs):
             # A reservation this old was never launched, so the close needs no acknowledgment.
@@ -799,7 +799,7 @@ class TestPipelineStartReservation:
             return original(**kwargs)
 
         with (
-            patch.object(CalibrationSessionService, "_claim_run", staticmethod(stall_past_a_close)),
+            patch.object(RunLedger, "_claim", staticmethod(stall_past_a_close)),
             prefect(["flow-run-a"]) as create,
         ):
             response = _run(test_client, session_id)

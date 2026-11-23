@@ -38,7 +38,7 @@ from qdash.api.services.catalog_task_run import resolve_catalog_task, validate_o
 from qdash.api.services.flow_service import FlowService
 from qdash.api.services.task_file_service import TaskFileService
 from qdash.api.services.task_result_service import TaskResultService
-from qdash.datamodel.calibration_session import CalibrationRunIdentity, CalibrationRunKind
+from qdash.datamodel.run import RunIdentity, RunKind
 
 router = APIRouter()
 
@@ -634,7 +634,9 @@ async def re_execute_task_result(
         Body(
             description=(
                 "Add the run to this calibration session (open, on the task's chip, created "
-                "by the signed-in user). Without it, QDash creates an automatic session."
+                "by the signed-in user); otherwise the request is refused before anything "
+                "starts. Without it, the run joins an automatic session when the server groups "
+                "runs automatically, or none."
             ),
             embed=True,
             min_length=1,
@@ -713,7 +715,7 @@ async def re_execute_task_result(
         else None
     )
 
-    async def dispatch(_: object, identity: CalibrationRunIdentity | None) -> ExecuteFlowResponse:
+    async def dispatch(_: object, identity: RunIdentity | None) -> ExecuteFlowResponse:
         return await flow_service.execute_single_task_from_snapshot(
             task_name=doc.name,
             qid=doc.qid,
@@ -735,7 +737,7 @@ async def re_execute_task_result(
         project_id=ctx.project_id,
         username=ctx.user.username,
         chip_id=doc.chip_id,
-        kind=CalibrationRunKind.TASK,
+        kind=RunKind.TASK,
         run_name=f"{doc.name} on {doc.qid}",
         request={
             "source_task_id": task_id,

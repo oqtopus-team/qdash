@@ -43,9 +43,10 @@ const ORIGIN_LABELS: Record<(typeof ORIGIN_FILTERS)[number], string> = {
 /**
  * The project's calibration sessions, newest first: one row per objective, linked to its page.
  *
- * Every run belongs to one. A run started without a session gets an automatic one, so the
- * origin filter separates the sessions people or agents created for an objective from those
- * QDash created for single runs. This page starts nothing.
+ * While the server groups runs automatically (the default), a run started without a session
+ * gets an automatic one, so the origin filter separates the sessions people or agents created
+ * for an objective from those QDash created for single runs. When it does not, such a run
+ * joins no session and is listed only in the Execution list. This page starts nothing.
  */
 export function CalibrationSessionListPageContent() {
   const linked = useLinkedProject();
@@ -105,7 +106,7 @@ export function CalibrationSessionListPageContent() {
     <PageContainer maxWidth>
       <PageHeader
         title="Calibration sessions"
-        description="Objectives that group runs and agent sessions. A run started without one gets an automatic session."
+        description="Objectives that group runs and agent sessions. A run started without one gets an automatic session when the server groups runs automatically."
       />
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <div role="tablist" aria-label="Status" className="tabs tabs-box tabs-sm w-fit">

@@ -25,13 +25,11 @@ from qdash.api.schemas.calibration_pipeline import (
 )
 from qdash.api.schemas.flow import ExecuteFlowResponse
 from qdash.api.services.calibration_pipeline_service import CalibrationPipelineService
-from qdash.api.services.calibration_session_service import (
-    CalibrationSessionService,
-    pipeline_request_hash,
-)
+from qdash.api.services.calibration_session_service import CalibrationSessionService
 from qdash.api.services.flow_service import FlowService
 from qdash.api.services.pipeline_launch import record_pipeline_launch
-from qdash.datamodel.calibration_session import CalibrationRunIdentity, CalibrationRunKind
+from qdash.api.services.run_ledger import RunLedger, pipeline_request_hash
+from qdash.datamodel.run import RunIdentity, RunKind
 
 router = APIRouter(prefix="/calibration-pipelines")
 
@@ -92,10 +90,10 @@ async def execute_pipeline(
     deployment. A spec with problems is rejected with 422 and the same problem
     list that /validate returns.
 
-    The run is recorded before it is launched: in ``calibration_session_id`` when
-    given, otherwise in an automatic calibration session QDash creates for it.
-    ``idempotency_key`` makes a retry return the recorded run instead of starting
-    another."""
+    The run is recorded before it is launched. It joins ``calibration_session_id``
+    when given; otherwise an automatic calibration session when the server groups
+    runs automatically, or none. ``idempotency_key`` makes a retry return the
+    recorded run instead of starting another."""
 
     def validate() -> ValidatePipelineResponse:
         result = service.validate(
@@ -115,7 +113,7 @@ async def execute_pipeline(
         return result
 
     async def dispatch(
-        result: ValidatePipelineResponse, identity: CalibrationRunIdentity | None
+        result: ValidatePipelineResponse, identity: RunIdentity | None
     ) -> ExecuteFlowResponse:
         assert result.spec is not None  # validate() refused a spec without one
         dispatched = await flows.execute_calibration_pipeline(
@@ -145,11 +143,11 @@ async def execute_pipeline(
             targets=result.targets,
         ).model_dump(mode="json")
 
-    recorded = await sessions.launch(
+    recorded = await RunLedger(sessions).launch(
         project_id=ctx.project_id,
         username=ctx.user.username,
         chip_id=request.chip_id,
-        kind=CalibrationRunKind.PIPELINE,
+        kind=RunKind.PIPELINE,
         run_name=str(request.spec.get("name") or ""),
         request_hash=pipeline_request_hash(
             request.chip_id, request.spec, request.backend_name, request.decision_id

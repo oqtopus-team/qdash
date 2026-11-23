@@ -26,14 +26,15 @@ export interface PipelineTarget {
 }
 
 /**
- * Where `Pipelines.execute` records a run, under one retry key: a calibration session, or,
- * without one, the automatic session the server creates for the run.
+ * How `Pipelines.execute` records a run, under one retry key: in a calibration session, or,
+ * without one, in an automatic session when the server groups runs automatically, or in none.
  */
 export interface PipelineRecording {
   /**
    * The calibration session to record the run in: open, on the same chip, and created by
    * the signed-in user. Grouping grants nothing; the run is still the request itself.
-   * Without it, the server records the run in an automatic session of its own.
+   * Without it, the run joins an automatic session when the server groups runs
+   * automatically, or none.
    */
   calibrationSessionId?: string;
   /**
@@ -142,8 +143,8 @@ export class Pipelines {
    * validates it again and answers 422 (`QDashValidationError`) with the same
    * problems. The run belongs to the session's project, or to the server's
    * default project for the user when none is configured. Returns once
-   * dispatched; nothing waits. With `recording`, the run is recorded in a
-   * calibration session before it is launched (see `PipelineRecording`);
+   * dispatched; nothing waits. With `recording`, the run is recorded under
+   * its key and session before it is launched (see `PipelineRecording`);
    * `options.reportedOrigin` records how the caller says it started the run.
    */
   async execute(

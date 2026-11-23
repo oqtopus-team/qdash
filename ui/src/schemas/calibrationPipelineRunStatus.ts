@@ -7,13 +7,13 @@
  */
 
 /**
- * Dispatch state of one run requested in a calibration session, whatever its kind.
+ * Dispatch state of one run, whatever its kind.
  *
  * ``dispatching``: the request was recorded and its launch has not reported back.
- * ``dispatched``: QDash created the pipeline's flow run; its executions carry its
- * ``flow_run_id``.
+ * ``dispatched``: QDash created the run's flow run; its executions carry its ``run_id``.
  * ``rejected``: QDash refused the launch before any flow run was created (the hardware was
- * busy or the worker deployment was missing); a retry with the same key may launch it.
+ * busy, the worker deployment was missing, or the attempt was never admitted); a retry with
+ * the same key may launch it.
  * ``unknown``: the launch failed in a way that may have created a flow run anyway, or it
  * stayed ``dispatching`` past the time a launch takes. A retry with the same key never
  * launches it again.

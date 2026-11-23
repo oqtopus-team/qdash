@@ -222,7 +222,7 @@ export function registerFlowAuthoringTools(pi: Pick<ExtensionAPI, "registerTool"
       // The names a flow can be saved under; pi rejects others before confirmation.
       name: Type.String({ pattern: "^[A-Za-z0-9_]+$", description: "The saved flow's name: letters, digits and underscores." }),
       parameters: Type.Optional(Type.Object({}, { additionalProperties: true, description: "Flow function parameters; override the flow's default_parameters." })),
-      calibrationSessionId: Type.Optional(Type.String({ description: "Record the run in this calibration session (open, on the flow's chip, created by the user). Without it QDash records the run in an automatic session of its own. Grants nothing." })),
+      calibrationSessionId: Type.Optional(Type.String({ description: "Record the run in this calibration session (open, on the flow's chip, created by the user). Without it the run joins an automatic session of its own when the server groups runs automatically, or no session. Grants nothing." })),
     }),
     async execute(toolCallId, params: ConnectionParams & { name: string; parameters?: Record<string, unknown>; calibrationSessionId?: string }, _signal, _onUpdate, ctx) {
       const recordedIn = params.calibrationSessionId ? ` It is recorded in calibration session ${params.calibrationSessionId}, which groups it and grants nothing.` : "";

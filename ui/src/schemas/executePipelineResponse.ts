@@ -26,15 +26,15 @@ export interface ExecutePipelineResponse {
   qdash_ui_url: string;
   /** Success message */
   message: string;
-  /** The calibration session the run is recorded in: the one the request named, or the automatic session QDash created for it */
+  /** The calibration session the run joined: the one the request named, or an automatic one; null when the run joined none */
   calibration_session_id?: ExecutePipelineResponseCalibrationSessionId;
-  /** The run's record in that session; every step execution carries it */
+  /** The run QDash recorded for the launch; every step execution carries it. Null only for a run the worker records when it starts (a saved flow with no chip) */
   calibration_run_id?: ExecutePipelineResponseCalibrationRunId;
   /** True when a retry returned the run an earlier request with its key started */
   replayed?: boolean;
   steps?: ResolvedPipelineStep[];
   targets?: ExecutePipelineResponseTargets;
-  /** The run's record in its calibration session */
+  /** The run QDash recorded for the launch (calibration_run_id) */
   pipeline_run_id?: ExecutePipelineResponsePipelineRunId;
   /** The decision the recorded run carries out, as QDash linked it; null when the request named none. A client that sent a decision checks it is echoed here */
   decision_id?: ExecutePipelineResponseDecisionId;

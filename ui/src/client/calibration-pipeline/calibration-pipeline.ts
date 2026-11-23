@@ -223,10 +223,10 @@ export const useValidateCalibrationPipeline = <TError = HTTPValidationError,
  * deployment. A spec with problems is rejected with 422 and the same problem
  * list that /validate returns.
  *
- * The run is recorded before it is launched: in ``calibration_session_id`` when
- * given, otherwise in an automatic calibration session QDash creates for it.
- * ``idempotency_key`` makes a retry return the recorded run instead of starting
- * another.
+ * The run is recorded before it is launched. It joins ``calibration_session_id``
+ * when given; otherwise an automatic calibration session when the server groups
+ * runs automatically, or none. ``idempotency_key`` makes a retry return the
+ * recorded run instead of starting another.
  * @summary Validate and run a calibration pipeline spec
  */
 export const executeCalibrationPipeline = (

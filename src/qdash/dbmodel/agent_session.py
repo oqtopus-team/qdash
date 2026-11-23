@@ -90,6 +90,11 @@ class AgentSessionDocument(Document):
     # ``pending`` and ``rejected``; None (a session created alone) is never checked.
     calibration_admission: CalibrationAdmission | None = None
     calibration_reservation_id: str | None = None
+    # Whether each action's dispatch records a run (``RunDocument``), in the calibration
+    # session above when it was admitted to one, otherwise in none. False for a session
+    # created before then: unless it was admitted to a calibration session, its executions
+    # stay in the session alone, as they always did.
+    records_runs: bool = False
 
     model_config = ConfigDict(from_attributes=True)
 

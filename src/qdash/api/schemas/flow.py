@@ -8,9 +8,11 @@ from pydantic import BaseModel, ConfigDict, Field
 from qdash.datamodel.flow_targets import FlowTargetOverride, TargetMode
 
 CALIBRATION_SESSION_FIELD = (
-    "Add the run to this calibration session, which must be open, on the run's chip, and "
-    "created by the signed-in user. It groups the run with the session's other work and grants "
-    "nothing. Without it, QDash creates an automatic session for the run."
+    "Add the run to this calibration session, which must exist, be open, be on the run's chip, "
+    "and be created by the signed-in user; otherwise the request is refused before anything "
+    "starts. It groups the run with the session's other work and grants nothing. Without it, "
+    "the run joins an automatic session when the server groups runs automatically (the "
+    "default), or no session when it does not."
 )
 IDEMPOTENCY_KEY_FIELD = (
     "A retry with the same key and request returns the recorded run instead of starting "
@@ -290,13 +292,16 @@ class ExecuteFlowResponse(BaseModel):
     calibration_session_id: str | None = Field(
         default=None,
         description=(
-            "The calibration session the run is recorded in: the one the request named, or the "
-            "automatic session QDash created for it"
+            "The calibration session the run joined: the one the request named, or an "
+            "automatic one; null when the run joined none"
         ),
     )
     calibration_run_id: str | None = Field(
         default=None,
-        description="The run's record in that session; every step execution carries it",
+        description=(
+            "The run QDash recorded for the launch; every step execution carries it. Null only "
+            "for a run the worker records when it starts (a saved flow with no chip)"
+        ),
     )
     replayed: bool = Field(
         default=False,

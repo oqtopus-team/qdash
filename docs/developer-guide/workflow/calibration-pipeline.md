@@ -72,12 +72,13 @@ Task results store the worker-resolved plan digest in `invocation.plan_digest`, 
 `note.calibration_plan.digest`. `execute` returns HTTP 422 with the validation problems, or 503
 when the worker deployment is not registered.
 
-`execute` records the run before it is launched: in `calibration_session_id` when given,
-otherwise in an automatic calibration session created for it. A retry with the same
+`execute` records the run before it is launched. It joins `calibration_session_id` when given;
+otherwise an automatic calibration session when the server groups runs automatically (the
+default), or none. A retry with the same
 `idempotency_key` returns the recorded run (`replayed: true`) instead of starting another;
 without a key every request starts a new run. The response adds `calibration_session_id`,
-`calibration_run_id`, and `pipeline_run_id`, and every step execution carries the session and
-run in `note.calibration_session_id` and `note.calibration_run_id`. With a session, an optional
+`calibration_run_id`, and `pipeline_run_id`, and every step execution carries the run in
+`note.calibration_run_id`, and its session, when it has one, in `note.calibration_session_id`. With a session, an optional
 `decision_id` names the session's decision the run carries out, and the response echoes it (see
 [Calibration Session Audit](../agent/calibration-session-audit.md#intent-before-execution)). The
 recording, retry, and unknown-outcome rules are in

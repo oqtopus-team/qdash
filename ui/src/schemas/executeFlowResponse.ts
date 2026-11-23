@@ -22,9 +22,9 @@ export interface ExecuteFlowResponse {
   qdash_ui_url: string;
   /** Success message */
   message: string;
-  /** The calibration session the run is recorded in: the one the request named, or the automatic session QDash created for it */
+  /** The calibration session the run joined: the one the request named, or an automatic one; null when the run joined none */
   calibration_session_id?: ExecuteFlowResponseCalibrationSessionId;
-  /** The run's record in that session; every step execution carries it */
+  /** The run QDash recorded for the launch; every step execution carries it. Null only for a run the worker records when it starts (a saved flow with no chip) */
   calibration_run_id?: ExecuteFlowResponseCalibrationRunId;
   /** True when a retry returned the run an earlier request with its key started */
   replayed?: boolean;

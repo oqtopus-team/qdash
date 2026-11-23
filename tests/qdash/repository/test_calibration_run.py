@@ -274,7 +274,7 @@ class TestAdoptRecordedRun:
 
     def test_another_session_is_refused(self, init_db: Any) -> None:
         identity = _api_run().model_copy(update={"calibration_session_id": "cs-other"})
-        with pytest.raises(CalibrationRunMismatch, match="belongs to session"):
+        with pytest.raises(CalibrationRunMismatch, match="belongs to calibration session"):
             _adopt(identity)
 
     def test_a_worker_recorded_run_is_bound_to_its_flow_run_from_the_start(
@@ -309,28 +309,24 @@ class TestLateSettlement:
     def test_the_api_settles_a_run_the_worker_already_bound_to_the_same_flow_run(
         self, init_db: Any
     ) -> None:
-        from qdash.api.services.calibration_session_service import CalibrationSessionService
+        from qdash.api.services.run_ledger import RunLedger
 
         identity = _api_run()
         claim = self._claim()
         _adopt(identity, flow_run_id="fr-1")
-        CalibrationSessionService._settle(
-            claim, CalibrationPipelineRunStatus.DISPATCHED, flow_run_id="fr-1"
-        )
+        RunLedger.settle(claim, CalibrationPipelineRunStatus.DISPATCHED, flow_run_id="fr-1")
         run = self._claim()
         assert (run.status, run.flow_run_id) == ("dispatched", "fr-1")
 
     def test_a_launch_reporting_another_flow_run_never_replaces_the_binding(
         self, init_db: Any
     ) -> None:
-        from qdash.api.services.calibration_session_service import CalibrationSessionService
+        from qdash.api.services.run_ledger import RunLedger
 
         identity = _api_run()
         claim = self._claim()
         _adopt(identity, flow_run_id="fr-1")
-        CalibrationSessionService._settle(
-            claim, CalibrationPipelineRunStatus.DISPATCHED, flow_run_id="fr-2"
-        )
+        RunLedger.settle(claim, CalibrationPipelineRunStatus.DISPATCHED, flow_run_id="fr-2")
         run = self._claim()
         assert (run.status, run.flow_run_id) == ("unknown", "fr-1")
         assert "fr-2" in run.error

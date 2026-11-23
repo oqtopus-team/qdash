@@ -7,6 +7,6 @@
  */
 
 /**
- * Add the run to this calibration session (open, on the task's chip, created by the signed-in user). Without it, QDash creates an automatic session.
+ * Add the run to this calibration session (open, on the task's chip, created by the signed-in user); otherwise the request is refused before anything starts. Without it, the run joins an automatic session when the server groups runs automatically, or none.
  */
 export type BodyReExecuteTaskResultCalibrationSessionId = string | null;

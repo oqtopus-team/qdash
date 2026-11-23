@@ -7,6 +7,6 @@
  */
 
 /**
- * The run's record in that session; every step execution carries it
+ * The run QDash recorded for the launch; every step execution carries it. Null only for a run the worker records when it starts (a saved flow with no chip)
  */
 export type ExecutePipelineResponseCalibrationRunId = string | null;

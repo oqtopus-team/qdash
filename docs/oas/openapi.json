@@ -5505,7 +5505,7 @@
           "calibration-pipeline"
         ],
         "summary": "Validate and run a calibration pipeline spec",
-        "description": "Runs the spec as one execution through the worker's calibration-pipeline\ndeployment. A spec with problems is rejected with 422 and the same problem\nlist that /validate returns.\n\nThe run is recorded before it is launched: in ``calibration_session_id`` when\ngiven, otherwise in an automatic calibration session QDash creates for it.\n``idempotency_key`` makes a retry return the recorded run instead of starting\nanother.",
+        "description": "Runs the spec as one execution through the worker's calibration-pipeline\ndeployment. A spec with problems is rejected with 422 and the same problem\nlist that /validate returns.\n\nThe run is recorded before it is launched. It joins ``calibration_session_id``\nwhen given; otherwise an automatic calibration session when the server groups\nruns automatically, or none. ``idempotency_key`` makes a retry return the\nrecorded run instead of starting another.",
         "operationId": "executeCalibrationPipeline",
         "security": [
           {
@@ -8656,7 +8656,7 @@
           "task"
         ],
         "summary": "Execute a single task from the task catalog",
-        "description": "Execute one task without requiring a previous execution snapshot.\n\nThe run is recorded in ``calibration_session_id`` when given, otherwise in an automatic\ncalibration session QDash creates for it, before it is launched.",
+        "description": "Execute one task without requiring a previous execution snapshot.\n\nThe run is recorded before it is launched. It joins ``calibration_session_id`` when given;\notherwise an automatic calibration session when the server groups runs automatically, or\nnone.",
         "operationId": "quickRunTask",
         "security": [
           {
@@ -13695,7 +13695,7 @@
           "flow"
         ],
         "summary": "Execute a flow",
-        "description": "Execute a Flow via Prefect deployment, as one run of a calibration session.\n\nThe run is recorded before it is launched: in ``calibration_session_id`` when given,\notherwise in an automatic session QDash creates for it. Every step execution of the run\ncarries the session and run IDs. ``idempotency_key`` makes a retry return the recorded\nrun instead of starting another.",
+        "description": "Execute a Flow via Prefect deployment, as one run of a calibration session.\n\nThe run is recorded before it is launched. It joins ``calibration_session_id`` when given\n(refused before launch if that session cannot take it); otherwise an automatic session\nwhen the server groups runs automatically, or none. Every step execution of the run\ncarries the run ID, and the session ID when it has one. ``idempotency_key`` makes a retry\nreturn the recorded run instead of starting another.",
         "operationId": "executeFlow",
         "security": [
           {
@@ -25332,7 +25332,7 @@
               }
             ],
             "title": "Calibration Session Id",
-            "description": "Add the run to this calibration session (open, on the task's chip, created by the signed-in user). Without it, QDash creates an automatic session."
+            "description": "Add the run to this calibration session (open, on the task's chip, created by the signed-in user); otherwise the request is refused before anything starts. Without it, the run joins an automatic session when the server groups runs automatically, or none."
           },
           "idempotency_key": {
             "anyOf": [
@@ -26896,7 +26896,7 @@
           "unknown"
         ],
         "title": "CalibrationPipelineRunStatus",
-        "description": "Dispatch state of one run requested in a calibration session, whatever its kind.\n\n``dispatching``: the request was recorded and its launch has not reported back.\n``dispatched``: QDash created the pipeline's flow run; its executions carry its\n``flow_run_id``.\n``rejected``: QDash refused the launch before any flow run was created (the hardware was\nbusy or the worker deployment was missing); a retry with the same key may launch it.\n``unknown``: the launch failed in a way that may have created a flow run anyway, or it\nstayed ``dispatching`` past the time a launch takes. A retry with the same key never\nlaunches it again."
+        "description": "Dispatch state of one run, whatever its kind.\n\n``dispatching``: the request was recorded and its launch has not reported back.\n``dispatched``: QDash created the run's flow run; its executions carry its ``run_id``.\n``rejected``: QDash refused the launch before any flow run was created (the hardware was\nbusy, the worker deployment was missing, or the attempt was never admitted); a retry with\nthe same key may launch it.\n``unknown``: the launch failed in a way that may have created a flow run anyway, or it\nstayed ``dispatching`` past the time a launch takes. A retry with the same key never\nlaunches it again."
       },
       "CalibrationRecommendationRef": {
         "properties": {
@@ -26943,7 +26943,7 @@
           "agent_action"
         ],
         "title": "CalibrationRunKind",
-        "description": "What one run of a calibration session launched.\n\n``pipeline``: a calibration pipeline spec (every run recorded before other kinds existed).\n``workflow``: a saved workflow (flow). ``task``: one catalog task, from the Task Workbench\nor a re-execution. ``agent_action``: the task an agent session's action ran."
+        "description": "What one run launched.\n\n``pipeline``: a calibration pipeline spec (every run recorded before other kinds existed).\n``workflow``: a saved workflow (flow). ``task``: one catalog task, from the Task Workbench\nor a re-execution. ``agent_action``: the task an agent session's action ran."
       },
       "CalibrationRunTrigger": {
         "type": "string",
@@ -28914,7 +28914,7 @@
               }
             ],
             "title": "Calibration Session Id",
-            "description": "Create the session in this calibration session, which must be open, on the same chip, and created by the signed-in user. It groups the session with the objective's other work and grants nothing beyond the policy."
+            "description": "Create the session in this calibration session, which must be open, on the same chip, and created by the signed-in user. It groups the session with the objective's other work and grants nothing beyond the policy. Without it, the session joins an automatic calibration session when the server groups runs automatically, or none."
           }
         },
         "type": "object",
@@ -31399,7 +31399,7 @@
               }
             ],
             "title": "Calibration Session Id",
-            "description": "Add the run to this calibration session, which must be open, on the run's chip, and created by the signed-in user. It groups the run with the session's other work and grants nothing. Without it, QDash creates an automatic session for the run."
+            "description": "Add the run to this calibration session, which must exist, be open, be on the run's chip, and be created by the signed-in user; otherwise the request is refused before anything starts. It groups the run with the session's other work and grants nothing. Without it, the run joins an automatic session when the server groups runs automatically (the default), or no session when it does not."
           },
           "idempotency_key": {
             "anyOf": [
@@ -31468,7 +31468,7 @@
               }
             ],
             "title": "Calibration Session Id",
-            "description": "The calibration session the run is recorded in: the one the request named, or the automatic session QDash created for it"
+            "description": "The calibration session the run joined: the one the request named, or an automatic one; null when the run joined none"
           },
           "calibration_run_id": {
             "anyOf": [
@@ -31480,7 +31480,7 @@
               }
             ],
             "title": "Calibration Run Id",
-            "description": "The run's record in that session; every step execution carries it"
+            "description": "The run QDash recorded for the launch; every step execution carries it. Null only for a run the worker records when it starts (a saved flow with no chip)"
           },
           "replayed": {
             "type": "boolean",
@@ -31537,7 +31537,7 @@
               }
             ],
             "title": "Calibration Session Id",
-            "description": "Add the run to this calibration session, which must be open, on the run's chip, and created by the signed-in user. It groups the run with the session's other work and grants nothing. Without it, QDash creates an automatic session for the run."
+            "description": "Add the run to this calibration session, which must exist, be open, be on the run's chip, and be created by the signed-in user; otherwise the request is refused before anything starts. It groups the run with the session's other work and grants nothing. Without it, the run joins an automatic session when the server groups runs automatically (the default), or no session when it does not."
           },
           "idempotency_key": {
             "anyOf": [
@@ -31693,7 +31693,7 @@
               }
             ],
             "title": "Calibration Session Id",
-            "description": "The calibration session the run is recorded in: the one the request named, or the automatic session QDash created for it"
+            "description": "The calibration session the run joined: the one the request named, or an automatic one; null when the run joined none"
           },
           "calibration_run_id": {
             "anyOf": [
@@ -31705,7 +31705,7 @@
               }
             ],
             "title": "Calibration Run Id",
-            "description": "The run's record in that session; every step execution carries it"
+            "description": "The run QDash recorded for the launch; every step execution carries it. Null only for a run the worker records when it starts (a saved flow with no chip)"
           },
           "replayed": {
             "type": "boolean",
@@ -31740,7 +31740,7 @@
               }
             ],
             "title": "Pipeline Run Id",
-            "description": "The run's record in its calibration session"
+            "description": "The run QDash recorded for the launch (calibration_run_id)"
           },
           "decision_id": {
             "anyOf": [
@@ -40279,7 +40279,7 @@
               }
             ],
             "title": "Calibration Session Id",
-            "description": "Add the run to this calibration session, which must be open, on the run's chip, and created by the signed-in user. It groups the run with the session's other work and grants nothing. Without it, QDash creates an automatic session for the run."
+            "description": "Add the run to this calibration session, which must exist, be open, be on the run's chip, and be created by the signed-in user; otherwise the request is refused before anything starts. It groups the run with the session's other work and grants nothing. Without it, the run joins an automatic session when the server groups runs automatically (the default), or no session when it does not."
           },
           "idempotency_key": {
             "anyOf": [

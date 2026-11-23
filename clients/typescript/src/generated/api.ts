@@ -1955,10 +1955,10 @@ const validateCalibrationPipeline = (
  * deployment. A spec with problems is rejected with 422 and the same problem
  * list that /validate returns.
  *
- * The run is recorded before it is launched: in ``calibration_session_id`` when
- * given, otherwise in an automatic calibration session QDash creates for it.
- * ``idempotency_key`` makes a retry return the recorded run instead of starting
- * another.
+ * The run is recorded before it is launched. It joins ``calibration_session_id``
+ * when given; otherwise an automatic calibration session when the server groups
+ * runs automatically, or none. ``idempotency_key`` makes a retry return the
+ * recorded run instead of starting another.
  * @summary Validate and run a calibration pipeline spec
  */
 const executeCalibrationPipeline = (
@@ -2895,8 +2895,9 @@ const listTasks = (
 /**
  * Execute one task without requiring a previous execution snapshot.
  *
- * The run is recorded in ``calibration_session_id`` when given, otherwise in an automatic
- * calibration session QDash creates for it, before it is launched.
+ * The run is recorded before it is launched. It joins ``calibration_session_id`` when given;
+ * otherwise an automatic calibration session when the server groups runs automatically, or
+ * none.
  * @summary Execute a single task from the task catalog
  */
 const quickRunTask = (
@@ -4198,10 +4199,11 @@ const getFlowExecutionPlan = (
 /**
  * Execute a Flow via Prefect deployment, as one run of a calibration session.
  *
- * The run is recorded before it is launched: in ``calibration_session_id`` when given,
- * otherwise in an automatic session QDash creates for it. Every step execution of the run
- * carries the session and run IDs. ``idempotency_key`` makes a retry return the recorded
- * run instead of starting another.
+ * The run is recorded before it is launched. It joins ``calibration_session_id`` when given
+ * (refused before launch if that session cannot take it); otherwise an automatic session
+ * when the server groups runs automatically, or none. Every step execution of the run
+ * carries the run ID, and the session ID when it has one. ``idempotency_key`` makes a retry
+ * return the recorded run instead of starting another.
  * @summary Execute a flow
  */
 const executeFlow = (

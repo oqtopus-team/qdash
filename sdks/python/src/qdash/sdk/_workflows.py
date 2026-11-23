@@ -54,7 +54,7 @@ class WorkflowRun:
 
     @property
     def calibration_session_id(self) -> str | None:
-        """The calibration session the run is recorded in: the one named, or an automatic one."""
+        """The run's calibration session: the one named, an automatic one, or None."""
         return self.response.calibration_session_id
 
     @property
@@ -169,9 +169,10 @@ class Workflows:
         project, so the run cannot fall back to the user's default project. Returns once the
         run is dispatched; call :meth:`WorkflowRun.wait` to follow it.
 
-        The server records the run, with every step execution, in ``calibration_session_id``
-        when given (open, on the run's chip, created by the signed-in user), otherwise in an
-        automatic session it creates. A retry with the same ``idempotency_key`` returns the
+        The server records the run, with every step execution, before launching it. The run
+        joins ``calibration_session_id`` when given (open, on the run's chip, created by the
+        signed-in user); otherwise an automatic session when the server groups runs
+        automatically, or none. A retry with the same ``idempotency_key`` returns the
         recorded run instead of starting another; without a key every call starts a new run.
         """
         checked = _checked_name(name)

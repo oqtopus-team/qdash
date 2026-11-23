@@ -40,7 +40,10 @@ from qdash.datamodel.calibration_session import (
 )
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.agent_session import AgentActionDocument, AgentSessionDocument
-from qdash.dbmodel.calibration_session import CalibrationPipelineRunDocument
+from qdash.dbmodel.calibration_session import (
+    CalibrationPipelineRunDocument,
+    CalibrationSessionDocument,
+)
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.execution_history import ExecutionHistoryDocument
 from qdash.dbmodel.qubit import QubitDocument
@@ -1391,3 +1394,81 @@ async def test_execute_action_applies_the_workbench_override_rules(
     stored = AgentActionDocument.find_one({"action_id": action.action_id}).run()
     assert stored is not None
     assert stored.execution_status == "failed"
+
+
+@pytest.mark.asyncio
+async def test_with_grouping_off_a_session_stands_alone_and_its_actions_record_runs(
+    service: AgentSessionService,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from qdash.config import get_settings
+
+    monkeypatch.setattr(get_settings(), "calibration_session_grouping", "explicit")
+    session = _create_session(service)
+    # No automatic parent and no admission to wait for: the policy is the only authority.
+    assert session.calibration_session_id is None
+    assert session.calibration_admission is None
+    assert CalibrationSessionDocument.find_all().count() == 0
+    action = service.submit_action(
+        project_id="project-1", session_id=session.session_id, body=_run_task_action()
+    )
+    sent: dict[str, object] = {}
+
+    class FakeFlowService:
+        async def execute_single_task_from_snapshot(self, **kwargs: object) -> object:
+            sent.update(kwargs)
+            return type(
+                "Operation", (), {"execution_id": "20260713-002", "flow_run_id": "operation-1"}
+            )()
+
+    await service.execute_action(
+        project_id="project-1",
+        session_id=session.session_id,
+        action_id=action.action_id,
+        body=ExecuteAgentActionRequest(),
+        flow_service=cast("FlowService", FakeFlowService()),
+        task_file_service=_catalog(monkeypatch),
+    )
+    run = CalibrationPipelineRunDocument.find_one(
+        {"run_id": f"cpr-action-{action.action_id}"}
+    ).run()
+    assert run is not None
+    assert run.calibration_session_id is None and run.association == "none"
+    assert (run.status, run.flow_run_id) == ("dispatched", "operation-1")
+    assert sent["ungrouped"] is False
+    assert sent["calibration_run"] == CalibrationRunIdentity(
+        calibration_session_id=None,
+        run_id=run.run_id,
+        dispatch_token=run.dispatch_token,
+    )
+
+
+def test_with_grouping_off_a_named_closed_calibration_session_still_refuses_the_start(
+    service: AgentSessionService, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from qdash.config import get_settings
+
+    monkeypatch.setattr(get_settings(), "calibration_session_grouping", "explicit")
+    CalibrationSessionDocument(
+        calibration_session_id="cs-closed",
+        project_id="project-1",
+        chip_id="chip-001",
+        objective="Done",
+        created_by="tester",
+        status="closed",
+    ).insert()
+    with pytest.raises(HTTPException) as refused:
+        service.create_session(
+            project_id="project-1",
+            username="tester",
+            body=CreateAgentSessionRequest(
+                chip_id="chip-001",
+                policy=AgentSessionPolicy(
+                    qids=["Q00"], allowed_tasks=["CheckQubitSpectroscopy"], max_actions=1
+                ),
+                skill_name="single-qubit-bringup",
+                calibration_session_id="cs-closed",
+            ),
+        )
+    assert refused.value.status_code == 409
+    assert AgentSessionDocument.find_all().count() == 0

@@ -435,7 +435,7 @@ export function registerCalibrationPipelineTools(pi: Pick<ExtensionAPI, "registe
     promptSnippet: "Run a validated QDash calibration pipeline spec",
     promptGuidelines: [
       "Use qdash_run_pipeline only for a spec that qdash_plan_pipeline reported valid.",
-      "When the run serves a calibration objective, pass that objective's calibrationSessionId (from qdash_create_calibration_session or the user) so QDash records the run, with all its step executions, in it. Without it QDash records the run in an automatic session of its own. It grants nothing: the user still approves this exact run.",
+      "When the run serves a calibration objective, pass that objective's calibrationSessionId (from qdash_create_calibration_session or the user) so QDash records the run, with all its step executions, in it. Without it the run joins an automatic session of its own when the server groups runs automatically, or no session. It grants nothing: the user still approves this exact run.",
       "When the run carries out an experiment you recorded with qdash_record_calibration_decision, pass that decision's decisionId too, so the session's audit links your intent to this run. Record the decision first; never pass a decision of another session.",
       "If QDash reports that a run's launch outcome is unknown, do not start it again: check qdash_list_executions and tell the user.",
       "Tell the user before running that completed tasks update calibrated parameters in QDash directly.",
@@ -467,8 +467,8 @@ export function registerCalibrationPipelineTools(pi: Pick<ExtensionAPI, "registe
       const qdash = new QDash(client);
       try {
         // Dispatch only: the run handle's wait() is deliberately not called here.
-        // Every run is recorded before it starts: in the named calibration session, or in an
-        // automatic one QDash creates. The key ties this tool call to that one run.
+        // Every run is recorded before it starts, in the named calibration session if any.
+        // The key ties this tool call to that one run.
         const recording = {
           idempotencyKey: pipelineRunKey(toolCallId),
           ...(params.calibrationSessionId ? { calibrationSessionId: params.calibrationSessionId } : {}),
