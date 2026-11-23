@@ -11,12 +11,12 @@ import type {
 } from "@/schemas";
 
 import {
-  calibrationSessionHref,
   dispatchStatusStyle,
   runDisplayName,
   runKindLabel,
   runTriggerLabel,
 } from "@/lib/chatCalibrationSession";
+import { type SessionReturnContext, calibrationSessionDetailHref } from "@/lib/executionArea";
 import { formatDateTime } from "@/lib/utils/datetime";
 
 import { pluralize } from "./agentSessionDisplay";
@@ -33,6 +33,8 @@ interface CalibrationSessionGroupRowProps {
   onOpenExecution: (execution: ExecutionResponseSummary) => void;
   registerCard: (executionId: string, element: HTMLDivElement | null) => void;
   hasDayFilter: boolean;
+  /** The list a calibration session page opened from this row links back to. */
+  sessionReturn?: SessionReturnContext;
 }
 
 /** The expansion key of a calibration session row; agent session rows use their own id. */
@@ -146,6 +148,7 @@ export function CalibrationSessionGroupRow({
   onOpenExecution,
   registerCard,
   hasDayFilter,
+  sessionReturn,
 }: CalibrationSessionGroupRowProps) {
   const summary = item.calibration_session;
   if (!summary) return null;
@@ -233,7 +236,11 @@ export function CalibrationSessionGroupRow({
         </button>
         <div className="flex shrink-0 flex-wrap gap-1">
           <Link
-            href={calibrationSessionHref(summary.calibration_session_id, projectId)}
+            href={calibrationSessionDetailHref(
+              summary.calibration_session_id,
+              projectId,
+              sessionReturn,
+            )}
             className="btn btn-ghost btn-sm"
           >
             <ExternalLink data-icon="inline-start" aria-hidden="true" />

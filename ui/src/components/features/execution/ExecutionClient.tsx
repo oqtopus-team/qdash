@@ -1,24 +1,25 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
-import {
-  ArrowLeft,
-  Calendar,
-  ChevronRight,
-  Clock,
-  Download,
-  StopCircle,
-  UserRound,
-} from "lucide-react";
+import { Calendar, ChevronRight, Clock, Download, StopCircle, UserRound } from "lucide-react";
+import { useQueryStates } from "nuqs";
 import Select, { type SingleValue, type StylesConfig } from "react-select";
 
+import {
+  type ExecutionCrumb,
+  type SessionReturnContext,
+  calibrationSessionDetailHref,
+  executionListHref,
+  executionViewParsers,
+  runAnchorId,
+} from "@/lib/executionArea";
 import { isExecutionCancellable } from "@/lib/executionStatus";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
 import { formatDateTime as formatDateTimeUtil } from "@/lib/utils/datetime";
 
 import { ExecutionAgentSessionNotice } from "./ExecutionAgentSessionNotice";
+import { ExecutionBreadcrumbs } from "./ExecutionAreaNav";
 import { ExecutionCalibrationNotice, ReportedOriginBadge } from "./ExecutionCalibrationContext";
 import { ExecutionDAG } from "./ExecutionDAG";
 import { ExecutionParameterChanges } from "./ExecutionParameterChanges";
@@ -90,6 +91,8 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
 
   // The project the execution was read from; links to its calibration session stay in it.
   const { projectId } = useProject();
+  // The Executions list view this page was opened from; an absent or invalid value is the default.
+  const [listView] = useQueryStates(executionViewParsers);
   const {
     data: executionDetailData,
     isLoading: isDetailLoading,
@@ -215,14 +218,41 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
   if (isDetailError) return <div>Error loading execution details.</div>;
   if (!executionDetailData || !execution) return <div>No data found.</div>;
 
+  const executionChip = execution.chip_id || chipId;
+  const calibration = execution.calibration_session;
+  // The Executions list on this chip, with the day, grouping and page this page was opened
+  // from; the session page it links to returns there too.
+  const listContext = { chip: executionChip, ...listView };
+  const sessionReturn: SessionReturnContext = { from: "executions", list: listContext };
+  const crumbs: ExecutionCrumb[] = [
+    {
+      label: "Execution",
+      href: executionListHref({ chipId: executionChip, projectId, ...listView }),
+    },
+  ];
+  // Only the session and run the server recorded for this execution; nothing is inferred.
+  if (calibration) {
+    const sessionHref = calibrationSessionDetailHref(
+      calibration.calibration_session_id,
+      projectId,
+      sessionReturn,
+    );
+    const objective = calibration.objective || calibration.calibration_session_id;
+    crumbs.push({ label: objective, title: objective, href: sessionHref });
+    if (calibration.via === "pipeline_run" && calibration.pipeline_run_id) {
+      const runId = calibration.pipeline_run_id;
+      crumbs.push({
+        label: `Run ${runId.slice(0, 8)}`,
+        title: `Run ${runId}`,
+        href: `${sessionHref}#${runAnchorId(runId)}`,
+      });
+    }
+  }
+
   return (
     <div className="w-full px-4 py-6">
       <div className="space-y-6">
-        {/* Back navigation */}
-        <Link href="/execution" className="btn btn-ghost btn-sm w-fit">
-          <ArrowLeft data-icon="inline-start" />
-          Back to Executions
-        </Link>
+        <ExecutionBreadcrumbs crumbs={crumbs} />
 
         <div className="space-y-4">
           <div
@@ -295,6 +325,7 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
             link={execution.calibration_session}
             origin={execution.reported_origin}
             projectId={projectId}
+            sessionReturn={sessionReturn}
           />
           <ExecutionRunSummary status={execution.status} tasks={execution.task ?? []} />
           {execution.status === "failed" && (

@@ -10,7 +10,6 @@ import {
   ChevronRight,
   ExternalLink,
   StopCircle,
-  Target,
   UserRound,
   X,
 } from "lucide-react";
@@ -18,6 +17,11 @@ import Link from "next/link";
 
 import { isExecutionCancellable } from "@/lib/executionStatus";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
+import {
+  type ExecutionListContext,
+  type SessionReturnContext,
+  executionDetailHref,
+} from "@/lib/executionArea";
 import { DEFAULT_TIMEZONE, formatDateTime } from "@/lib/utils/datetime";
 
 import { AgentSessionGroupRow } from "./AgentSessionGroupRow";
@@ -33,8 +37,8 @@ import {
   ExecutionActivityChart,
 } from "./ExecutionActivityChart";
 import { ExecutionAgentSessionNotice } from "./ExecutionAgentSessionNotice";
+import { ExecutionViewSwitch } from "./ExecutionAreaNav";
 import { ExecutionCalibrationNotice } from "./ExecutionCalibrationContext";
-import { calibrationSessionsHref } from "@/lib/chatCalibrationSession";
 import {
   ExecutionListCard,
   formatActorLabel,
@@ -89,12 +93,12 @@ function getTaskStatusDisplay(status?: string | null) {
 
 function PaginationControls({
   currentPage,
-  setCurrentPage,
+  onPageChange,
   hasMore,
   totalPages,
 }: {
   currentPage: number;
-  setCurrentPage: React.Dispatch<React.SetStateAction<number>>;
+  onPageChange: (page: number) => void;
   hasMore: boolean;
   totalPages?: number;
 }) {
@@ -105,7 +109,7 @@ function PaginationControls({
   return (
     <div className="flex justify-center items-center gap-2 sm:gap-4 my-3 sm:my-4 px-4">
       <button
-        onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+        onClick={() => onPageChange(Math.max(1, currentPage - 1))}
         disabled={currentPage === 1}
         className="btn btn-xs sm:btn-sm btn-outline"
       >
@@ -113,7 +117,7 @@ function PaginationControls({
       </button>
       <span className="text-sm">{pageLabel}</span>
       <button
-        onClick={() => setCurrentPage((prev) => prev + 1)}
+        onClick={() => onPageChange(currentPage + 1)}
         disabled={isNextDisabled}
         className="btn btn-xs sm:btn-sm btn-outline"
       >
@@ -138,15 +142,23 @@ function groupedLabel(calibrationSessions: number, agentSessions: number): strin
 export function ExecutionPageContent() {
   const queryClient = useQueryClient();
 
-  // URL state management
-  const { selectedChip, setSelectedChip, isInitialized } = useExecutionUrlState();
-
-  // Add date state for navigation
-  const [selectedDate, setSelectedDate] = useState<string>("latest");
+  // The chip, day, grouping and page live in the URL, so Back and links back restore them.
+  // Calibration and agent sessions are grouped on the server; the flat list stays available.
+  const {
+    selectedChip,
+    setSelectedChip,
+    selectedDate,
+    groupSessions,
+    page: currentPage,
+    changeChip,
+    changeDate,
+    changeGrouping,
+    setPage,
+    resetForProject,
+    isInitialized,
+  } = useExecutionUrlState();
 
   const { projectId } = useProject();
-  // Calibration and agent sessions are grouped on the server; the flat list stays available.
-  const [groupSessions, setGroupSessions] = useState(true);
   const [expandedSessions, setExpandedSessions] = useState<ReadonlySet<string>>(new Set());
   const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -159,12 +171,10 @@ export function ExecutionPageContent() {
   const pendingFocusRestore = useRef<string | null>(null);
   const executionListHeading = useRef<HTMLHeadingElement>(null);
 
-  // Pagination state
-  const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
 
   // Use custom hook for date navigation (unused but kept for potential future use)
-  useDateNavigation(selectedChip || "", selectedDate, setSelectedDate);
+  useDateNavigation(selectedChip || "", selectedDate, changeDate);
 
   // Get list of chips to set default
   const { data: chipsData } = useListChips();
@@ -179,12 +189,19 @@ export function ExecutionPageContent() {
     });
   }, [chipsData?.data?.chips]);
 
+  // Set when a project switch cleared the chip: the old chip's day and page go with it.
+  const projectSwitched = useRef(false);
+
   // Set the latest chip as default when chips are loaded and no chip is selected from URL
   useEffect(() => {
     if (isInitialized && !selectedChip && sortedChips.length > 0) {
-      setSelectedChip(sortedChips[0].chip_id);
+      const chipId = sortedChips[0].chip_id;
+      // One URL update for the chip and the reset, so neither overwrites the other.
+      if (projectSwitched.current) resetForProject(chipId);
+      else setSelectedChip(chipId);
+      projectSwitched.current = false;
     }
-  }, [isInitialized, selectedChip, sortedChips, setSelectedChip]);
+  }, [isInitialized, selectedChip, sortedChips, setSelectedChip, resetForProject]);
 
   const listParams = {
     chip_id: selectedChip || "",
@@ -195,15 +212,24 @@ export function ExecutionPageContent() {
     ...(selectedDate === "latest" ? {} : { date: selectedDate, timezone: DEFAULT_TIMEZONE }),
   };
 
-  // Fetch execution summary list by chip_id
+  // The list is read only for a chip of the open project. Around a project switch, or on Back
+  // to another project's entry, the chip and the project briefly disagree; asking then would
+  // show one project's chip under another, so the list waits for the project's chips.
+  const chipsLoaded = !!chipsData?.data?.chips;
+  const chipInProject = !!selectedChip && sortedChips.some((chip) => chip.chip_id === selectedChip);
+
+  // Fetch execution summary list by chip_id; like the grouped list, the key and header pin the
+  // project the page shows, so a refetch during a project switch stays in its own project.
   const flatList = useListExecutions(listParams, {
     query: {
+      queryKey: [...getListExecutionsQueryKey(listParams), projectId],
       // Refresh every 5 seconds
       refetchInterval: 5000,
       // Keep polling even when the window is in the background
       refetchIntervalInBackground: true,
-      enabled: !!selectedChip && !groupSessions,
+      enabled: chipInProject && !groupSessions && projectId !== null,
     },
+    request: projectId ? { headers: { "X-Project-Id": projectId } } : undefined,
   });
   // Rows with each agent session grouped; the key and header pin the project the page shows.
   const groupedList = useListExecutionGroups(listParams, {
@@ -211,14 +237,26 @@ export function ExecutionPageContent() {
       queryKey: [...getListExecutionGroupsQueryKey(listParams), projectId],
       refetchInterval: 5000,
       refetchIntervalInBackground: true,
-      enabled: !!selectedChip && groupSessions && projectId !== null,
+      enabled: chipInProject && groupSessions && projectId !== null,
     },
     request: projectId ? { headers: { "X-Project-Id": projectId } } : undefined,
   });
   const activeList = groupSessions ? groupedList : flatList;
-  const { isError, isLoading } = activeList;
-  const executionData = flatList.data;
-  const groupData = groupedList.data?.data;
+  const { isError } = activeList;
+  const isLoading = activeList.isLoading || (!!selectedChip && !chipsLoaded);
+  // Rows of another project's chip are never shown, even when an earlier answer is cached.
+  const executionData = chipInProject ? flatList.data : undefined;
+  const groupData = chipInProject ? groupedList.data?.data : undefined;
+  const listTotal = groupSessions ? groupData?.total : executionData?.data?.total;
+
+  // A page past the end, as from an old link or a list that shrank, moves to the last page
+  // without a history entry.
+  // The total is read only from the answer for this page's own request.
+  useEffect(() => {
+    if (listTotal == null) return;
+    const lastPage = Math.max(1, Math.ceil(listTotal / itemsPerPage));
+    if (currentPage > lastPage) setPage(lastPage, { replace: true });
+  }, [currentPage, listTotal, setPage]);
 
   const cancelMutation = useCancelExecution();
   const toast = useToast();
@@ -311,13 +349,18 @@ export function ExecutionPageContent() {
   const shownProject = useRef(projectId);
   useEffect(() => {
     if (shownProject.current === projectId) return;
+    const previous = shownProject.current;
     shownProject.current = projectId;
     pendingFocusRestore.current = null;
     setIsSidebarOpen(false);
     setSelectedExecutionId(null);
     setExpandedTaskIndex(null);
     setExpandedSessions(new Set());
-    setCurrentPage(1);
+    // Switching project clears the chip from the URL; the old chip's day and page go with it
+    // when the new project's default chip is picked. The first project to load, and Back to an
+    // entry of another project (which names its own chip), keep the view the URL holds.
+    projectSwitched.current =
+      previous !== null && !new URLSearchParams(window.location.search).get("chip");
   }, [projectId]);
 
   const toggleSession = (sessionId: string) => {
@@ -331,27 +374,28 @@ export function ExecutionPageContent() {
 
   const handleGroupingChange = (grouped: boolean) => {
     handleCloseSidebar();
-    setGroupSessions(grouped);
     setExpandedSessions(new Set());
-    setCurrentPage(1);
+    changeGrouping(grouped);
   };
 
-  // Chip selection change handler
+  // Chip selection change handler. A day picked for one chip means nothing for another, so
+  // the day and page reset with it.
   const handleChipChange = (chipId: string) => {
     handleCloseSidebar();
     setExpandedSessions(new Set());
-    setSelectedChip(chipId || null);
-    // A day picked for one chip means nothing for another.
-    setSelectedDate("latest");
-    setCurrentPage(1);
+    changeChip(chipId || null);
   };
 
-  // Wrap date setter to reset page
+  // A new day starts on its first page.
   const handleDateChange = (date: string) => {
     handleCloseSidebar();
     setExpandedSessions(new Set());
-    setSelectedDate(date);
-    setCurrentPage(1);
+    changeDate(date);
+  };
+
+  const handlePageChange = (page: number) => {
+    handleCloseSidebar();
+    setPage(page);
   };
 
   if (isLoading) return <ExecutionPageSkeleton />;
@@ -359,6 +403,12 @@ export function ExecutionPageContent() {
     return (
       <PageContainer>
         <PageHeader title="Execution" description="Workflow runs and their task results" />
+        <ExecutionViewSwitch
+          current="executions"
+          chipId={selectedChip}
+          projectId={projectId}
+          className="mb-4"
+        />
         <div role="alert" className="alert alert-error">
           <AlertCircle className="h-5 w-5" />
           <span>Execution history could not be loaded. Please try again.</span>
@@ -411,29 +461,32 @@ export function ExecutionPageContent() {
     setExpandedTaskIndex(expandedTaskIndex === index ? null : index);
   };
 
+  // A session or execution page opened from this list links back to this same view.
+  const listContext: ExecutionListContext = {
+    chip: selectedChip,
+    date: selectedDate === "latest" ? null : selectedDate,
+    flat: !groupSessions,
+    page: currentPage,
+  };
+  const sessionReturn: SessionReturnContext = { from: "executions", list: listContext };
+
   const pageRows = groupSessions
     ? (groupData?.items.length ?? 0)
     : (executionData?.data?.executions.length ?? 0);
   const hasMorePages = pageRows >= itemsPerPage;
 
-  const total = groupSessions ? groupData?.total : executionData?.data?.total;
+  const total = listTotal;
   const totalPages = total != null ? Math.max(1, Math.ceil(total / itemsPerPage)) : undefined;
   const shouldShowPagination = currentPage > 1 || hasMorePages || (totalPages ?? 1) > 1;
 
   return (
     <PageContainer>
-      <PageHeader
-        title="Execution"
-        description="Workflow runs and their task results"
-        actions={
-          <Link
-            href={calibrationSessionsHref({ chipId: selectedChip || null, projectId })}
-            className="btn btn-ghost btn-sm"
-          >
-            <Target data-icon="inline-start" aria-hidden="true" />
-            Calibration sessions
-          </Link>
-        }
+      <PageHeader title="Execution" description="Workflow runs and their task results" />
+      <ExecutionViewSwitch
+        current="executions"
+        chipId={selectedChip}
+        projectId={projectId}
+        className="mb-4"
       />
       <PageFiltersBar className="mb-4 sm:mb-6">
         <PageFiltersBar.Group>
@@ -515,6 +568,7 @@ export function ExecutionPageContent() {
                     onOpenExecution={handleCardClick}
                     registerCard={registerCard}
                     hasDayFilter={selectedDate !== "latest"}
+                    sessionReturn={sessionReturn}
                   />
                 ) : item.kind === "agent_session" && item.agent_session ? (
                   <AgentSessionGroupRow
@@ -528,6 +582,7 @@ export function ExecutionPageContent() {
                     onOpenExecution={handleCardClick}
                     registerCard={registerCard}
                     hasDayFilter={selectedDate !== "latest"}
+                    sessionReturn={sessionReturn}
                   />
                 ) : item.execution ? (
                   <ExecutionListCard
@@ -554,10 +609,7 @@ export function ExecutionPageContent() {
         {shouldShowPagination && (
           <PaginationControls
             currentPage={currentPage}
-            setCurrentPage={(page) => {
-              handleCloseSidebar();
-              setCurrentPage(page);
-            }}
+            onPageChange={handlePageChange}
             hasMore={hasMorePages}
             totalPages={totalPages}
           />
@@ -624,6 +676,7 @@ export function ExecutionPageContent() {
                 link={executionDetailData?.data?.calibration_session}
                 origin={executionDetailData?.data?.reported_origin}
                 projectId={projectId}
+                sessionReturn={sessionReturn}
                 className="mt-3"
               />
               {executionDetailData?.data && (
@@ -635,7 +688,12 @@ export function ExecutionPageContent() {
               )}
               <div className="mt-3 sm:mt-4 flex flex-wrap gap-2">
                 <Link
-                  href={`/execution/${selectedChip || ""}/${selectedExecutionId}`}
+                  href={executionDetailHref(
+                    selectedChip || "",
+                    selectedExecutionId,
+                    projectId,
+                    listContext,
+                  )}
                   className="btn btn-primary btn-sm sm:btn-md"
                 >
                   <ExternalLink data-icon="inline-start" />

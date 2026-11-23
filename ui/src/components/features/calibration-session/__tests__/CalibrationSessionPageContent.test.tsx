@@ -1,4 +1,5 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { NuqsTestingAdapter } from "nuqs/adapters/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CalibrationSessionPageContent } from "@/components/features/calibration-session/CalibrationSessionPageContent";
@@ -112,6 +113,14 @@ const DETAIL = {
   unknown_runs: ["cpr-2"],
 };
 
+function renderPage(searchParams = "") {
+  return render(
+    <NuqsTestingAdapter searchParams={searchParams}>
+      <CalibrationSessionPageContent calibrationSessionId="cs-1" />
+    </NuqsTestingAdapter>,
+  );
+}
+
 afterEach(cleanup);
 beforeEach(() => {
   state.detail = DETAIL;
@@ -130,7 +139,7 @@ describe("CalibrationSessionPageContent", () => {
         { ...first, run_kind: "workflow", run_name: "nightly_1q", trigger: "schedule" },
       ],
     };
-    render(<CalibrationSessionPageContent calibrationSessionId="cs-1" />);
+    renderPage();
     expect(screen.getByText("Automatic")).toBeTruthy();
     expect(screen.getByText(/QDash created it for a run started without a session/)).toBeTruthy();
     const [run] = screen.getAllByTestId("calibration-pipeline-run");
@@ -140,7 +149,7 @@ describe("CalibrationSessionPageContent", () => {
   });
 
   it("shows one pipeline run with every step execution, and the agent session with its executions", () => {
-    render(<CalibrationSessionPageContent calibrationSessionId="cs-1" />);
+    renderPage();
     expect(state.requests[0]).toEqual({
       key: ["/calibration-sessions/cs-1", "lab-a"],
       project: "lab-a",
@@ -177,7 +186,7 @@ describe("CalibrationSessionPageContent", () => {
       },
     ];
     state.detail = { ...DETAIL, pipeline_runs: [manual, tool] };
-    render(<CalibrationSessionPageContent calibrationSessionId="cs-1" />);
+    renderPage();
     const [manualRow, toolRow] = screen.getAllByTestId("calibration-pipeline-run");
     expect(within(manualRow).queryByTestId("reported-origin-badge")).toBeNull();
     const badge = within(toolRow).getByTestId("reported-origin-badge");
@@ -188,21 +197,21 @@ describe("CalibrationSessionPageContent", () => {
 
   it("offers closing only to its creator while it is open, and says that it grants nothing", () => {
     state.username = "bob";
-    const { unmount } = render(<CalibrationSessionPageContent calibrationSessionId="cs-1" />);
+    const { unmount } = renderPage();
     expect(screen.queryByRole("button", { name: "Close session" })).toBeNull();
     expect(screen.getByText(/It grants nothing/)).toBeTruthy();
     unmount();
 
     state.username = "alice";
     state.detail = { ...DETAIL, status: "closed", closed_by: "alice", closing_note: "done" };
-    render(<CalibrationSessionPageContent calibrationSessionId="cs-1" />);
+    renderPage();
     expect(screen.queryByRole("button", { name: "Close session" })).toBeNull();
     expect(screen.getByText("Closed", { selector: ".badge" })).toBeTruthy();
   });
 
   it("says when the lists are cut, and counts every child", () => {
     state.detail = { ...DETAIL, pipeline_run_total: 140, agent_session_total: 1 };
-    render(<CalibrationSessionPageContent calibrationSessionId="cs-1" />);
+    renderPage();
     const [cut] = screen.getAllByTestId("calibration-list-cut");
     expect(cut.textContent).toBe(
       "Showing the latest 2 of 140 runs. Close checks every one of them.",
@@ -226,7 +235,7 @@ describe("CalibrationSessionPageContent", () => {
         },
       ],
     };
-    render(<CalibrationSessionPageContent calibrationSessionId="cs-1" />);
+    renderPage();
     fireEvent.click(screen.getByRole("button", { name: "Close session" }));
     const dialog = screen.getByRole("dialog");
     expect(within(dialog).getByText(/agent sessions as-lost were being started/)).toBeTruthy();
@@ -239,7 +248,7 @@ describe("CalibrationSessionPageContent", () => {
 
   it("says an admitted pipeline run with an unknown start may still start after closing", () => {
     state.detail = { ...DETAIL, close_blockers: [], unknown_runs: ["cpr-2"] };
-    render(<CalibrationSessionPageContent calibrationSessionId="cs-1" />);
+    renderPage();
     fireEvent.click(screen.getByRole("button", { name: "Close session" }));
     const dialog = screen.getByRole("dialog");
     expect(within(dialog).getByText(/may still start after I close/)).toBeTruthy();
@@ -252,14 +261,14 @@ describe("CalibrationSessionPageContent", () => {
       ...DETAIL,
       agent_sessions: [{ ...agent, calibration_admission: "pending" }],
     };
-    render(<CalibrationSessionPageContent calibrationSessionId="cs-1" />);
+    renderPage();
     const row = screen.getByTestId("calibration-agent-session");
     expect(within(row).getByText("Not admitted yet")).toBeTruthy();
   });
 
   it("names empty sections", () => {
     state.detail = { ...DETAIL, pipeline_runs: [], agent_sessions: [], close_blockers: [] };
-    render(<CalibrationSessionPageContent calibrationSessionId="cs-1" />);
+    renderPage();
     expect(screen.getByText("No runs")).toBeTruthy();
     expect(screen.getByText("No agent sessions")).toBeTruthy();
   });
@@ -380,7 +389,7 @@ describe("CalibrationSessionPageContent", () => {
         missing: ["an authoritative record of what this run wrote to the hardware"],
       },
     };
-    render(<CalibrationSessionPageContent calibrationSessionId="cs-1" />);
+    renderPage();
     const progress = screen.getByRole("region", { name: "Search progression" });
     const stages = within(progress).getByRole("list", { name: "Stages reached" });
     expect(within(stages).getByText("Baseline").className).toContain("step-primary");
@@ -423,7 +432,7 @@ describe("CalibrationSessionPageContent", () => {
         missing: [],
       },
     };
-    render(<CalibrationSessionPageContent calibrationSessionId="cs-1" />);
+    renderPage();
     const notice = screen.getByRole("status");
     expect(notice.className).toContain("alert-warning");
     expect(notice.textContent).toMatch(/names no decision.*QDash refused its launch/);
@@ -437,8 +446,141 @@ describe("CalibrationSessionPageContent", () => {
       recommendation: null,
       latest_requested_run: null,
     };
-    render(<CalibrationSessionPageContent calibrationSessionId="cs-1" />);
+    renderPage();
     expect(screen.queryByRole("region", { name: "Search progression" })).toBeNull();
     expect(screen.queryByText(/Recommends|Keeps the baseline/)).toBeNull();
+  });
+
+  describe("place in the Execution area", () => {
+    const crumbLinks = () =>
+      within(screen.getByRole("navigation", { name: "Breadcrumb" }))
+        .getAllByRole("link")
+        .map((link) => [link.textContent, link.getAttribute("href")]);
+
+    it("names the session by its objective, under Execution and the session list", () => {
+      renderPage();
+      expect(
+        screen.getByRole("heading", { level: 1, name: "Bring up qubits 0 and 1" }),
+      ).toBeTruthy();
+      expect(screen.getByText("Calibration session")).toBeTruthy();
+      // An old bookmark or chat link has no list to return to: the plain session list.
+      expect(crumbLinks()).toEqual([
+        ["Execution", "/execution?project=lab-a"],
+        ["Calibration sessions", "/calibration-sessions?project=lab-a"],
+      ]);
+    });
+
+    it("heads an automatic session with the workflow name it recorded", () => {
+      state.detail = { ...DETAIL, origin: "automatic", objective: "Workflow nightly_1q" };
+      renderPage();
+      expect(screen.getByRole("heading", { level: 1, name: "Workflow nightly_1q" })).toBeTruthy();
+      expect(screen.getByText("Automatic calibration session")).toBeTruthy();
+    });
+
+    it("links back to the session list with the filters and page it was opened from", () => {
+      renderPage("chip=64Qv3&status=closed&origin=automatic&mine=true&page=2");
+      expect(crumbLinks()).toEqual([
+        ["Execution", "/execution?chip=64Qv3&project=lab-a"],
+        [
+          "Calibration sessions",
+          "/calibration-sessions?chip=64Qv3&status=closed&origin=automatic&mine=true&page=2&project=lab-a",
+        ],
+      ]);
+    });
+
+    it("links back to the Executions list on its chip when opened from there", () => {
+      renderPage("from=executions&chip=64Qv3");
+      expect(crumbLinks()).toEqual([["Execution", "/execution?chip=64Qv3&project=lab-a"]]);
+    });
+
+    it("drops return values it does not know and keeps links on Execution-area routes", () => {
+      renderPage("from=https://evil.example&status=bogus&page=-4&mine=maybe&chip=//evil.example");
+      expect(crumbLinks()).toEqual([
+        ["Execution", "/execution?chip=%2F%2Fevil.example&project=lab-a"],
+        ["Calibration sessions", "/calibration-sessions?chip=%2F%2Fevil.example&project=lab-a"],
+      ]);
+    });
+
+    it("keeps a long objective whole for reading below its clamped heading", () => {
+      const objective = `Bring up qubits ${"0-1 ".repeat(60)}\nthen check coherence`;
+      state.detail = { ...DETAIL, objective };
+      renderPage();
+      const heading = screen.getByRole("heading", { level: 1 });
+      expect(heading.textContent).toBe(objective);
+      expect(heading.className).toContain("line-clamp-3");
+      expect(heading.className).toContain("wrap-anywhere");
+      const summary = screen.getByRole("region", { name: "Summary" });
+      expect(within(summary).getByText("Objective")).toBeTruthy();
+      expect(within(summary).getByText(/then check coherence/).className).toContain(
+        "whitespace-pre-wrap",
+      );
+    });
+
+    it("anchors each run so an execution's breadcrumbs can point at it", () => {
+      renderPage();
+      const [run] = screen.getAllByTestId("calibration-pipeline-run");
+      expect(run.id).toBe("run-cpr-1");
+    });
+
+    it("returns to the Executions day, flat list and page, also from its executions", () => {
+      renderPage("from=executions&chip=64Qv3&date=20261120&flat=true&page=2&status=closed");
+      // Only the Executions list's own filters travel; the session list's status does not.
+      expect(crumbLinks()).toEqual([
+        ["Execution", "/execution?chip=64Qv3&date=20261120&flat=true&page=2&project=lab-a"],
+      ]);
+      const runs = screen.getByRole("region", { name: "Runs" });
+      expect(within(runs).getByRole("link", { name: "exec-1" }).getAttribute("href")).toBe(
+        "/execution/64Qv3/exec-1?project=lab-a&date=20261120&flat=true&page=2",
+      );
+    });
+
+    it("carries no Executions view to executions of another chip", () => {
+      renderPage("from=executions&chip=OTHER&date=20261120&page=2");
+      const runs = screen.getByRole("region", { name: "Runs" });
+      expect(within(runs).getByRole("link", { name: "exec-1" }).getAttribute("href")).toBe(
+        "/execution/64Qv3/exec-1?project=lab-a",
+      );
+    });
+
+    it("keeps the Executions day and grouping out of the session list's return link", () => {
+      renderPage("status=open&date=20261120&flat=true&page=3");
+      expect(crumbLinks()).toEqual([
+        ["Execution", "/execution?project=lab-a"],
+        ["Calibration sessions", "/calibration-sessions?status=open&page=3&project=lab-a"],
+      ]);
+      // An execution opened from a session reached from the session list carries no view.
+      const runs = screen.getByRole("region", { name: "Runs" });
+      expect(within(runs).getByRole("link", { name: "exec-1" }).getAttribute("href")).toBe(
+        "/execution/64Qv3/exec-1?project=lab-a",
+      );
+    });
+
+    describe("a link to one run", () => {
+      afterEach(() => window.history.replaceState(null, "", "/"));
+
+      it("marks and scrolls to the run when the page lists it", () => {
+        const scrollIntoView = vi.spyOn(HTMLElement.prototype, "scrollIntoView");
+        window.history.replaceState(null, "", "/calibration-sessions/cs-1#run-cpr-2");
+        renderPage();
+        const [first, second] = screen.getAllByTestId("calibration-pipeline-run");
+        expect(second.getAttribute("aria-current")).toBe("location");
+        expect(first.getAttribute("aria-current")).toBeNull();
+        expect(scrollIntoView).toHaveBeenCalledTimes(1);
+        scrollIntoView.mockRestore();
+        expect(screen.queryByTestId("calibration-run-not-listed")).toBeNull();
+      });
+
+      it("says so when the run is not among the latest runs listed", () => {
+        window.history.replaceState(null, "", "/calibration-sessions/cs-1#run-cpr-old");
+        state.detail = { ...DETAIL, pipeline_run_total: 30 };
+        renderPage();
+        expect(screen.getByTestId("calibration-run-not-listed").textContent).toBe(
+          "Run cpr-old is not among the latest 2 runs listed here. Its executions stay on the Execution list.",
+        );
+        for (const run of screen.getAllByTestId("calibration-pipeline-run")) {
+          expect(run.getAttribute("aria-current")).toBeNull();
+        }
+      });
+    });
   });
 });

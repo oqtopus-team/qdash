@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render as rtlRender, screen, within } from "@testing-library/react";
+import { withNuqsTestingAdapter, type UrlUpdateEvent } from "nuqs/adapters/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ExecutionPageContent } from "@/components/features/execution/ExecutionPageContent";
@@ -22,22 +22,26 @@ vi.mock("@tanstack/react-query", async () => {
   };
 });
 
+const DEFAULT_CHIPS = [
+  { chip_id: "chip-1", installed_at: "2026-06-01T00:00:00Z" },
+  { chip_id: "chip-2", installed_at: "2026-01-01T00:00:00Z" },
+];
+// The chips of the open project; null while a switched project's chips load.
+let chipList: typeof DEFAULT_CHIPS | null = DEFAULT_CHIPS;
 vi.mock("@/client/chip/chip", () => ({
-  useListChips: () => ({
-    data: {
-      data: {
-        chips: [{ chip_id: "chip-1", installed_at: "2026-06-01T00:00:00Z" }],
-      },
-    },
-  }),
+  useListChips: () => ({ data: chipList ? { data: { chips: chipList } } : undefined }),
 }));
 
-type ListArgs = { skip: number; chip_id: string; date?: string };
+type ListArgs = { skip: number; chip_id: string; date?: string; timezone?: string };
+
+/** The one day with runs; the API returns nothing for any other picked day. */
+const BUSY_DAY = "20261120";
 
 function flatExecutions({ skip, chip_id, date }: ListArgs) {
+  const empty = !!date && date !== BUSY_DAY;
   return {
-    total: date ? 0 : 40,
-    executions: date
+    total: empty ? 0 : 40,
+    executions: empty
       ? [] // the API returns nothing for a day with no runs
       : skip > 0 || chip_id === "chip-2"
         ? [
@@ -151,12 +155,15 @@ vi.mock("@/hooks/useDateNavigation", () => ({
   useDateNavigation: () => undefined,
 }));
 
-vi.mock("@/hooks/useUrlState", () => ({
-  useExecutionUrlState: () => {
-    const [selectedChip, setSelectedChip] = useState("chip-1");
-    return { selectedChip, setSelectedChip, isInitialized: true };
-  },
-}));
+// The page keeps its chip, day, grouping and page in the URL; tests start on chip-1.
+const onUrlUpdate = vi.fn<(event: UrlUpdateEvent) => void>();
+function render(ui: React.ReactElement, searchParams = "chip=chip-1") {
+  return rtlRender(ui, {
+    wrapper: withNuqsTestingAdapter({ searchParams, onUrlUpdate, hasMemory: true }),
+  });
+}
+const lastUpdate = () => onUrlUpdate.mock.calls[onUrlUpdate.mock.calls.length - 1]?.[0];
+const lastQuery = () => lastUpdate()?.queryString;
 
 vi.mock("@/components/ui/Toast", () => ({
   useToast: () => ({
@@ -168,8 +175,14 @@ vi.mock("@/components/ui/Toast", () => ({
 }));
 
 vi.mock("next/link", () => ({
-  default: ({ children, href }: { children: React.ReactNode; href: string }) => (
-    <a href={href}>{children}</a>
+  default: ({
+    children,
+    href,
+    ...rest
+  }: { children: React.ReactNode; href: string } & Record<string, unknown>) => (
+    <a href={href} {...rest}>
+      {children}
+    </a>
   ),
 }));
 
@@ -307,7 +320,7 @@ describe("ExecutionPageContent cancel confirmation", () => {
     const panel = screen.getByRole("complementary", { name: "Execution details" });
     expect(
       within(panel).getByRole("link", { name: "Open calibration session" }).getAttribute("href"),
-    ).toBe("/calibration-sessions/cs-1?project=project-1");
+    ).toBe("/calibration-sessions/cs-1?project=project-1&from=executions&chip=chip-1");
   });
 
   it("shows no calibration notice for an ordinary execution", () => {
@@ -333,7 +346,7 @@ describe("ExecutionPageContent cancel confirmation", () => {
     expect(panel.scrollTop).toBe(0);
     expect(within(panel).getByRole("heading", { name: "Completed Execution" })).toBeTruthy();
     expect(within(panel).getByRole("link", { name: "View Details" }).getAttribute("href")).toBe(
-      "/execution/chip-1/exec-2",
+      "/execution/chip-1/exec-2?project=project-1",
     );
     expect(within(panel).getByText("2 of 2 on this page")).toBeTruthy();
     expect(next.disabled).toBe(true);
@@ -829,7 +842,7 @@ describe("ExecutionPageContent calibration session groups", () => {
     expect(screen.queryByText(/Recommends/)).toBeNull();
     expect(
       screen.getByRole("link", { name: "Open calibration session" }).getAttribute("href"),
-    ).toBe("/calibration-sessions/cs-1?project=project-1");
+    ).toBe("/calibration-sessions/cs-1?project=project-1&from=executions&chip=chip-1");
     expect(screen.queryByText("zx90_q0_q1_c03_step1")).toBeNull();
   });
 
@@ -1022,6 +1035,23 @@ describe("ExecutionPageContent agent session groups", () => {
     ).toBe("/execution/chip-1/sessions/session-1");
   });
 
+  it("switches to the calibration session view on the same chip, in this project", () => {
+    render(<ExecutionPageContent />);
+    const views = screen.getByRole("navigation", { name: "Execution views" });
+    const executions = within(views).getByRole("link", { name: "Executions" });
+    const sessions = within(views).getByRole("link", { name: "Calibration sessions" });
+
+    expect(executions.getAttribute("aria-current")).toBe("page");
+    expect(sessions.getAttribute("aria-current")).toBeNull();
+    expect(sessions.getAttribute("href")).toBe(
+      "/calibration-sessions?chip=chip-1&project=project-1",
+    );
+    // Grouping stays the default view of this list.
+    expect(
+      (screen.getByRole("checkbox", { name: "Group sessions" }) as HTMLInputElement).checked,
+    ).toBe(true);
+  });
+
   it("switches to the flat list without grouping", () => {
     render(<ExecutionPageContent />);
     fireEvent.click(screen.getByRole("checkbox", { name: "Group sessions" }));
@@ -1092,5 +1122,170 @@ describe("ExecutionPageContent agent session groups", () => {
     expect(screen.getByRole("alert").textContent).toContain(
       "Execution history could not be loaded",
     );
+  });
+});
+
+describe("ExecutionPageContent view kept in the URL", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    loadingNextPage = false;
+    executionDetail = DEFAULT_DETAIL;
+    groupedItems = null;
+    groupedError = false;
+    currentProjectId = "project-1";
+    chipList = DEFAULT_CHIPS;
+    window.history.replaceState(null, "", "/execution");
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  const viewDetailsHref = () => {
+    const panel = screen.getByRole("complementary", { name: "Execution details" });
+    return within(panel).getByRole("link", { name: "View Details" }).getAttribute("href") ?? "";
+  };
+
+  it("opens an old bookmark as the grouped latest runs on the first page", () => {
+    render(<ExecutionPageContent />, "chip=chip-1");
+
+    const [args, options] = latestCall(mockListGroups) ?? [];
+    expect(options?.query.enabled).toBe(true);
+    expect(args).toMatchObject({ chip_id: "chip-1", skip: 0 });
+    expect(args?.date).toBeUndefined();
+    expect(latestCall(mockListExecutions)?.[1].query.enabled).toBe(false);
+    expect(
+      (screen.getByRole("checkbox", { name: "Group sessions" }) as HTMLInputElement).checked,
+    ).toBe(true);
+    expect(screen.getByText("selected:latest")).toBeTruthy();
+  });
+
+  it("reads invalid values as the defaults, before the first request", () => {
+    render(<ExecutionPageContent />, "chip=chip-1&date=20261345&flat=maybe&page=-4");
+
+    // No request ever carries the invalid day or page.
+    for (const [args] of [...mockListGroups.mock.calls, ...mockListExecutions.mock.calls]) {
+      expect((args as ListArgs).date).toBeUndefined();
+      expect((args as ListArgs).skip).toBe(0);
+    }
+    expect(latestCall(mockListGroups)?.[1].query.enabled).toBe(true);
+    expect(screen.getByText("selected:latest")).toBeTruthy();
+  });
+
+  it("restores a day, the flat list and page 2, and links the execution page back to them", () => {
+    render(<ExecutionPageContent />, `chip=chip-1&date=${BUSY_DAY}&flat=true&page=2`);
+
+    // The very first flat request already asks for that day and page.
+    const [first] = mockListExecutions.mock.calls[0] as [ListArgs];
+    expect(first).toMatchObject({ chip_id: "chip-1", date: BUSY_DAY, skip: 20 });
+    expect(latestCall(mockListExecutions)?.[1].query.enabled).toBe(true);
+    // The flat list is pinned to the project it shows, like the grouped one.
+    expect(latestCall(mockListExecutions)?.[1].query.queryKey).toContain("project-1");
+    expect(latestCall(mockListExecutions)?.[1].request?.headers["X-Project-Id"]).toBe("project-1");
+    expect(latestCall(mockListGroups)?.[1].query.enabled).toBe(false);
+    expect(screen.getByText("Page 2 of 2")).toBeTruthy();
+    expect(screen.getByText(`selected:${BUSY_DAY}`)).toBeTruthy();
+
+    fireEvent.click(screen.getByText("Other Execution"));
+    const href = viewDetailsHref();
+    expect(href).toBe(
+      `/execution/chip-1/exec-3?project=project-1&date=${BUSY_DAY}&flat=true&page=2`,
+    );
+  });
+
+  it("moves a page past the end to the last page without a history entry", async () => {
+    render(<ExecutionPageContent />, "chip=chip-1&page=9");
+
+    await vi.waitFor(() =>
+      expect(lastUpdate()).toMatchObject({
+        queryString: "?chip=chip-1&page=2",
+        options: { history: "replace" },
+      }),
+    );
+  });
+
+  it("adds a history entry for each change, so Back returns to the previous view", async () => {
+    const { unmount } = render(<ExecutionPageContent />, "chip=chip-1");
+
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    await vi.waitFor(() => expect(lastQuery()).toBe("?chip=chip-1&page=2"));
+    expect(lastUpdate().options.history).toBe("push");
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Group sessions" }));
+    await vi.waitFor(() => expect(lastQuery()).toBe("?chip=chip-1&flat=true"));
+    expect(lastUpdate().options.history).toBe("push");
+
+    fireEvent.click(screen.getByText("pick-day"));
+    await vi.waitFor(() => expect(lastQuery()).toBe("?chip=chip-1&flat=true&date=20260101"));
+
+    // Back to the earlier entry renders that entry's view again.
+    unmount();
+    vi.clearAllMocks();
+    render(<ExecutionPageContent />, "chip=chip-1&page=2");
+    expect(latestCall(mockListGroups)?.[0]).toMatchObject({ skip: 20 });
+    expect(latestCall(mockListGroups)?.[1].query.enabled).toBe(true);
+  });
+
+  it("resets the day and page when another chip is picked", async () => {
+    render(<ExecutionPageContent />, `chip=chip-1&date=${BUSY_DAY}&flat=true&page=2`);
+
+    fireEvent.click(screen.getByRole("button", { name: "Change chip" }));
+
+    // The flat list stays; the old chip's day and page do not.
+    await vi.waitFor(() => expect(lastQuery()).toBe("?chip=chip-2&flat=true"));
+    expect(lastUpdate().options.history).toBe("push");
+    expect(latestCall(mockListExecutions)?.[0]).toMatchObject({ chip_id: "chip-2", skip: 0 });
+    expect(latestCall(mockListExecutions)?.[0].date).toBeUndefined();
+  });
+
+  it("drops the day and page when the project is switched", async () => {
+    // The switch has removed the chip from the URL, and the new project's chips are loading.
+    chipList = null;
+    const { rerender } = render(<ExecutionPageContent />, `date=${BUSY_DAY}&page=2`);
+    window.history.replaceState(null, "", "/execution?project=project-2");
+    currentProjectId = "project-2";
+    rerender(<ExecutionPageContent />);
+    expect(onUrlUpdate).not.toHaveBeenCalled();
+
+    // Its default chip is picked with the old day and page dropped, in one update.
+    chipList = DEFAULT_CHIPS;
+    rerender(<ExecutionPageContent />);
+    await vi.waitFor(() => expect(lastQuery()).toBe("?chip=chip-1"));
+    expect(onUrlUpdate).toHaveBeenCalledTimes(1);
+    expect(lastUpdate().options.history).toBe("replace");
+    expect(latestCall(mockListGroups)?.[0]).toMatchObject({ skip: 0 });
+  });
+
+  it("asks for no list while the chip is not one of the open project's", () => {
+    // Back to another project's entry: its chip shows before that project's chips load.
+    chipList = null;
+    const { rerender } = render(<ExecutionPageContent />, `chip=chip-9&date=${BUSY_DAY}&page=2`);
+    expect(screen.getByText("Skeleton")).toBeTruthy();
+    for (const [, options] of [...mockListGroups.mock.calls, ...mockListExecutions.mock.calls]) {
+      expect((options as ListOptions).query.enabled).toBe(false);
+    }
+
+    // The project's chips do not include it: still nothing is asked for that chip.
+    chipList = DEFAULT_CHIPS;
+    rerender(<ExecutionPageContent />);
+    expect(latestCall(mockListGroups)?.[1].query.enabled).toBe(false);
+    expect(latestCall(mockListExecutions)?.[1].query.enabled).toBe(false);
+  });
+
+  it("keeps the view when Back returns to an entry of another project", () => {
+    const { rerender } = render(<ExecutionPageContent />, `chip=chip-1&date=${BUSY_DAY}&page=2`);
+
+    // Back restores an entry that names its own chip with its project.
+    window.history.replaceState(
+      null,
+      "",
+      `/execution?chip=chip-1&date=${BUSY_DAY}&page=2&project=project-2`,
+    );
+    currentProjectId = "project-2";
+    rerender(<ExecutionPageContent />);
+
+    expect(onUrlUpdate).not.toHaveBeenCalled();
+    expect(latestCall(mockListGroups)?.[0]).toMatchObject({ date: BUSY_DAY, skip: 20 });
+    expect(latestCall(mockListGroups)?.[1].query.queryKey).toContain("project-2");
   });
 });

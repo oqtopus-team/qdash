@@ -230,6 +230,19 @@ describe("Sidebar", () => {
     expect(operate.getAttribute("data-motion")).toBe("fade");
   });
 
+  it.each(["/calibration-sessions", "/calibration-sessions/cs-1", "/execution/chip-1/exec-1"])(
+    "keeps Execution as the one current row on %s",
+    (pathname) => {
+      mockPathname.mockReturnValue(pathname);
+      const { container } = render(<Sidebar />);
+
+      const { desktop } = getAsides(container);
+      const current = desktop.querySelectorAll('[aria-current="page"]');
+
+      expect([...current].map((link) => link.getAttribute("href"))).toEqual(["/execution"]);
+    },
+  );
+
   it("truncates a nav label instead of letting it grow the row", () => {
     sidebarState.isMobileOpen = true;
     const { container } = render(<Sidebar />);
