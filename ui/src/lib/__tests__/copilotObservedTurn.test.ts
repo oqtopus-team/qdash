@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   observedTurnPlacement,
+  parseRecordedTurn,
   parseTurnStart,
+  type RecordedTurn,
+  recordedTurnPlacement,
   transcriptDigest,
   turnStartOf,
 } from "@/lib/copilotObservedTurn";
@@ -146,5 +149,103 @@ describe("observedTurnPlacement", () => {
   it("follows nothing when the runtime reported no start", () => {
     expect(observedTurnPlacement([...older, question], false, null)).toBeNull();
     expect(observedTurnPlacement(older, true, null)).toBeNull();
+  });
+});
+
+describe("recordedTurnPlacement", () => {
+  const user = (content: string, turnRequestId?: string): ChatMessage => ({
+    role: "user",
+    content,
+    ...(turnRequestId ? { turnRequestId } : {}),
+  });
+  const answer = (payload: object, turnRequestId: string): ChatMessage => ({
+    role: "assistant",
+    content: JSON.stringify(payload),
+    turnRequestId,
+  });
+  const running = (requestId: string, startIndex: number, continuing = false): RecordedTurn => ({
+    requestId,
+    projectId: "p1",
+    status: "running",
+    startIndex,
+    continuing,
+    startedAt: 0,
+  });
+
+  it("finds a running turn by its request ID, wherever it moved", () => {
+    const messages: ChatMessage[] = [
+      user("Hi"),
+      { role: "assistant", content: "Hello" } as ChatMessage,
+      // A recovered run's answer and a steer the server placed before the turn's message.
+      answer({ blocks: [] }, "r1"),
+      {
+        ...user("also T2", "r1"),
+        steer: { requestId: "s1", entryId: null, placement: "approximate" },
+      },
+      user("Calibrate Q0", "r1"),
+      answer({ blocks: [], in_progress: true }, "r1"),
+    ];
+    const placed = recordedTurnPlacement(messages, "r1", false, running("r1", 2));
+    expect(placed).toMatchObject({ state: "running", continuing: false, userAt: 2 });
+    if (placed?.state !== "running") throw new Error("not placed");
+    expect(placed.shown.map((m) => m.content)).toEqual(["Hi", "Hello", "Calibrate Q0"]);
+  });
+
+  it("says a turn ended when its record does, or a later turn replaced it", () => {
+    const messages = [user("Q", "r1"), answer({ blocks: [] }, "r1"), user("Q2", "r2")];
+    expect(recordedTurnPlacement(messages, "r1", false, running("r2", 2))).toEqual({
+      state: "ended",
+    });
+    expect(
+      recordedTurnPlacement(messages.slice(0, 2), "r1", false, {
+        ...running("r1", 0),
+        status: "completed",
+      }),
+    ).toEqual({ state: "ended" });
+    // Without a record: its saved answer is its end, saved progress is not.
+    expect(recordedTurnPlacement(messages.slice(0, 2), "r1", false, null)).toEqual({
+      state: "ended",
+    });
+    expect(
+      recordedTurnPlacement(
+        [user("Q", "r1"), answer({ blocks: [], in_progress: true }, "r1")],
+        "r1",
+        false,
+        null,
+      ),
+    ).toMatchObject({ state: "running" });
+  });
+
+  it("places a continue that saved nothing yet where the server recorded it", () => {
+    const messages = [user("Hi"), { role: "assistant", content: "Hello" } as ChatMessage];
+    expect(recordedTurnPlacement(messages, "r1", false, running("r1", 2, true))).toMatchObject({
+      state: "running",
+      continuing: true,
+      userAt: -1,
+      history: messages,
+    });
+    expect(recordedTurnPlacement(messages, "r1", true, null)).toBeNull();
+  });
+
+  it("parses the session's recorded turn", () => {
+    expect(
+      parseRecordedTurn({
+        request_id: "r1",
+        project_id: "p1",
+        status: "running",
+        start_index: 2,
+        continuing: false,
+        started_at: "2026-11-23T01:00:00",
+      }),
+    ).toEqual({
+      requestId: "r1",
+      projectId: "p1",
+      status: "running",
+      startIndex: 2,
+      continuing: false,
+      startedAt: Date.parse("2026-11-23T01:00:00Z"),
+    });
+    expect(parseRecordedTurn({ request_id: "r1", status: "lost", start_index: 0 })).toBeNull();
+    expect(parseRecordedTurn(null)).toBeNull();
   });
 });

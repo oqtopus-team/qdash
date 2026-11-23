@@ -33,6 +33,10 @@ Every operation belongs to one phase, and no phase starts the next one implicitl
 | Run a registered workflow | `workflow.run(parameters=...)`, `qdash.workflows.run(name, parameters=...)`, then `run.wait()` | Dispatches the saved deployment | `POST /flows/{name}/execute`, `GET /executions/{id}` |
 | Author metric scripts and dashboards | `Script(...)`, `Dashboard(...)`, then `qdash.scripts.create`/`update`, `qdash.dashboards.create`/`update` | Saves a script revision or a dashboard | `/metric-scripts`, `/dashboards` |
 
+`Pipelines.execute` also takes `calibration_session_id` and `idempotency_key`, given together, to
+record the run in a calibration session before it is launched; a retry with the same key returns
+the recorded run. See [Calibration Sessions](../copilot/calibration-sessions.md).
+
 `Chip` is a front door over `Pipelines`, not a second implementation:
 `validate_calibration` and `calibrate` build a `Pipeline` from `targets`, `steps` and the
 `name`, `default_run_parameters` and `tags` given, and call `Pipelines.validate` and

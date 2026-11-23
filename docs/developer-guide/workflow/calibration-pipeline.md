@@ -72,6 +72,16 @@ Task results store the worker-resolved plan digest in `invocation.plan_digest`, 
 `note.calibration_plan.digest`. `execute` returns HTTP 422 with the validation problems, or 503
 when the worker deployment is not registered.
 
+`execute` also accepts `calibration_session_id` with an `idempotency_key`, given together. QDash
+then records the run in that calibration session before it is launched, and a retry with the same
+key returns the recorded run (`replayed: true`) instead of starting another; the response adds
+`calibration_session_id` and `pipeline_run_id`. Without them the route behaves as before. The
+recording, retry, and unknown-outcome rules are in
+[Calibration Sessions](../copilot/calibration-sessions.md#dispatch-is-recorded-before-launch).
+An optional `reported_origin` records how the caller says it started the run; QDash stores it as
+client reported (see
+[Reported launch origin](../copilot/calibration-sessions.md#reported-launch-origin)).
+
 ### Version 1 specs
 
 A missing `spec_version` means version 1. The API rejects version 1 with a problem at

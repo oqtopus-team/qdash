@@ -12,7 +12,7 @@ import asyncio
 import contextlib
 import gc
 import json
-from collections.abc import AsyncGenerator, Awaitable, Callable, MutableMapping
+from collections.abc import AsyncGenerator, Awaitable, Callable, Iterator, MutableMapping
 from types import SimpleNamespace
 from typing import Any
 
@@ -32,7 +32,10 @@ from qdash.api.schemas.auth import UserInDB
 from qdash.api.services import chat_turn_runs, pi_chat_service
 from qdash.api.services.chat_transcript import transcript_digest
 from qdash.copilot.config import CopilotConfig
+from qdash.datamodel.project import ProjectRole
 from qdash.dbmodel.copilot_chat_session import CopilotChatMessage
+from qdash.dbmodel.project import ProjectDocument
+from qdash.dbmodel.project_membership import ProjectMembershipDocument
 
 Message = MutableMapping[str, Any]
 
@@ -87,6 +90,25 @@ def runtime(monkeypatch: pytest.MonkeyPatch) -> Runtime:
 
     monkeypatch.setattr(pi_chat_service, "active_runtime_turn", not_running)
     return fake
+
+
+def _projects() -> None:
+    """Projects p1 and p2 with alice a member of both; p3, of which she is not."""
+    for project_id in ("p1", "p2", "p3"):
+        ProjectDocument(
+            project_id=project_id,
+            name=project_id,
+            owner_user_id="carol-id",
+            owner_username="carol",
+        ).insert()
+    for project_id in ("p1", "p2"):
+        ProjectMembershipDocument(
+            project_id=project_id,
+            user_id="alice-id",
+            username="alice",
+            role=ProjectRole.VIEWER,
+            status="active",
+        ).insert()
 
 
 def _unused() -> SimpleNamespace:
@@ -162,16 +184,18 @@ class Stream:
     async def disconnect(self) -> None:
         self.gone.set()
 
-    async def closed(self) -> None:
-        """Wait for the app to finish the response, and drop it as a server does.
+    def cancel(self) -> None:
+        """The server cancels the request's task, as on its shutdown."""
+        self.task.cancel()
 
-        An ASGI 2.4 app ends with ``ClientDisconnect``; the server logs and drops
-        it, which lets the response's generator be finalized.
+    async def closed(self) -> None:
+        """Wait for the app to finish the response.
+
+        An ASGI 2.4 app ends with ``ClientDisconnect``, a cancelled one with
+        ``CancelledError``; the server logs and drops either.
         """
-        with contextlib.suppress(Exception):
+        with contextlib.suppress(Exception, asyncio.CancelledError):
             await asyncio.wait_for(self.task, 5)
-        del self.task
-        gc.collect()
 
 
 def _turn_body(request_id: str, text: str, history: list[dict[str, Any]]) -> dict[str, Any]:
@@ -200,11 +224,27 @@ async def _until(check: Callable[[], Awaitable[bool]]) -> None:
     raise AssertionError("the condition was never met")
 
 
+@pytest.fixture
+def no_gc() -> Iterator[None]:
+    """No garbage collection: what the app leaves to a finalizer stays in place."""
+    enabled = gc.isenabled()
+    gc.disable()
+    try:
+        yield
+    finally:
+        if enabled:
+            gc.enable()
+
+
 @pytest.mark.asyncio
-@pytest.mark.parametrize("spec_version", ["2.3", "2.4"])
+@pytest.mark.parametrize(
+    ("spec_version", "ending"),
+    [("2.3", "disconnect"), ("2.4", "disconnect"), ("2.3", "cancel"), ("2.4", "cancel")],
+)
 async def test_a_turn_whose_stream_disconnects_is_saved_complete_for_the_owner(
-    init_db: Any, app: FastAPI, runtime: Runtime, spec_version: str
+    init_db: Any, app: FastAPI, runtime: Runtime, no_gc: None, spec_version: str, ending: str
 ) -> None:
+    _projects()
     client = httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test")
     async with client:
         created = await client.post(
@@ -219,19 +259,22 @@ async def test_a_turn_whose_stream_disconnects_is_saved_complete_for_the_owner(
         runtime.send("r1", "delta", {"text": "T1 is "})
         assert await stream.next_event() == ("delta", {"text": "T1 is "})
 
-        # The browser tab closes: the server reports the disconnect to the app.
-        await stream.disconnect()
-        runtime.send("r1", "delta", {"text": "40 "})
-        await stream.closed()
         run = chat_turn_runs.running("alice", "s1", "r1")
         assert run is not None and run.task is not None
+        assert len(run.subscribers) == 1
+        if ending == "disconnect":
+            # The browser tab closes: the server reports the disconnect to the app
+            # (ASGI 2.4 servers on the next send).
+            await stream.disconnect()
+            runtime.send("r1", "delta", {"text": "40 "})
+        else:
+            stream.cancel()
+            runtime.send("r1", "delta", {"text": "40 "})
+        await stream.closed()
 
-        async def unsubscribed() -> bool:
-            # ASGI 2.4 servers report the disconnect on the next send; the closed
-            # response's generator is finalized after the app returns.
-            return not run.subscribers
-
-        await _until(unsubscribed)
+        # The response unsubscribed as it ended, not when a finalizer ran later;
+        # the turn runs on.
+        assert not run.subscribers
         assert not run.task.done()
 
         # The turn goes on with nobody listening: its progress is saved...
@@ -247,6 +290,13 @@ async def test_a_turn_whose_stream_disconnects_is_saved_complete_for_the_owner(
             )
 
         await _until(progress_saved)
+        # The session names the turn it records, so a reloaded page finds it by request ID.
+        running = (await client.get("/chat/sessions/s1", headers=ALICE)).json()["turn"]
+        assert running["request_id"] == "r1"
+        assert running["status"] == "running"
+        assert running["start_index"] == 2
+        assert running["continuing"] is False
+        assert running["project_id"] == "p1"
 
         # ...and so is its end.
         runtime.send("r1", "result", _answer("T1 is 40 us."))
@@ -267,6 +317,7 @@ async def test_a_turn_whose_stream_disconnects_is_saved_complete_for_the_owner(
         assert "in_progress" not in answer
         assert "stopped" not in answer
         assert messages[3]["entry_id"] == "17"
+        assert saved.json()["turn"]["status"] == "completed"
 
         # Only the owner reads the chat.
         assert (await client.get("/chat/sessions/s1", headers=BOB)).status_code == 404
@@ -332,3 +383,82 @@ async def test_only_an_explicit_stop_ends_a_disconnected_turn_as_stopped(
         payload = json.loads(messages[-1]["content"])
         assert payload["stopped"] is True
         assert payload["blocks"][0]["content"] == "Partial"
+
+
+@pytest.mark.asyncio
+async def test_the_recorded_turn_is_named_only_in_the_project_it_was_sent_from(
+    init_db: Any, app: FastAPI, runtime: Runtime, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _projects()
+    client = httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test")
+    async with client:
+        await client.post(
+            "/chat/sessions", json={"session_id": "s1", "messages": HISTORY}, headers=ALICE
+        )
+        stream = Stream(app, _turn_body("r1", "What is T1?", HISTORY), "2.3")
+        runtime.send("r1", "delta", {"text": "Partial"})
+        assert await stream.next_event() == ("delta", {"text": "Partial"})
+
+        async def read(headers: dict[str, str]) -> httpx.Response:
+            got = await client.get("/chat/sessions/s1", headers=headers)
+            assert got.status_code == 200
+            # The chat itself is the owner's in every project; only the turn is masked.
+            assert len(got.json()["messages"]) >= 3
+            return got
+
+        async def recorded() -> bool:
+            return (await read(ALICE)).json()["turn"] is not None
+
+        await _until(recorded)
+        named = await read(ALICE)
+        assert named.json()["turn"]["request_id"] == "r1"
+        assert named.json()["turn"]["project_id"] == "p1"
+        # The reply depends on the project asked from: no cache serves it to another.
+        assert "no-store" in named.headers["cache-control"]
+        assert "X-Project-Id" in named.headers["vary"]
+
+        token = {"Authorization": ALICE["Authorization"]}
+        # Without X-Project-Id the user's default project (p1) is the one asked from.
+        assert (await read(token)).json()["turn"]["request_id"] == "r1"
+        # Another project she is a member of, one she is not, one that does not exist.
+        for project in ("p2", "p3", "missing"):
+            assert (await read({**token, "X-Project-Id": project})).json()["turn"] is None
+        # Asked from p1 again (A -> B -> A), the turn is named again.
+        assert (await read(ALICE)).json()["turn"]["request_id"] == "r1"
+
+        # A user with no default project and no header is in no project: no turn.
+        no_default = UserInDB(
+            user_id="alice-id",
+            username="alice",
+            access_token="alice-bare-token",
+            hashed_password="unused",
+            default_project_id=None,
+        )
+        known = auth.get_user_by_token
+        monkeypatch.setattr(
+            auth,
+            "get_user_by_token",
+            lambda t: no_default if t == "alice-bare-token" else known(t),
+        )
+        bare = await read({"Authorization": "Bearer alice-bare-token"})
+        assert bare.json()["turn"] is None
+
+        # Her membership of p1 ends: the turn is no longer named to her there.
+        membership = ProjectMembershipDocument.find_one(
+            {"project_id": "p1", "username": "alice"}
+        ).run()
+        assert membership is not None
+        membership.status = "removed"
+        membership.save()
+        assert (await read(ALICE)).json()["turn"] is None
+
+        # Another user never reads the chat at all.
+        assert (await client.get("/chat/sessions/s1", headers=BOB)).status_code == 404
+
+        runtime.send("r1", "result", _answer("Done."))
+        runtime.end("r1")
+        await stream.disconnect()
+        await stream.closed()
+        run = chat_turn_runs.running("alice", "s1", "r1")
+        if run is not None and run.task is not None:
+            await asyncio.wait_for(run.task, 5)

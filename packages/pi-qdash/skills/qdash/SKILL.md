@@ -25,6 +25,7 @@ Prefer the dedicated tool that matches the question. Use `qdash_query` only as a
    - `qdash_list_flows`, `qdash_get_flow` — list or inspect calibration flows
    - `qdash_validate_metric_script`, `qdash_preview_metric_script` — check and preview a metric script on a chip; they run the code on the server but save nothing (see the `qdash-metric-scripts` skill)
    - `qdash_get_pipeline_catalog`, `qdash_plan_pipeline` — compose and check a calibration pipeline spec before running it
+   - `qdash_get_calibration_session`, `qdash_list_calibration_sessions` — read one calibration objective with every pipeline run and agent session started for it, or find one to continue (see Calibration sessions)
    - `qdash_list_executions`, `qdash_get_execution`, `qdash_wait_execution`, `qdash_compare_executions` — inspect, await, or compare executions
    - `qdash_get_provenance_stats` — inspect provenance status
    - `qdash_list_forum_posts`, `qdash_get_forum_post`, `qdash_list_forum_replies` — inspect Forum context
@@ -36,6 +37,7 @@ Prefer the dedicated tool that matches the question. Use `qdash_query` only as a
    - `qdash_recent_calibration_summary`, `qdash_recommend_next_action` — summarize outcomes and recommend a safe next action
    - `qdash_degradation_report`, `qdash_plan_calibration`, `qdash_validate_calibration` — inspect drift, plan work, and validate results
 3. Confirmation-gated write tools (the harness asks the user before running them):
+   - `qdash_create_calibration_session` — record one calibration objective on a chip; it starts and grants nothing
    - `qdash_create_agent_session` — propose a bounded agent session; approving it approves every step inside it when its autonomy is `auto`
    - `qdash_submit_agent_action`, `qdash_execute_agent_action` — propose or run one action of a `confirm_each` session
    - `qdash_commit_agent_candidate`, `qdash_commit_agent_candidate_set` — commit reviewed candidate parameters
@@ -107,6 +109,42 @@ parameters without the session's candidate gate. Likewise, a flow or pipeline th
 catalog or validation problem, is reported, not routed into an agent session; changing path is
 the user's decision.
 
+## Calibration sessions
+
+A calibration session records one calibration objective on one chip ("bring qubits 0-3 up to
+single-qubit gates") and groups the pipeline runs and agent sessions started for it, so the
+user can see the objective's work in one place. QDash shows it under the name calibration
+session; an agent session is one bounded autonomous or step-confirmed run inside such work,
+not the objective itself.
+
+- When the user asks for calibration work toward one goal that will start a pipeline run or an
+  agent session, create a calibration session for that goal with
+  `qdash_create_calibration_session`, or reuse the one the user names. The chat shows a
+  session once it is created; there is no need to read it again for that.
+- Pass its ID as `calibrationSessionId` to every `qdash_run_pipeline` and
+  `qdash_create_agent_session` call for that goal. QDash records the run before it starts; a
+  pipeline run is one record that covers all its step executions. A run started without the ID
+  is not part of the session, and nothing moves it there later.
+- The session grants nothing. Each pipeline run is still the exact request the user approves,
+  and an agent session is still bounded by its own policy, gates, expiry, and pause. Never
+  present the session as permission, and never use it to skip an approval.
+- One chat may serve several objectives: use one calibration session per objective. To continue
+  an objective from another chat, use its ID (`qdash_list_calibration_sessions` finds it; confirm
+  the one with the user before starting runs in it).
+- Report progress with `qdash_get_calibration_session`. Statuses belong to each run and agent
+  session; judge the results themselves before saying the objective is met. Closing a
+  calibration session is the user's decision in QDash, not yours.
+- When saying how a run was started, use QDash's records: an execution with a linked
+  `agent_session` was dispatched by that agent session; a pipeline run with a `reported_origin`
+  was launched by the named tool, which reported it itself (QDash does not verify it, and it is
+  not an agent session); one with neither was started directly by its user. Membership in a
+  calibration session says what a run was for, not who ran it.
+- When QDash says a pipeline run's launch outcome is unknown, do not start it again: check
+  `qdash_list_executions` and tell the user. Such a run was admitted and may still start, even
+  after the calibration session is closed.
+- An agent session that QDash reports as not admitted refuses every operation; do not work
+  around it. A rejected one never operates: start a new calibration session for further work.
+
 ## Composing a calibration pipeline
 
 A calibration pipeline spec is a JSON description of one calibration run: `spec_version: 2`, targets, an ordered list of steps, and the settings of each task call. QDash validates it against the chip, backend, and task catalog and runs it as one execution. The spec can only name the step types and tasks QDash exposes; it cannot contain code.
@@ -118,7 +156,7 @@ Workflow:
 1. `qdash_get_pipeline_catalog` — read the step types (with what each needs from an earlier step and its default task list), the one-qubit modes, the task names by type, and a one-line description of each documented task. Use only names from this catalog. Before choosing a task for a custom step, call it again with `taskNames` to read when to use the task and its prerequisites; the prerequisites explain, and `qdash_plan_pipeline` reports what is actually missing.
 2. Turn the request into steps. Start from the catalog defaults and the flow templates (`qdash_query` with `flow_templates`, then `flow_template` for one template's task list): `OneQubitCheck` and `OneQubitFineTune` carry the standard one-qubit sequences, `TwoQubitCalibration` the two-qubit chain. Use `CustomOneQubit` / `CustomTwoQubit` only where the user wants a different task list, and keep the task order the templates use.
 3. `qdash_plan_pipeline` — validate. A result with problems is not an error: each problem carries a path into the spec (`steps[2].tasks[0]`, `targets.qids[1]`); fix it and plan again until it is valid. Warnings do not make a spec invalid but usually mean a filter reads a different step than intended. A result with `migrated_spec` means the spec used the version 1 shape; plan the migrated spec.
-4. Show the user the resolved steps, each call's `call_id` and effective settings from the plan, then `qdash_run_pipeline` with the same `chipId` and `spec`. The execution is confirmation-gated. Say that completed tasks write their calibrated parameters to QDash directly; there is no candidate gate, so inside an agent calibration session use the session's actions instead.
+4. Show the user the resolved steps, each call's `call_id` and effective settings from the plan, then `qdash_run_pipeline` with the same `chipId` and `spec`, and the objective's `calibrationSessionId` (see Calibration sessions). The execution is confirmation-gated. Say that completed tasks write their calibrated parameters to QDash directly; there is no candidate gate, so inside an agent calibration session use the session's actions instead.
 5. `qdash_wait_execution` with the returned `execution_id`. It returns when the whole run has finished, not just its first step. Then summarize which targets passed and which failed, fetch the figures of failed tasks with `qdash_get_task_figures` so the user sees them, and read `qdash_get_task_knowledge` for any task whose result needs interpretation.
 
 Rules:

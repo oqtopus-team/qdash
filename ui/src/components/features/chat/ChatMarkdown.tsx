@@ -24,14 +24,23 @@ import {
 } from "@/lib/chatMarkdown";
 import { useCodeHighlighter } from "@/lib/highlight";
 import { resetDiagram, startDiagramPan, zoomDiagram, ZOOM_STEP } from "@/lib/chatMermaidView";
+import { codeBlockTitle, codeFileName, downloadText } from "@/lib/chatDownloads";
 import { copyText } from "@/lib/utils/clipboard";
 
 export { normalizeMathDelimiters } from "@/lib/chatMarkdown";
 
 export { ChatLink };
 
-// Copy only: the renderer's download button has no counterpart in chat.
-const controls: ControlsConfig = { code: { copy: true, download: false } };
+// Both buttons are handled here: copy through the shared clipboard helper, and
+// download with a file name from the fence's title or language.
+const controls: ControlsConfig = { code: { copy: true, download: true } };
+
+const CODE_BLOCK = '[data-markdown="code-block"]';
+
+function blockCode(block: Element | null): string {
+  if (!(block instanceof HTMLElement)) return "";
+  return block.dataset.code ?? block.querySelector("pre code")?.textContent ?? "";
+}
 
 const COPIED_MS = 2000;
 
@@ -110,20 +119,32 @@ export const ChatMarkdown = memo(function ChatMarkdown({
     [toast],
   );
 
-  // Runs before the renderer's own copy handler, which only knows the async
-  // Clipboard API; copyText also works on plain-HTTP deployments.
+  // Runs before the renderer's own button handler, which only knows the async
+  // Clipboard API and names every download `code.<language>`; copyText also
+  // works on plain-HTTP deployments.
   const onClickCapture = useCallback(
     (event: React.MouseEvent<HTMLDivElement>) => {
       const target = event.target as Element;
       const button = target.closest<HTMLButtonElement>("button[data-code-action]");
       if (!button || !event.currentTarget.contains(button)) return;
       event.stopPropagation();
-      if (button.disabled || button.dataset.codeAction !== "copy") return;
-      const block = button.closest<HTMLElement>('[data-markdown="code-block"]');
-      const code = block?.dataset.code ?? block?.querySelector("pre code")?.textContent ?? "";
-      copy(button, code, "Failed to copy code");
+      if (button.disabled) return;
+      const block = button.closest<HTMLElement>(CODE_BLOCK);
+      const code = blockCode(block);
+      if (button.dataset.codeAction !== "download") {
+        copy(button, code, "Failed to copy code");
+        return;
+      }
+      // The renderer drops the fence's title, so match the block to its source
+      // fence by code, counting earlier blocks with the same code.
+      const earlier = [...event.currentTarget.querySelectorAll(CODE_BLOCK)];
+      const occurrence = earlier
+        .slice(0, block ? earlier.indexOf(block) : 0)
+        .filter((other) => blockCode(other) === code).length;
+      const title = codeBlockTitle(source, code, occurrence);
+      downloadText(codeFileName(block?.dataset.language, title), code);
     },
-    [copy],
+    [copy, source],
   );
 
   const onClick = useCallback(

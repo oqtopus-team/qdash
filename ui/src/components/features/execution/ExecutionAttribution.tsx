@@ -2,7 +2,9 @@
 
 import { Bot, UserRound } from "lucide-react";
 
-import type { ExecutionAgentSessionLink } from "@/schemas";
+import type { ExecutionAgentSessionLink, ReportedLaunchOrigin } from "@/schemas";
+
+import { ReportedOriginBadge } from "./ExecutionCalibrationContext";
 
 type ActorFields = {
   user_id?: string | null;
@@ -49,15 +51,19 @@ export function AgentActorLabel({
 
 /**
  * Who ran an execution: the recorded user for a manual run, or "Agent · @user" when a verified
- * agent session action dispatched it. The user stays the recorded one in both cases.
+ * agent session action dispatched it. A pipeline whose caller reported an agent tool keeps the
+ * recorded user and adds "Agent tool, reported": the report is never shown as the verified
+ * agent label. Calibration session membership plays no part here.
  */
 export function ExecutionActor({
   actor,
   link,
+  origin,
   iconClassName = "h-3 w-3 shrink-0",
 }: {
   actor?: ActorFields | null;
   link?: ExecutionAgentSessionLink | null;
+  origin?: ReportedLaunchOrigin | null;
   iconClassName?: string;
 }) {
   if (isAgentDispatched(link)) {
@@ -67,6 +73,12 @@ export function ExecutionActor({
     <span className="inline-flex min-w-0 items-center gap-1">
       <UserRound className={iconClassName} aria-hidden="true" />
       <span className="truncate">{recordedUserLabel(actor)}</span>
+      {origin ? (
+        <>
+          <span aria-hidden="true">·</span>
+          <ReportedOriginBadge origin={origin} />
+        </>
+      ) : null}
     </span>
   );
 }

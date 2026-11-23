@@ -21,6 +21,11 @@ export type NdjsonEvent =
       evaluation?: EvaluationSummary;
       /** What `classify` decided, for the chat to show under the step; bounded, never its input. */
       classification?: ClassificationDetails;
+      /**
+       * The calibration session a successful `qdash_create_calibration_session` call created, read from the tool's
+       * own result details (never from the model's arguments or text), for the chat to show.
+       */
+      calibrationSession?: CreatedCalibrationSession;
       /** What a workspace tool printed or answered, for the chat to show under the step; bounded. */
       output?: string;
       /** A command's exit status (`bash`). */
@@ -78,6 +83,35 @@ export type NdjsonEvent =
   | { type: "error"; message: string; code?: "compaction_failed" | "turn_not_started" }
   /** Keepalive while a turn is quiet (long tool calls); carries no content. */
   | { type: "ping" };
+
+/** Tool whose successful result names the calibration session it created. */
+export const CREATE_CALIBRATION_SESSION_TOOL = "qdash_create_calibration_session";
+
+/** What the chat learns of a calibration session a tool call created: its ID and chip, nothing else. */
+export interface CreatedCalibrationSession {
+  calibrationSessionId: string;
+  chipId?: string;
+}
+
+const CALIBRATION_SESSION_ID = /^[A-Za-z0-9_.:-]{1,200}$/;
+
+/**
+ * The calibration session a `qdash_create_calibration_session` result created, when the call succeeded and its
+ * details (written by the pi-qdash tool after QDash answered) name it. Anything else yields nothing: another tool,
+ * a failed or refused call, or details not shaped like the tool's own.
+ */
+export function createdCalibrationSessionFromDetails(
+  toolName: string | undefined,
+  details: Record<string, unknown> | undefined,
+  isError: boolean,
+): CreatedCalibrationSession | undefined {
+  if (isError || toolName !== CREATE_CALIBRATION_SESSION_TOOL || !details) return undefined;
+  if (details.tool !== CREATE_CALIBRATION_SESSION_TOOL) return undefined;
+  const id = details.calibrationSessionId;
+  if (typeof id !== "string" || !CALIBRATION_SESSION_ID.test(id)) return undefined;
+  const chipId = typeof details.chipId === "string" && details.chipId ? details.chipId.slice(0, 200) : undefined;
+  return { calibrationSessionId: id, ...(chipId ? { chipId } : {}) };
+}
 
 /**
  * Suffix for an unanswered submission's `detail`, which carries the provider's
@@ -303,14 +337,17 @@ export function toNdjsonEvents(event: SessionEventLike): NdjsonEvent[] {
     const evaluation = evaluationFromDetails(details);
     const classification =
       event.toolName === CLASSIFY_CHAT_TOOL ? classificationFromDetails(details) : undefined;
+    const isError = event.isError === true || durableResult?.isError === true;
+    const calibrationSession = createdCalibrationSessionFromDetails(event.toolName, details, isError);
     out.push({
       type: "tool_end",
       name: event.toolName ?? "unknown",
       ...(figures.length ? { figures } : {}),
       ...(evaluation ? { evaluation } : {}),
       ...(classification ? { classification } : {}),
+      ...(calibrationSession ? { calibrationSession } : {}),
       ...toolOutput(event),
-      isError: event.isError === true || durableResult?.isError === true,
+      isError,
       ...(event.toolCallId ? { id: event.toolCallId } : {}),
       ...(event.entry && typeof event.entryId === "string" ? { entry_id: event.entryId } : {}),
       ...(event.beforeTurn ? { before_turn: true as const } : {}),

@@ -29,7 +29,7 @@ from qdash.api.lib.project import (
     get_project_context,
     get_project_id_from_header,
 )
-from qdash.api.lib.sse import sse_event
+from qdash.api.lib.sse import ClosingStreamingResponse, sse_event
 from qdash.api.schemas.auth import User
 from qdash.api.schemas.copilot_chat_session import (
     CopilotChatSessionResponse,
@@ -219,8 +219,11 @@ async def chat_active(
     """
     try:
         target = await pi_chat_service.runtime_target(current_user.username, request.session_id)
-    except ChatUnavailableError:
-        return ChatActiveResponse(running=False)
+    except ChatUnavailableError as exc:
+        # A chat that is gone runs nothing; one still being created or cleaned up may.
+        if exc.status_code == 404:
+            return ChatActiveResponse(running=False)
+        return ChatActiveResponse(running=False, unavailable=True)
     auth = pi_chat_service.QDashAuth(
         access_token=credentials.credentials,
         project_id=project_id or current_user.default_project_id,
@@ -447,8 +450,11 @@ async def chat_stream(
         ):
             yield event
 
-    async def turn_running() -> bool:
-        """Whether the runtime runs a turn of this chat now (read-only)."""
+    async def turn_running() -> bool | None:
+        """Whether the runtime runs a turn of this chat now (read-only).
+
+        None: the runtime could not say, so a turn may still run.
+        """
         if not request.session_id:
             return False
         active = await pi_chat_service.active_runtime_turn(
@@ -460,11 +466,14 @@ async def chat_stream(
             ),
             target=target,
         )
+        if active.get("unavailable") is True:
+            return None
         return active.get("running") is True
 
     # The turn's stream runs in the API apart from this response: closing it, or every
-    # window, never ends the turn or what the server records of it.
-    return StreamingResponse(
+    # window, never ends the turn or what the server records of it; it only ends the
+    # response's subscription, at once.
+    return ClosingStreamingResponse(
         chat_turn_runs.stream_turn(
             request,
             username=current_user.username,
@@ -520,11 +529,33 @@ async def list_copilot_chat_sessions(
 )
 def get_copilot_chat_session(
     session_id: str,
+    response: Response,
     current_user: Annotated[User, Depends(get_current_active_user)],
+    project_id: Annotated[str | None, Depends(get_project_id_from_header)],
     service: Annotated[CopilotChatSessionService, Depends(get_copilot_chat_session_service)],
 ) -> CopilotChatSessionResponse:
-    """Return one chat session including the full message list."""
-    return service.get_session(username=current_user.username, session_id=session_id)
+    """Return one chat session including the full message list.
+
+    The session's ``turn`` is named only in the project it was sent from, like
+    ``/chat/active``: the project the request names (``X-Project-Id``, else the
+    user's default), and only one the user may read. Elsewhere it is null. As the
+    reply depends on that project, no cache keeps it for a request from another.
+    """
+    response.headers["Cache-Control"] = "private, no-store"
+    response.headers["Vary"] = "Authorization, X-Project-Id"
+    return service.get_session(
+        username=current_user.username,
+        session_id=session_id,
+        project_id=_readable_project(current_user, project_id),
+    )
+
+
+def _readable_project(user: User, project_id: str | None) -> str | None:
+    """The project the request is made in, if the user may read it; else None."""
+    try:
+        return get_project_context(user, project_id).project_id
+    except HTTPException:
+        return None
 
 
 @router.post(

@@ -76,11 +76,17 @@ answer is marked **Answer in progress, saved by the server**. Reopening it after
 shows the whole answer. A reload or another browser shows the same saved conversation. If QDash
 cannot save an answer, the chat says so and the window you sent it from keeps its own copy.
 If QDash itself restarts while an answer runs, the answer keeps running in the assistant, and
-reopening the chat reconnects to it and saves it.
+reopening the chat reconnects to it and saves it, or saves how it ended if it ended meanwhile.
+An answer that no longer runs anywhere is marked **Interrupted before it ended** once you send the
+next message.
+If the chat cannot reach the assistant to check on an answer, it keeps showing **Reconnecting**
+and checks again instead of saying the answer is lost. A message sent while QDash cannot check
+whether an earlier answer still runs is not sent, and the chat asks you to send it again shortly.
 
 The same chat open in another window or browser tab of yours, in the same project, shows the
-answer in progress too, from its start, once that window is in front or within about 15 seconds
-while it is shown. Nothing is sent again, and **Stop** works from either window. Only the window
+answer in progress too, from its start, and then each step as it happens. A window of the same
+browser picks it up at once; another browser or device does once that window is in front or
+within about 15 seconds while it is shown. Nothing is sent again, and **Stop** works from either window. Only the window
 where you sent the message shows its notifications. An answer that started and ended while the
 other window was not checking appears there at its next check. A message sent from a window that
 shows an older copy of the chat, such as one opened before another window's answer ended, is not
@@ -90,7 +96,7 @@ send the message again.
 The chat's header says what its answer is doing: what the assistant runs, **Waiting for the
 expert's answer**, **Reconnecting**, **Answer in progress** for a saved answer the chat does not
 follow now, or, once the answer ended, **Answered**, **Waiting for your approval**, **Waiting for
-your answer**, **Stopped**, or **Failed**. While the sidebar is closed,
+your answer**, **Stopped**, **Interrupted**, or **Failed**. While the sidebar is closed,
 a dot on **Ask Agent** shows that an answer is running, and **Ask Agent** opens that chat rather
 than a new one.
 
@@ -211,6 +217,22 @@ the unsaved draft and proposes a new one as a diff. **Apply to draft** puts it o
 sent until you pick one or type your own. See
 [Create a Dashboard with the Agent](./dashboards.md#create-a-dashboard-with-the-agent).
 
+### Save Answers and Files
+
+Select **Save as Markdown** under a finished answer to save its text and any proposed code change
+as a `.md` file named after the answer's first heading. An answer that is still running or was
+stopped does not offer it. Select **Download** on a code block to save that code as a file. A
+block whose opening fence names a file, for example ```` ```python title="fit.py" ````, is saved
+under that name; other blocks are saved as `snippet` with an extension for their language.
+
+When the assistant writes a file in its workspace, the answer lists the file's name under
+**Original write content from this answer**. Select the name to download the content that write
+produced, as the chat holds it. The download is the original write, not the file as it is now:
+it does not include later changes made by a script, and the chat never reads the file back from
+the workspace. The chat stops offering a file when a later edit or overwrite in the same answer
+changes it, or might have changed it, and when the answer stopped while the write ran. The
+contents of large or many files are not kept, so after a reload those files are not offered.
+
 ### Calculations and Scripts
 
 When the deployment enables it, the assistant has a private workspace for each chat: a shell with
@@ -306,6 +328,42 @@ keeps the values as candidates until you approve a commit (it asks before a meas
 needs a new value), and asks an expert in QDash when it
 cannot tell what to do next. To continue after the expert answers, tell it to continue, in the
 same chat or a new one. See [Agent Calibration](./agent-calibration.md).
+
+## Follow a Calibration Objective
+
+When you ask for calibration work toward one goal, such as "bring up Q00 and Q01", the assistant
+first proposes a **Calibration session** for that goal on an approval card. The session only
+records the goal: it starts nothing, and every pipeline run and step-by-step agent session the
+assistant then starts for the goal is still approved on its own card. Each card names the
+calibration session the run is recorded in.
+
+1. Approve the **Calibration session** card. A card above the message box shows the goal, how
+   many pipeline runs and agent sessions it holds, and how many still run or wait.
+2. Approve the runs the assistant proposes. A pipeline run is listed once with all of its steps,
+   and an agent session is listed with the measurements it ran.
+3. Select **Open** on the card to see the calibration session page: each pipeline run with its
+   steps and their executions, and each agent session with its state and executions. Select an
+   execution to open it on the **Execution** page. A pipeline the assistant started is marked
+   **Agent tool, reported**; one you started yourself has no mark.
+
+One chat can follow several goals, each in its own calibration session. To continue a goal in a
+new chat, ask the assistant to continue it; it finds the session among yours. Deleting or
+branching a chat does not change a calibration session. Outside the chat, open
+**Execution** and select **Calibration sessions** to find every objective.
+
+When the work is done, the person who created the session can select **Close session** on its
+page. Closing stops and cancels nothing and does not record whether the goal was met; it only
+prevents new runs in the session. QDash refuses to close it while a run or agent session in it still runs,
+waits for an expert, or is being started, or while an ended agent session still has a
+measurement in progress. If QDash could not confirm whether a pipeline run started (**Start
+unknown**), check the **Execution** page and confirm that in the close dialog first. Such a run
+was already admitted: it may be running, or it may still start after you close the session.
+The dialog also asks you to confirm an agent session whose start was interrupted. That session
+was never admitted, so if it appears later it is rejected and cannot run anything. An agent
+session marked **Not admitted yet** cannot run anything until its start completes. When a
+session holds more than 100 pipeline runs or agent sessions, its page lists the latest 100
+and says how many there are; closing still checks all of them.
+How this works: [Calibration Sessions](../developer-guide/copilot/calibration-sessions.md).
 
 ## Ask Agent About a Task Result {#ask-ai-about-a-task-result}
 

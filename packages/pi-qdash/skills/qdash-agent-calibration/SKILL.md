@@ -81,6 +81,11 @@ it.
    of every step and every granted update inside that scope, so the loop does not ask again.
    Never create a new session to get around a paused one; QDash refuses an `auto` session for
    qubits one of your sessions on the chip is paused for.
+   When the session serves a calibration objective the user stated, pass that objective's
+   calibration session as `calibrationSessionId` (create one with
+   `qdash_create_calibration_session` first, or reuse the one the user names; see Calibration
+   sessions in the `qdash` skill). QDash records the agent session in it; that grants nothing
+   beyond the policy, and pipeline runs for the same objective are recorded next to it.
    With `autonomy: "confirm_each"`, every action instead goes through `qdash_submit_agent_action`
    and `qdash_execute_agent_action`, which ask each time.
 

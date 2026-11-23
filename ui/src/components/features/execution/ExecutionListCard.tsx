@@ -18,6 +18,7 @@ import type { ExecutionResponseSummary } from "@/schemas";
 import { formatDateTime } from "@/lib/utils/datetime";
 
 import { ExecutionActor } from "./ExecutionAttribution";
+import { CalibrationSessionBadge } from "./ExecutionCalibrationContext";
 
 export { recordedUserLabel as formatActorLabel } from "./ExecutionAttribution";
 
@@ -143,7 +144,14 @@ export function ExecutionListCard({
             <span className="hidden sm:inline">Duration: {execution.elapsed_time}</span>
           )}
           {execution.elapsed_time && <span className="sm:hidden">{execution.elapsed_time}</span>}
-          <ExecutionActor actor={execution} link={execution.agent_session} />
+          <ExecutionActor
+            actor={execution}
+            link={execution.agent_session}
+            origin={execution.reported_origin}
+          />
+          {execution.calibration_session ? (
+            <CalibrationSessionBadge link={execution.calibration_session} />
+          ) : null}
         </div>
         {execution.status === "failed" && execution.message && (
           <p className="mt-2 line-clamp-2 text-xs text-error">{execution.message}</p>

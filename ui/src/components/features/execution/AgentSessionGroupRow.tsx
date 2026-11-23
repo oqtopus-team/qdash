@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 
-import { Bot, ChevronRight, ExternalLink } from "lucide-react";
+import { Bot, ChevronRight, ExternalLink, Target } from "lucide-react";
 
 import type { ExecutionGroupItem, ExecutionResponseSummary } from "@/schemas";
 
 import { sessionStatusLabel } from "@/components/features/agent-session/interventionLabels";
+import { calibrationSessionHref } from "@/lib/chatCalibrationSession";
 import { formatDateTime } from "@/lib/utils/datetime";
 
 import {
@@ -105,13 +106,29 @@ export function AgentSessionGroupRow({
             </span>
           </span>
         </button>
-        <Link
-          href={sessionGraphHref(summary.chip_id, summary.session_id, projectId)}
-          className="btn btn-ghost btn-sm shrink-0"
-        >
-          <ExternalLink data-icon="inline-start" aria-hidden="true" />
-          Open session graph
-        </Link>
+        <div className="flex shrink-0 flex-wrap gap-1">
+          {summary.calibration_session ? (
+            <Link
+              href={calibrationSessionHref(
+                summary.calibration_session.calibration_session_id,
+                projectId,
+              )}
+              className="btn btn-ghost btn-sm max-w-64"
+              title={`Calibration session: ${summary.calibration_session.objective}`}
+              aria-label={`Calibration session: ${summary.calibration_session.objective}`}
+            >
+              <Target data-icon="inline-start" aria-hidden="true" />
+              <span className="truncate">{summary.calibration_session.objective}</span>
+            </Link>
+          ) : null}
+          <Link
+            href={sessionGraphHref(summary.chip_id, summary.session_id, projectId)}
+            className="btn btn-ghost btn-sm"
+          >
+            <ExternalLink data-icon="inline-start" aria-hidden="true" />
+            Open session graph
+          </Link>
+        </div>
       </div>
       {isExpanded && (
         <div id={childrenId} className="flex flex-col gap-2 border-t border-base-content/10 p-3">

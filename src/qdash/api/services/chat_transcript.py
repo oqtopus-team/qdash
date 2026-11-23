@@ -24,6 +24,9 @@ MAX_PERSISTED_THINKING = 20_000
 MAX_PERSISTED_ARGS = 4_000
 MAX_PERSISTED_PROMPT = 12_000
 MAX_PERSISTED_OUTPUT = 2_000
+# Room for the full arguments of an answer's finished ``write`` calls, shared by them
+# in order, so the page can offer the written content after a reload.
+MAX_PERSISTED_WRITE_ARGS = 64_000
 
 TurnEnd = Literal["completed", "failed", "stopped", "noop"]
 
@@ -115,6 +118,35 @@ def _close_open_steps(steps: list[Step], now: int) -> list[Step]:
     return closed
 
 
+def interrupted_content(content: str, now: int | None = None) -> str | None:
+    """``content`` of saved progress marked as interrupted, or None if it is no progress.
+
+    For progress of a turn that no process runs any more (its API process restarted and
+    a new turn replaced it): the answer so far is kept, marked ``interrupted`` instead of
+    ``in_progress``, and its open steps closed as a stopped turn's are.
+    """
+    try:
+        payload = json.loads(content)
+    except ValueError:
+        return None
+    if not isinstance(payload, dict) or payload.get("in_progress") is not True:
+        return None
+    payload.pop("in_progress")
+    payload["interrupted"] = True
+    trace = payload.get("trace")
+    if isinstance(trace, dict) and isinstance(trace.get("steps"), list):
+        steps = trace["steps"]
+        closed = _close_open_steps(steps, _now_ms() if now is None else now)
+        # A call that was running is closed as done; keep that its end was not seen.
+        trace["steps"] = [
+            {**c, "interrupted": True}
+            if isinstance(s, dict) and s.get("kind") == "tool" and s.get("status") == "running"
+            else c
+            for s, c in zip(steps, closed, strict=True)
+        ]
+    return to_json(payload)
+
+
 def _tool_evaluation(value: Any) -> dict[str, Any] | None:
     if not isinstance(value, dict):
         return None
@@ -189,6 +221,14 @@ def _truncate_args(args: Any) -> Any:
     except (TypeError, ValueError):
         return None
     return f"{text[:MAX_PERSISTED_ARGS]}…" if len(text) > MAX_PERSISTED_ARGS else args
+
+
+def _json_length(value: Any) -> int | None:
+    """Serialized length as the page measures it (UTF-16 code units of ``JSON.stringify``)."""
+    try:
+        return len(to_json(value).encode("utf-16-le")) // 2
+    except (TypeError, ValueError):
+        return None
 
 
 class LiveTurn:
@@ -354,27 +394,45 @@ class LiveTurn:
             *([{"type": "text", "content": partial, "chart": None}] if partial else []),
         ]
 
-    def trace(self, now: int) -> dict[str, Any] | None:
-        """The steps as stored with the answer (``toPersistedTrace``)."""
-        work = _close_open_steps(self.steps, now)[: _answer_start(self.steps)]
+    def trace(self, now: int, *, settle: bool = True) -> dict[str, Any] | None:
+        """The steps as stored with the answer (``toPersistedTrace``).
+
+        ``settle``: the turn ended, so a step still open is closed (a call still being
+        written was never made). Progress of a running turn keeps them open: a tool
+        that runs, or is being written, is not reported as done or as not run.
+        """
+        steps_now = _close_open_steps(self.steps, now) if settle else list(self.steps)
+        work = steps_now[: _answer_start(self.steps)]
         if not work:
             return None
         budget = MAX_PERSISTED_THINKING
+        write_budget = MAX_PERSISTED_WRITE_ARGS
         steps: list[Step] = []
-        for s in work:
+        for index, s in enumerate(work):
             if s["kind"] == "thinking":
                 text = s["text"][: max(0, budget)]
                 budget -= len(text)
                 steps.append({**s, "text": text})
             elif s["kind"] == "tool":
                 rest = {k: v for k, v in s.items() if k not in ("draft", "draftIndex", "output")}
+                # Closing marks a running call done; keep that its end was not seen.
+                # Progress keeps the call running, so it is not interrupted.
+                interrupted = settle and self.steps[index].get("status") == "running"
                 args = _truncate_args(
                     s.get("args") if s.get("args") is not None else s.get("draft")
                 )
+                full = s.get("args")
+                if s["tool"] == "write" and s.get("status") == "done" and not interrupted and full:
+                    length = _json_length(full)
+                    if length is not None and MAX_PERSISTED_ARGS < length <= write_budget:
+                        write_budget -= length
+                        args = full
                 if args is None:
                     rest.pop("args", None)
                 else:
                     rest["args"] = args
+                if interrupted:
+                    rest["interrupted"] = True
                 output = s.get("output")
                 if output:
                     rest["output"] = (
@@ -557,7 +615,7 @@ class TurnTranscript:
                 return head
             return [*head, self._message("assistant", f"Error: {self.error}")]
         blocks = self.turn.stopped_blocks()
-        trace = self.turn.trace(now)
+        trace = self.turn.trace(now, settle=self.end == "stopped")
         if self.end == "stopped":
             payload: dict[str, Any] = {"blocks": blocks, "assessment": None, "stopped": True}
         elif blocks or trace:

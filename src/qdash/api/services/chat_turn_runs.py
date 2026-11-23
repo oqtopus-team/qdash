@@ -21,7 +21,7 @@ import contextlib
 import logging
 import time
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from qdash.api.lib.sse import sse_event
 from qdash.api.services import copilot_chat_session_service as sessions
@@ -234,18 +234,20 @@ async def _claim(
     username: str,
     project_id: str | None,
     request_id: str,
-    turn_running: Callable[[], Awaitable[bool]] | None,
-) -> tuple[sessions.ClaimOutcome, CopilotChatMessage | None]:
+    turn_running: Callable[[], Awaitable[bool | None]] | None,
+) -> tuple[sessions.ClaimOutcome | Literal["unknown"], CopilotChatMessage | None]:
     """Record the turn's start, waiting briefly for a save of it still on its way.
 
     A recorded turn still marked running blocks the claim while it runs here or in
     the runtime; one that runs nowhere (its API process restarted and nobody
-    reattached) is replaced.
+    reattached) is replaced. Only the runtime's own answer that nothing runs
+    counts as nowhere: when it cannot say (``turn_running`` gives None), the
+    claim is ``unknown`` and the recorded turn, and what it saved, stay as they are.
     """
     assert request.session_id is not None and request.turn_start is not None
     session_id = request.session_id
     user_message = user_message_of(request, request_id)
-    outcome: sessions.ClaimOutcome = "conflict"
+    outcome: sessions.ClaimOutcome | Literal["unknown"] = "conflict"
     replace_running = False
     for wait in (0.0, *CLAIM_WAITS):
         if wait:
@@ -264,8 +266,13 @@ async def _claim(
         if outcome == "busy" and not replace_running:
             if _runs_other_turn(username, session_id, request_id):
                 break
-            if turn_running is not None and await turn_running():
-                break
+            if turn_running is not None:
+                runs = await turn_running()
+                if runs is None:
+                    outcome = "unknown"
+                    break
+                if runs:
+                    break
             replace_running = True
             continue
         if outcome != "conflict":
@@ -299,7 +306,7 @@ async def _drive(
     key: RunKey,
     request: ChatRequest,
     source: Callable[[ChatRequest], AsyncGenerator[str, None]],
-    turn_running: Callable[[], Awaitable[bool]] | None = None,
+    turn_running: Callable[[], Awaitable[bool | None]] | None = None,
 ) -> None:
     username, session_id, request_id = key
     recorder: _Recorder | None = None
@@ -343,6 +350,21 @@ async def _drive(
                             "detail": (
                                 "Another answer is still running in this chat. Wait for it to "
                                 "end, or stop it, then send the message again."
+                            ),
+                            "code": TURN_RUNNING,
+                        },
+                    )
+                )
+                return
+            if outcome == "unknown":
+                run.publish(
+                    sse_event(
+                        "error",
+                        {
+                            "step": "init",
+                            "detail": (
+                                "Could not check whether an earlier answer still runs in this "
+                                "chat, so the message was not sent. Send it again shortly."
                             ),
                             "code": TURN_RUNNING,
                         },
@@ -453,7 +475,7 @@ async def stream_turn(
     username: str,
     project_id: str | None,
     source: Callable[[ChatRequest], AsyncGenerator[str, None]],
-    turn_running: Callable[[], Awaitable[bool]] | None = None,
+    turn_running: Callable[[], Awaitable[bool | None]] | None = None,
 ) -> AsyncGenerator[str, None]:
     """The turn's SSE events for one HTTP response, from the turn's own run.
 
@@ -464,8 +486,9 @@ async def stream_turn(
     turn that runs here from another project is refused, as the runtime would.
     """
     if not request.session_id or not request.request_id:
-        async for chunk in source(request):
-            yield chunk
+        async with contextlib.aclosing(source(request)) as stream:
+            async for chunk in stream:
+                yield chunk
         return
     key: RunKey = (username, request.session_id, request.request_id)
     run = _runs.get(key)

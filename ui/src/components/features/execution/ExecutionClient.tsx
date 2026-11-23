@@ -19,6 +19,7 @@ import { getApiErrorMessage } from "@/lib/utils/apiError";
 import { formatDateTime as formatDateTimeUtil } from "@/lib/utils/datetime";
 
 import { ExecutionAgentSessionNotice } from "./ExecutionAgentSessionNotice";
+import { ExecutionCalibrationNotice, ReportedOriginBadge } from "./ExecutionCalibrationContext";
 import { ExecutionDAG } from "./ExecutionDAG";
 import { ExecutionParameterChanges } from "./ExecutionParameterChanges";
 import { ExecutionRunSummary } from "./ExecutionRunSummary";
@@ -40,6 +41,7 @@ import { ExecutionDetailPageSkeleton } from "@/components/ui/Skeleton/PageSkelet
 import { TaskMessagePanel } from "@/components/ui/TaskMessagePanel";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import { useToast } from "@/components/ui/Toast";
+import { useProject } from "@/contexts/ProjectContext";
 import { useFullscreenPanel } from "@/hooks/useFullscreenPanel";
 import { useSelectStyles } from "@/hooks/useSelectStyles";
 
@@ -86,6 +88,8 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
     return parts.join(", ");
   };
 
+  // The project the execution was read from; links to its calibration session stay in it.
+  const { projectId } = useProject();
   const {
     data: executionDetailData,
     isLoading: isDetailLoading,
@@ -274,6 +278,11 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
                   <UserRound className="mr-2 text-info/70 flex-shrink-0" size={14} />
                   <span className="font-medium mr-1">User:</span>
                   <span className="truncate">{recordedUserLabel(execution)}</span>
+                  {execution.reported_origin ? (
+                    <span className="ml-2">
+                      <ReportedOriginBadge origin={execution.reported_origin} />
+                    </span>
+                  ) : null}
                 </>
               )}
             </div>
@@ -281,6 +290,11 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
           <ExecutionAgentSessionNotice
             link={execution.agent_session}
             chipId={execution.chip_id || chipId}
+          />
+          <ExecutionCalibrationNotice
+            link={execution.calibration_session}
+            origin={execution.reported_origin}
+            projectId={projectId}
           />
           <ExecutionRunSummary status={execution.status} tasks={execution.task ?? []} />
           {execution.status === "failed" && (

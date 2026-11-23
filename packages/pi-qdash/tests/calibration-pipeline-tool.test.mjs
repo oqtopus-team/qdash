@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { QDashClient, QDashConfig } from "@oqtopus-team/qdash-client";
 
 import {
   firstSentence,
@@ -9,6 +10,9 @@ import {
   problemsFromError,
   registerCalibrationPipelineTools,
 } from "../.test-dist/tools/calibration-pipeline.js";
+
+// What qdash_run_pipeline reports with every launch; never taken from the model.
+const TOOL_ORIGIN = { source: "agent_tool", tool: "qdash_run_pipeline", client: "pi-qdash" };
 
 const SPEC = {
   spec_version: 2,
@@ -174,7 +178,7 @@ test("run requires confirmation, then reports the execution", async () => {
   assert.equal(calls.length, 0);
 
   const result = await run.execute("t", { chipId: "64Qv3", spec: SPEC }, undefined, undefined, approved("t"));
-  assert.deepEqual(calls, [{ chip_id: "64Qv3", spec: SPEC }]);
+  assert.deepEqual(calls, [{ chip_id: "64Qv3", spec: SPEC, reported_origin: TOOL_ORIGIN }]);
   assert.equal(result.details.started, true);
   assert.equal(result.details.executionId, "20261006-012");
   assert.match(result.content[0].text, /execution_id 20261006-012/);
@@ -185,6 +189,50 @@ test("run requires confirmation, then reports the execution", async () => {
   assert.equal(viaUi.details.started, true);
   assert.equal(viaUi.details.data.execution_id, "20261006-012");
   assert.deepEqual(result.details.data, execution);
+});
+
+test("a run in a calibration session is recorded under a key from its tool call", async () => {
+  const calls = [];
+  const execution = {
+    execution_id: "20261006-013",
+    flow_run_id: "run-2",
+    flow_run_url: "http://prefect/run-2",
+    qdash_ui_url: "http://qdash/execution/64Qv3/20261006-013",
+    message: "Calibration pipeline 'coarse-then-coherence' started",
+    steps: STEPS,
+    targets: VALID.targets,
+    calibration_session_id: "cs-1",
+    pipeline_run_id: "cpr-1",
+    replayed: false,
+  };
+  let reply = execution;
+  const tools = registeredTools({
+    async executeCalibrationPipeline(request) { calls.push(request); return reply; },
+  });
+  const run = tools.get("qdash_run_pipeline");
+  const params = { chipId: "64Qv3", spec: SPEC, calibrationSessionId: "cs-1" };
+  const result = await run.execute("call-7", params, undefined, undefined, approved("call-7"));
+  assert.deepEqual(calls, [{ chip_id: "64Qv3", spec: SPEC, calibration_session_id: "cs-1", idempotency_key: "qdash_run_pipeline:call-7", reported_origin: TOOL_ORIGIN }]);
+  assert.equal(result.details.calibrationSessionId, "cs-1");
+  assert.equal(result.details.pipelineRunId, "cpr-1");
+  assert.match(result.content[0].text, /Recorded in calibration session cs-1 as pipeline run cpr-1/);
+
+  // A replay of the same call reuses its key and says that nothing new started.
+  reply = { ...execution, replayed: true };
+  const again = await run.execute("call-7", params, undefined, undefined, approved("call-7"));
+  assert.equal(calls[1].idempotency_key, "qdash_run_pipeline:call-7");
+  assert.equal(again.details.replayed, true);
+  assert.match(again.content[0].text, /^Already started/);
+  assert.match(again.content[0].text, /nothing new was started/);
+});
+
+test("a run whose launch outcome is unknown is reported, never retried", async () => {
+  const error = Object.assign(new Error("conflict"), { statusCode: 409, payload: { detail: "The dispatch outcome of pipeline run cpr-1 is unknown; it may be running." } });
+  const tools = registeredTools({ async executeCalibrationPipeline() { throw error; } });
+  await assert.rejects(
+    tools.get("qdash_run_pipeline").execute("c", { chipId: "64Qv3", spec: SPEC, calibrationSessionId: "cs-1" }, undefined, undefined, approved("c")),
+    /Do not start this run again; check qdash_list_executions/,
+  );
 });
 
 test("without a project every tool keeps the server's default: the run is still confirmation-gated, then dispatched", async () => {
@@ -215,7 +263,7 @@ test("without a project every tool keeps the server's default: the run is still 
   }
   await tools.get("qdash_plan_pipeline").execute("t", { spec: SPEC });
   await tools.get("qdash_get_pipeline_catalog").execute("t", {});
-  assert.deepEqual(calls, [{ chip_id: "64Qv3", spec: SPEC }, { chip_id: "64Qv3", spec: SPEC }, { chip_id: "64Qv3", spec: SPEC }, undefined]);
+  assert.deepEqual(calls, [{ chip_id: "64Qv3", spec: SPEC, reported_origin: TOOL_ORIGIN }, { chip_id: "64Qv3", spec: SPEC, reported_origin: TOOL_ORIGIN }, { chip_id: "64Qv3", spec: SPEC }, undefined]);
 });
 
 test("run turns a 422 with problems into a readable rejection and nothing else into an error", async () => {
@@ -403,3 +451,30 @@ test("catalog with taskNames lists each task's declared inputs and outputs with 
   assert.deepEqual(formatTaskParameters(tasks, []), []);
   assert.match(formatTaskParameters([{ name: "T" }], ["T"]).join("\n"), /Inputs: none\n  Outputs: none/);
 });
+
+// Use the real client here: mock api objects above intentionally test tool presentation,
+// while this contract must exercise the shared preflight and post-dispatch guard.
+for (const outdated of ["missing-route", "ignored-fields"]) {
+  test(`associated pipeline refuses an outdated API (${outdated}) without retry`, async () => {
+    const methods = [];
+    const client = new QDashClient(new QDashConfig({ baseUrl: "http://qdash.test", apiToken: "token" }), {
+      fetch: async (input, init) => {
+        const request = new Request(input, init);
+        methods.push(request.method);
+        const isGet = request.method === "GET";
+        return new Response(JSON.stringify(isGet
+          ? { calibration_session_id: "cs-1", chip_id: "64Qv3", status: "open" }
+          : { execution_id: "e1", flow_run_id: "f1" }), {
+          status: isGet && outdated === "missing-route" ? 404 : 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      },
+    });
+    const tools = registeredTools(client.api);
+    await assert.rejects(
+      tools.get("qdash_run_pipeline").execute("old", { chipId: "64Qv3", spec: SPEC, calibrationSessionId: "cs-1" }, undefined, undefined, approved("old")),
+      outdated === "ignored-fields" ? /result unknown.*Do not retry automatically/ : /404/,
+    );
+    assert.deepEqual(methods, outdated === "missing-route" ? ["GET"] : ["GET", "POST"]);
+  });
+}

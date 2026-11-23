@@ -6,9 +6,11 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { ExecutionResponseSummaryAgentSession } from './executionResponseSummaryAgentSession';
+import type { ExecutionResponseSummaryCalibrationSession } from './executionResponseSummaryCalibrationSession';
 import type { ExecutionResponseSummaryElapsedTime } from './executionResponseSummaryElapsedTime';
 import type { ExecutionResponseSummaryEndAt } from './executionResponseSummaryEndAt';
 import type { ExecutionResponseSummaryNote } from './executionResponseSummaryNote';
+import type { ExecutionResponseSummaryReportedOrigin } from './executionResponseSummaryReportedOrigin';
 import type { ExecutionResponseSummaryStartAt } from './executionResponseSummaryStartAt';
 import type { ExecutionResponseSummaryUserId } from './executionResponseSummaryUserId';
 
@@ -42,4 +44,8 @@ export interface ExecutionResponseSummary {
   note: ExecutionResponseSummaryNote;
   /** Set only when an action of an agent session dispatched this execution; a tag alone never sets it */
   agent_session?: ExecutionResponseSummaryAgentSession;
+  /** The calibration session this execution belongs to, from QDash's own records: a pipeline run recorded in it, or an action of an agent session admitted to it. Null when no record relates it, or when records disagree on the session */
+  calibration_session?: ExecutionResponseSummaryCalibrationSession;
+  /** How the caller that launched this execution's pipeline said it was started, such as an agent tool. Client reported, not verified by QDash; null when nothing was reported. The recorded user is still the one whose sign-in started it */
+  reported_origin?: ExecutionResponseSummaryReportedOrigin;
 }

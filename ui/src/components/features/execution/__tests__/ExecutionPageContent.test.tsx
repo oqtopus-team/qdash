@@ -285,6 +285,32 @@ describe("ExecutionPageContent cancel confirmation", () => {
     expect(panel.getAttribute("aria-hidden")).toBe("true");
   });
 
+  it("links the details panel to the execution's calibration session in this project", () => {
+    executionDetail = {
+      ...DEFAULT_DETAIL,
+      calibration_session: {
+        calibration_session_id: "cs-1",
+        chip_id: "chip-1",
+        objective: "Bring up qubits",
+        status: "open",
+        via: "pipeline_run",
+        pipeline_run_id: "cpr-1",
+      },
+    };
+    render(<ExecutionPageContent />);
+    fireEvent.click(screen.getByText("Running Execution"));
+    const panel = screen.getByRole("complementary", { name: "Execution details" });
+    expect(
+      within(panel).getByRole("link", { name: "Open calibration session" }).getAttribute("href"),
+    ).toBe("/calibration-sessions/cs-1?project=project-1");
+  });
+
+  it("shows no calibration notice for an ordinary execution", () => {
+    render(<ExecutionPageContent />);
+    fireEvent.click(screen.getByText("Running Execution"));
+    expect(screen.queryByTestId("execution-calibration-notice")).toBeNull();
+  });
+
   it("browses adjacent executions without closing the panel and resets its scroll", () => {
     render(<ExecutionPageContent />);
     fireEvent.click(screen.getByText("Running Execution"));

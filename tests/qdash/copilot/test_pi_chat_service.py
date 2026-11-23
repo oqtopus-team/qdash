@@ -166,6 +166,43 @@ class TestTranslate:
         assert "classification" not in ends[2]
 
     @pytest.mark.asyncio
+    async def test_tool_end_carries_only_a_created_calibration_session(self) -> None:
+        created = {"calibrationSessionId": "cs-1", "chipId": "64Qv3"}
+        tool = "qdash_create_calibration_session"
+        events = await _collect(
+            {"type": "tool_start", "name": tool, "id": "s1", "args": {"objective": "x"}},
+            {
+                "type": "tool_end",
+                "name": tool,
+                "id": "s1",
+                "isError": False,
+                "calibrationSession": {**created, "objective": "secret"},
+            },
+            # A failed create made nothing.
+            {"type": "tool_end", "name": tool, "isError": True, "calibrationSession": created},
+            # Another tool cannot claim to have created one.
+            {
+                "type": "tool_end",
+                "name": "qdash_get_calibration_session",
+                "isError": False,
+                "calibrationSession": created,
+            },
+            {
+                "type": "tool_end",
+                "name": tool,
+                "isError": False,
+                "calibrationSession": {"calibrationSessionId": "cs 1/.."},
+            },
+            {"type": "done", "text": "ok"},
+        )
+        ends = [data for name, data in events if name == "tool_end"]
+        assert ends[0]["calibration_session"] == {
+            "calibration_session_id": "cs-1",
+            "chip_id": "64Qv3",
+        }
+        assert all("calibration_session" not in end for end in ends[1:])
+
+    @pytest.mark.asyncio
     async def test_tool_end_carries_a_workspace_tools_answer(self) -> None:
         events = await _collect(
             {"type": "tool_start", "name": "bash", "id": "c9"},
@@ -1222,11 +1259,17 @@ async def test_a_refused_steer_status_raises(
         ),
         (200, {"running": True, "other_project": True}, {"running": True, "other_project": True}),
         (200, {"running": False}, {"running": False}),
-        # Malformed or failed answers report nothing running; the chat asks again later.
-        (200, {"running": True}, {"running": False}),
-        (200, ValueError("not json"), {"running": False}),
-        (401, {"error": "unauthorized"}, {"running": False}),
-        (500, {"error": "internal"}, {"running": False}),
+        # Malformed or failed answers say nothing of the turn: unavailable, never ended.
+        (200, {"running": True}, {"running": False, "unavailable": True}),
+        (200, {"running": True, "request_id": ""}, {"running": False, "unavailable": True}),
+        (200, {"running": "no"}, {"running": False, "unavailable": True}),
+        (200, {}, {"running": False, "unavailable": True}),
+        (200, ["running"], {"running": False, "unavailable": True}),
+        (200, None, {"running": False, "unavailable": True}),
+        (200, ValueError("not json"), {"running": False, "unavailable": True}),
+        (401, {"error": "unauthorized"}, {"running": False, "unavailable": True}),
+        (500, {"error": "internal"}, {"running": False, "unavailable": True}),
+        (503, {"running": False}, {"running": False, "unavailable": True}),
     ],
 )
 async def test_the_running_turn_is_read_for_the_user_and_project(
@@ -1254,18 +1297,29 @@ async def test_the_running_turn_is_read_for_the_user_and_project(
 
 
 @pytest.mark.asyncio
-async def test_an_unreachable_runtime_reports_no_running_turn(
-    monkeypatch: pytest.MonkeyPatch,
+@pytest.mark.parametrize(
+    "error",
+    ["connect", "timeout", "read", "runtime"],
+)
+async def test_an_unreachable_runtime_reports_the_turn_unavailable(
+    monkeypatch: pytest.MonkeyPatch, error: str
 ) -> None:
     import httpx
 
     from qdash.api.services import pi_chat_service
 
+    errors: dict[str, Exception] = {
+        "connect": httpx.ConnectError("down"),
+        "timeout": httpx.ReadTimeout("slow"),
+        "read": httpx.RemoteProtocolError("cut"),
+        "runtime": RuntimeError("event loop closed"),
+    }
     monkeypatch.setenv("AGENT_RUNTIME_TOKEN", "runtime-token")
-    _failing_runtime(monkeypatch, httpx.ConnectError("down"))
+    _failing_runtime(monkeypatch, errors[error])
+    # An outage is never the runtime's answer that nothing runs.
     assert await pi_chat_service.active_runtime_turn(
         "alice", "s1", auth=pi_chat_service.QDashAuth("t", "p1")
-    ) == {"running": False}
+    ) == {"running": False, "unavailable": True}
 
 
 def _failing_runtime(monkeypatch: pytest.MonkeyPatch, error: Exception) -> None:

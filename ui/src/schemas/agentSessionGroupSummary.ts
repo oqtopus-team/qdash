@@ -7,6 +7,7 @@
  */
 import type { AgentSessionGroupCounts } from './agentSessionGroupCounts';
 import type { AgentSessionGroupSummaryActiveInterventionId } from './agentSessionGroupSummaryActiveInterventionId';
+import type { AgentSessionGroupSummaryCalibrationSession } from './agentSessionGroupSummaryCalibrationSession';
 import type { AgentSessionGroupSummaryModel } from './agentSessionGroupSummaryModel';
 import type { AgentSessionStatus } from './agentSessionStatus';
 
@@ -38,6 +39,8 @@ export interface AgentSessionGroupSummary {
   model?: AgentSessionGroupSummaryModel;
   /** provider/model_id of model; empty when none was reported */
   model_name?: string;
+  /** The calibration session the session was admitted to, when it was created in one; null for a session created alone, or one not admitted */
+  calibration_session?: AgentSessionGroupSummaryCalibrationSession;
   counts: AgentSessionGroupCounts;
   /** The session's latest measurement start, or its creation before the first */
   latest_activity_at: string;

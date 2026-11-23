@@ -84,6 +84,11 @@ describe("the chat's status", () => {
         messages: [assistant({ ...blocks("text"), stopped: true })],
       })?.kind,
     ).toBe("stopped");
+    expect(
+      chatStatus({
+        messages: [assistant({ ...blocks("text"), interrupted: true })],
+      }),
+    ).toMatchObject({ kind: "interrupted", label: "Interrupted" });
     expect(chatStatus({ messages: [assistant("Error: down")] })?.kind).toBe("failed");
     expect(chatStatus({ messages: [{ role: "user", content: "hi" }] })).toBeNull();
   });

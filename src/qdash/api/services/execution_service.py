@@ -36,6 +36,11 @@ from qdash.api.services.agent_execution_links import (
     resolve_chip_links,
     summary_link,
 )
+from qdash.api.services.calibration_session_links import (
+    NO_RELATIONS,
+    ExecutionRelations,
+    resolve_execution_relations,
+)
 from qdash.common.utils.datetime import now, parse_elapsed_time
 from qdash.datamodel.execution import ExecutionStatusModel
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
@@ -203,8 +208,10 @@ def by_index_ids(by_index: dict[int, ExecutionHistoryDocument]) -> set[str]:
 def execution_summary(
     execution: ExecutionHistoryDocument,
     agent_session: ExecutionAgentSessionLink | None = None,
+    relations: ExecutionRelations = NO_RELATIONS,
 ) -> ExecutionResponseSummary:
-    """The list row of one execution, with its verified agent session link if any."""
+    """The list row of one execution, with its verified agent session link if any, and its
+    calibration session and reported origin as ``resolve_execution_relations`` found them."""
     return ExecutionResponseSummary(
         name=f"{execution.name}-{execution.execution_id}",
         execution_id=execution.execution_id,
@@ -218,6 +225,8 @@ def execution_summary(
         tags=execution.tags,
         note=execution.note,
         agent_session=agent_session,
+        calibration_session=relations.calibration_session,
+        reported_origin=relations.reported_origin,
     )
 
 
@@ -347,8 +356,15 @@ class ExecutionService:
             return []
         # One chip-wide resolution, shared with the grouped list, instead of a lookup per row.
         links = resolve_chip_links(project_id, chip_id)
+        agent_links = {e.execution_id: summary_link(links, e.execution_id) for e in executions}
+        # Calibration sessions and reported origins of the whole page, in batched reads.
+        relations = resolve_execution_relations(project_id, executions, agent_links)
         return [
-            execution_summary(execution, summary_link(links, execution.execution_id))
+            execution_summary(
+                execution,
+                agent_links[execution.execution_id],
+                relations.get(execution.execution_id, NO_RELATIONS),
+            )
             for execution in executions
         ]
 
@@ -400,6 +416,10 @@ class ExecutionService:
         # Fetch tasks directly from task_result_history collection
         tasks = self._fetch_tasks_for_execution(project_id, execution.execution_id)
 
+        agent_session = link_for_execution(project_id, execution)
+        relations = resolve_execution_relations(
+            project_id, [execution], {execution.execution_id: agent_session}
+        ).get(execution.execution_id, NO_RELATIONS)
         return ExecutionResponseDetail(
             name=f"{execution.name}-{execution.execution_id}",
             status=execution.status,
@@ -415,8 +435,24 @@ class ExecutionService:
             tags=execution.tags,
             chip_id=execution.chip_id,
             pipeline=self._pipeline_progress(project_id, execution),
-            agent_session=link_for_execution(project_id, execution),
+            agent_session=agent_session,
+            calibration_session=relations.calibration_session,
+            reported_origin=relations.reported_origin,
         )
+
+    def pipeline_progress_of(
+        self, project_id: str, executions: list[ExecutionHistoryDocument]
+    ) -> PipelineProgress | None:
+        """The pipeline run these executions of one flow run are steps of, or None.
+
+        The first execution that carries the plan (``note.pipeline``) is read; the scheduled
+        row QDash pre-creates carries none until the flow adopts it.
+        """
+        for execution in executions:
+            progress = self._pipeline_progress(project_id, execution)
+            if progress is not None:
+                return progress
+        return None
 
     def _pipeline_progress(
         self, project_id: str, execution: ExecutionHistoryDocument

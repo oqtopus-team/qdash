@@ -7,6 +7,8 @@
  */
 import type { AgentSessionPolicy } from './agentSessionPolicy';
 import type { AgentSessionResponseActiveInterventionId } from './agentSessionResponseActiveInterventionId';
+import type { AgentSessionResponseCalibrationAdmission } from './agentSessionResponseCalibrationAdmission';
+import type { AgentSessionResponseCalibrationSessionId } from './agentSessionResponseCalibrationSessionId';
 import type { AgentSessionResponseEndNotification } from './agentSessionResponseEndNotification';
 import type { AgentSessionResponseModel } from './agentSessionResponseModel';
 import type { AgentSessionResponseStartNotification } from './agentSessionResponseStartNotification';
@@ -43,4 +45,8 @@ export interface AgentSessionResponse {
   end_notification?: AgentSessionResponseEndNotification;
   /** Who stopped the session with a stop request, why, and when; null unless a stop request ended it (an expert's stop answer is recorded on its intervention) */
   stop?: AgentSessionResponseStop;
+  /** The calibration session it was created in; null when it was created alone */
+  calibration_session_id?: AgentSessionResponseCalibrationSessionId;
+  /** Admission in its calibration session: pending (written, start not finalized; every operation is refused), admitted (operates under its policy), or rejected (the calibration session was closed first; cancelled, never operates). Null for a session created alone, which is never checked */
+  calibration_admission?: AgentSessionResponseCalibrationAdmission;
 }

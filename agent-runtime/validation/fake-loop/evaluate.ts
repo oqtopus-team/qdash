@@ -48,6 +48,25 @@ export interface HumanResponseEvidence {
   sessionStatusAfter: string;
 }
 
+/** The manual pipeline the harness started through the API before the prompt. */
+export interface BaselineEvidence {
+  flowRunId: string;
+  /** How its root execution ended, as the harness waited for it. */
+  status: string;
+  /** Its executions as the chip's Execution list returns them, and as the detail does. */
+  listRows: Json[];
+  details: Json[];
+}
+
+/** Calibration session records of a purpose-level scenario. */
+export interface CalibrationEvidence {
+  /** Detail of every calibration session the caller created on the chip during the scenario. */
+  sessions: Json[];
+  /** `GET /executions/{id}` of every step execution of their runs and every chip execution. */
+  executionDetails: Record<string, Json>;
+  baseline?: BaselineEvidence;
+}
+
 export interface ScenarioEvidence {
   scenario: Scenario;
   target: ScenarioTarget;
@@ -69,6 +88,7 @@ export interface ScenarioEvidence {
   storedT1?: number;
   fault?: FaultEvidence;
   human?: HumanResponseEvidence;
+  calibration?: CalibrationEvidence;
 }
 
 export interface ScenarioVerdict {
@@ -323,12 +343,13 @@ export function evaluateScenario(evidence: ScenarioEvidence): ScenarioVerdict {
     add(`measured:${task}`, "server", `${task} measured to completion`, done ? "completed" : tried ? "measured, never completed" : "not measured", done);
   }
 
-  // Every execution on the chip during the scenario belongs to one of its sessions.
-  const unlinked = evidence.chipExecutions.filter((execution) => {
+  // Every execution on the chip during the scenario belongs to one of its sessions; in a
+  // calibration scenario, to one of its recorded pipeline runs instead (judged below).
+  const unlinked = expect.calibration ? [] : evidence.chipExecutions.filter((execution) => {
     const link = (execution.agent_session ?? null) as Json | null;
     return !(link && link.linked === true && sessionIds.has(str(link.session_id)));
   });
-  add(
+  if (!expect.calibration) add(
     "no_unlinked_executions",
     "server",
     "no execution on the chip outside the scenario's sessions",
@@ -392,6 +413,7 @@ export function evaluateScenario(evidence: ScenarioEvidence): ScenarioVerdict {
   }
 
   if (scenario.fault) evaluateFault(evidence, records, expectedFailure, add);
+  if (expect.calibration) evaluateCalibration(evidence, runs, add);
 
   // Reported interpretation: kept, never gating.
   const answer = runs.at(-1)?.finalText ?? "";
@@ -512,5 +534,177 @@ function evaluateFault(evidence: ScenarioEvidence, records: MeasurementRecords[]
     "each measurement after the failure is a repeat of the failed action",
     others.length === 0 ? "no repeat" : uncited.length === 0 ? "all cite it" : `${uncited.length} without repeat_of_action_id`,
     uncited.length === 0,
+  );
+}
+
+const sameOrigin = (value: unknown, expected: { source: string; tool: string; client: string }): boolean => {
+  const origin = value as Json | null | undefined;
+  return !!origin && origin.source === expected.source && origin.tool === expected.tool && (origin.client ?? "") === expected.client;
+};
+
+const originText = (value: unknown): string => {
+  const origin = value as Json | null | undefined;
+  return origin ? `${str(origin.source)}/${str(origin.tool)}/${str(origin.client)}` : "none";
+};
+
+/** The step executions of a recorded pipeline run: its listed executions and its steps'. */
+function runExecutionIds(run: Json): string[] {
+  const ids = new Set<string>();
+  for (const execution of (Array.isArray(run.executions) ? run.executions : []) as Json[]) if (str(execution.execution_id)) ids.add(str(execution.execution_id));
+  const steps = ((run.pipeline as Json | null | undefined)?.steps ?? []) as Json[];
+  for (const step of Array.isArray(steps) ? steps : []) if (str(step.execution_id)) ids.add(str(step.execution_id));
+  return [...ids];
+}
+
+/**
+ * A purpose-level scenario: the calibration session the model created, the pipeline it ran in
+ * it, every step execution's link back to the session with the tool's reported origin and no
+ * agent attribution, the model reading the session back, and the manual baseline staying
+ * unassociated. The model's account of the provenance is reported, never gating.
+ */
+function evaluateCalibration(evidence: ScenarioEvidence, runs: RunTranscript[], add: Add): void {
+  const expected = evidence.scenario.expect.calibration;
+  if (!expected) return;
+  const { target, username } = evidence;
+  const records = evidence.calibration ?? { sessions: [], executionDetails: {} };
+  const sessions = records.sessions;
+  add(
+    "calibration_session_count",
+    "server",
+    `${expected.sessions.min}..${expected.sessions.max} calibration session(s)`,
+    `${sessions.length}`,
+    sessions.length >= expected.sessions.min && sessions.length <= expected.sessions.max,
+  );
+  for (const session of sessions) {
+    add(
+      `calibration_session_scope:${str(session.calibration_session_id)}`,
+      "server",
+      `on chip ${target.chipId}, created by ${username}, with an objective`,
+      `chip ${str(session.chip_id)}, created by ${str(session.created_by)}, objective ${str(session.objective) ? "set" : "empty"}`,
+      session.chip_id === target.chipId && session.created_by === username && str(session.objective).trim() !== "",
+    );
+  }
+  const pipelineRuns = sessions.flatMap((session) => ((Array.isArray(session.pipeline_runs) ? session.pipeline_runs : []) as Json[]).map((run) => ({ session, run })));
+  add(
+    "pipeline_run_count",
+    "server",
+    `${expected.pipelineRuns.min}..${expected.pipelineRuns.max} pipeline run(s) recorded in them`,
+    `${pipelineRuns.length}`,
+    pipelineRuns.length >= expected.pipelineRuns.min && pipelineRuns.length <= expected.pipelineRuns.max,
+  );
+
+  const sessionIds = new Set(sessions.map((session) => str(session.calibration_session_id)));
+  const memberIds = new Set<string>();
+  for (const { session, run } of pipelineRuns) {
+    const runId = str(run.run_id);
+    const sessionId = str(session.calibration_session_id);
+    add(
+      `pipeline_run_dispatched:${runId}`,
+      "server",
+      "dispatched, requested by the signed-in user, and completed as a whole",
+      `${str(run.dispatch_status)}, requested by ${str(run.requested_by)}, run ${str((run.pipeline as Json | null | undefined)?.status) || "no progress"}`,
+      run.dispatch_status === "dispatched" && run.requested_by === username && lower((run.pipeline as Json | null | undefined)?.status) === "completed",
+    );
+    add(
+      `pipeline_run_reported_origin:${runId}`,
+      "server",
+      `reported origin ${originText(expected.reportedOrigin)} (client reported)`,
+      originText(run.reported_origin),
+      sameOrigin(run.reported_origin, expected.reportedOrigin),
+    );
+    const ids = runExecutionIds(run);
+    add(`pipeline_run_steps:${runId}`, "server", "at least one step execution listed in the session", `${ids.length}`, ids.length > 0);
+    for (const id of ids) {
+      memberIds.add(id);
+      const detail = records.executionDetails[id];
+      const row = evidence.chipExecutions.find((execution) => execution.execution_id === id);
+      const problems: string[] = [];
+      for (const [label, view] of [["detail", detail], ["list", row]] as const) {
+        if (!view) {
+          problems.push(`no ${label} record`);
+          continue;
+        }
+        const link = (view.calibration_session ?? null) as Json | null;
+        if (!link) problems.push(`${label}: no calibration session`);
+        else {
+          if (str(link.calibration_session_id) !== sessionId) problems.push(`${label}: session ${str(link.calibration_session_id)}`);
+          if (link.via !== "pipeline_run" || str(link.pipeline_run_id) !== runId) problems.push(`${label}: via ${str(link.via)} ${str(link.pipeline_run_id)}`);
+        }
+        if (!sameOrigin(view.reported_origin, expected.reportedOrigin)) problems.push(`${label}: origin ${originText(view.reported_origin)}`);
+        const agent = (view.agent_session ?? null) as Json | null;
+        if (agent && agent.linked === true) problems.push(`${label}: attributed to agent session ${str(agent.session_id)}`);
+        if (str(view.username) && view.username !== username) problems.push(`${label}: user ${str(view.username)}`);
+      }
+      if (detail) {
+        const tasks = (Array.isArray(detail.task) ? detail.task : []) as Json[];
+        const off = tasks.filter((task) => !expected.pipelineTasks.includes(str(task.name)) || (str(task.qid) && str(task.qid) !== target.qid));
+        if (off.length > 0) problems.push(`tasks out of scope: ${off.map((task) => `${str(task.name)}@${str(task.qid)}`).join(", ")}`);
+        if (lower(detail.status) !== "completed") problems.push(`execution ${str(detail.status) || "no status"}`);
+      }
+      add(
+        `pipeline_step_linked:${id}`,
+        "server",
+        "list row and detail both link to the run's calibration session via pipeline_run, carry the tool's reported origin, show no agent session, keep the signed-in user, and ran only the planned task on the qubit",
+        problems.length === 0 ? "linked" : problems.join("; "),
+        problems.length === 0,
+      );
+    }
+  }
+
+  // Every execution on the chip during the scenario is a step of a recorded run.
+  const stray = evidence.chipExecutions.filter((execution) => !memberIds.has(str(execution.execution_id)));
+  add(
+    "chip_executions_accounted",
+    "server",
+    "every execution on the chip during the scenario is a step of a pipeline run recorded in its calibration session",
+    stray.length === 0 ? `${evidence.chipExecutions.length} execution(s), all recorded` : `outside: ${stray.map((execution) => str(execution.execution_id)).join(", ")}`,
+    stray.length === 0,
+  );
+
+  // The model read the session back after the run was started, as the user asked.
+  const calls = runs.flatMap((run) => run.toolCalls);
+  const started = calls.findIndex((call) => call.toolName === "qdash_run_pipeline" && call.outcome === "ok");
+  const readBack = calls.some(
+    (call, index) => index > started && started >= 0 && call.toolName === "qdash_get_calibration_session" && call.outcome === "ok" && sessionIds.has(str((call.args as Json | undefined)?.calibrationSessionId)),
+  );
+  if (expected.readBack) {
+    add("calibration_session_read_back", "harness", "the session was read with qdash_get_calibration_session after the pipeline started", readBack ? "read back" : "not read back", readBack);
+  }
+  const executionReads = calls.filter((call, index) => index > started && started >= 0 && call.toolName === "qdash_get_execution" && call.outcome === "ok").length;
+  add("execution_reads", "harness", "informational", `${executionReads} qdash_get_execution call(s) after the run started`, true, false);
+
+  // The manual baseline, started by the harness through the API without a session or origin.
+  const baseline = records.baseline;
+  add("baseline_completed", "harness", "the manual baseline pipeline ran to completion before the prompt", baseline ? baseline.status : "not run", baseline?.status === "completed");
+  if (baseline) {
+    const views = [...baseline.listRows.map((row) => ["list", row] as const), ...baseline.details.map((detail) => ["detail", detail] as const)];
+    const attached = views.filter(([, view]) => view.calibration_session != null || view.reported_origin != null || ((view.agent_session ?? null) as Json | null)?.linked === true);
+    add(
+      "baseline_unassociated",
+      "server",
+      "every list row and detail of the manual pipeline has no calibration session, no reported origin, and no agent session",
+      views.length === 0 ? "no record of it" : attached.length === 0 ? `${views.length} record(s), all unassociated` : attached.map(([label, view]) => `${label} ${str(view.execution_id)}`).join(", "),
+      baseline.listRows.length > 0 && baseline.details.length > 0 && attached.length === 0,
+    );
+  }
+
+  // The model's account: kept, never gating.
+  const answer = runs.at(-1)?.finalText ?? "";
+  const stepIds = [...memberIds];
+  add(
+    "reported_executions_named",
+    "reported",
+    "the answer names every step execution of the run",
+    stepIds.length === 0 ? "no step executions" : stepIds.every((id) => answer.includes(id)) ? "all named" : `missing ${stepIds.filter((id) => !answer.includes(id)).join(", ")}`,
+    stepIds.length > 0 && stepIds.every((id) => answer.includes(id)),
+  );
+  const saysPipeline = /pipeline/i.test(answer) && /(qdash_run_pipeline|agent tool|your tool|my tool|launched|reported)/i.test(answer);
+  const claimsAgentSession = /(run|ran|dispatched|started|executed) by (an |the )?agent session/i.test(answer) && !/not (run|ran|dispatched|started|executed) by (an |the )?agent session/i.test(answer);
+  add(
+    "reported_provenance",
+    "reported",
+    "the answer says the pipeline was launched by its tool and not by an agent session",
+    saysPipeline && !claimsAgentSession ? "pipeline launched by the tool" : claimsAgentSession ? "claims an agent session ran it" : "provenance not stated",
+    saysPipeline && !claimsAgentSession,
   );
 }

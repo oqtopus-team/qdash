@@ -26,7 +26,9 @@ import { ChatLinkPreviewProvider } from "@/components/features/chat/ChatLinkPrev
 import { ChatNotice, ChatPendingSteers } from "@/components/features/chat/ChatPendingSteers";
 import { DetachedTurnRow } from "@/components/features/chat/ChatTurnStatus";
 import { ChatAgentSessionStatus } from "@/components/features/chat/ChatAgentSessionStatus";
+import { ChatCalibrationSessions } from "@/components/features/chat/ChatCalibrationSessions";
 import { linkedAgentSessions } from "@/lib/chatAgentSession";
+import { linkedCalibrationSessions } from "@/lib/chatCalibrationSession";
 import { QdashBotAvatar } from "@/components/ui/UserAvatar";
 import {
   AssistantMessage,
@@ -244,10 +246,15 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
     [context, generalSuggestions, pageSuggestions],
   );
   const isEmpty = messages.length === 0 && !liveTurn && !detachedTurn && steers.length === 0;
-  // The calibration session this chat's own tool calls last acted on, if any.
+  // The agent session this chat's own tool calls last acted on, if any.
   const liveSteps = liveTurn?.steps;
   const agentSessionId = useMemo(
     () => linkedAgentSessions(messages, liveSteps).slice(-1)[0] ?? null,
+    [messages, liveSteps],
+  );
+  // The calibration sessions (objectives) this chat's tool calls named, oldest first.
+  const calibrationSessionIds = useMemo(
+    () => linkedCalibrationSessions(messages, liveSteps),
     [messages, liveSteps],
   );
   const chatTurn = isStreaming ? "live" : detachedTurn ? "detached" : "none";
@@ -432,6 +439,11 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
 
         <div className={`shrink-0 ${pad} pb-3`}>
           <div className={variant === "page" ? "max-w-3xl mx-auto" : ""}>
+            {calibrationSessionIds.length > 0 && (
+              <div className="mb-2">
+                <ChatCalibrationSessions calibrationSessionIds={calibrationSessionIds} />
+              </div>
+            )}
             {agentSessionId && (
               <div className="mb-2">
                 <ChatAgentSessionStatus
@@ -441,7 +453,7 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
                   onContinue={
                     isLoadingMessages
                       ? undefined
-                      : () => submit(`Continue calibration session ${agentSessionId}.`)
+                      : () => submit(`Continue agent session ${agentSessionId}.`)
                   }
                 />
               </div>

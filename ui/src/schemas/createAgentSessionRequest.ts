@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { AgentSessionPolicy } from './agentSessionPolicy';
+import type { CreateAgentSessionRequestCalibrationSessionId } from './createAgentSessionRequestCalibrationSessionId';
 import type { CreateAgentSessionRequestModel } from './createAgentSessionRequestModel';
 
 /**
@@ -31,4 +32,6 @@ export interface CreateAgentSessionRequest {
   skill_hash?: string;
   /** The provider and model the client host reports it ran the agent with, read from the host's own runtime, never from the agent's tool arguments. Recorded as reported; QDash does not verify it, and it changes no scope or approval. Omitted when the host does not know it. */
   model?: CreateAgentSessionRequestModel;
+  /** Create the session in this calibration session, which must be open, on the same chip, and created by the signed-in user. It groups the session with the objective's other work and grants nothing beyond the policy. */
+  calibration_session_id?: CreateAgentSessionRequestCalibrationSessionId;
 }

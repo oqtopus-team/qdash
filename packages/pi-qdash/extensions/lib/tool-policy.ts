@@ -22,6 +22,7 @@
  * user's approval; none may run from a script, where no approval exists.
  */
 export const REVIEWED_WRITE_TOOL_NAMES = [
+  "qdash_create_calibration_session",
   "qdash_create_agent_session",
   "qdash_submit_agent_action",
   "qdash_end_agent_session",
@@ -98,6 +99,7 @@ export const NESTED_READ_TOOL_NAMES = [
   "qdash_get_agent_session",
   "qdash_get_agent_session_audit",
   "qdash_get_agent_session_context",
+  "qdash_get_calibration_session",
   "qdash_get_chip_metrics",
   "qdash_get_cooldown_wiring",
   "qdash_get_default_chip",
@@ -114,6 +116,7 @@ export const NESTED_READ_TOOL_NAMES = [
   "qdash_list_agent_actions",
   "qdash_list_agent_interventions",
   "qdash_list_agent_sessions",
+  "qdash_list_calibration_sessions",
   "qdash_list_chip_couplings",
   "qdash_list_chip_qubits",
   "qdash_list_chips",
@@ -178,6 +181,10 @@ export const DEFERRED_TOOL_NAMES = [
   "qdash_degradation_report",
   "qdash_plan_calibration",
   "qdash_validate_calibration",
+  // Calibration sessions: one objective and the runs started for it.
+  "qdash_create_calibration_session",
+  "qdash_get_calibration_session",
+  "qdash_list_calibration_sessions",
   // Scoped agent workflow state and actions.
   "qdash_create_agent_session",
   "qdash_get_agent_session",

@@ -55,6 +55,24 @@ class CopilotChatBranchSchema(BaseModel):
     source_entry_id: str = Field(..., description="The answer it was branched at")
 
 
+class CopilotChatTurnSchema(BaseModel):
+    """The latest turn the server records for a chat, as a reloaded page needs it.
+
+    A page that reattaches to a turn, or follows one another window started, finds
+    the turn's messages by ``request_id`` (each carries it as ``turn_request_id``)
+    and uses ``status`` to tell a running turn from one whose end is saved.
+    """
+
+    request_id: str = Field(..., description="The turn's request ID")
+    project_id: str | None = Field(default=None, description="The project it was sent from")
+    status: Literal["running", "completed", "failed", "stopped", "noop"] = Field(
+        ..., description="Whether the turn still runs, or how it ended"
+    )
+    start_index: int = Field(..., description="How many messages precede the turn")
+    continuing: bool = Field(default=False, description="A continue: no user message")
+    started_at: datetime | None = Field(default=None)
+
+
 class CopilotChatSessionResponse(BaseModel):
     """Full session payload returned to the client."""
 
@@ -63,6 +81,9 @@ class CopilotChatSessionResponse(BaseModel):
     context: dict[str, Any] | None = None
     messages: list[CopilotChatMessageSchema] = Field(default_factory=list)
     branch: CopilotChatBranchSchema | None = None
+    turn: CopilotChatTurnSchema | None = Field(
+        default=None, description="The latest turn the server records for the chat"
+    )
     created_at: datetime
     updated_at: datetime
 

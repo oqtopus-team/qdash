@@ -31,6 +31,7 @@ from qdash.datamodel.agent_session import (
     AgentSessionStatus,
     AgentSessionStopRecord,
 )
+from qdash.datamodel.calibration_session import CalibrationAdmission  # noqa: TC001
 from qdash.datamodel.quality_metrics import RECORDED_QUALITY_METRICS
 
 MODEL_FIELD_DESCRIPTION = (
@@ -63,6 +64,16 @@ class CreateAgentSessionRequest(BaseModel):
     skill_version: str = Field(default="", max_length=200)
     skill_hash: str = Field(default="", max_length=256)
     model: AgentModelIdentity | None = _model_field()
+    calibration_session_id: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=200,
+        description=(
+            "Create the session in this calibration session, which must be open, on the same "
+            "chip, and created by the signed-in user. It groups the session with the "
+            "objective's other work and grants nothing beyond the policy."
+        ),
+    )
 
     @model_validator(mode="after")
     def validate_new_quality_gates(self) -> CreateAgentSessionRequest:
@@ -154,6 +165,19 @@ class AgentSessionResponse(BaseModel):
         description=(
             "Who stopped the session with a stop request, why, and when; null unless a stop "
             "request ended it (an expert's stop answer is recorded on its intervention)"
+        ),
+    )
+    calibration_session_id: str | None = Field(
+        default=None,
+        description="The calibration session it was created in; null when it was created alone",
+    )
+    calibration_admission: CalibrationAdmission | None = Field(
+        default=None,
+        description=(
+            "Admission in its calibration session: pending (written, start not finalized; "
+            "every operation is refused), admitted (operates under its policy), or rejected "
+            "(the calibration session was closed first; cancelled, never operates). Null for "
+            "a session created alone, which is never checked"
         ),
     )
 

@@ -10,6 +10,7 @@ import {
   ChevronRight,
   ExternalLink,
   StopCircle,
+  Target,
   UserRound,
   X,
 } from "lucide-react";
@@ -27,6 +28,8 @@ import {
   ExecutionActivityChart,
 } from "./ExecutionActivityChart";
 import { ExecutionAgentSessionNotice } from "./ExecutionAgentSessionNotice";
+import { ExecutionCalibrationNotice } from "./ExecutionCalibrationContext";
+import { calibrationSessionsHref } from "@/lib/chatCalibrationSession";
 import {
   ExecutionListCard,
   formatActorLabel,
@@ -399,7 +402,19 @@ export function ExecutionPageContent() {
 
   return (
     <PageContainer>
-      <PageHeader title="Execution" description="Workflow runs and their task results" />
+      <PageHeader
+        title="Execution"
+        description="Workflow runs and their task results"
+        actions={
+          <Link
+            href={calibrationSessionsHref({ chipId: selectedChip || null, projectId })}
+            className="btn btn-ghost btn-sm"
+          >
+            <Target data-icon="inline-start" aria-hidden="true" />
+            Calibration sessions
+          </Link>
+        }
+      />
       <PageFiltersBar className="mb-4 sm:mb-6">
         <PageFiltersBar.Group>
           <PageFiltersBar.Item className="sm:w-64">
@@ -568,6 +583,12 @@ export function ExecutionPageContent() {
               <ExecutionAgentSessionNotice
                 link={executionDetailData?.data?.agent_session}
                 chipId={executionDetailData?.data?.chip_id || selectedChip || ""}
+                className="mt-3"
+              />
+              <ExecutionCalibrationNotice
+                link={executionDetailData?.data?.calibration_session}
+                origin={executionDetailData?.data?.reported_origin}
+                projectId={projectId}
                 className="mt-3"
               />
               {executionDetailData?.data && (

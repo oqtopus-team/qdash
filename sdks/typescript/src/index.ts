@@ -17,7 +17,7 @@
 export { QDash } from "./session.js";
 export type { QDashFactoryOptions, QDashSessionOptions } from "./session.js";
 export { CalibrationRun, Chip, PipelineRun, Pipelines } from "./pipelines.js";
-export type { PipelineSpecInput, PipelineTarget } from "./pipelines.js";
+export type { PipelineLaunchOptions, PipelineRecording, PipelineSpecInput, PipelineTarget } from "./pipelines.js";
 export { Workflow, WorkflowRun, Workflows } from "./workflows.js";
 export type { WorkflowRunOptions } from "./workflows.js";
 export {
