@@ -215,6 +215,7 @@ describe("Chip calibration", () => {
 
   it("records a run in a calibration session under its retry key", async () => {
     const { fetch, requests } = server({
+      "GET /calibration-sessions/cs-1": [{ body: { calibration_session_id: "cs-1", chip_id: "64Qv3", status: "open" } }],
       "POST /calibration-pipelines/execute": [{ body: { ...dispatched, calibration_session_id: "cs-1", pipeline_run_id: "cpr-1", replayed: false } }],
     });
     const qdash = new QDash(client(fetch, "p1"));
@@ -222,6 +223,7 @@ describe("Chip calibration", () => {
 
     expect(run.response.pipeline_run_id).toBe("cpr-1");
     expect(requests).toEqual([
+      { method: "GET", path: "/calibration-sessions/cs-1", body: undefined, project: "p1" },
       {
         method: "POST",
         path: "/calibration-pipelines/execute",

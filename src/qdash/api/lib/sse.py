@@ -4,7 +4,33 @@ from __future__ import annotations
 
 import json
 import math
-from typing import Any
+from collections.abc import AsyncGenerator
+from typing import TYPE_CHECKING, Any
+
+import anyio
+from starlette.responses import StreamingResponse
+
+if TYPE_CHECKING:
+    from starlette.types import Receive, Scope, Send
+
+
+class ClosingStreamingResponse(StreamingResponse):
+    """Close the response's async generator when sending ends or disconnects.
+
+    Starlette's ASGI 2.4 send-error path does not close its body iterator. A chat
+    subscriber must release its queue without waiting for garbage collection of
+    the response or its exception traceback. Closing that subscriber does not
+    cancel the independent task that owns the chat turn.
+    """
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        """Finish generator cleanup even when the request's cancel scope is cancelled."""
+        try:
+            await super().__call__(scope, receive, send)
+        finally:
+            if isinstance(self.body_iterator, AsyncGenerator):
+                with anyio.CancelScope(shield=True):
+                    await self.body_iterator.aclose()
 
 
 def _sanitize_for_json(obj: Any) -> Any:

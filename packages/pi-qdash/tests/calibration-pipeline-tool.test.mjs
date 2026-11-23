@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { QDashClient, QDashConfig } from "@oqtopus-team/qdash-client";
 
 import {
   firstSentence,
@@ -450,3 +451,30 @@ test("catalog with taskNames lists each task's declared inputs and outputs with 
   assert.deepEqual(formatTaskParameters(tasks, []), []);
   assert.match(formatTaskParameters([{ name: "T" }], ["T"]).join("\n"), /Inputs: none\n  Outputs: none/);
 });
+
+// Use the real client here: mock api objects above intentionally test tool presentation,
+// while this contract must exercise the shared preflight and post-dispatch guard.
+for (const outdated of ["missing-route", "ignored-fields"]) {
+  test(`associated pipeline refuses an outdated API (${outdated}) without retry`, async () => {
+    const methods = [];
+    const client = new QDashClient(new QDashConfig({ baseUrl: "http://qdash.test", apiToken: "token" }), {
+      fetch: async (input, init) => {
+        const request = new Request(input, init);
+        methods.push(request.method);
+        const isGet = request.method === "GET";
+        return new Response(JSON.stringify(isGet
+          ? { calibration_session_id: "cs-1", chip_id: "64Qv3", status: "open" }
+          : { execution_id: "e1", flow_run_id: "f1" }), {
+          status: isGet && outdated === "missing-route" ? 404 : 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      },
+    });
+    const tools = registeredTools(client.api);
+    await assert.rejects(
+      tools.get("qdash_run_pipeline").execute("old", { chipId: "64Qv3", spec: SPEC, calibrationSessionId: "cs-1" }, undefined, undefined, approved("old")),
+      outdated === "ignored-fields" ? /result unknown.*Do not retry automatically/ : /404/,
+    );
+    assert.deepEqual(methods, outdated === "missing-route" ? ["GET"] : ["GET", "POST"]);
+  });
+}

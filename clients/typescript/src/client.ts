@@ -423,7 +423,7 @@ export class QDashClient {
     this.config = config;
     this.options = options;
     this.transport = new QDashTransport(config, options);
-    this.api = this.bindGeneratedApi(getQDashAPI());
+    this.api = this.guardAssociatedWrites(this.bindGeneratedApi(getQDashAPI()));
   }
 
   static fromEnv(
@@ -907,7 +907,7 @@ export class QDashClient {
   }
 
   async createAgentSession(options: CreateAgentSessionOptions): Promise<AgentSessionResponse> {
-    return this.post("/agent-sessions", {
+    return this.api.createAgentSession({
       chip_id: options.chipId,
       policy: options.policy,
       expires_in_seconds: options.expiresInSeconds ?? 21_600,
@@ -915,7 +915,7 @@ export class QDashClient {
       skill_version: options.skillVersion ?? "",
       skill_hash: options.skillHash ?? "",
       ...(options.model ? { model: options.model } : {}),
-      ...(options.calibrationSessionId ? { calibration_session_id: options.calibrationSessionId } : {}),
+      ...(options.calibrationSessionId !== undefined ? { calibration_session_id: options.calibrationSessionId } : {}),
     });
   }
 
@@ -1347,6 +1347,49 @@ export class QDashClient {
       `/provenance/recommendations/${pathPart(entityId)}`,
       query({ max_depth: options.maxDepth }),
     );
+  }
+
+  /** Guard handwritten and generated entry points alike when callers require association.
+   * A readable parent proves support before a write. It cannot make mixed-version API
+   * fleets safe; the response check detects a lost association without retrying the write.
+   */
+  private guardAssociatedWrites(api: ReturnType<typeof getQDashAPI>): ReturnType<typeof getQDashAPI> {
+    const preflight = async (id: string, chipId: string, options: Parameters<typeof api.getCalibrationSession>[1]) => {
+      if (!id.trim()) throw new TypeError("calibration_session_id must be non-empty");
+      const parent = await api.getCalibrationSession(id, options);
+      // Closed parents can still return an idempotent replay. The API decides whether a
+      // new child may start; do not turn this capability check into a second policy gate.
+      if (!parent || parent.calibration_session_id !== id || parent.chip_id !== chipId) {
+        throw new Error("Calibration session preflight failed; nothing dispatched. Check server compatibility.");
+      }
+    };
+    return {
+      ...api,
+      executeCalibrationPipeline: async (request, options) => {
+        const id = request.calibration_session_id;
+        const key = request.idempotency_key;
+        if ((id != null) !== (key != null) || (key != null && !key.trim())) {
+          throw new TypeError("calibration_session_id and a non-empty idempotency_key must be given together");
+        }
+        if (id != null) await preflight(id, request.chip_id, options);
+        const result = await api.executeCalibrationPipeline(request, options);
+        if (id != null && (!result || result.calibration_session_id !== id ||
+            typeof result.pipeline_run_id !== "string" || !result.pipeline_run_id.trim())) {
+          throw new Error("Pipeline result unknown: the execution may have started without its association. Do not retry automatically or use a new key; reconcile the execution first.");
+        }
+        return result;
+      },
+      createAgentSession: async (request, options) => {
+        const id = request.calibration_session_id;
+        if (id != null) await preflight(id, request.chip_id, options);
+        const result = await api.createAgentSession(request, options);
+        if (id != null && (!result || result.calibration_session_id !== id ||
+            result.calibration_admission !== "admitted")) {
+          throw new Error("Agent session creation result unknown: a session may exist without its requested admission. Do not retry automatically or run actions; reconcile the session first.");
+        }
+        return result;
+      },
+    };
   }
 
   private bindGeneratedApi(

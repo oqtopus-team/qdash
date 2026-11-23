@@ -308,3 +308,47 @@ and `calibration-pipeline-tool.test.mjs`; the UI in
 - `ui/src/components/features/execution/ExecutionCalibrationContext.tsx`: badges and notices on
   the Execution page
 - `ui/src/components/features/chat/ChatCalibrationSessions.tsx`: the chat card
+
+## Deployment compatibility
+
+Upgrade the API atomically before publishing or deploying the associated SDKs and tools.
+Do not serve associated traffic through a mixed fleet of old and new API processes:
+an old process can ignore association fields and dispatch without recording idempotency.
+A successful parent preflight does not make a mixed fleet safe.
+
+The TypeScript client's bound API and the Python client read the requested calibration
+session before dispatching an associated pipeline or creating an associated agent session.
+An unsupported endpoint or a mismatched parent ID or chip stops the call before the write.
+The pipeline preflight also accepts a closed parent so the API can replay an earlier request
+with its original idempotency key. Only the server decides whether new work may start.
+
+After the write, the clients require the requested association in the response, plus a
+pipeline run ID or an admitted agent session. A missing or mismatched association is an
+unknown result: the write may have taken effect. The client does not retry it, and the caller
+must reconcile the recorded work before trying again. These checks do not add authority or
+change unassociated requests. Direct HTTP callers must implement the same checks; generated
+standalone HTTP functions do not replace the guarded client.
+
+Before rollback, quiesce admission and dispatch traffic. Drain and reconcile pending agent
+admissions and in-flight pipeline operations, including operations with unknown outcomes,
+before starting an older API. Retain the new collections; no backfill is required. Do not
+delete association records to make an older deployment appear compatible.
+
+Quiescence must cover every API instance, external client, scheduler, and agent runtime that
+can start work; a one-time query while new requests continue is not a rollback barrier.
+Check `agent_sessions.calibration_admission` for `pending`, the parents' `pending_children`,
+and `calibration_pipeline_runs` for `dispatching` or `unknown` outcomes. Use the new API's
+admission settlement and in-flight operation checks before stopping it. A terminal session
+status alone does not establish that its measurements, commits, or applies have finished.
+Resolve the actual Prefect run before treating an unknown dispatch as not started. Do not
+clear reservations, change admissions, or delete run records to pass this check. If a state
+cannot be reconciled, rollback remains blocked.
+
+Older APIs ignore the new admission field on an otherwise active agent session. Retaining
+the field in MongoDB therefore preserves data but does not enforce its authority during a
+rollback. Follow the [upgrade procedure](../../user-guide/operations.md#upgrade-calibration-session-support)
+to keep old instances from accepting this work.
+
+The execution repository now honors `MONGO_HOST` and `MONGO_PORT`, consistent with the
+configured Mongo connection. Deployments that relied on the previous implicit host or port
+must set these variables to the intended database before upgrading.

@@ -873,6 +873,12 @@ class QDashClient:
         ``idempotency_key`` (given together), the run is recorded in that calibration session
         before it is launched, and a retry with the same key returns the recorded run.
         """
+        if (calibration_session_id is None) != (idempotency_key is None):
+            raise ValueError("calibration_session_id and idempotency_key are given together")
+        if calibration_session_id is not None:
+            if not idempotency_key or not idempotency_key.strip():
+                raise ValueError("idempotency_key must be non-empty")
+            self._preflight_calibration_session(calibration_session_id, chip_id)
         response = self._request(
             "POST",
             "/calibration-pipelines/execute",
@@ -884,6 +890,19 @@ class QDashClient:
                 idempotency_key=idempotency_key,
             ),
         )
+        if calibration_session_id is not None:
+            data = response.data
+            if (
+                not isinstance(data, dict)
+                or data.get("calibration_session_id") != calibration_session_id
+                or not isinstance(data.get("pipeline_run_id"), str)
+                or not data["pipeline_run_id"].strip()
+            ):
+                raise RuntimeError(
+                    "Pipeline result unknown: the execution may have started without its "
+                    "association. Do not retry automatically or use a new key; "
+                    "reconcile the execution first."
+                )
         return self._validate_model_payload(ExecutePipelineResponse, response.data)
 
     def get_execution_activity(
@@ -966,6 +985,21 @@ class QDashClient:
                 )
             self._sleep(poll_interval_seconds)
 
+    def _preflight_calibration_session(self, session_id: str, chip_id: str) -> None:
+        """Prove server support before an associated write, without blocking closed replays."""
+        if not session_id.strip():
+            raise ValueError("calibration_session_id must be non-empty")
+        parent = self._request("GET", f"/calibration-sessions/{quote(session_id, safe='')}").data
+        if (
+            not isinstance(parent, dict)
+            or parent.get("calibration_session_id") != session_id
+            or parent.get("chip_id") != chip_id
+        ):
+            raise ValueError(
+                "Calibration session preflight failed; nothing dispatched. "
+                "Check server compatibility."
+            )
+
     def create_agent_session(
         self,
         *,
@@ -976,6 +1010,7 @@ class QDashClient:
         skill_version: str = "",
         skill_hash: str = "",
         model: dict[str, str] | None = None,
+        calibration_session_id: str | None = None,
     ) -> AgentSessionResponse:
         """Create a bounded authorization session for a local agent.
 
@@ -993,7 +1028,22 @@ class QDashClient:
         }
         if model is not None:
             body["model"] = model
+        if calibration_session_id is not None:
+            self._preflight_calibration_session(calibration_session_id, chip_id)
+            body["calibration_session_id"] = calibration_session_id
         response = self._request("POST", "/agent-sessions", json=body)
+        if calibration_session_id is not None:
+            data = response.data
+            if (
+                not isinstance(data, dict)
+                or data.get("calibration_session_id") != calibration_session_id
+                or data.get("calibration_admission") != "admitted"
+            ):
+                raise RuntimeError(
+                    "Agent session creation result unknown: a session may exist without its "
+                    "requested admission. Do not retry automatically or run actions; "
+                    "reconcile the session first."
+                )
         return self._validate_model_payload(AgentSessionResponse, response.data)
 
     def get_agent_session(self, session_id: str) -> AgentSessionResponse:
