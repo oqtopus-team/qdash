@@ -101,7 +101,11 @@ export function RecentChatsMenu({ onOpenAll }: { onOpenAll: () => void }) {
             )}
             <span className="truncate">{session.title}</span>
             {(session.id in runs || session.id in (detachedTurns ?? {})) && (
-              <span className="chat-pulse-dot ml-auto shrink-0" title="Answering" />
+              <span
+                className="loading loading-spinner loading-xs ml-auto shrink-0 text-primary"
+                role="status"
+                aria-label="Answering"
+              />
             )}
           </DropdownMenuItem>
         ))}

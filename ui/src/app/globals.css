@@ -1251,6 +1251,16 @@ html[data-theme="dark"],
   background: color-mix(in oklch, var(--color-base-content) 6%, transparent);
 }
 
+.chat-sidebar-item:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
+/* A running chat leaves room for its spinner beside the options menu. */
+.chat-sidebar-item-running {
+  padding-right: 4rem;
+}
+
 .chat-sidebar-item-active,
 .chat-sidebar-item-active:hover {
   background: color-mix(in oklch, var(--color-base-content) 9%, transparent);
@@ -1309,6 +1319,11 @@ html[data-theme="dark"],
   color: var(--color-base-content);
 }
 
+.chat-suggestion-pill:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
 /* Assistant answers sit flush left, full width, with no avatar (ChatGPT and Claude style). */
 .chat-assistant-row {
   min-width: 0;
@@ -1322,27 +1337,6 @@ html[data-theme="dark"],
   border-radius: 1.25rem;
   background: color-mix(in oklch, var(--color-base-content) 5%, var(--color-base-100));
   border: 1px solid color-mix(in oklch, var(--color-base-content) 10%, transparent);
-}
-
-/* Small breathing dot marking a session that is still answering. */
-.chat-pulse-dot {
-  width: 0.4rem;
-  height: 0.4rem;
-  border-radius: 9999px;
-  background: var(--color-primary);
-  animation: chatPulseDot 1.2s ease-in-out infinite;
-}
-
-@keyframes chatPulseDot {
-  0%,
-  100% {
-    transform: scale(0.75);
-    opacity: 0.35;
-  }
-  50% {
-    transform: scale(1);
-    opacity: 0.9;
-  }
 }
 
 .chat-composer {
