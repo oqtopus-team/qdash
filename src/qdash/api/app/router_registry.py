@@ -18,18 +18,21 @@ from qdash.api.routers import (
     backend,
     calibration,
     calibration_pipeline,
+    calibration_session,
     chip,
     config,
     cooldown,
     cooldown_wiring_event,
     copilot,
     cryostat,
+    dashboard,
     device_topology,
     evaluation,
     execution,
     file,
     flow,
     forum,
+    metric_script,
     metrics,
     note,
     notification,
@@ -41,6 +44,7 @@ from qdash.api.routers import (
     task_file,
     task_result,
     topology,
+    user_avatar,
 )
 
 
@@ -73,6 +77,7 @@ PROTECTED_ROUTERS: tuple[RouterRegistration, ...] = (
     RouterRegistration(agent_session.router, tags=("agent-session",)),
     RouterRegistration(calibration.router, tags=("calibration",)),
     RouterRegistration(calibration_pipeline.router, tags=("calibration-pipeline",)),
+    RouterRegistration(calibration_session.router, tags=("calibration-session",)),
     RouterRegistration(copilot.router, prefix="/copilot", tags=("copilot",)),
     RouterRegistration(settings.router, tags=("settings",)),
     RouterRegistration(chip.router, tags=("chip",)),
@@ -91,9 +96,12 @@ PROTECTED_ROUTERS: tuple[RouterRegistration, ...] = (
     RouterRegistration(cryostat.router, tags=("cryostat",)),
     RouterRegistration(cooldown.router, tags=("cooldown",)),
     RouterRegistration(cooldown_wiring_event.router, tags=("cooldown-wiring",)),
+    RouterRegistration(dashboard.router, prefix="/dashboards", tags=("dashboard",)),
+    RouterRegistration(metric_script.router, prefix="/metric-scripts", tags=("metric-script",)),
     RouterRegistration(topology.router, prefix="/topology", tags=("topology",)),
     RouterRegistration(config.router, tags=("config",)),
     RouterRegistration(provenance.router, prefix="/provenance", tags=("provenance",)),
+    RouterRegistration(user_avatar.router, tags=("user-avatar",)),
 )
 
 

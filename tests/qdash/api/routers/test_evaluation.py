@@ -20,6 +20,7 @@ from qdash.datamodel.note import NoteModel
 from qdash.datamodel.project import ProjectRole
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.chip import ChipDocument
+from qdash.dbmodel.copilot_chat_turn import CopilotChatTurnDocument
 from qdash.dbmodel.evaluation import EvaluationDocument
 from qdash.dbmodel.evaluation_run import EvaluationRunDocument
 from qdash.dbmodel.project import ProjectDocument
@@ -843,6 +844,376 @@ def test_chat_evaluations_are_filed_as_runs_of_one(test_client, service):
     )
 
 
+_ENTRIES = {"call-1": "11", "call-2": "13", "call_0": "21"}
+
+
+def _qcal_end(
+    call_id: str,
+    task_id: str | None = "task-q0-new",
+    *,
+    entry_id: str | None = "",
+    before_turn: bool = False,
+) -> dict[str, Any]:
+    """An evaluation's ``tool_end`` as the runtime streams it; ``entry_id`` is its result's entry."""
+    record = {**RECORD, "mode": "planner"}
+    if task_id is None:
+        record.pop("task_id")
+    else:
+        record["task_id"] = task_id
+    entry = _ENTRIES.get(call_id, "99") if entry_id == "" else entry_id
+    return {
+        "type": "tool_end",
+        "name": "qcal_evaluate",
+        "id": call_id,
+        "isError": False,
+        **({"entry_id": entry} if entry is not None else {}),
+        **({"before_turn": True} if before_turn else {}),
+        "evaluation": {"prompt": "p", "model": "vllm/nvidia/Ising-Calibration", "record": record},
+    }
+
+
+def _stream_turn(
+    service: EvaluationService,
+    events: list[dict[str, Any]],
+    *,
+    request_id: str = "r1",
+    session_id: str = "s1",
+    project_id: str = "eval_project",
+) -> list[tuple[str, dict[str, Any]]]:
+    """One stream of a chat turn through the SSE translation, recording as the router does."""
+    recorder = service.chat_recorder(
+        project_id=project_id,
+        username="eval_user",
+        session_id=session_id,
+        planner_model="openai-compatible/qwen",
+        request_id=request_id,
+    )
+    return _translate(events, recorder)
+
+
+def _translate(events: list[dict[str, Any]], recorder: Any) -> list[tuple[str, dict[str, Any]]]:
+    import json
+
+    from qdash.api.services.pi_chat_service import translate
+
+    async def lines():
+        for event in events:
+            yield json.dumps(event)
+
+    async def run() -> list[str]:
+        return [sse async for sse in translate(lines(), recorder=recorder)]
+
+    parsed = []
+    for sse in asyncio.run(run()):
+        if sse.startswith(":"):
+            continue
+        name, data = sse.strip().split("\n", 1)
+        parsed.append((name.removeprefix("event: "), json.loads(data.removeprefix("data: "))))
+    return parsed
+
+
+def _answer(evaluation: EvaluationDocument) -> str:
+    assert evaluation.planner is not None
+    return evaluation.planner.answer
+
+
+def _tool_end_ids(events: list[tuple[str, dict[str, Any]]]) -> list[tuple[Any, Any]]:
+    return [
+        (data["evaluation"].get("run_id"), data["evaluation"].get("evaluation_id"))
+        for name, data in events
+        if name == "tool_end" and "evaluation" in data
+    ]
+
+
+def test_a_chat_evaluation_the_dropped_stream_missed_is_recorded_from_the_replay(service):
+    _task_result(task_id="task-q0-new", qid="0", end_at=datetime(2026, 1, 2, tzinfo=UTC))
+    turn = [
+        {"type": "tool_start", "name": "qcal_evaluate", "id": "call-1"},
+        _qcal_end("call-1"),
+        {"type": "done", "text": "fit_quality good; I agree."},
+    ]
+
+    # The stream drops before the evaluation's result: nothing is stored or claimed.
+    dropped = _stream_turn(service, turn[:1])
+    assert dropped[-1][1]["code"] == "stream_lost"
+    assert EvaluationDocument.find_all().to_list() == []
+
+    # The reattach replays the turn from its start: the evaluation is stored once
+    # and the answer is attached when the replay sees the turn finish.
+    replay = _stream_turn(service, turn)
+    [(run_id, evaluation_id)] = _tool_end_ids(replay)
+    assert run_id and evaluation_id
+    assert replay[-1][0] == "result"
+
+    # Further replays, sequential or racing, store nothing new.
+    assert _tool_end_ids(_stream_turn(service, turn)) == [(run_id, evaluation_id)]
+    assert _tool_end_ids(_stream_turn(service, turn)) == [(run_id, evaluation_id)]
+    [stored] = EvaluationDocument.find_all().to_list()
+    assert (stored.run_id, stored.evaluation_id) == (run_id, evaluation_id)
+    assert stored.planner is not None
+    assert stored.planner.answer == "fit_quality good; I agree."
+    assert stored.planner.model == "openai-compatible/qwen"
+    assert stored.output is not None and stored.output.model == "vllm/nvidia/Ising-Calibration"
+    assert stored.evaluator is not None and stored.evaluator.commit == "042e454323b2"
+    [run] = EvaluationRunDocument.find_all().to_list()
+    assert (run.run_id, run.project_id, run.trigger, run.total) == (
+        run_id,
+        "eval_project",
+        "chat",
+        1,
+    )
+
+
+def test_a_replay_after_the_live_stream_recorded_attaches_the_answer_without_a_copy(service):
+    _task_result(task_id="task-q0-new", qid="0", end_at=datetime(2026, 1, 2, tzinfo=UTC))
+    turn = [_qcal_end("call-1"), _qcal_end("call-2"), {"type": "done", "text": "Both good."}]
+
+    # The live stream saw both results but dropped before the answer.
+    live = _tool_end_ids(_stream_turn(service, turn[:2]))
+    assert len(set(live)) == 2
+    assert {_answer(e) for e in EvaluationDocument.find_all().to_list()} == {""}
+
+    replay = _tool_end_ids(_stream_turn(service, turn))
+    assert replay == live
+    stored = EvaluationDocument.find_all().to_list()
+    assert sorted(e.evaluation_id for e in stored) == sorted(ids[1] for ids in live)
+    assert {_answer(e) for e in stored} == {"Both good."}
+    assert EvaluationRunDocument.find({"trigger": "chat"}).count() == 2
+
+
+def test_two_streams_storing_the_same_call_at_once_keep_one_record(service, monkeypatch):
+    """The second writer passed the existence check before the first wrote: the unique
+    IDs refuse its copies and it reports the record the first stored."""
+    _task_result(task_id="task-q0-new", qid="0", end_at=datetime(2026, 1, 2, tzinfo=UTC))
+    record = {**RECORD, "task_id": "task-q0-new", "mode": "planner"}
+
+    def recorder():
+        return service.chat_recorder(
+            project_id="eval_project",
+            username="eval_user",
+            session_id="s1",
+            planner_model="openai-compatible/qwen",
+            request_id="r1",
+        )
+
+    first, second = recorder(), recorder()
+    real_insert = EvaluationRunDocument.insert
+    raced: list[Any] = []
+    started = False
+
+    def insert_after_the_other_stream(self, *args, **kwargs):
+        nonlocal started
+        if not started:
+            started = True
+            raced.append(first.record(record, "entry:11"))
+        return real_insert(self, *args, **kwargs)
+
+    monkeypatch.setattr(EvaluationRunDocument, "insert", insert_after_the_other_stream)
+    ids = second.record(record, "entry:11")
+
+    assert raced == [ids]
+    assert ids is not None
+    assert EvaluationDocument.find_all().count() == 1
+    assert EvaluationRunDocument.find_all().count() == 1
+
+
+def test_a_failed_write_is_not_reported_and_a_replay_completes_it(service, monkeypatch):
+    _task_result(task_id="task-q0-new", qid="0", end_at=datetime(2026, 1, 2, tzinfo=UTC))
+    turn = [_qcal_end("call-1"), {"type": "done", "text": "ok"}]
+    real_insert = EvaluationDocument.insert
+
+    def fail(self, *args, **kwargs):
+        raise RuntimeError("database unavailable")
+
+    monkeypatch.setattr(EvaluationDocument, "insert", fail)
+    failed = _stream_turn(service, turn)
+    # No IDs are claimed for an evaluation that was not stored.
+    assert _tool_end_ids(failed) == [(None, None)]
+    assert EvaluationDocument.find_all().count() == 0
+
+    # The run was written before the failure; a replay completes the record under it.
+    monkeypatch.setattr(EvaluationDocument, "insert", real_insert)
+    [(run_id, evaluation_id)] = _tool_end_ids(_stream_turn(service, turn))
+    assert run_id and evaluation_id
+    assert EvaluationRunDocument.find_all().count() == 1
+    [stored] = EvaluationDocument.find_all().to_list()
+    assert stored.run_id == run_id
+    assert stored.planner is not None and stored.planner.answer == "ok"
+
+
+def test_chat_evaluations_of_other_turns_and_projects_stay_apart(service):
+    from qdash.api.services.evaluation_service import ChatCallKey
+
+    _task_result(task_id="task-q0-new", qid="0", end_at=datetime(2026, 1, 2, tzinfo=UTC))
+    # A local model may reuse a tool call ID in every turn; the turns stay separate.
+    first = _tool_end_ids(
+        _stream_turn(service, [_qcal_end("call_0"), {"type": "done", "text": "A"}])
+    )
+    second = _tool_end_ids(
+        _stream_turn(service, [_qcal_end("call_0"), {"type": "done", "text": "B"}], request_id="r2")
+    )
+    assert first != second
+    answers = {e.evaluation_id: _answer(e) for e in EvaluationDocument.find_all()}
+    assert answers == {first[0][1]: "A", second[0][1]: "B"}
+
+    key = ChatCallKey(session_id="s1", request_id="r1", call="entry:21")
+    base = key.ids("eval_project", "eval_user")
+    assert key.ids("other_project", "eval_user") != base
+    assert key.ids("eval_project", "other_user") != base
+    assert ChatCallKey("s2", "r1", "entry:21").ids("eval_project", "eval_user") != base
+    assert ChatCallKey("s1", "r1", "entry:22").ids("eval_project", "eval_user") != base
+
+    # A record under this call's ID that is not this call's is refused, not reported.
+    stored = EvaluationDocument.find_one({"evaluation_id": first[0][1]}).run()
+    assert stored is not None
+    stored.project_id = "other_project"
+    stored.save()
+    assert _tool_end_ids(
+        _stream_turn(service, [_qcal_end("call_0"), {"type": "done", "text": "A"}])
+    ) == [(None, None)]
+    kept = EvaluationDocument.find_one({"evaluation_id": first[0][1]}).run()
+    assert kept is not None and _answer(kept) == "A"
+
+
+def _turn_recorder(
+    service: EvaluationService,
+    *,
+    reattach: bool,
+    planner_model: str = "openai-compatible/qwen",
+    task_id: str | None = "task-q0-new",
+    project_id: str = "eval_project",
+    request_id: str = "r1",
+) -> Any:
+    """The recorder the router builds for one request of turn ``request_id``."""
+    return service.chat_turn_recorder(
+        project_id=project_id,
+        username="eval_user",
+        session_id="s1",
+        request_id=request_id,
+        planner_model=planner_model,
+        task_id=task_id,
+        reattach=reattach,
+    )
+
+
+def test_a_reattach_with_another_model_and_task_files_the_call_as_the_turn_was_sent(service):
+    """The stream drops before the evaluation's result; the reattach request names another
+    planner and task. The call is filed under the turn's own, as admitted, once."""
+    _task_result(task_id="task-q0-new", qid="0", end_at=datetime(2026, 1, 2, tzinfo=UTC))
+    _task_result(task_id="task-other", qid="1", end_at=datetime(2026, 1, 3, tzinfo=UTC))
+    # A task chat's opening figures carry no task ID: the turn's task is theirs.
+    turn = [_qcal_end("call-1", task_id=None), {"type": "done", "text": "ok"}]
+
+    original = _turn_recorder(service, reattach=False)
+    assert _translate(turn[:0], original)[-1][1]["code"] == "stream_lost"
+    assert EvaluationDocument.find_all().count() == 0
+
+    tampered: dict[str, Any] = {"planner_model": "openai-compatible/other", "task_id": "task-other"}
+    replay = _translate(turn, _turn_recorder(service, reattach=True, **tampered))
+    [(run_id, evaluation_id)] = _tool_end_ids(replay)
+    [stored] = EvaluationDocument.find_all().to_list()
+    assert stored.evaluation_id == evaluation_id
+    assert stored.planner is not None and stored.planner.model == "openai-compatible/qwen"
+    assert stored.task_id == "task-q0-new"
+    # A retried first request of the same turn, sent with other settings, reads the same record.
+    retry = _translate(turn, _turn_recorder(service, reattach=False, **tampered))
+    assert _tool_end_ids(retry) == [(run_id, evaluation_id)]
+    assert EvaluationDocument.find_all().count() == 1
+    [admitted] = CopilotChatTurnDocument.find_all().to_list()
+    assert (admitted.planner_model, admitted.task_id, admitted.project_id) == (
+        "openai-compatible/qwen",
+        "task-q0-new",
+        "eval_project",
+    )
+
+
+def test_a_partial_write_is_completed_from_the_turns_record_not_the_reattach(service, monkeypatch):
+    _task_result(task_id="task-q0-new", qid="0", end_at=datetime(2026, 1, 2, tzinfo=UTC))
+    _task_result(task_id="task-other", qid="1", end_at=datetime(2026, 1, 3, tzinfo=UTC))
+    turn = [_qcal_end("call-1", task_id=None), {"type": "done", "text": "ok"}]
+    real_insert = EvaluationDocument.insert
+
+    def fail(self, *args, **kwargs):
+        raise RuntimeError("database unavailable")
+
+    # The original stream wrote the run, then failed before the evaluation.
+    monkeypatch.setattr(EvaluationDocument, "insert", fail)
+    assert _tool_end_ids(_translate(turn, _turn_recorder(service, reattach=False))) == [
+        (None, None)
+    ]
+    monkeypatch.setattr(EvaluationDocument, "insert", real_insert)
+    [run] = EvaluationRunDocument.find_all().to_list()
+
+    tampered = _turn_recorder(
+        service, reattach=True, planner_model="openai-compatible/other", task_id="task-other"
+    )
+    [(run_id, _)] = _tool_end_ids(_translate(turn, tampered))
+    assert run_id == run.run_id
+    [stored] = EvaluationDocument.find_all().to_list()
+    assert stored.planner is not None and stored.planner.model == "openai-compatible/qwen"
+    assert stored.task_id == "task-q0-new"
+    assert run.planner_model == "openai-compatible/qwen"
+    assert EvaluationRunDocument.find_all().count() == 1
+
+
+def test_a_turn_is_never_filed_from_another_project_or_without_its_record(service):
+    from qdash.api.services.evaluation_service import ChatTurnRefusedError
+
+    _task_result(task_id="task-q0-new", qid="0", end_at=datetime(2026, 1, 2, tzinfo=UTC))
+    turn = [_qcal_end("call-1"), {"type": "done", "text": "ok"}]
+    _turn_recorder(service, reattach=False)
+
+    # Neither a reattach nor a retry of the turn from another project is accepted.
+    for reattach in (True, False):
+        with pytest.raises(ChatTurnRefusedError):
+            _turn_recorder(service, reattach=reattach, project_id="other_project")
+    # A reattach to a turn with no admission record (sent before records were kept)
+    # files nothing: what it was sent with is not known.
+    assert _turn_recorder(service, reattach=True, request_id="r-legacy") is None
+    assert CopilotChatTurnDocument.find_all().count() == 1
+    assert EvaluationDocument.find_all().count() == 0
+    # The record outlives the API process: a new service reads it.
+    fresh = EvaluationService(MongoChipRepository(), MongoTaskResultHistoryRepository())
+    assert _tool_end_ids(_translate(turn, _turn_recorder(fresh, reattach=True)))[0][0]
+
+
+def test_an_earlier_turns_result_and_an_unnamed_result_are_not_filed_under_this_turn(service):
+    """A run recovered after a restart streamed an evaluation before this turn's message
+    (``before_turn``); and a result without a durable entry cannot be named again."""
+    _task_result(task_id="task-q0-new", qid="0", end_at=datetime(2026, 1, 2, tzinfo=UTC))
+    events = [
+        _qcal_end("call_0", entry_id="3", before_turn=True),
+        {"type": "turn_start", "answer": "earlier answer"},
+        _qcal_end("call_0", entry_id=None),
+        _qcal_end("call_0", entry_id="7"),
+        {"type": "done", "text": "ok"},
+    ]
+    out = _translate(events, _turn_recorder(service, reattach=False))
+    ids = _tool_end_ids(out)
+    assert ids[0] == (None, None)
+    assert ids[1] == (None, None)
+    assert ids[2][1]
+    [stored] = EvaluationDocument.find_all().to_list()
+    assert stored.evaluation_id == ids[2][1]
+    assert stored.planner is not None and stored.planner.answer == "ok"
+
+
+def test_a_reused_tool_call_id_is_named_by_its_entry_in_the_live_stream_and_the_replay(service):
+    """A local model gives every call the same ID. The live stream saw the second call
+    only (it attached late); the replay sees both. Each is filed once, by its entry."""
+    _task_result(task_id="task-q0-new", qid="0", end_at=datetime(2026, 1, 2, tzinfo=UTC))
+    first, second = _qcal_end("call_0", entry_id="5"), _qcal_end("call_0", entry_id="9")
+    live = _tool_end_ids(_translate([second], _turn_recorder(service, reattach=False)))
+    replay = _tool_end_ids(
+        _translate(
+            [first, second, {"type": "done", "text": "ok"}], _turn_recorder(service, reattach=True)
+        )
+    )
+    assert replay[1] == live[0]
+    assert replay[0] != live[0]
+    assert EvaluationDocument.find_all().count() == 2
+
+
 @pytest.mark.parametrize("mode", ["direct", "planner"])
 @pytest.mark.parametrize("with_examples", [False, True])
 def test_example_setting_reaches_runtime_and_records_are_persisted(
@@ -1025,3 +1396,101 @@ def test_a_drafts_zip_downloads_as_uploaded(test_client, project, drafts):
     assert response.content == data
     missing = test_client.get(f"/evaluations/knowledge-drafts/{'0' * 64}/archive", headers=HEADERS)
     assert missing.status_code == 404
+
+
+def _stored_run(run_id: str, *, requested_at: datetime, **fields: Any) -> None:
+    EvaluationRunDocument(
+        run_id=run_id,
+        project_id=fields.pop("project_id", "eval_project"),
+        chip_id=fields.pop("chip_id", "chip-1"),
+        task_name=fields.pop("task_name", "CheckRabi"),
+        entity_type="qubit",
+        requested_by="eval_user",
+        requested_at=requested_at,
+        status="completed",
+        **fields,
+    ).insert()
+
+
+def _list(test_client: Any, **params: Any) -> dict[str, Any]:
+    response = test_client.get("/evaluations/runs", headers=HEADERS, params=params)
+    assert response.status_code == 200, response.text
+    body: dict[str, Any] = response.json()
+    return body
+
+
+def test_runs_page_past_the_newest_200(test_client, service):
+    start = datetime(2026, 1, 1, tzinfo=UTC)
+    # 230 runs; pairs share a requested_at so the run ID must break the tie.
+    for index in range(230):
+        _stored_run(f"evr_{index:04d}", requested_at=start + timedelta(minutes=index // 2))
+    newest_first = [f"evr_{index:04d}" for index in reversed(range(230))]
+
+    seen: list[str] = []
+    skip = 0
+    while True:
+        page = _list(test_client, limit=25, skip=skip)
+        assert (page["skip"], page["limit"], page["total"]) == (skip, 25, 230)
+        seen.extend(run["run_id"] for run in page["runs"])
+        if not page["has_more"]:
+            break
+        skip += 25
+    assert seen == newest_first
+
+    last = _list(test_client, limit=200, skip=200)
+    assert [run["run_id"] for run in last["runs"]] == newest_first[200:]
+    assert last["has_more"] is False
+    assert _list(test_client, limit=200)["has_more"] is True
+
+    beyond = _list(test_client, limit=25, skip=1000)
+    assert (beyond["runs"], beyond["has_more"], beyond["total"]) == ([], False, 230)
+
+
+def test_runs_pages_keep_filters_and_project_scope(test_client, service):
+    start = datetime(2026, 1, 1, tzinfo=UTC)
+    for index in range(30):
+        _stored_run(
+            f"evr_a{index:03d}",
+            requested_at=start + timedelta(minutes=index),
+            chip_id="chip-1" if index % 2 == 0 else "chip-2",
+            task_name="CheckRabi" if index % 3 == 0 else "CheckT1",
+        )
+    for index in range(5):
+        _stored_run(
+            f"evr_other{index}",
+            requested_at=start + timedelta(hours=1, minutes=index),
+            project_id="other_project",
+        )
+
+    chip_task = [f"evr_a{i:03d}" for i in reversed(range(30)) if i % 2 == 0 and i % 3 == 0]
+    first = _list(test_client, chip_id="chip-1", task="CheckRabi", limit=3)
+    second = _list(test_client, chip_id="chip-1", task="CheckRabi", limit=3, skip=3)
+    assert [r["run_id"] for r in first["runs"] + second["runs"]] == chip_task
+    assert (first["has_more"], second["has_more"]) == (True, False)
+    assert first["total"] == second["total"] == len(chip_task)
+
+    every = _list(test_client, limit=200)
+    assert (len(every["runs"]), every["total"]) == (30, 30)
+    assert all(run["run_id"].startswith("evr_a") for run in every["runs"])
+
+
+def test_runs_list_defaults_and_bounds(test_client, service):
+    start = datetime(2026, 1, 1, tzinfo=UTC)
+    for index in range(22):
+        _stored_run(f"evr_{index:04d}", requested_at=start + timedelta(minutes=index))
+
+    default = _list(test_client)
+    assert len(default["runs"]) == 20
+    assert (default["skip"], default["limit"], default["has_more"]) == (0, 20, True)
+    assert default["runs"][0]["run_id"] == "evr_0021"
+
+    for params in ({"limit": 0}, {"limit": 201}, {"skip": -1}):
+        response = test_client.get("/evaluations/runs", headers=HEADERS, params=params)
+        assert response.status_code == 422, params
+
+    # Direct service callers keep the list-returning API; out-of-range values are clamped.
+    assert len(service.list_runs(project_id="eval_project", limit=500)) == 22
+    assert [r.run_id for r in service.list_runs(project_id="eval_project", limit=2, skip=-5)] == [
+        "evr_0021",
+        "evr_0020",
+    ]

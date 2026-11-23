@@ -5,6 +5,8 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { ExecutePipelineResponseCalibrationSessionId } from './executePipelineResponseCalibrationSessionId';
+import type { ExecutePipelineResponsePipelineRunId } from './executePipelineResponsePipelineRunId';
 import type { ExecutePipelineResponseTargets } from './executePipelineResponseTargets';
 import type { ResolvedPipelineStep } from './resolvedPipelineStep';
 
@@ -24,4 +26,10 @@ export interface ExecutePipelineResponse {
   message: string;
   steps?: ResolvedPipelineStep[];
   targets?: ExecutePipelineResponseTargets;
+  /** The calibration session the run is recorded in, if any */
+  calibration_session_id?: ExecutePipelineResponseCalibrationSessionId;
+  /** The run's record in that calibration session */
+  pipeline_run_id?: ExecutePipelineResponsePipelineRunId;
+  /** True when a retry returned the run an earlier request with its key started */
+  replayed?: boolean;
 }

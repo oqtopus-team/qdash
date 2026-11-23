@@ -1,10 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if ! command -v betterleaks >/dev/null 2>&1; then
-  echo "betterleaks not installed; cannot run local leak scan" >&2
-  exit 1
-fi
+# Check the scanner release before reading any content.
+bash "$(dirname "${BASH_SOURCE[0]}")/check_betterleaks_version.sh"
 
 repo_root="$(git rev-parse --show-toplevel)"
 cd "$repo_root"

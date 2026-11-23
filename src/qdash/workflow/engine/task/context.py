@@ -13,7 +13,7 @@ import json
 import logging
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from qdash.datamodel.task import (
     CalibDataModel,
@@ -26,6 +26,9 @@ from qdash.workflow.engine.task.history_recorder import TaskHistoryRecorder
 from qdash.workflow.engine.task.result_processor import TaskResultProcessor
 from qdash.workflow.engine.task.snapshot_loader import SnapshotParameterLoader
 from qdash.workflow.engine.task.state_manager import TaskStateManager
+
+if TYPE_CHECKING:
+    from qdash.common.mux_mapping import MuxMapping
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +97,8 @@ class TaskContext:
         snapshot_loader: SnapshotParameterLoader | None = None,
         source_task_id: str | None = None,
         force_update_params: bool = False,
-        persist_output_parameters: bool = True,
+        update_calibration_parameters: bool = True,
+        mux_mapping: "MuxMapping | None" = None,
     ) -> None:
         self.id = context_id or str(uuid.uuid4())
         self.username = username
@@ -121,7 +125,8 @@ class TaskContext:
             snapshot_loader=snapshot_loader,
             source_task_id=source_task_id,
             force_update_params=force_update_params,
-            persist_output_parameters=persist_output_parameters,
+            update_calibration_parameters=update_calibration_parameters,
+            mux_mapping=mux_mapping,
         )
 
         # Initialize containers for coupling qids (only if state_manager was not injected)

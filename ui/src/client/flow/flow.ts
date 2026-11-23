@@ -27,10 +27,15 @@ import type {
 import type {
   DeleteFlow200,
   DeleteScheduleResponse,
+  Detail,
   ExecuteFlowRequest,
   ExecuteFlowResponse,
+  FlowExecutionPlanResponse,
   FlowTemplate,
   FlowTemplateWithCode,
+  FormatSourceRequest,
+  FormatSourceResponse,
+  GetFlowExecutionPlanParams,
   GetFlowResponse,
   HTTPValidationError,
   ListAllFlowSchedulesParams,
@@ -72,6 +77,10 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
 
 /**
  * Save a Flow to file system and MongoDB.
+ *
+ * By default the save creates the flow or overwrites an existing one. With
+ * ``create_only`` it only creates a new flow, and an existing name returns 409
+ * without changing the stored flow.
  * @summary Save a flow
  */
 export const saveFlow = (
@@ -91,7 +100,7 @@ export const saveFlow = (
 
 
 
-export const getSaveFlowMutationOptions = <TError = HTTPValidationError,
+export const getSaveFlowMutationOptions = <TError = Detail | HTTPValidationError,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveFlow>>, TError,{data: SaveFlowRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof saveFlow>>, TError,{data: SaveFlowRequest}, TContext> => {
 
@@ -120,12 +129,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type SaveFlowMutationResult = NonNullable<Awaited<ReturnType<typeof saveFlow>>>
     export type SaveFlowMutationBody = SaveFlowRequest
-    export type SaveFlowMutationError = HTTPValidationError
+    export type SaveFlowMutationError = Detail | HTTPValidationError
 
     /**
  * @summary Save a flow
  */
-export const useSaveFlow = <TError = HTTPValidationError,
+export const useSaveFlow = <TError = Detail | HTTPValidationError,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveFlow>>, TError,{data: SaveFlowRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof saveFlow>>,
@@ -229,6 +238,74 @@ export function useListFlows<TData = Awaited<ReturnType<typeof listFlows>>, TErr
 
 
 /**
+ * Format Python source with the project's Ruff settings.
+ *
+ * The source is parsed by Ruff, never imported or executed, and nothing is saved. A
+ * source that cannot be parsed returns ``syntax_error`` with the input unchanged.
+ * @summary Format flow source without saving it
+ */
+export const formatFlowSource = (
+    formatSourceRequest: FormatSourceRequest,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<FormatSourceResponse>(
+      {url: `/flows/format`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: formatSourceRequest, signal
+    },
+      options);
+    }
+
+
+
+
+export const getFormatFlowSourceMutationOptions = <TError = Detail | HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof formatFlowSource>>, TError,{data: FormatSourceRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof formatFlowSource>>, TError,{data: FormatSourceRequest}, TContext> => {
+
+const mutationKey = ['formatFlowSource'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof formatFlowSource>>, {data: FormatSourceRequest}> = (props) => {
+          const {data} = props ?? {};
+
+          return  formatFlowSource(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type FormatFlowSourceMutationResult = NonNullable<Awaited<ReturnType<typeof formatFlowSource>>>
+    export type FormatFlowSourceMutationBody = FormatSourceRequest
+    export type FormatFlowSourceMutationError = Detail | HTTPValidationError
+
+    /**
+ * @summary Format flow source without saving it
+ */
+export const useFormatFlowSource = <TError = Detail | HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof formatFlowSource>>, TError,{data: FormatSourceRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof formatFlowSource>>,
+        TError,
+        {data: FormatSourceRequest},
+        TContext
+      > => {
+      return useMutation(getFormatFlowSourceMutationOptions(options), queryClient);
+    }
+    /**
  * List the flow templates, optionally filtered to one backend.
  * @summary List all flow templates
  */
@@ -981,6 +1058,111 @@ export const useDeleteFlow = <TError = HTTPValidationError,
       return useMutation(getDeleteFlowMutationOptions(options), queryClient);
     }
     /**
+ * Read the saved source's steps and check manual rounds, without executing anything.
+ *
+ * The source is parsed, never imported or run. Manual rounds are checked against
+ * the chip's wiring and directed couplings with the checks the worker repeats
+ * before any target measures. Automatic groups are described, not computed.
+ * @summary Preview a flow's execution plan
+ */
+export const getFlowExecutionPlan = (
+    name: string,
+    params?: GetFlowExecutionPlanParams,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<FlowExecutionPlanResponse>(
+      {url: `/flows/${name}/execution-plan`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+
+
+
+
+export const getGetFlowExecutionPlanQueryKey = (name: string,
+    params?: GetFlowExecutionPlanParams,) => {
+    return [
+    `/flows/${name}/execution-plan`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetFlowExecutionPlanQueryOptions = <TData = Awaited<ReturnType<typeof getFlowExecutionPlan>>, TError = Detail | HTTPValidationError>(name: string,
+    params?: GetFlowExecutionPlanParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFlowExecutionPlan>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetFlowExecutionPlanQueryKey(name,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getFlowExecutionPlan>>> = ({ signal }) => getFlowExecutionPlan(name,params, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: name !== null && name !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getFlowExecutionPlan>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetFlowExecutionPlanQueryResult = NonNullable<Awaited<ReturnType<typeof getFlowExecutionPlan>>>
+export type GetFlowExecutionPlanQueryError = Detail | HTTPValidationError
+
+
+export function useGetFlowExecutionPlan<TData = Awaited<ReturnType<typeof getFlowExecutionPlan>>, TError = Detail | HTTPValidationError>(
+ name: string,
+    params: undefined |  GetFlowExecutionPlanParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFlowExecutionPlan>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getFlowExecutionPlan>>,
+          TError,
+          Awaited<ReturnType<typeof getFlowExecutionPlan>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetFlowExecutionPlan<TData = Awaited<ReturnType<typeof getFlowExecutionPlan>>, TError = Detail | HTTPValidationError>(
+ name: string,
+    params?: GetFlowExecutionPlanParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFlowExecutionPlan>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getFlowExecutionPlan>>,
+          TError,
+          Awaited<ReturnType<typeof getFlowExecutionPlan>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetFlowExecutionPlan<TData = Awaited<ReturnType<typeof getFlowExecutionPlan>>, TError = Detail | HTTPValidationError>(
+ name: string,
+    params?: GetFlowExecutionPlanParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFlowExecutionPlan>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Preview a flow's execution plan
+ */
+
+export function useGetFlowExecutionPlan<TData = Awaited<ReturnType<typeof getFlowExecutionPlan>>, TError = Detail | HTTPValidationError>(
+ name: string,
+    params?: GetFlowExecutionPlanParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFlowExecutionPlan>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetFlowExecutionPlanQueryOptions(name,params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
  * Execute a Flow via Prefect deployment.
  * @summary Execute a flow
  */

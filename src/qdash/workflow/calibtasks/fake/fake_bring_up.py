@@ -4,7 +4,12 @@ from typing import Any, ClassVar
 
 import plotly.graph_objects as go
 
-from qdash.datamodel.task import InputParameterSpec, OutputParameterSpec, RunParameterSpec
+from qdash.datamodel.task import (
+    InputParameterSpec,
+    OutputParameterSpec,
+    RunParameterSpec,
+    TaskDocumentation,
+)
 from qdash.workflow.calibtasks.base import PostProcessResult, PreProcessResult, RunResult
 from qdash.workflow.calibtasks.fake.base import FakeTask
 from qdash.workflow.engine.backend.fake import FakeBackend
@@ -23,6 +28,18 @@ class FakeBringUp(FakeTask):
 
     name: str = "FakeBringUp"
     task_type: str = "qubit"
+    documentation: ClassVar[TaskDocumentation] = TaskDocumentation(
+        description=(
+            "Fake-backend utility that copies the simulator's qubit frequency, resonator "
+            "frequency, and readout and control amplitudes into calibration storage. It is not "
+            "a hardware measurement."
+        ),
+        when_to_use=(
+            "Run it first in a fresh fake-backend project, in place of hardware bring-up, so "
+            "the qubex task chain (CheckChevron, CheckRabi, ...) finds its inputs."
+        ),
+        prerequisites=("Only runs on the fake backend.",),
+    )
     timeout: int = 60
 
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {}

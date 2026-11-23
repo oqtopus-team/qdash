@@ -5,7 +5,19 @@
 # The Pi Agent Runtime generates its models.json from this list at startup;
 # `temperature`/`top_p`/`top_k` do not reach Bedrock there.
 chat_models:
-  # Default vendor-neutral OpenAI Chat Completions API. The base URL must include /v1.
+  # Default: OpenAI's GPT-6 Sol through OpenAI's own API (api.openai.com), from
+  # pi's bundled model catalog, so it needs no base_url and no sampling settings.
+  # It authenticates with OPENAI_API_KEY from .env, read by the agent runtime
+  # only; without it a chat on this model is refused with what to set, and the
+  # chat never switches to another model by itself. Its planner-mode evaluations
+  # use it too (the first entry is the planner); evaluation.yaml is unchanged.
+  - provider: openai
+    name: gpt-6-sol
+    api_style: responses
+    # GPT-6 Sol's own default effort; "Auto" in the chat's Thinking menu.
+    reasoning_effort: medium
+  # Qwen through a vendor-neutral OpenAI Chat Completions API, selectable in the
+  # chat's model menu. The base URL must include /v1.
   - provider: openai-compatible-chat
     name: qwen3.8-flash-next
     api_style: completion
@@ -52,6 +64,25 @@ chat_models:
     # Chat answers and their thinking fit well within 8k; 16k reserved a quarter
     # of the 64k window for output and left prompts no room.
     max_output_tokens: 8192
+    # Set `strict_tool_schemas: true` only on an endpoint (`base_url`) that
+    # enforces OpenAI `strict` function schemas, so render_ui's arguments are
+    # sampled against its schema. Without it the schema is sent unenforced.
+    # Catalog models (OpenAI, Bedrock) need no setting.
+    # A gateway or proxy that differs from Pi's OpenAI defaults can set, per
+    # model with a `base_url`: `prompt_cache_key_mode` (auto, enabled,
+    # disabled), `requires_non_null_assistant_content` and
+    # `requires_tools_with_tool_history` (completion only). Unset keeps Pi's
+    # defaults; see docs/developer-guide/copilot/model-configuration.md.
+  # Claude Opus 5.5 through Anthropic's own API (api.anthropic.com), from pi's
+  # bundled model catalog, selectable in the chat's model menu. It authenticates
+  # with ANTHROPIC_API_KEY from .env, read by the agent runtime only; without it
+  # a chat on this model is refused with what to set. Its thinking is adaptive
+  # and always on, and it takes no temperature, top_p, or top_k, so none is set
+  # here; the Thinking menu's Off and Minimal run at Low on it.
+  - provider: anthropic
+    name: claude-opus-5-5
+    # Claude Opus 5.5's own default effort; "Auto" in the chat's Thinking menu.
+    reasoning_effort: medium
   # - provider: openai-compatible-ollama
   #   name: nvidia/Gemma-4-31B-IT-NVFP4
   #   api_style: completion

@@ -28,7 +28,9 @@ import type {
   CopilotChatSessionResponse,
   CopilotPreferences,
   CopilotPreferencesUpdate,
+  CopilotSkillList,
   CopilotSystemPrompt,
+  CreateCopilotChatBranchRequest,
   CreateCopilotChatSessionRequest,
   DeleteCopilotChatSession200,
   GetCopilotConfig200,
@@ -169,6 +171,10 @@ export function useGetCopilotConfig<TData = Awaited<ReturnType<typeof getCopilot
 
 /**
  * Return all persisted chat sessions owned by the current user.
+ *
+ * First cleans up, best effort, what failed requests of the user left: a
+ * branch still pending after its request's lease, and a deleted chat's store
+ * the runtime could not remove yet.
  * @summary List the current user's chat sessions
  */
 export const listCopilotChatSessions = (
@@ -327,6 +333,11 @@ export const useCreateCopilotChatSession = <TError = HTTPValidationError,
     }
     /**
  * Return one chat session including the full message list.
+ *
+ * The session's ``turn`` is named only in the project it was sent from, like
+ * ``/chat/active``: the project the request names (``X-Project-Id``, else the
+ * user's default), and only one the user may read. Elsewhere it is null. As the
+ * reply depends on that project, no cache keeps it for a request from another.
  * @summary Get a chat session with messages
  */
 export const getCopilotChatSession = (
@@ -486,6 +497,13 @@ export const useUpdateCopilotChatSession = <TError = HTTPValidationError,
     }
     /**
  * Delete a chat session owned by the current user.
+ *
+ * The chat's own running turn is stopped; a turn of another branch is not.
+ * Its runtime store and workspace are removed with the last session that uses
+ * them: a chat and its branches share one, so it stays while one is left.
+ * When the runtime cannot remove the store yet, the deleted chat is kept,
+ * hidden, and the removal is retried by deleting it again or by the next
+ * listing of the user's chats.
  * @summary Delete a chat session
  */
 export const deleteCopilotChatSession = (
@@ -546,6 +564,78 @@ export const useDeleteCopilotChatSession = <TError = HTTPValidationError,
         TContext
       > => {
       return useMutation(getDeleteCopilotChatSessionMutationOptions(options), queryClient);
+    }
+    /**
+ * Start a new chat session from a saved answer of one of the user's chats.
+ *
+ * The new session continues the conversation as it was at that answer, in the
+ * same runtime store: it shares the chat's current workspace files, and the
+ * chat and its branches answer one at a time. Only a completed answer the chat
+ * saved with its runtime entry ID qualifies, and only while nothing runs in
+ * the chat or its branches. The same request again returns the same session.
+ * @summary Branch a chat session from one of its answers
+ */
+export const branchCopilotChatSession = (
+    sessionId: string,
+    createCopilotChatBranchRequest: CreateCopilotChatBranchRequest,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<CopilotChatSessionResponse>(
+      {url: `/copilot/chat/sessions/${sessionId}/branches`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: createCopilotChatBranchRequest, signal
+    },
+      options);
+    }
+
+
+
+
+export const getBranchCopilotChatSessionMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof branchCopilotChatSession>>, TError,{sessionId: string;data: CreateCopilotChatBranchRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof branchCopilotChatSession>>, TError,{sessionId: string;data: CreateCopilotChatBranchRequest}, TContext> => {
+
+const mutationKey = ['branchCopilotChatSession'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof branchCopilotChatSession>>, {sessionId: string;data: CreateCopilotChatBranchRequest}> = (props) => {
+          const {sessionId,data} = props ?? {};
+
+          return  branchCopilotChatSession(sessionId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type BranchCopilotChatSessionMutationResult = NonNullable<Awaited<ReturnType<typeof branchCopilotChatSession>>>
+    export type BranchCopilotChatSessionMutationBody = CreateCopilotChatBranchRequest
+    export type BranchCopilotChatSessionMutationError = HTTPValidationError
+
+    /**
+ * @summary Branch a chat session from one of its answers
+ */
+export const useBranchCopilotChatSession = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof branchCopilotChatSession>>, TError,{sessionId: string;data: CreateCopilotChatBranchRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof branchCopilotChatSession>>,
+        TError,
+        {sessionId: string;data: CreateCopilotChatBranchRequest},
+        TContext
+      > => {
+      return useMutation(getBranchCopilotChatSessionMutationOptions(options), queryClient);
     }
     /**
  * QDash and allowlisted dependency source served read-only, with known revisions.
@@ -1068,6 +1158,99 @@ export function useGetCopilotSystemPrompt<TData = Awaited<ReturnType<typeof getC
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetCopilotSystemPromptQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
+ * Skills loaded by the Copilot runtime; a message starting ``/skill:<name>`` runs one.
+ * @summary List the skills a chat message can invoke
+ */
+export const listCopilotSkills = (
+
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<CopilotSkillList>(
+      {url: `/copilot/skills`, method: 'GET', signal
+    },
+      options);
+    }
+
+
+
+
+export const getListCopilotSkillsQueryKey = () => {
+    return [
+    `/copilot/skills`
+    ] as const;
+    }
+
+
+export const getListCopilotSkillsQueryOptions = <TData = Awaited<ReturnType<typeof listCopilotSkills>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCopilotSkills>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListCopilotSkillsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listCopilotSkills>>> = ({ signal }) => listCopilotSkills(requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listCopilotSkills>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListCopilotSkillsQueryResult = NonNullable<Awaited<ReturnType<typeof listCopilotSkills>>>
+export type ListCopilotSkillsQueryError = unknown
+
+
+export function useListCopilotSkills<TData = Awaited<ReturnType<typeof listCopilotSkills>>, TError = unknown>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCopilotSkills>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listCopilotSkills>>,
+          TError,
+          Awaited<ReturnType<typeof listCopilotSkills>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListCopilotSkills<TData = Awaited<ReturnType<typeof listCopilotSkills>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCopilotSkills>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listCopilotSkills>>,
+          TError,
+          Awaited<ReturnType<typeof listCopilotSkills>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListCopilotSkills<TData = Awaited<ReturnType<typeof listCopilotSkills>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCopilotSkills>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List the skills a chat message can invoke
+ */
+
+export function useListCopilotSkills<TData = Awaited<ReturnType<typeof listCopilotSkills>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCopilotSkills>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListCopilotSkillsQueryOptions(options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

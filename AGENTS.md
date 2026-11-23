@@ -1,6 +1,6 @@
 # QDash Agent Guide
 
-This file is the Codex-facing project guide. Keep it concise and update it when repository-wide conventions change. The older `CLAUDE.md` is retained as a Claude Code reference, but Codex should use this file first.
+This file is the shared guide for coding agents working in this repository. It covers project-wide conventions only; keep it concise and update it when those conventions change. Package directories may add their own `AGENTS.md` with package-specific rules.
 
 ## Project Overview
 
@@ -14,7 +14,7 @@ QDash is a web platform for managing and monitoring qubit calibration workflows.
 
 - Frontend: `ui/` uses Next.js, React, TypeScript, DaisyUI, TanStack Query, and Bun.
 - Backend API: `src/qdash/api/` uses FastAPI with MongoDB/PostgreSQL-related services.
-- Pi extensions: `packages/pi-qdash/` and `packages/pi-qcaleval/` share a root Bun workspace with `agent-runtime/` and `clients/typescript/`; install dependencies from the repository root. They remain independently published npm packages.
+- Pi extensions: `packages/pi-qdash/` and `packages/pi-qcaleval/` share a root Bun workspace with `agent-runtime/`, `clients/typescript/`, and `sdks/typescript/`; install dependencies from the repository root. They remain independently published npm packages.
 - Workflow engine: `src/qdash/workflow/` uses Prefect 3 and qubex.
 - Shared data/model code lives under `src/qdash/common`, `src/qdash/datamodel`, `src/qdash/dbmodel`, and repository/service modules.
 
@@ -50,6 +50,13 @@ When backend API schemas or routes change, run `task generate` from the reposito
 ## Common Commands
 
 Run commands from the repository root unless a directory is specified.
+
+On the host, run `task check` as `nix develop -c task check` and create commits inside the Nix
+shell (for example `nix develop -c git commit`) so the leak scans and pre-commit hook use the
+Betterleaks release pinned by `BETTERLEAKS_VERSION` in `.devcontainer/Dockerfile`. Inside the
+DevContainer, run the commands directly. Any brief that delegates checks or commits must carry
+this requirement. If `task check-betterleaks-version` fails, fix the environment; do not bypass
+the hook or edit leak allowlists to silence findings from another release.
 
 - Show available tasks: `task -l`
 - Install host-side local dependencies: `task dev-local-setup`
@@ -97,7 +104,7 @@ regardless of change size, including documentation-only changes.
 - Keep DaisyUI as the visual and theme foundation. Use the established Radix-based primitives in `ui/src/components/ui/` for interactions that need robust focus management, keyboard navigation, portals, dismissal, or collision-aware positioning.
 - Do not treat Radix as a wholesale DaisyUI replacement. Prefer DaisyUI for buttons, cards, inputs, badges, tables, and semantic colors; add a headless primitive only when the interaction behavior requires it.
 - Use TanStack Query for server state and `nuqs` for URL query state when matching existing patterns.
-- Use Lucide React icons where an icon is appropriate.
+- Use Lucide React icons where an icon is appropriate. Mark a leading or trailing icon in a labeled `.btn` with `data-icon="inline-start"` or `"inline-end"`; see the optical spacing rule in `docs/developer-guide/ui/guidelines.md`.
 - Follow `docs/developer-guide/ui/guidelines.md` and `docs/developer-guide/ui/design-policy.md` for implementation and visual design details.
 
 ## Documentation Conventions
@@ -118,8 +125,8 @@ regardless of change size, including documentation-only changes.
 - For PR text, follow `.github/pull_request_template.md` and `.github/instructions/pull-request-description-instructions.md`.
 - Branches usually start from `develop`; common prefixes are `feature/`, `bugfix/`, and `hotfix/`.
 - Before every push, including updates to an existing PR, run `task check` from the
-  repository root and require exit status 0. Focused tests, pre-commit hooks, and CI
-  do not replace this gate. Follow the [pre-push procedure](docs/developer-guide/development-flow.md#before-pushing).
+  repository root (`nix develop -c task check` on the host) and require exit status 0.
+  Focused tests, pre-commit hooks, and CI do not replace this gate. Follow the [pre-push procedure](docs/developer-guide/development-flow.md#before-pushing).
 - Stage intended new files before checking so the leak scan includes them. Fetch the
   PR target and use `LEAKS_BASE=origin/<target>` when it is not `develop`.
 - Review any auto-fix changes from `task check` and include intended fixes in the
@@ -137,3 +144,5 @@ regardless of change size, including documentation-only changes.
 - If changing UI behavior, add or adjust Vitest tests where practical and run the relevant UI checks.
 - If changing workflow or repository behavior, run the matching Python tests.
 - Mention any verification that could not be run and why.
+- Keep personal model, provider, editor, and delegation preferences in user-level agent
+  configuration, not in repository guidance.

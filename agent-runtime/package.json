@@ -9,16 +9,17 @@
     "check": "tsc --noEmit"
   },
   "dependencies": {
-    "@earendil-works/chord": "1.4.0",
-    "@earendil-works/pi-ai": "1.4.0",
-    "@earendil-works/pi-coding-agent": "1.4.0",
-    "@earendil-works/pi-durable": "1.4.0",
-    "@earendil-works/pi-env": "1.4.0",
+    "@earendil-works/chord": "1.6.0",
+    "@earendil-works/pi-ai": "1.6.0",
+    "@earendil-works/pi-codemode": "1.6.0",
+    "@earendil-works/pi-coding-agent": "1.6.0",
+    "@earendil-works/pi-durable": "1.6.0",
+    "@earendil-works/pi-env": "1.6.0",
+    "@oqtopus-team/pi-qdash": "workspace:*",
     "typebox": "^1.0.55",
     "yaml": "^2.8.0"
   },
   "devDependencies": {
-    "@oqtopus-team/pi-qdash": "workspace:*",
     "@types/node": "^22.0.0",
     "typescript": "^5.8.0",
     "@oqtopus-team/pi-qcaleval": "workspace:*"

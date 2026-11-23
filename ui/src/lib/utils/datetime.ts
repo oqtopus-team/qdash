@@ -183,3 +183,35 @@ export function formatRelativeTime(
     return "";
   }
 }
+
+/**
+ * Format a future UTC datetime string relative to now (e.g., "in 5m", "in 2h", "in 3d").
+ *
+ * @param utcString - ISO8601 datetime string
+ * @param timezone - Target timezone (default: from env or "Asia/Tokyo")
+ * @returns Relative time string, "now" for times within the next minute or already past,
+ *   or "" if input is null/undefined
+ */
+export function formatRelativeFutureTime(
+  utcString: string | null | undefined,
+  timezone: string = DEFAULT_TIMEZONE,
+): string {
+  if (!utcString) return "";
+
+  try {
+    const diffMs = parseUtcDate(utcString).getTime() - Date.now();
+    const diffMins = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    if (diffMins < 1) return "now";
+    if (diffMins < 60) return `in ${diffMins}m`;
+    if (diffHours < 24) return `in ${diffHours}h`;
+    if (diffDays < 7) return `in ${diffDays}d`;
+
+    // For later dates, show the formatted date
+    return formatDateTime(utcString, "MM/dd", timezone);
+  } catch {
+    return "";
+  }
+}

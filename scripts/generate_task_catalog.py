@@ -43,6 +43,12 @@ def build_catalog(base_path: Path) -> dict[str, object]:
                 tasks_by_name[task.name] = task
         discovered_backends[backend_path.name] = tasks_by_name
 
+    if service.documentation_errors:
+        raise RuntimeError(
+            "Task documentation must be a literal TaskDocumentation(...) call: "
+            + "; ".join(service.documentation_errors)
+        )
+
     # The fake backend runs the qubex implementation of every configured task that the fake
     # package does not define itself, so publish those qubex declarations under "fake" too.
     qubex_tasks = discovered_backends.get("qubex", {})

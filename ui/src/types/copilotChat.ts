@@ -1,5 +1,7 @@
 /** Shared types for every Copilot chat surface (page, sidebar, floating window). */
 
+import type { UiBlockPayload } from "@/lib/copilotUiSpec";
+
 /** The task result a chat is about; its first turn opens with the result's context and figures. */
 export interface TaskChatContext {
   taskName: string;
@@ -29,6 +31,18 @@ export interface ChatImageAttachment {
   mimeType: string;
 }
 
+/** Where a user message sent while an answer was written landed in the conversation. */
+export interface ChatMessageSteer {
+  requestId: string;
+  /** Its entry in the runtime's transcript. */
+  entryId: string | null;
+  /**
+   * `exact`: the chat saw where it landed. `approximate`: it was confirmed after the
+   * answer it interrupted was saved as one message, and follows that message.
+   */
+  placement: "exact" | "approximate";
+}
+
 export interface ChatMessage {
   role: "user" | "assistant";
   /** Plain text, or a JSON-encoded `CopilotBlocksResult` for assistant answers. */
@@ -40,6 +54,24 @@ export interface ChatMessage {
    * browser session that sent them; the server stores presence, not bytes.
    */
   attachments?: string[];
+  /** Set on a user message sent while an answer was written (a steer). */
+  steer?: ChatMessageSteer;
+  /**
+   * An assistant answer's entry in the runtime's transcript, from the stream's
+   * result. Only such an answer can be branched from; older answers have none.
+   */
+  entryId?: string;
+  /**
+   * The turn this message belongs to (its request ID). The server records a turn's
+   * messages itself; a save of this window's copy cannot replace them.
+   */
+  turnRequestId?: string;
+}
+
+/** Where a branched chat came from. */
+export interface ChatBranchOrigin {
+  sourceSessionId: string;
+  sourceEntryId: string;
 }
 
 /** A choice the assistant asks the user to make, shown as buttons. */
@@ -56,13 +88,25 @@ export interface ApprovalRequest {
   args: Record<string, unknown>;
 }
 
-/** A change the assistant proposes to the code open in the Workflow editor; the user applies it there. */
+/**
+ * A change the assistant proposes to the code open in an editor (the Workflow editor, the
+ * metric script editor, or a dashboard's draft as JSON); the user applies it there.
+ */
 export interface EditProposal {
   summary: string;
   /** The complete new file. */
   code: string;
+  /** Which editor the change is for. Absent on proposals made for flows before scripts existed. */
+  target?: "flow" | "metric_script" | "dashboard";
+  /** The flow's name; for a metric script or a dashboard, set to its name. */
   flowName: string;
   chipId: string | null;
+  /** The metric script the change is for (target `metric_script`). */
+  scriptId?: string;
+  /** The metric script's name (target `metric_script`). */
+  scriptName?: string;
+  /** The dashboard the change is for (target `dashboard`); null for a new dashboard. */
+  dashboardId?: string | null;
   pagePath: string;
 }
 
@@ -75,15 +119,47 @@ interface FlowEditorContext {
   dirty: boolean;
 }
 
+/** The metric script open in its editor, read when a turn is sent. */
+export interface MetricScriptEditorContext {
+  scriptId: string;
+  name: string;
+  /** The editor's current text, unsaved changes included. */
+  code: string;
+  dirty?: boolean;
+}
+
+/**
+ * A dashboard the user may edit, read when a turn is sent. Its unsaved draft is the
+ * "code" of the dashboard: JSON with the panels, plus name, description, chip and template
+ * for a new dashboard that is not created yet.
+ */
+interface DashboardEditorContext {
+  /** Absent for a new dashboard that exists only as a draft. */
+  dashboardId?: string;
+  name: string;
+  description?: string;
+  visibility?: "private" | "project";
+  /** The chip the page shows now. */
+  chipId?: string | null;
+  /** The stored version the draft is based on. */
+  version?: number | null;
+  /** The draft as JSON (see `dashboardDraft.ts`), unsaved changes included. */
+  code: string;
+  dirty?: boolean;
+}
+
 /** What the user has open while chatting from the sidebar or floating window; sent with every turn. */
 export interface PageContext {
   path: string;
   title: string;
   flow?: FlowEditorContext;
+  metricScript?: MetricScriptEditorContext;
+  dashboard?: DashboardEditorContext;
 }
 
-interface ContentBlock {
-  type: "text" | "chart" | "ask" | "approval" | "edit";
+export interface ContentBlock {
+  type: "text" | "chart" | "ui" | "ask" | "approval" | "edit";
+  /** Markdown for `text`; for `ui`, the block's plain-text fallback. */
   content: string | null;
   chart: {
     data: Record<string, unknown>[];
@@ -92,6 +168,11 @@ interface ContentBlock {
   ask?: AskRequest;
   approval?: ApprovalRequest;
   edit?: EditProposal;
+  /**
+   * A read-only UI the assistant composed (`render_ui`). Validated again
+   * before rendering; an unknown version or invalid spec shows `ui.fallback`.
+   */
+  ui?: UiBlockPayload;
 }
 
 export interface BlocksResult {
@@ -118,6 +199,33 @@ export interface ToolEvaluation {
   evaluationId?: string;
 }
 
+/**
+ * What the classifier model decided for a `classify` call: the assistant asked
+ * it to pick one of the categories it defined. Never the classifier's input.
+ */
+/** A calibration session a chat tool call created: its ID and chip. */
+export interface CreatedCalibrationSession {
+  calibrationSessionId: string;
+  chipId?: string;
+}
+
+export interface ToolClassification {
+  /** `provider/model` of the classifier model (classifier.yaml). */
+  classifier: string;
+  /** `classified`: a clear answer; `ambiguous`: no clear winner; `failed`: no answer. */
+  outcome: "classified" | "ambiguous" | "failed";
+  /** The chosen category, as the assistant named it. */
+  category?: string;
+  /** The chosen category's probability. */
+  probability?: number;
+  /** Its lead over the runner-up. */
+  margin?: number;
+  /** Every category's probability, highest first. */
+  probabilities?: { category: string; probability: number }[];
+  /** Why there is no answer, when `failed`. */
+  reason?: string;
+}
+
 export type TraceStep =
   | { kind: "thinking"; text: string; startedAt: number; endedAt?: number }
   | {
@@ -131,6 +239,11 @@ export type TraceStep =
        * `cancelled`: the turn ended before the call was made; nothing ran.
        */
       status: "drafting" | "running" | "done" | "error" | "cancelled";
+      /**
+       * Stored as `done` because the call was still running when the turn ended or was
+       * saved in progress; whether it finished is unknown.
+       */
+      interrupted?: boolean;
       startedAt: number;
       endedAt?: number;
       /** Arguments written so far, by JSON path such as `content` or `path` (while drafting). */
@@ -145,6 +258,13 @@ export type TraceStep =
       figures?: string[];
       /** What an evaluation tool sent its model (qcal_evaluate). */
       evaluation?: ToolEvaluation;
+      /** What the classifier decided (classify). */
+      classification?: ToolClassification;
+      /**
+       * The calibration session a successful `qdash_create_calibration_session` call created, as QDash answered it
+       * (the tool's result, relayed by the runtime and the API); never the model's arguments or text.
+       */
+      calibrationSession?: CreatedCalibrationSession;
     }
   | { kind: "text"; text: string };
 
@@ -161,12 +281,84 @@ export type CopilotBlocksResult = BlocksResult & {
   trace?: ChatTrace;
   /** The user stopped the turn; the blocks hold whatever had streamed. */
   stopped?: boolean;
+  /**
+   * Saved by the server while the turn still ran: the answer so far. Replaced by the
+   * answer's end once the turn ends.
+   */
+  in_progress?: boolean;
+  /**
+   * The answer so far of a turn that no process ran any more when a later turn
+   * replaced it (its API process restarted mid-turn): it never ended.
+   */
+  interrupted?: boolean;
   /** The user's rating of this answer, kept with it for later evaluation. */
   feedback?: AnswerFeedback;
 };
+
+/**
+ * The health of a streaming turn's connection, kept apart from what the turn does.
+ * `live`: the stream is open and its heartbeat arrives. `reconnecting`: the stream
+ * dropped or went silent past its heartbeat, and the chat is attaching to the turn
+ * again; what the assistant does meanwhile is unknown until it is back.
+ */
+export interface TurnConnection {
+  state: "live" | "reconnecting";
+  /** When the turn itself last sent something (text, a step, a status); heartbeats do not count. */
+  lastUpdateAt: number;
+  /** Attempts to attach again since the stream was last live. */
+  attempt: number;
+}
+
+/**
+ * What a turn was last seen doing, kept short so it can be stored with the turn's pointer
+ * (`copilotTurnStore.ts`): the tool it ran, with the tool's label, or a phrase such as
+ * "Thinking". Never the call's arguments or result.
+ */
+export interface TurnActivitySnapshot {
+  tool: string | null;
+  label: string;
+}
+
+/**
+ * A turn of this tab the chat does not stream now. `restoring`: after a reload or a
+ * remount, the chat loads the session and reattaches. `other_project`: the turn was sent
+ * from another project; it runs on, and the chat follows it again in that project.
+ */
+export interface DetachedTurn {
+  reason: "restoring" | "other_project";
+  requestId: string;
+  projectId: string | null;
+  startedAt: number;
+  /** What the chat last saw the turn do, and when the turn last sent something. */
+  activity: TurnActivitySnapshot | null;
+  lastUpdateAt: number | null;
+}
+
+/**
+ * A moment of a turn worth telling the user about, raised once per turn: an answer is
+ * ready, it waits for the user's approval, answer, or a proposed change, the turn waits for
+ * an expert, or it failed.
+ */
+export type ChatEventKind = "answer" | "approval" | "question" | "edit" | "expert" | "failed";
+
+export interface ChatTurnEvent {
+  kind: ChatEventKind;
+  sessionId: string;
+  /** The turn's own request ID. */
+  requestId: string;
+  /** The user and the project the turn belongs to. */
+  owner: string | null | undefined;
+  projectId: string | null;
+  /** The chat's title when the event was raised. */
+  chatTitle: string;
+  /** A short line from the event, such as the error. */
+  detail?: string;
+}
 
 /** The turn that is still streaming. */
 export interface LiveTurn {
   steps: TraceStep[];
   startedAt: number;
+  /** UI blocks finished so far (`render_ui`), shown live and kept if the user stops. */
+  blocks?: ContentBlock[];
 }

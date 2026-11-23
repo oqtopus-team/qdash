@@ -43,6 +43,7 @@ import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 import { AdminPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
+import { UserAvatar } from "@/components/ui/UserAvatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { formatDate } from "@/lib/utils/datetime";
 
@@ -1033,12 +1034,17 @@ function MembersModal({
                       {members.map((member: MemberItem) => (
                         <tr key={member.username}>
                           <td>
-                            <div className="font-mono text-sm">{member.username}</div>
-                            {member.display_name && (
-                              <div className="text-xs text-base-content/60">
-                                {member.display_name}
+                            <div className="flex items-center gap-2">
+                              <UserAvatar username={member.username} size={24} />
+                              <div className="min-w-0">
+                                <div className="font-mono text-sm">{member.username}</div>
+                                {member.display_name && (
+                                  <div className="text-xs text-base-content/60">
+                                    {member.display_name}
+                                  </div>
+                                )}
                               </div>
-                            )}
+                            </div>
                           </td>
                           <td>
                             <span className={`badge badge-sm ${getRoleBadgeClass(member.role)}`}>
@@ -1111,7 +1117,7 @@ function MembersModal({
                 </label>
 
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <label className="flex items-center gap-2">
+                  <label className="choice-field">
                     <input
                       type="checkbox"
                       className="checkbox checkbox-sm"
@@ -1135,13 +1141,14 @@ function MembersModal({
                     <ul className="divide-y divide-base-300">
                       {filteredAvailableUsers.map((userItem) => (
                         <li key={userItem.username}>
-                          <label className="flex cursor-pointer items-start gap-3 p-3 hover:bg-base-200">
+                          <label className="choice-field gap-3 p-3 hover:bg-base-200">
                             <input
                               type="checkbox"
-                              className="checkbox checkbox-sm mt-1"
+                              className="checkbox checkbox-sm"
                               checked={selectedCandidateUsernames.includes(userItem.username)}
                               onChange={() => handleToggleCandidate(userItem.username)}
                             />
+                            <UserAvatar username={userItem.username} size={24} />
                             <div className="min-w-0 flex-1">
                               <div className="flex flex-wrap items-center gap-2">
                                 <span className="font-mono text-sm">{userItem.username}</span>
@@ -1184,7 +1191,12 @@ function MembersModal({
                     onClick={handleAddMembers}
                     disabled={isBulkAdding || selectedCandidateUsernames.length === 0}
                   >
-                    {isBulkAdding ? <span className="loading loading-spinner loading-sm" /> : null}
+                    {isBulkAdding ? (
+                      <span
+                        data-icon="inline-start"
+                        className="loading loading-spinner loading-sm"
+                      />
+                    ) : null}
                     Add Selected
                   </button>
                 </div>
@@ -1383,11 +1395,11 @@ function AssignUsersToProjectModal({
                   <ul className="divide-y divide-base-300">
                     {filteredProjects.map((project) => (
                       <li key={project.project_id}>
-                        <label className="flex cursor-pointer items-start gap-3 p-3 hover:bg-base-200">
+                        <label className="choice-field gap-3 p-3 hover:bg-base-200">
                           <input
                             type="radio"
                             name="assign-project"
-                            className="radio radio-sm mt-1"
+                            className="radio radio-sm"
                             checked={selectedProjectId === project.project_id}
                             onChange={() => setSelectedProjectId(project.project_id)}
                           />

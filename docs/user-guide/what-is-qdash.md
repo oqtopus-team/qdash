@@ -8,9 +8,8 @@ QDash keeps calibration execution, results, and operator context together for ea
 
 ## What QDash Manages
 
-Calibration work produces more than a final parameter value. Operators also need the inputs,
-measurement artifacts, execution status, history, and discussion that explain where the value
-came from. QDash records these parts in one project-scoped workspace.
+QDash records calibration inputs, artifacts, status, history, and discussion in a project-scoped
+workspace.
 
 | Concept | Meaning in QDash |
 | --- | --- |
@@ -47,10 +46,9 @@ hardware decisions.
 
 ## Demo
 
-A 30-second tour of QDash: chip dashboard, chip topology, workflows, live executions, and
-time-series analysis.
+Watch the demo introducing QDash.
 
-<video controls playsinline preload="metadata" poster="/images/qdash-demo-poster.png" src="/videos/qdash-demo.mp4" style="width: 100%; border-radius: 8px;"></video>
+<video controls playsinline preload="metadata" src="/videos/qdash-demo.mp4" style="width: 100%; border-radius: 8px;"></video>
 
 Continue with the [Application Tour](./application-tour.md) to find each feature, or
 [set up QDash](./setup.md) for a lab. Developers can start with the

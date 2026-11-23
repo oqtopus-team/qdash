@@ -1,8 +1,6 @@
 "use client";
 
 import { useMemo, useState, useRef, useCallback, useEffect, memo } from "react";
-import { createPortal } from "react-dom";
-import Link from "next/link";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 
 import { GitBranch, Lock, ZoomIn } from "lucide-react";
@@ -11,12 +9,22 @@ import {
   GridFullscreenButton,
   gridFullscreenPanelClass,
 } from "@/components/ui/GridFullscreenButton";
+import { LockedGridScroller } from "@/components/ui/LockedGridScroller";
+import { LineageButton } from "@/components/features/provenance/ParameterLineageDialog";
 import { GridZoomControls } from "@/components/ui/GridZoomControls";
 import { RegionZoomToggle } from "@/components/ui/RegionZoomToggle";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 import { useFullscreenPanel } from "@/hooks/useFullscreenPanel";
 import { useGridLayout } from "@/hooks/useGridLayout";
+import { usePanClickGuard } from "@/hooks/usePanClickGuard";
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
+import {
+  buildMuxCellMap,
+  clipMuxBoxes,
+  muxLabelAreaClass,
+  type MuxGroupBox,
+} from "@/lib/utils/mux-groups";
 import { pickColor } from "@/lib/utils/color-scale";
 import { getQubitGridPosition, type TopologyLayoutParams } from "@/lib/utils/grid-position";
 import { calculateGridContainerWidth, cellFontSize } from "@/lib/utils/grid-layout";
@@ -29,6 +37,8 @@ interface MetricValue {
   execution_id?: string | null;
   stddev?: number | null;
 }
+
+const NO_MUX_GROUPS: MuxGroupBox[] = [];
 
 interface QubitMetricsGridProps {
   metricData: { [key: string]: MetricValue } | null;
@@ -101,113 +111,95 @@ const GridCell = memo(function GridCell({
   onClick,
 }: GridCellProps) {
   const fontSizes = getCellFontSizes(cellSize);
-  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
   // When cells are small, hide stddev and unit to prevent text from being crushed
   const effectiveShowUnits = showUnits && !fontSizes.hideExtras;
+  const tooltipLabel =
+    value !== null && value !== undefined
+      ? `${qid}: ${value.toFixed(4)}${stddev != null ? ` ± ${stddev.toFixed(4)}` : ""} ${unit}`
+      : `${qid}: No data`;
 
   return (
-    <button
-      onClick={onClick}
-      onMouseEnter={(e) => {
-        const rect = e.currentTarget.getBoundingClientRect();
-        setTooltipPos({ x: rect.left + rect.width / 2, y: rect.top });
-      }}
-      onMouseLeave={() => setTooltipPos(null)}
-      className={`aspect-square rounded-lg shadow-md flex flex-col items-center justify-center relative cursor-pointer ${
-        !bgColor ? "bg-base-300/50" : ""
-      } ${muxBgClass}`}
-      style={{
-        backgroundColor: bgColor || undefined,
-      }}
-    >
-      {/* QID Label */}
-      {showLabels && (
-        <div
-          className={`absolute top-0.5 left-0.5 px-0.5 py-px rounded font-medium shadow-sm leading-tight ${
-            value !== null && value !== undefined
-              ? "bg-black/30 text-white"
-              : "bg-base-content/20 text-base-content"
-          }`}
-          style={{ fontSize: fontSizes.labelSize }}
-        >
-          {qid}
-        </div>
-      )}
-
-      {/* Unit Label */}
-      {showLabels && effectiveShowUnits && (
-        <div
-          className="absolute top-0.5 right-1 text-white/90 font-medium drop-shadow leading-tight"
-          style={{ fontSize: fontSizes.unitSize }}
-        >
-          ({unit})
-        </div>
-      )}
-
-      {/* Value Display */}
-      {value !== null && value !== undefined && showValues && (
-        <div
-          className="flex flex-col items-center justify-center h-full leading-tight"
+    <Tooltip disableHoverableContent>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          onClick={onClick}
+          className={`aspect-square rounded-lg shadow-xs flex flex-col items-center justify-center relative cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-base-content ${
+            !bgColor ? "bg-base-300/50" : ""
+          } ${muxBgClass}`}
           style={{
-            paddingTop: showLabels ? cellFontSize(cellSize, 0.22) : undefined,
+            backgroundColor: bgColor || undefined,
           }}
         >
-          <div
-            className="font-medium text-white drop-shadow-md"
-            style={{ fontSize: fontSizes.valueSize }}
-          >
-            {value.toFixed(2)}
-          </div>
-          {stddev != null && effectiveShowUnits && (
+          {/* QID Label */}
+          {showLabels && (
             <div
-              className="text-white/80 font-medium drop-shadow"
-              style={{ fontSize: fontSizes.unitSize }}
+              className={`absolute top-0.5 left-0.5 px-0.5 py-px rounded font-medium shadow-sm leading-tight ${
+                value !== null && value !== undefined
+                  ? "bg-black/30 text-white"
+                  : "bg-base-content/20 text-base-content"
+              }`}
+              style={{ fontSize: fontSizes.labelSize }}
             >
-              ± {stddev.toFixed(2)}
+              {qid}
             </div>
           )}
-        </div>
-      )}
 
-      {/* No data indicator */}
-      {(value === null || value === undefined) && showValues && (
-        <div
-          className="flex flex-col items-center justify-center h-full leading-tight"
-          style={{
-            paddingTop: showLabels ? cellFontSize(cellSize, 0.22) : undefined,
-          }}
-        >
-          <div
-            className="text-base-content/40 font-medium"
-            style={{ fontSize: fontSizes.valueSize }}
-          >
-            N/A
-          </div>
-        </div>
-      )}
+          {/* Unit Label */}
+          {showLabels && effectiveShowUnits && (
+            <div
+              className="absolute top-0.5 right-1 text-white/90 font-medium drop-shadow leading-tight"
+              style={{ fontSize: fontSizes.unitSize }}
+            >
+              ({unit})
+            </div>
+          )}
 
-      {/* Hover tooltip - portal to escape overflow-hidden */}
-      {tooltipPos &&
-        typeof document !== "undefined" &&
-        createPortal(
-          <div
-            role="tooltip"
-            className="px-3 py-2 bg-base-100 text-base-content text-sm rounded-lg shadow-lg whitespace-nowrap pointer-events-none border border-base-300"
-            style={{
-              position: "fixed",
-              left: tooltipPos.x,
-              top: tooltipPos.y - 8,
-              transform: "translate(-50%, -100%)",
-              zIndex: 9999,
-            }}
-          >
-            {value !== null && value !== undefined
-              ? `${qid}: ${value.toFixed(4)}${stddev != null ? ` ± ${stddev.toFixed(4)}` : ""} ${unit}`
-              : `${qid}: No data`}
-          </div>,
-          document.body,
-        )}
-    </button>
+          {/* Value Display */}
+          {value !== null && value !== undefined && showValues && (
+            <div
+              className="flex flex-col items-center justify-center h-full leading-tight"
+              style={{
+                paddingTop: showLabels ? cellFontSize(cellSize, 0.22) : undefined,
+              }}
+            >
+              <div
+                className="font-medium text-white drop-shadow-md"
+                style={{ fontSize: fontSizes.valueSize }}
+              >
+                {value.toFixed(2)}
+              </div>
+              {stddev != null && effectiveShowUnits && (
+                <div
+                  className="text-white/80 font-medium drop-shadow"
+                  style={{ fontSize: fontSizes.unitSize }}
+                >
+                  ± {stddev.toFixed(2)}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* No data indicator */}
+          {(value === null || value === undefined) && showValues && (
+            <div
+              className="flex flex-col items-center justify-center h-full leading-tight"
+              style={{
+                paddingTop: showLabels ? cellFontSize(cellSize, 0.22) : undefined,
+              }}
+            >
+              <div
+                className="text-base-content/40 font-medium"
+                style={{ fontSize: fontSizes.valueSize }}
+              >
+                N/A
+              </div>
+            </div>
+          )}
+        </button>
+      </TooltipTrigger>
+      <TooltipContent className="tabular-nums">{tooltipLabel}</TooltipContent>
+    </Tooltip>
   );
 });
 
@@ -240,7 +232,14 @@ export function QubitMetricsGrid({
     showMuxBoundaries = false,
     qubits: topologyQubits,
     gridSize: topologyGridSize,
+    muxGroups = NO_MUX_GROUPS,
   } = useTopologyConfig(topologyId) ?? {};
+
+  // Cell -> MUX box, so boundaries follow the topology's actual MUX groups
+  const muxCellMap = useMemo(
+    () => buildMuxCellMap(muxGroups, topologyQubits),
+    [muxGroups, topologyQubits],
+  );
 
   // Calculate actual grid dimensions from topology qubit positions
   const { gridRows, gridCols } = useMemo(() => {
@@ -270,7 +269,7 @@ export function QubitMetricsGrid({
   );
 
   // View mode state: 'pan-zoom' for DOM with pan/zoom, 'region' for region zoom
-  const [viewMode, setViewMode] = useState<"pan-zoom" | "region">("region");
+  const [viewMode, setViewMode] = useState<"pan-zoom" | "region">("pan-zoom");
   const [regionSelectionEnabled, setRegionSelectionEnabled] = useState(false);
   const [zoomMode, setZoomMode] = useState<"full" | "region">("full");
   const [selectedRegion, setSelectedRegion] = useState<{
@@ -292,6 +291,7 @@ export function QubitMetricsGrid({
   const displayCols = zoomMode === "region" ? regionSize : gridCols;
   const displayRows = zoomMode === "region" ? regionSize : gridRows;
   const { isFullscreen, toggleFullscreen } = useFullscreenPanel();
+  const panClickGuard = usePanClickGuard();
   const { containerRef, cellSize, isMobile, viewportHeight, gap, padding } = useGridLayout({
     cols: displayCols,
     rows: displayRows,
@@ -304,12 +304,15 @@ export function QubitMetricsGrid({
   const numRegions = Math.floor(effectiveGridSize / regionSize);
   const isSquareGrid = gridRows === gridCols;
 
-  // Region tab is only available for square grids; fall back to pan-zoom otherwise.
+  // Lock works for every topology, but region zoom assumes a square grid; leave it when the
+  // grid is not square.
   useEffect(() => {
-    if (!isSquareGrid && viewMode === "region") {
-      setViewMode("pan-zoom");
+    if (!isSquareGrid) {
+      setZoomMode("full");
+      setSelectedRegion(null);
+      setRegionSelectionEnabled(false);
     }
-  }, [isSquareGrid, viewMode]);
+  }, [isSquareGrid]);
 
   // Debounced LOD update to avoid excessive re-renders during zoom
   const handleTransform = useCallback((_: unknown, state: { scale: number }) => {
@@ -370,10 +373,11 @@ export function QubitMetricsGrid({
     [selectedRegion, regionSize],
   );
 
-  // LOD flags
-  const showLabels = lodLevel !== "low" || zoomMode === "region";
-  const showValues = lodLevel !== "low" || zoomMode === "region";
-  const showUnits = lodLevel === "high" || zoomMode === "region";
+  // LOD flags. The locked view draws the grid at its default size, so it ignores the LOD that
+  // the last zoom left behind.
+  const showLabels = lodLevel !== "low" || viewMode === "region";
+  const showValues = lodLevel !== "low" || viewMode === "region";
+  const showUnits = lodLevel === "high" || viewMode === "region";
 
   // Pre-compute grid cells data for memoization
   const gridCellsData = useMemo(() => {
@@ -393,9 +397,7 @@ export function QubitMetricsGrid({
       const actualRow = displayGridStart.row + localRow;
       const actualCol = displayGridStart.col + localCol;
 
-      const muxRow = Math.floor(actualRow / muxSize);
-      const muxCol = Math.floor(actualCol / muxSize);
-      const isEvenMux = (muxRow + muxCol) % 2 === 0;
+      const muxBox = muxCellMap.get(`${actualRow},${actualCol}`);
 
       let qid: string | undefined;
       if (topologyQubits) {
@@ -418,8 +420,8 @@ export function QubitMetricsGrid({
       const value = metric?.value ?? null;
       const stddev = metric?.stddev ?? null;
       const muxBgClass =
-        hasMux && showMuxBoundaries
-          ? isEvenMux
+        hasMux && showMuxBoundaries && muxBox
+          ? muxBox.isEven
             ? "ring-2 ring-inset ring-primary/20"
             : "ring-2 ring-inset ring-secondary/20"
           : "";
@@ -432,7 +434,7 @@ export function QubitMetricsGrid({
     displayRows,
     displayCols,
     displayGridStart,
-    muxSize,
+    muxCellMap,
     topologyQubits,
     displayData,
     layoutParams,
@@ -452,7 +454,7 @@ export function QubitMetricsGrid({
   const gridContent = useMemo(
     () => (
       <div
-        className="grid bg-base-200/50 rounded-xl relative"
+        className="grid bg-base-200/50 rounded-[var(--radius-box)] relative"
         style={{
           gap: `${gap}px`,
           padding: `${padding / 2}px`,
@@ -502,36 +504,26 @@ export function QubitMetricsGrid({
                 gridTemplateRows: `repeat(${displayRows}, minmax(${displayCellSize}px, 1fr))`,
               }}
             >
-              {Array.from({
-                length: Math.pow(Math.ceil(displayCols / muxSize), 2),
-              }).map((_, idx) => {
-                const numMuxCols = Math.ceil(displayCols / muxSize);
-                const muxLocalRow = Math.floor(idx / numMuxCols);
-                const muxLocalCol = idx % numMuxCols;
-                const muxActualRow = Math.floor(displayGridStart.row / muxSize) + muxLocalRow;
-                const muxActualCol = Math.floor(displayGridStart.col / muxSize) + muxLocalCol;
-                const muxIndex =
-                  muxActualRow * Math.floor(effectiveGridSize / muxSize) + muxActualCol;
-                const startCol = muxLocalCol * muxSize + 1;
-                const startRow = muxLocalRow * muxSize + 1;
-                const spanCols = Math.min(muxSize, displayCols - muxLocalCol * muxSize);
-                const spanRows = Math.min(muxSize, displayRows - muxLocalRow * muxSize);
-                if (spanCols <= 0 || spanRows <= 0) return null;
-
+              {clipMuxBoxes(muxGroups, {
+                row: displayGridStart.row,
+                col: displayGridStart.col,
+                rows: displayRows,
+                cols: displayCols,
+              }).map((box) => {
                 return (
                   <div
-                    key={idx}
-                    className="flex items-center justify-center"
+                    key={box.muxId}
+                    className={muxLabelAreaClass(box)}
                     style={{
-                      gridColumn: `${startCol} / span ${spanCols}`,
-                      gridRow: `${startRow} / span ${spanRows}`,
+                      gridColumn: `${box.col + 1} / span ${box.cols}`,
+                      gridRow: `${box.row + 1} / span ${box.rows}`,
                     }}
                   >
                     <div
                       className="font-medium text-base-content/30 bg-base-100/60 px-1 py-px rounded border border-base-content/5"
                       style={{ fontSize: cellFontSize(displayCellSize, 0.13) }}
                     >
-                      MUX{muxIndex}
+                      MUX{box.muxId}
                     </div>
                   </div>
                 );
@@ -565,7 +557,7 @@ export function QubitMetricsGrid({
                     key={index}
                     className={`pointer-events-auto transition-colors duration-200 rounded-lg flex items-center justify-center ${
                       isHovered
-                        ? "bg-primary/30 border-2 border-primary shadow-lg z-10"
+                        ? "bg-primary/30 border-2 border-primary z-10"
                         : "bg-primary/5 border-2 border-primary/20 hover:border-primary/40 hover:bg-primary/10"
                     }`}
                     style={{
@@ -607,9 +599,8 @@ export function QubitMetricsGrid({
       handleCellClick,
       hasMux,
       showMuxBoundaries,
-      muxSize,
+      muxGroups,
       displayGridStart,
-      effectiveGridSize,
       zoomMode,
       regionSelectionEnabled,
       isSquareGrid,
@@ -631,18 +622,6 @@ export function QubitMetricsGrid({
       {/* View Mode Toggle */}
       <div className="flex items-center gap-4">
         <div className="tabs tabs-boxed bg-base-200 w-fit">
-          {isSquareGrid && (
-            <button
-              type="button"
-              className={`tab gap-2 ${viewMode === "region" ? "tab-active" : ""}`}
-              onClick={() => setViewMode("region")}
-              title="Lock"
-              aria-label="Lock"
-            >
-              <Lock className="h-4 w-4" />
-              <span className="hidden sm:inline">Lock</span>
-            </button>
-          )}
           <button
             type="button"
             className={`tab gap-2 ${viewMode === "pan-zoom" ? "tab-active" : ""}`}
@@ -657,6 +636,16 @@ export function QubitMetricsGrid({
           >
             <ZoomIn className="h-4 w-4" />
             <span className="hidden sm:inline">Zoom</span>
+          </button>
+          <button
+            type="button"
+            className={`tab gap-2 ${viewMode === "region" ? "tab-active" : ""}`}
+            onClick={() => setViewMode("region")}
+            title="Lock"
+            aria-label="Lock"
+          >
+            <Lock className="h-4 w-4" />
+            <span className="hidden sm:inline">Lock</span>
           </button>
         </div>
 
@@ -700,7 +689,7 @@ export function QubitMetricsGrid({
         className={`flex-1 relative flex justify-center ${
           viewMode === "pan-zoom"
             ? "bg-base-200/30 border-2 border-dashed border-base-300 rounded-lg"
-            : "items-start bg-base-200/60 rounded-lg"
+            : "items-start overflow-hidden bg-base-200/60 rounded-lg"
         }`}
         style={{ padding: `${Math.max(4, padding / 4)}px` }}
         ref={containerRef}
@@ -722,6 +711,7 @@ export function QubitMetricsGrid({
           >
             <GridZoomControls isFullscreen={isFullscreen} className="top-12" />
             <TransformComponent
+              contentProps={panClickGuard}
               wrapperStyle={{ width: "100%", height: "100%" }}
               contentStyle={{
                 display: "flex",
@@ -733,7 +723,7 @@ export function QubitMetricsGrid({
             </TransformComponent>
           </TransformWrapper>
         ) : (
-          gridContent
+          <LockedGridScroller>{gridContent}</LockedGridScroller>
         )}
       </div>
 
@@ -775,13 +765,16 @@ export function QubitMetricsGrid({
                 />
               </div>
               <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-base-300 flex justify-between items-center">
-                <Link
-                  href={`/provenance?parameter=${encodeURIComponent(metricKey)}&qid=${encodeURIComponent(selectedQubitInfo.qid)}&tab=lineage`}
-                  className="btn btn-ghost btn-sm sm:btn-md gap-1"
+                <LineageButton
+                  target={{
+                    parameterName: metricKey,
+                    qid: selectedQubitInfo.qid,
+                  }}
+                  className="btn btn-ghost btn-sm sm:btn-md"
                 >
-                  <GitBranch className="h-4 w-4" />
+                  <GitBranch data-icon="inline-start" />
                   <span className="hidden sm:inline">Lineage</span>
-                </Link>
+                </LineageButton>
                 <div className="flex gap-2">
                   <button
                     type="button"

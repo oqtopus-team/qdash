@@ -62,18 +62,9 @@ Use established aliases:
 
 ## Keep Boundaries Explicit
 
-Choose the narrowest owner that preserves the required behavior:
-
-| State | Owner |
-| --- | --- |
-| API records and mutation status | Generated TanStack Query hook |
-| Shareable filters, selections, and date ranges | Existing `use*UrlState` hook |
-| Authentication, active project, theme, or global layout | Existing context |
-| One component subtree | Local state or a focused hook |
-| Validated multi-field form | React Hook Form with Zod |
-
-Do not copy query results into Context or synchronize duplicate response state by hand. Invalidate
-the affected generated query keys after a mutation.
+Follow [State Ownership](./architecture.md#state-ownership): generated queries own API data,
+URL hooks own shareable filters, contexts own cross-route state, and local state owns a component
+subtree. Do not copy query results into context; invalidate affected query keys after mutations.
 
 Keep feature-specific composition in `components/features/`. Move a component to
 `components/ui/` only when its API no longer depends on a feature model and at least two callers
@@ -82,9 +73,36 @@ menus, tooltips, page framing, tables, loading and empty states, errors, confirm
 feedback.
 
 Use DaisyUI for buttons, cards, inputs, badges, tables, alerts, and other visual components. Reuse
-the shared Radix-based `Dialog`, `DropdownMenu`, and `Tooltip` wrappers when focus management,
-keyboard navigation, portals, dismissal, or collision handling requires them. Feature code does
-not import another headless primitive to replace an established wrapper.
+the shared Radix-based `Dialog`, `DropdownMenu`, `Popover`, and `Tooltip` wrappers when focus
+management, keyboard navigation, portals, dismissal, or collision handling requires them. Feature
+code does not import another headless primitive to replace an established wrapper. The app root
+mounts one `TooltipProvider`, so moving between neighbouring tooltips skips the open delay; feature
+code does not add its own provider. An inline autocomplete, such as the mention list in
+`MarkdownEditor`, keeps focus in its text field, which `DropdownMenu` would move into the menu; it
+renders a `listbox` and marks the field as a `combobox` with `aria-activedescendant` instead.
+
+Links that navigate to a page show no hover popup: no `Tooltip`, no hover card, and no native
+`title` that only repeats the destination. A visible label names the link; an icon-only link or
+navigation button carries an `aria-label` instead. The collapsed sidebar follows the same rule:
+its rows keep their labels mounted, faded and clipped, so each row keeps its accessible name, and
+only the expand/collapse toggle keeps a tooltip. A tooltip or `title` stays where it adds
+information the visible text lacks, such as a chart day's counts, a truncated identifier, or the
+reason an action is disabled.
+
+Links in chat answers are the exception: they get a hover card from the root
+`LinkHoverCardProvider` in `ui/src/components/features/link-preview/`, mounted with
+`scope="chat"` so it reacts only to links inside a `data-link-preview="chat"` subtree. The
+provider finds those `<a href>` elements, including ones rendered by Next.js `Link`, through event
+delegation on the document, so a click keeps its normal navigation. A pointer opens the card after
+400 ms and keyboard focus opens it at once; touch and focus that follows a pointer press open
+nothing. `describeLink` in `ui/src/lib/linkPreview.ts` names the destination from the URL alone. A
+task result, execution, forum post, or figure route on the current origin loads a short summary
+when the card opens. Other links show their page, host, file, or address and are never requested.
+An empty `href`, a bare `#`, a `javascript:` URL, and `aria-disabled="true"` get no card, and
+buttons are never treated as links. In a chat answer, a record route on any host is still read as
+a QDash record, matching the click preview in `ChatLinkPreviewProvider`, because older answers may
+name a misconfigured host. Mark a subtree with `data-link-preview="off"` when its links must not
+show a card, as the card's own content does.
 
 How these boundaries connect: [UI Architecture](./architecture.md).
 
@@ -134,12 +152,20 @@ are short (`Ask a question`, `Search tasks`).
 ## Keep Surfaces Flat
 
 Depth comes from borders and spacing, not from gradients, glow, or motion. `globals.css` sets the
-DaisyUI components once; feature code does not add decoration on top.
+DaisyUI components once; feature code does not add decoration on top. Corner radii come from the
+active theme's DaisyUI tokens (`--radius-field`, `--radius-box`, `--radius-selector`): the light
+and dark themes set `0.5rem` fields and `0.75rem` boxes, and every other theme keeps its own shape.
+Shared primitives use `rounded-[var(--radius-box)]` rather than a fixed `rounded-*` step.
+`globals.css` sets the button radius outside a cascade layer, so a `rounded-*` utility on a `.btn`
+never applies; leave the shape to the theme. Theme colors come from DaisyUI 5 variables such as
+`var(--color-primary)`; the DaisyUI 4 channels (`oklch(var(--p))`) no longer exist and resolve to
+no color. `ui/src/lib/__tests__/designTokens.test.ts` fails on either pattern and on a button
+radius rule that does not exclude `.btn-circle`.
 
 | Surface | Rule |
 | --- | --- |
-| Button | Solid DaisyUI fill, `0.5rem` radius, no shadow, no hover lift |
-| Card, table, alert, dropdown | 1px border in `base-content/10`, hairline shadow, `0.5rem` to `0.75rem` radius |
+| Button | Solid DaisyUI fill, `--radius-field` radius (`.btn-circle` stays round), no shadow, no hover lift |
+| Card, table, alert, dropdown, dialog | 1px border in `base-content/10`, hairline shadow, `--radius-box` radius |
 | Input | 1px border, primary border plus a 3px soft ring on focus |
 | Active navigation or tab | Tinted background (`primary` at 12%) with primary text, not a filled gradient |
 | Floating layer (modal, drawer, menu) | One soft shadow; this is the only place `shadow-md` or larger belongs |
@@ -154,10 +180,94 @@ A qubit or coupling id is always a `QubitTile` (`ui/src/components/ui/QubitTile.
 small square-cornered box, the same shape as a cell of the chip grid, with a status dot when the
 reference carries a status. Do not render ids as plain badges.
 
-Icons come from `lucide-react`, 16px to 18px, in the color of their text role (`text-base-content/60`
+Icons come from `lucide-react`, 16px to 18px outside buttons, in the color of their text role (`text-base-content/60`
 for meta), never in `secondary` or `accent`. Product UI does not use emoji or emoji images; `EmptyState` renders
-a lucide icon from its `emoji` name map, and toasts use lucide status icons. `FluentEmoji` remains
-only for user-chosen avatars and the sign-in page.
+a lucide icon from its `emoji` name map, and toasts use lucide status icons. `UserAvatar` renders
+the user's glyph avatar locally; see [User Avatars](./architecture.md#user-avatars).
+
+## Space Icon Buttons Optically
+
+An icon next to a label reads lighter than the word, so equal geometry looks lopsided. A labeled
+`.btn` marks its leading or trailing icon with `data-icon="inline-start"` or
+`data-icon="inline-end"` on the direct child, and the shared rule in `ui/src/app/globals.css`
+applies four corrections:
+
+| Principle | Rule |
+| --- | --- |
+| Less outer padding on the icon side | The icon side gets 75% of the button's `--btn-p`; the label side keeps it |
+| Slightly smaller icons | The icon is `1em + 2px` of the button's font size: 13px on `btn-xs`, 14px on `btn-sm`, 16px on the default size |
+| Tighter icon-label gap | `0.375em`, replacing DaisyUI's fixed `0.375rem` |
+| Nudge only where the shape warrants it | Only shapes whose mass sits off center move; Lucide `Play` shifts right by one grid unit (1/24 of its box) |
+
+```tsx
+<button type="button" className="btn btn-primary btn-sm">
+  <Plus data-icon="inline-start" aria-hidden="true" />
+  Add
+</button>
+<button type="button" className="btn btn-ghost btn-sm">
+  Export
+  <ChevronDown data-icon="inline-end" aria-hidden="true" />
+</button>
+```
+
+Put the hook on a loading spinner that replaces the icon too, so the swap keeps the same size.
+Do not add `gap-*` to a hooked button or `h-*`, `w-*`, `size-*`, or `size={...}` to a hooked
+icon; the rule overrides them. Height, vertical padding, and `.btn-square` or `.btn-circle`
+icon-only controls are unchanged, so DaisyUI size classes still set the hit target. A button
+with an explicit `px-*`, `ps-*`, `pe-*`, `pl-*`, or `pr-*` utility keeps that padding. A label
+hidden below a breakpoint (`hidden sm:inline`) keeps padding symmetric while only the icon
+shows.
+
+`ui/src/lib/__tests__/buttonIconSpacing.test.ts` fails when a labeled `.btn` has an
+unhooked leading or trailing icon, or when an icon-only button carries a hook. Start-aligned rows
+(`justify-start`, `justify-between`, `justify-end`) and labels rendered only conditionally
+(`{open && <span>Label</span>}`) are exempt because the icon aligns to a list edge or can stand
+alone.
+
+## Label Checkboxes and Radios with the Whole Row
+
+A DaisyUI checkbox, radio, or toggle with visible text sits inside
+`<label className="choice-field">` as a direct child. Put checkboxes and radios before their
+text; a toggle can follow its text or sit between two state labels.
+The shared rule in `ui/src/app/globals.css` makes the whole label the click target, keeps the
+label at least 24px tall, centers the control on the first line of text however far the text
+wraps, and dims the text and shows a not-allowed cursor when the control is disabled. The control
+keeps its DaisyUI size class, so a dense list can still use `checkbox-xs` or `checkbox-sm`.
+
+```tsx
+<label className="choice-field gap-3 rounded-lg border border-base-300 p-3">
+  <input type="radio" name="mode" className="radio radio-sm" />
+  <span>
+    <span className="block font-medium">Fixed prompt</span>
+    <span className="block text-xs text-base-content/60">QDash builds the prompt</span>
+  </span>
+</label>
+```
+
+The rule sits in the components layer, so utilities on the label (`gap-*`, padding, borders,
+`items-center` for a one-line row with a trailing control) still apply. Do not combine
+`choice-field` with DaisyUI's `label` class, which keeps text on one line, and do not put
+`mt-*` or `my-*` on the control, which overrides the alignment. Give every radio group one
+`name`. A control without visible text, such as a table selection cell, takes an `aria-label`
+instead of a label.
+
+`ui/src/lib/__tests__/choiceField.test.ts` fails when a labeled checkbox, radio, or toggle is not the
+direct child of a `choice-field` label, carries a margin utility, or has no accessible name.
+
+## Size Controls That Share a Row
+
+Inputs, selects, and buttons in one row use the same DaisyUI size step: `input`, `select`, and
+`btn` together, or `input-sm`, `select-sm`, and `btn-sm` together. Icon-only buttons in that
+row use `btn-square` at the same step. Set heights with these size classes, not with `h-*`,
+`min-h-*`, or pixel values, so a theme's `--size-field` keeps the row aligned.
+
+React-Select controls take their styles from `useSelectStyles` in
+`ui/src/hooks/useSelectStyles.ts`, or from `getDaisySelectStyles` in
+`ui/src/lib/react-select-theme.ts`. A single select is `SELECT_CONTROL_HEIGHT`, the height of
+a default `input` or `btn`; a multi-select starts at that height and grows with its values. A
+call site may override colors or borders but not the control height.
+`ui/src/lib/__tests__/reactSelectTheme.test.ts` fails when a call site sets a numeric control
+height.
 
 ## Draw Charts from One Theme
 
@@ -190,27 +300,8 @@ when data crosses a generic boundary, not to repeat inference that is already pr
 
 ## Run the Development Loop
 
-From the repository root:
-
-```bash
-task dev-local-setup
-task dev-local
-task test-ui
-task ci-ui
-task ci-ui-build
-```
-
-Use focused commands from `ui/` while iterating:
-
-```bash
-bun run test:run src/components/features/tasks/__tests__/TaskWorkbenchRun.test.tsx
-bun run lint
-bun run fmt:check
-bunx tsc --noEmit
-```
-
-`task ci-ui` runs tests, Next.js type generation, TypeScript, lint, formatting, Knip, and the Bun
-audit. `task ci-ui-build` performs the production build separately.
+Start development with `task dev-local-setup` and `task dev-local` from the repository root.
+Use [UI Testing](./testing.md#run-tests) for focused tests, static checks, and production builds.
 
 ## Regenerate the API Client
 

@@ -5,12 +5,13 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { GetExecutionActivityGranularity } from './getExecutionActivityGranularity';
 
 export type GetExecutionActivityParams = {
 /**
- * Chip ID to count executions for
+ * Chip ID to count executions for; omit to count every chip in the project
  */
-chip_id: string;
+chip_id?: string | null;
 /**
  * Trailing window in calendar days
  * @minimum 1
@@ -18,7 +19,11 @@ chip_id: string;
  */
 days?: number;
 /**
- * IANA time zone used to assign executions to days
+ * IANA time zone used to assign executions to buckets
  */
 timezone?: string;
+/**
+ * Bucket length: `day` (default) or `6h`. `6h` returns `days` x 4 buckets and accepts at most 31 days
+ */
+granularity?: GetExecutionActivityGranularity;
 };

@@ -1,8 +1,14 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { writeFileSync } from "node:fs";
 
+import { clampThinkingLevel, type Api, type Model } from "@earendil-works/pi-ai";
 import { parse } from "yaml";
 
 import { compactionBudget, type CompactionBudget } from "./budget.ts";
+import {
+  readCopilotModelYaml,
+  type CopilotModelFiles,
+  type CopilotModelYaml,
+} from "./copilot-profile.ts";
 
 /**
  * Build pi's models.json from QDash's chat.yaml and evaluation.yaml.
@@ -17,6 +23,47 @@ import { compactionBudget, type CompactionBudget } from "./budget.ts";
 export const PROVIDER_ALIASES: Record<string, string> = { bedrock: "amazon-bedrock" };
 
 const OPENAI_COMPATIBLE_PROVIDER_PREFIX = "openai-compatible";
+
+/**
+ * Catalog providers whose models need an API key from the environment, and its variable. A
+ * chat on one of them without the key is refused before the turn starts, with what to set,
+ * instead of failing inside the model request or running on another model.
+ */
+export const NATIVE_API_KEY_ENV: Readonly<Record<string, string>> = {
+  openai: "OPENAI_API_KEY",
+  anthropic: "ANTHROPIC_API_KEY",
+};
+
+/** The thinking levels a chat turn may ask for (the chat's Thinking menu). */
+type ChatThinkingLevel = "off" | "minimal" | "low" | "medium" | "high";
+const CHAT_THINKING_LEVELS: ReadonlySet<string> = new Set(["off", "minimal", "low", "medium", "high"]);
+
+/**
+ * The level a turn on `model` runs at for the asked `level`: the asked one when the model supports
+ * it, else pi's nearest supported level. A model whose thinking is always on (Claude Opus 5.5:
+ * adaptive thinking, which Anthropic does not let a request disable) has no `off` or `minimal`:
+ * without this, pi would send such a turn no level and the model would think at pi's fallback
+ * effort, `high`. With it, `off` and `minimal` run at `low`, the least the model offers. Unset
+ * stays unset (the agent's own default).
+ */
+export function supportedThinkingLevel<L extends ChatThinkingLevel>(
+  model: Model<Api> | undefined,
+  level: L | undefined,
+): ChatThinkingLevel | undefined {
+  if (level === undefined || model === undefined) return level;
+  const clamped = clampThinkingLevel(model, level);
+  return CHAT_THINKING_LEVELS.has(clamped) ? (clamped as ChatThinkingLevel) : level;
+}
+
+/** Why a chat on `providerId/modelId` cannot run without a credential, or undefined when it can. */
+export function missingCredentialMessage(providerId: string, modelId: string, hasCredential: boolean): string | undefined {
+  const variable = NATIVE_API_KEY_ENV[providerId];
+  if (variable === undefined || hasCredential) return undefined;
+  return (
+    `${providerId}/${modelId} needs ${variable} in the agent runtime's environment, and it is not set. ` +
+    `Set ${variable} in .env and recreate the agent-runtime container, or choose another model.`
+  );
+}
 
 /** Used for locally hosted models, whose context window chat.yaml does not state. */
 const DEFAULT_CONTEXT_WINDOW = 131072;
@@ -37,7 +84,21 @@ interface ChatModel {
   reasoning_effort?: unknown;
   sampling_params?: unknown;
   sampling_params_by_thinking_level?: unknown;
+  strict_tool_schemas?: unknown;
+  prompt_cache_key_mode?: unknown;
+  requires_non_null_assistant_content?: unknown;
+  requires_tools_with_tool_history?: unknown;
 }
+
+/** Values Pi accepts for `compat.promptCacheKeyMode`. */
+const PROMPT_CACHE_KEY_MODES = ["auto", "enabled", "disabled"] as const;
+type PromptCacheKeyMode = (typeof PROMPT_CACHE_KEY_MODES)[number];
+
+/** chat.yaml boolean keys that map onto Pi's OpenAI completions compat flags. */
+const COMPLETIONS_COMPAT_FLAGS = {
+  requires_non_null_assistant_content: "requiresNonNullAssistantContent",
+  requires_tools_with_tool_history: "requiresToolsWithToolHistory",
+} as const satisfies Partial<Record<keyof ChatModel, string>>;
 
 interface ModelEntry {
   id: string;
@@ -184,14 +245,22 @@ export function buildModelsConfig(
     });
     const models_ = (entry.models ??= []);
     if (models_.some((existing) => existing.id === name)) continue;
+    const modelCompat = {
+      ...(reasoning && isOpenAiCompatibleProvider(rawProvider) && isQwenModel(name)
+        ? { thinkingFormat: "qwen-chat-template" }
+        : {}),
+      // Only the operator knows whether a custom endpoint enforces OpenAI
+      // `strict` function schemas; pi assumes it does not. Tools that prefer
+      // constrained sampling, such as render_ui, then send `strict: true`.
+      ...(model.strict_tool_schemas === true ? { supportsStrictMode: true } : {}),
+      ...gatewayCompat(model, `${providerId}/${name}`, entry.api),
+    };
     models_.push({
       id: name,
       contextWindow: asNumber(model.num_ctx) ?? DEFAULT_CONTEXT_WINDOW,
       maxTokens: maxTokens ?? DEFAULT_MAX_TOKENS,
       ...(reasoning ? { reasoning: true } : {}),
-      ...(reasoning && isOpenAiCompatibleProvider(rawProvider) && isQwenModel(name)
-        ? { compat: { thinkingFormat: "qwen-chat-template" } }
-        : {}),
+      ...(Object.keys(modelCompat).length > 0 ? { compat: modelCompat } : {}),
       // Pi treats an unstated `input` as text-only and then silently drops
       // image content while building the request. Figure analysis exists to
       // read figures, so the answer would come back as "no figures attached"
@@ -207,22 +276,95 @@ export function buildModelsConfig(
   return { providers };
 }
 
+/** The variables of the Cloudflare Access service token shared by QDash's AI endpoints. */
+export const CF_ACCESS_ENV = { clientId: "CF_ACCESS_CLIENT_ID", clientSecret: "CF_ACCESS_CLIENT_SECRET" } as const;
+
+/**
+ * Whether an endpoint gets the shared Access token: its base URL is one of the
+ * variables `prefixes` names and the token is set. A name ending in `_` is a
+ * prefix that needs a suffix (`env:<prefix><SUFFIX>`); any other name must
+ * match exactly. Half a token is an error. Reads presence only, never returns
+ * a value.
+ */
+export function usesCloudflareAccess(
+  baseUrlSetting: string,
+  env: NodeJS.ProcessEnv,
+  prefixes: readonly string[] = ["OPENAI_COMPATIBLE_BASE_URL_"],
+): boolean {
+  const match = /^env:([A-Za-z0-9_]+)$/.exec(baseUrlSetting);
+  const eligible = (name: string, prefix: string) =>
+    prefix.endsWith("_") ? name.startsWith(prefix) && name.length > prefix.length : name === prefix;
+  if (!match || !prefixes.some((prefix) => eligible(match[1], prefix))) {
+    return false;
+  }
+  const { clientId, clientSecret } = CF_ACCESS_ENV;
+  if (!env[clientId] && !env[clientSecret]) return false;
+  if (!env[clientId]?.trim() || !env[clientSecret]?.trim()) {
+    throw new Error(`Cloudflare Access requires both ${clientId} and ${clientSecret}`);
+  }
+  return true;
+}
+
 /** Share Access authentication across configured compatible endpoints without persisting secrets. */
 function cloudflareAccessHeaders(
   baseUrlSetting: string,
   env: NodeJS.ProcessEnv,
 ): Record<string, string> | undefined {
-  if (!/^env:OPENAI_COMPATIBLE_BASE_URL_[A-Za-z0-9_]+$/.test(baseUrlSetting)) return undefined;
-  const clientId = "CF_ACCESS_CLIENT_ID";
-  const clientSecret = "CF_ACCESS_CLIENT_SECRET";
-  if (!env[clientId] && !env[clientSecret]) return undefined;
-  if (!env[clientId]?.trim() || !env[clientSecret]?.trim()) {
-    throw new Error(`Cloudflare Access requires both ${clientId} and ${clientSecret}`);
-  }
+  if (!usesCloudflareAccess(baseUrlSetting, env)) return undefined;
   return {
-    "CF-Access-Client-Id": `$${clientId}`,
-    "CF-Access-Client-Secret": `$${clientSecret}`,
+    "CF-Access-Client-Id": `$${CF_ACCESS_ENV.clientId}`,
+    "CF-Access-Client-Secret": `$${CF_ACCESS_ENV.clientSecret}`,
   };
+}
+
+/**
+ * Opt-in compat for gateways and proxies whose OpenAI dialect differs from Pi's
+ * defaults. Every key is per model and unset unless chat.yaml states it, so Pi
+ * keeps its own defaults; an explicit `false` is written as `false`.
+ *
+ * - `prompt_cache_key_mode` sets `promptCacheKeyMode`. Pi's `auto` sends
+ *   `prompt_cache_key` on the responses API but, on completions, only to
+ *   api.openai.com; `enabled` sends it to a proxy that routes on it and
+ *   `disabled` omits it for an endpoint that rejects the field.
+ * - `requires_non_null_assistant_content` and `requires_tools_with_tool_history`
+ *   only exist on Pi's completions API, so a responses-style endpoint ignores them.
+ *
+ * Invalid values are dropped with a warning that names the key, never the value.
+ */
+function gatewayCompat(
+  model: ChatModel,
+  label: string,
+  api: string | undefined,
+): Record<string, unknown> {
+  const compat: Record<string, unknown> = {};
+  const mode = model.prompt_cache_key_mode;
+  if (mode !== undefined) {
+    if (isPromptCacheKeyMode(mode)) {
+      compat.promptCacheKeyMode = mode;
+    } else {
+      console.warn(
+        `[agent-runtime] ignoring prompt_cache_key_mode on ${label}: expected one of ${PROMPT_CACHE_KEY_MODES.join(", ")}`,
+      );
+    }
+  }
+  for (const [key, field] of Object.entries(COMPLETIONS_COMPAT_FLAGS)) {
+    const value = model[key as keyof typeof COMPLETIONS_COMPAT_FLAGS];
+    if (value === undefined) continue;
+    if (typeof value !== "boolean") {
+      console.warn(`[agent-runtime] ignoring ${key} on ${label}: expected true or false`);
+    } else if (api !== "openai-completions") {
+      console.warn(
+        `[agent-runtime] ignoring ${key} on ${label}: it applies only to api_style completion`,
+      );
+    } else {
+      compat[field] = value;
+    }
+  }
+  return compat;
+}
+
+function isPromptCacheKeyMode(value: unknown): value is PromptCacheKeyMode {
+  return PROMPT_CACHE_KEY_MODES.includes(value as PromptCacheKeyMode);
 }
 
 /** A suffix gives each OpenAI-compatible endpoint its own provider namespace. */
@@ -237,28 +379,21 @@ function isQwenModel(name: string): boolean {
   return name.toLowerCase().includes("qwen");
 }
 
-/** Generate models.json next to the agent dir and return its path. */
+/**
+ * Generate models.json next to the agent dir and return its path.
+ *
+ * `files` is the selection of copilot-profile.ts; a named profile's files are
+ * validated, the default files are read as they always were.
+ */
 export function writeModelsConfig(
-  chatConfigPath: string,
-  evaluationConfigPath: string,
+  files: CopilotModelFiles,
   outPath: string,
-): string {
-  const config = buildModelsConfig(
-    readFileSync(chatConfigPath, "utf8"),
-    readFileIfPresent(evaluationConfigPath),
-    process.env,
-  );
+  env: NodeJS.ProcessEnv = process.env,
+): { path: string; yaml: CopilotModelYaml } {
+  const yaml = readCopilotModelYaml(files);
+  const config = buildModelsConfig(yaml.chatYaml, yaml.evaluationYaml, env);
   writeFileSync(outPath, `${JSON.stringify(config, null, 2)}\n`);
-  return outPath;
-}
-
-function readFileIfPresent(path: string): string | undefined {
-  try {
-    return readFileSync(path, "utf8");
-  } catch (error) {
-    console.warn(`[agent-runtime] could not read ${path}, ignoring:`, error);
-    return undefined;
-  }
+  return { path: outPath, yaml };
 }
 
 /**
@@ -268,7 +403,7 @@ function readFileIfPresent(path: string): string | undefined {
  * configured path through after removing trailing slashes. Pi's OpenAI SDK then
  * appends the operation path such as `/chat/completions` or `/responses`.
  */
-function resolveBaseUrl(setting: string, env: NodeJS.ProcessEnv): string | undefined {
+export function resolveBaseUrl(setting: string, env: NodeJS.ProcessEnv): string | undefined {
   const raw = setting.startsWith("env:") ? env[setting.slice(4)] : setting;
   if (!raw) return undefined;
   return raw.replace(/\/+$/, "");

@@ -2,6 +2,7 @@ from typing import Any
 
 from qdash.datamodel.task import TaskTypes
 from qdash.workflow.engine.backend.base import BaseBackend
+from qdash.workflow.engine.backend.fake_faults import raise_validation_fault
 from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
 
 
@@ -57,6 +58,16 @@ class FakeBackend(BaseBackend):
             ),
         )
         self._exp.connect()
+
+    def before_task_run(self, task_name: str, qid: str) -> None:
+        """Fail the run when an opt-in validation fault names this chip, qubit, and task."""
+        chip_id = self._config.get("chip_id", "64Q")
+        raise_validation_fault(
+            chip_dir=get_qubex_paths().chip_dir(chip_id),
+            chip_id=chip_id,
+            task_name=task_name,
+            qid=qid,
+        )
 
     def disconnect(self) -> None:
         """Release the fake Experiment if it was created."""

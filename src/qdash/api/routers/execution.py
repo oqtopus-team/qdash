@@ -17,7 +17,11 @@ from fastapi.responses import FileResponse
 from starlette.background import BackgroundTask
 from starlette.exceptions import HTTPException
 
-from qdash.api.dependencies import get_execution_service, get_flow_service
+from qdash.api.dependencies import (
+    get_execution_group_service,
+    get_execution_service,
+    get_flow_service,
+)
 from qdash.api.lib.project import (
     ProjectContext,
     get_project_context,
@@ -27,6 +31,7 @@ from qdash.api.schemas.error import Detail
 from qdash.api.schemas.execution import (
     ArtifactPreviewResponse,
     CancelExecutionResponse,
+    ExecutionActivityGranularity,
     ExecutionActivityResponse,
     ExecutionAvailabilityRequest,
     ExecutionAvailabilityResponse,
@@ -34,8 +39,16 @@ from qdash.api.schemas.execution import (
     ExecutionResponseDetail,
     ListExecutionsResponse,
 )
+from qdash.api.schemas.execution_group import (
+    AgentSessionGraphResponse,
+    ListExecutionGroupsResponse,
+)
 from qdash.api.services.artifact_preview_service import preview_netcdf
-from qdash.api.services.execution_service import ExecutionService
+from qdash.api.services.execution_group_service import ExecutionGroupService
+from qdash.api.services.execution_service import (
+    MAX_SIX_HOUR_ACTIVITY_DAYS,
+    ExecutionService,
+)
 from qdash.api.services.flow_service import FlowService
 from qdash.common.config.path_resolver import (
     PathOutsideCalibData,
@@ -301,30 +314,118 @@ def list_executions(
 
 
 @router.get(
+    "/executions/groups",
+    response_model=ListExecutionGroupsResponse,
+    summary="List executions with agent sessions grouped",
+    operation_id="listExecutionGroups",
+)
+def list_execution_groups(
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    group_service: Annotated[ExecutionGroupService, Depends(get_execution_group_service)],
+    chip_id: Annotated[str, Query(description="Chip ID to list executions for")],
+    skip: Annotated[int, Query(ge=0, description="Rows to skip")] = 0,
+    limit: Annotated[int, Query(ge=1, le=100, description="Rows to return")] = 20,
+    date: Annotated[
+        str | None,
+        Query(
+            pattern=r"^\d{8}$",
+            description=(
+                "Only rows active on this day, YYYYMMDD: executions started on it, and agent "
+                "sessions created or with a measurement started on it"
+            ),
+        ),
+    ] = None,
+    timezone: Annotated[
+        str, Query(description="IANA time zone that defines the day for ``date``")
+    ] = "UTC",
+) -> ListExecutionGroupsResponse:
+    """List a chip's executions newest first, with each agent session as one row.
+
+    A session row holds the real executions the session's actions dispatched, linked through
+    the session's action records; a tag alone does not group an execution. Rows are grouped
+    before pagination, so a session is never split across pages and no execution is listed
+    twice. ``total`` counts rows and ``total_executions`` counts executions. A session row is
+    ordered by its latest activity (its latest measurement start, or its creation before the
+    first). The session's status is its own; each child keeps its execution's status.
+    """
+    return group_service.list_groups(
+        project_id=ctx.project_id,
+        chip_id=chip_id,
+        skip=skip,
+        limit=limit,
+        date=date,
+        timezone=timezone,
+    )
+
+
+@router.get(
+    "/executions/groups/agent-sessions/{session_id}",
+    response_model=AgentSessionGraphResponse,
+    responses={404: {"model": Detail}},
+    summary="Get an agent session as a graph over its executions",
+    operation_id="getAgentSessionGraph",
+)
+def get_agent_session_graph(
+    session_id: str,
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    group_service: Annotated[ExecutionGroupService, Depends(get_execution_group_service)],
+) -> AgentSessionGraphResponse:
+    """Return one agent session's measurements, proposals, decisions, and interventions.
+
+    Nodes are typed and carry ids of the authoritative records (actions, executions, task
+    results, decisions, interventions), not raw data. Edges are typed: ``sequence`` is the
+    order measurements were dispatched; the other kinds come from references in the records.
+    It is a live read, not a snapshot; the session audit endpoints hold the full record.
+    A session of another project is not found.
+    """
+    return group_service.get_session_graph(project_id=ctx.project_id, session_id=session_id)
+
+
+@router.get(
     "/executions/activity",
     response_model=ExecutionActivityResponse,
-    summary="Count executions per day",
+    summary="Count executions per day or per 6-hour slot",
     operation_id="getExecutionActivity",
 )
 def get_execution_activity(
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
     execution_service: Annotated[ExecutionService, Depends(get_execution_service)],
-    chip_id: Annotated[str, Query(description="Chip ID to count executions for")],
+    chip_id: Annotated[
+        str | None,
+        Query(
+            description="Chip ID to count executions for; omit to count every chip in the project"
+        ),
+    ] = None,
     days: Annotated[int, Query(ge=1, le=365, description="Trailing window in calendar days")] = 30,
     timezone: Annotated[
-        str, Query(description="IANA time zone used to assign executions to days")
+        str, Query(description="IANA time zone used to assign executions to buckets")
     ] = "UTC",
+    granularity: Annotated[
+        ExecutionActivityGranularity,
+        Query(
+            description=(
+                "Bucket length: `day` (default) or `6h`. `6h` returns `days` x 4 buckets "
+                f"and accepts at most {MAX_SIX_HOUR_ACTIVITY_DAYS} days"
+            )
+        ),
+    ] = "day",
 ) -> ExecutionActivityResponse:
-    """Count a chip's executions per calendar day, by status, over a trailing window.
+    """Count executions per bucket, by status, over a trailing window.
 
-    Every day of the window is returned, empty days included, so a chart can draw a
-    continuous axis. Days follow ``timezone`` so they match what the user sees.
+    With ``chip_id`` only that chip's executions count; without it, every execution in the
+    caller's current project counts. Executions of other projects are never included.
+    Every bucket of the window is returned, empty ones included, so a chart can draw a
+    continuous axis. Buckets follow wall-clock time in ``timezone`` so they match what the
+    user sees: one per calendar day ending today, or with ``granularity=6h`` four per day
+    (local 00:00, 06:00, 12:00, 18:00) ending with the slot that contains the current time.
+    Each bucket carries its ``start`` and exclusive ``end``.
     """
     return execution_service.get_execution_activity(
         project_id=ctx.project_id,
         chip_id=chip_id,
         days=days,
         timezone=timezone,
+        granularity=granularity,
     )
 
 

@@ -2,16 +2,14 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { PanelLeftOpen, SquarePen } from "lucide-react";
+import { useOptionalChatDock } from "@/contexts/ChatDockContext";
 import { useCopilotChatSessionContext } from "@/contexts/CopilotChatSessionContext";
 import { withViewTransition } from "@/lib/viewTransition";
 import { ChatSidebar, RenameInput, SessionMenu } from "@/components/features/chat/ChatSidebar";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import {
-  ChatThread,
-  ContextChip,
-  type ChatThreadHandle,
-} from "@/components/features/chat/ChatThread";
+import { ChatThread, type ChatThreadHandle } from "@/components/features/chat/ChatThread";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
+import { ChatStatusLine, useChatStatus } from "@/components/features/chat/ChatTurnStatus";
 
 const MOBILE_BREAKPOINT_PX = 768;
 
@@ -48,11 +46,15 @@ export function CopilotChatPage() {
     activeSessionId,
     isLoadingSessions,
     runs,
+    detachedTurns,
     switchSession,
     deleteSession,
     renameSession,
   } = useCopilotChatSessionContext();
-  const runningSessionIds = Object.keys(runs);
+  const endInvestigation = useOptionalChatDock()?.endInvestigation;
+  // Chats with an answer going, streamed here or not (being restored, another project).
+  const runningSessionIds = [...Object.keys(runs), ...Object.keys(detachedTurns ?? {})];
+  const status = useChatStatus();
 
   const [showSidebar, setShowSidebar] = useState(true);
   const [renaming, setRenaming] = useState(false);
@@ -72,14 +74,20 @@ export function CopilotChatPage() {
   }, []);
 
   const handleNewChat = useCallback(() => {
-    if (activeSession && activeSession.messages.length === 0 && !activeSession.context) {
+    if (
+      activeSession &&
+      activeSession.messages.length === 0 &&
+      !activeSession.context &&
+      !activeSession.investigation
+    ) {
       threadRef.current?.focus();
       return;
     }
+    endInvestigation?.(activeSession?.id);
     // The page starts from the greeting; the session is created on first send.
     withViewTransition(() => switchSession(null));
     if (isMobile) setShowSidebar(false);
-  }, [activeSession, isMobile, switchSession]);
+  }, [activeSession, endInvestigation, isMobile, switchSession]);
 
   const handleSelect = useCallback(
     (id: string) => {
@@ -104,7 +112,9 @@ export function CopilotChatPage() {
   const hasMessages = Boolean(activeSession && activeSession.messages.length > 0);
 
   return (
-    <div className="relative flex h-[calc(100vh-64px)] bg-base-100 overflow-hidden">
+    // Fill the area AppLayout leaves under the navbar; on phones that excludes the tab bar,
+    // which a fixed viewport height would push the composer under.
+    <div className="relative flex h-full bg-base-100 overflow-hidden">
       {showSidebar && (
         <>
           {isMobile && (
@@ -160,21 +170,17 @@ export function CopilotChatPage() {
                 <h2 className="text-sm font-medium truncate text-base-content/80">
                   {activeSession.title}
                 </h2>
-                {activeSession.context && (
-                  <span className="ml-1 min-w-0 shrink">
-                    <ContextChip context={activeSession.context} />
-                  </span>
-                )}
                 <SessionMenu
                   session={activeSession}
                   onRename={() => setRenaming(true)}
                   onDelete={() => setConfirmDelete(true)}
                   className="opacity-60 hover:opacity-100"
                 />
+                <ChatStatusLine status={status} className="ml-2" />
               </div>
             )
           ) : (
-            <h2 className="ml-1 text-sm font-medium truncate text-base-content/80">AI Chat</h2>
+            <h2 className="ml-1 text-sm font-medium truncate text-base-content/80">Agent</h2>
           )}
         </header>
 

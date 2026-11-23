@@ -3,8 +3,7 @@ description: IBM-style heavy hexagonal topology (27 qubits, similar to Falcon)
 grid_size: 8
 num_qubits: 27
 layout_type: hex
-mux:
-  enabled: false
+muxes: {}
 qubits:
   # Row 0: horizontal chain
   0:

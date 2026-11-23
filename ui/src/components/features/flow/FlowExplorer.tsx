@@ -178,9 +178,17 @@ export function FlowExplorer({
       const flow = location?.name ? shown.find((f) => f.name === location.name) : undefined;
       const decoration =
         flow && flow.name === currentName && isDirty
-          ? { color: "var(--color-warning)", text: "●", title: "Unsaved changes" }
+          ? {
+              color: "var(--color-warning)",
+              text: "●",
+              title: "Unsaved changes",
+            }
           : flow?.file_exists === false
-            ? { color: "var(--color-warning)", text: "missing", title: "Missing source file" }
+            ? {
+                color: "var(--color-warning)",
+                text: "missing",
+                title: "Missing source file",
+              }
             : undefined;
       return {
         ...node,

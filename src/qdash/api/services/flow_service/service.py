@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from fastapi import HTTPException
+from pymongo.errors import DuplicateKeyError
 
+from qdash.api.lib.python_format import format_source_for_save
 from qdash.api.schemas.execution import (
     ExecutionAvailabilityRequest,
     ExecutionAvailabilityResponse,
@@ -15,6 +18,7 @@ from qdash.api.schemas.execution import (
 from qdash.api.schemas.flow import (
     ExecuteFlowRequest,
     ExecuteFlowResponse,
+    FlowExecutionPlanResponse,
     FlowSummary,
     FlowTemplate,
     FlowTemplateWithCode,
@@ -30,21 +34,32 @@ from qdash.api.services.flow_service.execution import (
     ExecutionCoordinator,
     FlowDispatchError,
 )
+from qdash.api.services.flow_service.execution_plan import uses_manual_rounds
+from qdash.api.services.flow_service.plan_preview import build_execution_plan
 from qdash.api.services.flow_service.prefect_gateway import SystemDeploymentUnavailable
 from qdash.api.services.flow_service.source_store import FlowSourceStore
+from qdash.api.services.flow_service.target_defaults import (
+    flow_parameter_names,
+    resolve_target_defaults,
+    supported_target_modes,
+)
 from qdash.api.services.flow_service.templates import TemplateCatalog
 from qdash.api.services.flow_service.validation import (
-    format_with_ruff,
     normalize_folder,
     validate_flow_code,
     validate_flow_name,
 )
+from qdash.api.services.manual_round_checks import load_chip_round_model
+from qdash.common.manual_rounds import MANUAL_TARGET_OVERRIDE_REASON
+from qdash.common.mux_mapping import resolve_topology_mux_mapping
 from qdash.config import get_settings
+from qdash.datamodel.flow_targets import TARGET_CONTEXT_KEY, FlowTargetOverride
 
 if TYPE_CHECKING:
     from uuid import UUID
 
     from qdash.repository import MongoExecutionLockRepository, MongoFlowRepository
+    from qdash.repository.protocols import ChipRepository
 
 logger = logging.getLogger("uvicorn.app")
 
@@ -61,9 +76,11 @@ class FlowService:
         source_store: FlowSourceStore | None = None,
         deployment_client: DeploymentServiceClient | None = None,
         templates: TemplateCatalog | None = None,
+        chip_repository: ChipRepository | None = None,
     ) -> None:
         """Wire the flow repository and the collaborators it coordinates."""
         self._flow_repo = flow_repository
+        self._chip_repo = chip_repository
         self._coordinator = coordinator or ExecutionCoordinator(
             lock_repository=execution_lock_repository,
         )
@@ -91,11 +108,32 @@ class FlowService:
         if request.flow_function_name is None:
             request.flow_function_name = request.name
 
+        # Format first, so the source validated, stored and returned is the same text. A
+        # source Ruff cannot parse stays as written and fails validation below.
+        request.code = await asyncio.to_thread(format_source_for_save, request.code)
+
         validate_flow_code(request.code, request.flow_function_name)
 
         file_path = self._sources.path_for(project_id, request.name)
+        # Saves of one flow run one at a time, also across API processes, so a
+        # create-only save cannot race another save of the same name.
+        async with self._sources.lock(file_path):
+            return await self._save_flow_locked(request, username, project_id, file_path, folder)
+
+    async def _save_flow_locked(
+        self,
+        request: SaveFlowRequest,
+        username: str,
+        project_id: str,
+        file_path: Path,
+        folder: str | None,
+    ) -> SaveFlowResponse:
+        """Save a flow while holding its save lock."""
+        flow_function_name = request.flow_function_name or request.name
         file_path_str = str(file_path)
         existing_flow = self._flow_repo.find_by_project_and_name(project_id, request.name)
+        if request.create_only and existing_flow:
+            raise _flow_exists(request.name)
         old_deployment_id = existing_flow.deployment_id if existing_flow else None
 
         # Read the old source on an update path, so we can restore it if the
@@ -104,14 +142,20 @@ class FlowService:
         if existing_flow and self._sources.exists(file_path):
             old_source = self._sources.read(file_path)
 
-        self._sources.write(file_path, request.code)
-        format_with_ruff(file_path)
+        if request.create_only:
+            try:
+                self._sources.create(file_path, request.code)
+            except FileExistsError:
+                # A source without metadata still belongs to someone; never replace it.
+                raise _flow_exists(request.name) from None
+        else:
+            self._sources.write(file_path, request.code)
 
         deployment_name = f"{project_id}-{request.name}"
         try:
             deployment_id = await self._deployment.register(
                 file_path=str(self._sources.to_deployment_path(file_path)),
-                flow_function_name=request.flow_function_name,
+                flow_function_name=flow_function_name,
                 deployment_name=deployment_name,
                 old_deployment_id=old_deployment_id,
             )
@@ -136,7 +180,7 @@ class FlowService:
                     flow=existing_flow,
                     description=request.description,
                     chip_id=request.chip_id,
-                    flow_function_name=request.flow_function_name,
+                    flow_function_name=flow_function_name,
                     default_parameters=request.default_parameters,
                     default_run_parameters=request.default_run_parameters,
                     file_path=file_path_str,
@@ -155,7 +199,7 @@ class FlowService:
                     username=username,
                     chip_id=request.chip_id,
                     description=request.description,
-                    flow_function_name=request.flow_function_name,
+                    flow_function_name=flow_function_name,
                     default_parameters=request.default_parameters,
                     file_path=file_path_str,
                     deployment_id=deployment_id,
@@ -168,6 +212,14 @@ class FlowService:
                     f" by user '{username}'"
                 )
                 message = f"Flow '{request.name}' created successfully"
+        except DuplicateKeyError as exc:
+            # Another writer created the flow after the lookup above.
+            logger.error(f"Flow '{request.name}' was created concurrently: {exc}")
+            if existing_flow and old_source is not None:
+                self._sources.write(file_path, old_source)
+            else:
+                self._discard_file(file_path)
+            raise _flow_exists(request.name) from exc
         except Exception as exc:
             logger.error(f"Failed to save flow to database: {exc}")
             # On an update, restore the previous source rather than deleting
@@ -188,6 +240,7 @@ class FlowService:
             name=request.name,
             file_path=file_path_str,
             message=message,
+            code=request.code,
         )
 
     async def list_flows(self, username: str, project_id: str) -> ListFlowsResponse:
@@ -240,6 +293,10 @@ class FlowService:
             created_by=flow.username,
             description=flow.description,
             code=code,
+            target_defaults=resolve_target_defaults(
+                code, flow.flow_function_name, flow.default_parameters
+            ),
+            target_modes=supported_target_modes(code, flow.flow_function_name),
             flow_function_name=flow.flow_function_name,
             chip_id=flow.chip_id,
             default_parameters=flow.default_parameters,
@@ -325,13 +382,39 @@ class FlowService:
         if "tags" not in parameters and flow.tags:
             parameters["tags"] = flow.tags
 
+        chip_id = str(parameters.get("chip_id") or flow.chip_id or "").strip()
+        run_context: dict[str, Any] = {}
+        if request.target_override is not None:
+            code = self._sources.read(Path(flow.file_path))
+            if uses_manual_rounds(code):
+                raise HTTPException(status_code=400, detail=MANUAL_TARGET_OVERRIDE_REASON)
+            mode = request.target_override.mode
+            if mode not in supported_target_modes(code, flow.flow_function_name):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Flow '{name}' does not accept {mode} target overrides",
+                )
+            if mode == "coupling_pairs":
+                self._validate_coupling_pairs(project_id, chip_id, request.target_override)
+            override = request.target_override.model_dump()
+            # Omit unselected modes so workers that predate a mode still parse it.
+            run_context[TARGET_CONTEXT_KEY] = request.target_override.model_dump(exclude_none=True)
+            accepted = flow_parameter_names(code, flow.flow_function_name)
+            # Templates may validate targets before creating CalibService. Pass
+            # them (and clear the other mode) only when the flow can receive
+            # this mode; otherwise saved parameters stay and CalibService.run
+            # applies the override from the run context.
+            if mode in accepted:
+                parameters.update(
+                    {key: value for key, value in override.items() if key in accepted}
+                )
+
         logger.info(
             f"Executing flow '{name}' "
             f"(deployment={flow.deployment_id}) "
             f"with parameters: {parameters}"
         )
 
-        chip_id = str(parameters.get("chip_id") or flow.chip_id or "").strip()
         try:
             result = await self._coordinator.dispatch_run(
                 project_id=project_id,
@@ -342,6 +425,7 @@ class FlowService:
                 parameters=parameters,
                 tags=parameters.get("tags") or flow.tags,
                 workflow=True,
+                **({"context": run_context} if run_context else {}),
             )
         except FlowDispatchError as exc:
             logger.error(f"Failed to execute flow: {exc}")
@@ -352,6 +436,74 @@ class FlowService:
 
         logger.info(f"Flow run created: {result.flow_run_id}")
         return _execute_response(result, f"Flow '{name}' execution started successfully")
+
+    async def get_execution_plan(
+        self, name: str, username: str, project_id: str, chip_id: str | None
+    ) -> FlowExecutionPlanResponse:
+        """Preview what the saved source states about its execution on one chip.
+
+        Read-only: the source is parsed, never imported or run, and only the
+        chip's wiring file and coupling documents are read. Nothing is reserved,
+        scheduled, written or sent to hardware.
+        """
+        flow = self._flow_repo.find_by_project_and_name(project_id, name)
+        if not flow:
+            raise HTTPException(status_code=404, detail=f"Flow '{name}' not found")
+        file_path = Path(flow.file_path)
+        if not self._sources.exists(file_path):
+            raise HTTPException(status_code=404, detail=f"Flow file not found: {file_path}")
+        chip = (chip_id or flow.chip_id or "").strip()
+        if not chip:
+            raise HTTPException(status_code=400, detail="Select a chip to preview the execution")
+        repository = self._chips()
+        found = repository.find_by_id(project_id, chip)
+        if found is None:
+            raise HTTPException(status_code=404, detail=f"Chip '{chip}' not found in this project")
+        # The chip's topology, resolved as the worker session resolves it.
+        topology_id = getattr(found, "topology_id", None)
+        # The parameters a run from the execution dialog receives.
+        parameters: dict[str, Any] = {
+            **flow.default_parameters,
+            "username": username,
+            "chip_id": chip,
+            "flow_name": name,
+            "project_id": project_id,
+        }
+        return build_execution_plan(
+            flow_name=name,
+            chip_id=chip,
+            updated_at=flow.updated_at,
+            code=self._sources.read(file_path),
+            function_name=flow.flow_function_name,
+            parameters=parameters,
+            chip_model=lambda: load_chip_round_model(
+                project_id,
+                chip,
+                repository.get_coupling_ids,
+                lambda: resolve_topology_mux_mapping(
+                    topology_id if isinstance(topology_id, str) else None
+                ),
+            ),
+        )
+
+    def _chips(self) -> ChipRepository:
+        if self._chip_repo is None:
+            from qdash.repository import MongoChipRepository
+
+            self._chip_repo = MongoChipRepository()
+        return self._chip_repo
+
+    def _validate_coupling_pairs(
+        self, project_id: str, chip_id: str, override: FlowTargetOverride
+    ) -> None:
+        """Reject pairs that are not directed couplings of the run's chip before dispatch."""
+        known = set(self._chips().get_coupling_ids(project_id, chip_id))
+        unknown = [f"{c}-{t}" for c, t in override.pairs() if f"{c}-{t}" not in known]
+        if unknown:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Coupling pairs not found on chip '{chip_id}': {', '.join(unknown)}",
+            )
 
     async def execute_single_task_from_snapshot(
         self,
@@ -365,7 +517,7 @@ class FlowService:
         source_task_id: str | None = None,
         parameter_overrides: dict[str, dict[str, Any]] | None = None,
         update_params: bool = True,
-        persist_output_parameters: bool = True,
+        update_calibration_parameters: bool = True,
         reconfigure: bool = False,
         execution_name: str | None = None,
         backend_name: str | None = None,
@@ -392,7 +544,7 @@ class FlowService:
             "tags": tags or [],
             "source_task_id": source_task_id,
             "parameter_overrides": parameter_overrides,
-            "persist_output_parameters": persist_output_parameters,
+            "update_calibration_parameters": update_calibration_parameters,
             "update_params": update_params,
             "reconfigure": reconfigure,
             "backend_name": backend_name,
@@ -527,8 +679,8 @@ class FlowService:
         return ExecuteFlowResponse(
             execution_id=operation_id,
             flow_run_id=operation_id,
-            flow_run_url=f"http://localhost:{settings.prefect_port}/runs/flow-run/{operation_id}",
-            qdash_ui_url=f"http://localhost:{settings.ui_port}/",
+            flow_run_url=f"{settings.public_url}/prefect/runs/flow-run/{operation_id}",
+            qdash_ui_url=f"{settings.public_url}/",
             message=f"Agent candidate commit '{commit_id}' queued for backend application",
         )
 
@@ -597,6 +749,14 @@ class FlowService:
         """Remove a file written for a save that could not be completed."""
         if file_path.exists():
             file_path.unlink()
+
+
+def _flow_exists(name: str) -> HTTPException:
+    """The conflict a create-only save reports for a name that is already taken."""
+    return HTTPException(
+        status_code=409,
+        detail=f"Flow '{name}' already exists. Choose another name.",
+    )
 
 
 def _execute_response(result: DispatchResult, message: str) -> ExecuteFlowResponse:

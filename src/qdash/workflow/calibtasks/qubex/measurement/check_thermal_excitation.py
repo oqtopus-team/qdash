@@ -8,7 +8,12 @@ from typing import TYPE_CHECKING, Any, ClassVar
 from qubex.experiment.experiment_constants import DEFAULT_SHOTS
 from qubex.measurement.measurement_defaults import DEFAULT_INTERVAL
 
-from qdash.datamodel.task import InputParameterSpec, OutputParameterSpec, RunParameterSpec
+from qdash.datamodel.task import (
+    InputParameterSpec,
+    OutputParameterSpec,
+    RunParameterSpec,
+    TaskDocumentation,
+)
 from qdash.workflow.calibtasks.base import PostProcessResult, RunResult
 from qdash.workflow.calibtasks.qubex.base import QubexTask, readout_duration_run_parameter
 from qdash.workflow.calibtasks.qubex.validation import (
@@ -26,6 +31,31 @@ class CheckThermalExcitation(QubexTask):
 
     name: str = "CheckThermalExcitation"
     task_type: str = "qubit"
+    documentation: ClassVar[TaskDocumentation] = TaskDocumentation(
+        description=(
+            "Estimates the residual excited-state population from two averaged sequences, with "
+            "and without a preceding GE pi pulse, each comparing an EF pi pulse against no EF "
+            "pulse. It writes thermal_excitation_probability as the ratio of the two signal "
+            "differences."
+        ),
+        when_to_use=(
+            "Run it during characterization to check effective qubit temperature or reset "
+            "quality. It uses 1024 times the default shot count, so it is slow."
+        ),
+        prerequisites=(
+            (
+                "GE and EF drive targets configured in the current session: run ConfigureEF, or"
+                " start with ConfigureAll, using configuration_mode ge-ef-cr or ge-ef-fh."
+            ),
+            "control_frequency_ef (or ef_frequency) stored by CheckAdaptiveEFChevron.",
+            "hpi_amplitude and hpi_duration stored by CreateHPIPulse.",
+            "ef_pi_amplitude and ef_pi_duration stored by CreateEFPIPulse.",
+            (
+                "control_frequency (or qubit_frequency), readout_frequency (or "
+                "resonator_frequency), and readout_amplitude are stored for the qubit."
+            ),
+        ),
+    )
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
         "control_frequency": InputParameterSpec.required_database(
             fallback_parameter_names=("qubit_frequency",), unit="GHz"

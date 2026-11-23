@@ -32,7 +32,7 @@ describe("ExecutionTaskProgress", () => {
     expect(screen.getByText("control power sweep for Q00")).toBeTruthy();
     expect(screen.getByText("4 / 12 points")).toBeTruthy();
     expect(screen.getByText("This measurement · ~35s remaining")).toBeTruthy();
-    expect(screen.getByText("33%")).toBeTruthy();
+    expect(screen.getByText("33%", { selector: ".sr-only" })).toBeTruthy();
     expect(screen.getByRole("progressbar", { name: "Measurement progress" })).toHaveAttribute(
       "value",
       String((4 / 12) * 100),
@@ -80,7 +80,7 @@ describe("ExecutionTaskProgress", () => {
 
     expect(screen.getByText("1 / 4 sweeps completed")).toBeTruthy();
     expect(screen.queryByText(/1 \/ 10 points/)).toBeNull();
-    expect(screen.getByText("28%")).toBeTruthy();
+    expect(screen.getByText("28%", { selector: ".sr-only" })).toBeTruthy();
     expect(
       Number(screen.getByRole("progressbar", { name: "All sweeps" }).getAttribute("value")),
     ).toBeCloseTo(27.5);
@@ -109,7 +109,7 @@ describe("ExecutionTaskProgress", () => {
     );
     expect(screen.getByText("6 / 65 sweeps completed")).toBeTruthy();
     expect(screen.getByText("All sweeps · ~19m 55s remaining")).toBeTruthy();
-    expect(screen.getByText("10%")).toBeTruthy();
+    expect(screen.getByText("10%", { selector: ".sr-only" })).toBeTruthy();
     expect(screen.queryByText(/13 \/ 26/)).toBeNull();
     expect(screen.queryByText(/This sweep/)).toBeNull();
   });
@@ -158,7 +158,9 @@ describe("ExecutionTaskProgress", () => {
         />,
       );
       expect(screen.getByText(`${current === 26 ? 65 : 64} / 65 sweeps completed`)).toBeTruthy();
-      expect(screen.getByText(current === 26 ? "100%" : "99%")).toBeTruthy();
+      expect(
+        screen.getByText(current === 26 ? "100%" : "99%", { selector: ".sr-only" }),
+      ).toBeTruthy();
       if (current === 26) expect(screen.getByText("Finishing measurement…")).toBeTruthy();
     },
   );

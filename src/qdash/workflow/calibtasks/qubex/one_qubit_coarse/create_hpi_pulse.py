@@ -7,6 +7,7 @@ from qdash.datamodel.task import (
     InputParameterSpec,
     OutputParameterSpec,
     RunParameterSpec,
+    TaskDocumentation,
 )
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -27,6 +28,27 @@ class CreateHPIPulse(QubexTask):
 
     name: str = "CreateHPIPulse"
     task_type: str = "qubit"
+    documentation: ClassVar[TaskDocumentation] = TaskDocumentation(
+        description=(
+            "Calibrates the amplitude of a 32 ns flat-top half-pi pulse by sweeping amplitude "
+            "around the Rabi-model estimate over a train of repeated pulses. It writes "
+            "hpi_amplitude and hpi_duration."
+        ),
+        when_to_use=(
+            "Run it after CheckRabi. Most later single-qubit measurements require the half-pi "
+            "pulse, and CheckHPIPulse verifies it."
+        ),
+        prerequisites=(
+            (
+                "Rabi parameters from a CheckRabi run under the current readout_duration, with "
+                "rabi_r2 at or above the R² threshold; they normalize the IQ data."
+            ),
+            (
+                "control_frequency (or qubit_frequency), readout_frequency (or "
+                "resonator_frequency), and readout_amplitude are stored for the qubit."
+            ),
+        ),
+    )
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
         # RabiParam calibrates the pulse and normalizes IQ; validate its readout context.
         **required_rabi_normalization_inputs(),

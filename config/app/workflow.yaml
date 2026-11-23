@@ -54,7 +54,8 @@ params_updater:
     - capture_delay_word.yaml
 
 github:
-  # Publish manual edits and saved Tasks runs when GitHub credentials are configured.
+  # Pull before and push after workflow runs on the qubex backend, and publish manual
+  # edits and saved Tasks runs, when GitHub credentials are configured.
   enabled: true
   branch: main
   # Optional allowlist for params/*.yaml files pushed by ALL_PARAMS.

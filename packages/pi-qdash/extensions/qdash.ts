@@ -1,37 +1,55 @@
 import { randomUUID } from "node:crypto";
 import { dirname, join } from "node:path";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
 
 import type { ExtensionAPI, Theme } from "@earendil-works/pi-coding-agent";
 import {
+  EXECUTIONS_MAX_PAGE_SIZE,
   QDashClient,
   defaultConfigPath,
+  executionListProblems,
   type CooldownResponse,
   type DownloadedFile,
   type TaskResultFigureOptions,
 } from "@oqtopus-team/qdash-client";
 import { Text, truncateToWidth } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
+import { QDash, type TaskResultComparison } from "@oqtopus-team/qdash-sdk";
 
 import { analyzePlotlyFigure, figureAnalysisText } from "./lib/figure-analysis.js";
 import { fetchFigureDetails, figureComponent, figureResultText, mediaTypeForPath, type FigureDetails } from "./lib/figures.js";
 import { forumImageReplyContent, forumImageReplyPreview, loadLocalForumImages, type LocalForumImage } from "./lib/forum-images.js";
 import { forumDetailComponent, forumDetailLines, forumListLines, forumPostTitle, forumPostsFromPayload } from "./lib/forum-render.js";
+import { hostModelIdentity } from "./lib/host-model.js";
 import { investigationContextSummary, validateInvestigationContext, type TimeseriesInvestigationContext } from "./lib/investigation-context.js";
 import { executionPagePath, forumPostPagePath, qdashObjectLinks, qdashWebBaseUrl, qdashWebUrl, safeConfig, withQDashLinks } from "./lib/links.js";
 import { arrayFromPayload, compactItems, firstNumber, firstString, formatItem, payloadTotal, statusIcon } from "./lib/payload.js";
 import { toFigureToolResult, toTextToolResult, toToolResult } from "./lib/results.js";
 import { ansi, boxLinesToWidth, boxed, formatNumber, textComponent } from "./lib/render.js";
-import { plotSeriesLines, timeseriesPlotComponent, timeseriesPoints } from "./lib/timeseries-plot.js";
 import { installQDashWriteGate } from "./lib/write-gate.js";
+import { requireWriteApproval } from "./lib/write-approval.js";
+import { installQDashGuidance } from "./lib/guidance-hook.js";
+import { qdashContextPath } from "./lib/context-path.js";
+import { errorStatus, fileContentSourceGuidance, filesTreeSourceGuidance, looksLikeSourcePath } from "./lib/source-guidance.js";
 import { withAbort } from "./lib/abort.js";
+import { WAIT_AGENT_ACTION, WAIT_EXECUTION } from "./lib/waits.js";
 import { qcalContextText, recordedParameters, sweepsOf, type RecordedParameter, type Sweep } from "./lib/qcal-evidence.js";
+import { registerAgentLoopTools } from "./tools/agent-loop.js";
+import { registerAgentSessionEndTool } from "./tools/agent-session-end.js";
 import { registerCalibrationPipelineTools } from "./tools/calibration-pipeline.js";
+import { registerCalibrationSessionTools } from "./tools/calibration-session.js";
+import { registerCurrentTimeTool } from "./tools/current-time.js";
 import { registerFlowAuthoringTools } from "./tools/flow-authoring.js";
+import { isMetricScriptQueryAction, metricScriptQuery, registerMetricScriptTools, type MetricScriptQueryAction } from "./tools/metric-scripts.js";
 import { registerSourceCodeTools } from "./tools/source-code.js";
-import { registerTaskKnowledgeTool } from "./tools/task-knowledge.js";
+import { notFound, registerTaskKnowledgeTool } from "./tools/task-knowledge.js";
+import { agentSessionApprovalText, pausedSessionConflict } from "./lib/agent-loop.js";
+import { agentSessionPolicyProblems, agentSessionPolicySchema, type AgentSessionPolicyInput } from "./lib/agent-session-policy.js";
+import { installQDashToolPolicy } from "./lib/script-policy.js";
+import { installQcalHydration } from "./lib/qcal-hydration-hook.js";
+import type { TaskKnowledgeLike } from "./lib/qcal-hydration.js";
 import { registerTimeseriesComparisonTool } from "./tools/timeseries.js";
+import { checkQueryResponse, isContractedAction, QUERY_CONTRACTS, TASK_RESULTS_PAGE_LIMIT, targetHistoryProblem, taskResultPageProblem } from "./lib/query-contracts.js";
 import { analyzeWiringMarkdown, wiringInsightLines, type WiringInsights } from "./lib/wiring-analysis.js";
 
 type QDashQueryParams = {
@@ -74,6 +92,7 @@ type QDashQueryParams = {
     | "flow_template"
     | "flow_helper_files"
     | "flow_helper_file"
+    | MetricScriptQueryAction
     | "executions"
     | "execution"
     | "forum_posts"
@@ -94,6 +113,8 @@ type QDashQueryParams = {
   path?: string;
   flowName?: string;
   templateId?: string;
+  scriptId?: string;
+  dashboardId?: string;
   filename?: string;
   executionId?: string;
   entityId?: string;
@@ -101,6 +122,7 @@ type QDashQueryParams = {
   parameterName?: string;
   tag?: string;
   date?: string;
+  timezone?: string;
   backend?: string;
   status?: string;
   username?: string;
@@ -123,10 +145,6 @@ type RawGetParams = {
   query?: Record<string, string | number | boolean | null | undefined>;
 };
 
-type ConfirmableParams = {
-  confirmWrite?: boolean;
-};
-
 type QDashContextState = {
   profile?: string;
   chipId?: string;
@@ -140,7 +158,6 @@ type QDashContextState = {
 };
 
 const CONTEXT_ENTRY_TYPE = "qdash-context";
-const GLOBAL_CONTEXT_PATH = join(homedir(), ".pi", "agent", "qdash-context.json");
 let currentContext: QDashContextState = {};
 
 function applyQDashContext<T extends { profile?: string; chipId?: string; sessionId?: string }>(params: T): T {
@@ -200,8 +217,9 @@ function isQDashContextState(value: unknown): value is QDashContextState {
 
 function loadGlobalContext(): QDashContextState {
   try {
-    if (!existsSync(GLOBAL_CONTEXT_PATH)) return {};
-    const data = JSON.parse(readFileSync(GLOBAL_CONTEXT_PATH, "utf8"));
+    const path = qdashContextPath();
+    if (!existsSync(path)) return {};
+    const data = JSON.parse(readFileSync(path, "utf8"));
     return isQDashContextState(data) ? data : {};
   } catch {
     return {};
@@ -210,8 +228,9 @@ function loadGlobalContext(): QDashContextState {
 
 function saveGlobalContext(context: QDashContextState): void {
   const { investigation: _investigation, ...globalContext } = context;
-  mkdirSync(dirname(GLOBAL_CONTEXT_PATH), { recursive: true });
-  writeFileSync(GLOBAL_CONTEXT_PATH, `${JSON.stringify(globalContext, null, 2)}\n`, "utf8");
+  const path = qdashContextPath();
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, `${JSON.stringify(globalContext, null, 2)}\n`, "utf8");
 }
 
 function adoptContextFromToolInput(input: unknown): boolean {
@@ -312,6 +331,15 @@ const QueryAction = Type.Union([
   Type.Literal("flow_template"),
   Type.Literal("flow_helper_files"),
   Type.Literal("flow_helper_file"),
+  Type.Literal("metric_scripts"),
+  Type.Literal("metric_script"),
+  Type.Literal("metric_script_templates"),
+  Type.Literal("metric_script_template"),
+  Type.Literal("metric_script_catalog"),
+  Type.Literal("dashboards"),
+  Type.Literal("dashboard"),
+  Type.Literal("dashboard_templates"),
+  Type.Literal("dashboard_template"),
   Type.Literal("executions"),
   Type.Literal("execution"),
   Type.Literal("forum_posts"),
@@ -348,20 +376,23 @@ const querySchema = Type.Object({
   cooldownId: Type.Optional(Type.String()),
   taskId: Type.Optional(Type.String()),
   taskName: Type.Optional(Type.String()),
-  task: Type.Optional(Type.String({ description: "Task parameter used by latest/history endpoints." })),
+  task: Type.Optional(Type.String({ description: "Task name for qubit_latest, coupling_latest, qubit_history and coupling_history (taskName is accepted too)." })),
   projectId: Type.Optional(Type.String()),
-  path: Type.Optional(Type.String({ description: "Project file path for file_content." })),
+  path: Type.Optional(Type.String({ description: "file_content only: a file path relative to the calibration config directory. Not source code; read QDash or qubex source with qdash_read_source. files_tree takes no path." })),
   flowName: Type.Optional(Type.String()),
-  templateId: Type.Optional(Type.String()),
+  templateId: Type.Optional(Type.String({ description: "flow_template, metric_script_template or dashboard_template: the template ID." })),
+  scriptId: Type.Optional(Type.String({ description: "metric_script: the script ID (ms_…)." })),
+  dashboardId: Type.Optional(Type.String({ description: "dashboard: the dashboard ID." })),
   filename: Type.Optional(Type.String()),
   executionId: Type.Optional(Type.String()),
   entityId: Type.Optional(Type.String()),
   parameter: Type.Optional(Type.String({ description: "Metric/parameter name for timeseries." })),
   parameterName: Type.Optional(Type.String()),
   tag: Type.Optional(Type.String()),
-  date: Type.Optional(Type.String({ description: "History date, usually YYYYMMDD." })),
+  date: Type.Optional(Type.String({ description: "executions only: only executions started on this day, YYYYMMDD. qubit_history and coupling_history take no date and return the whole history." })),
+  timezone: Type.Optional(Type.String({ description: "executions only: IANA time zone that defines the day for date. Defaults to UTC." })),
   backend: Type.Optional(Type.String()),
-  status: Type.Optional(Type.String()),
+  status: Type.Optional(Type.String({ description: "task_results or forum_posts status filter. executions has no status filter." })),
   username: Type.Optional(Type.String()),
   messageContains: Type.Optional(Type.String()),
   startAt: Type.Optional(Type.String()),
@@ -369,8 +400,8 @@ const querySchema = Type.Object({
   startFrom: Type.Optional(Type.String()),
   startTo: Type.Optional(Type.String()),
   withinHours: Type.Optional(Type.Number()),
-  limit: Type.Optional(Type.Number()),
-  skip: Type.Optional(Type.Number()),
+  limit: Type.Optional(Type.Number({ description: "Page size. task_results and executions: an integer from 1 to 100." })),
+  skip: Type.Optional(Type.Number({ description: "Rows to skip. task_results and executions: an integer of 0 or more." })),
   offset: Type.Optional(Type.Number()),
 });
 
@@ -401,6 +432,24 @@ type TaskResultFigureFile = DownloadedFile & {
   figurePaths: string[];
   jsonFigurePaths: string[];
 };
+
+/** A figure of a task result already read, selected as `client.getTaskResultFigure` selects it. */
+async function taskResultFigure(
+  client: QDashClient,
+  taskId: string,
+  task: Record<string, unknown>,
+  options: TaskResultFigureOptions = {},
+): Promise<TaskResultFigureFile> {
+  const strings = (value: unknown) => (Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : []);
+  const figurePaths = strings(task.figure_path);
+  const jsonFigurePaths = strings(task.json_figure_path);
+  const paths = options.preferJson && jsonFigurePaths.length > 0 ? jsonFigurePaths : figurePaths;
+  const index = options.index ?? 0;
+  const path = paths[index];
+  if (!path) throw new Error(`No figure at index ${index} for task result '${taskId}'`);
+  const file = await client.getExecutionFigure(path);
+  return { ...file, path, figurePaths, jsonFigurePaths };
+}
 
 type CalibrationEvidence = {
   id?: string;
@@ -465,10 +514,6 @@ function qcalEvidenceText(evidence: CalibrationEvidence, include: { inputs?: boo
 
 function cleanQuery(values: Record<string, unknown> = {}): Record<string, unknown> {
   return Object.fromEntries(Object.entries(values).filter(([, value]) => value !== undefined && value !== null));
-}
-
-function pathPart(value: string): string {
-  return encodeURIComponent(value);
 }
 
 function requireValue(value: string | undefined, name: string): string {
@@ -612,7 +657,7 @@ async function buildDashboard(params: { profile?: string; configPath?: string; u
     failedTaskResults: {
       count: payloadTotal(failedTasksPayload),
       shown: arrayFromPayload(failedTasksPayload).length,
-      items: compactItems(failedTasksPayload, ["task_id", "task_name", "status", "qid", "coupling_id", "start_at", "created_at"], limit),
+      items: compactItems(failedTasksPayload, ["task_id", "task_name", "invocation", "status", "qid", "coupling_id", "start_at", "created_at"], limit),
       raw: failedTasksPayload,
     },
     provenanceStats: value(provenanceStats),
@@ -778,8 +823,9 @@ function recentCalibrationSummaryComponent(summary: RecentCalibrationSummary, th
 type CalibrationComparison = {
   context: { profile?: string; chipId: string; webBaseUrl: string };
   target: { kind: "qubit" | "coupling"; id: string; label: string };
-  compared: Array<{ task: string; before: Record<string, unknown>; after: Record<string, unknown>; changes: Record<string, { before: unknown; after: unknown }> }>;
-};
+  /** List rows read, and how many matched in total. */
+  rows: { read: number; total: number };
+} & Pick<TaskResultComparison, "compared" | "insufficient">;
 
 async function buildCalibrationComparison(params: { profile?: string; configPath?: string; useEnv?: boolean; chipId?: string; qid?: string; couplingId?: string; limit?: number; withinHours?: number }): Promise<CalibrationComparison> {
   params = applyQDashContext(params);
@@ -790,48 +836,36 @@ async function buildCalibrationComparison(params: { profile?: string; configPath
   if (!qid && !couplingId) throw new Error("qid or couplingId is required (or select one with /qdash-use-target)");
   const kind = qid ? "qubit" : "coupling";
   const id = (qid ?? couplingId) as string;
-  const results = await client.listTaskResults({ chipId, qid, couplingId, limit: Math.max(2, Math.min(100, params.limit ?? 20)) });
-  const items = arrayFromPayload(results).filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object");
-  const groups = new Map<string, Record<string, unknown>[]>();
-  for (const item of items) {
-    const task = firstString(item, ["task_name", "name"]) ?? "task";
-    groups.set(task, [...(groups.get(task) ?? []), item]);
-  }
-  const compared = [...groups.entries()].flatMap(([task, entries]) => {
-    if (entries.length < 2) return [];
-    const after = entries[0];
-    const before = entries[1];
-    const beforeParams = (before.output_parameters ?? {}) as Record<string, unknown>;
-    const afterParams = (after.output_parameters ?? {}) as Record<string, unknown>;
-    const changes: Record<string, { before: unknown; after: unknown }> = {};
-    for (const name of new Set([...Object.keys(beforeParams), ...Object.keys(afterParams)])) {
-      const beforeValue = parameterValue(beforeParams[name]);
-      const afterValue = parameterValue(afterParams[name]);
-      if (JSON.stringify(beforeValue) !== JSON.stringify(afterValue)) changes[name] = { before: beforeValue, after: afterValue };
-    }
-    return [{ task, before, after, changes }];
-  });
-  return { context: { profile: params.profile ?? currentContext.profile, chipId, webBaseUrl: qdashWebBaseUrl(client) }, target: { kind, id, label: kind === "qubit" ? `q${id}` : `c${id}` }, compared };
-}
-
-function parameterValue(value: unknown): unknown {
-  if (value && typeof value === "object" && "value" in value) return (value as { value?: unknown }).value;
-  return value;
+  const limit = Math.max(2, Math.min(TASK_RESULTS_PAGE_LIMIT, Math.trunc(params.limit ?? 20)));
+  // The SDK selects, reads and compares the results; this tool adapts arguments and presents them.
+  const { rows, compared, insufficient } = await new QDash(client).taskResults.compareLatest({ chipId, qid: id, limit });
+  return {
+    context: { profile: params.profile ?? currentContext.profile, chipId, webBaseUrl: qdashWebBaseUrl(client) },
+    target: { kind, id, label: kind === "qubit" ? `q${id}` : `c${id}` },
+    rows,
+    compared,
+    insufficient,
+  };
 }
 
 function calibrationComparisonLines(comparison: CalibrationComparison, color = false): string[] {
   const accent = (text: string) => color ? ansi("1;36", text) : text;
   const muted = (text: string) => color ? ansi("90", text) : text;
   const lines = [`profile ${comparison.context.profile ?? "env/default"}  chip ${comparison.context.chipId}`, `target ${comparison.target.label}`, ""];
-  if (comparison.compared.length === 0) lines.push(muted("Not enough repeated task results to compare."));
+  if (comparison.compared.length === 0) lines.push(muted(`Not enough repeated task results to compare among the ${comparison.rows.read} newest of ${comparison.rows.total}.`));
   for (const item of comparison.compared) {
     lines.push(accent(item.task));
-    const beforeId = firstString(item.before, ["task_id", "id"]) ?? "before";
-    const afterId = firstString(item.after, ["task_id", "id"]) ?? "after";
-    lines.push(`  before ${shortId(beforeId, 18)}  after ${shortId(afterId, 18)}`);
+    lines.push(`  before ${shortId(item.before.task_id, 18)}  after ${shortId(item.after.task_id, 18)}`);
+    if (item.status !== "compared" || !item.changes) {
+      lines.push(`  comparison unavailable: ${item.error ?? "the results could not be read"}`);
+      continue;
+    }
     const changes = Object.entries(item.changes);
     if (changes.length === 0) lines.push(`  ${muted("no output-parameter changes")}`);
     else for (const [name, change] of changes) lines.push(`  ${name}: ${JSON.stringify(change.before)} → ${JSON.stringify(change.after)}`);
+  }
+  if (comparison.insufficient.length > 0) {
+    lines.push(muted(`single result, not compared: ${comparison.insufficient.map((entry) => entry.task).join(", ")}`));
   }
   return boxed("QDash Calibration Comparison", lines, color);
 }
@@ -928,7 +962,7 @@ async function buildTargetOperationsReport(params: { profile?: string; configPat
   const limit = Math.max(1, Math.min(100, params.limit ?? 10));
   const [latestTarget, results, forumPosts] = await Promise.all([
     kind === "qubit" ? client.getChipQubit(chipId, id) : client.getChipCoupling(chipId, id),
-    client.listTaskResults({ chipId, qid, couplingId, startAt: start.toISOString(), endAt: end.toISOString(), limit }),
+    client.listTaskResults({ chipId, qid: id, startFrom: start.toISOString(), startTo: end.toISOString(), limit }),
     client.listForumPosts({ chipId, status: "open", targetType: kind, targetId: id, limit }),
   ]);
   const recentResults = arrayFromPayload(results).filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object");
@@ -1381,8 +1415,7 @@ async function buildForumEvidenceReply(client: QDashClient, params: ForumEvidenc
   const history = params.includeHistory === false ? [] : arrayFromPayload(await client.listTaskResults({
     chipId,
     taskName,
-    qid,
-    couplingId,
+    qid: qid ?? couplingId,
     limit: params.historyLimit ?? 5,
   })).filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object");
   const historyLines = history
@@ -1427,9 +1460,45 @@ async function buildForumEvidenceReply(client: QDashClient, params: ForumEvidenc
   return { request, preview: content, parent, task, figures };
 }
 
+/**
+ * The `qid` filter of a task-result query: the API filters qubits and
+ * couplings by one exact ID, so `couplingId` is sent as `qid`.
+ */
+function taskResultTarget(params: { qid?: string; couplingId?: string }): string | undefined {
+  if (params.qid !== undefined && params.couplingId !== undefined && params.qid !== params.couplingId) {
+    throw new Error("task_results: give qid or couplingId, not both; QDash filters task results by one exact target ID.");
+  }
+  return params.qid ?? params.couplingId;
+}
+
+/**
+ * Run a read-only query. Task-result paging is checked before any request,
+ * and the response of an action with a contract (query-contracts.ts) is
+ * checked against it, so a script never reads a malformed response as empty.
+ */
 async function executeQuery(params: QDashQueryParams) {
+  if (params.action === "task_results") {
+    const problem = taskResultPageProblem(params);
+    if (problem) throw new Error(`task_results: ${problem}`);
+  }
+  if (params.action === "executions") {
+    // The client's own check, run before the default chip is resolved so a bad call sends nothing.
+    const { flowName, status, skip, limit, date, timezone } = params;
+    const problems = executionListProblems({ flowName, status, skip, limit, date, timezone });
+    if (problems.length > 0) throw new Error(`executions: ${problems.join("; ")}. No request was sent.`);
+  }
+  if (params.action === "qubit_history" || params.action === "coupling_history") {
+    const problem = targetHistoryProblem({ action: params.action, date: params.date });
+    if (problem) throw new Error(`${params.action}: ${problem}`);
+  }
+  const data = await dispatchQuery(params);
+  return isContractedAction(params.action) ? checkQueryResponse(params.action, data) : data;
+}
+
+async function dispatchQuery(params: QDashQueryParams) {
   params = applyQDashContext(params);
   const client = await makeClient(params);
+  if (isMetricScriptQueryAction(params.action)) return metricScriptQuery(client, params.action, params);
   switch (params.action) {
     case "chips": return client.listChips();
     case "default_chip": return client.getDefaultChip();
@@ -1445,13 +1514,13 @@ async function executeQuery(params: QDashQueryParams) {
     case "cooldown": return client.api.getCooldown(requireValue(params.cooldownId, "cooldownId"));
     case "cooldown_wiring_events": return client.api.listCooldownWiringEvents(requireValue(params.cooldownId, "cooldownId"), { limit: params.limit, skip: params.skip });
     case "timeseries": return client.getTaskResultsTimeseries({ chipId: await defaultChipId(client, params.chipId), parameter: requireValue(params.parameter, "parameter"), tag: params.tag, qid: params.qid, startAt: requireValue(params.startAt, "startAt"), endAt: requireValue(params.endAt, "endAt") });
-    case "task_results": return rawGet(client, "/task-results", { chip_id: params.chipId, task_name: params.taskName, qid: params.qid, coupling_id: params.couplingId, execution_id: params.executionId, username: params.username, status: params.status, start_from: params.startFrom ?? params.startAt, start_to: params.startTo ?? params.endAt, message_contains: params.messageContains, limit: params.limit, skip: params.skip });
+    case "task_results": return rawGet(client, "/task-results", { chip_id: params.chipId, task_name: params.taskName, qid: taskResultTarget(params), execution_id: params.executionId, username: params.username, status: params.status, start_from: params.startFrom ?? params.startAt, start_to: params.startTo ?? params.endAt, message_contains: params.messageContains, limit: params.limit, skip: params.skip });
     case "task_result": return client.getTaskResult(requireValue(params.taskId, "taskId"));
     case "task_note": return client.api.getTaskNote(requireValue(params.taskId, "taskId"));
     case "qubit_latest": return client.api.getLatestQubitTaskResults({ chip_id: await defaultChipId(client, params.chipId), task: requireValue(params.task ?? params.taskName, "task") });
-    case "qubit_history": return rawGet(client, `/task-results/qubits/${pathPart(requireValue(params.qid, "qid"))}/history`, { chip_id: await defaultChipId(client, params.chipId), task: requireValue(params.task ?? params.taskName, "task"), date: requireValue(params.date, "date") });
+    case "qubit_history": return client.getQubitTaskHistory({ chipId: await defaultChipId(client, params.chipId), qid: requireValue(params.qid, "qid"), task: requireValue(params.task ?? params.taskName, "task") });
     case "coupling_latest": return client.api.getLatestCouplingTaskResults({ chip_id: await defaultChipId(client, params.chipId), task: requireValue(params.task ?? params.taskName, "task") });
-    case "coupling_history": return rawGet(client, `/task-results/couplings/${pathPart(requireValue(params.couplingId, "couplingId"))}/history`, { chip_id: await defaultChipId(client, params.chipId), task: requireValue(params.task ?? params.taskName, "task"), date: requireValue(params.date, "date") });
+    case "coupling_history": return client.getCouplingTaskHistory({ chipId: await defaultChipId(client, params.chipId), couplingId: requireValue(params.couplingId, "couplingId"), task: requireValue(params.task ?? params.taskName, "task") });
     case "tasks": return client.listTasks(params.backend);
     case "task_knowledge": return params.taskName ? client.getTaskKnowledge(params.taskName) : client.listTaskKnowledge();
     case "task_knowledge_markdown": return client.getTaskKnowledgeMarkdown(requireValue(params.taskName, "taskName"));
@@ -1466,7 +1535,7 @@ async function executeQuery(params: QDashQueryParams) {
     case "flow_template": return client.getFlowTemplate(requireValue(params.templateId, "templateId"));
     case "flow_helper_files": return client.api.listFlowHelperFiles();
     case "flow_helper_file": return client.api.getFlowHelperFile(requireValue(params.filename, "filename"));
-    case "executions": return rawGet(client, "/executions", { chip_id: params.chipId, flow_name: params.flowName, status: params.status, skip: params.skip, limit: params.limit });
+    case "executions": return client.listExecutions({ chipId: await defaultChipId(client, params.chipId), skip: params.skip, limit: params.limit, date: params.date, timezone: params.timezone });
     case "execution": return client.getExecution(requireValue(params.executionId, "executionId"));
     case "forum_posts": return client.listForumPosts({ status: params.status, chipId: params.chipId, limit: params.limit, skip: params.skip });
     case "provenance_stats": return client.getProvenanceStats();
@@ -1480,11 +1549,61 @@ async function executeQuery(params: QDashQueryParams) {
   }
 }
 
-export default function qdashExtension(pi: ExtensionAPI) {
+/**
+ * A source-code request sent to the config file actions, answered with the source
+ * tool call to make instead. files_tree takes no path, so a path is never ignored
+ * silently; file_content keeps its config semantics and only a config miss (400 or
+ * 404) on a source-looking path becomes guidance. Other errors propagate.
+ */
+function filesTreeWithPath(params: QDashQueryParams) {
+  const path = params.path?.trim();
+  if (params.action !== "files_tree" || !path) return undefined;
+  return toTextToolResult(filesTreeSourceGuidance(path), { error: "files_tree takes no path" }, { action: params.action, path, misdirected: true });
+}
+
+function fileContentSourceMiss(params: QDashQueryParams, error: unknown) {
+  const path = params.path?.trim();
+  if (params.action !== "file_content" || !path || !looksLikeSourcePath(path)) return undefined;
+  const status = errorStatus(error);
+  if (status !== 400 && status !== 404) return undefined;
+  const reason = `config file API: ${error instanceof Error ? error.message : String(error)}`;
+  return toTextToolResult(fileContentSourceGuidance(path, reason), { error: reason }, { action: params.action, path, misdirected: true });
+}
+
+/** QDash's knowledge response for a task as the configured user, for evaluation hydration. */
+async function loadTaskKnowledge(taskName: string, signal?: AbortSignal): Promise<TaskKnowledgeLike | undefined> {
+  const client = await makeClient({});
+  try {
+    return await withAbort(
+      client.getTaskKnowledge(taskName) as unknown as Promise<TaskKnowledgeLike>,
+      signal,
+      `Task knowledge for ${taskName}`,
+    );
+  } catch (error) {
+    if (signal?.aborted) throw error;
+    // No knowledge, or QDash unreachable: the evaluation runs on the model's context alone.
+    if (!notFound(error)) console.warn(`[pi-qdash] task knowledge for ${taskName} unavailable: ${error instanceof Error ? error.name : "error"}`);
+    return undefined;
+  }
+}
+
+export default function qdashExtension(host: ExtensionAPI) {
+  // Every tool registers through the policy: deferred loading, script data,
+  // and model-only exposure for tools scripts must not reach.
+  const pi = installQDashToolPolicy(host, { entry: import.meta.url });
   installQDashWriteGate(pi);
+  installQDashGuidance(pi);
+  installQcalHydration(pi, { loadTaskKnowledge });
+  registerCurrentTimeTool(pi);
   registerTaskKnowledgeTool(pi, { makeClient });
   registerSourceCodeTools(pi, { makeClient });
+  registerAgentLoopTools(pi, { makeClient });
+  registerAgentSessionEndTool(pi, { makeClient });
   registerCalibrationPipelineTools(pi, {
+    makeClient,
+    resolveChipId: (client, chipId) => defaultChipId(client as QDashClient, chipId),
+  });
+  registerCalibrationSessionTools(pi, {
     makeClient,
     resolveChipId: (client, chipId) => defaultChipId(client as QDashClient, chipId),
   });
@@ -1492,6 +1611,11 @@ export default function qdashExtension(pi: ExtensionAPI) {
     makeClient,
     resolveChipId: (client, chipId) => defaultChipId(client as QDashClient, chipId),
     flowPageUrl: (client, name) => qdashWebUrl(client as QDashClient, `/workflow/${encodeURIComponent(name)}`),
+  });
+  registerMetricScriptTools(pi, {
+    makeClient,
+    resolveChipId: (client, chipId) => defaultChipId(client as QDashClient, chipId),
+    pageUrl: (client, path) => qdashWebUrl(client as QDashClient, path),
   });
 
   pi.registerTool({
@@ -1516,16 +1640,27 @@ export default function qdashExtension(pi: ExtensionAPI) {
     name: "qdash_query",
     label: "QDash Query",
     description: "Run common read-only QDash queries via @oqtopus-team/qdash-client.",
-    promptSnippet: "Query QDash chips, cryostats, cooldown wiring, metrics, tasks, files, flows, executions, projects, forum posts, and provenance",
+    promptSnippet: "Query QDash chips, cryostats, cooldown wiring, metrics, tasks, files, flows, metric scripts, dashboards, executions, projects, forum posts, and provenance",
     promptGuidelines: [
       "Prefer dedicated QDash tools such as qdash_list_chips, qdash_get_chip_metrics, qdash_list_task_results, qdash_list_forum_posts, qdash_list_flows, and qdash_list_executions when they match the task.",
       "Use qdash_query for read-only QDash data access not covered by a dedicated tool, instead of curl or scraping the UI.",
+      "The task_results, chip_metrics, and timeseries actions return the same data as qdash_list_task_results, qdash_get_chip_metrics, and qdash_get_timeseries; their descriptions give the shape. task_results takes limit 1 to 100 and pages with skip.",
+      "files_tree and file_content cover only the calibration config directory; for QDash or qubex source code use qdash_list_source_roots, qdash_search_source and qdash_read_source (for example qdash_read_source {\"path\":\"qdash/workflow/engine/task/executor.py\"}).",
       "Ask for confirmation before using operational or write APIs; qdash_query intentionally exposes read-only operations only.",
       "Never expose QDash tokens, passwords, or Cloudflare Access secrets.",
     ],
     parameters: querySchema,
     async execute(_toolCallId, params: QDashQueryParams) {
-      const data = await executeQuery(params);
+      const misdirected = filesTreeWithPath(params);
+      if (misdirected) return misdirected;
+      let data: unknown;
+      try {
+        data = await executeQuery(params);
+      } catch (error) {
+        const guidance = fileContentSourceMiss(params, error);
+        if (guidance) return guidance;
+        throw error;
+      }
       const client = await makeClient(params);
       return toToolResult(withQDashLinks(client, data), { action: params.action, webBaseUrl: qdashWebBaseUrl(client) });
     },
@@ -1544,6 +1679,8 @@ export default function qdashExtension(pi: ExtensionAPI) {
       label: tool.label,
       description: tool.description,
       promptSnippet: tool.promptSnippet,
+      // A script's declaration of the tool shows the response shape pi-qdash checks.
+      ...(isContractedAction(tool.action) ? { outputSchema: QUERY_CONTRACTS[tool.action] } : {}),
       promptGuidelines: [
         `Prefer ${tool.name} for this specific read-only QDash operation instead of qdash_query or qdash_raw_get.`,
         "Never expose QDash tokens, passwords, or Cloudflare Access secrets.",
@@ -1578,7 +1715,7 @@ export default function qdashExtension(pi: ExtensionAPI) {
   registerQueryTool({
     name: "qdash_get_chip_metrics",
     label: "QDash Chip Metrics",
-    description: "Get metrics for a chip. If chipId is omitted, the default chip is used.",
+    description: "Get the latest metric value per target on a chip (default chip if chipId is omitted). Returns { chip_id, qubit_count, qubit_metrics, coupling_metrics }, where qubit_metrics[metricKey][qid] is { value, task_id, execution_id, stddev }, e.g. qubit_metrics.t1[\"6\"]. Not an array; metric keys come from metrics_config, qids are stored IDs (from qdash_list_chip_qubits), and values carry no timestamp.",
     promptSnippet: "Get QDash chip metrics for the default or specified chip",
     action: "chip_metrics",
     parameters: Type.Object({ ...connectionParams, ...chipScopedParams }),
@@ -1704,7 +1841,7 @@ export default function qdashExtension(pi: ExtensionAPI) {
   registerQueryTool({
     name: "qdash_get_timeseries",
     label: "QDash Timeseries",
-    description: "Get task-result timeseries for a parameter and time range.",
+    description: "Get the values of one output parameter over a time range. parameter is the exact output parameter name as tasks store it (for example from metrics_config or a task result), with no aliases. Returns { data }, where data[qid] is an array of { value, error, unit, calibrated_at, execution_id, task_id } oldest first, e.g. data[\"6\"]. data is an object keyed by target ID even when qid is set; a target with no points in the window is absent.",
     promptSnippet: "Get QDash task-result timeseries for a parameter over a time range",
     action: "timeseries",
     parameters: Type.Object({
@@ -1718,42 +1855,6 @@ export default function qdashExtension(pi: ExtensionAPI) {
     }),
   });
 
-  pi.registerTool({
-    name: "qdash_plot_timeseries",
-    label: "QDash Plot Timeseries",
-    description: "Render a compact TUI sparkline/plot for a task-result parameter timeseries.",
-    promptSnippet: "Plot QDash task-result timeseries in the TUI",
-    promptGuidelines: ["Use qdash_plot_timeseries when the user wants to visualize history, drift, trends, or analysis timeseries in the TUI."],
-    parameters: Type.Object({
-      ...connectionParams,
-      ...chipScopedParams,
-      parameter: Type.String(),
-      startAt: Type.Optional(Type.String({ description: "Start timestamp, preferably UTC ISO with Z. Defaults to withinHours ago." })),
-      endAt: Type.Optional(Type.String({ description: "End timestamp, preferably UTC ISO with Z. Defaults to now." })),
-      withinHours: Type.Optional(Type.Number({ description: "Lookback window when startAt is omitted. Defaults to 168 hours." })),
-      qid: Type.Optional(Type.String()),
-      tag: Type.Optional(Type.String()),
-      height: Type.Optional(Type.Number()),
-      width: Type.Optional(Type.Number()),
-      color: Type.Optional(Type.Boolean({ description: "Emit ANSI colors in text output for terminal display." })),
-    }),
-    async execute(_toolCallId, params: { profile?: string; configPath?: string; useEnv?: boolean; chipId?: string; parameter: string; startAt?: string; endAt?: string; withinHours?: number; qid?: string; tag?: string; height?: number; width?: number; color?: boolean }) {
-      const client = await makeClient(params);
-      const endAt = params.endAt ?? new Date().toISOString();
-      const startAt = params.startAt ?? new Date(Date.parse(endAt) - (params.withinHours ?? 168) * 3600_000).toISOString();
-      const chipId = await defaultChipId(client, params.chipId);
-      const data = await client.getTaskResultsTimeseries({ chipId, parameter: params.parameter, tag: params.tag, qid: params.qid, startAt, endAt });
-      const title = `QDash Timeseries: ${params.parameter}${params.qid ? ` q${params.qid}` : ""}`;
-      const text = plotSeriesLines(timeseriesPoints(data), { title, height: params.height, width: params.width, color: params.color }).join("\n");
-      return toTextToolResult(text, data, { tool: "qdash_plot_timeseries", parameter: params.parameter, qid: params.qid, chipId, startAt, endAt });
-    },
-    renderResult(result, _options, theme) {
-      const details = result.details as { data?: unknown; parameter?: string; qid?: string } | undefined;
-      const title = `QDash Timeseries: ${details?.parameter ?? "parameter"}${details?.qid ? ` q${details.qid}` : ""}`;
-      return timeseriesPlotComponent(details?.data, title, theme);
-    },
-  });
-
   registerTimeseriesComparisonTool(pi, {
     makeClient,
     defaultChipId,
@@ -1763,7 +1864,7 @@ export default function qdashExtension(pi: ExtensionAPI) {
   registerQueryTool({
     name: "qdash_list_task_results",
     label: "QDash List Task Results",
-    description: "List task results with common filters.",
+    description: "List one page of task results, newest first. Returns { items, total, skip, limit, status_counts }; items have task_id, task_name, qid, status, execution_id, message, start_at, end_at but no output parameters. limit is 1 to 100 (default 50): for more rows call again with skip increased by the rows already read until skip >= total. qid and couplingId match one stored ID exactly (\"6\", \"6-7\").",
     promptSnippet: "List QDash task results with filters such as chip, task, status, qubit, coupling, or time range",
     action: "task_results",
     parameters: Type.Object({
@@ -1775,13 +1876,13 @@ export default function qdashExtension(pi: ExtensionAPI) {
       executionId: Type.Optional(Type.String()),
       username: Type.Optional(Type.String()),
       status: Type.Optional(Type.String()),
-      startAt: Type.Optional(Type.String()),
-      endAt: Type.Optional(Type.String()),
-      startFrom: Type.Optional(Type.String()),
-      startTo: Type.Optional(Type.String()),
+      startAt: Type.Optional(Type.String({ description: "Same as startFrom." })),
+      endAt: Type.Optional(Type.String({ description: "Same as startTo." })),
+      startFrom: Type.Optional(Type.String({ description: "Inclusive lower bound on the task start time, ISO 8601." })),
+      startTo: Type.Optional(Type.String({ description: "Inclusive upper bound on the task start time, ISO 8601." })),
       messageContains: Type.Optional(Type.String()),
-      limit: Type.Optional(Type.Number()),
-      skip: Type.Optional(Type.Number()),
+      limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 100, description: "Rows in this page." })),
+      skip: Type.Optional(Type.Integer({ minimum: 0, description: "Rows to skip before this page." })),
     }),
   });
 
@@ -1815,10 +1916,17 @@ export default function qdashExtension(pi: ExtensionAPI) {
   registerQueryTool({
     name: "qdash_list_executions",
     label: "QDash List Executions",
-    description: "List QDash executions with optional chip, flow, status, and pagination filters.",
-    promptSnippet: "List QDash executions",
+    description: "List one chip's QDash executions, newest first, as { executions, total }. chipId defaults to the active/default chip. Filters are page (skip, limit) and start day (date, timezone) only; there is no flow or status filter, so filter the returned rows by flow_name or status.",
+    promptSnippet: "List a chip's QDash executions",
     action: "executions",
-    parameters: Type.Object({ ...connectionParams, chipId: Type.Optional(Type.String()), flowName: Type.Optional(Type.String()), status: Type.Optional(Type.String()), limit: Type.Optional(Type.Number()), skip: Type.Optional(Type.Number()) }),
+    parameters: Type.Object({
+      ...connectionParams,
+      ...chipScopedParams,
+      limit: Type.Optional(Type.Integer({ minimum: 1, maximum: EXECUTIONS_MAX_PAGE_SIZE, description: `Rows to return, from 1 to ${EXECUTIONS_MAX_PAGE_SIZE}. Defaults to 20.` })),
+      skip: Type.Optional(Type.Integer({ minimum: 0, description: "Rows to skip before this page." })),
+      date: Type.Optional(Type.String({ pattern: "^\\d{8}$", description: "Only executions started on this day, YYYYMMDD." })),
+      timezone: Type.Optional(Type.String({ description: "IANA time zone that defines the day for date. Defaults to UTC." })),
+    }),
   });
 
   pi.registerTool({
@@ -1843,7 +1951,7 @@ export default function qdashExtension(pi: ExtensionAPI) {
         signal,
         `Waiting for execution ${params.executionId}`,
       );
-      return toToolResult(withQDashLinks(client, data), { tool: "qdash_wait_execution", executionId: params.executionId, webBaseUrl: qdashWebBaseUrl(client) });
+      return WAIT_EXECUTION.result(client, params, data);
     },
   });
 
@@ -1898,48 +2006,63 @@ export default function qdashExtension(pi: ExtensionAPI) {
     promptSnippet: "Create a QDash agent calibration session after explicit user confirmation",
     promptGuidelines: [
       "Use qdash_create_agent_session only after the user explicitly asks to start an agent calibration workflow.",
-      "qdash_create_agent_session is a write operation; set confirmWrite only after user confirmation.",
+      "qdash_create_agent_session is a write operation: the host asks the user to approve each call, and no argument approves it.",
+      "The policy takes no numeric bounds or quality gates (allowed_overrides, task_quality_gates, quality_gates): the tool refuses them, even ones the user stated, because QDash cannot verify who wrote a number. A granted output is accepted on its task's own completion checks, and a session created here overrides no task input.",
+      "When the goal needs a measured value committed (a dependent step reads it), propose parameter_updates in the policy (autonomy auto) as one object {parameters: [...], tasks: [...], apply_backend: false}, never a list: only the parameters the goal commits, only the tasks that measure them, apply_backend only when the goal needs the backend files written. A granted output is accepted when its task completed with its own checks passing; another output of the same task that is not granted (such as CheckChevron's control_amplitude when only qubit_frequency is granted) is staged for reference only and never blocks the granted one. Never add an output to the grant only because the task also reports it. Find output names with qdash_get_pipeline_catalog taskNames. Show the user every field before asking: approving it lets passing results be committed without asking again.",
+      "Never create a new session to get around a paused one; the tool refuses while one of your sessions on the chip is paused for these qubits.",
+      "When the session serves a calibration objective, pass its calibrationSessionId so QDash records the agent session in it. That grants nothing beyond the policy.",
     ],
     parameters: Type.Object({
       ...connectionParams,
       ...chipScopedParams,
-      policy: Type.Any({ description: "Agent session policy object accepted by QDash." }),
+      policy: agentSessionPolicySchema,
       expiresInSeconds: Type.Optional(Type.Number()),
       skillName: Type.Optional(Type.String()),
       skillVersion: Type.Optional(Type.String()),
       skillHash: Type.Optional(Type.String()),
-      modelName: Type.Optional(Type.String()),
-      confirmWrite: Type.Optional(Type.Boolean({ description: "Required for non-interactive execution. Set true only after explicit user confirmation." })),
+      calibrationSessionId: Type.Optional(Type.String({ description: "Create the agent session in this calibration session (open, same chip, created by the user). Grants nothing beyond the policy." })),
     }),
-    async execute(_toolCallId, params: ConfirmableParams & {
+    async execute(toolCallId, params: {
       profile?: string;
       configPath?: string;
       useEnv?: boolean;
       chipId?: string;
-      policy: unknown;
+      policy: AgentSessionPolicyInput;
       expiresInSeconds?: number;
       skillName?: string;
       skillVersion?: string;
       skillHash?: string;
-      modelName?: string;
+      calibrationSessionId?: string;
     }, _signal, _onUpdate, ctx) {
-      if (!params.confirmWrite) {
-        if (!ctx.hasUI || !(await ctx.ui.confirm("Create QDash agent session?", "This will create an agent session in QDash."))) {
-          throw new Error("qdash_create_agent_session requires explicit confirmation");
-        }
-      }
+      // A malformed policy fails here, before any approval or QDash call.
+      const problems = agentSessionPolicyProblems(params.policy);
+      if (problems) throw new Error(problems);
       const client = await makeClient(params);
       const chipId = await defaultChipId(client, params.chipId);
+      const policy = params.policy as { qids?: unknown };
+      const qids = Array.isArray(policy.qids) ? policy.qids.map(String) : undefined;
+      // A new session must not start what a paused session of the user waits on a person for.
+      const autonomous = (policy as { autonomy?: unknown }).autonomy === "auto";
+      const conflict = autonomous ? await pausedSessionConflict(client, chipId, qids) : null;
+      if (conflict) throw new Error(conflict.replace("Nothing was started", "No session was created").replace("A flow or pipeline", "A new session"));
+      const recordedIn = params.calibrationSessionId ? `\nRecorded in calibration session ${params.calibrationSessionId}, which groups it and grants nothing.` : "";
+      await requireWriteApproval("qdash_create_agent_session", toolCallId, params, ctx, { title: "Create QDash agent session?", message: `${agentSessionApprovalText(chipId, params.policy, params.expiresInSeconds)}${recordedIn}` });
       const data = await client.createAgentSession({
         chipId,
-        policy: params.policy as never,
+        policy: { ...params.policy, evaluation: params.policy.evaluation ?? "off" } as never,
         expiresInSeconds: params.expiresInSeconds,
         skillName: params.skillName ?? "pi-qdash",
         skillVersion: params.skillVersion,
         skillHash: params.skillHash,
-        modelName: params.modelName,
+        // The host's model, from the extension context; no argument can set it.
+        model: hostModelIdentity(ctx),
+        ...(params.calibrationSessionId ? { calibrationSessionId: params.calibrationSessionId } : {}),
       });
-      return toToolResult(data, { tool: "qdash_create_agent_session", chipId });
+      const expectedEvaluation = params.policy.evaluation ?? "off";
+      if ((data as { policy?: { evaluation?: string | null } }).policy?.evaluation !== expectedEvaluation) {
+        throw new Error(`QDash created session ${(data as { session_id?: string }).session_id ?? "(unknown)"} without the approved evaluation mode (${expectedEvaluation}). Do not run steps in it: complete it, and upgrade QDash before creating another session.`);
+      }
+      return toToolResult(data, { tool: "qdash_create_agent_session", chipId, ...(params.calibrationSessionId ? { calibrationSessionId: params.calibrationSessionId } : {}) });
     },
   });
 
@@ -1963,7 +2086,8 @@ export default function qdashExtension(pi: ExtensionAPI) {
     promptSnippet: "Submit an action to a QDash agent session after explicit user confirmation",
     promptGuidelines: [
       "Use qdash_submit_agent_action only after the user confirms the exact agent action.",
-      "Set confirmWrite only after explicit user confirmation.",
+      "The host asks the user to approve each call; no argument approves it.",
+      "An authorized request_human action records an intervention in QDash and pauses the session until an expert answers there; put the question for the expert in diagnosis.",
     ],
     parameters: Type.Object({
       ...connectionParams,
@@ -1975,9 +2099,8 @@ export default function qdashExtension(pi: ExtensionAPI) {
       qids: Type.Optional(Type.Array(Type.String())),
       parameterOverrides: Type.Optional(Type.Record(Type.String(), Type.Number())),
       diagnosis: Type.Optional(Type.String()),
-      confirmWrite: Type.Optional(Type.Boolean()),
     }),
-    async execute(_toolCallId, params: ConfirmableParams & {
+    async execute(toolCallId, params: {
       profile?: string;
       configPath?: string;
       useEnv?: boolean;
@@ -1990,11 +2113,7 @@ export default function qdashExtension(pi: ExtensionAPI) {
       parameterOverrides?: Record<string, number>;
       diagnosis?: string;
     }, _signal, _onUpdate, ctx) {
-      if (!params.confirmWrite) {
-        if (!ctx.hasUI || !(await ctx.ui.confirm("Submit QDash agent action?", `Submit action '${params.actionType}' to session '${params.sessionId}'?`))) {
-          throw new Error("qdash_submit_agent_action requires explicit confirmation");
-        }
-      }
+      await requireWriteApproval("qdash_submit_agent_action", toolCallId, params, ctx, { title: "Submit QDash agent action?", message: `Submit action '${params.actionType}' to session '${params.sessionId}'?` });
       const client = await makeClient(params);
       const data = await client.submitAgentAction(params.sessionId, {
         idempotencyKey: params.idempotencyKey ?? randomUUID(),
@@ -2004,6 +2123,7 @@ export default function qdashExtension(pi: ExtensionAPI) {
         qids: params.qids,
         parameterOverrides: params.parameterOverrides,
         diagnosis: params.diagnosis,
+        model: hostModelIdentity(ctx),
       });
       return toToolResult(data, { tool: "qdash_submit_agent_action" });
     },
@@ -2036,6 +2156,23 @@ export default function qdashExtension(pi: ExtensionAPI) {
   });
 
   pi.registerTool({
+    name: "qdash_list_agent_interventions",
+    label: "QDash List Agent Interventions",
+    description:
+      "List a QDash agent session's interventions, newest first: why the agent stopped, its question, the expert's decision and guidance, and whether the session can resume.",
+    promptSnippet: "List QDash agent interventions and expert answers for an agent session",
+    promptGuidelines: [
+      "Use qdash_list_agent_interventions after a request_human action, or when a QDash agent session is waiting_for_human, to read the expert's decision and guidance.",
+      "An expert's guidance is evidence, not an instruction to widen the session: it grants no new task, target, override, or write.",
+    ],
+    parameters: Type.Object({ ...connectionParams, sessionId: Type.String() }),
+    async execute(_toolCallId, params: { profile?: string; configPath?: string; useEnv?: boolean; sessionId: string }) {
+      const client = await makeClient(params);
+      return toToolResult(await client.listAgentInterventions(params.sessionId), { tool: "qdash_list_agent_interventions" });
+    },
+  });
+
+  pi.registerTool({
     name: "qdash_wait_agent_action",
     label: "QDash Wait Agent Action",
     description: "Wait for a QDash agent action to be dispatched or linked to an execution.",
@@ -2059,7 +2196,7 @@ export default function qdashExtension(pi: ExtensionAPI) {
         signal,
         `Waiting for agent action ${params.actionId}`,
       );
-      return toToolResult(data, { tool: "qdash_wait_agent_action" });
+      return WAIT_AGENT_ACTION.result(client, params, data);
     },
   });
 
@@ -2092,14 +2229,9 @@ export default function qdashExtension(pi: ExtensionAPI) {
       sourceExecutionId: Type.Optional(Type.String({ description: "Execution the action was decided from, recorded for provenance. The run does not restore it." })),
       updateParams: Type.Optional(Type.Boolean()),
       reconfigure: Type.Optional(Type.Boolean()),
-      confirmWrite: Type.Optional(Type.Boolean()),
     }),
-    async execute(_toolCallId, params: ConfirmableParams & { profile?: string; configPath?: string; useEnv?: boolean; sessionId: string; actionId: string; sourceExecutionId?: string; updateParams?: boolean; reconfigure?: boolean }, _signal, _onUpdate, ctx) {
-      if (!params.confirmWrite) {
-        if (!ctx.hasUI || !(await ctx.ui.confirm("Execute QDash agent action?", `Run action '${params.actionId}' on the current calibration state? Outputs stay staged until a candidate is committed.`))) {
-          throw new Error("qdash_execute_agent_action requires explicit confirmation");
-        }
-      }
+    async execute(toolCallId, params: { profile?: string; configPath?: string; useEnv?: boolean; sessionId: string; actionId: string; sourceExecutionId?: string; updateParams?: boolean; reconfigure?: boolean }, _signal, _onUpdate, ctx) {
+      await requireWriteApproval("qdash_execute_agent_action", toolCallId, params, ctx, { title: "Execute QDash agent action?", message: `Run action '${params.actionId}' on the current calibration state? Outputs stay staged until a candidate is committed.` });
       const client = await makeClient(params);
       return toToolResult(await client.executeAgentAction(params.sessionId, params.actionId, {
         sourceExecutionId: params.sourceExecutionId,
@@ -2123,14 +2255,9 @@ export default function qdashExtension(pi: ExtensionAPI) {
       taskId: Type.String(),
       idempotencyKey: Type.Optional(Type.String()),
       expectedStateVersion: Type.Number(),
-      confirmWrite: Type.Optional(Type.Boolean()),
     }),
-    async execute(_toolCallId, params: ConfirmableParams & { profile?: string; configPath?: string; useEnv?: boolean; sessionId: string; actionId: string; parameterName: string; taskId: string; idempotencyKey?: string; expectedStateVersion: number }, _signal, _onUpdate, ctx) {
-      if (!params.confirmWrite) {
-        if (!ctx.hasUI || !(await ctx.ui.confirm("Commit QDash agent candidate?", `Commit candidate '${params.parameterName}' for task '${params.taskId}'?`))) {
-          throw new Error("qdash_commit_agent_candidate requires explicit confirmation");
-        }
-      }
+    async execute(toolCallId, params: { profile?: string; configPath?: string; useEnv?: boolean; sessionId: string; actionId: string; parameterName: string; taskId: string; idempotencyKey?: string; expectedStateVersion: number }, _signal, _onUpdate, ctx) {
+      await requireWriteApproval("qdash_commit_agent_candidate", toolCallId, params, ctx, { title: "Commit QDash agent candidate?", message: `Commit candidate '${params.parameterName}' for task '${params.taskId}'?` });
       const client = await makeClient(params);
       const data = await client.commitAgentActionCandidate(params.sessionId, params.actionId, params.parameterName, {
         idempotencyKey: params.idempotencyKey ?? randomUUID(),
@@ -2224,14 +2351,9 @@ export default function qdashExtension(pi: ExtensionAPI) {
     parameters: Type.Object({
       ...connectionParams,
       request: Type.Any({ description: "ForumPostCreate request body accepted by QDash." }),
-      confirmWrite: Type.Optional(Type.Boolean()),
     }),
-    async execute(_toolCallId, params: ConfirmableParams & { profile?: string; configPath?: string; useEnv?: boolean; request: unknown }, _signal, _onUpdate, ctx) {
-      if (!params.confirmWrite) {
-        if (!ctx.hasUI || !(await ctx.ui.confirm("Create QDash forum post?", "This will create a forum post in QDash."))) {
-          throw new Error("qdash_create_forum_post requires explicit confirmation");
-        }
-      }
+    async execute(toolCallId, params: { profile?: string; configPath?: string; useEnv?: boolean; request: unknown }, _signal, _onUpdate, ctx) {
+      await requireWriteApproval("qdash_create_forum_post", toolCallId, params, ctx, { title: "Create QDash forum post?", message: "This will create a forum post in QDash." });
       const client = await makeClient(params);
       return toToolResult(await client.createForumPost(params.request as never), { tool: "qdash_create_forum_post" });
     },
@@ -2306,15 +2428,11 @@ export default function qdashExtension(pi: ExtensionAPI) {
       imagePaths: Type.Array(Type.String(), { minItems: 1, maxItems: 8 }),
       interpretation: Type.String({ description: "Human-readable interpretation or context shown after the images." }),
       title: Type.Optional(Type.String()),
-      confirmWrite: Type.Optional(Type.Boolean()),
     }),
-    async execute(_toolCallId, params: ConfirmableParams & { profile?: string; configPath?: string; useEnv?: boolean; parentPostId: string; imagePaths: string[]; interpretation: string; title?: string }, _signal, _onUpdate, ctx) {
+    async execute(toolCallId, params: { profile?: string; configPath?: string; useEnv?: boolean; parentPostId: string; imagePaths: string[]; interpretation: string; title?: string }, _signal, _onUpdate, ctx) {
       const client = await makeClient(params);
       const prepared = await prepareForumImageReply(client, params);
-      if (!params.confirmWrite) {
-        const confirmed = ctx.hasUI && await ctx.ui.confirm("Upload images and create QDash forum reply?", prepared.preview.slice(0, 1800));
-        if (!confirmed) throw new Error("qdash_create_forum_image_reply requires explicit confirmation");
-      }
+      await requireWriteApproval("qdash_create_forum_image_reply", toolCallId, params, ctx, { title: "Upload images and create QDash forum reply?", message: prepared.preview });
       const created = await createForumImageReply(client, params, prepared);
       const postId = firstString(created.reply as unknown as Record<string, unknown>, ["id"]);
       const parentUrl = qdashWebUrl(client, `/forum/posts/${encodeURIComponent(params.parentPostId)}`);
@@ -2339,15 +2457,11 @@ export default function qdashExtension(pi: ExtensionAPI) {
       maxFigures: Type.Optional(Type.Number()),
       includeHistory: Type.Optional(Type.Boolean()),
       historyLimit: Type.Optional(Type.Number()),
-      confirmWrite: Type.Optional(Type.Boolean()),
     }),
-    async execute(_toolCallId, params: ConfirmableParams & { profile?: string; configPath?: string; useEnv?: boolean; parentPostId: string; taskId: string; interpretation: string; title?: string; includeFigures?: boolean; maxFigures?: number; includeHistory?: boolean; historyLimit?: number }, _signal, _onUpdate, ctx) {
+    async execute(toolCallId, params: { profile?: string; configPath?: string; useEnv?: boolean; parentPostId: string; taskId: string; interpretation: string; title?: string; includeFigures?: boolean; maxFigures?: number; includeHistory?: boolean; historyLimit?: number }, _signal, _onUpdate, ctx) {
       const client = await makeClient(params);
       const built = await buildForumEvidenceReply(client, params);
-      if (!params.confirmWrite) {
-        const confirmed = ctx.hasUI && await ctx.ui.confirm("Create QDash forum evidence reply?", built.preview.slice(0, 1800));
-        if (!confirmed) throw new Error("qdash_create_forum_evidence_reply requires explicit confirmation");
-      }
+      await requireWriteApproval("qdash_create_forum_evidence_reply", toolCallId, params, ctx, { title: "Create QDash forum evidence reply?", message: built.preview });
       const data = await client.createForumPost(built.request as never);
       const postId = firstString(data as unknown as Record<string, unknown>, ["id"]);
       const parentUrl = qdashWebUrl(client, `/forum/posts/${encodeURIComponent(params.parentPostId)}`);
@@ -2366,14 +2480,9 @@ export default function qdashExtension(pi: ExtensionAPI) {
       ...connectionParams,
       postId: Type.String(),
       request: Type.Any({ description: "ForumPostUpdate request body accepted by QDash." }),
-      confirmWrite: Type.Optional(Type.Boolean()),
     }),
-    async execute(_toolCallId, params: ConfirmableParams & { profile?: string; configPath?: string; useEnv?: boolean; postId: string; request: unknown }, _signal, _onUpdate, ctx) {
-      if (!params.confirmWrite) {
-        if (!ctx.hasUI || !(await ctx.ui.confirm("Update QDash forum post?", `Update forum post '${params.postId}'?`))) {
-          throw new Error("qdash_update_forum_post requires explicit confirmation");
-        }
-      }
+    async execute(toolCallId, params: { profile?: string; configPath?: string; useEnv?: boolean; postId: string; request: unknown }, _signal, _onUpdate, ctx) {
+      await requireWriteApproval("qdash_update_forum_post", toolCallId, params, ctx, { title: "Update QDash forum post?", message: `Update forum post '${params.postId}'?` });
       const client = await makeClient(params);
       return toToolResult(await client.updateForumPost(params.postId, params.request as never), { tool: "qdash_update_forum_post" });
     },
@@ -2391,14 +2500,9 @@ export default function qdashExtension(pi: ExtensionAPI) {
       candidates: Type.Array(Type.Any({ description: "Agent plan candidate references accepted by QDash." })),
       idempotencyKey: Type.Optional(Type.String()),
       expectedStateVersion: Type.Number(),
-      confirmWrite: Type.Optional(Type.Boolean()),
     }),
-    async execute(_toolCallId, params: ConfirmableParams & { profile?: string; configPath?: string; useEnv?: boolean; sessionId: string; candidates: unknown[]; idempotencyKey?: string; expectedStateVersion: number }, _signal, _onUpdate, ctx) {
-      if (!params.confirmWrite) {
-        if (!ctx.hasUI || !(await ctx.ui.confirm("Commit QDash agent candidate set?", `Commit ${params.candidates.length} candidate(s)?`))) {
-          throw new Error("qdash_commit_agent_candidate_set requires explicit confirmation");
-        }
-      }
+    async execute(toolCallId, params: { profile?: string; configPath?: string; useEnv?: boolean; sessionId: string; candidates: unknown[]; idempotencyKey?: string; expectedStateVersion: number }, _signal, _onUpdate, ctx) {
+      await requireWriteApproval("qdash_commit_agent_candidate_set", toolCallId, params, ctx, { title: "Commit QDash agent candidate set?", message: `Commit ${params.candidates.length} candidate(s)?` });
       const client = await makeClient(params);
       return toToolResult(await client.commitAgentCandidateSet(params.sessionId, params.candidates as never, {
         idempotencyKey: params.idempotencyKey ?? randomUUID(),
@@ -2433,14 +2537,9 @@ export default function qdashExtension(pi: ExtensionAPI) {
       idempotencyKey: Type.Optional(Type.String()),
       expectedStateVersion: Type.Number(),
       pushToGithub: Type.Optional(Type.Boolean()),
-      confirmWrite: Type.Optional(Type.Boolean()),
     }),
-    async execute(_toolCallId, params: ConfirmableParams & { profile?: string; configPath?: string; useEnv?: boolean; sessionId: string; commitId: string; idempotencyKey?: string; expectedStateVersion: number; pushToGithub?: boolean }, _signal, _onUpdate, ctx) {
-      if (!params.confirmWrite) {
-        if (!ctx.hasUI || !(await ctx.ui.confirm("Apply QDash agent candidate commit?", `Apply commit '${params.commitId}' to backend configuration?`))) {
-          throw new Error("qdash_apply_agent_candidate_commit requires explicit confirmation");
-        }
-      }
+    async execute(toolCallId, params: { profile?: string; configPath?: string; useEnv?: boolean; sessionId: string; commitId: string; idempotencyKey?: string; expectedStateVersion: number; pushToGithub?: boolean }, _signal, _onUpdate, ctx) {
+      await requireWriteApproval("qdash_apply_agent_candidate_commit", toolCallId, params, ctx, { title: "Apply QDash agent candidate commit?", message: `Apply commit '${params.commitId}' to backend configuration?` });
       const client = await makeClient(params);
       return toToolResult(await client.applyAgentCandidateCommit(params.sessionId, params.commitId, {
         idempotencyKey: params.idempotencyKey ?? randomUUID(),
@@ -2488,15 +2587,16 @@ export default function qdashExtension(pi: ExtensionAPI) {
       const chipId = await defaultChipId(client, params.chipId);
       const end = new Date();
       const start = new Date(end.getTime() - (params.withinHours ?? 168) * 3600_000);
-      const payload = await client.listTaskResults({ chipId, startAt: start.toISOString(), endAt: end.toISOString(), limit: 50 });
+      const payload = await client.listTaskResults({ chipId, startFrom: start.toISOString(), startTo: end.toISOString(), limit: 50 });
       const tasks = arrayFromPayload(payload).filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object");
       const task = tasks[params.taskIndex ?? 0];
       const taskId = task && firstString(task, ["task_id", "taskId"]);
       if (!taskId) throw new Error("No recent calibration task result with a task ID was found");
+      const taskName = firstString(task, ["task_name", "taskName", "name"]);
       const file: TaskResultFigureFile = await client.getTaskResultFigure(taskId, { index: params.figureIndex ?? 0 });
       const bytes = Buffer.from(file.data);
       const mediaType = file.mediaType || mediaTypeForPath(file.path ?? "");
-      const details: FigureDetails = { tool: "qdash_recent_calibration_figure", taskId, path: file.path ?? "", mediaType, sizeBytes: bytes.byteLength, figurePaths: file.figurePaths ?? [], jsonFigurePaths: file.jsonFigurePaths ?? [] };
+      const details: FigureDetails = { tool: "qdash_recent_calibration_figure", taskId, ...(taskName ? { taskName } : {}), path: file.path ?? "", mediaType, sizeBytes: bytes.byteLength, figurePaths: file.figurePaths ?? [], jsonFigurePaths: file.jsonFigurePaths ?? [] };
       if (mediaType.startsWith("image/")) details.base64 = bytes.toString("base64");
       else details.text = bytes.toString("utf8");
       return toFigureToolResult(figureResultText(details), details, { task, selectedPath: details.path }, details);
@@ -2541,13 +2641,17 @@ export default function qdashExtension(pi: ExtensionAPI) {
     async execute(_toolCallId, params: { profile?: string; configPath?: string; useEnv?: boolean; taskId: string; index?: number; preferJson?: boolean }) {
       const client = await makeClient(params);
       try {
-        const options: TaskResultFigureOptions = { index: params.index, preferJson: params.preferJson };
-        const file: TaskResultFigureFile = await client.getTaskResultFigure(params.taskId, options);
+        // The task result is read once for its figure paths and its task name,
+        // which evaluation hydration uses to keep figures with their task.
+        const task = await client.getTaskResult(params.taskId) as unknown as Record<string, unknown>;
+        const file = await taskResultFigure(client, params.taskId, task, { index: params.index, preferJson: params.preferJson });
+        const taskName = firstString(task, ["task_name", "taskName", "name"]);
         const bytes = Buffer.from(file.data);
         const mediaType = file.mediaType || mediaTypeForPath(file.path ?? "");
         const details: FigureDetails = {
           tool: "qdash_get_task_figures",
           taskId: params.taskId,
+          ...(taskName ? { taskName } : {}),
           path: file.path ?? "",
           mediaType,
           sizeBytes: bytes.byteLength,
@@ -2714,7 +2818,7 @@ export default function qdashExtension(pi: ExtensionAPI) {
       const result = toTextToolResult(
         qcalEvidenceText(evidence, { inputs: params.includeInputs === true, metrics: params.includeMetrics === true }),
         { evidence },
-        { tool: "qdash_build_qcal_evidence", taskId: params.taskId, evidence },
+        { tool: "qdash_build_qcal_evidence", taskId: params.taskId, ...(evidence.task?.name ? { taskName: evidence.task.name } : {}), evidence },
       );
       return { ...result, content: [...result.content, ...images] };
     },
@@ -2842,10 +2946,10 @@ export default function qdashExtension(pi: ExtensionAPI) {
   pi.registerTool({
     name: "qdash_dashboard",
     label: "QDash Dashboard",
-    description: "Build a compact read-only QDash dashboard for the current profile/chip context.",
+    description: "Build a compact read-only QDash status summary (chips, open Forum threads, recent executions, failed task results) for the current profile/chip context. It does not read or change custom dashboards; those are qdash_query dashboards/dashboard and qdash_save_dashboard.",
     promptSnippet: "Show QDash harness dashboard: chips, open Forum threads, recent executions, failed task results, and provenance stats",
     promptGuidelines: [
-      "Use qdash_dashboard when the user asks for QDash status, overview, triage, or a dashboard.",
+      "Use qdash_dashboard when the user asks for a QDash status overview or triage summary. It is not a custom dashboard: to build, change or save a dashboard of panels, follow the qdash-metric-scripts skill.",
       "Summarize dashboard data instead of dumping large raw payloads.",
     ],
     parameters: Type.Object({ ...connectionParams, ...chipScopedParams, limit: Type.Optional(Type.Number()), color: Type.Optional(Type.Boolean({ description: "Emit ANSI colors in text output for terminal display." })) }),

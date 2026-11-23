@@ -18,10 +18,23 @@ export default withMermaid(
         target: "es2022",
       },
       optimizeDeps: {
+        // mermaid imports the CommonJS package fastdom, which
+        // vitepress-plugin-mermaid does not pre-bundle. Without these entries
+        // the dev server serves it as ESM and the page renders blank.
+        include: [
+          "mermaid > fastdom",
+          "mermaid > fastdom/extensions/fastdom-promised.js",
+        ],
         esbuildOptions: {
           // Keep dev pre-bundling aligned with the production target.
           target: "es2022",
         },
+      },
+      ssr: {
+        // vitepress-openapi >= 0.2.13 imports `useData` from "vitepress" in its
+        // client bundle. Bundle it for SSR so that import resolves to the
+        // VitePress client runtime instead of the Node entry, which lacks it.
+        noExternal: ["vitepress-openapi"],
       },
     },
     base: "/qdash/",
@@ -64,7 +77,9 @@ export default withMermaid(
       theme: "neutral",
     },
     mermaidPlugin: {
-      class: "mermaid my-class",
+      // Not "mermaid": mermaid's startOnLoad handler re-parses every `.mermaid` element on window
+      // load and can replace an already rendered diagram with a syntax-error SVG.
+      class: "mermaid-diagram",
     },
 
     themeConfig: {
@@ -97,40 +112,69 @@ export default withMermaid(
                 {
                   text: "Setup",
                   items: [
-                    { text: "Choose a Backend", link: "/user-guide/setup" },
+                    { text: "Install and Sign In", link: "/user-guide/setup" },
                     { text: "Fake Backend", link: "/user-guide/setup/fake-backend" },
                     { text: "Qubex Backend", link: "/user-guide/setup/qubex-backend" },
+                    { text: "AI Setup", link: "/user-guide/setup/ai" },
                   ],
                 },
                 { text: "Operations", link: "/user-guide/operations" },
                 { text: "System Updates", link: "/user-guide/system-updates" },
+                { text: "Upgrade MongoDB", link: "/user-guide/mongodb-upgrade" },
               ],
             },
             {
-              text: "Work in QDash",
+              text: "Get Started",
               items: [
+                { text: "Run Your First Calibration", link: "/user-guide/first-calibration" },
                 { text: "Application Tour", link: "/user-guide/application-tour" },
-                {
-                  text: "Authentication and Users",
-                  link: "/user-guide/authentication-and-users",
-                },
-                {
-                  text: "Projects and Data Sharing",
-                  link: "/user-guide/projects-and-data-sharing",
-                },
-                { text: "Dashboard", link: "/user-guide/dashboard" },
+              ],
+            },
+            {
+              text: "Run Calibrations",
+              items: [
                 { text: "Running Calibrations", link: "/user-guide/running-calibrations" },
                 { text: "Creating Workflows", link: "/user-guide/creating-workflows" },
+                {
+                  text: "Manual Execution Rounds",
+                  link: "/user-guide/manual-execution-rounds",
+                },
                 { text: "Task Parameters", link: "/user-guide/task-parameters" },
-                { text: "Data and Provenance", link: "/user-guide/data-and-provenance" },
-                { text: "Reviewing Results", link: "/user-guide/reviewing-results" },
-                { text: "AI Evaluations", link: "/user-guide/ai-evaluations" },
-                { text: "AI Chat", link: "/user-guide/ai-chat" },
-                { text: "Agent Calibration", link: "/user-guide/agent-calibration" },
                 {
                   text: "Cryostats and Cool-downs",
                   link: "/user-guide/cryostats-and-cool-downs",
                 },
+              ],
+            },
+            {
+              text: "Review Results",
+              items: [
+                { text: "Overview", link: "/user-guide/overview" },
+                { text: "Dashboards", link: "/user-guide/dashboards" },
+                { text: "Metric Scripts", link: "/user-guide/metric-scripts" },
+                { text: "Data and Provenance", link: "/user-guide/data-and-provenance" },
+                { text: "Reviewing Results", link: "/user-guide/reviewing-results" },
+              ],
+            },
+            {
+              text: "Collaborate and Manage Access",
+              items: [
+                {
+                  text: "Projects and Data Sharing",
+                  link: "/user-guide/projects-and-data-sharing",
+                },
+                {
+                  text: "Authentication and Users",
+                  link: "/user-guide/authentication-and-users",
+                },
+              ],
+            },
+            {
+              text: "Use AI Assistance",
+              items: [
+                { text: "Agent", link: "/user-guide/ai-chat" },
+                { text: "AI Evaluations", link: "/user-guide/ai-evaluations" },
+                { text: "Agent Calibration", link: "/user-guide/agent-calibration" },
               ],
             },
           ],
@@ -183,10 +227,12 @@ export default withMermaid(
                 { text: "Quickstart", link: "/developer-guide/workflow/quickstart" },
                 { text: "Engine Architecture", link: "/developer-guide/workflow/engine-architecture" },
                 { text: "Services", link: "/developer-guide/workflow/services" },
+                { text: "Task Calls", link: "/developer-guide/workflow/task-calls" },
                 { text: "Calibration Pipeline Spec", link: "/developer-guide/workflow/calibration-pipeline" },
                 { text: "Calibration Data Lifecycle", link: "/developer-guide/workflow/calibration-data-lifecycle" },
                 { text: "Parameter Resolution", link: "/developer-guide/workflow/parameter-resolution" },
                 { text: "Frequency Parameter Policy", link: "/developer-guide/workflow/frequency-parameter-policy" },
+                { text: "Cross-Resonance Tasks", link: "/developer-guide/workflow/cross-resonance-tasks" },
                 { text: "Testing", link: "/developer-guide/workflow/testing" },
               ],
             },
@@ -195,10 +241,13 @@ export default withMermaid(
               collapsed: true,
               items: [
                 { text: "Architecture", link: "/developer-guide/copilot/architecture" },
+                { text: "Model Configuration", link: "/developer-guide/copilot/model-configuration" },
                 { text: "Pi Packages", link: "/developer-guide/copilot/packages" },
                 { text: "Pi Extension Design", link: "/developer-guide/copilot/extensions" },
                 { text: "Agent Platform", link: "/developer-guide/copilot/agent-platform" },
                 { text: "Agentic Calibration", link: "/developer-guide/copilot/agentic-calibration" },
+                { text: "Calibration Sessions", link: "/developer-guide/copilot/calibration-sessions" },
+                { text: "Agent Loop Validation", link: "/developer-guide/copilot/agent-validation" },
                 { text: "Knowledge Layout", link: "/developer-guide/copilot/knowledge-layout" },
                 { text: "Calibration Evaluation", link: "/developer-guide/copilot/evaluation" },
                 { text: "Workspace", link: "/developer-guide/copilot/workspace" },
@@ -214,7 +263,11 @@ export default withMermaid(
                 { text: "CR Scheduler", link: "/developer-guide/architecture/cr-scheduler" },
                 { text: "Square Lattice", link: "/developer-guide/architecture/square-lattice-topology" },
                 { text: "Notes", link: "/developer-guide/architecture/notes" },
+                { text: "Dashboards", link: "/developer-guide/architecture/dashboards" },
+                { text: "Metric Scripts", link: "/developer-guide/architecture/metric-scripts" },
                 { text: "Provenance", link: "/developer-guide/architecture/provenance" },
+                { text: "Python SDK", link: "/developer-guide/architecture/python-sdk" },
+                { text: "TypeScript SDK", link: "/developer-guide/architecture/typescript-sdk" },
               ],
             },
             {
@@ -228,6 +281,7 @@ export default withMermaid(
                 { text: "TypeScript Client", link: "/reference/clients/typescript" },
                 { text: "pi-qdash", link: "/reference/pi-qdash" },
                 { text: "pi-qcaleval", link: "/reference/pi-qcaleval" },
+                { text: "Task Method Sources", link: "/reference/task-method-sources" },
               ],
             },
             {

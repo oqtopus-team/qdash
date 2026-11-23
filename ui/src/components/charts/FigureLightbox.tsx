@@ -44,12 +44,12 @@ function LightboxControls({
         >
           {isInteractive ? (
             <>
-              <Image className="h-4 w-4" />
+              <Image data-icon="inline-start" />
               <span className="text-xs">Static</span>
             </>
           ) : (
             <>
-              <LineChart className="h-4 w-4" />
+              <LineChart data-icon="inline-start" />
               <span className="text-xs">Interactive</span>
             </>
           )}
@@ -120,7 +120,7 @@ export function FigureLightbox({ src, alt, jsonFigurePath, onClose }: FigureLigh
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="h-[calc(100dvh-2rem)] max-h-none max-w-none overflow-hidden rounded-2xl bg-neutral/95 p-0">
+      <DialogContent className="h-[calc(100dvh-2rem)] max-h-none max-w-none overflow-hidden bg-neutral/95 p-0">
         <DialogTitle className="sr-only">Figure preview</DialogTitle>
         <DialogDescription className="sr-only">
           Expanded figure with pan, zoom, and optional interactive controls.
@@ -140,12 +140,17 @@ export function FigureLightbox({ src, alt, jsonFigurePath, onClose }: FigureLigh
             onToggleInteractive={() => setIsInteractive((v) => !v)}
           />
           {isInteractive && jsonFigurePath ? (
-            <div className="flex h-full w-full items-center justify-center">
-              <div className="max-h-[90%] max-w-[90%] overflow-auto rounded-xl bg-base-100 p-4 shadow-lg">
-                <PlotlyRenderer
-                  fullPath={`/api/executions/figure?path=${encodeURIComponent(jsonFigurePath)}`}
-                />
-              </div>
+            // Bounded panel below the top controls (top-4 + btn-sm + gap), so the plot
+            // fits the viewport and the Plotly modebar never sits under those controls.
+            <div
+              data-testid="figure-lightbox-interactive"
+              className="absolute inset-x-2 top-16 bottom-2 overflow-hidden rounded-[var(--radius-box)] bg-base-100 p-2 shadow-lg sm:inset-x-4 sm:bottom-4 sm:p-4"
+            >
+              <PlotlyRenderer
+                sizing="container"
+                className="h-full w-full min-h-0 min-w-0"
+                fullPath={`/api/executions/figure?path=${encodeURIComponent(jsonFigurePath)}`}
+              />
             </div>
           ) : (
             <TransformComponent

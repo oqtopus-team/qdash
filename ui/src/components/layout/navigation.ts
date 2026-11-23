@@ -11,6 +11,7 @@ import {
   Gauge,
   House,
   LayoutDashboard,
+  LayoutGrid,
   ListTodo,
   MessagesSquare,
   Settings,
@@ -24,6 +25,7 @@ export type NavItem = {
   href: string;
   label: string;
   title?: string;
+  badge?: "Beta";
   icon: LucideIcon;
   match?: "exact" | "prefix";
   visible?: boolean;
@@ -42,14 +44,21 @@ interface NavigationOptions {
 export function getNavigationSections({ canEdit, isAdmin }: NavigationOptions): NavSection[] {
   return [
     {
-      label: "Overview",
+      label: "Explore",
       items: [
         { href: "/home", label: "Home", icon: House },
-        { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+        { href: "/overview", label: "Overview", icon: LayoutDashboard },
+        {
+          href: "/dashboards",
+          label: "Dashboards",
+          badge: "Beta",
+          icon: LayoutGrid,
+          match: "prefix",
+        },
         { href: "/metrics", label: "Metrics", icon: Gauge },
         { href: "/chip", label: "Chip", icon: Cpu },
         { href: "/analysis", label: "Analysis", icon: BarChart3 },
-        { href: "/chat", label: "AI Chat", icon: Bot },
+        { href: "/chat", label: "Agent", icon: Bot },
       ],
     },
     {
@@ -112,4 +121,67 @@ export function getNavigationSections({ canEdit, isAdmin }: NavigationOptions): 
       ],
     },
   ];
+}
+
+/**
+ * Destinations shown as tabs in the mobile tab bar, in display order. Each tab
+ * is active on its own route and on every route nested under one of its bases;
+ * `/executions/{id}` resolves to an execution page, so it belongs to Execution.
+ * Every other destination sits in the More sheet that the last tab opens.
+ */
+const MOBILE_TAB_BASES: ReadonlyArray<{ href: string; bases: readonly string[] }> = [
+  { href: "/overview", bases: ["/overview"] },
+  { href: "/workflow", bases: ["/workflow"] },
+  { href: "/execution", bases: ["/execution", "/executions"] },
+  { href: "/chat", bases: ["/chat"] },
+];
+
+export type MobileTab = {
+  item: NavItem;
+  bases: readonly string[];
+};
+
+/** Resolves whether `item` owns the current route, honouring its `match` mode. */
+export function isNavItemActive(item: NavItem, pathname: string): boolean {
+  return item.match === "prefix" ? pathname.startsWith(item.href) : pathname === item.href;
+}
+
+/** True when `pathname` is `base` itself or a route nested under it. */
+export function isPathWithin(pathname: string, base: string): boolean {
+  return pathname === base || pathname.startsWith(`${base}/`);
+}
+
+/**
+ * Resolves the mobile tabs from the shared sections, so a tab carries the same
+ * label, icon, and visibility as its sidebar row; a hidden row hides its tab.
+ */
+export function getMobileTabs(sections: NavSection[]): MobileTab[] {
+  const items = new Map(sections.flatMap((section) => section.items).map((i) => [i.href, i]));
+  return MOBILE_TAB_BASES.flatMap(({ href, bases }) => {
+    const item = items.get(href);
+    return item && item.visible !== false ? [{ item, bases }] : [];
+  });
+}
+
+export function isMobileTabActive(tab: MobileTab, pathname: string): boolean {
+  return tab.bases.some((base) => isPathWithin(pathname, base));
+}
+
+/** The sections without the destinations the mobile tab bar already shows. */
+export function withoutMobileTabs(sections: NavSection[]): NavSection[] {
+  const tabHrefs = new Set(MOBILE_TAB_BASES.map((tab) => tab.href));
+  return sections.map((section) => ({
+    ...section,
+    items: section.items.filter((item) => !tabHrefs.has(item.href)),
+  }));
+}
+
+/**
+ * True when a visible destination outside the mobile tabs owns `pathname`, so the
+ * More tab can show that the current page lives in its sheet.
+ */
+export function isMobileOverflowActive(sections: NavSection[], pathname: string): boolean {
+  return withoutMobileTabs(sections).some((section) =>
+    section.items.some((item) => item.visible !== false && isNavItemActive(item, pathname)),
+  );
 }

@@ -1,12 +1,37 @@
 name: ${ENV:-default}
 services:
+  caddy:
+    # Browser entry point on UI_PORT: the UI at /, the API at /api and Prefect
+    # at /prefect (signed-in QDash users only). See config/caddy/Caddyfile.
+    # This is the only port the stack publishes on the host, so stacks with
+    # different ENV (Compose project) and UI_PORT values run side by side.
+    # Other services talk over custom_net. `task dev-local` uses this service
+    # too, with compose.dev-local.yaml pointing the upstreams at its API and UI.
+    image: caddy:2.10.2-alpine
+    restart: always
+    environment:
+      QDASH_API_UPSTREAM: api:${API_PORT:-5715}
+      QDASH_UI_UPSTREAM: ui:${UI_PORT:-5714}
+      # Its scheme and host tell Caddy which browser requests use HTTPS.
+      CLIENT_URL: ${CLIENT_URL:-}
+    ports:
+      - "${UI_PORT:-5714}:80"
+    volumes:
+      - ./config/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+    depends_on:
+      - ui
+      - api
+      - prefect-server
+    networks:
+      - custom_net
   mongo:
-    image: mongo
+    # Required, with no default: the release must match the data in MONGO_DATA_PATH.
+    # The .env examples set it for new installations; existing ones set the running
+    # release (docs/user-guide/mongodb-upgrade.md).
+    image: mongo:${MONGO_VERSION:?Set MONGO_VERSION in .env to the running MongoDB release; see docs/user-guide/mongodb-upgrade.md}
     restart: always
     env_file:
       - .env
-    ports:
-      - "${MONGO_PORT:-27017}:27017"
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
@@ -49,8 +74,6 @@ services:
     restart: always
     env_file:
       - .env
-    ports:
-      - "${MONGO_EXPRESS_PORT:-8081}:8081"
     environment:
       ME_CONFIG_MONGODB_ADMINUSERNAME: ${MONGO_INITDB_ROOT_USERNAME}
       ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
@@ -69,8 +92,6 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - ${POSTGRES_DATA_PATH:-./postgres_data}:/var/lib/postgresql/data
     healthcheck:
@@ -88,10 +109,14 @@ services:
       - .env
     entrypoint: ["/bin/bash", "-c"]
     command: ["prefect server start --host 0.0.0.0"]
-    ports:
-      - "${PREFECT_PORT:-4200}:4200"
     environment:
       - PREFECT_API_DATABASE_CONNECTION_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      # The browser opens the Prefect UI through Caddy at /prefect, which maps
+      # /prefect/api to this server's /api. Services keep using /api directly.
+      - PREFECT_SERVER_UI_SERVE_BASE=/prefect
+      - PREFECT_SERVER_UI_API_URL=/prefect/api
+      # The browser session reaches Prefect with a cookie; require CSRF tokens.
+      - PREFECT_SERVER_API_CSRF_PROTECTION_ENABLED=true
     depends_on:
       postgres:
         condition: service_healthy
@@ -122,8 +147,6 @@ services:
       - deployment-logs:/app/logs
     working_dir: /app/qdash/workflow
     command: uvicorn deployment_service:app --host 0.0.0.0 --port 8001 --reload
-    ports:
-      - "${DEPLOYMENT_SERVICE_PORT:-8001}:8001"
     environment:
       - PREFECT_API_URL=http://prefect-server:4200/api
       - PYTHONPATH=/app:/app/qdash/workflow:/app/qdash/dbmodel:/app/qdash
@@ -174,8 +197,6 @@ services:
     restart: always
     env_file:
       - .env
-    ports:
-      - "${API_PORT:-5715}:${API_PORT:-5715}"
     volumes:
       - ./src/qdash/api:/app/qdash/api
       - ./src/qdash/analysis:/app/qdash/analysis # Shared spectroscopy analysis (used by reanalysis service)
@@ -195,13 +216,17 @@ services:
       - ${CONFIG_PATH:-./config/qubex-config}:/app/config/qubex-config # Qubex backend configuration repository/data
       - api-logs:/app/logs
       - agent-runtime-auth:/run/agent-runtime-auth:ro
+      # The metric runner's socket: metric scripts run in metric-runner, not in the API.
+      - metric-runner-socket:/run/metric-runner:ro
       # Read-only source the Copilot searches when it investigates a failure
       - ./src/qdash:/app/source/qdash:ro
       - ${CALIBTASKS_PATH:-./src/qdash/workflow/calibtasks}:/app/source/qdash/workflow/calibtasks:ro
-    environment:
-      QDASH_SOURCE_ROOT: /app/source/qdash
     working_dir: /app/qdash/api
-    command: gunicorn main:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --reload --bind :${API_PORT:-5715} --log-level debug
+    # --forwarded-allow-ips: take the scheme of redirects and URLs from the
+    # X-Forwarded-Proto that Caddy sets from CLIENT_URL. The port is not
+    # published on the host; only Caddy and other containers on custom_net
+    # reach it.
+    command: gunicorn main:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --reload --bind :${API_PORT:-5715} --forwarded-allow-ips=* --log-level debug
     develop:
       watch:
         - action: sync
@@ -218,8 +243,11 @@ services:
         condition: service_completed_successfully
       agent-runtime-auth:
         condition: service_completed_successfully
+      metric-runner:
+        condition: service_started
     environment:
       - PYTHONPATH=/app:/app/qdash:/app/qdash/api:/app/qdash/dbmodel:/app/qdash/datamodel:/app/qdash
+      - QDASH_SOURCE_ROOT=/app/source/qdash
       - CALIB_DATA_PATH=/app/calib_data
       - PREFECT_API_URL=http://prefect-server:4200/api
       - DEPLOYMENT_SERVICE_URL=http://deployment-service:8001
@@ -227,6 +255,7 @@ services:
       - PI_AGENT_RUNTIME_URL=http://agent-runtime:${AGENT_RUNTIME_PORT:-8002}
       - AGENT_RUNTIME_TOKEN=${AGENT_RUNTIME_TOKEN:-}
       - AGENT_RUNTIME_TOKEN_FILE=/run/agent-runtime-auth/token
+      - METRIC_RUNNER_SOCKET=/run/metric-runner/metric.sock
     networks:
       - custom_net
   agent-runtime-auth:
@@ -264,10 +293,8 @@ services:
     volumes:
       - ./agent-runtime/src:/app/agent-runtime/src
       - ./agent-runtime/exec:/app/agent-runtime/exec # Hello protocol shared with agent-exec
+      - ./ui/src/lib/copilotUiSpec.ts:/app/ui/src/lib/copilotUiSpec.ts:ro # render_ui catalog shared with the chat
       - ./config:/app/config # Read for copilot language and model settings only
-      # Local pi extension checkouts for development (gitignored, empty in
-      # production); the runtime trusts whatever package directories it finds.
-      - ./agent-runtime/extensions:/app/extensions:ro
       - agent-runtime-state:/app/state
       - agent-runtime-auth:/run/agent-runtime-auth:ro
       - agent-exec-socket:/run/agent-exec:ro
@@ -297,6 +324,9 @@ services:
       # ignores it. Keep a placeholder for keyless local endpoints.
       - OPENAI_COMPATIBLE_API_KEY_CHAT=${OPENAI_COMPATIBLE_API_KEY_CHAT:-openai-compatible}
       - OPENAI_COMPATIBLE_API_KEY_EVALUATION=${OPENAI_COMPATIBLE_API_KEY_EVALUATION:-openai-compatible}
+      # The classifier of config/copilot/classifier.yaml reads CLASSIFIER_BASE_URL
+      # and CLASSIFIER_API_KEY from .env (env_file above). There is no default
+      # endpoint; without both the classifier stays unavailable.
       # The Copilot workspace (agent-exec below): where the chat's bash, read,
       # write and edit tools run. Unset AGENT_EXEC_SOCKET to offer no workspace.
       - AGENT_EXEC_SOCKET=/run/agent-exec/exec.sock
@@ -348,24 +378,81 @@ services:
         limits:
           pids: 512
           memory: ${AGENT_EXEC_MEMORY_LIMIT:-2g}
+          cpus: ${AGENT_EXEC_CPU_LIMIT:-2}
+    network_mode: none
+  metric-runner:
+    # Validates and evaluates the API's metric scripts, and nothing else: the
+    # API keeps authentication, data access and persistence, and agent-exec
+    # stays the Copilot workspace. One persistent supervisor (PID 1) runs each
+    # job as a per-slot uid in a fresh directory and relays its data requests
+    # to the API's broker over metric.sock (0660 root:0, so only the API, which
+    # runs as root, connects). It holds no QDash credentials (no env_file, no
+    # source or workspace mounts) and has no network. See
+    # docs/developer-guide/architecture/metric-scripts.md.
+    build:
+      context: .
+      dockerfile: ./agent-runtime/metric-runner/Dockerfile
+    restart: always
+    read_only: true
+    # Job directories live here. tmpfs pages count against the memory limit
+    # below, so the size is part of the memory budget.
+    tmpfs:
+      - /tmp:size=${METRIC_RUNNER_TMPFS_SIZE:-256m}
+    volumes:
+      - metric-runner-socket:/run/metric-runner
+      # Live metric worker source, the same pattern the api service uses;
+      # production images build this copy in (metric-runner/Dockerfile).
+      - ./src/qdash/api/metric_runtime:/app/metric-runtime/qdash/api/metric_runtime:ro
+    environment:
+      - METRIC_RUNNER_SOCKET=/run/metric-runner/metric.sock
+      - METRIC_RUNNER_SOCKET_GID=0
+      # Limits come from .env by substitution (this service reads no env_file).
+      # Budget rule: CONCURRENCY x (MAX_MEMORY_MB + 128 MiB worker baseline)
+      # + 128 MiB supervisor + TMPFS_SIZE <= MEMORY_LIMIT; the defaults use
+      # 2 x (1024 + 128) + 128 + 256 = 2688 MiB of 3 GiB. The runner logs the
+      # budget at startup and warns when it does not fit.
+      - METRIC_RUNNER_CONCURRENCY=${METRIC_RUNNER_CONCURRENCY:-2}
+      - METRIC_RUNNER_QUEUE_LIMIT=${METRIC_RUNNER_QUEUE_LIMIT:-16}
+      - METRIC_RUNNER_QUEUE_WAIT_SECONDS=${METRIC_RUNNER_QUEUE_WAIT_SECONDS:-5}
+      - METRIC_RUNNER_MAX_TIMEOUT_SECONDS=${METRIC_RUNNER_MAX_TIMEOUT_SECONDS:-300}
+      - METRIC_RUNNER_MAX_MEMORY_MB=${METRIC_RUNNER_MAX_MEMORY_MB:-1024}
+    # Root only to prepare each job directory, drop to the job uid (setpriv)
+    # and kill and sweep what the job uid left behind.
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - KILL
+      - SETGID
+      - SETUID
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          pids: ${METRIC_RUNNER_PIDS_LIMIT:-256}
+          memory: ${METRIC_RUNNER_MEMORY_LIMIT:-3g}
+          cpus: ${METRIC_RUNNER_CPU_LIMIT:-2}
     network_mode: none
   ui:
     build:
       context: .
       dockerfile: ./ui/Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+        # The browser reaches the API through Caddy on the same origin.
+        NEXT_PUBLIC_API_URL: /api
         NEXT_PUBLIC_ENV: ${ENV}
         NEXT_PUBLIC_DEFAULT_THEME: ${NEXT_PUBLIC_DEFAULT_THEME:-light}
-        NEXT_PUBLIC_PREFECT_URL: ${NEXT_PUBLIC_PREFECT_URL}
-        INTERNAL_API_URL: http://api:${API_PORT:-5715}
+    # Rebuild on every `docker compose up`, so a plain `up -d` after `git pull`
+    # does not keep serving an old UI image. Unchanged sources hit the cache.
+    pull_policy: build
     restart: always
     env_file:
       - .env
     environment:
       - PORT=${UI_PORT:-5714}
-    ports:
-      - "${UI_PORT:-5714}:${UI_PORT:-5714}"
     depends_on:
       - api
     networks:
@@ -394,3 +481,4 @@ volumes:
   agent-runtime-auth:
   agent-exec-workspace:
   agent-exec-socket:
+  metric-runner-socket:

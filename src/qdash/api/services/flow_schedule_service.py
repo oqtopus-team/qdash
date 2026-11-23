@@ -19,9 +19,11 @@ from prefect.client.schemas.filters import (
     DeploymentFilter,
     DeploymentFilterId,
     FlowRunFilter,
+    FlowRunFilterNextScheduledStartTime,
     FlowRunFilterState,
     FlowRunFilterStateType,
 )
+from prefect.client.schemas.sorting import FlowRunSort
 
 from qdash.api.schemas.flow import (
     DeleteScheduleResponse,
@@ -43,6 +45,12 @@ logger = logging.getLogger("uvicorn.app")
 
 DEPLOYMENT_SERVICE_URL = os.getenv("DEPLOYMENT_SERVICE_URL", "http://deployment-service:8001")
 DEFAULT_TIMEOUT = httpx.Timeout(connect=5.0, read=30.0, write=10.0, pool=5.0)
+
+
+def _target_chip_id(parameters: dict[str, Any] | None, flow: FlowDocument) -> str | None:
+    """Return the chip a schedule targets: its own chip_id parameter, else the flow's chip."""
+    chip_id = (parameters or {}).get("chip_id") or getattr(flow, "chip_id", None)
+    return str(chip_id) if chip_id else None
 
 
 def _iter_cron_schedules(schedules: list[Any]) -> Iterator[Any]:
@@ -202,6 +210,7 @@ class FlowScheduleService:
                                 created_at=sched.created
                                 or deployment.created
                                 or datetime.now(timezone.utc),
+                                chip_id=_target_chip_id(getattr(sched, "parameters", None), flow),
                             )
                         )
                 except Exception as e:
@@ -210,15 +219,21 @@ class FlowScheduleService:
                 # Get one-time scheduled runs
                 try:
                     state_filter = FlowRunFilterStateType(any_=[StateType.SCHEDULED])
+                    now = datetime.now(timezone.utc)
                     flow_runs = await client.read_flow_runs(
                         deployment_filter=DeploymentFilter(
                             id=DeploymentFilterId(any_=[uuid.UUID(flow.deployment_id)])
                         ),
-                        flow_run_filter=FlowRunFilter(state=FlowRunFilterState(type=state_filter)),
+                        flow_run_filter=FlowRunFilter(
+                            state=FlowRunFilterState(type=state_filter),
+                            next_scheduled_start_time=FlowRunFilterNextScheduledStartTime.model_validate(
+                                {"after_": now}
+                            ),
+                        ),
+                        sort=FlowRunSort.NEXT_SCHEDULED_START_TIME_ASC,
                         limit=limit,
                     )
 
-                    now = datetime.now(timezone.utc)
                     for flow_run in flow_runs:
                         if (
                             flow_run.next_scheduled_start_time
@@ -233,6 +248,7 @@ class FlowScheduleService:
                                     next_run=flow_run.next_scheduled_start_time,
                                     active=True,
                                     created_at=flow_run.created or datetime.now(timezone.utc),
+                                    chip_id=_target_chip_id(flow_run.parameters, flow),
                                 )
                             )
                 except Exception as e:
@@ -304,6 +320,7 @@ class FlowScheduleService:
                             created_at=sched.created
                             or deployment.created
                             or datetime.now(timezone.utc),
+                            chip_id=_target_chip_id(getattr(sched, "parameters", None), flow),
                         )
                     )
             except Exception as e:
@@ -311,16 +328,22 @@ class FlowScheduleService:
 
             try:
                 state_filter = FlowRunFilterStateType(any_=[StateType.SCHEDULED])
+                now = datetime.now(timezone.utc)
                 flow_runs = await client.read_flow_runs(
                     deployment_filter=DeploymentFilter(
                         id=DeploymentFilterId(any_=[uuid.UUID(flow.deployment_id)])
                     ),
-                    flow_run_filter=FlowRunFilter(state=FlowRunFilterState(type=state_filter)),
+                    flow_run_filter=FlowRunFilter(
+                        state=FlowRunFilterState(type=state_filter),
+                        next_scheduled_start_time=FlowRunFilterNextScheduledStartTime.model_validate(
+                            {"after_": now}
+                        ),
+                    ),
+                    sort=FlowRunSort.NEXT_SCHEDULED_START_TIME_ASC,
                     limit=limit,
                     offset=offset,
                 )
 
-                now = datetime.now(timezone.utc)
                 for flow_run in flow_runs:
                     if (
                         flow_run.next_scheduled_start_time
@@ -335,6 +358,7 @@ class FlowScheduleService:
                                 next_run=flow_run.next_scheduled_start_time,
                                 active=True,
                                 created_at=flow_run.created or datetime.now(timezone.utc),
+                                chip_id=_target_chip_id(flow_run.parameters, flow),
                             )
                         )
             except Exception as e:

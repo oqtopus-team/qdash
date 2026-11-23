@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 
+import { stripFrontmatter } from "@earendil-works/pi-coding-agent";
 import { defineTool } from "@earendil-works/pi-durable";
 import { Type } from "typebox";
 
@@ -36,4 +37,47 @@ export function buildSkillTool(skills: readonly SkillSummary[]) {
       return { output: [{ type: "text", text: readFileSync(skill.filePath, "utf8") }] };
     },
   });
+}
+
+/** What a chat message starts with to invoke a skill explicitly, as in pi: `/skill:name args`. */
+export const SKILL_COMMAND_PREFIX = "/skill:";
+
+/** A skill as the chat composer offers it for `/skill:name`. */
+export interface SkillCommand {
+  name: string;
+  description: string;
+}
+
+/** The skills a user may invoke from the chat, by name. */
+export function skillCommands(skills: readonly SkillSummary[]): SkillCommand[] {
+  return skills
+    .map(({ name, description }) => ({ name, description }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/**
+ * Expand a `/skill:name args` message into the skill's instructions followed
+ * by the arguments, the way pi's own sessions expand skill commands.
+ *
+ * This runtime submits messages to the durable harness directly, so pi's
+ * expansion never runs; without this the model would only see the literal
+ * command. The block carries no file location because the model has no file
+ * tools here. An unknown name, an unreadable skill file, or any other
+ * message is returned unchanged.
+ */
+export function expandSkillCommand(text: string, skills: readonly SkillSummary[]): string {
+  const match = /^\/skill:(\S+)(?:\s+([\s\S]*))?$/.exec(text);
+  if (!match) return text;
+  const skill = skills.find((candidate) => candidate.name === match[1]);
+  if (!skill) return text;
+  let body: string;
+  try {
+    body = stripFrontmatter(readFileSync(skill.filePath, "utf8")).trim();
+  } catch (error) {
+    console.warn(`[agent-runtime] skill ${skill.name} unreadable: ${String(error)}`);
+    return text;
+  }
+  const block = `<skill name="${skill.name}">\n${body}\n</skill>`;
+  const args = (match[2] ?? "").trim();
+  return args ? `${block}\n\n${args}` : block;
 }

@@ -1,11 +1,19 @@
 """Shared request/response models for Copilot APIs and workflows."""
 
 from qdash.copilot.contracts.models import (
+    ChatActiveRequest,
+    ChatActiveResponse,
     ChatRequest,
+    ChatSteerRequest,
+    ChatSteerResponse,
+    ChatSteerStatusRequest,
     ChatStopRequest,
     ChatStopResponse,
+    ChatTurnStart,
+    DashboardEditorContext,
     FlowEditorContext,
     InvestigationTarget,
+    MetricScriptEditorContext,
     PageContext,
     TaskChatTarget,
     TaskContext,
@@ -13,11 +21,19 @@ from qdash.copilot.contracts.models import (
 )
 
 __all__ = [
+    "ChatActiveRequest",
+    "ChatActiveResponse",
     "ChatRequest",
+    "ChatSteerRequest",
+    "ChatSteerResponse",
+    "ChatSteerStatusRequest",
     "ChatStopRequest",
     "ChatStopResponse",
+    "ChatTurnStart",
+    "DashboardEditorContext",
     "FlowEditorContext",
     "InvestigationTarget",
+    "MetricScriptEditorContext",
     "PageContext",
     "TaskChatTarget",
     "TaskContext",

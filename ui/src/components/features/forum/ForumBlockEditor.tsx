@@ -47,7 +47,7 @@ function cloneBlocks(blocks: Record<string, unknown>[]): Record<string, unknown>
   return JSON.parse(JSON.stringify(blocks)) as Record<string, unknown>[];
 }
 
-export type ForumBlockSnapshot = {
+type ForumBlockSnapshot = {
   blocks: Record<string, unknown>[];
   markdown: string;
 };

@@ -6,7 +6,9 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { AgentActionType } from './agentActionType';
+import type { SubmitAgentActionRequestModel } from './submitAgentActionRequestModel';
 import type { SubmitAgentActionRequestParameterOverrides } from './submitAgentActionRequestParameterOverrides';
+import type { SubmitAgentActionRequestRepeatOfActionId } from './submitAgentActionRequestRepeatOfActionId';
 import type { SubmitAgentActionRequestTaskName } from './submitAgentActionRequestTaskName';
 
 /**
@@ -26,4 +28,10 @@ export interface SubmitAgentActionRequest {
   parameter_overrides?: SubmitAgentActionRequestParameterOverrides;
   /** @maxLength 5000 */
   diagnosis?: string;
+  /** The proposal is an autonomous step that runs without a per-call approval. QDash then also requires that the signed-in user created the session, that its autonomy is auto, that no measurement of the session is running, that an undispatched identical action is dispatched instead, that the task and qubit stay within max_rounds_per_target, and that a finished identical measurement is repeated only with repeat_of_action_id. A refused step is not recorded and uses no action budget. Only valid for run_task. */
+  autonomous?: boolean;
+  /** The finished identical action an autonomous step measures again on purpose */
+  repeat_of_action_id?: SubmitAgentActionRequestRepeatOfActionId;
+  /** The provider and model the client host reports it ran the agent with, read from the host's own runtime, never from the agent's tool arguments. Recorded as reported; QDash does not verify it, and it changes no scope or approval. Omitted when the host does not know it. */
+  model?: SubmitAgentActionRequestModel;
 }

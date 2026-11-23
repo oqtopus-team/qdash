@@ -315,3 +315,44 @@ test("a proposed edit is emitted before tool_end", () => {
     ],
   );
 });
+
+test("a placed steer becomes a steer line with where it landed", () => {
+  assert.deepEqual(
+    toNdjsonEvents({ type: "steer_placed", requestId: "s1", entryId: "12", text: "Use Q5", answer: "T1 is 42 us." }),
+    [{ type: "steer", request_id: "s1", status: "applied", entry_id: "12", text: "Use Q5", answer: "T1 is 42 us." }],
+  );
+  assert.deepEqual(toNdjsonEvents({ type: "steer_placed", entryId: "12" }), []);
+});
+
+test("a successful qdash_create_calibration_session result carries the created session, typed", () => {
+  // The details the pi-qdash tool writes after QDash created the session
+  // (packages/pi-qdash/tests/calibration-session-tool.test.mjs checks the producer side).
+  const details = {
+    tool: "qdash_create_calibration_session",
+    chipId: "64Qv3",
+    calibrationSessionId: "cs-1",
+    data: { calibration_session_id: "cs-1", objective: "Bring up qubits 0 and 1" },
+  };
+  const end = (event) => toNdjsonEvents({ type: "tool_execution_end", toolName: "qdash_create_calibration_session", ...event }).find(
+    (line) => line.type === "tool_end",
+  );
+  assert.deepEqual(end({ result: { details } }).calibrationSession, { calibrationSessionId: "cs-1", chipId: "64Qv3" });
+  // Replayed from the durable entry, the same.
+  assert.deepEqual(
+    end({ entry: { model: [{ role: "toolResult", details }] }, entryId: "e1" }).calibrationSession,
+    { calibrationSessionId: "cs-1", chipId: "64Qv3" },
+  );
+  // A failed or refused call, or a durable error result, created nothing.
+  assert.equal("calibrationSession" in end({ isError: true, result: { details } }), false);
+  assert.equal("calibrationSession" in end({ entry: { model: [{ role: "toolResult", isError: true, details }] } }), false);
+  // The model's arguments never name it: no details, no session.
+  assert.equal("calibrationSession" in end({ args: { calibrationSessionId: "cs-1" } }), false);
+  // Details not written by this tool, or a malformed ID, are ignored.
+  assert.equal("calibrationSession" in end({ result: { details: { ...details, tool: "other" } } }), false);
+  assert.equal("calibrationSession" in end({ result: { details: { ...details, calibrationSessionId: "cs 1/../x" } } }), false);
+  // Another tool's details with the same fields do not count.
+  const other = toNdjsonEvents({ type: "tool_execution_end", toolName: "qdash_get_calibration_session", result: { details } }).find(
+    (line) => line.type === "tool_end",
+  );
+  assert.equal("calibrationSession" in other, false);
+});

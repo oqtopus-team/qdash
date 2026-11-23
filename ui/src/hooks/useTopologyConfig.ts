@@ -8,6 +8,12 @@
 import { useMemo } from "react";
 
 import { useGetTopologyById } from "@/client/topology/topology";
+import {
+  buildMuxGroupBoxes,
+  buildQidToMux,
+  standaloneQids,
+  type MuxGroupBox,
+} from "@/lib/utils/mux-groups";
 
 // Type definitions matching backend Pydantic models
 
@@ -16,10 +22,14 @@ interface QubitPosition {
   col: number;
 }
 
-interface MuxConfig {
-  enabled: boolean;
-  size: number;
-}
+/** Which template format the normalized `muxes` came from. */
+type MuxesSource = "muxes" | "legacy_groups" | "legacy_qid_div_4" | "legacy_disabled";
+
+/**
+ * Qubit position fallback for chips without topology positions: the legacy
+ * 2x2 MUX block layout. MUX membership never comes from this value.
+ */
+const LEGACY_MUX_BLOCK_SIZE = 2;
 
 interface VisualizationConfig {
   show_mux_boundaries: boolean;
@@ -38,7 +48,13 @@ interface TopologyDefinition {
   num_qubits: number;
   layout_type: LayoutType;
   direction_convention: DirectionConvention;
-  mux: MuxConfig;
+  /**
+   * MUX ID -> member qubit IDs; the array index is the local slot. Qubits no
+   * MUX lists are standalone (not multiplexed).
+   */
+  muxes: Record<string, number[]>;
+  muxes_source?: MuxesSource;
+  standalone_qubits?: number[];
   qubits: Record<number, QubitPosition>;
   couplings: [number, number][];
   visualization: VisualizationConfig;
@@ -54,10 +70,16 @@ interface TopologyDefinition {
  *   - couplings: List of coupling pairs
  *   - gridSize: Grid size
  *   - numQubits: Number of qubits
- *   - muxSize: MUX size (convenience accessor)
+ *   - muxSize: Legacy 2x2 block size, only for placing qubits without positions
  *   - regionSize: Region size (convenience accessor)
- *   - hasMux: Whether MUX is enabled (convenience accessor)
- *   - showMuxBoundaries: Whether to show MUX boundaries (convenience accessor)
+ *   - hasMux: Whether the topology declares at least one MUX
+ *   - showMuxBoundaries: Whether to draw MUX boundaries and labels. This is a
+ *     rendering choice only; membership always comes from `muxes`.
+ *   - muxGroups: MUX groups with their grid bounds, sorted by MUX ID.
+ *     Membership comes from the API's `muxes`; nothing is derived from
+ *     coordinates or qubit IDs here.
+ *   - qidToMux: Qubit ID to MUX ID lookup for `muxGroups`
+ *   - standaloneQids: Known qubits that no MUX lists (no MUX label or box)
  *   - getQubitPosition: Helper to get position for a qubit ID
  *   - isLoading: Loading state
  *   - isError: Error state
@@ -94,15 +116,21 @@ export function useTopologyConfig(topologyId: string) {
       return positionMap.get(qid) || null;
     };
 
+    const muxGroups: MuxGroupBox[] = buildMuxGroupBoxes(topology.muxes, topology.qubits);
+
     return {
       topology,
       qubits: topology.qubits,
       couplings: topology.couplings,
       gridSize: topology.grid_size,
       numQubits: topology.num_qubits,
-      muxSize: topology.mux?.size ?? 2,
+      muxSize: LEGACY_MUX_BLOCK_SIZE,
+      muxGroups,
+      qidToMux: buildQidToMux(muxGroups),
+      standaloneQids: topology.standalone_qubits ?? standaloneQids(topology.muxes, topology.qubits),
+      muxesSource: (topology.muxes_source ?? "muxes") as MuxesSource,
       regionSize: topology.visualization?.region_size ?? 4,
-      hasMux: topology.mux?.enabled ?? false,
+      hasMux: muxGroups.length > 0,
       showMuxBoundaries: topology.visualization?.show_mux_boundaries ?? false,
       layoutType: (topology.layout_type ?? "grid") as LayoutType,
       directionConvention: (topology.direction_convention ?? "unspecified") as DirectionConvention,

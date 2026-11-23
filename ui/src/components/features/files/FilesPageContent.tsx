@@ -1,7 +1,6 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, useMemo } from "react";
 
@@ -296,8 +295,8 @@ export function FilesPageContent({ workspace }: { workspace: FileWorkspace }) {
               title={isEditorLocked ? "Click to edit" : "Currently editing"}
               disabled={showChanges || !selectedFile}
             >
-              <Pencil size={16} />
-              <span className="ml-1">{isEditorLocked ? "Edit" : "Editing"}</span>
+              <Pencil data-icon="inline-start" />
+              <span>{isEditorLocked ? "Edit" : "Editing"}</span>
             </button>
             <button
               onClick={handleSave}
@@ -310,8 +309,8 @@ export function FilesPageContent({ workspace }: { workspace: FileWorkspace }) {
                 <span className="loading loading-spinner loading-xs"></span>
               ) : (
                 <>
-                  <Save size={16} />
-                  <span className="ml-1">Save</span>
+                  <Save data-icon="inline-start" />
+                  <span>Save</span>
                 </>
               )}
             </button>
@@ -348,8 +347,8 @@ export function FilesPageContent({ workspace }: { workspace: FileWorkspace }) {
                   <span className="loading loading-spinner loading-xs"></span>
                 ) : (
                   <>
-                    <Database size={16} />
-                    <span className="ml-1">Import to QDash</span>
+                    <Database data-icon="inline-start" />
+                    <span>Import to QDash</span>
                   </>
                 )}
               </button>
@@ -371,9 +370,6 @@ export function FilesPageContent({ workspace }: { workspace: FileWorkspace }) {
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <Link href="/provenance" className="btn btn-xs btn-ghost">
-                View in Provenance →
-              </Link>
               <button onClick={() => setImportResult(null)} className="btn btn-xs btn-ghost">
                 ✕
               </button>
@@ -610,7 +606,7 @@ export function FilesPageContent({ workspace }: { workspace: FileWorkspace }) {
         </div>
 
         {/* Mobile FAB */}
-        <div className="fab fixed bottom-20 right-4 z-30 sm:hidden">
+        <div className="fab fixed bottom-[calc(6rem+env(safe-area-inset-bottom))] right-4 z-30 sm:hidden">
           <div tabIndex={0} role="button" className="btn btn-circle btn-primary shadow-lg">
             <Plus size={20} />
           </div>

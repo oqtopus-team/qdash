@@ -6,6 +6,7 @@ from qdash.datamodel.task import (
     InputParameterSpec,
     OutputParameterSpec,
     RunParameterSpec,
+    TaskDocumentation,
 )
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -21,6 +22,25 @@ class ConfigureAll(QubexTask):
 
     name: str = "ConfigureAll"
     task_type: str = "system"
+    documentation: ClassVar[TaskDocumentation] = TaskDocumentation(
+        description=(
+            "System task that builds a Qubex experiment for the selected MUXes, reloads the "
+            "system model, and pushes the settings of every target in those MUXes to the QuEL "
+            "boxes. It measures nothing and writes no calibration values."
+        ),
+        when_to_use=(
+            "Run it once at the start of a pipeline instead of per-qubit Configure; the "
+            "ConfigureAll step type wraps this task and fills mux_ids from the step targets. "
+            "Set configuration_mode to ge-ef-cr or ge-ef-fh when later steps need EF or FH "
+            "targets."
+        ),
+        prerequisites=(
+            (
+                "mux_ids name MUXes defined by the chip topology; standalone qubits without a "
+                "MUX cannot be targeted."
+            ),
+        ),
+    )
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {}
     run_spec: ClassVar[dict[str, RunParameterSpec]] = {
         "mux_ids": RunParameterSpec(
@@ -64,6 +84,10 @@ class ConfigureAll(QubexTask):
         if not isinstance(mode, str) or mode not in get_args(ConfigurationMode):
             raise ValueError(f"Unsupported configuration_mode: {mode!r}")
         configuration_mode = cast("ConfigurationMode", mode)
+        # This task builds its own Experiment, so it must run the backend's
+        # MUX layout check itself before touching the boxes, and must not hand
+        # Qubex a MUX that the chip topology does not define.
+        mux_ids = backend.ensure_mux_mapping_compatible().check_mux_ids(mux_ids)
 
         qubex_paths = get_qubex_paths()
         config_dir = backend.config.get("config_dir", str(qubex_paths.config_dir(chip_id)))
@@ -86,7 +110,18 @@ class ConfigureAll(QubexTask):
             params_dir=exp.params_path,
             configuration_mode=configuration_mode,
         )
-        print(f"[ConfigureAll] Pushing system_manager (box_ids={exp.box_ids})")
-        exp.system_manager.push(box_ids=exp.box_ids, confirm=False, parallel=False)
+        # Experiment.targets is scoped to the qubits in the selected MUXes,
+        # whereas system_manager.load rebuilds the complete system model.
+        target_labels = sorted(exp.targets)
+        print(
+            f"[ConfigureAll] Pushing system_manager "
+            f"(box_ids={exp.box_ids}, target_labels={target_labels})"
+        )
+        exp.system_manager.push(
+            box_ids=exp.box_ids,
+            confirm=False,
+            parallel=False,
+            target_labels=target_labels,
+        )
         print("[ConfigureAll] Done")
         return RunResult(raw_result={"mux_ids": mux_ids, "box_ids": exp.box_ids})

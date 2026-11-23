@@ -54,6 +54,7 @@ backends:
         - CreateEFPIPulse
         - CheckAdaptiveFHChevron
         - EFReadoutClassification
+        - CheckGEFRelaxation
         - CheckThermalExcitation
         - CheckSpinLockSpectroscopy
         - CheckReadoutMIST

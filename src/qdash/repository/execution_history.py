@@ -96,17 +96,21 @@ class MongoExecutionHistoryRepository:
         self,
         *,
         project_id: str,
-        chip_id: str,
+        chip_id: str | None,
         since: datetime,
     ) -> list[ExecutionStartRow]:
-        """Return start time and status of a chip's executions started at or after ``since``.
+        """Return start time and status of executions started at or after ``since``.
 
-        Used for activity charts, so the window is bounded by date rather than by count,
-        and only the two counted fields are read from MongoDB.
+        Counts one chip's executions, or every chip's in the project when ``chip_id`` is
+        ``None``; the project filter always applies. Used for activity charts, so the window
+        is bounded by date rather than by count, and only the two counted fields are read.
         """
+        query: dict[str, Any] = {"project_id": project_id, "start_at": {"$gte": since}}
+        if chip_id is not None:
+            query["chip_id"] = chip_id
         results: list[ExecutionStartRow] = (
             ExecutionHistoryDocument.find(
-                {"project_id": project_id, "chip_id": chip_id, "start_at": {"$gte": since}},
+                query,
                 sort=[("start_at", SortDirection.ASCENDING)],
             )
             .project(ExecutionStartRow)

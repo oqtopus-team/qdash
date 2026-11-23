@@ -1,6 +1,8 @@
 import { createCodeBlockSpec } from "@blocknote/core";
 import { toast } from "sonner";
 
+import { copyText } from "@/lib/utils/clipboard";
+
 type CodeBlockSpec = ReturnType<typeof createCodeBlockSpec>;
 type CodeBlockRender = CodeBlockSpec["implementation"]["render"];
 
@@ -34,7 +36,7 @@ function createCopyButton(getCode: () => string): {
   /** Copies the current code to the clipboard, showing a check mark on success or an error toast on failure. */
   const onClick = async () => {
     try {
-      await navigator.clipboard.writeText(getCode());
+      await copyText(getCode());
       if (resetTimer) clearTimeout(resetTimer);
       button.innerHTML = CHECK_ICON_SVG;
       resetTimer = setTimeout(() => {

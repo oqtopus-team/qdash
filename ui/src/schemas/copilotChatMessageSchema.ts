@@ -7,6 +7,9 @@
  */
 import type { CopilotChatMessageSchemaAttachedImage } from './copilotChatMessageSchemaAttachedImage';
 import type { CopilotChatMessageSchemaCreatedAt } from './copilotChatMessageSchemaCreatedAt';
+import type { CopilotChatMessageSchemaEntryId } from './copilotChatMessageSchemaEntryId';
+import type { CopilotChatMessageSchemaSteer } from './copilotChatMessageSchemaSteer';
+import type { CopilotChatMessageSchemaTurnRequestId } from './copilotChatMessageSchemaTurnRequestId';
 
 /**
  * One message inside a copilot chat session.
@@ -17,5 +20,11 @@ export interface CopilotChatMessageSchema {
   /** Message content */
   content: string;
   attached_image?: CopilotChatMessageSchemaAttachedImage;
+  /** Set on a user message sent while an answer was written */
+  steer?: CopilotChatMessageSchemaSteer;
+  /** An assistant answer's entry in the runtime's transcript, from the chat stream's result; the chat can be branched from that answer */
+  entry_id?: CopilotChatMessageSchemaEntryId;
+  /** The chat turn this message belongs to. The server records the latest turn's messages itself; a save cannot replace them. */
+  turn_request_id?: CopilotChatMessageSchemaTurnRequestId;
   created_at?: CopilotChatMessageSchemaCreatedAt;
 }

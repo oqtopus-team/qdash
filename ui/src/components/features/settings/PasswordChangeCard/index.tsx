@@ -173,7 +173,11 @@ export function PasswordChangeCard() {
           >
             {changePasswordMutation.isPending ? (
               <>
-                <span className="loading loading-spinner loading-sm" aria-hidden="true" />
+                <span
+                  data-icon="inline-start"
+                  className="loading loading-spinner loading-sm"
+                  aria-hidden="true"
+                />
                 Changing...
               </>
             ) : (

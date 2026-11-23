@@ -6,11 +6,14 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { ExecuteFlowRequestParameters } from './executeFlowRequestParameters';
+import type { ExecuteFlowRequestTargetOverride } from './executeFlowRequestTargetOverride';
 
 /**
  * Request to execute a Flow.
  */
 export interface ExecuteFlowRequest {
+  /** Targets for this run, overriding direct CalibService and pipeline targets */
+  target_override?: ExecuteFlowRequestTargetOverride;
   /** Execution parameters (overrides default_parameters) */
   parameters?: ExecuteFlowRequestParameters;
 }

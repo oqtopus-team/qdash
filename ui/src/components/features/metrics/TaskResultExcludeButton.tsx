@@ -65,9 +65,9 @@ export function TaskResultExcludeButton({
             type="button"
             onClick={handleRestore}
             disabled={mutation.isPending}
-            className="btn btn-xs btn-ghost gap-1"
+            className="btn btn-xs btn-ghost"
           >
-            <RotateCcw className="h-3 w-3" />
+            <RotateCcw data-icon="inline-start" />
             Restore
           </button>
         </div>
@@ -92,10 +92,10 @@ export function TaskResultExcludeButton({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="btn btn-xs btn-outline btn-warning gap-1"
+        className="btn btn-xs btn-outline btn-warning"
         disabled={mutation.isPending}
       >
-        <Ban className="h-3 w-3" />
+        <Ban data-icon="inline-start" />
         Exclude this measurement
       </button>
       <Dialog
@@ -134,9 +134,12 @@ export function TaskResultExcludeButton({
               disabled={mutation.isPending}
             >
               {mutation.isPending ? (
-                <span className="loading loading-spinner loading-xs"></span>
+                <span
+                  data-icon="inline-start"
+                  className="loading loading-spinner loading-xs"
+                ></span>
               ) : (
-                <Ban className="h-4 w-4" />
+                <Ban data-icon="inline-start" />
               )}
               Exclude
             </button>

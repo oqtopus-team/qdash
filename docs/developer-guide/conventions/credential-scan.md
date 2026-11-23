@@ -4,11 +4,11 @@ QDash runs three tools to keep secrets out of the repository: Lefthook orchestra
 
 ## Tools
 
-| Tool        | Where it runs                          | What it scans                                   | Configuration                    |
-| ----------- | -------------------------------------- | ----------------------------------------------- | -------------------------------- |
-| Lefthook    | Local pre-commit                       | Triggers Betterleaks against staged files       | `lefthook.yml`                   |
+| Tool | Where it runs | What it scans | Configuration |
+| --- | --- | --- | --- |
+| Lefthook | Local pre-commit | Triggers Betterleaks against staged files | `lefthook.yml` |
 | Betterleaks | Local pre-commit and `task check` | Staged files, or tracked working files and branch commits | `.betterleaks.toml` |
-| Trufflehog  | CI only (push, PR to `main`/`develop`) | Git history; only verified secrets are reported | `.trufflehog-exclude-paths.txt`  |
+| Trufflehog | CI only (push, PR to `main`/`develop`) | Git history; only verified secrets are reported | `.trufflehog-exclude-paths.txt` |
 
 CI definitions live in `.github/workflows/secret-scan.yml`. Installation instructions are in [Setup](../setup.md#secret-scanning-tools).
 
@@ -18,20 +18,19 @@ CI definitions live in `.github/workflows/secret-scan.yml`. Installation instruc
 
 The two tools support different allowlist granularities, which is why they own different stages:
 
-|             | Path allowlist                          | Literal-string allowlist             |
-| ----------- | --------------------------------------- | ------------------------------------ |
-| Betterleaks | yes (`prefilter` CEL)                   | yes (`filter` CEL, in `.betterleaks.toml`) |
-| Trufflehog  | yes (`.trufflehog-exclude-paths.txt`)   | no                                   |
+|  | Path allowlist | Literal-string allowlist |
+| --- | --- | --- |
+| Betterleaks | yes (`prefilter` CEL) | yes (`filter` CEL, in `.betterleaks.toml`) |
+| Trufflehog | yes (`.trufflehog-exclude-paths.txt`) | no |
 
-Because Betterleaks can allowlist *specific values*, it can be configured strictly: only the literals matched by the `filter` in `.betterleaks.toml` are exempt — anything else credential-shaped is rejected. That precision makes it the right gate at **pre-commit**, where it blocks credentials before they enter git history.
-
-Trufflehog has no string-level allowlist, so the only way to suppress a known false positive is to drop the entire file. Compensating for that, it **verifies findings by probing the upstream provider** to check whether a credential is live, and walks **full git history** in CI on push and PR. Its role is ongoing detection of live secrets — running on remote CI infrastructure and reaching out to remote providers to confirm validity.
-
-The result is a clear division of labor: Betterleaks is the strict, fast, syntactic gate at commit time; Trufflehog is the slower, semantic, live-credential check that runs in CI. Betterleaks is intentionally not run in CI — the local pre-commit hook covers the syntactic pass, and any commit that slips past it is caught by Trufflehog's history scan, so running it again on every push would only duplicate work.
+Betterleaks uses narrow value exemptions to block credential-shaped strings before commit.
+Trufflehog checks Git history in CI and contacts providers to verify whether findings are live.
+Its exclusions apply to whole paths, so use them sparingly. The repository runs Betterleaks
+locally and Trufflehog in CI; a verified-secret scan does not replace the local pattern scan.
 
 ### Lefthook
 
-`lefthook.yml` defines a single pre-commit command that calls `scripts/scan_staged_leaks.sh`. The helper copies staged index contents into a temporary tree and scans that tree with Betterleaks, avoiding Betterleaks' git-diff integration while still checking exactly the files about to be committed. Running `lefthook install` once writes the git hook into `.git/hooks/`. If the Betterleaks binary is missing, the helper fails closed so commits cannot proceed without the staged leak scan.
+`lefthook.yml` defines a single pre-commit command that calls `scripts/scan_staged_leaks.sh`. The helper copies staged index contents into a temporary tree and scans that tree with Betterleaks, avoiding Betterleaks' git-diff integration while still checking exactly the files about to be committed. Running `lefthook install` once writes the git hook into `.git/hooks/`. If the Betterleaks binary is missing or is not the [pinned release](#scanner-version), the helper fails closed so commits cannot proceed without the staged leak scan.
 
 ### Betterleaks
 
@@ -64,28 +63,22 @@ Value exemptions (in `filter`):
 | `mongodb://root:example@mongo:27017` | `finding["secret"]` | Local-dev compose default. The hostname `mongo` resolves only inside the compose network and the password is literally the word `example` — it is not a secret in any environment, just an example value. (Gitleaks used `regexTarget = "match"`; Betterleaks captures the clean URI in `finding["secret"]`, so the filter matches there.) |
 | `ADMIN_TOKEN`, `YOUR_TOKEN` | `finding["secret"]` | Documentation placeholder token names, not real credentials. |
 | `x90_gate_fidelity`, `x180_gate_fidelity`, `zx90_gate_fidelity` | `finding["secret"]` | Quantum gate fidelity metric names that resemble high-entropy tokens. |
+| Same MongoDB URI under `generic-credential-uri` | `finding["rule_id"]`, `finding["secret"]` equal to `example`, `finding["match"]` | Betterleaks 1.9 reports only the password part of the local-dev URI as the secret, so this branch matches the full URI instead. |
+| `example`, `prefect`, `passw0rd` in `.env.example` and `.env.example.qubex` | `generic-password`, path, `finding["secret"]` | Published local-dev defaults for MongoDB, PostgreSQL, and the initial admin account; every developer copies them to `.env`. |
+| `secure_password123`, `admin_password123`, `short` in `tests/data/sample_data.py` | `generic-password`, path, `finding["secret"]` | Sample user records (`SAMPLE_USERS`) in shared test data. |
+| `password="hashed"` or `password="unused"` in `tests/qdash/api/{routers,services}/test_*.py` | `generic-password`, path, `finding["match"]` | Placeholder `hashed_password` field values on test users; the tests never verify them as passwords. |
+| `changed-password` in `tests/qdash/api/routers/test_admin.py` | `generic-password`, path, `finding["secret"]` | Request body for the password-change test. |
+| `temporary-secret`, `current`, `next-password` in the `EditUserModal` and `PasswordChangeCard` tests | `generic-password`, path, `finding["secret"]` | Form input values in UI tests. |
+| `Show password` in `LoginPageContent.tsx`, `new-password` in `PasswordChangeCard/index.tsx` | `generic-password`, path, `finding["secret"]` | An `aria-label` string and an `autoComplete` token, not credentials. |
 
-The shared property of every path entry is **generation-owned**: the file is rewritten by a tool, not by a human. A developer pasting a real credential into one of these files would lose it on the next regeneration step, so the scanning blind spot has no practical attack surface. The value entries cover fixed sample/placeholder strings that are identical across every developer's machine.
+The shared property of every path entry is **generation-owned**: the file is rewritten by a tool, not by a human. A developer pasting a real credential into one of these files would lose it on the next regeneration step, so the scanning blind spot has no practical attack surface. The value entries cover fixed sample/placeholder strings that are identical across every developer's machine. Value entries scoped to a file also require the rule ID and the exact literal, so any other value in that file, or the same literal in another file, is still reported. Write `finding["rule_id"]` in the filter; the camel-case `ruleID` key is not set and silently never matches.
 
 ### Trufflehog
 
 Trufflehog walks the git history and reports only **verified** findings — meaning it actively probed the upstream provider and confirmed the credential is live. False positives are rare, so a hit should be treated as a real leak.
 
-Paths in `.trufflehog-exclude-paths.txt` are excluded from history scanning. Each line is a regex matched against the file path:
-
-```
-\.betterleaks\.toml
-\.gitleaks\.toml
-docs/design/api-testing-guidelines\.md
-docs/developer-guide/api/endpoint-testing\.md
-docs/developer-guide/api/testing\.md
-docs/developer-guide/conventions/credential-scan\.md
-docs/development/api/testing\.md
-docs/development/credential-scan\.md
-poetry\.lock
-scripts/migrate_user_tokens\.py
-tests/conftest\.py
-```
+`.trufflehog-exclude-paths.txt` contains one path regex per line. The table below explains its
+exemptions, including historical paths.
 
 #### Exclude entries and why they are safe
 
@@ -96,8 +89,8 @@ Because Trufflehog walks **full git history**, the exclude list must cover both 
 | `\.betterleaks\.toml` | tracked | Contains the Betterleaks allowlist itself — the literal `mongodb://root:example@mongo:27017` and placeholder tokens (`ADMIN_TOKEN`, `YOUR_TOKEN`) would otherwise be re-flagged as credentials. None are real secrets; see the Betterleaks allowlist tables above. |
 | `\.gitleaks\.toml` | deleted (history only) | Removed when the project migrated from Gitleaks to Betterleaks. Earlier commits still contain it with the same example values, so it stays excluded for history scans. |
 | `docs/design/api-testing-guidelines\.md` | deleted (history only) | Removed in commit `50b0fd31`. Old API testing guideline document that referenced example tokens. Excluded so historical commits do not trigger findings. |
-| `docs/developer-guide/api/endpoint-testing\.md` | tracked | Earlier revisions contained an example MongoDB DSN. The path remains excluded because Betterleaks scans Git history. |
-| `docs/developer-guide/api/testing\.md` | tracked | Earlier revisions contained example tokens and fixtures. The path remains excluded because Betterleaks scans Git history. |
+| `docs/developer-guide/api/endpoint-testing\.md` | tracked | Earlier revisions contained an example MongoDB DSN. The path remains excluded because Trufflehog scans Git history. |
+| `docs/developer-guide/api/testing\.md` | tracked | Earlier revisions contained example tokens and fixtures. The path remains excluded because Trufflehog scans Git history. |
 | `docs/developer-guide/conventions/credential-scan\.md` | tracked | This document itself. Contains example tool output with mock values such as `AKIAIOSFODNN7EXAMPLE` and fabricated commit hashes used to illustrate finding format. |
 | `docs/development/api/testing\.md`, `docs/development/credential-scan\.md` | moved (history only) | The two pages above before the documentation was reorganised into the two guides. |
 | `poetry\.lock` | deleted (history only) | Removed in commit `e840268b` when the project moved to `uv`. Lockfile entries contain public package integrity digests that look high-entropy. |
@@ -110,13 +103,13 @@ Trufflehog only reports **verified** findings, so unverified pattern matches in 
 
 The repository ships task targets that mirror the CI commands.
 
-| Command                  | What it does                                                |
-| ------------------------ | ----------------------------------------------------------- |
-| `task scan-leaks`        | Betterleaks over the full git history                       |
+| Command | What it does |
+| --- | --- |
+| `task scan-leaks` | Betterleaks over the full git history |
 | `task scan-leaks-local` | Betterleaks over tracked working files and commits absent from the target branch |
-| `task scan-leaks-staged` | Betterleaks against staged files only (same as pre-commit)  |
-| `task scan-secrets`      | Trufflehog against git history, verified findings only      |
-| `task scan-secrets-all`  | Trufflehog against git history, including unverified hits   |
+| `task scan-leaks-staged` | Betterleaks against staged files only (same as pre-commit) |
+| `task scan-secrets` | Trufflehog against git history, verified findings only |
+| `task scan-secrets-all` | Trufflehog against git history, including unverified hits |
 
 `task check` (the standard pre-push gate) includes `scan-leaks-local`.
 `scripts/scan_local_leaks.sh` copies regular files listed by `git ls-files` from the
@@ -127,7 +120,7 @@ unrelated branches or commits already reachable from the target.
 Fetch the target branch before checking so the local reference is current. Override
 the target with `task check LEAKS_BASE=origin/main` or
 `task scan-leaks-local LEAKS_BASE=origin/main`. A missing target, shallow clone,
-unrelated target history, or missing Betterleaks executable causes the local scan to fail.
+unrelated target history, or missing or unpinned Betterleaks executable causes the local scan to fail.
 
 New files must be staged with `git add` to enter the working-file scan. Untracked files,
 deleted files, symlinks, and submodule directories are excluded from that scan.
@@ -135,6 +128,30 @@ The pre-commit hook separately checks staged contents; the local scan reads curr
 working contents, including unstaged edits. Findings are redacted in local scan output.
 Use `task scan-leaks` explicitly for an audit across all local Git history, including
 other fetched branches.
+
+### Scanner Version
+
+Every Betterleaks scan requires the release pinned by `ARG BETTERLEAKS_VERSION` in
+`.devcontainer/Dockerfile`; `flake.nix` pins the Nix shell to the same release. Other
+releases ship different default rules, so a newer host install can flag the repository's
+sample values that the pinned release accepts.
+
+`scripts/check_betterleaks_version.sh` reads the pinned version from the Dockerfile and
+compares it with the output of `betterleaks version`. The staged scan, the local scan,
+`task scan-leaks`, and the start of `task check` run this check before reading any content.
+A missing executable, a different release, or unparseable version output stops the scan
+with the expected and actual versions:
+
+```text
+betterleaks version check failed: expected betterleaks 1.3.1, actual: 1.9.0 (/opt/homebrew/bin/betterleaks)
+Run checks and commits in the Nix shell, for example: nix develop -c task check
+or nix develop -c git commit. The DevContainer also provides the pinned release.
+```
+
+Fix the environment rather than the policy: run the command inside `nix develop` or the
+DevContainer. Run `task check-betterleaks-version` to test the active environment alone.
+To upgrade Betterleaks, change `BETTERLEAKS_VERSION` and the `nixpkgs-betterleaks` pin
+together and rerun the scans.
 
 ## Reading Output
 
@@ -158,7 +175,7 @@ Fingerprint: src/qdash/api/config.py:aws-access-token:42
 Key fields when triaging:
 
 - **RuleID** — which detector matched. Gives an immediate hint at the secret type.
-- **File / Line** — where to look. For staged scans, the line number is in the working tree.
+- **File / Line** — where to look. For staged scans, the line number refers to the staged contents.
 - **Fingerprint** — stable identifier for the finding; use it if you need to discuss a specific hit.
 
 The exit code is non-zero on any finding, which is what blocks the commit.
@@ -168,7 +185,7 @@ The exit code is non-zero on any finding, which is what blocks the commit.
 A verified finding looks like:
 
 ```
-Found verified result 🐷🔑
+Found verified result
 Detector Type: AWS
 Decoder Type: PLAIN
 Raw result: AKIA****************

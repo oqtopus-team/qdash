@@ -4,7 +4,9 @@
  * Pure functions only, so they can be tested without a running agent.
  */
 
+import { CLASSIFY_CHAT_TOOL, CLASSIFY_LIMITS, type ClassificationDetails } from "./classify-tool.ts";
 import { recordFromDetails, type EvaluateResult } from "./evaluate.ts";
+import { uiBlockFromDetails, type UiBlockPayload } from "./ui-tool.ts";
 
 export type NdjsonEvent =
   | { type: "tool_start"; name: string; id?: string; args?: unknown }
@@ -17,10 +19,27 @@ export type NdjsonEvent =
       figures?: string[];
       /** What an evaluation tool sent its model, for the chat to show on request. */
       evaluation?: EvaluationSummary;
+      /** What `classify` decided, for the chat to show under the step; bounded, never its input. */
+      classification?: ClassificationDetails;
+      /**
+       * The calibration session a successful `qdash_create_calibration_session` call created, read from the tool's
+       * own result details (never from the model's arguments or text), for the chat to show.
+       */
+      calibrationSession?: CreatedCalibrationSession;
       /** What a workspace tool printed or answered, for the chat to show under the step; bounded. */
       output?: string;
       /** A command's exit status (`bash`). */
       exitCode?: number;
+      /**
+       * The durable entry of the tool's result, when it has one: it names the call the same way in the original
+       * stream of a turn and in every stream that replays it, whatever ID the model gave the call.
+       */
+      entry_id?: string;
+      /**
+       * The result was committed before this request's own message, by a run recovered from an earlier request: it
+       * belongs to an earlier turn (see `turn_start`).
+       */
+      before_turn?: true;
     }
   | { type: "text_delta"; delta: string }
   | { type: "thinking_delta"; delta: string }
@@ -29,14 +48,70 @@ export type NdjsonEvent =
   /** Text appended to one argument (`path`, such as `["content"]`) of the call being written. */
   | { type: "tool_args_delta"; index: number; path: Array<string | number>; delta: string }
   | { type: "chart"; chart: { data: unknown[]; layout: unknown } }
+  /** A read-only UI composed with render_ui: a validated json-render spec and its plain-text fallback. */
+  | { type: "ui"; ui: UiBlockPayload }
   | { type: "ask"; ask: unknown }
   | { type: "approval"; approval: unknown }
   /** A change the model proposes to the editor the user has open (propose_code_edit). */
   | { type: "edit"; edit: unknown }
-  | { type: "done"; text: string }
-  | { type: "error"; message: string }
+  /**
+   * A message the user sent while the answer was written, placed in the transcript as `entry_id`. `answer` is the
+   * text of the answer it follows, when it came after the run's last tool round; a new run answers it.
+   * `before_turn`: it landed before this request's own message, in a run recovered from an earlier request (the
+   * runtime died while the steer was queued), so it belongs to an earlier turn, not after this request's message.
+   */
+  | {
+      type: "steer";
+      request_id: string;
+      status: "applied";
+      entry_id: string;
+      text: string;
+      answer: string;
+      before_turn?: true;
+    }
+  /** A steer the harness settled without placing: the run failed or was stopped before its next tool round ended. */
+  | { type: "steer"; request_id: string; status: "withdrawn"; reason: string }
+  /**
+   * The turn's own message was placed. What streamed before it belongs to an earlier turn: a run recovered after the
+   * runtime died answered a steer of that turn (`before_turn`) first. `answer` is the text that run ended with.
+   */
+  | { type: "turn_start"; answer: string }
+  /** `entry_id`: the durable entry of the answer. */
+  | { type: "done"; text: string; entry_id?: string }
+  /** A continue found nothing to answer: no request was sent and nothing was added. */
+  | { type: "noop"; reason: "nothing_to_answer" }
+  | { type: "error"; message: string; code?: "compaction_failed" | "turn_not_started" }
   /** Keepalive while a turn is quiet (long tool calls); carries no content. */
   | { type: "ping" };
+
+/** Tool whose successful result names the calibration session it created. */
+export const CREATE_CALIBRATION_SESSION_TOOL = "qdash_create_calibration_session";
+
+/** What the chat learns of a calibration session a tool call created: its ID and chip, nothing else. */
+export interface CreatedCalibrationSession {
+  calibrationSessionId: string;
+  chipId?: string;
+}
+
+const CALIBRATION_SESSION_ID = /^[A-Za-z0-9_.:-]{1,200}$/;
+
+/**
+ * The calibration session a `qdash_create_calibration_session` result created, when the call succeeded and its
+ * details (written by the pi-qdash tool after QDash answered) name it. Anything else yields nothing: another tool,
+ * a failed or refused call, or details not shaped like the tool's own.
+ */
+export function createdCalibrationSessionFromDetails(
+  toolName: string | undefined,
+  details: Record<string, unknown> | undefined,
+  isError: boolean,
+): CreatedCalibrationSession | undefined {
+  if (isError || toolName !== CREATE_CALIBRATION_SESSION_TOOL || !details) return undefined;
+  if (details.tool !== CREATE_CALIBRATION_SESSION_TOOL) return undefined;
+  const id = details.calibrationSessionId;
+  if (typeof id !== "string" || !CALIBRATION_SESSION_ID.test(id)) return undefined;
+  const chipId = typeof details.chipId === "string" && details.chipId ? details.chipId.slice(0, 200) : undefined;
+  return { calibrationSessionId: id, ...(chipId ? { chipId } : {}) };
+}
 
 /**
  * Suffix for an unanswered submission's `detail`, which carries the provider's
@@ -66,8 +141,8 @@ export interface EvaluationSummary {
   record?: EvaluateResult;
 }
 
-/** Minimal shape of the Pi events we care about. */
-type SessionEventLike = {
+/** Minimal shape of the session events the stream maps; `ViewEventTranslator` produces them. */
+export type SessionEventLike = {
   type: string;
   toolName?: string;
   toolCallId?: string;
@@ -81,6 +156,13 @@ type SessionEventLike = {
     block?: unknown;
   }>;
   result?: { details?: unknown; structuredOutput?: unknown };
+  /** `steer_placed`: the steer's request ID, entry, text, and the answer it follows. */
+  requestId?: string;
+  /** `steer_placed`, `tool_execution_end`: it landed before the turn's own message (see the `steer` NDJSON event). */
+  beforeTurn?: boolean;
+  entryId?: string;
+  text?: string;
+  answer?: string;
   entry?: {
     model?: ReadonlyArray<{
       role?: string;
@@ -91,8 +173,38 @@ type SessionEventLike = {
   };
 };
 
-/** Tools whose answer the chat shows under the step: the workspace's. QDash tools answer the model only. */
-const OUTPUT_TOOLS = new Set(["bash", "read", "write", "edit"]);
+/**
+ * Tools whose answer the chat shows under the step: the workspace's, and a
+ * Code Mode script's output with the tool calls it made. QDash tools answer
+ * the model only.
+ */
+const OUTPUT_TOOLS = new Set(["bash", "read", "write", "edit", "codemode"]);
+/** Longest error text of one script tool call in the summary. */
+const MAX_NESTED_ERROR_CHARS = 300;
+
+/**
+ * The tool calls a Code Mode script made, one line each, from its result's
+ * details (`CodemodeToolDetails.calls`): status, tool, duration, and error.
+ */
+export function nestedCallSummary(details: unknown): string | undefined {
+  const calls = (details as { calls?: unknown } | undefined)?.calls;
+  if (!Array.isArray(calls) || calls.length === 0) return undefined;
+  const lines = calls.flatMap((call) => {
+    if (!call || typeof call !== "object") return [];
+    const { name, status, durationMs, error } = call as Record<string, unknown>;
+    if (typeof name !== "string") return [];
+    const state = typeof status === "string" ? status : "unknown";
+    const time = typeof durationMs === "number" ? ` (${Math.round(durationMs)} ms)` : "";
+    const why =
+      typeof error === "string" && error
+        ? `: ${error.replace(/\s+/g, " ").slice(0, MAX_NESTED_ERROR_CHARS)}`
+        : "";
+    return [`${state.padEnd(9)} ${name}${time}${why}`];
+  });
+  if (lines.length === 0) return undefined;
+  const failed = calls.filter((call) => (call as { status?: unknown })?.status === "error").length;
+  return [`Tool calls: ${lines.length}${failed ? `, ${failed} failed` : ""}`, ...lines].join("\n");
+}
 /** Longest output a tool_end line carries; the tail, as the model's own window keeps the tail. */
 export const MAX_TOOL_OUTPUT_CHARS = 4000;
 
@@ -127,6 +239,12 @@ function toolOutput(event: SessionEventLike): { output?: string; exitCode?: numb
     }
   }
   text = text?.trim();
+  if (event.toolName === "codemode") {
+    const details = event.result?.details ?? event.entry?.model?.[0]?.details;
+    const summary = nestedCallSummary(details);
+    // Last, so the tail kept below always shows which calls ran and failed.
+    if (summary) text = text ? `${text}\n\n${summary}` : summary;
+  }
   if (text && text.length > MAX_TOOL_OUTPUT_CHARS) text = `…${text.slice(-MAX_TOOL_OUTPUT_CHARS)}`;
   return { ...(text ? { output: text } : {}), ...(exitCode !== undefined ? { exitCode } : {}) };
 }
@@ -137,6 +255,21 @@ function toolOutput(event: SessionEventLike): { output?: string; exitCode?: numb
  * `done` and `error` are built by the server after `prompt()` settles, not here.
  */
 export function toNdjsonEvents(event: SessionEventLike): NdjsonEvent[] {
+  if (event.type === "turn_started") return [{ type: "turn_start", answer: event.answer ?? "" }];
+  if (event.type === "steer_placed") {
+    if (typeof event.requestId !== "string" || typeof event.entryId !== "string") return [];
+    return [
+      {
+        type: "steer",
+        request_id: event.requestId,
+        status: "applied",
+        entry_id: event.entryId,
+        text: event.text ?? "",
+        answer: event.answer ?? "",
+        ...(event.beforeTurn ? { before_turn: true as const } : {}),
+      },
+    ];
+  }
   if (event.type === "message_update") {
     // Text and thinking appends drive the live answer in the chat UI. A tool
     // call being written streams too, so the chat can show code as it is
@@ -189,6 +322,8 @@ export function toNdjsonEvents(event: SessionEventLike): NdjsonEvent[] {
     const durableResult = event.entry?.model?.[0];
     const chart = chartFromDetails(event.result?.details) ?? chartFromDetails(durableResult?.details);
     if (chart) out.push({ type: "chart", chart });
+    const ui = uiBlockFromDetails(event.result?.details) ?? uiBlockFromDetails(durableResult?.details);
+    if (ui) out.push({ type: "ui", ui });
     // Interactive requests end the turn; the UI renders them as cards.
     const details = (event.result?.details ?? durableResult?.details) as
       | Record<string, unknown>
@@ -200,14 +335,22 @@ export function toNdjsonEvents(event: SessionEventLike): NdjsonEvent[] {
     }
     const figures = figuresFromDetails(details);
     const evaluation = evaluationFromDetails(details);
+    const classification =
+      event.toolName === CLASSIFY_CHAT_TOOL ? classificationFromDetails(details) : undefined;
+    const isError = event.isError === true || durableResult?.isError === true;
+    const calibrationSession = createdCalibrationSessionFromDetails(event.toolName, details, isError);
     out.push({
       type: "tool_end",
       name: event.toolName ?? "unknown",
       ...(figures.length ? { figures } : {}),
       ...(evaluation ? { evaluation } : {}),
+      ...(classification ? { classification } : {}),
+      ...(calibrationSession ? { calibrationSession } : {}),
       ...toolOutput(event),
-      isError: event.isError === true || durableResult?.isError === true,
+      isError,
       ...(event.toolCallId ? { id: event.toolCallId } : {}),
+      ...(event.entry && typeof event.entryId === "string" ? { entry_id: event.entryId } : {}),
+      ...(event.beforeTurn ? { before_turn: true as const } : {}),
     });
     return out;
   }
@@ -254,6 +397,52 @@ function evaluationFromDetails(
     ...(model ? { model } : {}),
     ...(details.fallback === true ? { fallback: true } : {}),
     ...(record ? { record } : {}),
+  };
+}
+
+const CLASSIFICATION_OUTCOMES = new Set<ClassificationDetails["outcome"]>(["classified", "ambiguous", "failed"]);
+/** Longest category name, classifier label or failure reason a tool_end line carries. */
+export const MAX_CLASSIFICATION_TEXT_CHARS = 200;
+
+const probability = (value: unknown): value is number =>
+  typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1;
+const shortText = (value: unknown): string | undefined =>
+  typeof value === "string" && value ? value.slice(0, MAX_CLASSIFICATION_TEXT_CHARS) : undefined;
+
+/**
+ * The classification `classify` recorded in its details
+ * (`details.classification`), when well-formed: only the known fields,
+ * bounded.
+ */
+export function classificationFromDetails(
+  details: Record<string, unknown> | undefined,
+): ClassificationDetails | undefined {
+  const raw = details?.classification;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
+  const fields = raw as Record<string, unknown>;
+  const classifier = shortText(fields.classifier);
+  const outcome = fields.outcome as ClassificationDetails["outcome"];
+  if (!classifier || !CLASSIFICATION_OUTCOMES.has(outcome)) return undefined;
+  const category = shortText(fields.category);
+  const reason = shortText(fields.reason);
+  const probabilities = Array.isArray(fields.probabilities)
+    ? fields.probabilities
+        .flatMap((entry) => {
+          if (!entry || typeof entry !== "object") return [];
+          const name = shortText((entry as Record<string, unknown>).category);
+          const value = (entry as Record<string, unknown>).probability;
+          return name && probability(value) ? [{ category: name, probability: value }] : [];
+        })
+        .slice(0, CLASSIFY_LIMITS.maxCategories)
+    : [];
+  return {
+    classifier,
+    outcome,
+    ...(category ? { category } : {}),
+    ...(probability(fields.probability) ? { probability: fields.probability } : {}),
+    ...(typeof fields.margin === "number" && Number.isFinite(fields.margin) ? { margin: fields.margin } : {}),
+    ...(probabilities.length ? { probabilities } : {}),
+    ...(reason ? { reason } : {}),
   };
 }
 

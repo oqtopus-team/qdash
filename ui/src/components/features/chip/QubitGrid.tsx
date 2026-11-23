@@ -18,14 +18,32 @@ import {
   GridFullscreenButton,
   gridFullscreenPanelClass,
 } from "@/components/ui/GridFullscreenButton";
+import { LockedGridScroller } from "@/components/ui/LockedGridScroller";
 import { GridZoomControls } from "@/components/ui/GridZoomControls";
 import { RegionZoomToggle } from "@/components/ui/RegionZoomToggle";
+import {
+  TaskTileStatusMark,
+  taskTileLabel,
+  taskTileStatusFill,
+} from "@/components/ui/TaskTileStatus";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
+import { useToast } from "@/components/ui/Toast";
 import { useFullscreenPanel } from "@/hooks/useFullscreenPanel";
+import { getApiErrorMessage, parseBlobErrorBody } from "@/lib/utils/apiError";
 import { useGridLayout } from "@/hooks/useGridLayout";
+import { usePanClickGuard } from "@/hooks/usePanClickGuard";
 import { useQubitTaskResults } from "@/hooks/useQubitTaskResults";
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
 import { getQubitGridPosition, type TopologyLayoutParams } from "@/lib/utils/grid-position";
 import { calculateGridContainerWidth } from "@/lib/utils/grid-layout";
+import {
+  buildMuxCellMap,
+  clipMuxBoxes,
+  muxLabelAreaClass,
+  type MuxGroupBox,
+} from "@/lib/utils/mux-groups";
+
+const NO_MUX_GROUPS: MuxGroupBox[] = [];
 
 interface QubitGridProps {
   chipId: string;
@@ -53,18 +71,6 @@ const DEFAULT_DOWNLOAD_OPTIONS: DownloadOptions = {
 const EmptyCell = memo(function EmptyCell({ muxBgClass }: { muxBgClass: string }) {
   return <div className={`aspect-square bg-base-300/50 rounded-lg ${muxBgClass}`} />;
 });
-
-// Status color helper
-function getStatusColor(status: string | undefined): string {
-  switch (status) {
-    case "completed":
-      return "bg-success";
-    case "failed":
-      return "bg-error";
-    default:
-      return "bg-warning";
-  }
-}
 
 function toPathList(paths: string[] | string | null | undefined): string[] {
   if (!paths) return [];
@@ -133,32 +139,54 @@ const GridCell = memo(function GridCell({
     );
   }
 
+  const label = taskTileLabel("Qubit", qid, task.status);
+  const downloadState = !isDownloadMode
+    ? ""
+    : !canBeDownloaded
+      ? ", no figures to download"
+      : isSelectedForDownload
+        ? ", selected for download"
+        : "";
+  const accessibleName = `${label}${downloadState}`;
+  const isUnavailable = isDownloadMode && !canBeDownloaded;
+
   // Zoomed-out: show status-colored tile (heatmap style)
   if (!showFigures) {
     return (
-      <button
-        onClick={onClick}
-        className={`aspect-square rounded-lg shadow-sm relative group cursor-pointer ${getStatusColor(task.status)} ${muxBgClass} ${
-          isDownloadMode && isSelectedForDownload ? "ring-2 ring-primary ring-offset-1" : ""
-        } ${isDownloadMode && !canBeDownloaded ? "opacity-40 cursor-not-allowed" : ""}`}
-      >
-        {showLabels && (
-          <div className="absolute top-0.5 left-0.5 bg-black/30 text-white px-0.5 py-px rounded text-[0.5rem] font-medium">
-            {qid}
-          </div>
-        )}
-        {/* Hover tooltip */}
-        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-base-100 text-base-content text-xs rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
-          {qid}: {task.status}
-        </div>
-        {isDownloadMode && canBeDownloaded && isSelectedForDownload && (
-          <div className="absolute inset-0 flex items-center justify-center bg-primary/20">
-            <div className="bg-primary text-primary-content rounded-full p-0.5">
-              <Check size={10} />
-            </div>
-          </div>
-        )}
-      </button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            onClick={onClick}
+            aria-label={accessibleName}
+            aria-disabled={isUnavailable || undefined}
+            className={`aspect-square rounded-lg shadow-sm relative cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-base-content ${taskTileStatusFill(task.status)} ${muxBgClass} ${
+              isDownloadMode && isSelectedForDownload ? "ring-2 ring-primary ring-offset-1" : ""
+            } ${isUnavailable ? "opacity-40 cursor-not-allowed" : ""}`}
+          >
+            {showLabels && (
+              <div className="absolute top-0.5 left-0.5 bg-black/30 text-white px-0.5 py-px rounded text-[0.5rem] font-medium">
+                {qid}
+              </div>
+            )}
+            {showLabels && (
+              <TaskTileStatusMark
+                status={task.status}
+                variant="tile"
+                className="absolute bottom-0.5 right-0.5"
+              />
+            )}
+            {isDownloadMode && canBeDownloaded && isSelectedForDownload && (
+              <div className="absolute inset-0 flex items-center justify-center bg-primary/20">
+                <div className="bg-primary text-primary-content rounded-full p-0.5">
+                  <Check size={10} />
+                </div>
+              </div>
+            )}
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>{accessibleName}</TooltipContent>
+      </Tooltip>
     );
   }
 
@@ -171,52 +199,61 @@ const GridCell = memo(function GridCell({
   };
 
   return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={onClick}
-      onKeyDown={handleKeyDown}
-      className={`aspect-square rounded-xl bg-white shadow-md border border-base-300/60 overflow-hidden transition-all duration-200 hover:shadow-xl hover:border-primary/40 relative w-full ${muxBgClass} ${
-        isDownloadMode && isSelectedForDownload ? "ring-2 ring-primary ring-offset-2" : ""
-      } ${isDownloadMode && !canBeDownloaded ? "opacity-40 cursor-not-allowed" : ""}`}
-    >
-      {task.figure_path && figurePath && (
-        <div className="absolute inset-1">
-          <TaskFigure
-            path={figurePath}
-            qid={qid}
-            className="w-full h-full object-contain"
-            hideExpandButton
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={onClick}
+          onKeyDown={handleKeyDown}
+          aria-label={accessibleName}
+          aria-disabled={isUnavailable || undefined}
+          className={`aspect-square rounded-xl bg-white shadow-xs border border-base-300/60 overflow-hidden transition-colors duration-200 hover:border-primary/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary relative w-full ${muxBgClass} ${
+            isDownloadMode && isSelectedForDownload ? "ring-2 ring-primary ring-offset-2" : ""
+          } ${isUnavailable ? "opacity-40 cursor-not-allowed" : ""}`}
+        >
+          {task.figure_path && figurePath && (
+            <div className="absolute inset-1">
+              <TaskFigure
+                path={figurePath}
+                qid={qid}
+                className="w-full h-full object-contain"
+                hideExpandButton
+              />
+            </div>
+          )}
+          {showLabels && (
+            <div
+              className={`absolute top-1 left-1 bg-base-100/80 px-1.5 py-0.5 rounded text-xs font-medium ${
+                zoomMode === "full" ? "hidden md:block" : ""
+              }`}
+            >
+              {qid}
+            </div>
+          )}
+          <TaskTileStatusMark
+            status={task.status}
+            variant="figure"
+            className="absolute bottom-1 right-1"
           />
-        </div>
-      )}
-      {showLabels && (
-        <div
-          className={`absolute top-1 left-1 bg-base-100/80 px-1.5 py-0.5 rounded text-xs font-medium ${
-            zoomMode === "full" ? "hidden md:block" : ""
-          }`}
-        >
-          {qid}
-        </div>
-      )}
-      <div
-        className={`absolute bottom-1 right-1 w-2 h-2 rounded-full ${getStatusColor(task.status)}`}
-      />
-      {/* Download selection overlay */}
-      {isDownloadMode && canBeDownloaded && (
-        <div
-          className={`absolute inset-0 flex items-center justify-center transition-colors ${
-            isSelectedForDownload ? "bg-primary/20" : "bg-transparent hover:bg-base-content/10"
-          }`}
-        >
-          {isSelectedForDownload && (
-            <div className="bg-primary text-primary-content rounded-full p-1">
-              <Check size={16} />
+          {/* Download selection overlay */}
+          {isDownloadMode && canBeDownloaded && (
+            <div
+              className={`absolute inset-0 flex items-center justify-center transition-colors ${
+                isSelectedForDownload ? "bg-primary/20" : "bg-transparent hover:bg-base-content/10"
+              }`}
+            >
+              {isSelectedForDownload && (
+                <div className="bg-primary text-primary-content rounded-full p-1">
+                  <Check size={16} />
+                </div>
+              )}
             </div>
           )}
         </div>
-      )}
-    </div>
+      </TooltipTrigger>
+      <TooltipContent>{accessibleName}</TooltipContent>
+    </Tooltip>
   );
 });
 
@@ -241,7 +278,14 @@ export function QubitGrid({
     showMuxBoundaries = false,
     qubits: topologyQubits,
     gridSize: topologyGridSize,
+    muxGroups = NO_MUX_GROUPS,
   } = useTopologyConfig(topologyId) ?? {};
+
+  // Cell -> MUX box, so boundaries follow the topology's actual MUX groups
+  const muxCellMap = useMemo(
+    () => buildMuxCellMap(muxGroups, topologyQubits),
+    [muxGroups, topologyQubits],
+  );
 
   // Calculate actual grid dimensions from topology qubit positions
   const { gridRows, gridCols } = useMemo(() => {
@@ -278,6 +322,7 @@ export function QubitGrid({
   // Download selection mode state
   const [downloadSelectionEnabled, setDownloadSelectionEnabled] = useState(false);
   const [selectedForDownload, setSelectedForDownload] = useState<Set<string>>(new Set());
+  const toast = useToast();
   const [isDownloading, setIsDownloading] = useState(false);
   const [isDownloadConfirmOpen, setIsDownloadConfirmOpen] = useState(false);
   const [downloadOptions, setDownloadOptions] = useState<DownloadOptions>(DEFAULT_DOWNLOAD_OPTIONS);
@@ -312,7 +357,7 @@ export function QubitGrid({
   }, [selectedForDownload, taskResponse?.data?.result]);
 
   // View mode state: 'pan-zoom' for DOM with pan/zoom, 'region' for region zoom
-  const [viewMode, setViewMode] = useState<"pan-zoom" | "region">("region");
+  const [viewMode, setViewMode] = useState<"pan-zoom" | "region">("pan-zoom");
   const [regionSelectionEnabled, setRegionSelectionEnabled] = useState(false);
   const [zoomMode, setZoomMode] = useState<"full" | "region">("full");
   const [selectedRegion, setSelectedRegion] = useState<{
@@ -324,21 +369,33 @@ export function QubitGrid({
     col: number;
   } | null>(null);
   const { isFullscreen, toggleFullscreen, exitFullscreen } = useFullscreenPanel();
+  const panClickGuard = usePanClickGuard();
 
   // LOD: store zoom scale, compute visibility flags from effective cell size.
   // Initialize to a conservative value; will be updated on first transform.
   const [currentScale, setCurrentScale] = useState<number | null>(null);
   const lodTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  useEffect(() => {
+    return () => {
+      if (lodTimeoutRef.current !== null) {
+        clearTimeout(lodTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const numRegions = Math.floor(gridSize / regionSize);
   const isSquareGrid = gridRows === gridCols;
 
-  // Region tab is only available for square grids; fall back to pan-zoom otherwise.
+  // Lock works for every topology, but region zoom assumes a square grid; leave it when the
+  // grid is not square.
   useEffect(() => {
-    if (!isSquareGrid && viewMode === "region") {
-      setViewMode("pan-zoom");
+    if (!isSquareGrid) {
+      setZoomMode("full");
+      setSelectedRegion(null);
+      setRegionSelectionEnabled(false);
     }
-  }, [isSquareGrid, viewMode]);
+  }, [isSquareGrid]);
 
   // Calculate displayed grid size based on zoom mode
   const displayCols = zoomMode === "region" ? regionSize : gridCols;
@@ -473,8 +530,10 @@ export function QubitGrid({
       setDownloadSelectionEnabled(false);
       setSelectedForDownload(new Set());
     } catch (error) {
-      console.error("Download error:", error);
-      alert("Download failed. Please try again.");
+      // Keep the dialog, options and selection so the download can be retried.
+      toast.error(
+        getApiErrorMessage(await parseBlobErrorBody(error), "Download failed. Please try again."),
+      );
     } finally {
       setIsDownloading(false);
     }
@@ -515,7 +574,7 @@ export function QubitGrid({
   // Grid content (extracted for reuse in both view modes)
   const gridContent = (
     <div
-      className="grid bg-base-200/50 rounded-xl relative"
+      className="grid bg-base-200/50 rounded-[var(--radius-box)] relative"
       style={{
         gap: `${gap}px`,
         padding: `${padding / 2}px`,
@@ -532,15 +591,11 @@ export function QubitGrid({
         const actualRow = displayGridStart.row + localRow;
         const actualCol = displayGridStart.col + localCol;
 
-        // Calculate MUX index for this cell
-        const muxRow = Math.floor(actualRow / muxSize);
-        const muxCol = Math.floor(actualCol / muxSize);
-        const isEvenMux = (muxRow + muxCol) % 2 === 0;
-
-        // MUX background class
+        // MUX background class from the MUX group covering this cell, if any
+        const muxBox = muxCellMap.get(`${actualRow},${actualCol}`);
         const muxBgClass =
-          hasMux && showMuxBoundaries
-            ? isEvenMux
+          hasMux && showMuxBoundaries && muxBox
+            ? muxBox.isEven
               ? "ring-2 ring-inset ring-primary/20"
               : "ring-2 ring-inset ring-secondary/20"
             : "";
@@ -602,36 +657,25 @@ export function QubitGrid({
               gridTemplateRows: `repeat(${displayRows}, minmax(${displayCellSize}px, 1fr))`,
             }}
           >
-            {Array.from({
-              length: Math.pow(Math.ceil(displayCols / muxSize), 2),
-            }).map((_, idx) => {
-              const numMuxCols = Math.ceil(displayCols / muxSize);
-              const muxLocalRow = Math.floor(idx / numMuxCols);
-              const muxLocalCol = idx % numMuxCols;
-              const muxActualRow = Math.floor(displayGridStart.row / muxSize) + muxLocalRow;
-              const muxActualCol = Math.floor(displayGridStart.col / muxSize) + muxLocalCol;
-              const muxIndex = muxActualRow * Math.floor(gridSize / muxSize) + muxActualCol;
-              const startCol = muxLocalCol * muxSize + 1;
-              const startRow = muxLocalRow * muxSize + 1;
-              const spanCols = Math.min(muxSize, displayCols - muxLocalCol * muxSize);
-              const spanRows = Math.min(muxSize, displayRows - muxLocalRow * muxSize);
-              if (spanCols <= 0 || spanRows <= 0) return null;
-
-              return (
-                <div
-                  key={idx}
-                  className="flex items-center justify-center"
-                  style={{
-                    gridColumn: `${startCol} / span ${spanCols}`,
-                    gridRow: `${startRow} / span ${spanRows}`,
-                  }}
-                >
-                  <div className="text-[0.45rem] md:text-[0.6rem] font-medium text-base-content/30 bg-base-100/60 px-1 py-px rounded border border-base-content/5">
-                    MUX{muxIndex}
-                  </div>
+            {clipMuxBoxes(muxGroups, {
+              row: displayGridStart.row,
+              col: displayGridStart.col,
+              rows: displayRows,
+              cols: displayCols,
+            }).map((box) => (
+              <div
+                key={box.muxId}
+                className={muxLabelAreaClass(box)}
+                style={{
+                  gridColumn: `${box.col + 1} / span ${box.cols}`,
+                  gridRow: `${box.row + 1} / span ${box.rows}`,
+                }}
+              >
+                <div className="text-[0.45rem] md:text-[0.6rem] font-medium text-base-content/30 bg-base-100/60 px-1 py-px rounded border border-base-content/5">
+                  MUX{box.muxId}
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -661,7 +705,7 @@ export function QubitGrid({
                   key={index}
                   className={`pointer-events-auto transition-colors duration-200 rounded-lg flex items-center justify-center ${
                     isHovered
-                      ? "bg-primary/30 border-2 border-primary shadow-lg z-10"
+                      ? "bg-primary/30 border-2 border-primary z-10"
                       : "bg-primary/5 border-2 border-primary/20 hover:border-primary/40 hover:bg-primary/10"
                   }`}
                   style={{
@@ -711,18 +755,6 @@ export function QubitGrid({
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg py-2">
         <div className="flex items-center gap-4">
           <div className="tabs tabs-boxed bg-base-300 w-fit">
-            {isSquareGrid && (
-              <button
-                type="button"
-                className={`tab gap-2 ${viewMode === "region" ? "tab-active" : ""}`}
-                onClick={() => setViewMode("region")}
-                title="Lock"
-                aria-label="Lock"
-              >
-                <Lock className="h-4 w-4" />
-                <span className="hidden sm:inline">Lock</span>
-              </button>
-            )}
             <button
               type="button"
               className={`tab gap-2 ${viewMode === "pan-zoom" ? "tab-active" : ""}`}
@@ -737,6 +769,16 @@ export function QubitGrid({
             >
               <ZoomIn className="h-4 w-4" />
               <span className="hidden sm:inline">Zoom</span>
+            </button>
+            <button
+              type="button"
+              className={`tab gap-2 ${viewMode === "region" ? "tab-active" : ""}`}
+              onClick={() => setViewMode("region")}
+              title="Lock"
+              aria-label="Lock"
+            >
+              <Lock className="h-4 w-4" />
+              <span className="hidden sm:inline">Lock</span>
             </button>
           </div>
 
@@ -766,28 +808,28 @@ export function QubitGrid({
                   {selectedForDownload.size} / {availableForDownloadCount} selected
                 </span>
                 <button
-                  className="btn btn-xs btn-ghost"
+                  className="btn btn-sm btn-ghost"
                   onClick={selectAllForDownload}
                   title="Select all"
                 >
                   All
                 </button>
                 <button
-                  className="btn btn-xs btn-ghost"
+                  className="btn btn-sm btn-ghost"
                   onClick={clearDownloadSelection}
                   title="Clear selection"
                 >
                   Clear
                 </button>
                 <button
-                  className="btn btn-sm btn-primary gap-1"
+                  className="btn btn-sm btn-primary"
                   onClick={() => setIsDownloadConfirmOpen(true)}
                   disabled={selectedForDownload.size === 0 || isDownloading}
                 >
                   {isDownloading ? (
-                    <span className="loading loading-spinner loading-xs" />
+                    <span data-icon="inline-start" className="loading loading-spinner loading-xs" />
                   ) : (
-                    <Download size={16} />
+                    <Download data-icon="inline-start" />
                   )}
                   Download
                 </button>
@@ -805,7 +847,7 @@ export function QubitGrid({
             ) : (
               <div className="flex items-center gap-2">
                 <button
-                  className="btn btn-sm btn-outline gap-2"
+                  className="btn btn-sm btn-outline"
                   onClick={() => {
                     setDownloadSelectionEnabled(true);
                     setRegionSelectionEnabled(false);
@@ -814,7 +856,7 @@ export function QubitGrid({
                   title="Select figures to download"
                   disabled={availableForDownloadCount === 0}
                 >
-                  <Download size={16} />
+                  <Download data-icon="inline-start" />
                   Download
                 </button>
               </div>
@@ -885,6 +927,7 @@ export function QubitGrid({
           >
             <GridZoomControls isFullscreen={isFullscreen} className="top-12" />
             <TransformComponent
+              contentProps={panClickGuard}
               wrapperStyle={{ width: "100%", height: "100%" }}
               contentStyle={{
                 display: "flex",
@@ -896,7 +939,7 @@ export function QubitGrid({
             </TransformComponent>
           </TransformWrapper>
         ) : (
-          gridContent
+          <LockedGridScroller>{gridContent}</LockedGridScroller>
         )}
       </div>
 

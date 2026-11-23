@@ -1,18 +1,27 @@
 "use client";
 
 import { useMemo, useRef, useState, useCallback, useEffect } from "react";
-import Link from "next/link";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 
 import { ArrowRightLeft, GitBranch, Lock, ZoomIn } from "lucide-react";
 
+import { LineageButton } from "@/components/features/provenance/ParameterLineageDialog";
 import { GridFullscreenButton } from "@/components/ui/GridFullscreenButton";
+import { LockedGridScroller } from "@/components/ui/LockedGridScroller";
 import { GridZoomControls } from "@/components/ui/GridZoomControls";
 import { RegionZoomToggle } from "@/components/ui/RegionZoomToggle";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 import { useFullscreenPanel } from "@/hooks/useFullscreenPanel";
 import { useGridLayout } from "@/hooks/useGridLayout";
+import { usePanClickGuard } from "@/hooks/usePanClickGuard";
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
+import {
+  buildMuxCellMap,
+  clipMuxBoxes,
+  muxLabelPosition,
+  type MuxGroupBox,
+} from "@/lib/utils/mux-groups";
 import { pickColor } from "@/lib/utils/color-scale";
 import { getQubitGridPosition, type TopologyLayoutParams } from "@/lib/utils/grid-position";
 import { calculateGridDimension, cellFontSize } from "@/lib/utils/grid-layout";
@@ -36,6 +45,8 @@ interface MetricValue {
   task_id?: string | null;
   execution_id?: string | null;
 }
+
+const NO_MUX_GROUPS: MuxGroupBox[] = [];
 
 interface CouplingMetricsGridProps {
   metricData: { [key: string]: MetricValue } | null;
@@ -86,7 +97,14 @@ export function CouplingMetricsGrid({
     qubits: topologyQubits,
     couplings: topologyCouplings,
     gridSize: topologyGridSize,
+    muxGroups = NO_MUX_GROUPS,
   } = useTopologyConfig(topologyId) ?? {};
+
+  // Cell -> MUX box, so boundaries follow the topology's actual MUX groups
+  const muxCellMap = useMemo(
+    () => buildMuxCellMap(muxGroups, topologyQubits),
+    [muxGroups, topologyQubits],
+  );
 
   // Calculate actual grid dimensions from topology qubit positions
   const { gridRows, gridCols } = useMemo(() => {
@@ -123,16 +141,20 @@ export function CouplingMetricsGrid({
   const [isDirectionReversed, setIsDirectionReversed] = useState(false);
 
   // View mode state: 'pan-zoom' for DOM with pan/zoom, 'region' for region zoom
-  const [viewMode, setViewMode] = useState<"pan-zoom" | "region">("region");
+  const [viewMode, setViewMode] = useState<"pan-zoom" | "region">("pan-zoom");
 
-  // Region tab is only available for square grids; fall back to pan-zoom otherwise.
+  // Lock works for every topology, but region zoom assumes a square grid; leave it when the
+  // grid is not square.
   useEffect(() => {
-    if (!isSquareGrid && viewMode === "region") {
-      setViewMode("pan-zoom");
+    if (!isSquareGrid) {
+      setZoomMode("full");
+      setSelectedRegion(null);
+      setRegionSelectionEnabled(false);
     }
-  }, [isSquareGrid, viewMode]);
+  }, [isSquareGrid]);
 
   const { isFullscreen, toggleFullscreen } = useFullscreenPanel();
+  const panClickGuard = usePanClickGuard();
 
   // Region selection state
   const [regionSelectionEnabled, setRegionSelectionEnabled] = useState(false);
@@ -297,15 +319,13 @@ export function CouplingMetricsGrid({
             const x = displayCol * (displayCellSize + gap);
             const y = displayRow * (displayCellSize + gap);
 
-            // Calculate MUX index for this cell (using actual position, not display position)
-            const muxRow = Math.floor(pos.row / muxSize);
-            const muxCol = Math.floor(pos.col / muxSize);
-            const isEvenMux = (muxRow + muxCol) % 2 === 0;
+            // MUX group covering this cell (using actual position, not display position)
+            const muxBox = muxCellMap.get(`${pos.row},${pos.col}`);
 
             // MUX styling class
             const muxBgClass =
-              hasMux && showMuxBoundaries
-                ? isEvenMux
+              hasMux && showMuxBoundaries && muxBox
+                ? muxBox.isEven
                   ? "ring-2 ring-inset ring-primary/20"
                   : "ring-2 ring-inset ring-secondary/20"
                 : "";
@@ -332,41 +352,32 @@ export function CouplingMetricsGrid({
       {/* MUX labels - centered in each MUX group */}
       {hasMux && showMuxBoundaries && (
         <>
-          {Array.from({
-            length: Math.pow(Math.ceil(displayGridSize / muxSize), 2),
-          }).map((_, idx) => {
-            const numMuxCols = Math.ceil(displayGridSize / muxSize);
-            const muxLocalRow = Math.floor(idx / numMuxCols);
-            const muxLocalCol = idx % numMuxCols;
-
-            // Calculate actual MUX position considering zoom offset
-            const muxActualRow = Math.floor(displayGridStart.row / muxSize) + muxLocalRow;
-            const muxActualCol = Math.floor(displayGridStart.col / muxSize) + muxLocalCol;
-            const muxIndex = muxActualRow * Math.floor(effectiveGridSize / muxSize) + muxActualCol;
-
-            // Calculate center position of MUX group
-            const muxCenterX =
-              (muxLocalCol * muxSize + muxSize / 2) * (displayCellSize + gap) - gap / 2;
-            const muxCenterY =
-              (muxLocalRow * muxSize + muxSize / 2) * (displayCellSize + gap) - gap / 2;
+          {clipMuxBoxes(muxGroups, {
+            row: displayGridStart.row,
+            col: displayGridStart.col,
+            rows: displayGridSize,
+            cols: displayGridSize,
+          }).map((box) => {
+            // Centered over several cells; a single cell gets its label at an edge.
+            const position = muxLabelPosition(box, displayCellSize, gap);
 
             return (
               <div
-                key={`mux-label-${idx}`}
+                key={`mux-label-${box.muxId}`}
                 className={`absolute z-10 pointer-events-none ${
                   zoomMode === "full" ? "hidden md:flex" : "flex"
                 }`}
                 style={{
-                  top: muxCenterY,
-                  left: muxCenterX,
-                  transform: "translate(-50%, -50%)",
+                  top: position.top,
+                  left: position.left,
+                  transform: position.transform,
                 }}
               >
                 <div
                   className="font-medium text-base-content/30 bg-base-100/60 px-1 py-px rounded border border-base-content/5"
                   style={{ fontSize: cellFontSize(displayCellSize, 0.13) }}
                 >
-                  MUX{muxIndex}
+                  MUX{box.muxId}
                 </div>
               </div>
             );
@@ -424,71 +435,74 @@ export function CouplingMetricsGrid({
             const arrowAngle = (Math.atan2(dy, dx) * 180) / Math.PI;
 
             const valueFontSizes = getCouplingFontSizes(displayCellSize);
+            const tooltipLabel =
+              value !== null && value !== undefined
+                ? `${srcQ}\u2192${tgtQ}: ${value.toFixed(4)} ${unit}`
+                : `${srcQ}\u2192${tgtQ}: No data`;
             return (
-              <button
-                key={couplingId}
-                onClick={() => metric && setSelectedCouplingInfo({ couplingId, metric })}
-                style={{
-                  position: "absolute",
-                  top: centerY,
-                  left: centerX,
-                  width: displayCellSize * 0.75,
-                  height: displayCellSize * 0.5,
-                  backgroundColor: bgColor || undefined,
-                }}
-                className={`rounded-md shadow-md flex flex-col items-center justify-center transition-transform hover:shadow-xl -translate-x-1/2 -translate-y-1/2 relative group cursor-pointer ${
-                  !bgColor ? "bg-base-300/50" : ""
-                }`}
-              >
-                {/* Value Display - LOD controlled */}
-                {value !== null && value !== undefined && showValues && (
-                  <div
-                    className="font-medium text-white drop-shadow-md leading-tight"
-                    style={{ fontSize: valueFontSizes.valueSize }}
-                  >
-                    {value.toFixed(showUnits ? 2 : 1)}
-                  </div>
-                )}
-
-                {/* No data indicator - LOD controlled */}
-                {(value === null || value === undefined) && showValues && (
-                  <div
-                    className="text-base-content/40 font-medium"
-                    style={{ fontSize: valueFontSizes.valueSize }}
-                  >
-                    —
-                  </div>
-                )}
-
-                {/* Direction arrow pointing from source to target qubit */}
-                {showValues && (
-                  <svg
-                    width="14"
-                    height="6"
-                    viewBox="0 0 18 7"
-                    className="mt-px drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]"
+              <Tooltip key={couplingId} disableHoverableContent>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label={tooltipLabel}
+                    onClick={() => metric && setSelectedCouplingInfo({ couplingId, metric })}
                     style={{
-                      transform: `rotate(${arrowAngle}deg)`,
+                      position: "absolute",
+                      top: centerY,
+                      left: centerX,
+                      width: displayCellSize * 0.75,
+                      height: displayCellSize * 0.5,
+                      backgroundColor: bgColor || undefined,
                     }}
+                    className={`rounded-md shadow-xs flex flex-col items-center justify-center -translate-x-1/2 -translate-y-1/2 relative cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-base-content ${
+                      !bgColor ? "bg-base-300/50" : ""
+                    }`}
                   >
-                    <line x1="1" y1="3.5" x2="14" y2="3.5" stroke="white" strokeWidth="1.5" />
-                    <polyline
-                      points="11,0.5 16,3.5 11,6.5"
-                      fill="none"
-                      stroke="white"
-                      strokeWidth="1.5"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                )}
+                    {/* Value Display - LOD controlled */}
+                    {value !== null && value !== undefined && showValues && (
+                      <div
+                        className="font-medium text-white drop-shadow-md leading-tight"
+                        style={{ fontSize: valueFontSizes.valueSize }}
+                      >
+                        {value.toFixed(showUnits ? 2 : 1)}
+                      </div>
+                    )}
 
-                {/* Hover tooltip - always show on hover */}
-                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-base-100 text-base-content text-sm rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
-                  {value !== null && value !== undefined
-                    ? `${srcQ}\u2192${tgtQ}: ${value.toFixed(4)} ${unit}`
-                    : `${srcQ}\u2192${tgtQ}: No data`}
-                </div>
-              </button>
+                    {/* No data indicator - LOD controlled */}
+                    {(value === null || value === undefined) && showValues && (
+                      <div
+                        className="text-base-content/40 font-medium"
+                        style={{ fontSize: valueFontSizes.valueSize }}
+                      >
+                        —
+                      </div>
+                    )}
+
+                    {/* Direction arrow pointing from source to target qubit */}
+                    {showValues && (
+                      <svg
+                        width="14"
+                        height="6"
+                        viewBox="0 0 18 7"
+                        className="mt-px drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]"
+                        style={{
+                          transform: `rotate(${arrowAngle}deg)`,
+                        }}
+                      >
+                        <line x1="1" y1="3.5" x2="14" y2="3.5" stroke="white" strokeWidth="1.5" />
+                        <polyline
+                          points="11,0.5 16,3.5 11,6.5"
+                          fill="none"
+                          stroke="white"
+                          strokeWidth="1.5"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    )}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent className="tabular-nums">{tooltipLabel}</TooltipContent>
+              </Tooltip>
             );
           });
       })()}
@@ -511,7 +525,7 @@ export function CouplingMetricsGrid({
                 key={index}
                 className={`absolute transition-colors duration-200 rounded-lg flex items-center justify-center z-20 ${
                   isHovered
-                    ? "bg-primary/30 border-2 border-primary shadow-lg"
+                    ? "bg-primary/30 border-2 border-primary"
                     : "bg-primary/5 border-2 border-primary/20 hover:border-primary/40 hover:bg-primary/10"
                 }`}
                 style={{
@@ -551,18 +565,6 @@ export function CouplingMetricsGrid({
       {/* View mode toggle */}
       <div className="flex items-center justify-between px-1 md:px-4 py-2">
         <div className="tabs tabs-boxed bg-base-200/50 p-1">
-          {isSquareGrid && (
-            <button
-              type="button"
-              className={`tab gap-2 ${viewMode === "region" ? "tab-active" : ""}`}
-              onClick={() => setViewMode("region")}
-              title="Lock"
-              aria-label="Lock"
-            >
-              <Lock className="h-4 w-4" />
-              <span className="hidden sm:inline">Lock</span>
-            </button>
-          )}
           <button
             type="button"
             className={`tab gap-2 ${viewMode === "pan-zoom" ? "tab-active" : ""}`}
@@ -577,6 +579,16 @@ export function CouplingMetricsGrid({
           >
             <ZoomIn className="h-4 w-4" />
             <span className="hidden sm:inline">Zoom</span>
+          </button>
+          <button
+            type="button"
+            className={`tab gap-2 ${viewMode === "region" ? "tab-active" : ""}`}
+            onClick={() => setViewMode("region")}
+            title="Lock"
+            aria-label="Lock"
+          >
+            <Lock className="h-4 w-4" />
+            <span className="hidden sm:inline">Lock</span>
           </button>
         </div>
 
@@ -595,10 +607,10 @@ export function CouplingMetricsGrid({
           </div>
           <button
             onClick={() => setIsDirectionReversed((prev) => !prev)}
-            className={`btn btn-sm gap-1.5 ${isDirectionReversed ? "btn-secondary" : "btn-outline"}`}
+            className={`btn btn-sm ${isDirectionReversed ? "btn-secondary" : "btn-outline"}`}
             title={isDirectionReversed ? "Showing reverse direction" : "Showing forward direction"}
           >
-            <ArrowRightLeft className="h-3.5 w-3.5" />
+            <ArrowRightLeft data-icon="inline-start" />
             <span className="text-xs">{isDirectionReversed ? "Reverse" : "Forward"}</span>
           </button>
         </div>
@@ -627,7 +639,7 @@ export function CouplingMetricsGrid({
         className={`flex-1 relative flex justify-center ${
           viewMode === "pan-zoom"
             ? "bg-base-200/30 border-2 border-dashed border-base-300 rounded-lg"
-            : "bg-base-200/60 rounded-lg"
+            : "items-start overflow-hidden bg-base-200/60 rounded-lg"
         }`}
         style={{ padding: `${Math.max(4, padding / 4)}px` }}
       >
@@ -648,6 +660,7 @@ export function CouplingMetricsGrid({
           >
             <GridZoomControls isFullscreen={isFullscreen} className="top-12" />
             <TransformComponent
+              contentProps={panClickGuard}
               wrapperStyle={{ width: "100%", height: "100%" }}
               contentStyle={{
                 display: "flex",
@@ -659,7 +672,7 @@ export function CouplingMetricsGrid({
             </TransformComponent>
           </TransformWrapper>
         ) : (
-          gridContent
+          <LockedGridScroller>{gridContent}</LockedGridScroller>
         )}
       </div>
 
@@ -706,13 +719,16 @@ export function CouplingMetricsGrid({
 
               {/* Modal Footer */}
               <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-base-300 flex justify-between items-center">
-                <Link
-                  href={`/provenance?parameter=${encodeURIComponent(metricKey)}&qid=${encodeURIComponent(selectedCouplingInfo.couplingId)}&tab=lineage`}
-                  className="btn btn-ghost btn-sm sm:btn-md gap-1"
+                <LineageButton
+                  target={{
+                    parameterName: metricKey,
+                    qid: selectedCouplingInfo.couplingId,
+                  }}
+                  className="btn btn-ghost btn-sm sm:btn-md"
                 >
-                  <GitBranch className="h-4 w-4" />
+                  <GitBranch data-icon="inline-start" />
                   <span className="hidden sm:inline">Lineage</span>
-                </Link>
+                </LineageButton>
                 <div className="flex gap-2">
                   <button
                     type="button"

@@ -1,6 +1,15 @@
 import type { StylesConfig, GroupBase } from "react-select";
 
 /**
+ * Height of a DaisyUI field at the default (`md`) size: the same formula DaisyUI uses
+ * for `input`, `select`, and `btn`, so a React-Select control lines up with them in a row.
+ */
+export const SELECT_CONTROL_HEIGHT = "calc(var(--size-field, 0.25rem) * 10)";
+
+const baseContent = (percent: number) =>
+  `color-mix(in oklch, var(--color-base-content) ${percent}%, transparent)`;
+
+/**
  * DaisyUI-compatible theme for React-Select
  * Provides consistent styling that matches the DaisyUI design system
  */
@@ -12,53 +21,53 @@ export function getDaisySelectStyles<
   return {
     control: (provided, state) => ({
       ...provided,
-      backgroundColor: "oklch(var(--b1))",
-      borderColor: state.isFocused ? "oklch(var(--p))" : "oklch(var(--bc) / 0.2)",
-      borderRadius: "var(--rounded-btn, 0.5rem)",
-      minHeight: "2.5rem",
-      height: "2.5rem",
-      boxShadow: state.isFocused ? "0 0 0 2px oklch(var(--p) / 0.2)" : "none",
+      backgroundColor: "var(--color-base-100)",
+      borderColor: state.isFocused ? "var(--color-primary)" : "var(--color-base-300)",
+      borderRadius: "0.5rem",
+      minHeight: SELECT_CONTROL_HEIGHT,
+      // A multi-select grows with its chips; a single select keeps the field height.
+      height: state.isMulti ? "auto" : SELECT_CONTROL_HEIGHT,
+      boxShadow: "none",
       "&:hover": {
-        borderColor: "oklch(var(--bc) / 0.4)",
+        borderColor: baseContent(25),
       },
     }),
-    valueContainer: (provided) => ({
+    valueContainer: (provided, state) => ({
       ...provided,
-      padding: "0 0.75rem",
-      height: "2.5rem",
+      padding: state.isMulti ? "0.125rem 0.75rem" : "0 0.75rem",
     }),
     input: (provided) => ({
       ...provided,
       margin: 0,
       padding: 0,
-      color: "oklch(var(--bc))",
+      color: "var(--color-base-content)",
     }),
     singleValue: (provided) => ({
       ...provided,
-      color: "oklch(var(--bc))",
+      color: "var(--color-base-content)",
     }),
     placeholder: (provided) => ({
       ...provided,
-      color: "oklch(var(--bc) / 0.5)",
+      color: baseContent(50),
     }),
     indicatorsContainer: (provided) => ({
       ...provided,
-      height: "2.5rem",
+      alignSelf: "stretch",
     }),
     dropdownIndicator: (provided) => ({
       ...provided,
       padding: "0 0.5rem",
-      color: "oklch(var(--bc) / 0.5)",
+      color: baseContent(50),
       "&:hover": {
-        color: "oklch(var(--bc))",
+        color: "var(--color-base-content)",
       },
     }),
     clearIndicator: (provided) => ({
       ...provided,
       padding: "0 0.25rem",
-      color: "oklch(var(--bc) / 0.5)",
+      color: baseContent(50),
       "&:hover": {
-        color: "oklch(var(--er))",
+        color: "var(--color-error)",
       },
     }),
     indicatorSeparator: () => ({
@@ -66,9 +75,9 @@ export function getDaisySelectStyles<
     }),
     menu: (provided) => ({
       ...provided,
-      backgroundColor: "oklch(var(--b1))",
-      borderRadius: "var(--rounded-box, 0.5rem)",
-      border: "1px solid oklch(var(--bc) / 0.2)",
+      backgroundColor: "var(--color-base-100)",
+      borderRadius: "0.5rem",
+      border: `1px solid ${baseContent(20)}`,
       boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)",
       zIndex: 50,
       overflow: "hidden",
@@ -80,16 +89,16 @@ export function getDaisySelectStyles<
     option: (provided, state) => ({
       ...provided,
       backgroundColor: state.isSelected
-        ? "oklch(var(--p))"
+        ? "var(--color-primary)"
         : state.isFocused
-          ? "oklch(var(--b2))"
+          ? "var(--color-base-200)"
           : "transparent",
-      color: state.isSelected ? "oklch(var(--pc))" : "oklch(var(--bc))",
-      borderRadius: "var(--rounded-btn, 0.375rem)",
+      color: state.isSelected ? "var(--color-primary-content)" : "var(--color-base-content)",
+      borderRadius: "0.375rem",
       padding: "0.5rem 0.75rem",
       cursor: "pointer",
       "&:active": {
-        backgroundColor: state.isSelected ? "oklch(var(--p))" : "oklch(var(--b3))",
+        backgroundColor: state.isSelected ? "var(--color-primary)" : "var(--color-base-300)",
       },
     }),
     group: (provided) => ({
@@ -98,180 +107,39 @@ export function getDaisySelectStyles<
     }),
     groupHeading: (provided) => ({
       ...provided,
-      color: "oklch(var(--bc) / 0.6)",
+      color: baseContent(60),
       fontSize: "0.75rem",
       fontWeight: 500,
-      textTransform: "uppercase",
-      letterSpacing: "0.05em",
+      textTransform: "none",
       padding: "0.25rem 0.75rem",
       marginBottom: "0.25rem",
     }),
     noOptionsMessage: (provided) => ({
       ...provided,
-      color: "oklch(var(--bc) / 0.5)",
+      color: baseContent(50),
       padding: "0.75rem",
     }),
     loadingMessage: (provided) => ({
       ...provided,
-      color: "oklch(var(--bc) / 0.5)",
+      color: baseContent(50),
     }),
     multiValue: (provided) => ({
       ...provided,
-      backgroundColor: "oklch(var(--b2))",
-      borderRadius: "var(--rounded-badge, 1rem)",
+      backgroundColor: "var(--color-base-200)",
+      borderRadius: "1rem",
     }),
     multiValueLabel: (provided) => ({
       ...provided,
-      color: "oklch(var(--bc))",
+      color: "var(--color-base-content)",
       padding: "0.125rem 0.5rem",
     }),
     multiValueRemove: (provided) => ({
       ...provided,
-      color: "oklch(var(--bc) / 0.5)",
-      borderRadius: "0 var(--rounded-badge, 1rem) var(--rounded-badge, 1rem) 0",
+      color: baseContent(50),
+      borderRadius: "0 1rem 1rem 0",
       "&:hover": {
-        backgroundColor: "oklch(var(--er) / 0.2)",
-        color: "oklch(var(--er))",
-      },
-    }),
-  };
-}
-
-/**
- * Smaller variant for compact layouts
- */
-export function getDaisySelectStylesSm<
-  Option,
-  IsMulti extends boolean = false,
-  Group extends GroupBase<Option> = GroupBase<Option>,
->(): StylesConfig<Option, IsMulti, Group> {
-  return {
-    control: (provided, state) => ({
-      ...provided,
-      backgroundColor: "oklch(var(--b1))",
-      borderColor: state.isFocused ? "oklch(var(--p))" : "oklch(var(--bc) / 0.2)",
-      borderRadius: "var(--rounded-btn, 0.5rem)",
-      minHeight: "2rem",
-      height: "2rem",
-      boxShadow: state.isFocused ? "0 0 0 2px oklch(var(--p) / 0.2)" : "none",
-      "&:hover": {
-        borderColor: "oklch(var(--bc) / 0.4)",
-      },
-    }),
-    valueContainer: (provided) => ({
-      ...provided,
-      padding: "0 0.5rem",
-      height: "2rem",
-    }),
-    input: (provided) => ({
-      ...provided,
-      margin: 0,
-      padding: 0,
-      color: "oklch(var(--bc))",
-    }),
-    singleValue: (provided) => ({
-      ...provided,
-      color: "oklch(var(--bc))",
-    }),
-    placeholder: (provided) => ({
-      ...provided,
-      color: "oklch(var(--bc) / 0.5)",
-    }),
-    indicatorsContainer: (provided) => ({
-      ...provided,
-      height: "2rem",
-    }),
-    dropdownIndicator: (provided) => ({
-      ...provided,
-      padding: "0 0.375rem",
-      color: "oklch(var(--bc) / 0.5)",
-      "&:hover": {
-        color: "oklch(var(--bc))",
-      },
-    }),
-    clearIndicator: (provided) => ({
-      ...provided,
-      padding: "0 0.25rem",
-      color: "oklch(var(--bc) / 0.5)",
-      "&:hover": {
-        backgroundColor: "oklch(var(--er) / 0.2)",
-        color: "oklch(var(--er))",
-      },
-    }),
-    indicatorSeparator: () => ({
-      display: "none",
-    }),
-    menu: (provided) => ({
-      ...provided,
-      backgroundColor: "oklch(var(--b1))",
-      borderRadius: "var(--rounded-box, 0.5rem)",
-      border: "1px solid oklch(var(--bc) / 0.2)",
-      boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)",
-      zIndex: 50,
-      overflow: "hidden",
-    }),
-    menuList: (provided) => ({
-      ...provided,
-      padding: "0.25rem",
-    }),
-    option: (provided, state) => ({
-      ...provided,
-      backgroundColor: state.isSelected
-        ? "oklch(var(--p))"
-        : state.isFocused
-          ? "oklch(var(--b2))"
-          : "transparent",
-      color: state.isSelected ? "oklch(var(--pc))" : "oklch(var(--bc))",
-      borderRadius: "var(--rounded-btn, 0.375rem)",
-      padding: "0.375rem 0.5rem",
-      fontSize: "0.875rem",
-      cursor: "pointer",
-      "&:active": {
-        backgroundColor: state.isSelected ? "oklch(var(--p))" : "oklch(var(--b3))",
-      },
-    }),
-    group: (provided) => ({
-      ...provided,
-      paddingTop: "0.5rem",
-    }),
-    groupHeading: (provided) => ({
-      ...provided,
-      color: "oklch(var(--bc) / 0.6)",
-      fontSize: "0.75rem",
-      fontWeight: 500,
-      textTransform: "uppercase",
-      letterSpacing: "0.05em",
-      padding: "0.25rem 0.5rem",
-      marginBottom: "0.125rem",
-    }),
-    noOptionsMessage: (provided) => ({
-      ...provided,
-      color: "oklch(var(--bc) / 0.5)",
-      padding: "0.5rem",
-      fontSize: "0.875rem",
-    }),
-    loadingMessage: (provided) => ({
-      ...provided,
-      color: "oklch(var(--bc) / 0.5)",
-    }),
-    multiValue: (provided) => ({
-      ...provided,
-      backgroundColor: "oklch(var(--b2))",
-      borderRadius: "var(--rounded-badge, 1rem)",
-    }),
-    multiValueLabel: (provided) => ({
-      ...provided,
-      color: "oklch(var(--bc))",
-      padding: "0.125rem 0.375rem",
-      fontSize: "0.75rem",
-    }),
-    multiValueRemove: (provided) => ({
-      ...provided,
-      color: "oklch(var(--bc) / 0.5)",
-      borderRadius: "0 var(--rounded-badge, 1rem) var(--rounded-badge, 1rem) 0",
-      "&:hover": {
-        backgroundColor: "oklch(var(--er) / 0.2)",
-        color: "oklch(var(--er))",
+        backgroundColor: "color-mix(in oklch, var(--color-error) 20%, transparent)",
+        color: "var(--color-error)",
       },
     }),
   };

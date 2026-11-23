@@ -227,6 +227,29 @@ describe("EvaluationRequestModal", () => {
     expect(mutateAsync).not.toHaveBeenCalled();
   });
 
+  it("selects a prompt option by clicking anywhere on its card, keeping one native radio group", () => {
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <EvaluationRequestModal
+          isOpen
+          onClose={vi.fn()}
+          scope={scope}
+          scopeLabel="all qubits on 64Qv3"
+        />
+      </QueryClientProvider>,
+    );
+    const fixed = screen.getByRole("radio", { name: /Fixed prompt/ }) as HTMLInputElement;
+    const viaCopilot = screen.getByRole("radio", { name: /Via Copilot/ }) as HTMLInputElement;
+    expect(fixed.name).toBe(viaCopilot.name);
+    expect(fixed.checked).toBe(true);
+
+    // The description text is part of the label, so it is a click target too.
+    fireEvent.click(screen.getByText(/summarises the result and calls the evaluation itself/));
+    expect(viaCopilot.checked).toBe(true);
+    expect(fixed.checked).toBe(false);
+    expect(viaCopilot.closest("label")?.className).toContain("choice-field");
+  });
+
   it("lets the person narrow a chip-wide run to some entities", async () => {
     mutateAsync.mockResolvedValue({
       data: { run: { run_id: "evr_10" }, task_ids: ["t1"], skipped: {} },

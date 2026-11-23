@@ -1,12 +1,16 @@
 """Schema definitions for execution router."""
 
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_serializer, field_validator
 
 from qdash.common.utils.datetime import format_elapsed_time, parse_elapsed_time
+from qdash.datamodel.agent_session import AgentSessionStatus
+from qdash.datamodel.calibration_session import CalibrationSessionStatus
+from qdash.datamodel.launch_origin import ReportedLaunchOrigin
 from qdash.datamodel.task import TaskResultInputParameter, TaskResultOutputParameter
+from qdash.datamodel.task_invocation import TaskInvocation
 
 
 class ArtifactPreviewResponse(BaseModel):
@@ -70,6 +74,10 @@ class Task(BaseModel):
     end_at: datetime | None = None
     elapsed_time: timedelta | None = None
     task_type: str | None = None
+    invocation: TaskInvocation | None = Field(
+        default=None,
+        description="Planned step and call this result executed; null for older results.",
+    )
     default_view: bool = True
 
     @field_validator("elapsed_time", mode="before")
@@ -83,6 +91,75 @@ class Task(BaseModel):
     def _serialize_elapsed_time(cls, v: timedelta | None) -> str | None:
         """Serialize elapsed_time to H:MM:SS format."""
         return format_elapsed_time(v) if v else None
+
+
+class ExecutionAgentSessionLink(BaseModel):
+    """The agent session an execution belongs to, as its records establish it."""
+
+    session_id: str
+    linked: bool = Field(
+        description=(
+            "True when an action of the session dispatched this execution on the same chip; "
+            "false when only a tag names the session, which is no authority to group it"
+        )
+    )
+    action_id: str | None = None
+    status: AgentSessionStatus | None = Field(
+        default=None, description="The session's state, when the session is in this project"
+    )
+    created_by: str | None = Field(
+        default=None,
+        description=(
+            "The user who created the session and is responsible for it; set only when linked. "
+            "Answers, resumes, and commit authorizations are recorded separately in the audit"
+        ),
+    )
+    model_name: str = Field(
+        default="",
+        description=(
+            "provider/model_id the creating host reported for the session (client reported, "
+            "not verified); empty when none was reported"
+        ),
+    )
+
+
+class CalibrationSessionRef(BaseModel):
+    """A calibration session another record belongs to, read in the request's project."""
+
+    calibration_session_id: str
+    chip_id: str
+    objective: str
+    status: CalibrationSessionStatus
+
+
+class ExecutionCalibrationSessionLink(CalibrationSessionRef):
+    """The calibration session an execution belongs to, and the server record that says so.
+
+    ``via`` names the record: ``pipeline_run`` when the execution is a step of a pipeline run
+    recorded in the session (matched by project, chip, and flow run), ``agent_session`` when an
+    action of an admitted agent session of the session dispatched it. Membership says what the
+    work was for; it never says that an agent ran it.
+    """
+
+    via: Literal["pipeline_run", "agent_session"]
+    pipeline_run_id: str | None = Field(
+        default=None, description="The pipeline run, when via is pipeline_run"
+    )
+    agent_session_id: str | None = Field(
+        default=None, description="The agent session, when via is agent_session"
+    )
+
+
+_CALIBRATION_SESSION_DESCRIPTION = (
+    "The calibration session this execution belongs to, from QDash's own records: a pipeline "
+    "run recorded in it, or an action of an agent session admitted to it. Null when no record "
+    "relates it, or when records disagree on the session"
+)
+_REPORTED_ORIGIN_DESCRIPTION = (
+    "How the caller that launched this execution's pipeline said it was started, such as an "
+    "agent tool. Client reported, not verified by QDash; null when nothing was reported. The "
+    "recorded user is still the one whose sign-in started it"
+)
 
 
 class ExecutionResponseSummary(BaseModel):
@@ -114,6 +191,19 @@ class ExecutionResponseSummary(BaseModel):
     elapsed_time: timedelta | None = None
     tags: list[str]
     note: dict[str, Any]
+    agent_session: ExecutionAgentSessionLink | None = Field(
+        default=None,
+        description=(
+            "Set only when an action of an agent session dispatched this execution; a tag "
+            "alone never sets it"
+        ),
+    )
+    calibration_session: ExecutionCalibrationSessionLink | None = Field(
+        default=None, description=_CALIBRATION_SESSION_DESCRIPTION
+    )
+    reported_origin: ReportedLaunchOrigin | None = Field(
+        default=None, description=_REPORTED_ORIGIN_DESCRIPTION
+    )
 
     @field_validator("elapsed_time", mode="before")
     @classmethod
@@ -133,6 +223,9 @@ class PipelineStepProgress(BaseModel):
 
     index: int = Field(description="1-based position in the pipeline spec")
     name: str
+    step_id: str | None = Field(
+        default=None, description="Plan-scoped step id; null for transforms and older runs"
+    )
     type: str = ""
     kind: str = Field(default="calibration", description='"calibration" or "transform"')
     execution_id: str | None = Field(
@@ -201,6 +294,19 @@ class ExecutionResponseDetail(BaseModel):
         default=None,
         description="Set when this execution belongs to a pipeline run; covers every step of it",
     )
+    agent_session: ExecutionAgentSessionLink | None = Field(
+        default=None,
+        description=(
+            "The agent session whose action dispatched this execution, or the session only "
+            "its tag names (linked false); null for an execution outside agent sessions"
+        ),
+    )
+    calibration_session: ExecutionCalibrationSessionLink | None = Field(
+        default=None, description=_CALIBRATION_SESSION_DESCRIPTION
+    )
+    reported_origin: ReportedLaunchOrigin | None = Field(
+        default=None, description=_REPORTED_ORIGIN_DESCRIPTION
+    )
 
     @field_validator("elapsed_time", mode="before")
     @classmethod
@@ -223,10 +329,35 @@ class CancelExecutionResponse(BaseModel):
     message: str
 
 
-class ExecutionActivityDay(BaseModel):
-    """Executions started on one calendar day, counted by status."""
+ExecutionActivityGranularity = Literal["day", "6h"]
+"""Bucket length of the activity counts: a calendar day, or a quarter of one."""
 
-    date: str = Field(..., description="Calendar day in the requested time zone, YYYY-MM-DD")
+
+class ExecutionActivityDay(BaseModel):
+    """Executions started in one bucket (a calendar day or a 6-hour slot), counted by status."""
+
+    date: str = Field(
+        ...,
+        description=(
+            "Calendar day in the requested time zone, YYYY-MM-DD; for a 6-hour bucket, "
+            "the day the bucket starts on"
+        ),
+    )
+    start: datetime = Field(
+        ...,
+        description=(
+            "Start of the bucket, inclusive, in UTC; local midnight, or local 00:00, 06:00, "
+            "12:00, or 18:00 for a 6-hour bucket, in the requested time zone"
+        ),
+    )
+    end: datetime = Field(
+        ...,
+        description=(
+            "End of the bucket, exclusive, in UTC; the next "
+            "bucket's start. Boundaries are local wall-clock hours, so a bucket that spans a "
+            "DST change is an hour shorter or longer"
+        ),
+    )
     completed: int = 0
     failed: int = 0
     running: int = Field(0, description="Executions still in progress (running, cancelling)")
@@ -237,15 +368,29 @@ class ExecutionActivityDay(BaseModel):
 
 
 class ExecutionActivityResponse(BaseModel):
-    """Daily execution counts for a chip over a trailing window of days."""
+    """Execution counts for a chip, or a whole project, over a trailing window of days."""
 
-    chip_id: str
+    chip_id: str | None = Field(
+        ..., description="Chip the counts are for, or null when every chip in the project counts"
+    )
     days: int = Field(..., description="Length of the window in calendar days")
     timezone: str = Field(..., description="IANA time zone the days are bucketed in")
-    since: str = Field(..., description="First day of the window, YYYY-MM-DD")
-    until: str = Field(..., description="Last day of the window (today), YYYY-MM-DD")
+    granularity: ExecutionActivityGranularity = Field(
+        ...,
+        description=(
+            "Bucket length: `day` for one bucket per calendar day, `6h` for four buckets "
+            "per day starting at local 00:00, 06:00, 12:00, and 18:00"
+        ),
+    )
+    since: str = Field(..., description="Day the first bucket starts on, YYYY-MM-DD")
+    until: str = Field(..., description="Day the last bucket starts on (today), YYYY-MM-DD")
     buckets: list[ExecutionActivityDay] = Field(
-        ..., description="One entry per calendar day, oldest first, including empty days"
+        ...,
+        description=(
+            "One entry per bucket, oldest first, including empty buckets. Daily: one per "
+            "calendar day ending today. 6-hour: `days` x 4 slots ending with the slot that "
+            "contains the current time, so no bucket lies entirely in the future"
+        ),
     )
 
 

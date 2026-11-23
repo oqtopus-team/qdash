@@ -3,7 +3,6 @@
 import type { ReactNode } from "react";
 import { FlaskConical, History, MessageSquare } from "lucide-react";
 import { useCopilotChatSessionContext } from "@/contexts/CopilotChatSessionContext";
-import { ContextChip } from "@/components/features/chat/ChatThread";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/DropdownMenu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
+import { ChatStatusLine, useChatStatus } from "@/components/features/chat/ChatTurnStatus";
 
 const RECENT_LIMIT = 8;
 
@@ -43,27 +43,28 @@ export function SurfaceButton({
   );
 }
 
-/** Title of the active chat, with its result badge when it has one. */
+/**
+ * Title of the active chat, with what its turn is doing (running, waiting, reconnecting, or
+ * how it ended); its context shows above the composer.
+ */
 export function SurfaceTitle() {
   const { activeSession } = useCopilotChatSessionContext();
+  const status = useChatStatus();
   const hasMessages = Boolean(activeSession?.messages.length);
   return (
     <div className="min-w-0 flex-1">
       <div className="text-sm font-medium truncate">
-        {activeSession && hasMessages ? activeSession.title : "Ask AI"}
+        {activeSession && hasMessages ? activeSession.title : "Agent"}
       </div>
-      {activeSession?.context && hasMessages && (
-        <div className="mt-0.5">
-          <ContextChip context={activeSession.context} />
-        </div>
-      )}
+      <ChatStatusLine status={status} className="mt-0.5" />
     </div>
   );
 }
 
 /** Jump back to a recent chat without leaving the page. Full history lives on /chat. */
 export function RecentChatsMenu({ onOpenAll }: { onOpenAll: () => void }) {
-  const { sessions, activeSessionId, runs, switchSession } = useCopilotChatSessionContext();
+  const { sessions, activeSessionId, runs, detachedTurns, switchSession } =
+    useCopilotChatSessionContext();
   const recent = [...sessions].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, RECENT_LIMIT);
 
   return (
@@ -99,14 +100,14 @@ export function RecentChatsMenu({ onOpenAll }: { onOpenAll: () => void }) {
               <MessageSquare className="w-3.5 h-3.5 shrink-0 text-base-content/45" />
             )}
             <span className="truncate">{session.title}</span>
-            {session.id in runs && (
+            {(session.id in runs || session.id in (detachedTurns ?? {})) && (
               <span className="chat-pulse-dot ml-auto shrink-0" title="Answering" />
             )}
           </DropdownMenuItem>
         ))}
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={onOpenAll}>
-          <span className="text-xs text-base-content/70">View all in AI Chat</span>
+          <span className="text-xs text-base-content/70">View all in Agent</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

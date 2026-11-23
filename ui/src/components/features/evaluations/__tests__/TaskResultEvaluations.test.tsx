@@ -64,11 +64,11 @@ describe("TaskResultEvaluations", () => {
       "t1",
       expect.objectContaining({ query: expect.objectContaining({ enabled: true }) }),
     );
-    const askAi = screen.getByRole("button", { name: /Ask AI/ });
+    const askAi = screen.getByRole("button", { name: /Ask Agent/ });
     expect((askAi as HTMLButtonElement).disabled).toBe(false);
     fireEvent.click(askAi);
     // The chip page's modal, plus the chat as a third way to ask.
-    expect(screen.getByText("Ask AI", { selector: "h2, [role=heading], div" })).toBeTruthy();
+    expect(screen.getByText("Ask Agent", { selector: "h2, [role=heading], div" })).toBeTruthy();
     expect(screen.getByLabelText(/Fixed prompt/)).toBeTruthy();
     expect(screen.getByLabelText(/Via Copilot/)).toBeTruthy();
     expect(screen.getByLabelText(/Chat with Copilot/)).toBeTruthy();
@@ -97,7 +97,7 @@ describe("TaskResultEvaluations", () => {
       executionId: "e1",
       onChat,
     });
-    fireEvent.click(screen.getByRole("button", { name: /Ask AI/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Ask Agent/ }));
     fireEvent.click(screen.getByLabelText(/Chat with Copilot/));
     fireEvent.click(screen.getByRole("button", { name: /Open chat/ }));
     expect(onChat).toHaveBeenCalled();
@@ -109,7 +109,7 @@ describe("TaskResultEvaluations", () => {
     listEvaluations.mockReturnValue({ data: { data: { evaluations: [] } } });
     getTaskResult.mockReturnValue({ data: undefined });
     renderSection({ taskName: "CheckRabi", qid: "Q05", chipId: "64Qv3", executionId: "e1" });
-    fireEvent.click(screen.getByRole("button", { name: /Ask AI/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Ask Agent/ }));
     expect(screen.queryByLabelText(/Fixed prompt/)).toBeNull();
     expect(openTaskChat).toHaveBeenCalled();
   });
@@ -122,31 +122,73 @@ describe("TaskResultEvaluations", () => {
       "t1",
       expect.objectContaining({ query: expect.objectContaining({ enabled: false }) }),
     );
-    expect((screen.getByRole("button", { name: /Ask AI/ }) as HTMLButtonElement).disabled).toBe(
+    expect((screen.getByRole("button", { name: /Ask Agent/ }) as HTMLButtonElement).disabled).toBe(
       false,
     );
   });
 
-  it("keeps Ask AI disabled until the result is known", () => {
+  it("keeps Ask Agent disabled until the result is known", () => {
     listEvaluations.mockReturnValue({ data: { data: { evaluations: [] } } });
     getTaskResult.mockReturnValue({ data: undefined });
     renderSection();
-    expect((screen.getByRole("button", { name: /Ask AI/ }) as HTMLButtonElement).disabled).toBe(
+    expect((screen.getByRole("button", { name: /Ask Agent/ }) as HTMLButtonElement).disabled).toBe(
       true,
     );
   });
 
-  it("names what is missing in the Ask AI tooltip", () => {
+  it("names what is missing in the Ask Agent tooltip", () => {
     listEvaluations.mockReturnValue({ data: { data: { evaluations: [] } } });
     getTaskResult.mockReturnValue({ data: undefined });
     renderSection({ chipId: "64Qv3", taskName: "CheckRabi" });
-    expect(screen.getByRole("button", { name: /Ask AI/ }).getAttribute("title")).toBe(
+    expect(screen.getByRole("button", { name: /Ask Agent/ }).getAttribute("title")).toBe(
       "Missing qid",
     );
     cleanup();
     renderSection();
-    expect(screen.getByRole("button", { name: /Ask AI/ }).getAttribute("title")).toBe(
+    expect(screen.getByRole("button", { name: /Ask Agent/ }).getAttribute("title")).toBe(
       "Missing chip / task / qid",
     );
+  });
+});
+
+describe("TaskResultEvaluations while an evaluation is on its way", () => {
+  const known = { chipId: "64Qv3", taskName: "CheckRabi", qid: "Q05", executionId: "e1" };
+
+  it("says so while a listed evaluation is still pending or running", () => {
+    listEvaluations.mockReturnValue({
+      data: {
+        data: {
+          evaluations: [
+            { evaluation_id: "ev1", run_id: "r1", task_id: "t1", status: "running", output: null },
+          ],
+        },
+      },
+    });
+    getTaskResult.mockReturnValue({ data: undefined });
+    renderSection(known);
+
+    expect(screen.getByRole("status")).toHaveTextContent("Evaluating");
+  });
+
+  it("shows nothing extra when every evaluation has finished", () => {
+    listEvaluations.mockReturnValue({
+      data: {
+        data: {
+          evaluations: [
+            {
+              evaluation_id: "ev1",
+              run_id: "r1",
+              task_id: "t1",
+              status: "completed",
+              output: { complete: true },
+            },
+          ],
+        },
+      },
+    });
+    getTaskResult.mockReturnValue({ data: undefined });
+    renderSection(known);
+
+    expect(screen.queryByRole("status")).toBeNull();
   });
 });

@@ -21,6 +21,11 @@ when you are learning the editor or checking a new task sequence without laborat
    function marked as the flow in the source.
 6. Edit the source, then select **Save Flow**.
 
+**Save Flow** only creates a workflow. When the project already has a workflow with that name,
+including one created while you were editing, nothing is saved: the page keeps your source and
+properties and asks for another **Flow Name**. To change an existing workflow, open it and
+select **Save**, which replaces it.
+
 Selecting another template replaces the current editor contents. Choose the template before
 making source changes.
 
@@ -48,9 +53,12 @@ targets priority when both are present.
 | `exclude_qids` | Qubits to remove from a MUX selection |
 | `qids` | An explicit list of individual qubits |
 
-The current **Execute Flow** dialog does not collect MUX or qubit targets. To run or schedule a
-workflow from the application, give the template a safe default target. In **Simple Calibration**,
-add this fallback immediately before the block that creates the targets:
+For an immediate run, select targets in **Execute Flow** as described in
+[Run a Workflow](./running-calibrations.md#run-a-workflow). Changes in that dialog apply only to
+that run and do not change the saved source or schedules.
+
+For scheduled runs, give the template a safe default target. In **Simple Calibration**, add this
+fallback immediately before the block that creates the targets:
 
 ```python
 if mux_ids is None and qids is None:
@@ -68,8 +76,8 @@ before running resonator spectroscopy. The template requires `mux_ids` and runs
 **CorrectCaptureDelay** once per MUX.
 
 1. Select **Box Setup** under **TEMPLATE** and set a flow name.
-2. Set a default MUX target in the source when you plan to run it from the application. Replace
-   the template's missing-target check with:
+2. For an immediate run, select **MUX IDs** in **Execute Flow**. For scheduled runs, set a
+   default MUX target in the source by replacing the template's missing-target check with:
 
    ```python
    if mux_ids is None:
@@ -83,39 +91,101 @@ before running resonator spectroscopy. The template requires `mux_ids` and runs
 ## Choose Tasks and Execution Order
 
 The task list runs from top to bottom. Open **Tasks** in another tab to find the task names enabled
-for the active backend, then replace the default list in the template:
+for the active backend, then replace the default list in the template. In **Simple Calibration**,
+edit the default list after `else` in the `tasks=` argument of `CustomOneQubit` in the flow
+function. Keep the condition so tasks supplied at execution time still override the default:
 
 ```python
-if tasks is None:
-    tasks = [
-        "Configure",
-        "CheckT1",
-        "CheckRamsey",
-    ]
+CustomOneQubit(
+    step_name="simple_tasks",
+    tasks=tasks
+    if tasks is not None
+    else [
+        TaskCall(name="CheckRabi"),
+        TaskCall(name="CreateHPIPulse", run={"hpi_duration": 32}),
+        TaskCall(name="CheckHPIPulse"),
+    ],
+    execution_mode=execution_mode,
+),
 ```
+
+The `run={"hpi_duration": 32}` setting belongs to that `CreateHPIPulse` call only. A replacement
+list runs each call with only the settings that call sets.
 
 Keep configuration tasks and measurement tasks in their required order. A later task reads the
 calibration state produced or applied by earlier tasks.
 
-The `mode` value controls how one-qubit work is arranged:
+To run a task twice in the same step, for example a coarse and a fine Ramsey measurement, give
+each occurrence its own `call_id` and its own settings:
 
-| Mode | Behavior |
+```python
+TaskCall(name="CheckRamsey", call_id="ramsey_coarse", run={"detuning": 0.001}),
+TaskCall(name="CheckRamsey", call_id="ramsey_fine", run={"detuning": 0.0002}),
+```
+
+Each call appears as its own task in the execution, labeled with its call ID. A list of plain task
+names such as `"CheckT1"` stops the flow before it measures; see
+[Update a flow saved before task calls](#update-a-flow-saved-before-task-calls).
+
+### Choose an Execution Mode
+
+Set `execution_mode` in the source to control how qubits wait for each other. Except for
+`simultaneous_spectroscopy`, each qubit runs the whole task list independently; modes differ in
+when the next qubit starts.
+
+| Execution mode | Behavior |
 | --- | --- |
-| `scheduled` | Groups work around hardware-sharing constraints; the default for **Simple Calibration** |
-| `synchronized` | Runs the same task across the selected qubits before moving to the next task |
-| `serial` | Runs the selected work sequentially |
-| `simultaneous_spectroscopy` | Batches supported spectroscopy tasks across compatible targets |
+| `parallel_by_mux` | MUXes run in parallel and the qubits of one MUX run one after another; each MUX moves on as soon as its current qubit finishes. The default for templates such as **Simple Calibration** |
+| `parallel_by_round` | Qubits run in rounds of qubits from different MUXes; the next round starts after every qubit of the current round finishes |
+| `sequential` | One MUX and one qubit at a time |
+| `simultaneous_spectroscopy` | Experimental: each supported spectroscopy task measures a batch of qubits together |
+| `manual` | You list the rounds in `rounds`; they run exactly as written, waiting like `parallel_by_round`. See [Write Manual Execution Rounds](./manual-execution-rounds.md) |
 
-Keep the template's mode unless the procedure requires a specific ordering. The selected tasks
-must support the chosen mode and backend.
+![Three timelines on one time axis for qubits 0 and 1 on MUX 0 and qubits 8 and 9 on MUX 2. Each qubit's bar is split into its tasks: CheckRabi, then CreateHPIPulse, then CheckT1. In sequential, the qubits run one at a time in the order 0, 1, 8, 9. In parallel_by_mux, qubit 0 moves to CreateHPIPulse while qubit 8 is still on CheckRabi, and qubit 1 starts CheckRabi when qubit 0 finishes CheckT1, while qubit 8 is still on CheckT1. In parallel_by_round, qubits 0 and 8 also move through their tasks independently, but qubit 1 waits until qubit 8 finishes CheckT1, its last task, then qubits 1 and 9 start together as round 2.](/images/guides/one-qubit-execution-modes.gif)
+
+The animation uses illustrative durations. Each qubit runs CheckRabi, CreateHPIPulse, then
+CheckT1. In `parallel_by_mux`, a MUX starts its next qubit as soon as its current one finishes.
+In `parallel_by_round`, the next round waits for all qubits to finish. Neither mode synchronizes
+pulses or waits between individual tasks. All three non-spectroscopy modes use the same hardware
+stages; QDash derives their grouping and order from the chip wiring.
+
+To check these modes and the two-qubit groups below while you edit a flow, select
+**Execution help** in the workflow editor header; on a narrow screen it is in the action menu.
+The help opens over the editor and does not save or run the flow.
+
+With `<box ID>:<port>` wiring, including the QuEL-1 and QuEL-3 templates, MUXes on the same box
+can run in parallel without shared-box resource checks. Use `sequential` until your deployment
+has verified that this is safe. See
+[Check Parallel Execution on QuEL-3](./setup/qubex-backend.md#check-parallel-execution-on-quel-3)
+for wiring classification and hardware limits.
+
+Templates with an `execution_mode` parameter, such as **Simple Calibration** and **Bring-up**,
+default to `parallel_by_mux`. Steps written directly in the source, such as `CustomOneQubit`,
+`OneQubitCheck`, and `OneQubitFineTune`, default to `parallel_by_round` when `execution_mode` is
+omitted. To make a **Simple Calibration** flow run one qubit at a time, change the default in the
+flow function's parameters:
+
+```python
+execution_mode: OneQubitExecutionMode = "sequential",
+```
+
+One-qubit concurrency has no user setting: `parallel_by_mux` runs one worker per MUX in the
+current stage, and `parallel_by_round` includes at most one qubit per MUX. Each stage or round
+has 16 worker slots; additional targets wait. This software limit does not establish hardware
+capacity. To reduce concurrency, select fewer MUXes per run or use `sequential`.
+
+Keep the template's execution mode unless the procedure requires a specific ordering. The
+selected tasks must support the chosen mode and backend. A flow or pipeline that still uses the
+former names stops before it measures; see
+[Update a Flow That Uses the Former Mode Names](#update-a-flow-that-uses-the-former-mode-names).
 
 ## Schedule Two-Qubit Calibration
 
-Use **2Q Calibration** after the candidate qubits have the one-qubit calibration values
+Use **2Q Calibration from Qubits** after the candidate qubits have the one-qubit calibration values
 required by the selected tasks. CR (cross-resonance) scheduling chooses directed coupling pairs
 and groups pairs that can run together without sharing qubits or conflicting hardware.
 
-1. Open **New Flow** and choose **2Q Calibration** under **TEMPLATE**.
+1. Open **New Flow** and choose **2Q Calibration from Qubits** under **TEMPLATE**.
 2. Set a default `qids` list in the source for runs started from the application, as described in
    [Choose the Targets](#choose-the-targets). Include at least two connected qubits.
 3. Set the direction and parallelism defaults in the source using the settings below.
@@ -125,12 +195,64 @@ and groups pairs that can run together without sharing qubits or conflicting har
 | Source setting | Meaning | Default |
 | --- | --- | --- |
 | `inverse` | Reverse the selected CR direction; check that your procedure supports this direction | `False` |
-| `max_parallel_ops` | Maximum coupling pairs in one parallel group; hardware conflicts can reduce this number | `10` |
+| `max_parallel_ops` | Most coupling pairs that one group can hold; conflicts can make groups smaller | `10` |
 
-Groups run one after another. Within a group, coupling pairs can run in parallel, and each pair
-runs its task list from top to bottom. A pair can advance to its next task while another pair is
-still measuring. Pairs within one MUX are scheduled before pairs across MUXes. If no eligible pair
-remains after direction and hardware checks, scheduling fails.
+QDash splits the scheduled pairs into groups and runs the groups one after another. Two pairs go
+to different groups when they share a qubit, use the same MUX, or use MUXes that share a readout
+or control module in the chip wiring. All groups of pairs inside one MUX run before the groups of
+pairs that span two MUXes. If no eligible pair remains after direction and hardware checks,
+scheduling fails.
+
+Inside a group, each pair runs the task list from top to bottom in its own worker. A pair moves
+to its next task without waiting for the other pairs, and a pair that finishes early waits until
+every pair of its group is done; only then does the next group start.
+
+![Execution timeline of four CR schedule groups, G1 to G4, with max_parallel_ops 4 and the task list CheckCrossResonance, CreateZX90, CheckZX90, drawn on four worker lanes that later groups reuse. Each group has its own color and tag: blue G1, orange G2, teal G3, purple G4. G1 runs four pairs at once, 0 to 1, 4 to 5, 12 to 13 and 16 to 17, one per worker. The pairs move through their tasks at different rates: at one moment 0 to 1 is still on CheckCrossResonance, 12 to 13 and 16 to 17 are on CreateZX90, and 4 to 5 is on CheckZX90. 4 to 5, 12 to 13 and 16 to 17 finish first and wait for 0 to 1, the slowest pair. G2 then runs 3 to 1 and 8 to 9, G3 runs 3 to 2, and G4 runs the inter-MUX pair 7 to 10. Each group starts only after every pair of the previous group finishes.](/images/guides/two-qubit-cr-schedule.gif)
+
+The animation shows eight directed pairs grouped with `max_parallel_ops = 4`. Colors identify
+groups; outlines, hatching, and fills show pending, running, and completed tasks. Durations are
+illustrative. Pairs within a group do not synchronize pulses.
+
+This grouping is the two-qubit `execution_mode="automatic"`, the default; one-qubit steps never
+use it, and the steps of a workflow run one after another. To calibrate one pair at a time, set
+`max_parallel_ops` to `1`. To choose the groups yourself and have them checked before the run,
+use `execution_mode="manual"`; see
+[Write Two-Qubit Rounds](./manual-execution-rounds.md#write-two-qubit-rounds).
+
+`max_parallel_ops` caps group size without relaxing hardware conflicts. Pipelines accept 1–100,
+but each group has 16 worker slots, so additional pairs wait. To lower the template default
+from 10 to 4, change this parameter in the flow function:
+
+```python
+max_parallel_ops: int = 4,
+```
+
+The template passes this value to `GenerateCRSchedule(max_parallel_ops=max_parallel_ops,
+inverse=inverse)`, which builds the groups before any pair is measured. The two-qubit step that
+follows reuses those groups as they are, so a `max_parallel_ops` value set on that step does not
+change them. If a later filter removes a qubit, pairs containing that qubit are left out of the
+stored groups without regrouping the remaining pairs.
+
+To choose the directed pairs yourself and let QDash form their groups, select **2Q Automatic
+Pairs** in **New Flow**. Set `coupling_pairs` in the source, or select **Coupling pairs** in
+**Execute** for that run. `("0", "1")` and `("1", "0")` are different pairs. QDash checks each
+selected direction against the chip, adds no other pairs, and groups the selection using the
+rules above and the template's `max_parallel_ops` (10 by default). Earlier filters can remove
+pairs by removing either qubit.
+
+To write exact groups and their order, choose **2Q Manual Rounds** and follow
+[Write Two-Qubit Rounds](./manual-execution-rounds.md#write-two-qubit-rounds). Its rounds are
+validated before execution and cannot be replaced through **Execute**.
+
+Existing workflows using `SetCRSchedule` must migrate: move explicit groups into a two-qubit
+step's `rounds` with `execution_mode="manual"`, or select pairs with `CouplingTargets` for
+automatic grouping. The unchecked setter and **2Q Scheduled Calibration** template were removed.
+
+On QuEL-3, the module of a wiring ID such as `quel3-02-a01:4` is the whole box ID, so pairs whose
+MUXes use control ports of the same box, or readout ports of the same box, go to different
+groups. QDash does not compare a control port with a readout port, does not consider read-in or
+pump ports, and does not model finer QuEL-3 port independence; see
+[Check Parallel Execution on QuEL-3](./setup/qubex-backend.md#check-parallel-execution-on-quel-3).
 
 In a combined one-qubit and two-qubit workflow, filter the one-qubit results before generating
 the CR schedule so the two-qubit work uses only the remaining candidates.
@@ -139,34 +261,51 @@ How this works: [CR Gate Scheduler](../developer-guide/architecture/cr-scheduler
 
 ## Set Parameters for One Task
 
-Add `task_parameters` to the workflow's calibration service when one named task needs different
-run settings, calibration inputs, or output-saving behavior:
+Set `run`, `input`, and `update_calibration_parameters` on a `TaskCall` when one call needs
+different run settings, calibration inputs, or output-saving behavior. The settings apply to that
+call only:
 
 ```python
-from qdash.workflow import sweep
+from qdash.workflow import TaskCall, sweep
 
-task_parameters={
-    "CheckRamsey": {
-        "run": {
-            "shots": 1024,
-            "time_range": sweep.arange(0, 10_000, 100),
-        },
-        "input": {
-            "control_frequency": 7.012,
-        },
-        "update_calibration_parameters": False,
+TaskCall(
+    name="CheckRamsey",
+    run={
+        "shots": 1024,
+        "time_range": sweep.arange(0, 10_000, 100),
     },
-},
+    input={"control_frequency": 7.012},
+    update_calibration_parameters=False,
+),
 ```
 
 Values under `run` control the experiment. Use `sweep.linspace`, `sweep.logspace`,
 `sweep.arange`, or `sweep.range` for generated ranges so their construction remains visible in the
 workflow, or `sweep.values(0, 4, 16, 64)` for points you list yourself. A parameter that the task
 defines as one kind of range accepts any of these forms. Other run parameters use plain values.
-Values under `input` replace the current
-calibration input for every selected target in that task. Set `update_calibration_parameters` to
-`False` for an exploratory measurement whose outputs must remain in history without becoming the
-current calibration values.
+Values under `input` replace the current calibration input for every selected target in that call.
+Set `update_calibration_parameters` to `False` for an exploratory measurement whose outputs must
+remain in history without becoming the current calibration values.
+
+When several calls need the same settings, keep them in a variable and reuse it in each
+`TaskCall`:
+
+```python
+RAMSEY_RUN = {"shots": 1024}
+
+TaskCall(name="CheckRamsey", call_id="ramsey_coarse", run={**RAMSEY_RUN, "detuning": 0.001}),
+TaskCall(name="CheckRamsey", call_id="ramsey_fine", run={**RAMSEY_RUN, "detuning": 0.0002}),
+```
+
+Run settings that every task shares, such as `interval`, belong in the workflow's
+`default_run_parameters`.
+
+Older workflows may pass `task_parameters` or `task_run_parameters` to `CalibService` to give every
+call of a task the same settings. QDash no longer accepts them, and such a workflow fails before
+it measures, with an error that names the argument. To fix it, copy each task's settings into
+every call of that task, keeping any value the call already sets, as
+[Migrate per-task defaults](../developer-guide/workflow/task-calls.md#migrate-per-task-defaults)
+shows.
 
 QDash rejects a parameter placed in the wrong section, a parameter the task does not declare, or
 an input the task does not allow users to override. See [Task Parameters](./task-parameters.md)
@@ -187,12 +326,54 @@ An explicit input override takes priority over either value.
 Review the effective inputs in **Execution** to confirm what the later task actually used.
 How this works: [State Between Steps](../developer-guide/workflow/quickstart.md#state-between-steps).
 
+## Update a Flow Saved Before Task Calls
+
+A flow saved before task calls lists tasks by name, such as `tasks=["Configure", "CheckT1"]`, and
+stops before it measures. Edit the flow in **Workflow**:
+
+1. Add `from qdash.workflow import TaskCall` to the imports.
+2. Replace each task name with `TaskCall(name="...")`. Where the same task appears more than once
+   in one list, add a `call_id` that describes each occurrence, for example
+   `call_id="configure_readout"`.
+3. Replace `stop_on_failure_tasks=("Configure",)` with `on_failure="stop"` on the listed calls.
+4. Save the flow and run it on a small target.
+
+Check the call IDs and settings of the run in **Execution** before running the flow on more
+targets. Results recorded before the update stay readable in **Execution**; they show the task
+name without a call ID. Flows that read results by task name, filter on one call, or set
+per-occurrence settings need further edits:
+[Migrate Saved Flows](../developer-guide/workflow/task-calls.md#migrate-saved-flows).
+
+## Update a Flow That Uses the Former Mode Names
+
+The one-qubit `mode` setting was renamed to `execution_mode`, and its values were renamed. The
+former names are no longer accepted: a flow run, a step, or a calibration pipeline that uses them
+fails validation instead of running with a default.
+
+| Former | Current |
+| --- | --- |
+| `mode` parameter or pipeline step key | `execution_mode` |
+| `serial` | `sequential` |
+| `scheduled` | `parallel_by_mux` |
+| `synchronized` | `parallel_by_round` |
+
+For example, change `CustomOneQubit(..., mode="scheduled")` to
+`CustomOneQubit(..., execution_mode="parallel_by_mux")` and `{"type": "OneQubitCheck", "mode":
+"synchronized"}` to `{"type": "OneQubitCheck", "execution_mode": "parallel_by_round"}`. The
+behavior of each mode is unchanged.
+
 ## Save and Test the Workflow
 
 1. Select **Save Flow** for a new workflow. For an existing workflow, select **Edit**, make the
-   change, then select **Save**.
+   change, then select **Save**. Save formats the source in QDash's standard Python layout and
+   stores the formatted text, which the editor then shows. A source with a syntax error is not
+   formatted, and the save reports the error. To format without saving, run **Format Document**
+   from the command palette (Cmd/Ctrl+Shift+P) or press Shift+Alt+F in the editor; undo restores
+   the previous text.
 2. Confirm that **Flow saved successfully!** appears without a save error.
-3. Select **Execute** and review **Flow Name**, **Username**, **Chip ID**, and **Tags**.
+3. Select **Execute** and review **Flow Name**, **Username**, **Chip ID**, and **Tags** on
+   **Settings**. Open **Execution preview** to see the steps and rounds the saved source states;
+   see [Review the Execution Preview](./manual-execution-rounds.md#review-the-execution-preview).
 4. Confirm that no other run should use the chip. A workflow reserves the entire chip until all
    its steps finish.
 5. Select **Execute**, then open **Execution** to follow task order, status, parameters, and
@@ -205,12 +386,9 @@ How this works: [Workflow Authoring Quickstart](../developer-guide/workflow/quic
 
 ## Organize Your Workflows
 
-The **Workflow** page lists each workflow under its creator and, inside that space, under the
-folders you choose. Filing happens in the editor's **Explorer** panel, which shows one creator's
-space as `folder/name.py`; the selector at its top switches to another creator, and **Open in
-editor** on a creator's folder on the **Workflow** page opens the editor on that space. Moving a
-workflow changes only where it is listed: its name, source file, schedules, and running
-executions are untouched.
+Use the editor's **Explorer** to organize workflows within their creator's space. Its selector
+switches creators; **Open in editor** on the Workflow page opens that creator's space. Moving
+a workflow changes its listing only, preserving its name, source, schedules, and executions.
 
 - **Move a workflow**: drag its row onto a folder, or onto the empty area below the tree for the
   top of the space; or right-click it and pick a folder from **Move … to**. Dragging a folder

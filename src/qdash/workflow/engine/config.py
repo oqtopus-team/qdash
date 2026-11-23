@@ -4,10 +4,13 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from qdash.workflow.engine.task_parameters import normalize_default_run_parameters
 from qdash.workflow.paths import get_path_resolver
+
+if TYPE_CHECKING:
+    from qdash.common.mux_mapping import MuxMapping
 
 
 @dataclass
@@ -34,6 +37,13 @@ class CalibConfig:
             :mod:`qdash.workflow.engine.task_parameters`
         default_run_parameters: Shared run fallbacks in the canonical form of
             :mod:`qdash.workflow.engine.task_parameters`.
+        mux_mapping: The MUX membership the session planned this Execution with.
+            The Qubex backend rejects a layout it cannot drive, and MUX result
+            fan-out distributes to its members, so neither reads the chip
+            topology again. A chip without a topology is pinned as the legacy
+            mapping. None means no mapping was pinned: the Qubex backend
+            resolves one before connecting, and a MUX-level task fails with
+            ``MuxMappingError`` because fan-out never resolves the topology.
     """
 
     username: str
@@ -51,7 +61,6 @@ class CalibConfig:
     skip_execution: bool = False  # Isolated worker borrowing its step's Execution
     connect_backend: bool = True  # Parent may delegate all hardware work to isolated workers
     force_update_params: bool = False  # Force backend params update regardless of R² validation
-    persist_output_parameters: bool = True  # Write task outputs to calibration/backend stores
     configuration_mode: str | None = field(
         default_factory=lambda: os.environ.get("QUBEX_CONFIGURATION_MODE")
     )
@@ -59,6 +68,7 @@ class CalibConfig:
         default_factory=dict
     )  # Shared fallback run parameters for all tasks.
     task_parameters: dict[str, dict[str, Any]] = field(default_factory=dict)
+    mux_mapping: MuxMapping | None = None
 
     # Derived paths (computed after initialization)
     calib_data_path: str = field(default="", init=False)

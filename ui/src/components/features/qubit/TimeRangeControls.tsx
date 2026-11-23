@@ -35,15 +35,15 @@ export function TimeRangeControls({
             />
           </div>
           <button
-            className={`btn btn-sm mt-8 gap-2 ${isStartAtLocked ? "btn-primary" : "btn-ghost"}`}
+            className={`btn btn-sm mt-8 ${isStartAtLocked ? "btn-primary" : "btn-ghost"}`}
             onClick={onToggleStartAtLock}
             title={isStartAtLocked ? "Unlock start time" : "Lock start time"}
             disabled={disabled}
             aria-label={isStartAtLocked ? "Unlock start time" : "Lock start time"}
           >
             <svg
+              data-icon="inline-start"
               xmlns="http://www.w3.org/2000/svg"
-              className="w-4 h-4"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -72,15 +72,15 @@ export function TimeRangeControls({
             <DateTimePicker label="To" value={endAt} onChange={onEndAtChange} disabled={disabled} />
           </div>
           <button
-            className={`btn btn-sm mt-8 gap-2 ${isEndAtLocked ? "btn-primary" : "btn-ghost"}`}
+            className={`btn btn-sm mt-8 ${isEndAtLocked ? "btn-primary" : "btn-ghost"}`}
             onClick={onToggleEndAtLock}
             title={isEndAtLocked ? "Unlock end time" : "Lock end time"}
             disabled={disabled}
             aria-label={isEndAtLocked ? "Unlock end time" : "Lock end time"}
           >
             <svg
+              data-icon="inline-start"
               xmlns="http://www.w3.org/2000/svg"
-              className="w-4 h-4"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"

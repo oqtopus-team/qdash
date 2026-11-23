@@ -14,3 +14,23 @@ export function sortSchedulesByNextRun<T extends SortableSchedule>(schedules: re
     return a.flow_name.localeCompare(b.flow_name);
   });
 }
+
+type UpcomingCandidate = Pick<FlowScheduleSummary, "next_run" | "flow_name" | "active">;
+
+/**
+ * Selects the next scheduled runs in ascending start time, without mutating the input.
+ * Only active entries with a concrete future next_run are kept, so paused schedules and
+ * recurring schedule definitions without a materialized run are excluded.
+ */
+export function selectUpcomingRuns<T extends UpcomingCandidate>(
+  schedules: readonly T[],
+  limit: number,
+  now: number = Date.now(),
+): T[] {
+  const upcoming = schedules.filter((schedule) => {
+    if (!schedule.active || !schedule.next_run) return false;
+    const time = new Date(schedule.next_run).getTime();
+    return Number.isFinite(time) && time > now;
+  });
+  return sortSchedulesByNextRun(upcoming).slice(0, limit);
+}

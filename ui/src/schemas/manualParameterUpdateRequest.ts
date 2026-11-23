@@ -11,9 +11,12 @@ import type { ManualParameterUpdateRequestParameters } from './manualParameterUp
 /**
  * Request to manually correct calibration parameters from a task result.
  *
- * Corrections must reference a supported source task result, and only that
- * result's output parameters can be written. Parameters are written to the DB
- * and provenance is recorded.
+ * Corrections must reference a supported spectroscopy result, and only the
+ * operational parameters mapped for that task can be written: readout
+ * frequency and amplitude for resonator spectroscopy, control frequency and
+ * coarse control amplitude for qubit spectroscopy. Measured frequencies are
+ * never corrected by hand. Parameters are written to the DB and provenance
+ * is recorded.
  * The qid format determines target type: "0" for qubit, "0-1" for coupling.
  */
 export interface ManualParameterUpdateRequest {

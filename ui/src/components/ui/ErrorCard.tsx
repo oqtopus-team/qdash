@@ -4,6 +4,8 @@ interface ErrorCardProps {
   title?: string;
   message: string;
   onRetry?: () => void;
+  /** A retry is in flight: the button is disabled and shows progress. */
+  retrying?: boolean;
   icon?: ReactNode;
   className?: string;
 }
@@ -15,12 +17,14 @@ export function ErrorCard({
   title = "Error",
   message,
   onRetry,
+  retrying = false,
   icon,
   className = "",
 }: ErrorCardProps) {
   return (
     <div
-      className={`card bg-base-100 shadow-sm rounded-xl p-8 border border-error/20 ${className}`}
+      role="alert"
+      className={`card bg-base-100 shadow-sm p-8 border border-error/20 ${className}`}
     >
       <div className="flex flex-col items-center text-center space-y-4">
         {/* Error Icon */}
@@ -51,22 +55,31 @@ export function ErrorCard({
         {/* Retry Button */}
         {onRetry && (
           <div className="card-actions">
-            <button className="btn btn-error btn-outline gap-2" onClick={onRetry} type="button">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="w-4 h-4"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <polyline points="23 4 23 10 17 10"></polyline>
-                <polyline points="1 20 1 14 7 14"></polyline>
-                <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"></path>
-              </svg>
+            <button
+              className="btn btn-error btn-outline"
+              onClick={onRetry}
+              disabled={retrying}
+              type="button"
+            >
+              {retrying ? (
+                <span data-icon="inline-start" className="loading loading-spinner loading-xs" />
+              ) : (
+                <svg
+                  data-icon="inline-start"
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <polyline points="23 4 23 10 17 10"></polyline>
+                  <polyline points="1 20 1 14 7 14"></polyline>
+                  <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"></path>
+                </svg>
+              )}
               Try Again
             </button>
           </div>

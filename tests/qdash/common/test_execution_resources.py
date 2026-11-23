@@ -172,3 +172,116 @@ def test_unresolved_wiring_claims_whole_chip(wiring_file: Path, contents: str | 
     scope = resolve_execution_resource_scope("chip-1", {"mux_ids": [0, 4]})
     assert scope.exclusive is True
     assert scopes_conflict(scope, ExecutionResourceScope("chip-1", ("mux:9",)))
+
+
+# --------------------------------------------------------------------------
+# MUX membership comes from the chip topology, not qid // 4.
+
+
+def _explicit_mapping():
+    from qdash.common.mux_mapping import MuxMapping
+
+    # MUX 9 owns noncontiguous qubits; qid 0 is NOT on MUX 0 here.
+    return MuxMapping.from_groups({9: ["0", "17", "5", "2"], 3: ["4", "1"]})
+
+
+def _write_two_mux_wiring(wiring_file: Path) -> None:
+    wiring_file.write_text(
+        yaml.safe_dump(
+            {
+                "chip-1": [
+                    {"mux": 9, "ctrl": ["C9-0", "C9-1", "C9-2", "C9-3"], "read_out": "R9-0"},
+                    {"mux": 3, "ctrl": ["C3-0", "C3-1"], "read_out": "R3-0"},
+                    {"mux": 0, "ctrl": ["C0-0"], "read_out": "R0-0"},
+                ]
+            }
+        )
+    )
+
+
+def test_explicit_mapping_locks_the_owning_mux(wiring_file: Path) -> None:
+    _write_two_mux_wiring(wiring_file)
+    mapping = _explicit_mapping()
+
+    scope = resolve_execution_resource_scope("chip-1", {"qid": "17"}, mux_mapping=mapping)
+    coupling = resolve_execution_resource_scope("chip-1", {"qid": "0-1"}, mux_mapping=mapping)
+
+    assert {r for r in scope.resources if r.startswith("mux:")} == {"mux:9"}
+    assert "channel:R9-0" in scope.resources
+    assert {r for r in coupling.resources if r.startswith("mux:")} == {"mux:3", "mux:9"}
+    assert not scope.exclusive
+
+
+def test_explicit_mapping_is_conservative_for_unknown_targets(wiring_file: Path) -> None:
+    _write_two_mux_wiring(wiring_file)
+    mapping = _explicit_mapping()
+
+    # qid 8 is in no MUX; MUX 0 is wired but not in the topology.
+    assert resolve_execution_resource_scope("chip-1", {"qid": "8"}, mux_mapping=mapping).exclusive
+    assert resolve_execution_resource_scope(
+        "chip-1", {"mux_ids": [0]}, mux_mapping=mapping
+    ).exclusive
+
+
+def test_slot_without_control_port_claims_the_chip(wiring_file: Path) -> None:
+    from qdash.common.mux_mapping import MuxMapping
+
+    _write_two_mux_wiring(wiring_file)
+    mapping = MuxMapping.from_groups({3: ["4", "1", "6"]})
+
+    assert resolve_execution_resource_scope("chip-1", {"qid": "4"}, mux_mapping=mapping).exclusive
+
+
+def test_project_scoped_lookup_failure_claims_the_chip(
+    wiring_file: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from qdash.common.mux_mapping import MuxMappingError
+
+    _write_two_mux_wiring(wiring_file)
+
+    def unresolved(_project_id: str, _chip_id: str):
+        raise MuxMappingError("Topology 'gone' not found")
+
+    monkeypatch.setattr(execution_resources, "resolve_chip_mux_mapping", unresolved)
+
+    scope = resolve_execution_resource_scope("chip-1", {"qid": "0"}, project_id="project-1")
+
+    assert scope.exclusive
+
+
+def test_project_scoped_lookup_uses_the_chip_topology(
+    wiring_file: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_two_mux_wiring(wiring_file)
+    calls: list[tuple[str, str]] = []
+
+    def resolved(project_id: str, chip_id: str):
+        calls.append((project_id, chip_id))
+        return _explicit_mapping()
+
+    monkeypatch.setattr(execution_resources, "resolve_chip_mux_mapping", resolved)
+
+    scope = resolve_execution_resource_scope("chip-1", {"qid": "2"}, project_id="project-1")
+
+    assert calls == [("project-1", "chip-1")]
+    assert {r for r in scope.resources if r.startswith("mux:")} == {"mux:9"}
+
+
+def test_standalone_targets_reserve_the_whole_chip(wiring_file: Path) -> None:
+    """Wiring maps only MUXes, so a standalone qubit's hardware sharing is unknown."""
+    from qdash.common.mux_mapping import MuxMapping
+
+    _write_two_mux_wiring(wiring_file)
+    mapping = MuxMapping.from_groups(
+        {9: ["0", "17", "5", "2"], 3: ["4", "1"]}, known_qids=["0", "1", "2", "4", "5", "8", "17"]
+    )
+
+    standalone = resolve_execution_resource_scope("chip-1", {"qid": "8"}, mux_mapping=mapping)
+    mixed = resolve_execution_resource_scope("chip-1", {"qids": ["17", "8"]}, mux_mapping=mapping)
+    coupling = resolve_execution_resource_scope("chip-1", {"qid": "8-17"}, mux_mapping=mapping)
+    muxed = resolve_execution_resource_scope("chip-1", {"qids": ["17", "4"]}, mux_mapping=mapping)
+
+    assert standalone.exclusive and mixed.exclusive and coupling.exclusive
+    # A standalone run conflicts with any MUX work on the chip, and vice versa.
+    assert scopes_conflict(standalone, muxed)
+    assert not muxed.exclusive

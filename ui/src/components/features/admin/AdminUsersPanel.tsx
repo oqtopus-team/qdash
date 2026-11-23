@@ -2,6 +2,8 @@
 
 import type { UserListItem } from "@/schemas";
 
+import { UserAvatar } from "@/components/ui/UserAvatar";
+
 type UserRoleFilter = "all" | "admin" | "user";
 type UserProjectFilter = "all" | "with" | "without";
 
@@ -161,7 +163,7 @@ export function AdminUsersPanel({
                 disabled={bulkAction !== null || bulkProjectCandidates.length === 0}
               >
                 {bulkAction === "create-project" ? (
-                  <span className="loading loading-spinner loading-xs" />
+                  <span data-icon="inline-start" className="loading loading-spinner loading-xs" />
                 ) : null}
                 Create Default Projects
               </button>
@@ -180,7 +182,7 @@ export function AdminUsersPanel({
         )}
 
         <div className="space-y-3 sm:hidden">
-          <label className="flex items-center gap-3 rounded-box border border-base-300 bg-base-100 px-3 py-2">
+          <label className="choice-field gap-3 rounded-box border border-base-300 bg-base-100 px-3 py-2">
             <input
               type="checkbox"
               className="checkbox checkbox-sm"
@@ -199,12 +201,14 @@ export function AdminUsersPanel({
                     <input
                       type="checkbox"
                       className="checkbox checkbox-sm mt-1"
+                      aria-label={`Select ${userItem.username}`}
                       checked={selectedUsernames.includes(userItem.username)}
                       disabled={!isUserSelectable(userItem, currentUsername)}
                       onChange={() => onToggleUserSelection(userItem.username)}
                     />
-                    <div>
-                      <h3 className="font-mono font-medium">{userItem.username}</h3>
+                    <UserAvatar username={userItem.username} size={28} />
+                    <div className="min-w-0">
+                      <h3 className="font-mono font-medium break-all">{userItem.username}</h3>
                       <p className="text-sm text-base-content/60">{userItem.display_name || "-"}</p>
                       <p className="text-xs text-base-content/50">
                         {userItem.organization || "No organization"}
@@ -264,6 +268,7 @@ export function AdminUsersPanel({
                   <input
                     type="checkbox"
                     className="checkbox checkbox-sm"
+                    aria-label="Select all removable users in view"
                     checked={allSelectableUsersSelected}
                     onChange={onToggleSelectAll}
                     disabled={selectableFilteredUsersCount === 0}
@@ -285,12 +290,18 @@ export function AdminUsersPanel({
                     <input
                       type="checkbox"
                       className="checkbox checkbox-sm"
+                      aria-label={`Select ${userItem.username}`}
                       checked={selectedUsernames.includes(userItem.username)}
                       disabled={!isUserSelectable(userItem, currentUsername)}
                       onChange={() => onToggleUserSelection(userItem.username)}
                     />
                   </td>
-                  <td className="font-mono">{userItem.username}</td>
+                  <td>
+                    <div className="flex items-center gap-2">
+                      <UserAvatar username={userItem.username} size={24} />
+                      <span className="font-mono">{userItem.username}</span>
+                    </div>
+                  </td>
                   <td>{userItem.display_name || "-"}</td>
                   <td>{userItem.organization || "-"}</td>
                   <td>

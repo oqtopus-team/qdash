@@ -6,6 +6,7 @@ import {
   ReactFlow,
   Background,
   Controls,
+  ControlButton,
   Handle,
   Position,
   ReactFlowProvider,
@@ -14,6 +15,7 @@ import {
   useReactFlow,
 } from "@xyflow/react";
 import dagre from "dagre";
+import { Lock, LockOpen } from "lucide-react";
 
 import type { Node, Edge, NodeProps, NodeTypes } from "@xyflow/react";
 
@@ -42,46 +44,26 @@ interface TaskNode {
   output_parameters?: Record<string, unknown>;
 }
 
-const getStatusStyles = (status: string) => {
+/** Status classes use the theme's semantic colors so nodes stay readable on every theme. */
+export const getStatusClasses = (status: string): string => {
   switch (status) {
     case "running":
-      return {
-        background: "hsl(198 93% 60% / 0.1)",
-        borderColor: "hsl(198 93% 60%)",
-        color: "hsl(198 93% 60%)",
-      };
+      return "border-info bg-info/10 text-info";
     case "completed":
-      return {
-        background: "hsl(142 71% 45% / 0.1)",
-        borderColor: "hsl(142 71% 45%)",
-        color: "hsl(142 71% 45%)",
-      };
+      return "border-success bg-success/10 text-success";
     case "scheduled":
-      return {
-        background: "hsl(48 96% 53% / 0.1)",
-        borderColor: "hsl(48 96% 53%)",
-        color: "hsl(48 96% 53%)",
-      };
+      return "border-warning bg-warning/10 text-warning";
     case "failed":
-      return {
-        background: "hsl(0 91% 71% / 0.1)",
-        borderColor: "hsl(0 91% 71%)",
-        color: "hsl(0 91% 71%)",
-      };
+      return "border-error bg-error/10 text-error";
     case "cancelled":
-      return {
-        background: "hsl(220 9% 46% / 0.1)",
-        borderColor: "hsl(220 9% 46%)",
-        color: "hsl(220 9% 46%)",
-      };
+      return "border-base-content/40 bg-base-content/5 text-base-content/60";
     default:
-      return {
-        background: "hsl(220 13% 91%)",
-        borderColor: "hsl(220 13% 91%)",
-        color: "hsl(220 9% 46%)",
-      };
+      return "border-base-300 bg-base-200 text-base-content/60";
   }
 };
+
+/** Edge stroke and arrow follow the theme's content color. */
+export const EDGE_COLOR = "color-mix(in oklch, var(--color-base-content) 45%, transparent)";
 
 interface NodeData extends Record<string, unknown> {
   name: string;
@@ -96,20 +78,10 @@ const CustomNode = ({ data }: NodeProps) => {
   const nodeData = data as NodeData;
   return (
     <div
-      className={`group relative cursor-pointer rounded-lg border px-4 shadow-lg transition-shadow ${
-        nodeData.isSelected ? "ring-2 ring-primary ring-offset-2 ring-offset-base-200" : ""
-      }`}
+      className={`group relative flex h-[60px] min-w-[150px] max-w-[300px] cursor-pointer flex-col justify-center rounded-[var(--radius-field)] border-2 px-4 shadow-xs ${getStatusClasses(
+        nodeData.status,
+      )} ${nodeData.isSelected ? "ring-2 ring-primary ring-offset-2 ring-offset-base-200" : ""}`}
       aria-current={nodeData.isSelected ? "true" : undefined}
-      style={{
-        ...getStatusStyles(nodeData.status),
-        borderWidth: "2px",
-        minWidth: "150px",
-        maxWidth: "300px",
-        height: "60px", // Fixed height
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "center",
-      }}
     >
       <Handle type="target" position={Position.Left} />
       <div className="font-medium truncate">{nodeData.name}</div>
@@ -134,8 +106,10 @@ interface ExecutionDAGProps {
 }
 
 /**
- * React Flow canvas for the execution graph. Starts locked so the page scrolls normally;
- * the Controls lock button toggles pan, zoom and node dragging.
+ * React Flow canvas for the execution graph. Starts unlocked with pan and zoom enabled;
+ * the Controls lock button locks or unlocks pan and zoom. Locking resets the view to the default
+ * fitted view and hides the Controls zoom and fit buttons so it stays there. Nodes stay at their
+ * computed layout: they cannot be dragged, so dragging on a node pans the canvas.
  */
 function FlowContent({
   nodes,
@@ -151,27 +125,52 @@ function FlowContent({
   isPreviewOpen: boolean;
 }) {
   const { fitView } = useReactFlow();
-  const [isLocked, setIsLocked] = useState(true);
+  const [isLocked, setIsLocked] = useState(false);
 
-  // Re-fit whenever the container size (fullscreen toggle) changes.
+  // Unlocked, the viewport is the user's pan/zoom: only the locked canvas refits when its
+  // container size changes, so the user's view survives fullscreen and preview toggles.
+  const isLockedRef = useRef(isLocked);
   useEffect(() => {
+    isLockedRef.current = isLocked;
+  }, [isLocked]);
+
+  // Fit once on mount, then re-fit the locked canvas whenever fullscreen changes its size.
+  // The ref is set when the fit runs so a cancelled frame (Strict Mode re-run) is retried.
+  const fittedFullscreen = useRef<boolean | null>(null);
+  useEffect(() => {
+    if (fittedFullscreen.current === isFullscreen) return;
+    if (fittedFullscreen.current !== null && !isLockedRef.current) {
+      fittedFullscreen.current = isFullscreen;
+      return;
+    }
     const frame = requestAnimationFrame(() => {
+      fittedFullscreen.current = isFullscreen;
       fitView({ ...FIT_VIEW_OPTIONS, duration: 0 });
     });
     return () => cancelAnimationFrame(frame);
   }, [isFullscreen, fitView]);
 
   // The canvas gives up width to the preview sidebar with a CSS transition; once that has
-  // finished, glide the graph into the space that is left. The initial fit is handled above.
+  // finished, glide the locked graph into the space that is left. The time the transition settles
+  // is kept so that locking mid-transition still fits the final width: the lock button fits the
+  // intermediate width at once, and this effect fits again when the transition ends. Unlocking
+  // re-runs the effect, so its cleanup cancels a pending fit that would otherwise reset the
+  // user's new viewport.
   const previousPreviewOpen = useRef(isPreviewOpen);
+  const previewSettlesAt = useRef(0);
   useEffect(() => {
-    if (previousPreviewOpen.current === isPreviewOpen) return;
-    previousPreviewOpen.current = isPreviewOpen;
+    if (previousPreviewOpen.current !== isPreviewOpen) {
+      previousPreviewOpen.current = isPreviewOpen;
+      previewSettlesAt.current = Date.now() + PREVIEW_TRANSITION_MS + 50;
+    }
+    if (!isLocked) return;
+    const delay = previewSettlesAt.current - Date.now();
+    if (delay <= 0) return;
     const timer = setTimeout(() => {
       fitView({ ...FIT_VIEW_OPTIONS, duration: PREVIEW_TRANSITION_MS });
-    }, PREVIEW_TRANSITION_MS + 50);
+    }, delay);
     return () => clearTimeout(timer);
-  }, [isPreviewOpen, fitView]);
+  }, [isPreviewOpen, isLocked, fitView]);
 
   return (
     <ReactFlow
@@ -188,46 +187,69 @@ function FlowContent({
       zoomOnPinch={!isLocked}
       zoomOnDoubleClick={!isLocked}
       preventScrolling={!isLocked}
-      nodesDraggable={!isLocked}
+      nodesDraggable={false}
       nodesConnectable={false}
-      elementsSelectable={!isLocked}
+      elementsSelectable={false}
       defaultEdgeOptions={{
         type: "smoothstep",
-        animated: true,
         style: { strokeWidth: 2 },
         markerEnd: {
           type: MarkerType.ArrowClosed,
-          color: "#64748b",
+          color: EDGE_COLOR,
         },
       }}
       fitViewOptions={FIT_VIEW_OPTIONS}
       onNodeClick={(_, node) => onSelectTask(node.id)}
     >
       <Background />
-      <Controls showInteractive onInteractiveChange={(interactive) => setIsLocked(!interactive)} />
+      <Controls
+        showInteractive={false}
+        showZoom={!isLocked}
+        showFitView={!isLocked}
+        fitViewOptions={FIT_VIEW_OPTIONS}
+      >
+        <ControlButton
+          onClick={() => {
+            if (!isLocked) {
+              fitView({ ...FIT_VIEW_OPTIONS, duration: 0 });
+            }
+            setIsLocked(!isLocked);
+          }}
+          title={isLocked ? "Unlock view" : "Lock view"}
+          aria-label={isLocked ? "Unlock view" : "Lock view"}
+        >
+          {isLocked ? (
+            <Lock size={12} style={{ fill: "none" }} />
+          ) : (
+            <LockOpen size={12} style={{ fill: "none" }} />
+          )}
+        </ControlButton>
+      </Controls>
       <Panel position="top-left" className="bg-base-100 p-2 rounded flex items-center gap-2">
         <div className="text-sm">Select a node to preview its result</div>
-        <button
-          type="button"
-          onClick={() => fitView({ ...FIT_VIEW_OPTIONS, duration: 300 })}
-          className="btn btn-sm btn-ghost"
-          title="Fit to view"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="h-4 w-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
+        {!isLocked && (
+          <button
+            type="button"
+            onClick={() => fitView({ ...FIT_VIEW_OPTIONS, duration: 300 })}
+            className="btn btn-sm btn-ghost"
+            title="Fit to view"
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M4 8V4m0 0h4M4 4l5 5m11-1V4m-4 0h4m0 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"
-            />
-          </svg>
-        </button>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 8V4m0 0h4M4 4l5 5m11-1V4m-4 0h4m0 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"
+              />
+            </svg>
+          </button>
+        )}
       </Panel>
     </ReactFlow>
   );
@@ -277,8 +299,7 @@ export function ExecutionDAG({ tasks }: ExecutionDAGProps) {
         source: task.upstream_id,
         target: task.task_id,
         type: "smoothstep",
-        animated: true,
-        style: { stroke: "#64748b", strokeWidth: 2 },
+        style: { stroke: EDGE_COLOR, strokeWidth: 2 },
       }));
 
     // Add nodes and edges to dagre graph

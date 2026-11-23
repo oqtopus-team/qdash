@@ -20,7 +20,11 @@ interface PageContainerProps {
  */
 export function PageContainer({ children, className = "", maxWidth = false }: PageContainerProps) {
   return (
-    <div className={`w-full min-h-screen bg-base-100/50 px-4 md:px-6 py-6 md:py-8 ${className}`}>
+    // The right gutter widens to `--agent-tab-inset` while the layout's Ask Agent tab floats
+    // over that edge; max() keeps it from adding to the usual gutter.
+    <div
+      className={`w-full min-h-screen bg-base-100/50 pl-4 pr-[max(1rem,var(--agent-tab-inset,0px))] md:pl-6 md:pr-[max(1.5rem,var(--agent-tab-inset,0px))] py-6 md:py-8 ${className}`}
+    >
       {maxWidth ? <div className="max-w-[1600px] mx-auto">{children}</div> : children}
     </div>
   );

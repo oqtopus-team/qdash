@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { ChipConfigResultBackend } from './chipConfigResultBackend';
+import type { ChipConfigResultPreset } from './chipConfigResultPreset';
 import type { ChipConfigResultSourceSystemId } from './chipConfigResultSourceSystemId';
 import type { ChipConfigResultStatus } from './chipConfigResultStatus';
 
@@ -17,6 +18,7 @@ export interface ChipConfigResult {
   path: string;
   source_system_id?: ChipConfigResultSourceSystemId;
   backend?: ChipConfigResultBackend;
+  preset?: ChipConfigResultPreset;
   files?: string[];
   message?: string;
 }

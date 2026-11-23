@@ -34,6 +34,7 @@ if "prefect" not in sys.modules:
     sys.modules["prefect.client.schemas.actions"] = MagicMock()
     sys.modules["prefect.client.schemas.filters"] = MagicMock()
     sys.modules["prefect.client.schemas.schedules"] = MagicMock()
+    sys.modules["prefect.client.schemas.sorting"] = MagicMock()
     sys.modules["prefect.deployments"] = MagicMock()
     sys.modules["prefect.exceptions"] = MagicMock()
     sys.modules["prefect.states"] = MagicMock()
@@ -65,12 +66,24 @@ os.environ["SLACK_BOT_TOKEN"] = "test-token"  # noqa: S105
 os.environ["SLACK_CHANNEL_ID"] = "test-channel"
 os.environ["SLACK_FORUM_NOTIFICATION"] = "false"
 os.environ["SLACK_FORUM_CHANNEL_ID"] = ""
+os.environ["SLACK_AGENT_NOTIFICATION"] = "false"
+os.environ["SLACK_AGENT_CHANNEL_ID"] = ""
 os.environ.setdefault("POSTGRES_DATA_PATH", "/tmp/postgres")
 os.environ.setdefault("MONGO_DATA_PATH", "/tmp/mongo")
 os.environ.setdefault("CALIB_DATA_PATH", "/tmp/calib")
 os.environ.setdefault("QPU_DATA_PATH", "/tmp/qpu")
 os.environ["SLACK_APP_TOKEN"] = "test-app-token"  # noqa: S105
 os.environ.setdefault("OPENAI_API_KEY", "test-openai-key")
+# Tests read the default Copilot model files unless they select a profile.
+os.environ.pop("QDASH_COPILOT_PROFILE", None)
+
+# Qubex fitting helpers call ``fig.show()`` by default. Where a browser is discoverable (a
+# desktop host or an inherited ``BROWSER``), Plotly's default renderer serves the figure from
+# a one-shot local HTTP server and blocks until a browser fetches it, which can stall a run
+# indefinitely. Tests never display figures, so no renderer is active.
+import plotly.io as _plotly_io  # noqa: E402
+
+_plotly_io.renderers.default = ""
 
 
 def _patched_command(self: Any, command: dict[str, Any] | str, **kwargs: Any) -> dict[str, Any]:

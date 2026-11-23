@@ -7,4 +7,7 @@
  */
 import type { NumericBounds } from './numericBounds';
 
+/**
+ * Legacy session-wide quality gates: metric name -> bounds checked on every candidate of every task. Kept so sessions approved before task_quality_gates keep their exact meaning; a new session must leave it empty and use task_quality_gates.
+ */
 export type AgentSessionPolicyQualityGates = {[key: string]: NumericBounds};

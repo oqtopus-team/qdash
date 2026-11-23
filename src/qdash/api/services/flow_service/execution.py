@@ -88,7 +88,7 @@ class ExecutionCoordinator:
         scope = (
             resolve_workflow_resource_scope(chip_id)
             if workflow
-            else resolve_execution_resource_scope(chip_id, parameters)
+            else resolve_execution_resource_scope(chip_id, parameters, project_id=project_id)
         )
         if self._locks.has_conflict(project_id, scope):
             return False, _WHOLE_CHIP_REASON if workflow else _SCOPED_CONFLICT_REASON
@@ -105,6 +105,7 @@ class ExecutionCoordinator:
         parameters: dict[str, Any],
         tags: list[str] | None = None,
         workflow: bool = False,
+        context: dict[str, Any] | None = None,
     ) -> DispatchResult:
         """Dispatch a run that owns the execution lock until the flow adopts it."""
         claimed_execution_id = self._claim(
@@ -119,6 +120,7 @@ class ExecutionCoordinator:
             flow_run_id = await self._prefect.create_flow_run(
                 deployment_id=deployment_id,
                 parameters=parameters,
+                **({"context": context} if context else {}),
             )
         except Exception as exc:
             # Nothing reached Prefect, so the flow will never adopt the lock.
@@ -140,9 +142,9 @@ class ExecutionCoordinator:
         settings = get_settings()
         return DispatchResult(
             flow_run_id=flow_run_id,
-            flow_run_url=_flow_run_url(settings.prefect_port, flow_run_id),
+            flow_run_url=_flow_run_url(settings.public_url, flow_run_id),
             execution_id=execution_id,
-            qdash_ui_url=_qdash_ui_url(settings.ui_port, chip_id, execution_id),
+            qdash_ui_url=_qdash_ui_url(settings.public_url, chip_id, execution_id),
         )
 
     async def dispatch_background(
@@ -194,7 +196,7 @@ class ExecutionCoordinator:
         scope = (
             resolve_workflow_resource_scope(chip_id)
             if workflow
-            else resolve_execution_resource_scope(chip_id, parameters)
+            else resolve_execution_resource_scope(chip_id, parameters, project_id=project_id)
         )
         if not self._locks.try_lock(
             project_id=project_id,
@@ -246,7 +248,7 @@ class ExecutionCoordinator:
         Pre-creation is deliberately best effort: the Prefect flow run has
         already been created by the time this runs, and a bookkeeping failure
         here is not a reason to cancel a healthy calibration. On failure the
-        run is left going and ``CalibService._initialize()`` allocates an
+        run is left going and the worker's calibration session allocates an
         execution ID of its own at flow start, exactly as it does for runs that
         never went through the API (cron schedules). Callers fall back to the
         flow run ID for the response, so the only thing lost is the
@@ -291,14 +293,14 @@ class ExecutionCoordinator:
             return None
 
 
-def _flow_run_url(prefect_port: int, flow_run_id: str) -> str:
-    """Build the Prefect UI URL of a flow run."""
-    return f"http://localhost:{prefect_port}/runs/flow-run/{flow_run_id}"
+def _flow_run_url(public_url: str, flow_run_id: str) -> str:
+    """Build the Prefect UI URL of a flow run, served under /prefect of the QDash URL."""
+    return f"{public_url}/prefect/runs/flow-run/{flow_run_id}"
 
 
-def _qdash_ui_url(ui_port: int, chip_id: str | None, execution_id: str | None) -> str:
+def _qdash_ui_url(public_url: str, chip_id: str | None, execution_id: str | None) -> str:
     """Build the QDash UI URL of an execution."""
-    base = f"http://localhost:{ui_port}/execution"
+    base = f"{public_url}/execution"
     if not chip_id:
         return base
     if not execution_id:

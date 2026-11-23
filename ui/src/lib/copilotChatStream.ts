@@ -2,13 +2,27 @@
  * Pure helpers that fold Copilot SSE events into a live transcript.
  */
 
-import type { ChatTrace, LiveTurn, ToolEvaluation, TraceStep } from "@/types/copilotChat";
+import type {
+  ChatTrace,
+  ContentBlock,
+  CreatedCalibrationSession,
+  LiveTurn,
+  ToolClassification,
+  ToolEvaluation,
+  TraceStep,
+} from "@/types/copilotChat";
 
 // Bound what a single message adds to the stored session document.
 const MAX_PERSISTED_THINKING = 20_000;
 const MAX_PERSISTED_ARGS = 4_000;
 const MAX_PERSISTED_PROMPT = 12_000;
 const MAX_PERSISTED_OUTPUT = 2_000;
+/**
+ * Room for the full arguments of an answer's finished `write` calls, shared by
+ * them in order, so the chat can offer the written content after a reload. A
+ * write that does not fit is cut to `MAX_PERSISTED_ARGS` like any other call.
+ */
+const MAX_PERSISTED_WRITE_ARGS = 64_000;
 
 function closeThinking(steps: TraceStep[], now: number): TraceStep[] {
   return steps.map((step) =>
@@ -153,6 +167,65 @@ function toolEvaluation(value: unknown): ToolEvaluation | undefined {
   };
 }
 
+const CLASSIFICATION_OUTCOMES = new Set<ToolClassification["outcome"]>([
+  "classified",
+  "ambiguous",
+  "failed",
+]);
+
+const isProbability = (value: unknown): value is number =>
+  typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1;
+
+/** The classifier decision of a tool_end payload (classify), when it is well-formed. */
+function toolClassification(value: unknown): ToolClassification | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const { classifier, outcome, category, probability, margin, probabilities, reason } =
+    value as Record<string, unknown>;
+  if (typeof classifier !== "string" || !classifier) return undefined;
+  if (!CLASSIFICATION_OUTCOMES.has(outcome as ToolClassification["outcome"])) return undefined;
+  const ranked = Array.isArray(probabilities)
+    ? probabilities.flatMap((entry) => {
+        if (!entry || typeof entry !== "object") return [];
+        const { category: name, probability: p } = entry as Record<string, unknown>;
+        return typeof name === "string" && name && isProbability(p)
+          ? [{ category: name, probability: p }]
+          : [];
+      })
+    : [];
+  return {
+    classifier,
+    outcome: outcome as ToolClassification["outcome"],
+    ...(typeof category === "string" && category ? { category } : {}),
+    ...(isProbability(probability) ? { probability } : {}),
+    ...(typeof margin === "number" && Number.isFinite(margin) ? { margin } : {}),
+    ...(ranked.length ? { probabilities: ranked } : {}),
+    ...(typeof reason === "string" && reason ? { reason } : {}),
+  };
+}
+
+/** Tool whose successful result names the calibration session it created. */
+export const CREATE_CALIBRATION_SESSION_TOOL = "qdash_create_calibration_session";
+const CALIBRATION_SESSION_ID = /^[A-Za-z0-9_.:-]{1,200}$/;
+
+/**
+ * The calibration session of a tool_end payload: only for a successful
+ * `qdash_create_calibration_session` call, and only when well-formed.
+ */
+function createdCalibrationSession(
+  tool: string,
+  isError: boolean,
+  value: unknown,
+): CreatedCalibrationSession | undefined {
+  if (isError || tool !== CREATE_CALIBRATION_SESSION_TOOL) return undefined;
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const { calibration_session_id: id, chip_id: chipId } = value as Record<string, unknown>;
+  if (typeof id !== "string" || !CALIBRATION_SESSION_ID.test(id)) return undefined;
+  return {
+    calibrationSessionId: id,
+    ...(typeof chipId === "string" && chipId ? { chipId } : {}),
+  };
+}
+
 export function endTool(
   steps: TraceStep[],
   payload: {
@@ -161,23 +234,46 @@ export function endTool(
     is_error?: boolean;
     figures?: unknown;
     evaluation?: unknown;
+    classification?: unknown;
+    calibration_session?: unknown;
     output?: unknown;
     exit_code?: unknown;
   },
 ): TraceStep[] {
-  // Match by call id; fall back to the oldest running call of that tool.
-  const idx =
-    payload.id != null
-      ? steps.findIndex((s) => s.kind === "tool" && s.id === payload.id)
-      : steps.findIndex(
-          (s) => s.kind === "tool" && s.tool === payload.tool && s.status === "running",
-        );
+  // Match by call id, preferring the call of that id still running: a local model
+  // may give every call of a turn the same id. Without an id, the oldest running
+  // call of that tool.
+  let idx = -1;
+  if (payload.id != null) {
+    for (let i = steps.length - 1; i >= 0; i--) {
+      const s = steps[i];
+      if (s.kind === "tool" && s.id === payload.id && s.status === "running") {
+        idx = i;
+        break;
+      }
+    }
+    if (idx === -1) idx = steps.findIndex((s) => s.kind === "tool" && s.id === payload.id);
+  } else {
+    idx = steps.findIndex(
+      (s) => s.kind === "tool" && s.tool === payload.tool && s.status === "running",
+    );
+  }
   const step = steps[idx];
   if (!step || step.kind !== "tool") return steps;
   const figures = Array.isArray(payload.figures)
     ? payload.figures.filter((p): p is string => typeof p === "string" && p.length > 0)
     : [];
   const evaluation = toolEvaluation(payload.evaluation);
+  const classification = toolClassification(payload.classification);
+  // Both the call that started and the result must be the create tool's.
+  const calibrationSession =
+    step.tool === payload.tool
+      ? createdCalibrationSession(
+          payload.tool,
+          payload.is_error === true,
+          payload.calibration_session,
+        )
+      : undefined;
   const next = [...steps];
   next[idx] = {
     ...step,
@@ -185,6 +281,8 @@ export function endTool(
     endedAt: Date.now(),
     ...(figures.length ? { figures } : {}),
     ...(evaluation ? { evaluation } : {}),
+    ...(classification ? { classification } : {}),
+    ...(calibrationSession ? { calibrationSession } : {}),
     ...(typeof payload.output === "string" && payload.output ? { output: payload.output } : {}),
     ...(typeof payload.exit_code === "number" ? { exitCode: payload.exit_code } : {}),
   };
@@ -198,7 +296,36 @@ export function answerStartIndex(steps: TraceStep[]): number {
   return i;
 }
 
-export function streamedAnswer(turn: LiveTurn): string {
+/**
+ * A `ui` SSE event: the block a `render_ui` call produced, added to the turn
+ * as soon as its tool finished. The API sends a text block instead when the
+ * runtime's payload was malformed but had a fallback.
+ */
+export function appendLiveBlock(turn: LiveTurn, payload: unknown): LiveTurn {
+  if (!payload || typeof payload !== "object") return turn;
+  const block = payload as Partial<ContentBlock>;
+  if (block.type === "ui" && block.ui && typeof block.ui === "object") {
+    return { ...turn, blocks: [...(turn.blocks ?? []), block as ContentBlock] };
+  }
+  if (block.type === "text" && typeof block.content === "string" && block.content) {
+    return {
+      ...turn,
+      blocks: [...(turn.blocks ?? []), { type: "text", content: block.content, chart: null }],
+    };
+  }
+  return turn;
+}
+
+/** The blocks kept when the user stops a turn: finished UI blocks, then the text so far. */
+export function stoppedBlocks(turn: LiveTurn): ContentBlock[] {
+  const partial = streamedAnswer(turn);
+  return [
+    ...(turn.blocks ?? []),
+    ...(partial ? [{ type: "text" as const, content: partial, chart: null }] : []),
+  ];
+}
+
+function streamedAnswer(turn: LiveTurn): string {
   return turn.steps
     .slice(answerStartIndex(turn.steps))
     .map((step) => (step.kind === "text" ? step.text : ""))
@@ -215,12 +342,22 @@ function truncateArgs(args: unknown): unknown {
   }
 }
 
+/** Serialized length of a value, or `undefined` when it cannot be serialized. */
+function jsonLength(value: unknown): number | undefined {
+  try {
+    return JSON.stringify(value)?.length;
+  } catch {
+    return undefined;
+  }
+}
+
 /** Shrink the live steps into what is stored alongside the final answer. */
 export function toPersistedTrace(turn: LiveTurn, now: number): ChatTrace | undefined {
   const work = closeOpenSteps(turn.steps, now).slice(0, answerStartIndex(turn.steps));
   if (work.length === 0) return undefined;
   let thinkingBudget = MAX_PERSISTED_THINKING;
-  const steps = work.map((step): TraceStep => {
+  let writeBudget = MAX_PERSISTED_WRITE_ARGS;
+  const steps = work.map((step, index): TraceStep => {
     if (step.kind === "thinking") {
       const text = step.text.slice(0, Math.max(0, thinkingBudget));
       thinkingBudget -= text.length;
@@ -231,11 +368,23 @@ export function toPersistedTrace(turn: LiveTurn, now: number): ChatTrace | undef
         ...step.evaluation,
         prompt: step.evaluation.prompt.slice(0, MAX_PERSISTED_PROMPT),
       };
+      // Closing marks a running call done; keep that its end was not seen.
+      const original = turn.steps[index];
+      const interrupted = original.kind === "tool" && original.status === "running";
       // A call the model never finished keeps what it wrote as its arguments.
       const { draft, draftIndex: _draftIndex, output, ...rest } = step;
+      let args = truncateArgs(step.args ?? draft);
+      if (step.tool === "write" && step.status === "done" && !interrupted && step.args) {
+        const length = jsonLength(step.args);
+        if (length !== undefined && length > MAX_PERSISTED_ARGS && length <= writeBudget) {
+          writeBudget -= length;
+          args = step.args;
+        }
+      }
       return {
         ...rest,
-        args: truncateArgs(step.args ?? draft),
+        args,
+        ...(interrupted ? { interrupted: true } : {}),
         ...(output
           ? {
               output:

@@ -1,6 +1,6 @@
 # QDash demo video (Remotion)
 
-A 30 second product demo of QDash rendered with [Remotion](https://www.remotion.dev/).
+The previous 30-second product demo of QDash, rendered with [Remotion](https://www.remotion.dev/).
 
 ## Usage
 

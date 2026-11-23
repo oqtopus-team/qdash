@@ -10,10 +10,12 @@ from qdash.api.dependencies import (
     get_flow_service,
 )
 from qdash.api.lib.project import ProjectContext, get_project_context, get_project_context_editor
+from qdash.api.schemas.error import Detail
 from qdash.api.schemas.flow import (
     DeleteScheduleResponse,
     ExecuteFlowRequest,
     ExecuteFlowResponse,
+    FlowExecutionPlanResponse,
     FlowTemplate,
     FlowTemplateWithCode,
     GetFlowResponse,
@@ -28,8 +30,10 @@ from qdash.api.schemas.flow import (
     UpdateScheduleRequest,
     UpdateScheduleResponse,
 )
+from qdash.api.schemas.source_format import FormatSourceRequest, FormatSourceResponse
 from qdash.api.services.flow_schedule_service import FlowScheduleService
 from qdash.api.services.flow_service import FlowService
+from qdash.api.services.source_format_service import format_source
 
 router = APIRouter()
 logger = getLogger("uvicorn.app")
@@ -45,14 +49,47 @@ logger = getLogger("uvicorn.app")
     response_model=SaveFlowResponse,
     summary="Save a flow",
     operation_id="saveFlow",
+    responses={
+        409: {
+            "model": Detail,
+            "description": "create_only is set and a flow with this name already exists",
+        },
+    },
 )
 async def save_flow(
     request: SaveFlowRequest,
     ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[FlowService, Depends(get_flow_service)],
 ) -> SaveFlowResponse:
-    """Save a Flow to file system and MongoDB."""
+    """Save a Flow to file system and MongoDB.
+
+    By default the save creates the flow or overwrites an existing one. With
+    ``create_only`` it only creates a new flow, and an existing name returns 409
+    without changing the stored flow.
+    """
     return await service.save_flow(request, ctx.user.username, ctx.project_id)
+
+
+@router.post(
+    "/flows/format",
+    response_model=FormatSourceResponse,
+    summary="Format flow source without saving it",
+    operation_id="formatFlowSource",
+    responses={
+        413: {"model": Detail, "description": "The source exceeds the formatting size limit"},
+        503: {"model": Detail, "description": "The formatter could not run"},
+    },
+)
+def format_flow_source(
+    request: FormatSourceRequest,
+    _ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
+) -> FormatSourceResponse:
+    """Format Python source with the project's Ruff settings.
+
+    The source is parsed by Ruff, never imported or executed, and nothing is saved. A
+    source that cannot be parsed returns ``syntax_error`` with the input unchanged.
+    """
+    return format_source(request.source)
 
 
 @router.get(
@@ -211,6 +248,33 @@ async def get_flow(
 ) -> GetFlowResponse:
     """Get Flow details including code content."""
     return await service.get_flow(name, ctx.user.username, ctx.project_id)
+
+
+@router.get(
+    "/flows/{name}/execution-plan",
+    response_model=FlowExecutionPlanResponse,
+    summary="Preview a flow's execution plan",
+    operation_id="getFlowExecutionPlan",
+    responses={
+        400: {"model": Detail, "description": "No chip is selected or saved for the flow"},
+        404: {"model": Detail, "description": "The flow, its source or the chip is not found"},
+    },
+)
+async def get_flow_execution_plan(
+    name: str,
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    service: Annotated[FlowService, Depends(get_flow_service)],
+    chip_id: Annotated[
+        str | None, Query(description="Chip to check against; defaults to the flow's chip")
+    ] = None,
+) -> FlowExecutionPlanResponse:
+    """Read the saved source's steps and check manual rounds, without executing anything.
+
+    The source is parsed, never imported or run. Manual rounds are checked against
+    the chip's wiring and directed couplings with the checks the worker repeats
+    before any target measures. Automatic groups are described, not computed.
+    """
+    return await service.get_execution_plan(name, ctx.user.username, ctx.project_id, chip_id)
 
 
 @router.post(

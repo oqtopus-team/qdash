@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from qdash.api.schemas.task_file import TaskInfo
     from qdash.api.services.calibration_pipeline_service import CalibrationPipelineService
+    from qdash.api.services.calibration_session_service import CalibrationSessionService
     from qdash.api.services.flow_schedule_service import FlowScheduleService
     from qdash.api.services.flow_service import FlowService
 
@@ -19,6 +20,8 @@ from qdash.api.dependencies.cache import (
     clear_dependency_caches as _clear_dependency_caches,
 )
 from qdash.api.services.admin_service import AdminService
+from qdash.api.services.agent_intervention_service import AgentInterventionService
+from qdash.api.services.agent_session_audit import AgentSessionAuditService
 from qdash.api.services.agent_session_service import AgentSessionService
 from qdash.api.services.auth_service import AuthService
 from qdash.api.services.calibration_service import CalibrationService
@@ -29,13 +32,16 @@ from qdash.api.services.cooldown_wiring_event_service import CooldownWiringEvent
 from qdash.api.services.copilot_chat_session_service import CopilotChatSessionService
 from qdash.api.services.copilot_investigation_service import CopilotInvestigationService
 from qdash.api.services.cryostat_service import CryostatService
+from qdash.api.services.dashboard_service import DashboardService
 from qdash.api.services.device_topology_service import DeviceTopologyService
 from qdash.api.services.evaluation_service import EvaluationService
+from qdash.api.services.execution_group_service import ExecutionGroupService
 from qdash.api.services.execution_service import ExecutionService
 from qdash.api.services.file_service import FileService
 from qdash.api.services.forum_service import ForumService
 from qdash.api.services.knowledge_draft_service import KnowledgeDraftStore
 from qdash.api.services.manual_update_service import ManualUpdateService
+from qdash.api.services.metric_script_service import MetricScriptService
 from qdash.api.services.metrics_service import MetricsService
 from qdash.api.services.note_service import NoteService
 from qdash.api.services.notification_service import NotificationService
@@ -48,6 +54,7 @@ from qdash.api.services.source_access_service import SourceAccessService
 from qdash.api.services.task_file_service import TaskFileService
 from qdash.api.services.task_result_service import TaskResultService
 from qdash.api.services.task_service import TaskService
+from qdash.api.services.user_avatar_service import UserAvatarService
 from qdash.copilot.runtime import CopilotRuntime
 from qdash.repository import (
     MongoChipRepository,
@@ -64,8 +71,10 @@ from qdash.repository.cooldown import MongoCooldownRepository
 from qdash.repository.cooldown_wiring_event import MongoCooldownWiringEventRepository
 from qdash.repository.coupling import MongoCouplingCalibrationRepository
 from qdash.repository.cryostat import MongoCryostatRepository
+from qdash.repository.dashboard import MongoDashboardRepository
 from qdash.repository.execution_history import MongoExecutionHistoryRepository
 from qdash.repository.execution_lock import MongoExecutionLockRepository
+from qdash.repository.metric_script import MongoMetricScriptRepository
 from qdash.repository.provenance import (
     MongoActivityRepository,
     MongoParameterVersionRepository,
@@ -74,12 +83,25 @@ from qdash.repository.provenance import (
 from qdash.repository.qubit import MongoQubitCalibrationRepository
 from qdash.repository.tag import MongoTagRepository
 from qdash.repository.task_definition import MongoTaskDefinitionRepository
+from qdash.repository.user_avatar import MongoUserAvatarRepository
+
+
+@cached_dependency_provider
+def get_agent_intervention_service() -> AgentInterventionService:
+    """Get the agent intervention service instance."""
+    return AgentInterventionService()
 
 
 @cached_dependency_provider
 def get_agent_session_service() -> AgentSessionService:
     """Get the agent session service instance."""
-    return AgentSessionService()
+    return AgentSessionService(intervention_service=get_agent_intervention_service())
+
+
+@cached_dependency_provider
+def get_agent_session_audit_service() -> AgentSessionAuditService:
+    """Get the agent session audit service instance."""
+    return AgentSessionAuditService()
 
 
 @cached_dependency_provider
@@ -171,6 +193,12 @@ def get_execution_lock_repository() -> MongoExecutionLockRepository:
 
     """
     return MongoExecutionLockRepository()
+
+
+@cached_dependency_provider
+def get_execution_group_service() -> ExecutionGroupService:
+    """Get the service that groups executions by agent session."""
+    return ExecutionGroupService(execution_history_repository=get_execution_history_repository())
 
 
 @cached_dependency_provider
@@ -453,6 +481,40 @@ def get_cryostat_service() -> CryostatService:
 
 
 @cached_dependency_provider
+def get_dashboard_repository() -> MongoDashboardRepository:
+    """Get the dashboard repository instance."""
+    return MongoDashboardRepository()
+
+
+@cached_dependency_provider
+def get_dashboard_service() -> DashboardService:
+    """Get the dashboard service instance."""
+    return DashboardService(
+        dashboard_repository=get_dashboard_repository(),
+        metric_script_repository=get_metric_script_repository(),
+        metric_script_service=get_metric_script_service(),
+    )
+
+
+@cached_dependency_provider
+def get_metric_script_repository() -> MongoMetricScriptRepository:
+    """Get the metric script repository instance."""
+    return MongoMetricScriptRepository()
+
+
+@cached_dependency_provider
+def get_metric_script_service() -> MetricScriptService:
+    """Get the metric script service instance."""
+    return MetricScriptService(
+        metric_script_repository=get_metric_script_repository(),
+        dashboard_repository=get_dashboard_repository(),
+        chip_repository=get_chip_repository(),
+        metrics_service=get_metrics_service(),
+        task_result_repository=get_task_result_repository(),
+    )
+
+
+@cached_dependency_provider
 def get_cooldown_repository() -> MongoCooldownRepository:
     """Get the cool-down repository instance."""
     return MongoCooldownRepository()
@@ -486,6 +548,12 @@ def get_cooldown_wiring_event_service() -> CooldownWiringEventService:
 def get_user_repository() -> MongoUserRepository:
     """Get the user repository instance."""
     return MongoUserRepository()
+
+
+@cached_dependency_provider
+def get_user_avatar_service() -> UserAvatarService:
+    """Get the user avatar settings service instance."""
+    return UserAvatarService(store=MongoUserAvatarRepository())
 
 
 @cached_dependency_provider
@@ -578,6 +646,14 @@ def get_calibration_pipeline_service() -> "CalibrationPipelineService":
 
 
 @cached_dependency_provider
+def get_calibration_session_service() -> "CalibrationSessionService":
+    """Get the calibration session service instance."""
+    from qdash.api.services.calibration_session_service import CalibrationSessionService
+
+    return CalibrationSessionService(execution_service=get_execution_service())
+
+
+@cached_dependency_provider
 def get_flow_service() -> "FlowService":
     """Get the flow service instance."""
     from qdash.api.services.flow_service import FlowService
@@ -585,6 +661,7 @@ def get_flow_service() -> "FlowService":
     return FlowService(
         flow_repository=get_flow_repository(),
         execution_lock_repository=get_execution_lock_repository(),
+        chip_repository=get_chip_repository(),
     )
 
 

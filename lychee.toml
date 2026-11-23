@@ -17,5 +17,9 @@ fallback_extensions = ["md"]
 exclude_all_private = true
 include_mail = false
 
-# GitHub returns 404 to unauthenticated checks for this private dependency.
-exclude = ['^https://github\.com/qiqb-osaka/qdash-task-knowledge$']
+exclude = [
+  # GitHub returns 404 to unauthenticated checks for this private dependency.
+  '^https://github\.com/qiqb-osaka/qdash-task-knowledge$',
+  # The DOI resolver returns 403 to automated requests, so DOI references stay unchecked.
+  '^https://doi\.org/',
+]

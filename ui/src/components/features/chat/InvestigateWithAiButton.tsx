@@ -17,7 +17,8 @@ interface InvestigateWithAiButtonProps {
 /**
  * One click from a failure's log to an AI investigation of it: the chat opens
  * with the recorded logs, identifiers and the source the assistant can read,
- * and asks for an evidence-backed cause. Clicking again resumes that chat.
+ * and asks for an evidence-backed cause. Clicking again resumes that chat; after
+ * New chat in it, a click starts a fresh investigation.
  */
 export function InvestigateWithAiButton({
   target,
@@ -31,7 +32,7 @@ export function InvestigateWithAiButton({
   return (
     <button
       type="button"
-      className={`btn btn-${size} gap-1 ${className}`}
+      className={`btn btn-${size} shrink-0 whitespace-nowrap ${className}`}
       onClick={(event) => {
         // Inside a clickable card, the click must not also select the card.
         event.stopPropagation();
@@ -39,7 +40,7 @@ export function InvestigateWithAiButton({
       }}
       title="Investigate this failure with the logs and the QDash source"
     >
-      <Bot className={size === "xs" ? "h-3 w-3" : "h-4 w-4"} aria-hidden="true" />
+      <Bot data-icon="inline-start" aria-hidden="true" />
       Investigate with AI
     </button>
   );

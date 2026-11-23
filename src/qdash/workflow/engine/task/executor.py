@@ -15,6 +15,7 @@ import traceback
 from contextlib import AbstractContextManager, nullcontext
 from typing import TYPE_CHECKING, Any, cast
 
+from qdash.datamodel.quality_metrics import QUALITY_METRIC_R2
 from qdash.repository import FilesystemCalibDataSaver
 from qdash.workflow.calibtasks.results import PostProcessResult, PreProcessResult, RunResult
 from qdash.workflow.engine.progress import ProgressPlan
@@ -38,6 +39,7 @@ from qdash.workflow.engine.task.types import (
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
+    from qdash.common.mux_mapping import MuxMapping
     from qdash.workflow.engine.backend.base import BaseBackend
     from qdash.workflow.engine.execution.service import ExecutionService
 
@@ -85,7 +87,8 @@ class TaskExecutor:
         snapshot_loader: SnapshotParameterLoader | None = None,
         source_task_id: str | None = None,
         force_update_params: bool = False,
-        persist_output_parameters: bool = True,
+        update_calibration_parameters: bool = True,
+        mux_mapping: "MuxMapping | None" = None,
     ) -> None:
         self.state_manager = state_manager
         self.execution_id = execution_id
@@ -103,7 +106,7 @@ class TaskExecutor:
             calib_dir=calib_dir,
             task_manager_id=task_manager_id,
             force_update_params=force_update_params,
-            persist_output_parameters=persist_output_parameters,
+            update_calibration_parameters=update_calibration_parameters,
         )
         self._mux_distributor = MuxDistributor(
             state_manager=state_manager,
@@ -112,6 +115,7 @@ class TaskExecutor:
             data_saver=self.data_saver,
             history_recorder=self.history_recorder,
             backend_saver=self._backend_saver,
+            mux_mapping=mux_mapping,
         )
 
     def execute_task(
@@ -152,6 +156,10 @@ class TaskExecutor:
         qid: str,
     ) -> RunResult | None:
         """Run the main task logic."""
+        # Only the fake backend acts here (opt-in validation faults); see BaseBackend.
+        before_task_run = getattr(backend, "before_task_run", None)
+        if callable(before_task_run):
+            before_task_run(task.get_name(), qid)
         return task.run(backend, qid)
 
     def _progress_context(
@@ -359,6 +367,11 @@ class TaskExecutor:
             # 1. Start task
             self.state_manager.start_task(task_name, task_type, qid)
 
+            # 1.1 A MUX-level task fans its result out after it runs; reject it
+            #     before any hardware work when the execution pinned no mapping.
+            if execution_service is not None and getattr(task, "is_mux_level", False):
+                self._mux_distributor.require_mapping(task_name)
+
             # 1.5 Apply snapshot overrides early so initial history record
             #     contains the correct (overridden) parameter values.
             if self._snapshot_loader is not None:
@@ -425,7 +438,7 @@ class TaskExecutor:
                 r2_value = run_result.r2.get(qid)
                 if r2_value is not None:
                     task_model = self.state_manager.get_task(task_name, task_type, qid)
-                    task_model.quality_metrics["r2"] = float(r2_value)
+                    task_model.quality_metrics[QUALITY_METRIC_R2] = float(r2_value)
 
             if run_result is None:
                 self._complete_task(task_name, task_type, qid, "No run result")
@@ -626,6 +639,13 @@ class TaskExecutor:
                 self.state_manager.start_task(task_name, task_type, qid)
                 started_qids.append(qid)
 
+            # A MUX-level task must run against the execution's pinned mapping, as
+            # in execute(); reject the whole batch before any hardware work so every
+            # qid is recorded as failed once and nothing is saved.
+            if execution_service is not None and getattr(task, "is_mux_level", False):
+                self._mux_distributor.require_mapping(task_name)
+
+            for qid in qids:
                 if self._snapshot_loader is not None:
                     self._apply_snapshot_overrides(task, task_name, task_type, qid)
 
@@ -664,7 +684,7 @@ class TaskExecutor:
                 result.r2 = {qid: r2_value} if r2_value is not None else None
                 if r2_value is not None:
                     task_model = self.state_manager.get_task(task_name, task_type, qid)
-                    task_model.quality_metrics["r2"] = float(r2_value)
+                    task_model.quality_metrics[QUALITY_METRIC_R2] = float(r2_value)
 
             if run_result is None:
                 for qid, result in results.items():
@@ -851,7 +871,8 @@ class TaskExecutor:
         )
 
         assert self._snapshot_loader is not None
-        snapshot = self._snapshot_loader.get_snapshot(task_name, qid)
+        invocation = self.state_manager.get_task(task_name, task_type, qid).invocation
+        snapshot = self._snapshot_loader.get_snapshot(task_name, qid, invocation)
         if snapshot is None:
             if self._snapshot_loader.requires_snapshot(task_name):
                 raise ValueError(

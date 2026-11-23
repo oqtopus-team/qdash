@@ -10,15 +10,19 @@
 
 `@oqtopus-team/pi-qdash` is a [pi](https://github.com/badlogic/pi-mono) extension for querying [QDash](https://github.com/oqtopus-team/qdash), the large-scale QPU calibration platform in the OQTOPUS ecosystem.
 
-It uses [`@oqtopus-team/qdash-client`](https://www.npmjs.com/package/@oqtopus-team/qdash-client) and reuses existing `QDASH_*` environment variables or profiles from `~/.config/qdash/config.ini` / `$XDG_CONFIG_HOME/qdash/config.ini`.
+It uses [`@oqtopus-team/qdash-client`](https://www.npmjs.com/package/@oqtopus-team/qdash-client), and [`@oqtopus-team/qdash-sdk`](https://www.npmjs.com/package/@oqtopus-team/qdash-sdk) for the pipeline and flow-run tools, and reuses existing `QDASH_*` environment variables or profiles from `~/.config/qdash/config.ini` / `$XDG_CONFIG_HOME/qdash/config.ini`.
 
 ## Features
 
 - **Read-only investigation**: dedicated tools to inspect chips, qubits, couplings, calibration task results, task knowledge (`qdash_get_task_knowledge`), executions, and Forum posts. Secrets are redacted from tool output.
 - **Dashboards and insights**: compact dashboards, triage overviews, target-level incident reports, degradation reports, and wiring insights.
-- **Agent calibration workflow**: create agent sessions, submit and track agent actions, and commit/apply calibration candidates. Write operations are approval-gated.
+- **Agent calibration workflow**: run a model-driven calibration loop in an agent session you approve once (see the `qdash-agent-calibration` skill), ask an expert through a QDash intervention, continue from QDash's records after the answer, and commit/apply calibration candidates. Write operations are approval-gated; inside an `auto` session you created and approved, its own steps and expert requests need no further approval, and QDash checks them again.
 - **Calibration pipelines**: compose a declarative pipeline spec from QDash's step catalog (`qdash_get_pipeline_catalog`), validate it (`qdash_plan_pipeline`), and run it as one execution (`qdash_run_pipeline`, approval-gated).
+- **Calibration sessions**: record one calibration objective (`qdash_create_calibration_session`, approval-gated) and group the pipeline runs and agent sessions started for it with `calibrationSessionId`; read one with `qdash_get_calibration_session`. A calibration session grants nothing.
 - **Figures**: fetch calibration PNG/JSON figures and render them in the interactive TUI.
+- **Metric scripts and dashboards**: write `qdash_metrics` scripts that compute per-qubit or per-coupling values, validate and preview them on a chip (`qdash_validate_metric_script`, `qdash_preview_metric_script`), and save scripts and dashboards after approval, guided by the `qdash-metric-scripts` skill.
+- **Scripts and tool loading**: with pi's `codemode` and `tool_search`, scripts batch read-only QDash calls and receive JSON data, and narrower tools load on demand. Scripts cannot reach write, figure, or shell tools. pi-qdash activates both for a new user and keeps a selection you make across reloads, new sessions, and forks. Set `PI_QDASH_CODEMODE=off`, or add `-codemode` to pi's `defaultTools` setting, to leave `codemode` inactive.
+- **Calibration evaluation**: with [pi-qcaleval](https://www.npmjs.com/package/@oqtopus-team/pi-qcaleval) installed, `qcal_evaluate` calls get the requested task's figure, QDash task knowledge, and (on request) labeled examples.
 - **Generic timeseries comparison**: inspect and align arbitrary QDash parameters/targets with explicitly mapped local CSV sensor columns, reuse schema-validated investigation presets, and report correlations plus optional shared-period/phase evidence without hard-coded metrics or schemas.
 - **Forum integration**: read Forum posts, publish task-result evidence, and upload locally generated analysis images to replies.
 
@@ -42,8 +46,8 @@ Or try it without installing:
 pi -e npm:@oqtopus-team/pi-qdash
 ```
 
-The package declares Node.js 20 or later and is tested with Node.js 24 and pi 1.4.0.
-Published releases pin the matching `@oqtopus-team/qdash-client` version.
+The package declares Node.js 20 or later and is tested with Node.js 24 and pi 1.6.0.
+Published releases pin the matching `@oqtopus-team/qdash-client` and `@oqtopus-team/qdash-sdk` versions.
 Use the `beta` dist-tag to try changes merged into QDash's `develop` branch:
 
 ```bash
@@ -71,7 +75,7 @@ explains where to add tools, safety gates, and domain reasoning.
 
 Development takes place in the [QDash monorepo](https://github.com/oqtopus-team/qdash/tree/develop/packages/pi-qdash).
 Follow the [package development and release guide](https://oqtopus-team.github.io/qdash/developer-guide/copilot/packages)
-for workspace setup, checks, local pi CLI testing, and independent npm releases.
+for workspace setup, checks, local pi CLI testing, and npm releases, which share QDash's version.
 Open pull requests against QDash's `develop` branch and report bugs in
 [QDash issues](https://github.com/oqtopus-team/qdash/issues).
 
@@ -83,7 +87,7 @@ Citation information is available in the [CITATION](https://github.com/oqtopus-t
 
 Open a [QDash issue](https://github.com/oqtopus-team/qdash/issues) or email us:
 
-- [oqtopus-team[at]googlegroups.com](mailto:oqtopus-team[at]googlegroups.com)
+- [oqtopus-team[at]googlegroups.com](mailto:oqtopus-team@googlegroups.com)
 
 ## License
 

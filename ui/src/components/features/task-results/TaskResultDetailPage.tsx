@@ -5,9 +5,15 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, RefreshCw, ExternalLink, CheckCircle, UserRound, Pencil } from "lucide-react";
 import { useGetTaskResult } from "@/client/task/task";
 import { useGetTaskFileSettings, useListTaskInfo } from "@/client/task-file/task-file";
+import { TaskLineageSection } from "@/components/features/provenance/TaskLineageSection";
+import { FigureStrip } from "@/components/charts/FigureStrip";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { ExecutionTaskProgress } from "@/components/features/execution/ExecutionTaskProgress";
-import { TaskArtifactDownloads } from "@/components/features/chip/TaskArtifactDownloads";
+import { useRecordJourneyResultView } from "@/components/features/first-calibration/useRecordJourneyResultView";
+import {
+  TaskArtifactDownloads,
+  hasTaskArtifactDownloads,
+} from "@/components/features/chip/TaskArtifactDownloads";
 import { TaskResultEvaluations } from "@/components/features/evaluations/TaskResultEvaluations";
 import { TaskResultThreads } from "@/components/features/forum/TaskResultThreads";
 import { SpectroscopyManualCorrection } from "@/components/features/task-results/SpectroscopyManualCorrection";
@@ -63,6 +69,7 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
     },
   });
   const taskResult = taskResultResponse?.data;
+  useRecordJourneyResultView(taskResult);
   const { data: taskFileSettings } = useGetTaskFileSettings();
   const defaultBackend = taskFileSettings?.data?.default_backend || "qubex";
   const { data: taskInfoData } = useListTaskInfo({ backend: defaultBackend });
@@ -91,8 +98,8 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
         description="The requested task result does not exist or has been removed."
         emoji="magnifying-glass"
         action={
-          <button onClick={() => router.back()} className="btn btn-sm btn-ghost gap-1">
-            <ArrowLeft className="h-4 w-4" />
+          <button onClick={() => router.back()} className="btn btn-sm btn-ghost">
+            <ArrowLeft data-icon="inline-start" />
             Go back
           </button>
         }
@@ -128,9 +135,9 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
             {canReExecute && (
               <button
                 onClick={() => router.push(`/tasks?sourceTaskId=${encodeURIComponent(taskId)}`)}
-                className="btn btn-sm btn-primary gap-1"
+                className="btn btn-sm btn-primary"
               >
-                <RefreshCw className="h-3.5 w-3.5" />
+                <RefreshCw data-icon="inline-start" />
                 Run again
               </button>
             )}
@@ -149,7 +156,7 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
         />
       )}
       {taskResult.task_name === "ManualParameterEdit" && (
-        <div className="mb-4 overflow-hidden rounded-xl border border-success/30 bg-success/5">
+        <div className="mb-4 overflow-hidden rounded-[var(--radius-box)] border border-success/30 bg-success/5">
           <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-start gap-3">
               <div className="rounded-full bg-success/15 p-2 text-success">
@@ -172,10 +179,10 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
             {taskResult.source_task_id && (
               <a
                 href={`/task-results/${taskResult.source_task_id}`}
-                className="btn btn-sm btn-outline shrink-0 gap-2"
+                className="btn btn-sm btn-outline shrink-0"
               >
                 View source result
-                <ExternalLink size={14} />
+                <ExternalLink data-icon="inline-end" />
               </a>
             )}
           </div>
@@ -297,13 +304,17 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
         </div>
       )}
 
-      {((taskResult.json_figure_path && taskResult.json_figure_path.length > 0) ||
-        (taskResult.raw_data_path && taskResult.raw_data_path.length > 0)) && (
+      {hasTaskArtifactDownloads({
+        jsonFigurePaths: taskResult.json_figure_path,
+        rawDataPaths: taskResult.raw_data_path,
+        imagePaths: taskResult.figure_path,
+      }) && (
         <div className="mb-4 rounded-lg bg-base-200/50 p-4">
           <h2 className="mb-3 text-sm font-medium">Artifacts</h2>
           <TaskArtifactDownloads
             jsonFigurePaths={taskResult.json_figure_path}
             rawDataPaths={taskResult.raw_data_path}
+            imagePaths={taskResult.figure_path}
           />
         </div>
       )}
@@ -311,16 +322,18 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
       {/* Figure */}
       {((taskResult.figure_path && taskResult.figure_path.length > 0) ||
         (taskResult.json_figure_path && taskResult.json_figure_path.length > 0)) && (
-        <div className="h-[280px] overflow-x-auto overflow-y-hidden flex items-center justify-start gap-3 mb-4">
-          {(taskResult.figure_path ?? []).map((fig, i) => (
-            <TaskFigure
-              key={i}
-              path={fig}
-              jsonFigurePath={(taskResult.json_figure_path ?? [])[i]}
-              qid={taskResult.qid}
-              className="h-full w-auto object-contain rounded flex-shrink-0"
-            />
-          ))}
+        <div className="mb-4" data-coachmark="task-result-figure" data-task-id={taskId}>
+          <FigureStrip className="h-[280px] gap-3 overflow-y-hidden">
+            {(taskResult.figure_path ?? []).map((fig, i) => (
+              <TaskFigure
+                key={i}
+                path={fig}
+                jsonFigurePath={(taskResult.json_figure_path ?? [])[i]}
+                qid={taskResult.qid}
+                className="h-full w-auto object-contain rounded flex-shrink-0"
+              />
+            ))}
+          </FigureStrip>
         </div>
       )}
 
@@ -335,10 +348,12 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
         )}
 
         {taskResult.output_parameters && Object.keys(taskResult.output_parameters).length > 0 && (
-          <ParametersTable
-            title="Output Parameters"
-            parameters={taskResult.output_parameters as Record<string, unknown>}
-          />
+          <div data-coachmark="task-result-metrics" data-task-id={taskId}>
+            <ParametersTable
+              title="Output Parameters"
+              parameters={taskResult.output_parameters as Record<string, unknown>}
+            />
+          </div>
         )}
 
         {taskResult.chip_id && REANALYZABLE_TASKS.has(taskResult.task_name) && (
@@ -347,9 +362,7 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
             qid={taskResult.qid}
             taskId={taskResult.task_id}
             taskName={taskResult.task_name}
-            taskStatus={taskResult.status}
             outputParameters={(taskResult.output_parameters ?? {}) as Record<string, unknown>}
-            outputParameterNames={taskResult.output_parameter_names ?? []}
             jsonFigurePaths={taskResult.json_figure_path ?? []}
           />
         )}
@@ -360,6 +373,14 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
             parameters={taskResult.run_parameters as Record<string, unknown>}
           />
         )}
+
+        <TaskLineageSection
+          taskId={taskId}
+          executionId={taskResult.execution_id}
+          qid={taskResult.qid ?? ""}
+          outputParameters={taskResult.output_parameters as Record<string, unknown> | undefined}
+          className="mb-4 rounded-lg bg-base-200/50 p-4"
+        />
 
         <TaskMessagePanel
           status={taskResult.status}

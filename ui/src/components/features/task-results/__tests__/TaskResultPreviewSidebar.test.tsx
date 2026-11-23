@@ -7,12 +7,21 @@ const mocks = vi.hoisted(() => ({
   result: null as Record<string, unknown> | null,
 }));
 
+vi.mock("@/components/features/provenance/TaskLineageSection", () => ({
+  TaskLineageSection: () => null,
+}));
+
 vi.mock("@/client/task/task", () => ({
   useGetTaskResult: (taskId: string) => ({
     data: taskId && mocks.result ? { data: mocks.result } : undefined,
     isLoading: false,
     isError: false,
   }),
+}));
+
+// Journey recording has its own tests; it needs the auth and project providers.
+vi.mock("@/components/features/first-calibration/useRecordJourneyResultView", () => ({
+  useRecordJourneyResultView: () => {},
 }));
 
 vi.mock("@/client/task-file/task-file", () => ({

@@ -95,7 +95,12 @@ export function sourceRootsMarkdown(data: SourceRoots): string {
 
 export function searchMarkdown(data: SearchResult): string {
   const matches = data.matches ?? [];
-  if (!matches.length) return `No ${data.mode === "path" ? "file paths" : "lines"} match \`${data.query}\`.`;
+  if (!matches.length) {
+    if (data.truncated) {
+      return `No matches found in the files searched for \`${data.query}\`. The search stopped at the file limit; unsearched files may match. Narrow root or pathPrefix.`;
+    }
+    return `No ${data.mode === "path" ? "file paths" : "lines"} match \`${data.query}\`.`;
+  }
   const lines = matches.map((match) =>
     match.line == null ? `- ${match.root}:${match.path}` : `- ${match.root}:${match.path}:${match.line}  ${match.text ?? ""}`,
   );
@@ -115,8 +120,13 @@ function sourceRefusal(error: unknown): string | undefined {
   if (!error || typeof error !== "object") return undefined;
   const value = error as { status?: unknown; statusCode?: unknown; response?: { status?: unknown }; message?: unknown };
   const status = Number(value.status ?? value.statusCode ?? value.response?.status);
-  if ([400, 403, 404, 413].includes(status)) return String(value.message ?? `HTTP ${status}`);
-  return undefined;
+  if (![400, 403, 404, 413].includes(status)) return undefined;
+  const message = String(value.message ?? `HTTP ${status}`);
+  // A bare FastAPI-style 404 can indicate an unavailable route or proxy mismatch.
+  if (status === 404 && /:\s*Not Found$/.test(message)) {
+    return `${message}. The /copilot/source endpoint may be unavailable. Check API routing/proxy configuration and update the API image if it predates source access.`;
+  }
+  return message;
 }
 
 export function registerSourceCodeTools(pi: Pick<ExtensionAPI, "registerTool">, deps: SourceCodeDependencies): void {

@@ -2,16 +2,30 @@
 
 from qdash.client.services.agent_runner import (
     AgentCalibrationRunner,
+    AgentInterventionReason,
     AgentPlanner,
     AgentPlannerDecision,
     AgentPlannerObservation,
     AgentPlanNode,
     AgentPlanOutcome,
+    AgentPlanResumeState,
     AgentPlanRunner,
     AgentSkillTransition,
     AgentStepOutcome,
 )
 from qdash.client.services.client import QDashClient
+from qdash.client.services.client_models import (
+    AgentActionListResponse,
+    AgentActionResponse,
+    AgentCandidateCommitResponse,
+    AgentCandidateListResponse,
+    AgentCandidateResponse,
+    AgentCandidateSetCommitResponse,
+    AgentInterventionResponse,
+    AgentSessionPolicy,
+    AgentSessionResponse,
+    CandidateGateResponse,
+)
 from qdash.client.services.config import (
     QDashConfig,
     QDashRetryConfig,
@@ -27,15 +41,6 @@ from qdash.client.services.errors import (
 )
 from qdash.client.services.exporter_models import NormalizedMetricRecord
 from qdash.client.services.models import (
-    AgentActionListResponse,
-    AgentActionResponse,
-    AgentCandidateCommitResponse,
-    AgentCandidateListResponse,
-    AgentCandidateResponse,
-    AgentCandidateSetCommitResponse,
-    AgentSessionPolicy,
-    AgentSessionResponse,
-    CandidateGateResponse,
     ChipMetricsResponse,
     ChipResponse,
     ListChipsResponse,
@@ -51,8 +56,11 @@ __all__ = [
     "AgentCandidateListResponse",
     "AgentCandidateResponse",
     "AgentCandidateSetCommitResponse",
+    "AgentInterventionReason",
+    "AgentInterventionResponse",
     "AgentPlanNode",
     "AgentPlanOutcome",
+    "AgentPlanResumeState",
     "AgentPlanRunner",
     "AgentPlanner",
     "AgentPlannerDecision",

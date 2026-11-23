@@ -66,3 +66,31 @@ test("returns null without the section or without any usable line", () => {
   assert.equal(extractToolGuide("# No guide here\n", ["qdash_list_chips"]), null);
   assert.equal(extractToolGuide(SKILL, []), null);
 });
+
+test("deferred tools are marked so the model searches before calling them", async () => {
+  const { DEFERRED_MARK, toolGuideNames } = await import("../src/tool-guide.ts");
+  const guide = extractToolGuide(
+    SKILL,
+    ["qdash_config_info", "qdash_list_chips", "qdash_get_default_chip", "qdash_create_agent_session"],
+    ["qdash_config_info", "qdash_create_agent_session", "qdash_list_cryostats"],
+  );
+  assert.match(guide, new RegExp(`\`qdash_config_info\`\\${DEFERRED_MARK} — check profile names`));
+  assert.match(guide, /- `qdash_create_agent_session`\*/);
+  assert.match(guide, /`qdash_list_chips`, `qdash_get_default_chip`$/m);
+  assert.deepEqual(
+    [...toolGuideNames(guide)].sort(),
+    ["qdash_config_info", "qdash_create_agent_session", "qdash_get_default_chip", "qdash_list_chips"],
+  );
+  assert.equal(toolGuideNames(null).size, 0);
+});
+
+test("the runtime guide is the routing pi-qdash shares with pi CLI, plus deferred marks", async () => {
+  const { readFileSync } = await import("node:fs");
+  const { extractToolRouting } = await import("@oqtopus-team/pi-qdash/extensions/lib/qdash-guidance.ts");
+  const skill = readFileSync(new URL("../../packages/pi-qdash/skills/qdash/SKILL.md", import.meta.url), "utf8");
+  const enabled = ["qdash_list_chips", "qdash_get_default_chip", "qdash_list_cryostats", "qdash_list_cooldowns", "qdash_query"];
+  const shared = extractToolRouting(skill, enabled);
+  assert.ok(shared);
+  assert.equal(extractToolGuide(skill, enabled), shared);
+  assert.equal(extractToolGuide(skill, enabled, ["qdash_list_cooldowns"]), shared.replace("`qdash_list_cooldowns`", "`qdash_list_cooldowns`*"));
+});

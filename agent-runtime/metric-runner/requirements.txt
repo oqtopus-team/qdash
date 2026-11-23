@@ -1,0 +1,8 @@
+# Python packages of the metric runner (metric-runner/Dockerfile): only what
+# the metric worker and its SDK import. The import policy
+# (src/qdash/api/metric_runtime/policy.py) allows scripts numpy, scipy, math
+# and statistics; pint backs the SDK's units. Jobs have no network, so this
+# list is the whole catalogue.
+numpy>=2,<3
+scipy>=1.14,<2
+pint>=0.24,<1

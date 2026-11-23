@@ -3,7 +3,9 @@
 This module provides the main calibration API with a step-based pipeline approach.
 
 Main API:
-    CalibService: High-level API for calibration workflows
+    CalibService: Runs calibration steps for one validated context
+    CalibContext: The checked user, chip and project of a run
+    resolve_calib_context: Resolve a CalibContext for direct Python use
     generate_execution_id: Generate unique execution IDs
 
 Targets:
@@ -12,6 +14,7 @@ Targets:
     QubitTargets: Target specific qubit IDs
     CouplingTargets: Target specific coupling pairs
     AllMuxTargets: Target all MUXes (full chip)
+    AllQubitTargets: Target every qubit, multiplexed or standalone
 
 Steps:
     Step: Abstract base class for calibration steps
@@ -37,8 +40,8 @@ Example:
     )
 
     @flow
-    def full_calibration(username: str, chip_id: str):
-        cal = CalibService(username, chip_id)
+    def full_calibration(username: str, chip_id: str, project_id: str | None = None):
+        cal = CalibService(username, chip_id, project_id=project_id)
         targets = MuxTargets([0, 1, 2, 3])
 
         results = cal.run(targets, steps=[
@@ -50,18 +53,18 @@ Example:
         return results
 """
 
+from qdash.datamodel.task_call import TaskCall
 from qdash.workflow.service.calib_service import CalibService
+from qdash.workflow.service.context import (
+    CalibContext,
+    CalibContextError,
+    resolve_calib_context,
+)
 from qdash.workflow.service.execution_id import generate_execution_id
 from qdash.workflow.service.github import (
     ConfigFileType,
     GitHubIntegration,
     GitHubPushConfig,
-)
-from qdash.workflow.service.session_context import (
-    SessionContext,
-    clear_current_session,
-    get_current_session,
-    set_current_session,
 )
 from qdash.workflow.service.steps import (
     CalibrationStep,
@@ -81,6 +84,7 @@ from qdash.workflow.service.steps import (
 )
 from qdash.workflow.service.targets import (
     AllMuxTargets,
+    AllQubitTargets,
     CouplingTargets,
     MuxTargets,
     QubitTargets,
@@ -100,7 +104,10 @@ __all__ = [
     "FULL_1Q_TASKS_AFTER_CHECK",
     "FULL_2Q_TASKS",
     "AllMuxTargets",
+    "AllQubitTargets",
     # === High-level API ===
+    "CalibContext",
+    "CalibContextError",
     "CalibService",
     "CalibrationStep",
     "ConfigFileType",
@@ -119,17 +126,14 @@ __all__ = [
     "OneQubitFineTune",
     "Pipeline",
     "QubitTargets",
-    # === Context Management ===
-    "SessionContext",
     # === Steps ===
     "Step",
     "StepContext",
     # === Targets ===
     "Target",
+    "TaskCall",
     "TransformStep",
     "TwoQubitCalibration",
-    "clear_current_session",
     "generate_execution_id",
-    "get_current_session",
-    "set_current_session",
+    "resolve_calib_context",
 ]

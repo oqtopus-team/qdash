@@ -32,4 +32,6 @@ export interface SaveFlowRequest {
   tags?: string[];
   /** Folder path inside the creator's space, e.g. "daily/t1"; "" is the root. Omitted keeps an existing flow's folder (a new flow goes to the root). */
   folder?: SaveFlowRequestFolder;
+  /** Create a new flow only. When a flow or flow file with this name already exists in the project, the request fails with 409 and changes nothing. False (the default) creates the flow or overwrites an existing one. */
+  create_only?: boolean;
 }

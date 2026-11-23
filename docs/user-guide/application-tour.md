@@ -1,13 +1,13 @@
 # Application Tour
 
-QDash groups project-scoped calibration work into Overview, Operate, Collaborate, and Manage
+QDash groups project-scoped calibration work into Explore, Operate, Collaborate, and Manage
 sections in the application sidebar.
 
 <!-- MEDIA PLACEHOLDER
 File: /images/guides/application-sidebar.gif
 Start: Home with a project selected and every sidebar section visible.
 Sequence: Highlight each sidebar section, open the project selector, then return to Home.
-Alt: QDash sidebar grouped into Overview, Operate, Collaborate, and Manage sections.
+Alt: QDash sidebar grouped into Explore, Operate, Collaborate, and Manage sections.
 -->
 
 ## Project Context
@@ -21,20 +21,24 @@ for the role to assign.
 
 | Page | Purpose | Guide |
 | --- | --- | --- |
-| **Home** | Start common work and review active executions, failed tasks, and recent notifications. | This page |
-| **Dashboard** | Scan all configured chip metrics, coverage, distributions, and scoped notes. | [Dashboard](./dashboard.md) |
+| **Home** | Start common work and review recent executions, upcoming scheduled workflow runs, and recent failed tasks. | This page |
+| **Overview** | Scan all configured chip metrics, coverage, distributions, and scoped notes. | [Overview](./overview.md) |
+| **Dashboards** | Compose metric maps, the results of your own metric scripts (such as collision checks or a median per coupling), and notes into a saved layout shared with the project. | [Dashboards](./dashboards.md), [Metric Scripts](./metric-scripts.md) |
 | **Metrics** | Inspect one metric across qubits or couplings and compare its history. | [Calibration Data and Provenance](./data-and-provenance.md) |
 | **Chip** | Browse calibration tasks and the latest results on the chip topology. | [Calibration Data and Provenance](./data-and-provenance.md) |
 | **Analysis** | Plot and compare chip parameters over a selected time range. | [Calibration Data and Provenance](./data-and-provenance.md) |
-| **AI Chat** | Ask questions using project calibration context. | [AI Chat](./ai-chat.md) |
+| **Agent** | Ask questions using project calibration context. | [Agent](./ai-chat.md) |
 
-Use **Dashboard** for broad health checks, **Metrics** for a parameter-focused investigation, and
-**Chip** when the calibration task or physical target is the starting point.
+**Executions** on Home shows the active project's runs across all chips over the last 30 days,
+grouped by day and status. The chart labels block size on busy days and uses partial blocks for
+remainders. Hover over or focus a day for exact counts; select the chart or **All executions**
+to open **Execution**. Select a running-status badge in the top bar to open that run.
 
-When a project has no chips, Home highlights the **Setup tour** for project editors. After a chip
-exists, the tour remains available as a compact Home action for replay. It opens the Chip page,
-points to the creation action, and explains the chip ID and topology fields without creating data
-until the form is submitted.
+## Run Your First Calibration
+
+Project editors can start the guide on **Home**. Follow
+[Run Your First Calibration](./first-calibration.md) to create a chip, run a workflow, and inspect
+its result.
 
 ## Operate
 
@@ -60,17 +64,13 @@ permission. See [Running Calibrations](./running-calibrations.md) for the end-to
 
 Mentions and replies arrive at the bell in the top bar, which shows the unread count. Select the
 bell to preview the newest notifications, or **View all** to open **Inbox**. See
-[Reviewing and Sharing Results](./reviewing-results.md#follow-notifications) for the notification
-flow and the same page for how these records relate.
+[Reviewing and Sharing Results](./reviewing-results.md#follow-notifications) for details.
 
 ## Manage
 
-The Config guide is under construction because its repository workflow still needs product-owner
-review. The page is available to project editors.
-
 | Page | Purpose | Guide |
 | --- | --- | --- |
-| **Config** | Edit Qubex configuration files and synchronize their repository. | **Under construction** |
+| **Config** | Edit Qubex configuration files and synchronize their repository. | Guidance under review. |
 | **Settings** | Change appearance, account settings, active project, and project membership. | [Authentication and Users](./authentication-and-users.md) and [Projects and Data Sharing](./projects-and-data-sharing.md) |
 | **Admin** | Manage system users, projects, and administrative settings. | [Authentication and Users](./authentication-and-users.md#create-users) and [Projects and Data Sharing](./projects-and-data-sharing.md#create-a-project) |
 
@@ -81,6 +81,7 @@ them.
 ## External Tools
 
 The bottom of the sidebar links to this documentation and, for project editors, to the Prefect
-dashboard. Use the QDash UI or API for workflow changes so QDash project metadata remains
+dashboard. Prefect opens only for users signed in to QDash. Any signed-in user can view runs
+there; only a system administrator can change anything in Prefect. Use the QDash UI or API for workflow changes so QDash project metadata remains
 synchronized with Prefect. The interactive API documentation is not linked from the sidebar; it is
 served at the API's `/docs` path, listed in [Setup](./setup.md#verify-the-installation).

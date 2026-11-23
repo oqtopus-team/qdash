@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useId } from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useQuery } from "@tanstack/react-query";
 import dynamic from "next/dynamic";
 import { ImageIcon, BarChart3, Code2 } from "lucide-react";
 import { CodeBlock } from "@/components/features/chat/CodeBlock";
+import { renderMermaid } from "@/lib/chatMermaid";
 
 const ChatPlotlyChart = dynamic(
   () => import("@/components/features/chat/ChatPlotlyChart").then((m) => m.ChatPlotlyChart),
@@ -14,38 +15,30 @@ const ChatPlotlyChart = dynamic(
 );
 
 /**
- * Renders a mermaid diagram from a code string.
- * Uses mermaid.render() on the client side only.
+ * Renders a mermaid diagram from a code string on the client. Rendering goes
+ * through the shared strict renderer so this view and chat never leave a
+ * looser Mermaid config behind for each other.
  */
 function MermaidDiagram({ code }: { code: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const uniqueId = useId().replace(/:/g, "_");
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      try {
-        const mermaid = (await import("mermaid")).default;
-        mermaid.initialize({
-          startOnLoad: false,
-          theme: "default",
-          securityLevel: "loose",
-        });
-        const { svg } = await mermaid.render(`mermaid${uniqueId}`, code);
-        if (!cancelled && containerRef.current) {
-          containerRef.current.innerHTML = svg;
-        }
-      } catch {
-        // Fallback: show as code block
-        if (!cancelled && containerRef.current) {
-          containerRef.current.textContent = code;
-        }
+    void renderMermaid(code, "default", { links: "keep" }).then((result) => {
+      const container = containerRef.current;
+      if (cancelled || !container) return;
+      if (result.status === "ok") {
+        // Sanitized by renderMermaid: strict mode, no scripts or event handlers.
+        container.innerHTML = result.svg;
+      } else {
+        // Fallback: show the source
+        container.textContent = code;
       }
-    })();
+    });
     return () => {
       cancelled = true;
     };
-  }, [code, uniqueId]);
+  }, [code]);
 
   return <div ref={containerRef} className="my-3 flex justify-center overflow-x-auto" />;
 }
@@ -290,7 +283,10 @@ function LoadedImage({
   path,
   alt,
   ...props
-}: React.ComponentPropsWithoutRef<"img"> & { loader: MarkdownImageLoader; path: string }) {
+}: React.ComponentPropsWithoutRef<"img"> & {
+  loader: MarkdownImageLoader;
+  path: string;
+}) {
   const { data, isError } = useQuery({
     queryKey: ["markdown-image", loader.cacheKey, path],
     queryFn: () => loader.load(path),

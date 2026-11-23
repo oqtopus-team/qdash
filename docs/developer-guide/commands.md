@@ -7,7 +7,7 @@ Run commands from the repository root unless noted.
 ```bash
 task -l                  # list tasks
 task dev-local-setup     # install host-side Python/UI dependencies
-task dev-local           # Docker services + host API/UI
+task dev-local           # Caddy and Docker services + hot-reload API/UI
 task dev-local-down      # stop host API/UI and local Docker Compose services
 task deploy-local        # full Docker Compose stack
 ```
@@ -22,7 +22,9 @@ task test                # all Python tests
 task test-api            # API tests
 task test-workflow       # workflow tests
 task test-client         # Python client tests
+task test-sdk            # Python SDK tests
 task test-client-ts      # TypeScript client checks
+task test-sdk-ts         # TypeScript SDK checks against the built client
 task ci-pi-packages      # pi extension and release-script checks
 task ci-agent-runtime    # runtime tests and typecheck
 task test-ui             # UI tests
@@ -34,17 +36,19 @@ task check               # required before every push; Python, UI, workspace pac
 ## Build and Generation
 
 ```bash
-task generate            # OpenAPI + generated UI client
+task generate            # OpenAPI + generated UI, TypeScript, and Python clients
 task generate-task-catalog # workflow task metadata catalog
 task build               # UI production build
 task build-client-ts     # build the local TypeScript client for pi CLI development
 task build-docs          # documentation build
 task check-docs-links    # documentation build, links, and anchors
+task check-docs-mermaid  # documentation build, every Mermaid diagram rendered in Chromium
 ```
 
 ## Secrets
 
 ```bash
+task check-betterleaks-version
 task scan-leaks
 task scan-leaks-staged
 task scan-secrets

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useState, useCallback } from "react";
+import React, { useCallback, useId, useRef, useState } from "react";
 import {
   Bold,
   Italic,
@@ -21,7 +21,6 @@ export interface MentionCandidate {
   id: string;
   label: string;
   secondaryLabel?: string;
-  avatarKey?: string | null;
   icon?: React.ReactNode;
 }
 
@@ -190,6 +189,7 @@ export function MarkdownEditor({
   const [mentionStart, setMentionStart] = useState(0);
   const [mentionIndex, setMentionIndex] = useState(0);
   const mentionRef = useRef<HTMLDivElement>(null);
+  const mentionListId = useId();
 
   const filteredMentions = (mentionCandidates ?? []).filter((candidate) => {
     const query = mentionQuery.toLowerCase();
@@ -199,6 +199,8 @@ export function MarkdownEditor({
       candidate.secondaryLabel?.toLowerCase().includes(query)
     );
   });
+
+  const showMentions = mentionOpen && filteredMentions.length > 0;
 
   const closeMention = useCallback(() => {
     setMentionOpen(false);
@@ -455,17 +457,33 @@ export function MarkdownEditor({
               onBlur={() => setTimeout(closeMention, 150)}
               rows={rows}
               disabled={disabled}
+              {...(mentionCandidates?.length
+                ? {
+                    role: "combobox",
+                    "aria-autocomplete": "list" as const,
+                    "aria-expanded": showMentions,
+                    "aria-controls": showMentions ? mentionListId : undefined,
+                    "aria-activedescendant": showMentions
+                      ? `${mentionListId}-${mentionIndex}`
+                      : undefined,
+                  }
+                : {})}
             />
-            {mentionOpen && filteredMentions.length > 0 && (
+            {showMentions && (
               <div
                 ref={mentionRef}
-                className="absolute bottom-full left-0 mb-1 z-50 bg-base-100 border border-base-300 rounded-lg shadow-lg py-1 min-w-[180px]"
+                id={mentionListId}
+                role="listbox"
+                aria-label="Mention suggestions"
+                className="absolute bottom-full left-0 mb-1 z-50 min-w-[180px] rounded-[var(--radius-box)] border border-base-content/10 bg-base-100 p-1 shadow-lg"
               >
                 {filteredMentions.map((candidate, i) => (
-                  <button
+                  <div
                     key={candidate.id}
-                    type="button"
-                    className={`flex items-center gap-2 w-full px-3 py-1.5 text-sm text-left hover:bg-base-200 ${
+                    id={`${mentionListId}-${i}`}
+                    role="option"
+                    aria-selected={i === mentionIndex}
+                    className={`flex cursor-default items-center gap-2 w-full rounded-[var(--radius-field)] px-2.5 py-1.5 text-sm text-left hover:bg-base-200 ${
                       i === mentionIndex ? "bg-base-200" : ""
                     }`}
                     onMouseDown={(e) => {
@@ -481,11 +499,7 @@ export function MarkdownEditor({
                           <Users className="h-3.5 w-3.5" />
                         </span>
                       ) : (
-                        <UserAvatar
-                          username={candidate.id}
-                          avatarKey={candidate.avatarKey}
-                          size={20}
-                        />
+                        <UserAvatar username={candidate.id} size={20} />
                       ))}
                     <span className="flex min-w-0 flex-col">
                       <span className="font-medium truncate">
@@ -496,7 +510,7 @@ export function MarkdownEditor({
                         {candidate.secondaryLabel ? ` · ${candidate.secondaryLabel}` : ""}
                       </span>
                     </span>
-                  </button>
+                  </div>
                 ))}
               </div>
             )}

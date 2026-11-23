@@ -5,7 +5,7 @@ QDash combines system-wide user accounts with project-specific roles.
 ## Sign In
 
 Open the QDash sign-in page and enter your username and password. After authentication, QDash
-opens the Execution page in your default project.
+opens **Execution** in your default project.
 
 ![Signing in to QDash](/images/guides/login.gif)
 
@@ -46,10 +46,29 @@ reset.
 
 ![Changing your password from Settings](/images/guides/change-password.gif)
 
+## Change Your Avatar
+
+QDash generates an avatar from your username, consistently across instances of the same release.
+
+To choose a different avatar:
+
+1. Open **Settings** and select the **Account** tab.
+2. Under **Avatar**, drag the avatar grid or focus it and use the arrow keys. The avatar in the
+   center is selected and appears in the preview.
+3. Optional: use **Shuffle**, **New shape**, **New colors**, or **New background** to vary the
+   selection.
+4. Select **Save Profile**. **Cancel** discards the selection.
+
+To return to the generated avatar, select **Use automatic avatar**, then **Save Profile**. A chosen
+avatar applies only to the QDash instance where you saved it. If QDash cannot load your chosen
+avatar, for example during a network interruption, it shows your automatic avatar instead.
+
 ## API Authentication
 
-Automation should use a saved [QDash Client](../reference/clients/python.md) profile. The client
-handles authentication and project selection without placing tokens directly in shell history.
+Scripts authenticate with the token shown in **Settings → API Token**, saved in a client profile
+with the project to use. The client then sends the token and project with every request, and the
+token stays out of shell history; see
+[Connect to a Deployment](../reference/clients/python.md#connect-to-a-deployment).
 
 For a custom API integration, use the interactive OpenAPI page linked from QDash or the
 [OpenAPI reference](../reference/openapi.md) for the current authentication and project-selection

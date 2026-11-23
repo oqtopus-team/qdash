@@ -35,6 +35,8 @@ SKIPPED_DIRS = frozenset({"__pycache__", "node_modules", ".venv", "venv", "site-
 # Paths inside the QDash root that hold per-project content; served through the
 # project-scoped flow API instead.
 QDASH_EXCLUDED_PREFIXES = ("workflow/user_flows",)
+# Directories an installed package lives in; the segment after one names the package.
+INSTALL_DIRS = frozenset({"site-packages", "dist-packages"})
 
 DEFAULT_DEPENDENCIES = ("qubex", "qubecalib")
 MAX_FILE_BYTES = 1_000_000
@@ -264,13 +266,36 @@ class SourceAccessService:
 
         A traceback from the workflow worker names files such as
         ``/app/qdash/workflow/engine/x.py`` or
-        ``/app/.venv/lib/python3.11/site-packages/qubex/y.py``; the root's name
-        is the last matching package segment.
+        ``/app/.venv/lib/python3.11/site-packages/qubex/y.py``.
+        Configured directory matches take precedence, with the most specific
+        root winning when roots overlap. Under ``site-packages`` the package
+        is the segment that follows it. Elsewhere the QDash root wins over dependencies, because QDash's own tree has
+        directories named after them (``workflow/calibtasks/qubex/``); within a
+        root, the last segment with its name is used.
         """
-        parts = PurePosixPath(path.strip().replace("\\", "/")).parts
-        for index in range(len(parts) - 1, -1, -1):
-            for root in self.roots:
-                if parts[index] == root.name and index + 1 < len(parts):
+        candidate = PurePosixPath(path.strip().replace("\\", "/"))
+        # A real checkout path is more precise than package-name heuristics.
+        for configured_root in sorted(
+            self.roots, key=lambda root: len(root.path.parts), reverse=True
+        ):
+            directory = PurePosixPath(configured_root.path.as_posix())
+            if candidate.is_relative_to(directory):
+                relative = candidate.relative_to(directory)
+                if relative.parts:
+                    return configured_root, relative.as_posix()
+        parts = candidate.parts
+        by_name = {root.name: root for root in self.roots}
+        installed = [i for i, part in enumerate(parts) if part in INSTALL_DIRS]
+        if installed:
+            index = installed[-1] + 1
+            root = by_name.get(parts[index]) if index + 1 < len(parts) else None
+            if root is None:
+                return None
+            return root, PurePosixPath(*parts[index + 1 :]).as_posix()
+        ordered = sorted(self.roots, key=lambda root: root.kind != "qdash")
+        for root in ordered:
+            for index in range(len(parts) - 2, -1, -1):
+                if parts[index] == root.name:
                     return root, PurePosixPath(*parts[index + 1 :]).as_posix()
         return None
 

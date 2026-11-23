@@ -1,13 +1,9 @@
 # Calibration Evaluation
 
-An evaluation is a recorded judgement of one task result's figure by the calibration evaluation
-model, which answers the six questions of the QCalEval benchmark against the task's reference
-from the knowledge repository. This page is the mechanism; the procedures are in
+An evaluation records how a model judges one task result's figure against the task reference
+using the six QCalEval questions. A **record** holds the inputs, answers, and human verdicts; a
+**run** groups records requested together for comparison. For the procedure, see
 [AI Evaluations](../../user-guide/ai-evaluations.md).
-
-Two words recur. A **record** is one evaluation: what the model was given, what it answered,
-and what a person said about it. A **run** is a set of records requested together, which is the
-unit of comparison.
 
 ## Responsibilities
 
@@ -29,9 +25,8 @@ pi-qcaleval asks the questions the way the benchmark ([arXiv 2604.25884](https:/
 and the Ising-Calibration training data do. Each question is one single-turn request with no
 system prompt: the background, an `Experiment context:` line, and the question template with the
 figure at its `<image>` position. The six requests go out at once. A request that fails is sent
-once more; an answer that arrived is never asked again, whatever it says. The model decodes
-greedily (`temperature: 0.0` in `config/copilot/evaluation.yaml`), so the same plot and prompt
-give the same diagnosis and two runs are comparable.
+once more; an answer that arrived is never asked again, whatever it says. Requests use `temperature: 0.0` from `config/copilot/evaluation.yaml` to reduce sampling
+variation. Compare runs using their recorded inputs and model settings.
 
 | Key | Question | Filled from the reference | Parsed answer |
 | --- | --- | --- | --- |
@@ -136,7 +131,7 @@ Every judgement the evaluation model makes becomes an `evaluation` document unde
 | Trigger | Who | How |
 | --- | --- | --- |
 | `bulk` | Chip page | `POST /evaluations/runs` with a task and a chip, a day, or a list of task results |
-| `single` | A task result's **Ask AI** | The same route with one task result |
+| `single` | A task result's **Ask Agent** | The same route with one task result |
 | `chat` | The planner, during a chat | Recorded from the `qcal_evaluate` tool result; see below |
 
 A bulk request selects the latest evaluable result of the task per qubit or coupling of the
@@ -173,6 +168,16 @@ A chat is recorded the same way: when the planner calls `qcal_evaluate`, the dur
 wrapper stamps a `host` record (the figure and reference the runtime filled in) on the result,
 the runtime's `tool_end` event carries it, and the API files it as a run of one with the
 planner's final answer. A figure no tool fetched, such as a user attachment, is not recorded.
+A call is filed under the project, planner model, and task its turn was first sent with. A
+reattached stream that replays the turn stores no second copy of a call another stream of the
+turn already filed; a call no stream of the turn reports, or one without a durable result entry,
+is not filed. See
+[Reattaching to a Turn](./chat-streaming.md#reattaching-to-a-turn).
+The wrapper fills the call's figure from the newest figure in the conversation that belongs to
+`task_name`: pi-qdash figure tools record the task, so a newer figure of another task is never
+evaluated in its place. The reference and examples come from one knowledge request. pi CLI fills
+`qcal_evaluate` with the same rules; see the
+[pi-qdash reference](../../reference/pi-qdash.md#evaluation-hydration).
 
 ### Knowledge drafts
 
@@ -221,7 +226,7 @@ their project and are not deleted.
 | --- | --- |
 | `input` | The context, the exact prompt (`[figure]` marks an image) and system prompt, the run's question, whether a reference and examples were requested and actually used, the reference's size and hash, the figures by hash, and the examples by id and figure hash |
 | `output` | The model (`provider/modelId`, `fallback` when no calibration VLM was configured), the parsed diagnosis, the raw answer, every answer as returned, the questions asked, `attempts`, `stop_reason`, each call's duration and input and output tokens, the total duration and token usage, and the judging model's `context_window` |
-| `evaluator` | The extension that judged: package name, version, `checkout` or `package`, the checkout commit |
+| `evaluator` | The extension that judged: package name, version (with `+source.<hash>` for the bundled package), and `package`; records from the retired checkout mount carry `checkout` and its commit |
 | `planner` | In planner mode: the planner's model, answer, tool calls and duration |
 | `verdict`, `verdicts`, `verdict_history` | The latest verdict for compatibility, each reviewer's current verdict, and every immutable review change; a disagreement can classify the affected diagnosis area |
 
@@ -236,16 +241,14 @@ load, so records stored before those fields existed are judged the same way. A r
 adds its wall time and the completed records' model time added up, so runs are weighed on cost
 as well as outcome.
 
-Sizes are reported in two units on purpose. The reference is measured in characters
-(`knowledge_chars`) because that is independent of the judging model and known before any call,
-so a preview can show it; next to its hash it tells two references apart. The context budget
-is measured in tokens, because that is what the model's window limits and images dominate it:
-pi-qcaleval records each call's `input_tokens` (images included) and `output_tokens` as the
-model counted them, and `_context_window` in the evaluation service stores the judging model's
-`num_ctx` from `config/copilot/evaluation.yaml` with the record, so a later config change does
-not rewrite it. The UI reports the largest call (`tokenPeak` in `evaluationDisplay.ts`) and
-flags it once prompt plus answer reach 90% of the window (`CONTEXT_WARNING_RATIO`). Records
-from an evaluator that does not report `input_tokens` show no token figure.
+Reference size uses characters (`knowledge_chars`), available before a model call. Context
+usage uses the model's reported `input_tokens` (including images) and `output_tokens`. The
+evaluation service snapshots `num_ctx` from the model configuration as `context_window`, so
+later configuration changes do not alter old records.
+
+The UI shows the largest call (`tokenPeak` in `evaluationDisplay.ts`) and warns when prompt plus
+answer reaches 90% of the window (`CONTEXT_WARNING_RATIO`). Records without reported
+`input_tokens` show no token count.
 
 ### Comparing runs
 
@@ -263,13 +266,10 @@ no compare API.
 
 ## Changing it
 
-**A task's reference.** Edit the task's `task.md` in the knowledge repository, within its
-template and keep its YAML frontmatter identity unchanged. The Knowledge page's **Download zip**
-(`GET /tasks/{task_name}/knowledge/archive`) gives the published directory to start from. Evaluate
-the edited directory as a knowledge draft against a run on the shared knowledge before proposing
-it; the **Evaluation prompts** panel previews the shared reference or a dropped draft. The
-Knowledge page does not write: updating a deployment means merging into the repository and moving
-the `config/task-knowledge` checkout (`task knowledge-pull`).
+**A task's reference.** Follow the
+[knowledge-draft procedure](../../user-guide/ai-evaluations.md#try-a-knowledge-change-before-proposing-it),
+preserving the template and frontmatter identity. After merging the change, update the
+deployment checkout with `task knowledge-pull`.
 
 **A demonstration.** Add `examples/<slug>.md` with a figure and YAML frontmatter containing
 `type: qdash.calibration-example`, `profile: qdash-calibration/v1`, `outcome`, and the QCalEval
@@ -291,8 +291,8 @@ what the context says; the evidence itself is pi-qdash's tool.
 explicit `model` argument or `QCALEVAL_MODEL`; else the first configured model whose id matches
 `Ising-Calibration`; else the conversation's own model when it accepts images, with
 `fallback: true` on the record. Each request carries the background, one question and the
-figures, at most four per evaluation (`MAX_IMAGES`), so an evaluation fits a 16k-token
-deployment.
+figures, at most four per evaluation (`MAX_IMAGES`). Check token usage against the configured
+context window, especially with examples.
 
 Tests: `agent-runtime/test/evaluate.test.mjs` and `knowledge-context.test.mjs` (prompt fill,
 context, examples, preview), `tests/qdash/datamodel/test_task_knowledge_registry.py`

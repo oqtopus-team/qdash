@@ -18,33 +18,37 @@ import { getApiErrorMessage } from "@/lib/utils/apiError";
 
 const PARAMETER_UNITS: Record<string, string> = {
   readout_frequency: "GHz",
-  optimal_power: "dB",
   readout_amplitude: "a.u.",
-  coarse_qubit_frequency: "GHz",
-  qubit_anharmonicity: "GHz",
-  f01_repr_db: "dB",
-  f01_quality_level: "a.u.",
+  control_frequency: "GHz",
   coarse_control_amplitude: "a.u.",
 };
 
-const FAILED_TASK_PARAMETER_NAMES: Record<string, readonly string[]> = {
-  CheckQubitSpectroscopy: [
-    "coarse_qubit_frequency",
-    "qubit_anharmonicity",
-    "f01_repr_db",
-    "f01_quality_level",
-    "coarse_control_amplitude",
-  ],
+/**
+ * Operational parameters an operator may correct from each spectroscopy result, mapped to
+ * the source output they are read from. Measured values (`resonator_frequency`,
+ * `coarse_qubit_frequency`) and diagnostics are never corrected by hand; see
+ * docs/developer-guide/workflow/frequency-parameter-policy.md.
+ */
+const CORRECTION_PARAMETERS: Record<string, Readonly<Record<string, string>>> = {
+  CheckResonatorSpectroscopy: {
+    readout_frequency: "resonator_frequency",
+    readout_amplitude: "readout_amplitude",
+  },
+  CheckQubitSpectroscopy: {
+    control_frequency: "coarse_qubit_frequency",
+    coarse_control_amplitude: "coarse_control_amplitude",
+  },
 };
+
+/** Headroom applied by CheckQubitSpectroscopy when deriving the coarse drive amplitude. */
+const COARSE_CONTROL_AMPLITUDE_HEADROOM_DB = 10;
 
 interface SpectroscopyManualCorrectionProps {
   chipId: string;
   qid: string;
   taskId: string;
   taskName: string;
-  taskStatus: string;
   outputParameters: Record<string, unknown>;
-  outputParameterNames: string[];
   jsonFigurePaths: string[];
 }
 
@@ -59,9 +63,7 @@ export function SpectroscopyManualCorrection({
   qid,
   taskId,
   taskName,
-  taskStatus,
   outputParameters,
-  outputParameterNames,
   jsonFigurePaths,
 }: SpectroscopyManualCorrectionProps) {
   const [editing, setEditing] = useState(false);
@@ -77,24 +79,15 @@ export function SpectroscopyManualCorrection({
   const mutation = useUpdateCalibrationParameters();
   const { data: qubitResponse } = useGetChipQubit(chipId, qid);
 
-  const names = useMemo(
-    () =>
-      spectroscopyCorrectionParameterNames(
-        taskName,
-        taskStatus,
-        outputParameterNames,
-        outputParameters,
-      ),
-    [taskName, taskStatus, outputParameterNames, outputParameters],
-  );
+  const names = useMemo(() => spectroscopyCorrectionParameterNames(taskName), [taskName]);
   const currentData = (qubitResponse?.data?.data ?? {}) as Record<string, unknown>;
+  const measuredOutput = (name: string) => outputParameters[sourceOutputName(taskName, name)];
 
   const beginEditing = () => {
     const nextBaselines = Object.fromEntries(
       names.map((name) => [
         name,
-        parameterValue(parameterRaw(currentData, name)) ??
-          parameterValue(parameterRaw(outputParameters, name)),
+        parameterValue(currentData[name]) ?? parameterValue(measuredOutput(name)),
       ]),
     );
     setBaselines(nextBaselines);
@@ -122,7 +115,7 @@ export function SpectroscopyManualCorrection({
               name,
               {
                 value: parseFinite(values[name]),
-                unit: parameterUnit(parameterRaw(outputParameters, name), name),
+                unit: parameterUnit(measuredOutput(name), name),
               },
             ]),
           ),
@@ -154,22 +147,7 @@ export function SpectroscopyManualCorrection({
   const useSelectedPoint = () => {
     if (!pendingPoint) return;
     const { x, y } = pendingPoint;
-    setValues((old) => {
-      if (taskName === "CheckResonatorSpectroscopy") {
-        return {
-          ...old,
-          readout_frequency: String(x),
-          optimal_power: String(y),
-          readout_amplitude: String(10 ** (y / 20)),
-        };
-      }
-      return {
-        ...old,
-        coarse_qubit_frequency: String(x),
-        f01_repr_db: String(y),
-        coarse_control_amplitude: String(Math.min(10 ** ((y + 10) / 20), 1)),
-      };
-    });
+    setValues((old) => ({ ...old, ...correctionValuesFromPoint(taskName, { x, y }) }));
     setSelectedPoint(pendingPoint);
     setPendingPoint(null);
     setPicking(false);
@@ -182,7 +160,7 @@ export function SpectroscopyManualCorrection({
 
   if (!editing) {
     return (
-      <div className="rounded-xl border border-base-300 bg-base-100 p-4 shadow-sm">
+      <div className="rounded-[var(--radius-box)] border border-base-300 bg-base-100 p-4 shadow-sm">
         {createdTaskId && (
           <div className="alert alert-success mb-4 text-sm">
             <span>Manual correction saved.</span>
@@ -207,8 +185,8 @@ export function SpectroscopyManualCorrection({
               </p>
             </div>
           </div>
-          <button className="btn btn-sm btn-outline shrink-0 gap-2" onClick={beginEditing}>
-            <Pencil size={14} />
+          <button className="btn btn-sm btn-outline shrink-0" onClick={beginEditing}>
+            <Pencil data-icon="inline-start" />
             Correct values
           </button>
         </div>
@@ -217,7 +195,7 @@ export function SpectroscopyManualCorrection({
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border border-base-300 bg-base-100 shadow-sm">
+    <div className="overflow-hidden rounded-[var(--radius-box)] border border-base-300 bg-base-100 shadow-sm">
       <div className="flex flex-col gap-3 border-b border-base-300 bg-base-200/50 p-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
@@ -225,14 +203,15 @@ export function SpectroscopyManualCorrection({
             <h3 className="text-sm font-medium">Manual spectroscopy correction</h3>
           </div>
           <p className="mt-1 max-w-2xl text-xs leading-relaxed text-base-content/60">
-            Enter the values read from the stored figure. The measurement is preserved and a linked
-            ManualParameterEdit result updates only the fields changed here.
+            Enter the operating values read from the stored figure. The measured frequency and the
+            original result are preserved; a linked ManualParameterEdit result updates only the
+            fields changed here.
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {jsonFigurePaths.length > 0 && (
-            <button className="btn btn-sm btn-outline gap-2" onClick={openPicker}>
-              <Crosshair size={14} />
+            <button className="btn btn-sm btn-outline" onClick={openPicker}>
+              <Crosshair data-icon="inline-start" />
               Pick x/y from plot
             </button>
           )}
@@ -273,9 +252,8 @@ export function SpectroscopyManualCorrection({
             </thead>
             <tbody>
               {names.map((name) => {
-                const measuredRaw = parameterRaw(outputParameters, name);
-                const measured = parameterValue(measuredRaw);
-                const current = parameterValue(parameterRaw(currentData, name));
+                const measured = parameterValue(measuredOutput(name));
+                const current = parameterValue(currentData[name]);
                 const baseline = baselines[name];
                 const changed = parseFinite(values[name]) !== baseline;
                 return (
@@ -308,7 +286,7 @@ export function SpectroscopyManualCorrection({
                         )}
                       </div>
                     </td>
-                    <td>{parameterUnit(measuredRaw, name)}</td>
+                    <td>{parameterUnit(measuredOutput(name), name)}</td>
                   </tr>
                 );
               })}
@@ -357,7 +335,7 @@ export function SpectroscopyManualCorrection({
                   <li key={name} className="flex items-center justify-between gap-4 px-3 py-2.5">
                     <span className="min-w-0 truncate font-mono text-xs">{name}</span>
                     <span className="shrink-0 font-mono text-xs font-medium">
-                      {values[name]} {parameterUnit(parameterRaw(outputParameters, name), name)}
+                      {values[name]} {parameterUnit(measuredOutput(name), name)}
                     </span>
                   </li>
                 ))}
@@ -410,7 +388,7 @@ export function SpectroscopyManualCorrection({
           </div>
           <div className="min-h-0 flex-1 overflow-auto bg-base-200 p-3 sm:p-5">
             {jsonFigurePaths[0] && (
-              <div className="mx-auto w-fit max-w-full overflow-auto rounded-xl border border-base-300 bg-base-100 p-3 shadow-sm">
+              <div className="mx-auto w-fit max-w-full overflow-auto rounded-[var(--radius-box)] border border-base-300 bg-base-100 p-3 shadow-sm">
                 <PlotlyRenderer
                   fullPath={`/api/executions/figure?path=${encodeURIComponent(jsonFigurePaths[0])}`}
                   onClick={handlePlotClick}
@@ -456,31 +434,37 @@ export function SpectroscopyManualCorrection({
   );
 }
 
-export function spectroscopyCorrectionParameterNames(
+/** Operational parameter names an operator may correct from a spectroscopy result. */
+export function spectroscopyCorrectionParameterNames(taskName: string): string[] {
+  return Object.keys(CORRECTION_PARAMETERS[taskName] ?? {});
+}
+
+/** Source output that holds the measured value shown next to a correction field. */
+export function sourceOutputName(taskName: string, parameterName: string): string {
+  return CORRECTION_PARAMETERS[taskName]?.[parameterName] ?? parameterName;
+}
+
+/** Corrected operating values derived from a point picked on the spectroscopy figure. */
+export function correctionValuesFromPoint(
   taskName: string,
-  taskStatus: string,
-  outputParameterNames: string[],
-  outputParameters: Record<string, unknown>,
-): string[] {
-  const failedTaskNames =
-    taskStatus === "failed" ? (FAILED_TASK_PARAMETER_NAMES[taskName] ?? []) : [];
-  return [
-    ...new Set(
-      [...outputParameterNames, ...Object.keys(outputParameters), ...failedTaskNames].map(
-        canonicalParameterName,
+  point: PickedPoint,
+): Record<string, string> {
+  const { x, y } = point;
+  if (taskName === "CheckResonatorSpectroscopy") {
+    return {
+      readout_frequency: String(x),
+      readout_amplitude: String(10 ** (y / 20)),
+    };
+  }
+  if (taskName === "CheckQubitSpectroscopy") {
+    return {
+      control_frequency: String(x),
+      coarse_control_amplitude: String(
+        Math.min(10 ** ((y + COARSE_CONTROL_AMPLITUDE_HEADROOM_DB) / 20), 1),
       ),
-    ),
-  ];
-}
-
-function canonicalParameterName(name: string): string {
-  return name === "anharmonicity" ? "qubit_anharmonicity" : name;
-}
-
-function parameterRaw(parameters: Record<string, unknown>, name: string): unknown {
-  if (name in parameters) return parameters[name];
-  if (name === "qubit_anharmonicity") return parameters.anharmonicity;
-  return undefined;
+    };
+  }
+  return {};
 }
 
 function parameterValue(raw: unknown): number | null {

@@ -8,6 +8,7 @@ import {
   FileDiff,
   FilePenLine,
   LineChart,
+  Tags,
   Terminal,
   Wrench,
 } from "lucide-react";
@@ -25,7 +26,18 @@ type ToolStep = Extract<TraceStep, { kind: "tool" }>;
 
 const WORKSPACE_TOOLS = new Set(["bash", "read", "write", "edit"]);
 
-export function isWorkspaceTool(tool: string): boolean {
+/** The tool that asks the configured classifier model (agent-runtime classify-tool.ts). */
+const CLASSIFY_TOOL = "classify";
+
+/** The tool that runs a JavaScript script calling read-only QDash tools (agent-runtime codemode.ts). */
+const CODEMODE_TOOL = "codemode";
+
+/** Language of a tool call's `code` argument. */
+function codeLanguage(tool: string): string {
+  return tool === CODEMODE_TOOL ? "javascript" : "python";
+}
+
+function isWorkspaceTool(tool: string): boolean {
   return WORKSPACE_TOOLS.has(tool);
 }
 
@@ -34,6 +46,8 @@ export function toolIcon(tool: string) {
   if (tool === "read") return FileCode;
   if (tool === "write") return FilePenLine;
   if (tool === "edit") return FileDiff;
+  if (tool === CLASSIFY_TOOL) return Tags;
+  if (tool === CODEMODE_TOOL) return Code2;
   if (tool.includes("python") || tool.endsWith("_flow")) return Code2;
   if (tool.includes("chart") || tool.includes("timeseries") || tool.includes("plot")) {
     return LineChart;
@@ -78,26 +92,41 @@ function firstLine(value: string): string {
   return line.length > 90 ? `${line.slice(0, 90)}…` : line;
 }
 
-/** A short one-line hint of what the tool was asked, e.g. `qid: 0, parameter: t1`. */
-function argsPreview(args: unknown): string | null {
-  const entries = Object.entries(record(args) ?? {}).filter(
-    ([, v]) => v !== null && v !== undefined && v !== "",
-  );
-  if (entries.length === 0) return null;
-  const line = entries
-    .map(([k, v]) => `${k}: ${typeof v === "string" ? v.split("\n")[0] : JSON.stringify(v)}`)
-    .join(", ");
-  return line.length > 90 ? `${line.slice(0, 90)}…` : line;
+/** Words that only set up the command that follows them. */
+const COMMAND_PREFIXES = new Set(["sudo", "env", "time", "nohup", "exec", "command"]);
+
+/**
+ * The program a shell command runs, for a short row title: `bun` for
+ * `cd ui && bun run test`. It reads only the first line and skips a leading
+ * `cd`, environment assignments and wrapper words; anything it does not
+ * recognise as a plain program name gives null, so the caller falls back to a
+ * generic title instead of showing a fragment of the command.
+ */
+export function commandName(command: string | undefined): string | null {
+  if (!command) return null;
+  const line = command.split("\n").find((l) => l.trim()) ?? "";
+  // This is a display hint, not a shell parser. Quoting, escapes and expansion
+  // can hide whitespace or separators inside values; never display their fragments.
+  if (/["'`\\$]/.test(line)) return null;
+  for (const segment of line.split(/&&|\|\||;|\|/)) {
+    const words = segment.trim().split(/\s+/).filter(Boolean);
+    while (words.length > 0 && (/^\w+=/.test(words[0]) || COMMAND_PREFIXES.has(words[0]))) {
+      words.shift();
+    }
+    const program = words[0]?.split("/").pop();
+    if (!program || program === "cd") continue;
+    return /^[\w][\w.+-]{0,31}$/.test(program) ? program : null;
+  }
+  return null;
 }
 
-/** The one-line hint next to a step's label: the command, the file, or the arguments. */
+/**
+ * A short, curated hint next to a step's title, such as an edit count or a
+ * flow name. Raw commands, code and arguments stay in the details.
+ */
 export function stepPreview(step: ToolStep): string | null {
   const args = record(step.status === "drafting" ? step.draft : step.args);
-  if (!args) return step.status === "drafting" ? "writing…" : null;
-  if (step.tool === "bash") {
-    const command = text(args.command);
-    return command ? `$ ${firstLine(command)}` : null;
-  }
+  if (!args || step.tool === "bash") return null;
   if (isWorkspaceTool(step.tool)) {
     // The path is in the title; only an edit count adds anything.
     const edits = Array.isArray(args.edits) ? args.edits.length : 0;
@@ -107,7 +136,11 @@ export function stepPreview(step: ToolStep): string | null {
     const name = text(args.name);
     return name ? `flow ${name}` : null;
   }
-  return argsPreview(args);
+  if (step.tool === CLASSIFY_TOOL) {
+    const question = text(args.question);
+    return question ? firstLine(question) : null;
+  }
+  return null;
 }
 
 /** How long the shown text may trail the streamed text while catching up. */
@@ -197,16 +230,48 @@ export function stepTitle(step: ToolStep): string {
     }
   }
   switch (step.tool) {
-    case "bash":
-      return drafting ? "Writing a command" : step.status === "running" ? "Running" : "Ran";
+    case "bash": {
+      if (drafting) return "Writing a command";
+      const program = commandName(text(args?.command));
+      const verb = step.status === "running" ? "Running" : "Ran";
+      return `${verb} ${program ?? "a command"}`;
+    }
     case "write":
       return `${drafting || step.status === "running" ? "Writing" : "Wrote"}${path ? ` ${path}` : ""}`;
     case "edit":
       return `${drafting || step.status === "running" ? "Editing" : "Edited"}${path ? ` ${path}` : ""}`;
     case "read":
       return `${step.status === "done" || step.status === "error" ? "Read" : "Reading"}${path ? ` ${path}` : ""}`;
+    case CODEMODE_TOOL:
+      return drafting
+        ? "Writing a script"
+        : step.status === "running"
+          ? "Running a script"
+          : "Ran a script";
     case "qdash_save_flow":
       return drafting ? `Writing flow${name ? ` ${name}` : ""}` : step.label;
+    case CLASSIFY_TOOL: {
+      if (drafting) return "Writing a classification question";
+      if (step.status === "running") return "Classifying";
+      if (step.status === "error") return "Classification failed";
+      const outcome = step.classification?.outcome;
+      const category = step.classification?.category;
+      if (step.status === "done" && outcome === "classified" && category) {
+        return `Classified as ${category}`;
+      }
+      if (step.status === "done" && outcome === "ambiguous") return "Classification unclear";
+      return step.status === "done" ? "Classified" : step.label;
+    }
+    // The waiting tools: while running, the turn is parked on QDash, not working.
+    case "qdash_wait_agent_intervention":
+      if (step.status === "running") return "Waiting for the expert's answer";
+      return step.status === "done" ? "Expert answer received" : step.label;
+    case "qdash_wait_agent_action":
+      if (step.status === "running") return "Waiting for the calibration step to finish";
+      return step.status === "done" ? "Calibration step ended" : step.label;
+    case "qdash_wait_execution":
+      if (step.status === "running") return "Waiting for the execution to finish";
+      return step.status === "done" ? "Execution ended" : step.label;
     default:
       return drafting ? `Writing a ${step.label.toLowerCase()} call` : step.label;
   }
@@ -221,7 +286,7 @@ function DraftView({ step }: { step: ToolStep }) {
     draft.command !== undefined
       ? "bash"
       : draft.code !== undefined
-        ? "python"
+        ? codeLanguage(step.tool)
         : languageForPath(path);
   const others = Object.entries(draft).filter(
     ([key]) => !["content", "code", "command"].includes(key),
@@ -249,10 +314,22 @@ function DraftView({ step }: { step: ToolStep }) {
   );
 }
 
+/**
+ * Code a call ran, held to a bounded scroll box so an expanded script does not
+ * push the newest output far below the fold.
+ */
+function BoundedCode(props: Parameters<typeof CodeBlock>[0]) {
+  return (
+    <div className="max-h-72 overflow-y-auto" data-testid="tool-code">
+      <CodeBlock compact {...props} />
+    </div>
+  );
+}
+
 function PathLine({ path, detail }: { path: string | undefined; detail?: string }) {
   if (!path) return null;
   return (
-    <div className="mb-1 font-mono text-xs text-base-content/60">
+    <div className="mb-1 break-all font-mono text-xs text-base-content/60">
       {path}
       {detail && <span className="text-base-content/40"> · {detail}</span>}
     </div>
@@ -305,39 +382,56 @@ function EditsView({ edits }: { edits: unknown[] }) {
 }
 
 /** Any tool's arguments: source as code, the rest as JSON. */
-function ArgsView({ args }: { args: unknown }) {
+function ArgsView({ tool, args }: { tool: string; args: unknown }) {
   if (args === undefined || args === null) return null;
-  if (typeof args === "string")
-    return (
-      <CodeBlock compact language="json">
-        {args}
-      </CodeBlock>
-    );
+  if (typeof args === "string") return <BoundedCode language="json">{args}</BoundedCode>;
   const values = record(args) ?? {};
   const source =
     typeof values.command === "string"
       ? { key: "command", language: "bash" }
       : typeof values.code === "string"
-        ? { key: "code", language: "python" }
+        ? { key: "code", language: codeLanguage(tool) }
         : undefined;
-  if (!source)
-    return (
-      <CodeBlock compact language="json">
-        {JSON.stringify(args, null, 2)}
-      </CodeBlock>
-    );
+  if (!source) return <BoundedCode language="json">{JSON.stringify(args, null, 2)}</BoundedCode>;
   const { [source.key]: code, ...rest } = values;
   return (
     <>
-      <CodeBlock compact language={source.language}>
-        {String(code)}
-      </CodeBlock>
+      <BoundedCode language={source.language}>{String(code)}</BoundedCode>
       {Object.keys(rest).length > 0 && (
-        <CodeBlock compact language="json">
-          {JSON.stringify(rest, null, 2)}
-        </CodeBlock>
+        <BoundedCode language="json">{JSON.stringify(rest, null, 2)}</BoundedCode>
       )}
     </>
+  );
+}
+
+/** What the assistant asked the classifier: the question, the candidates and the context. */
+function ClassifyArgsView({ args }: { args: Record<string, unknown> }) {
+  const question = text(args.question);
+  const context = text(args.context);
+  const categories = (Array.isArray(args.categories) ? args.categories : []).flatMap((entry) => {
+    const category = record(entry);
+    const name = text(category?.name);
+    return name ? [{ name, description: text(category?.description) }] : [];
+  });
+  return (
+    <div className="space-y-1.5 text-xs">
+      {question && <p className="text-base-content/75">{question}</p>}
+      {categories.length > 0 && (
+        <dl className="grid grid-cols-[minmax(0,auto)_minmax(0,1fr)] gap-x-3 gap-y-0.5">
+          {categories.map((category) => (
+            <div key={category.name} className="contents">
+              <dt className="font-mono text-base-content/60">{category.name}</dt>
+              <dd className="m-0 min-w-0 text-base-content/55">{category.description}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+      {context && (
+        <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded-md bg-base-200/60 p-2 font-mono leading-relaxed text-base-content/65">
+          {context}
+        </pre>
+      )}
+    </div>
   );
 }
 
@@ -354,11 +448,7 @@ export function ToolDetails({ step }: { step: ToolStep }) {
     const command = text(args?.command);
     return (
       <div>
-        {command && (
-          <CodeBlock compact language="bash">
-            {command}
-          </CodeBlock>
-        )}
+        {command && <BoundedCode language="bash">{command}</BoundedCode>}
         <OutputPanel step={step} />
       </div>
     );
@@ -370,9 +460,9 @@ export function ToolDetails({ step }: { step: ToolStep }) {
       <div>
         {content === undefined && <PathLine path={path} />}
         {content !== undefined && (
-          <CodeBlock compact language={languageForPath(path)} title={path}>
+          <BoundedCode language={languageForPath(path)} title={path}>
             {content}
-          </CodeBlock>
+          </BoundedCode>
         )}
         <OutputPanel step={step} />
       </div>
@@ -384,6 +474,19 @@ export function ToolDetails({ step }: { step: ToolStep }) {
       <div>
         <PathLine path={text(args?.path)} />
         {edits.length > 0 && <EditsView edits={edits} />}
+        <OutputPanel step={step} />
+      </div>
+    );
+  }
+  if (step.tool === CLASSIFY_TOOL && args) {
+    return <ClassifyArgsView args={args} />;
+  }
+  if (step.tool === CODEMODE_TOOL) {
+    // The script, then what it printed and one line per tool call it made.
+    const code = text(args?.code);
+    return (
+      <div>
+        {code && <BoundedCode language="javascript">{code}</BoundedCode>}
         <OutputPanel step={step} />
       </div>
     );
@@ -404,7 +507,7 @@ export function ToolDetails({ step }: { step: ToolStep }) {
   }
   return (
     <div>
-      <ArgsView args={step.args} />
+      <ArgsView tool={step.tool} args={step.args} />
       <OutputPanel step={step} />
     </div>
   );

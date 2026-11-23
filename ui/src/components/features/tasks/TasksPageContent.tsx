@@ -24,6 +24,7 @@ import {
 import { SelectedLabel } from "@/components/ui/SelectedLabel";
 import { EditorPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { useToast } from "@/components/ui/Toast";
+import { copyText } from "@/lib/utils/clipboard";
 
 import { TaskWorkbench } from "./TaskWorkbench";
 import { useGetTaskResult } from "@/client/task/task";
@@ -139,7 +140,7 @@ function TasksCatalog({ sourceTask }: { sourceTask?: TaskResultResponse }) {
 
   const copyTaskName = async (taskName: string) => {
     try {
-      await navigator.clipboard.writeText(taskName);
+      await copyText(taskName);
       toast.success(`Copied: ${taskName}`);
     } catch {
       toast.error("Failed to copy to clipboard");
@@ -255,7 +256,7 @@ function TasksCatalog({ sourceTask }: { sourceTask?: TaskResultResponse }) {
                                 setExecutionTarget(null);
                               }}
                             >
-                              <Braces className="shrink-0 text-purple-400" size={14} />
+                              <Braces className="shrink-0 text-base-content/60" size={14} />
                               <span className="truncate text-sm text-base-content/80">
                                 {task.name}
                               </span>

@@ -21,10 +21,12 @@ interface AskAiButtonProps {
   size?: "xs" | "sm";
   variant?: "primary" | "outline";
   className?: string;
+  /** Called once an evaluation has been requested, so the host can show it is on its way. */
+  onRequested?: () => void;
 }
 
 /**
- * The one "Ask AI" entry for a single task result, everywhere a result is
+ * The one "Ask Agent" entry for a single task result, everywhere a result is
  * shown: the same request modal as the chip page's Evaluate, with the choice
  * of a recorded evaluation (model only or via Copilot) or a chat about the
  * result. A viewer who cannot request evaluations goes straight to the chat.
@@ -39,6 +41,7 @@ export function AskAiButton({
   size = "sm",
   variant = "primary",
   className = "",
+  onRequested,
 }: AskAiButtonProps) {
   const { canEdit } = useProject();
   const { openTaskChat } = useChatDock();
@@ -55,7 +58,7 @@ export function AskAiButton({
     return (
       <button type="button" className={buttonClass} onClick={chat} title="Chat about this result">
         <Bot className={iconClass} />
-        Ask AI
+        Ask Agent
       </button>
     );
   }
@@ -74,7 +77,7 @@ export function AskAiButton({
         }
       >
         <Bot className={iconClass} />
-        Ask AI
+        Ask Agent
       </button>
       {ready && (
         <EvaluationRequestModal
@@ -89,6 +92,7 @@ export function AskAiButton({
           }}
           scopeLabel={`${taskName} · ${qid}`}
           onChat={chat}
+          onRequested={onRequested}
         />
       )}
     </>

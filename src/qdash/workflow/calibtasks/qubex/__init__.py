@@ -34,6 +34,7 @@ from qdash.workflow.calibtasks.qubex.measurement.check_ckp import CheckCKP
 from qdash.workflow.calibtasks.qubex.measurement.check_cpmg_noise_spectroscopy import (
     CheckCPMGNoiseSpectroscopy,
 )
+from qdash.workflow.calibtasks.qubex.measurement.check_gef_relaxation import CheckGEFRelaxation
 from qdash.workflow.calibtasks.qubex.measurement.check_quantum_efficiency import (
     CheckQuantumEfficiency,
 )
@@ -114,6 +115,7 @@ __all__ = [
     "CheckDRAGHPIPulse",
     "CheckDRAGPIPulse",
     "CheckEFRabi",
+    "CheckGEFRelaxation",
     "CheckHPIPulse",
     "CheckJAZZ",
     "CheckNoise",

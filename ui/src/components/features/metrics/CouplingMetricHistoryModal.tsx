@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import Link from "next/link";
 
 import { ArrowRightLeft, ChevronRight, GitBranch, History, ListTodo, FileText } from "lucide-react";
 
@@ -16,7 +15,7 @@ import { formatDateTime, formatDateTimeCompact } from "@/lib/utils/datetime";
 import { useManualOverrides } from "@/hooks/useManualOverrides";
 
 import { ParametersTable } from "./ParametersTable";
-import { AskAiButton } from "@/components/features/evaluations/AskAiButton";
+import { LineageButton } from "@/components/features/provenance/ParameterLineageDialog";
 import { TaskResultEvaluations } from "@/components/features/evaluations/TaskResultEvaluations";
 import { TaskResultThreads } from "@/components/features/forum/TaskResultThreads";
 import { TaskResultExcludeButton } from "./TaskResultExcludeButton";
@@ -206,10 +205,10 @@ export function CouplingMetricHistoryModal({
     <div className="flex items-center gap-2">
       <button
         onClick={handleDirectionToggle}
-        className={`btn btn-sm gap-1.5 ${isReversed ? "btn-secondary" : "btn-outline"}`}
+        className={`btn btn-sm ${isReversed ? "btn-secondary" : "btn-outline"}`}
         title={`Switch to ${isReversed ? couplingId : reversedCouplingId}`}
       >
-        <ArrowRightLeft className="h-3.5 w-3.5" />
+        <ArrowRightLeft data-icon="inline-start" />
         <span className="font-mono text-xs">{activeCouplingId}</span>
       </button>
     </div>
@@ -540,26 +539,15 @@ export function CouplingMetricHistoryModal({
               </span>
             </div>
           )}
-          {/* Provenance link and Ask AI */}
+          {/* Lineage */}
           <div className="pt-2 mt-2 border-t border-base-300 flex items-center gap-2 flex-wrap">
-            <Link
-              href={`/provenance?parameter=${encodeURIComponent(metricName)}&qid=${encodeURIComponent(activeCouplingId)}&tab=lineage`}
-              className="btn btn-xs btn-outline gap-1"
+            <LineageButton
+              target={{ parameterName: metricName, qid: activeCouplingId }}
+              className="btn btn-xs btn-outline"
             >
-              <GitBranch className="h-3 w-3" />
-              View Provenance Lineage
-            </Link>
-            {chatContext && (
-              <AskAiButton
-                taskId={chatContext.taskId}
-                chipId={chatContext.chipId}
-                taskName={chatContext.taskName}
-                qid={chatContext.qid}
-                chatContext={chatContext}
-                onChat={() => openMiniChat(chatContext)}
-                size="xs"
-              />
-            )}
+              <GitBranch data-icon="inline-start" />
+              Lineage
+            </LineageButton>
             {selectedHistoryItem?.task_id && (
               <TaskResultExcludeButton
                 taskId={selectedHistoryItem.task_id}
@@ -575,7 +563,7 @@ export function CouplingMetricHistoryModal({
 
       {/* Input/Output Parameters */}
       {selectedTask && (
-        <div className="flex flex-col gap-2 mt-2">
+        <div className="flex flex-col gap-2 mt-2 mb-6">
           {selectedTask.input_parameters &&
             Object.keys(selectedTask.input_parameters).length > 0 && (
               <ParametersTable
@@ -610,6 +598,7 @@ export function CouplingMetricHistoryModal({
           chipId={chipId}
           taskName={selectedTask.name || undefined}
           qid={activeCouplingId}
+          executionId={selectedExecutionId || undefined}
           onChat={chatContext ? () => openMiniChat(chatContext) : undefined}
         />
       )}

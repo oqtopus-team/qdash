@@ -6,6 +6,7 @@ import asyncio
 import logging
 from typing import TYPE_CHECKING, Annotated, Any
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response, StreamingResponse
 from fastapi.security import (
@@ -28,10 +29,11 @@ from qdash.api.lib.project import (
     get_project_context,
     get_project_id_from_header,
 )
-from qdash.api.lib.sse import sse_event
+from qdash.api.lib.sse import ClosingStreamingResponse, sse_event
 from qdash.api.schemas.auth import User
 from qdash.api.schemas.copilot_chat_session import (
     CopilotChatSessionResponse,
+    CreateCopilotChatBranchRequest,
     CreateCopilotChatSessionRequest,
     ListCopilotChatSessionsResponse,
     UpdateCopilotChatSessionRequest,
@@ -39,6 +41,7 @@ from qdash.api.schemas.copilot_chat_session import (
 from qdash.api.schemas.copilot_preferences import (
     CopilotPreferences,
     CopilotPreferencesUpdate,
+    CopilotSkillList,
     CopilotSystemPrompt,
 )
 from qdash.api.schemas.copilot_source import (
@@ -48,15 +51,22 @@ from qdash.api.schemas.copilot_source import (
     SourceRootResponse,
     SourceSearchMatch,
 )
-from qdash.api.services import pi_chat_service
+from qdash.api.services import chat_turn_runs, pi_chat_service
 from qdash.api.services.copilot_chat_session_service import (
+    ChatUnavailableError,
     CopilotChatSessionService,
+    ForkedBranch,
+    ReleaseStore,
+    RuntimeTarget,
+    StopChat,
+    StopOutcome,
+    request_turn_stop,
 )
 from qdash.api.services.copilot_investigation_service import (
     CopilotInvestigationService,
     InvestigationNotFoundError,
 )
-from qdash.api.services.evaluation_service import EvaluationService
+from qdash.api.services.evaluation_service import ChatTurnRefusedError, EvaluationService
 from qdash.api.services.source_access_service import SourceAccessError, SourceAccessService
 from qdash.copilot.config import (
     CopilotConfig,
@@ -64,7 +74,12 @@ from qdash.copilot.config import (
     select_chat_model,
 )
 from qdash.copilot.contracts import (
+    ChatActiveRequest,
+    ChatActiveResponse,
     ChatRequest,
+    ChatSteerRequest,
+    ChatSteerResponse,
+    ChatSteerStatusRequest,
     ChatStopRequest,
     ChatStopResponse,
     TaskContextBundle,
@@ -76,6 +91,39 @@ from qdash.datamodel.task_knowledge import get_task_knowledge
 router = APIRouter()
 public_router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+async def _runtime_target(username: str, session_id: str) -> RuntimeTarget:
+    """Where the runtime keeps the user's chat, from its stored session; never from the request."""
+    try:
+        return await pi_chat_service.runtime_target(username, session_id)
+    except ChatUnavailableError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+
+def _store_release(username: str, *, attempts: int) -> ReleaseStore:
+    """Remove a store no session of the user uses any more, stopping deleted chats' turns."""
+
+    async def release(
+        store: str, generation: str, deleted_chats: list[tuple[str, RuntimeTarget]]
+    ) -> bool:
+        return await pi_chat_service.remove_runtime_store(
+            username, store, generation, deleted_chats, attempts=attempts
+        )
+
+    return release
+
+
+def _deleted_chat_stopper(username: str, auth: pi_chat_service.QDashAuth) -> StopChat:
+    """Stop exactly one deleted chat's turn, and the work its store kept for it from
+    before a restart, reporting whether the runtime confirmed it."""
+
+    async def stop(session_id: str, target: RuntimeTarget) -> StopOutcome:
+        return await pi_chat_service.abort_runtime_turn(
+            username, session_id, target, stored_with=auth
+        )
+
+    return stop
 
 
 def _config_with_chat_model(config: CopilotConfig, request: ChatRequest) -> CopilotConfig:
@@ -129,10 +177,133 @@ async def chat_stop(
     """Stop the turn running for a chat session.
 
     Closing the SSE stream alone does not cancel the runtime's turn, so the
-    chat's Stop button calls this explicitly.
+    chat's Stop button calls this explicitly. It stops only this chat's turn,
+    never one of another branch that shares its store.
     """
-    stopped = await pi_chat_service.abort_runtime_turn(current_user.username, request.session_id)
-    return ChatStopResponse(stopped=stopped)
+    try:
+        target = await pi_chat_service.runtime_target(current_user.username, request.session_id)
+    except ChatUnavailableError:
+        return ChatStopResponse(stopped=False)
+    # Noted before the runtime stops it, so the turn's recorded end says stopped, not failed.
+    chat_turn_runs.note_stop(current_user.username, request.session_id, request.turn_request_id)
+    try:
+        await asyncio.to_thread(
+            request_turn_stop,
+            current_user.username,
+            request.session_id,
+            request.turn_request_id,
+        )
+    except Exception:
+        logger.warning("Could not note the stop of session %s", request.session_id, exc_info=True)
+    outcome = await pi_chat_service.abort_runtime_turn(
+        current_user.username,
+        request.session_id,
+        target,
+        turn_request_id=request.turn_request_id,
+    )
+    return ChatStopResponse(stopped=outcome == "stopped")
+
+
+@router.post("/chat/active", include_in_schema=False)
+async def chat_active(
+    request: ChatActiveRequest,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer_scheme)],
+    project_id: Annotated[str | None, Depends(get_project_id_from_header)],
+) -> ChatActiveResponse:
+    """Which turn runs a chat session now, so another window can follow it.
+
+    Read-only: it never sends a message or starts a run. Only the current user's
+    own chat is looked up, and the turn is named only in the project it was sent
+    from; the window then reattaches with that request ID, which submits nothing.
+    """
+    try:
+        target = await pi_chat_service.runtime_target(current_user.username, request.session_id)
+    except ChatUnavailableError as exc:
+        # A chat that is gone runs nothing; one still being created or cleaned up may.
+        if exc.status_code == 404:
+            return ChatActiveResponse(running=False)
+        return ChatActiveResponse(running=False, unavailable=True)
+    auth = pi_chat_service.QDashAuth(
+        access_token=credentials.credentials,
+        project_id=project_id or current_user.default_project_id,
+    )
+    result = await pi_chat_service.active_runtime_turn(
+        current_user.username, request.session_id, auth=auth, target=target
+    )
+    return ChatActiveResponse(**result)
+
+
+@router.post("/chat/steer", include_in_schema=False)
+async def chat_steer(
+    request: ChatSteerRequest,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer_scheme)],
+    project_id: Annotated[str | None, Depends(get_project_id_from_header)],
+) -> ChatSteerResponse:
+    """Send a message to the answer being written for a chat session.
+
+    The running turn reads it after its current step, without starting a new
+    one. It reaches only the current user's own running turn, in the same
+    project; ``rejected`` means nothing was running and the message should be
+    sent as a new one.
+    """
+    auth = pi_chat_service.QDashAuth(
+        access_token=credentials.credentials,
+        project_id=project_id or current_user.default_project_id,
+    )
+    target = await _runtime_target(current_user.username, request.session_id)
+    try:
+        result = await pi_chat_service.steer_runtime_turn(
+            current_user.username,
+            request.session_id,
+            request_id=request.request_id,
+            turn_request_id=request.turn_request_id,
+            message=request.message,
+            auth=auth,
+            target=target,
+        )
+    except pi_chat_service.SteerRefusedError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    except (httpx.HTTPError, RuntimeError) as exc:
+        logger.warning("Could not steer Pi turn for session %s", request.session_id, exc_info=True)
+        raise HTTPException(status_code=502, detail="The Copilot runtime is not reachable") from exc
+    return ChatSteerResponse(**result)
+
+
+@router.post("/chat/steer/status", include_in_schema=False)
+async def chat_steer_status(
+    request: ChatSteerStatusRequest,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer_scheme)],
+    project_id: Annotated[str | None, Depends(get_project_id_from_header)],
+) -> ChatSteerResponse:
+    """Where a message sent while an answer was written stands, without sending it.
+
+    Read-only: it never sends the message or starts a run. The chat asks after
+    its stream ended before it saw where the message landed. ``not_found`` means
+    it was never admitted, and a request with the same ID will not be admitted
+    later; a steer from another project is refused.
+    """
+    auth = pi_chat_service.QDashAuth(
+        access_token=credentials.credentials,
+        project_id=project_id or current_user.default_project_id,
+    )
+    target = await _runtime_target(current_user.username, request.session_id)
+    try:
+        result = await pi_chat_service.steer_runtime_status(
+            current_user.username,
+            request.session_id,
+            request_id=request.request_id,
+            auth=auth,
+            target=target,
+        )
+    except pi_chat_service.SteerRefusedError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    except (httpx.HTTPError, RuntimeError) as exc:
+        logger.warning("Could not read a steer for session %s", request.session_id, exc_info=True)
+        raise HTTPException(status_code=502, detail="The Copilot runtime is not reachable") from exc
+    return ChatSteerResponse(**result)
 
 
 def _figures_status(bundle: TaskContextBundle) -> str | None:
@@ -168,14 +339,22 @@ async def chat_stream(
     project, and the source the assistant can read. Otherwise it is a general
     chat, optionally scoped by chip_id/qid.
     """
+    # Refused here, before streaming, for a branch still being created or a deleted chat.
+    target = (
+        await _runtime_target(current_user.username, request.session_id)
+        if request.session_id
+        else None
+    )
     investigation_message: str | None = None
-    if request.investigation is not None:
+    # A continue adds no message: the conversation already holds its opening context.
+    # A reattach sends nothing at all.
+    if request.investigation is not None and not request.continue_run and not request.reattach:
         if request.task is not None:
             raise HTTPException(
                 status_code=400, detail="A chat cannot set both task and investigation"
             )
         # The logs come from the project the user may read, checked before streaming.
-        ctx: ProjectContext = get_project_context(current_user, project_id)
+        ctx: ProjectContext = await asyncio.to_thread(get_project_context, current_user, project_id)
         try:
             investigation = await asyncio.to_thread(
                 investigation_service.build,
@@ -190,7 +369,7 @@ async def chat_stream(
             ) from exc
         investigation_message = investigation.opening_message
 
-    async def event_generator() -> AsyncGenerator[str, None]:
+    async def event_generator(request: ChatRequest) -> AsyncGenerator[str, None]:
         config = load_copilot_config()
         if not config.enabled:
             yield sse_event("error", {"step": "init", "detail": "Copilot is not enabled"})
@@ -199,7 +378,7 @@ async def chat_stream(
 
         task_bundle = None
         images_sent: dict[str, Any] | None = None
-        if request.task is not None:
+        if request.task is not None and not request.continue_run and not request.reattach:
             yield sse_event(
                 "status",
                 {"step": "build_context", "message": "タスク結果のコンテキストを構築中..."},
@@ -227,18 +406,34 @@ async def chat_stream(
 
         effective_project = project_id or current_user.default_project_id
         # The planner's own qcal_evaluate calls are kept as evaluations
-        # (trigger "chat"), so every model judgement is on one ledger.
-        recorder = (
-            evaluation_service.chat_recorder(
-                project_id=effective_project,
-                username=current_user.username,
-                session_id=request.session_id,
-                planner_model=f"{chat_config.model.provider}/{chat_config.model.name}",
-                task_id=request.task.task_id if request.task else None,
-            )
-            if effective_project
-            else None
-        )
+        # (trigger "chat"), so every model judgement is on one ledger. The turn's
+        # first request stores the project, planner model and task it was sent
+        # with; every later request of the turn (a retry, or a reattach replaying
+        # it) files the turn's evaluations under that record, never under what it
+        # says itself. Each call is named by its result's durable entry, so a call
+        # two streams of the turn both saw is stored once.
+        recorder = None
+        if effective_project:
+            try:
+                recorder = await asyncio.to_thread(
+                    evaluation_service.chat_turn_recorder,
+                    project_id=effective_project,
+                    username=current_user.username,
+                    session_id=request.session_id,
+                    request_id=request.request_id,
+                    planner_model=f"{chat_config.model.provider}/{chat_config.model.name}",
+                    task_id=request.task.task_id if request.task else None,
+                    reattach=request.reattach,
+                )
+            except ChatTurnRefusedError as exc:
+                yield sse_event(
+                    "error", {"step": "init", "detail": exc.detail, "code": "wrong_project"}
+                )
+                return
+            except Exception:
+                # The chat still answers; what it evaluates is not filed, as its
+                # provenance could not be stored.
+                logger.exception("Could not store the chat turn of session %s", request.session_id)
         async for event in pi_chat_service.stream(
             request,
             chat_config,
@@ -251,11 +446,41 @@ async def chat_stream(
             images_sent=images_sent,
             recorder=recorder,
             opening_message=investigation_message,
+            target=target,
         ):
             yield event
 
-    return StreamingResponse(
-        event_generator(),
+    async def turn_running() -> bool | None:
+        """Whether the runtime runs a turn of this chat now (read-only).
+
+        None: the runtime could not say, so a turn may still run.
+        """
+        if not request.session_id:
+            return False
+        active = await pi_chat_service.active_runtime_turn(
+            current_user.username,
+            request.session_id,
+            auth=pi_chat_service.QDashAuth(
+                access_token=credentials.credentials,
+                project_id=project_id or current_user.default_project_id,
+            ),
+            target=target,
+        )
+        if active.get("unavailable") is True:
+            return None
+        return active.get("running") is True
+
+    # The turn's stream runs in the API apart from this response: closing it, or every
+    # window, never ends the turn or what the server records of it; it only ends the
+    # response's subscription, at once.
+    return ClosingStreamingResponse(
+        chat_turn_runs.stream_turn(
+            request,
+            username=current_user.username,
+            project_id=project_id or current_user.default_project_id,
+            source=event_generator,
+            turn_running=turn_running,
+        ),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
@@ -267,12 +492,33 @@ async def chat_stream(
     operation_id="listCopilotChatSessions",
     response_model=ListCopilotChatSessionsResponse,
 )
-def list_copilot_chat_sessions(
+async def list_copilot_chat_sessions(
     current_user: Annotated[User, Depends(get_current_active_user)],
+    credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer_scheme)],
     service: Annotated[CopilotChatSessionService, Depends(get_copilot_chat_session_service)],
 ) -> ListCopilotChatSessionsResponse:
-    """Return all persisted chat sessions owned by the current user."""
-    return service.list_sessions(username=current_user.username)
+    """Return all persisted chat sessions owned by the current user.
+
+    First cleans up, best effort, what failed requests of the user left: a
+    branch still pending after its request's lease, and a deleted chat's store
+    the runtime could not remove yet.
+    """
+    username = current_user.username
+    try:
+        await service.reclaim(
+            username=username,
+            release_store=_store_release(username, attempts=1),
+            stop_chat=_deleted_chat_stopper(
+                username,
+                pi_chat_service.QDashAuth(
+                    access_token=credentials.credentials,
+                    project_id=current_user.default_project_id,
+                ),
+            ),
+        )
+    except Exception:
+        logger.warning("Could not clean up chat sessions of %s", username, exc_info=True)
+    return await asyncio.to_thread(service.list_sessions, username=username)
 
 
 @router.get(
@@ -283,11 +529,33 @@ def list_copilot_chat_sessions(
 )
 def get_copilot_chat_session(
     session_id: str,
+    response: Response,
     current_user: Annotated[User, Depends(get_current_active_user)],
+    project_id: Annotated[str | None, Depends(get_project_id_from_header)],
     service: Annotated[CopilotChatSessionService, Depends(get_copilot_chat_session_service)],
 ) -> CopilotChatSessionResponse:
-    """Return one chat session including the full message list."""
-    return service.get_session(username=current_user.username, session_id=session_id)
+    """Return one chat session including the full message list.
+
+    The session's ``turn`` is named only in the project it was sent from, like
+    ``/chat/active``: the project the request names (``X-Project-Id``, else the
+    user's default), and only one the user may read. Elsewhere it is null. As the
+    reply depends on that project, no cache keeps it for a request from another.
+    """
+    response.headers["Cache-Control"] = "private, no-store"
+    response.headers["Vary"] = "Authorization, X-Project-Id"
+    return service.get_session(
+        username=current_user.username,
+        session_id=session_id,
+        project_id=_readable_project(current_user, project_id),
+    )
+
+
+def _readable_project(user: User, project_id: str | None) -> str | None:
+    """The project the request is made in, if the user may read it; else None."""
+    try:
+        return get_project_context(user, project_id).project_id
+    except HTTPException:
+        return None
 
 
 @router.post(
@@ -334,12 +602,81 @@ def update_copilot_chat_session(
 async def delete_copilot_chat_session(
     session_id: str,
     current_user: Annotated[User, Depends(get_current_active_user)],
+    credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer_scheme)],
     service: Annotated[CopilotChatSessionService, Depends(get_copilot_chat_session_service)],
 ) -> dict[str, bool]:
-    """Delete a chat session owned by the current user."""
-    service.delete_session(username=current_user.username, session_id=session_id)
-    await pi_chat_service.delete_runtime_session_state(current_user.username, session_id)
+    """Delete a chat session owned by the current user.
+
+    The chat's own running turn is stopped; a turn of another branch is not.
+    Its runtime store and workspace are removed with the last session that uses
+    them: a chat and its branches share one, so it stays while one is left.
+    When the runtime cannot remove the store yet, the deleted chat is kept,
+    hidden, and the removal is retried by deleting it again or by the next
+    listing of the user's chats.
+    """
+    username = current_user.username
+    # Only proves the user to the runtime: stopping work kept in the store opens no project data.
+    auth = pi_chat_service.QDashAuth(
+        access_token=credentials.credentials, project_id=current_user.default_project_id
+    )
+    await service.delete_session(
+        username=username,
+        session_id=session_id,
+        stop_chat=_deleted_chat_stopper(username, auth),
+        release_store=_store_release(username, attempts=3),
+    )
     return {"deleted": True}
+
+
+@router.post(
+    "/chat/sessions/{session_id}/branches",
+    summary="Branch a chat session from one of its answers",
+    operation_id="branchCopilotChatSession",
+    response_model=CopilotChatSessionResponse,
+)
+async def branch_copilot_chat_session(
+    session_id: str,
+    request: CreateCopilotChatBranchRequest,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer_scheme)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    service: Annotated[CopilotChatSessionService, Depends(get_copilot_chat_session_service)],
+) -> CopilotChatSessionResponse:
+    """Start a new chat session from a saved answer of one of the user's chats.
+
+    The new session continues the conversation as it was at that answer, in the
+    same runtime store: it shares the chat's current workspace files, and the
+    chat and its branches answer one at a time. Only a completed answer the chat
+    saved with its runtime entry ID qualifies, and only while nothing runs in
+    the chat or its branches. The same request again returns the same session.
+    """
+    username = current_user.username
+    auth = pi_chat_service.QDashAuth(
+        access_token=credentials.credentials, project_id=ctx.project_id
+    )
+
+    async def fork(
+        store: str, source_conversation: str | None, entry_id: str, target: str
+    ) -> ForkedBranch:
+        return await pi_chat_service.fork_runtime_branch(
+            username, store, source_conversation, entry_id, target, auth=auth
+        )
+
+    try:
+        return await service.branch_session(
+            username=username,
+            source_session_id=session_id,
+            request=request,
+            project_id=ctx.project_id,
+            fork=fork,
+            release_store=_store_release(username, attempts=3),
+        )
+    except (httpx.HTTPError, RuntimeError) as exc:
+        logger.warning("Could not branch chat session %s", session_id, exc_info=True)
+        raise HTTPException(
+            status_code=502,
+            detail="The Copilot runtime could not create the branch; try again",
+        ) from exc
 
 
 def _source_error(exc: SourceAccessError) -> HTTPException:
@@ -498,3 +835,21 @@ async def get_copilot_system_prompt(
         logger.warning("system prompt unavailable: %s", exc)
         raise HTTPException(status_code=503, detail="The Copilot runtime is not reachable") from exc
     return CopilotSystemPrompt(**result)
+
+
+@router.get(
+    "/skills",
+    response_model=CopilotSkillList,
+    summary="List the skills a chat message can invoke",
+    operation_id="listCopilotSkills",
+)
+async def list_copilot_skills(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+) -> CopilotSkillList:
+    """Skills loaded by the Copilot runtime; a message starting ``/skill:<name>`` runs one."""
+    try:
+        result = await pi_chat_service.skills()
+    except Exception as exc:
+        logger.warning("skills unavailable: %s", exc)
+        raise HTTPException(status_code=503, detail="The Copilot runtime is not reachable") from exc
+    return CopilotSkillList(**result)

@@ -23,7 +23,33 @@ Running a workflow or task requires project edit permission.
 2. Select **Edit** before changing the source, then select **Save**.
 3. Select **Execute**.
 4. Review the flow name, username, chip, and tags in the confirmation dialog.
-5. Confirm the run, then open **Execution** to follow its progress.
+5. Under **Calibration targets**, review the defaults from the saved workflow. To change them
+   for this run, select **MUX IDs** or **Qubit IDs** and enter IDs separated by commas or spaces.
+   For MUX targets, use **Excluded qubit IDs** to omit individual qubits. For a two-qubit workflow
+   that groups selected directed pairs automatically, enter **Coupling pairs** instead, as described below.
+6. Confirm the run, then open **Execution** to follow its progress.
+
+Leaving the target fields unchanged preserves the workflow's code settings. **Use code defaults**
+discards target edits. An explicit change replaces the initial calibration targets throughout the
+current flow run; later filtering steps still apply. The saved workflow and schedules are unchanged.
+A workflow that targets all MUXes, or targets couplings without offering **Coupling pairs**, stops
+with an error when you change its targets.
+
+**Coupling pairs** replaces the MUX and qubit fields for automatic pair workflows, such as
+**2Q Automatic Pairs**. Workflows that choose pairs from qubits or build opaque step lists in
+helper functions do not offer it. Write each pair as `control-target`, for example `63-85`,
+and separate pairs with commas, spaces, or new lines. Direction matters: `85-63` calibrates
+the opposite direction, and each directed pair must exist on the run's chip. QDash groups only
+these pairs using the chip's hardware constraints and the step's parallelism cap. Later filters
+can remove pairs whose qubits no longer qualify.
+
+**2Q Automatic Pairs** requires a saved `coupling_pairs` selection or a selection in **Execute**.
+**2Q Manual Rounds** uses the rounds and targets saved in its source and offers no target override;
+see [Write Two-Qubit Rounds](./manual-execution-rounds.md#write-two-qubit-rounds).
+
+If targets depend on runtime calculations or differ within the workflow, the dialog cannot show a
+single default. Leave the fields unchanged to use the code, or enter an explicit selection for the
+run. Separate nested workflow runs retain their own targets.
 
 Use the workflow schedule panel when the same flow must run automatically. Manage schedules in
 QDash so the workflow and its Prefect deployment remain aligned.
@@ -44,8 +70,8 @@ Alt: Task workbench ready to run one calibration task with resolved inputs and r
    use the current calibration value.
 5. Enable **Reconfigure hardware first** when the current calibration configuration must be
    applied before the task starts.
-6. Enable **Save calibrated outputs to DB** only when successful outputs should become the current
-   calibration values.
+6. Enable **Update calibration values** only when successful outputs should become the current
+   calibration values. The run is saved in task history either way.
 7. Select **Run task** and follow the status in **Results**.
 
 The run button stays disabled while another execution holds the same hardware or until **Reload**
@@ -57,14 +83,47 @@ or saving outputs.
 Open **Execution** to inspect a run's status, task topology, timing, parameters, output, and
 artifacts. Select a task in the topology to open its details, or select a node in the execution
 flow to preview its result in the same side panel that **Task Results** uses; open the full
-result from there.
+result from there. While a run is in progress, its details and its page show how many tasks have
+finished and which one is being measured, and the running task shows its measurement progress.
 
 Cancelling a run sends a cancellation request to the worker. A task that is inside an operation
 that cannot be interrupted can take time to stop.
 
-**Executions per day** at the top of the page counts the chip's runs for the last 7, 30 or 90
-days, stacked by status. Select a bar to limit the list below to that day; select it again to
-return to the latest runs.
+The activity chart groups the chip's runs by status over **7d**, **30d** (default), or **90d**:
+
+- **30d** and **90d** show one column per day.
+- **7d** shows 28 six-hour periods starting at 00:00, 06:00, 12:00, and 18:00 in the
+  deployment's time zone, including the current period.
+
+Empty periods keep their columns. The chart labels how many executions a full block represents;
+a partially filled block holds fewer. Hover over or focus a column for exact counts. Select it
+to filter the list to that day, even in the six-hour view; select the same day again to clear
+the filter.
+
+With **Group agent sessions** on (the default), each agent calibration session is one row of the
+list, holding the runs the agent started. The row shows the session's own state, such as
+**Active** or **Paused for an expert**, not the state of its last run: a session waiting between
+measurements or for an expert is not failed. Expand the row to list its runs and open one in the
+same details panel as any other run; select **Open session graph** to see every step. The count above
+the list gives runs and rows separately, because one session row can hold several runs. With a
+day selected, a session appears when it was approved or started a run that day, and its row
+still lists all of its runs. Turn the switch off for the plain list of runs. See
+[Agent Calibration](./agent-calibration.md#follow-a-session-on-the-execution-page).
+
+A run started for a calibration objective shows the objective as a badge on its card: each step
+of a pipeline run recorded in a calibration session, and each run of an agent session started in
+one. The details panel and the run's page say why it belongs there and offer **Open calibration
+session**; an agent session row offers the same link beside **Open session graph**. A run
+without an objective looks as before, and nothing asks you to create one.
+
+The card names the user whose sign-in started the run. **Agent** marks a run an agent session
+dispatched. **Agent tool, reported** marks a pipeline the assistant's tool started with your
+approval: the tool reports this itself and QDash does not verify it, so the run stays yours.
+Belonging to an objective does not make a run an agent run.
+
+Select **Calibration sessions** at the top of the **Execution** page to list the objectives on
+the selected chip, newest first. Filter them by **Open** or **Closed** or with **Only mine**,
+and remove the chip filter to see every chip. Selecting an objective opens its page.
 
 ## Inspect a Result
 

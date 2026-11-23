@@ -7,7 +7,7 @@ the API. Backend services remain the source of truth for project data and permis
 
 | Layer | Location | Responsibility |
 | --- | --- | --- |
-| Routes | `ui/src/app/` | App Router entry points, layouts, and the Copilot stream proxy |
+| Routes | `ui/src/app/` | App Router entry points and layouts |
 | Feature UI | `ui/src/components/features/` | Page behavior and feature-specific composition |
 | Shared UI | `ui/src/components/ui/` | Reusable interaction and presentation primitives |
 | Layout | `ui/src/components/layout/` | Navigation, global indicators, and chat surfaces |
@@ -28,9 +28,10 @@ settings. Route groups organize layouts without changing URLs.
 authenticated login request to `/execution`. It deliberately passes `/api` requests through;
 FastAPI validates their bearer token and project permissions.
 
-`ui/src/app/api/copilot/chat/route.ts` is the browser-facing proxy for the streaming chat route.
-Other API calls use the generated client through the Next.js `/api` rewrite or
-`NEXT_PUBLIC_API_URL`.
+Caddy forwards every browser `/api` request to the API, including the Copilot chat stream, both
+in Docker Compose and under `task dev-local`. Next.js has no `/api` rewrites or route handlers;
+`ui/src/lib/__tests__/nextConfig.test.ts` keeps it that way. See
+[Browser Entry Point](../architecture.md#browser-entry-point).
 
 ## Provider Order
 
@@ -43,13 +44,16 @@ QueryClientProvider
       └─ AxiosProvider
          └─ ProjectProvider
             └─ ThemeProvider
-               ├─ route content
-               └─ ToastContainer
+               └─ TooltipProvider
+                  └─ LinkHoverCardProvider
+                     ├─ route content
+                     └─ ToastContainer
 ```
 
 Keep this order when adding a provider. `ProjectProvider` uses authenticated generated hooks and
 the shared query client, while feature components expect authentication, project, theme, and toast
-state to be available.
+state to be available. `LinkHoverCardProvider` sits inside `ProjectProvider` because a chat link
+card loads record summaries through project-scoped generated hooks.
 
 ## API Data Flow
 
@@ -85,6 +89,40 @@ or first accessible project. It writes the selection back to the URL and browser
 invalidates queries when the project changes. Feature code uses `useProject()` instead of reading
 that storage directly.
 
+## User Avatars
+
+`UserAvatar` renders a validated `glyph-avatar` spec as an SVG `data:` URI in an `<img>`,
+without an external image service. The package is pinned to `0.1.0`. The automatic spec,
+`v1:<username>::solid:c`, gives the same username the same avatar for that package version.
+It is also the fallback while custom data loads or fails validation or retrieval.
+
+A custom choice from the picker in **Settings** is saved per instance as a spec string. The API
+validates the spec with `parse_avatar_spec` and stores it in the `user_avatar` collection with
+its seed and the generator name and version; it never accepts or stores SVG. Resetting to the
+automatic avatar deletes the record. Records written by an earlier development version with
+`source: "automatic"`, `svg`, or `etag` fields are ignored when read, and the obsolete fields are
+removed when the user saves again, so no migration is needed. The legacy `avatar_key` field on
+`user` is left unchanged and unused by the avatar.
+
+`ui/src/lib/avatar/avatarSpecs.ts` loads custom specs for display. It collects the usernames
+rendered in the same tick and fetches them with one `GET /users/avatars` request of up to 100
+usernames, caches results for five minutes, and retries a failed lookup on a later mount after
+30 seconds. Saving in the profile form writes the new spec into this cache, which updates the
+sidebar, forum, and every other `UserAvatar` of that user without reloading. The profile form
+itself reads and writes the full setting through `GET` and `PUT /auth/me/avatar`.
+
+The cache belongs to one authenticated session. `AuthProvider` calls `startAvatarSpecSession`
+whenever the access token changes, so login, logout, and a rejected token discard every cached
+spec and queued lookup. Mounted avatars show the automatic avatar at once and look their users
+up again when a token is present; no lookup is made without one. A response or profile save
+that started in an earlier session is dropped, so a slow request cannot fill the next account's
+cache. The session is tracked by object identity and holds no token.
+
+Changing the pinned version changes every automatic avatar and how stored specs render. Update
+`ui/package.json`, `GLYPH_AVATAR_VERSION` in `ui/src/lib/avatar/glyphAvatar.ts`, and
+`GLYPH_AVATAR_VERSION` in `src/qdash/api/services/user_avatar_service.py` together; tests on
+both sides fail when they differ.
+
 ## Architectural Invariants
 
 - `page.tsx` and `layout.tsx` use default exports; ordinary modules use named exports.
@@ -114,3 +152,5 @@ that storage directly.
 - `ui/orval.config.cjs`
 - `ui/src/contexts/ProjectContext.tsx`
 - `ui/src/components/layout/navigation.ts`
+- `ui/src/components/ui/UserAvatar.tsx` and `ui/src/lib/avatar/`
+- `src/qdash/api/services/user_avatar_service.py` and `src/qdash/api/routers/user_avatar.py`

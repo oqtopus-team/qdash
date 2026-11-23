@@ -7,11 +7,11 @@ produced.
 
 | Question | Open |
 | --- | --- |
-| Is the chip broadly healthy? | **Dashboard** |
+| Is the chip broadly healthy? | **Overview** |
 | How does one metric compare across targets? | **Metrics** |
 | What is the latest result for a task on each target? | **Chip** |
 | How did parameters change over time? | **Analysis** |
-| Which result produced a value? | **Data Provenance** |
+| Which result produced a value, and what depends on it? | **Lineage** on the result or metric |
 | What happened in one run? | **Execution** or **Task Results** |
 
 The active project, chip, time range, cool-down, target direction, and value selection determine
@@ -19,14 +19,10 @@ what these pages show. Include that scope when sharing an observation.
 
 ## Scan Current State
 
-1. Open **Dashboard** and select a chip.
-2. Set the time range or cool-down and choose the latest, best, or average value selection.
-3. Review coverage and distributions, then select a metric or target that needs investigation.
-
-Open **Metrics** when one parameter across many targets is the focus. For coupling data, confirm
-the displayed direction before comparing values. Narrow the **Color range** above the topology when
-an outlier flattens the other colors; the range is shared with **Dashboard** and described in
-[Dashboard](./dashboard.md#scan-chip-health).
+Follow [Overview](./overview.md#select-the-data-scope) to choose a chip, time range, and value
+selection, then review coverage and distributions. Use **Metrics** to compare one parameter
+across targets, checking direction for couplings. The
+[Color range](./overview.md#scan-chip-health) control is shared by both pages.
 
 ## Inspect Measurements
 
@@ -41,8 +37,11 @@ Figures and raw data are available only when the selected task produced them.
 Open **Analysis** to compare selected parameters over time. If a chart is empty, broaden the time
 range and confirm the chip, target, and parameter selections.
 
-Open **Data Provenance** to trace a current value back to the task result and inputs that produced
-it. Use the affected lineage to identify downstream values that may need recalibration.
+Open **Lineage** on a task result, on an entry in a metric's history, or on a row of an
+execution's **Parameter changes** to see which task produced the value, the current values that
+task read, and the values derived from it. Manual edits and seed imports appear as the producer of
+the values they wrote. After changing a value, re-run the tasks that produced the values derived
+from it. **Full graph** shows every value the selected one derives from.
 
 ## Modify Current Parameters
 

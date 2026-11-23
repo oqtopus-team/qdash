@@ -6,7 +6,9 @@ import React, {
   forwardRef,
   useCallback,
   useEffect,
+  useId,
   useImperativeHandle,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -14,6 +16,7 @@ import {
   ArrowUp,
   Check,
   ChevronDown,
+  CornerDownRight,
   Cpu,
   Paperclip,
   Square,
@@ -25,6 +28,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/DropdownMenu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
@@ -40,9 +44,12 @@ import {
   type ChatThinkingChoice,
   type ChatThinkingLevel,
 } from "@/lib/chatThinking";
+import { matchSkills, skillInvocation, skillQuery, type ChatSkill } from "@/lib/chatSkills";
 import type { ModelOption } from "@/lib/copilotModels";
+import type { ChatModelListStatus } from "@/hooks/useChatModelSelection";
 
 const MAX_HEIGHT_PX = 240;
+const NO_SKILLS: readonly ChatSkill[] = [];
 
 /** The thinking menu's button text: the choice, with what Auto resolves to. */
 export function thinkingLabel(
@@ -69,6 +76,8 @@ interface ChatComposerProps {
   modelOptions: ModelOption[];
   selectedModelKey: string;
   onModelChange: (key: string) => void;
+  /** Whether the configured model list has loaded; switching waits for it. */
+  modelStatus?: ChatModelListStatus;
   /** How much the model thinks before answering; omitted on surfaces without the menu. */
   thinkingChoice?: ChatThinkingChoice;
   /** What "Auto" amounts to for the selected model. */
@@ -85,6 +94,16 @@ interface ChatComposerProps {
   onRemoveAttachment?: (id: string) => void;
   /** Narrow surfaces: smaller type and a shorter model label. */
   compact?: boolean;
+  /**
+   * While an answer streams, a message can still be sent: the answer reads it after its
+   * current step (`onSubmit` is called as usual). Figures cannot go with it.
+   */
+  steerable?: boolean;
+  /**
+   * Skills the runtime has loaded. Typing `/` at the start of a message offers
+   * them; picking one inserts `/skill:<name> ` for the user to add arguments.
+   */
+  skills?: readonly ChatSkill[];
 }
 
 export interface ChatComposerHandle {
@@ -103,6 +122,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
     modelOptions,
     selectedModelKey,
     onModelChange,
+    modelStatus = "ready",
     thinkingChoice,
     thinkingModelDefault,
     onThinkingChange,
@@ -113,6 +133,8 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
     onAttach,
     onRemoveAttachment,
     compact = false,
+    steerable = false,
+    skills = NO_SKILLS,
   },
   ref,
 ) {
@@ -123,26 +145,96 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
   useImperativeHandle(ref, () => ({ focus: () => textareaRef.current?.focus() }), []);
 
   // Grow with the content up to MAX_HEIGHT_PX, then scroll.
-  useEffect(() => {
+  const fitHeight = useCallback(() => {
     const el = textareaRef.current;
     if (!el) return;
     el.style.height = "auto";
     el.style.height = `${Math.min(el.scrollHeight, MAX_HEIGHT_PX)}px`;
-  }, [value]);
+  }, []);
+
+  useEffect(fitHeight, [value, fitHeight]);
+
+  // The height depends on the width too: the docked sidebar mounts the composer while
+  // it slides open from zero width, where even the placeholder wraps to the height cap.
+  // Measure again whenever the width settles somewhere new.
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    let width = el.clientWidth;
+    const observer = new ResizeObserver(() => {
+      if (el.clientWidth === width) return;
+      width = el.clientWidth;
+      fitHeight();
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [fitHeight]);
 
   const canAttach = Boolean(onAttach) && !isStreaming && !disabled;
   const attachmentsFull = (attachments?.length ?? 0) >= MAX_ATTACHMENTS;
-  const canSend = value.trim().length > 0 && !isStreaming && !disabled && !isStaging;
+  const hasText = value.trim().length > 0;
+  const canSteer = isStreaming && steerable && hasText && !disabled && !(attachments?.length ?? 0);
+  const canSend = (hasText && !isStreaming && !disabled && !isStaging) || canSteer;
+
+  // The skill menu: open while a leading `/command` is typed into a focused, idle composer.
+  // A steer is read as plain text, so the menu stays closed while an answer streams.
+  const skillListId = useId();
+  const [focused, setFocused] = useState(false);
+  // Escape closes the menu for the text it was pressed on; typing reopens it.
+  const [dismissedValue, setDismissedValue] = useState<string | null>(null);
+  const [active, setActive] = useState({ query: "", index: 0 });
+  const query = skills.length && !isStreaming && !disabled ? skillQuery(value) : null;
+  const skillMatches = useMemo(
+    () => (query === null ? [] : matchSkills(skills, query)),
+    [query, skills],
+  );
+  const skillMenuOpen = focused && skillMatches.length > 0 && dismissedValue !== value;
+  // A new query starts at the top match.
+  const activeIndex = active.query === query ? Math.min(active.index, skillMatches.length - 1) : 0;
+  const activeOptionId = `${skillListId}-option-${activeIndex}`;
+
+  useEffect(() => {
+    if (!skillMenuOpen) return;
+    document.getElementById(activeOptionId)?.scrollIntoView?.({ block: "nearest" });
+  }, [activeOptionId, skillMenuOpen]);
+
+  const selectSkill = useCallback(
+    (skill: ChatSkill) => {
+      // Inserted, not sent: the user adds arguments and sends as usual.
+      onChange(skillInvocation(skill.name));
+      textareaRef.current?.focus();
+    },
+    [onChange],
+  );
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
       if (e.nativeEvent.isComposing) return;
+      if (skillMenuOpen) {
+        const count = skillMatches.length;
+        if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+          e.preventDefault();
+          const step = e.key === "ArrowDown" ? 1 : -1;
+          setActive({ query: query ?? "", index: (activeIndex + step + count) % count });
+          return;
+        }
+        if ((e.key === "Enter" && !e.shiftKey) || e.key === "Tab") {
+          e.preventDefault();
+          selectSkill(skillMatches[activeIndex]);
+          return;
+        }
+        if (e.key === "Escape") {
+          e.preventDefault();
+          setDismissedValue(value);
+          return;
+        }
+      }
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
         if (canSend) onSubmit();
       }
     },
-    [canSend, onSubmit],
+    [activeIndex, canSend, onSubmit, query, selectSkill, skillMatches, skillMenuOpen, value],
   );
 
   // Screenshots pasted from the clipboard arrive as files; text pastes as usual.
@@ -190,10 +282,16 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
   );
 
   const selected = modelOptions.find((o) => o.key === selectedModelKey) ?? modelOptions[0];
+  const selectedIdentity = selected?.resolvedModel ?? selected?.model;
+  const alwaysThinking = selectedIdentity?.name === "claude-opus-5-5";
+  const displayedThinking = alwaysThinking && thinkingChoice === "off" ? "low" : thinkingChoice;
+  const thinkingChoices = alwaysThinking
+    ? THINKING_CHOICES.filter((choice) => choice.value !== "off")
+    : THINKING_CHOICES;
 
   return (
     <form
-      className={`chat-composer ${dragging ? "ring-2 ring-primary/40" : ""}`}
+      className={`chat-composer @container ${dragging ? "ring-2 ring-primary/40" : ""}`}
       onSubmit={(e) => {
         e.preventDefault();
         if (canSend) onSubmit();
@@ -230,7 +328,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
                 <button
                   type="button"
                   onClick={() => onRemoveAttachment(attachment.id)}
-                  className="absolute -top-1.5 -right-1.5 btn btn-circle btn-xs h-5 w-5 min-h-0 bg-base-content text-base-100 border-none opacity-0 group-hover/thumb:opacity-100 focus:opacity-100"
+                  className="absolute -top-1.5 -right-1.5 btn btn-circle btn-xs bg-base-content text-base-100 border-none opacity-0 group-hover/thumb:opacity-100 focus:opacity-100"
                   aria-label={`Remove ${attachment.name}`}
                 >
                   <X className="w-3 h-3" />
@@ -240,155 +338,337 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
           ))}
         </div>
       )}
-      <textarea
-        ref={textareaRef}
-        value={value}
-        disabled={disabled}
-        onChange={(e) => onChange(e.target.value)}
-        onKeyDown={handleKeyDown}
-        onPaste={handlePaste}
-        placeholder={placeholder}
-        rows={1}
-        aria-label="Message"
-        className="w-full resize-none bg-transparent border-none outline-none focus:ring-0 leading-6 px-1 pt-1 text-sm placeholder:text-base-content/35"
-      />
+      <div className="relative">
+        {skillMenuOpen && (
+          <ul
+            id={skillListId}
+            role="listbox"
+            aria-label="Skills"
+            className="menu menu-sm absolute bottom-full left-0 right-0 z-50 mb-2 max-h-64 flex-nowrap overflow-y-auto rounded-box border border-base-300 bg-base-100 shadow-lg"
+          >
+            {skillMatches.map((skill, i) => (
+              <li
+                key={skill.name}
+                id={`${skillListId}-option-${i}`}
+                role="option"
+                aria-selected={i === activeIndex}
+              >
+                <div
+                  className={`flex flex-col items-start gap-0.5 ${i === activeIndex ? "menu-focus" : ""}`}
+                  onMouseDown={(e) => {
+                    // Keep focus in the message field.
+                    e.preventDefault();
+                    selectSkill(skill);
+                  }}
+                  onMouseMove={() => {
+                    if (i !== activeIndex) setActive({ query: query ?? "", index: i });
+                  }}
+                >
+                  <span className="font-mono text-xs">/skill:{skill.name}</span>
+                  {skill.description && (
+                    <span className="line-clamp-2 text-xs text-base-content/60">
+                      {skill.description}
+                    </span>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+        <textarea
+          ref={textareaRef}
+          value={value}
+          disabled={disabled}
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onPaste={handlePaste}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          placeholder={
+            isStreaming && steerable ? "Add a note; it is read after the current step" : placeholder
+          }
+          rows={1}
+          aria-label="Message"
+          {...(skills.length
+            ? {
+                role: "combobox",
+                "aria-autocomplete": "list" as const,
+                "aria-expanded": skillMenuOpen,
+                "aria-controls": skillMenuOpen ? skillListId : undefined,
+                "aria-activedescendant": skillMenuOpen ? activeOptionId : undefined,
+              }
+            : {})}
+          className="w-full max-h-[40dvh] resize-none bg-transparent border-none outline-none focus:ring-0 leading-6 px-1 pt-1 text-base sm:text-sm placeholder:text-base-content/35"
+        />
+      </div>
       <div className="flex items-center gap-2 pt-1">
-        {onAttach && (
-          <>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept={ACCEPT_ATTRIBUTE}
-              multiple
-              hidden
-              onChange={handleFilesPicked}
+        {/* The selectors share the room left of the send controls and truncate there,
+            so a narrow composer never pushes them past its edge. */}
+        <div
+          role="group"
+          aria-label="Message options"
+          className="flex min-w-0 flex-1 items-center gap-1 @md:gap-2"
+        >
+          {onAttach && (
+            <>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept={ACCEPT_ATTRIBUTE}
+                multiple
+                hidden
+                onChange={handleFilesPicked}
+              />
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    disabled={!canAttach || attachmentsFull}
+                    onClick={() => fileInputRef.current?.click()}
+                    className="btn btn-ghost btn-sm btn-circle shrink-0 text-base-content/60"
+                    aria-label="Attach a figure"
+                  >
+                    <Paperclip className="w-3.5 h-3.5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {attachmentsFull
+                    ? `Up to ${MAX_ATTACHMENTS} figures per message`
+                    : "Attach a figure (PNG/JPEG, or paste a screenshot)"}
+                </TooltipContent>
+              </Tooltip>
+            </>
+          )}
+          {selected && (
+            <ModelControl
+              options={modelOptions}
+              selected={selected}
+              status={modelStatus}
+              onChange={onModelChange}
+              disabled={isStreaming || disabled}
+              compact={compact}
             />
+          )}
+          {thinkingChoice && onThinkingChange && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  disabled={isStreaming || disabled}
+                  className="btn btn-ghost btn-sm min-w-0 max-w-[45%] shrink font-normal text-base-content/60"
+                  aria-label="Thinking level"
+                  title="How much the model thinks before answering"
+                >
+                  <Brain data-icon="inline-start" className="shrink-0" />
+                  {compact ? (
+                    <span className="truncate">
+                      {thinkingLabel(
+                        displayedThinking ?? thinkingChoice,
+                        thinkingModelDefault ?? null,
+                        true,
+                      )}
+                    </span>
+                  ) : (
+                    <>
+                      {/* The full label needs a wide composer; a phone gets the short one. */}
+                      <span className="truncate @md:hidden">
+                        {thinkingLabel(
+                          displayedThinking ?? thinkingChoice,
+                          thinkingModelDefault ?? null,
+                          true,
+                        )}
+                      </span>
+                      <span className="hidden truncate @md:inline">
+                        {thinkingLabel(
+                          displayedThinking ?? thinkingChoice,
+                          thinkingModelDefault ?? null,
+                        )}
+                      </span>
+                    </>
+                  )}
+                  <ChevronDown data-icon="inline-end" className="shrink-0" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" side="top">
+                {thinkingChoices.map((choice) => (
+                  <DropdownMenuItem
+                    key={choice.value}
+                    onSelect={() => onThinkingChange(choice.value)}
+                  >
+                    <span className="flex-1">
+                      <span className="block">
+                        {choice.value === "auto" && thinkingModelDefault
+                          ? `Auto (${thinkingModelDefault})`
+                          : choice.label}
+                      </span>
+                      <span className="block text-xs text-base-content/50">
+                        {alwaysThinking && choice.value === "low"
+                          ? "Brief reasoning; this model always thinks"
+                          : choice.description}
+                      </span>
+                    </span>
+                    {choice.value === displayedThinking && (
+                      <Check className="w-3.5 h-3.5 text-primary" />
+                    )}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+          {instructionsActive && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Link
+                  href="/settings?tab=copilot"
+                  className="btn btn-ghost btn-sm shrink-0 gap-1 font-normal text-base-content/60"
+                  aria-label="Your instructions apply"
+                >
+                  <UserCog className="w-3.5 h-3.5 shrink-0" />
+                  {!compact && <span className="hidden @lg:inline">Your instructions</span>}
+                </Link>
+              </TooltipTrigger>
+              <TooltipContent>Your instructions from Settings apply to this chat</TooltipContent>
+            </Tooltip>
+          )}
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          {isStreaming && steerable && hasText && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="submit"
+                  disabled={!canSteer}
+                  className="btn btn-circle btn-sm btn-primary disabled:bg-base-content/15 disabled:text-base-100"
+                  aria-label="Send to the answer in progress"
+                >
+                  <CornerDownRight className="w-4 h-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Send now: read after the current step (Enter)</TooltipContent>
+            </Tooltip>
+          )}
+          {isStreaming ? (
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
                   type="button"
-                  disabled={!canAttach || attachmentsFull}
-                  onClick={() => fileInputRef.current?.click()}
-                  className="btn btn-ghost btn-xs btn-circle h-7 w-7 text-base-content/60"
-                  aria-label="Attach a figure"
+                  onClick={onStop}
+                  className="btn btn-circle btn-sm bg-base-content text-base-100 hover:bg-base-content/80 border-none"
+                  aria-label="Stop generating"
                 >
-                  <Paperclip className="w-3.5 h-3.5" />
+                  <Square className="w-3 h-3 fill-current" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent>
-                {attachmentsFull
-                  ? `Up to ${MAX_ATTACHMENTS} figures per message`
-                  : "Attach a figure (PNG/JPEG, or paste a screenshot)"}
-              </TooltipContent>
+              <TooltipContent>Stop (Esc)</TooltipContent>
             </Tooltip>
-          </>
-        )}
-        {modelOptions.length > 1 && selected && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                disabled={isStreaming || disabled}
-                className="btn btn-ghost btn-xs h-7 gap-1.5 rounded-lg font-normal text-base-content/60 max-w-[60%]"
-                aria-label="Chat model"
-              >
-                <Cpu className="w-3.5 h-3.5 shrink-0" />
-                <span className="truncate">
-                  {compact ? (selected.model?.name ?? "Default model") : selected.label}
-                </span>
-                <ChevronDown className="w-3 h-3 shrink-0" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" side="top">
-              {modelOptions.map((option) => (
-                <DropdownMenuItem key={option.key} onSelect={() => onModelChange(option.key)}>
-                  <span className="flex-1 truncate">{option.label}</span>
-                  {option.key === selected.key && <Check className="w-3.5 h-3.5 text-primary" />}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
-        {thinkingChoice && onThinkingChange && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                disabled={isStreaming || disabled}
-                className="btn btn-ghost btn-xs h-7 gap-1.5 rounded-lg font-normal text-base-content/60"
-                aria-label="Thinking level"
-                title="How much the model thinks before answering"
-              >
-                <Brain className="w-3.5 h-3.5 shrink-0" />
-                <span className="truncate">
-                  {thinkingLabel(thinkingChoice, thinkingModelDefault ?? null, compact)}
-                </span>
-                <ChevronDown className="w-3 h-3 shrink-0" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" side="top">
-              {THINKING_CHOICES.map((choice) => (
-                <DropdownMenuItem
-                  key={choice.value}
-                  onSelect={() => onThinkingChange(choice.value)}
-                >
-                  <span className="flex-1">
-                    <span className="block">
-                      {choice.value === "auto" && thinkingModelDefault
-                        ? `Auto (${thinkingModelDefault})`
-                        : choice.label}
-                    </span>
-                    <span className="block text-xs text-base-content/50">{choice.description}</span>
-                  </span>
-                  {choice.value === thinkingChoice && (
-                    <Check className="w-3.5 h-3.5 text-primary" />
-                  )}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
-        {instructionsActive && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Link
-                href="/settings?tab=copilot"
-                className="btn btn-ghost btn-xs h-7 gap-1 rounded-lg font-normal text-base-content/60"
-                aria-label="Your instructions apply"
-              >
-                <UserCog className="w-3.5 h-3.5 shrink-0" />
-                {!compact && <span>Your instructions</span>}
-              </Link>
-            </TooltipTrigger>
-            <TooltipContent>Your instructions from Settings apply to this chat</TooltipContent>
-          </Tooltip>
-        )}
-        <div className="flex-1" />
-        {isStreaming ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                type="button"
-                onClick={onStop}
-                className="btn btn-circle btn-sm bg-base-content text-base-100 hover:bg-base-content/80 border-none"
-                aria-label="Stop generating"
-              >
-                <Square className="w-3 h-3 fill-current" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent>Stop (Esc)</TooltipContent>
-          </Tooltip>
-        ) : (
-          <button
-            type="submit"
-            disabled={!canSend}
-            className="btn btn-circle btn-sm btn-primary disabled:bg-base-content/15 disabled:text-base-100"
-            aria-label="Send message"
-          >
-            <ArrowUp className="w-4 h-4" />
-          </button>
-        )}
+          ) : (
+            <button
+              type="submit"
+              disabled={!canSend}
+              className="btn btn-circle btn-sm btn-primary disabled:bg-base-content/15 disabled:text-base-100"
+              aria-label="Send message"
+            >
+              <ArrowUp className="w-4 h-4" />
+            </button>
+          )}
+        </div>
       </div>
     </form>
   );
 });
+
+/** Why the model cannot be switched, when it cannot. */
+function fixedModelReason(status: ChatModelListStatus, optionCount: number): string | null {
+  if (status === "loading") return "Loading the configured chat models";
+  if (status === "error") return "Could not load the chat models; the configured default answers";
+  if (optionCount < 2) return "Only one chat model is configured";
+  return null;
+}
+
+/**
+ * The model the next message goes to, with a menu of the configured chat models.
+ * It names the model the default resolves to rather than an opaque "Default", and
+ * says why it cannot be switched when only one model is configured.
+ */
+function ModelControl({
+  options,
+  selected,
+  status,
+  onChange,
+  disabled,
+  compact,
+}: {
+  options: ModelOption[];
+  selected: ModelOption;
+  status: ChatModelListStatus;
+  onChange: (key: string) => void;
+  disabled: boolean;
+  compact: boolean;
+}) {
+  const name = status === "loading" ? "Loading models…" : selected.label;
+  const fixedReason = fixedModelReason(status, options.length);
+  const content = (
+    <>
+      <Cpu data-icon="inline-start" aria-hidden="true" />
+      <span className="truncate">{name}</span>
+      {!compact && selected.isConfiguredDefault && status === "ready" && (
+        <span className="hidden shrink-0 text-base-content/40 @md:inline">default</span>
+      )}
+    </>
+  );
+  const className =
+    "btn btn-ghost btn-sm min-w-0 max-w-[60%] shrink font-normal text-base-content/60";
+
+  if (fixedReason) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            aria-disabled="true"
+            aria-label={`Chat model: ${name}. ${fixedReason}`}
+            className={`${className} cursor-default hover:bg-transparent`}
+          >
+            {content}
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>{fixedReason}</TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          disabled={disabled}
+          className={className}
+          aria-label={`Chat model: ${name}`}
+          title="Model for your next message"
+        >
+          {content}
+          <ChevronDown data-icon="inline-end" aria-hidden="true" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" side="top">
+        <DropdownMenuLabel className="text-xs font-normal text-base-content/50">
+          Model for your next message
+        </DropdownMenuLabel>
+        {options.map((option) => (
+          <DropdownMenuItem key={option.key} onSelect={() => onChange(option.key)}>
+            <span className="flex-1 min-w-0">
+              <span className="block truncate">{option.label}</span>
+              <span className="block text-xs text-base-content/50">
+                {[option.resolvedModel?.provider, option.isConfiguredDefault ? "default" : null]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </span>
+            </span>
+            {option.key === selected.key && <Check className="w-3.5 h-3.5 text-primary" />}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}

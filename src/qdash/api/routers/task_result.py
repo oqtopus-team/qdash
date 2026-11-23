@@ -161,10 +161,20 @@ def list_task_results(
     message_contains: Annotated[
         str | None, Query(description="Case-insensitive message search")
     ] = None,
+    step_id: Annotated[
+        str | None, Query(description="Planned step id filter (invocation.step_id)")
+    ] = None,
+    call_id: Annotated[
+        str | None, Query(description="Planned call id filter (invocation.call_id)")
+    ] = None,
     skip: Annotated[int, Query(ge=0, description="Number of rows to skip")] = 0,
     limit: Annotated[int, Query(ge=1, le=100, description="Maximum rows to return")] = 50,
 ) -> TaskResultListResponse:
-    """List task results for cross-task investigation."""
+    """List task results for cross-task investigation.
+
+    ``step_id`` and ``call_id`` return the results of one planned call, so two
+    calls of the same task in one step can be read separately.
+    """
     return service.list_task_results(
         project_id=ctx.project_id,
         status=status,
@@ -176,6 +186,8 @@ def list_task_results(
         start_from=start_from,
         start_to=start_to,
         message_contains=message_contains,
+        step_id=step_id,
+        call_id=call_id,
         skip=skip,
         limit=limit,
     )

@@ -44,6 +44,14 @@ start_to?: string | null;
  */
 message_contains?: string | null;
 /**
+ * Planned step id filter (invocation.step_id)
+ */
+step_id?: string | null;
+/**
+ * Planned call id filter (invocation.call_id)
+ */
+call_id?: string | null;
+/**
  * Number of rows to skip
  * @minimum 0
  */

@@ -5,13 +5,19 @@
   "workspaces": [
     "agent-runtime",
     "packages/*",
-    "clients/typescript"
+    "clients/typescript",
+    "sdks/typescript"
   ],
+  "dependencies": {
+    "@json-render/core": "0.22.0",
+    "zod": "^4.4.3"
+  },
   "overrides": {
     "esbuild": "^0.28.1",
     "js-yaml": "^4.3.2"
   },
   "scripts": {
-    "build:client": "bun run --filter @oqtopus-team/qdash-client build"
+    "build:client": "bun run --filter @oqtopus-team/qdash-client build",
+    "build:sdk": "bun run --filter @oqtopus-team/qdash-sdk build"
   }
 }

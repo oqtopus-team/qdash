@@ -6,10 +6,12 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/Dialog";
+import { useToast } from "@/components/ui/Toast";
 import { SystemRole, type UserListItem } from "@/schemas";
 
 import { useResetPassword } from "@/client/auth/auth";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
+import { copyText } from "@/lib/utils/clipboard";
 
 type EditUserModalProps = {
   user: UserListItem;
@@ -44,6 +46,7 @@ export function EditUserModal({
   const isSelf = user.username === currentUsername;
   const [showPasswordReset, setShowPasswordReset] = useState(false);
   const [temporaryPassword, setTemporaryPassword] = useState<string | null>(null);
+  const toast = useToast();
   const [copied, setCopied] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordSuccess, setPasswordSuccess] = useState(false);
@@ -100,7 +103,12 @@ export function EditUserModal({
   /** Copies the temporary password to the clipboard. */
   const handleCopyPassword = async () => {
     if (!temporaryPassword) return;
-    await navigator.clipboard.writeText(temporaryPassword);
+    try {
+      await copyText(temporaryPassword);
+    } catch {
+      toast.error("Failed to copy password");
+      return;
+    }
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -132,17 +140,14 @@ export function EditUserModal({
           </div>
 
           <div className="form-control">
-            <label
-              className="label cursor-pointer justify-start gap-4"
-              htmlFor="edit-user-disabled"
-            >
+            <label className="choice-field gap-3" htmlFor="edit-user-disabled">
               <input
                 id="edit-user-disabled"
                 type="checkbox"
                 className="toggle toggle-error"
                 {...register("disabled")}
               />
-              <span className="label-text">
+              <span>
                 Account Disabled
                 {disabled && <span className="text-error ml-2">(User cannot login)</span>}
               </span>
@@ -191,8 +196,8 @@ export function EditUserModal({
               onClick={() => setShowPasswordReset(true)}
             >
               <svg
+                data-icon="inline-start"
                 xmlns="http://www.w3.org/2000/svg"
-                className="h-4 w-4"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"

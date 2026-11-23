@@ -3,7 +3,7 @@
 ``CalibrationPipelineSpec`` (``qdash.datamodel.calibration_pipeline``) is what
 an agent or the UI submits through ``POST /calibration-pipelines/execute``. The
 API validates it; this flow only maps it onto the same Step classes the
-templates use and hands them to ``CalibService.run``. Nothing in the spec can
+templates use and runs them like ``CalibService.run``. Nothing in the spec can
 reach code outside that mapping.
 
 Registered on worker startup as the ``system-calibration-pipeline`` deployment
@@ -17,6 +17,7 @@ from typing import Any
 from prefect import flow, get_run_logger
 
 from qdash.datamodel.calibration_pipeline import (
+    SPEC_VERSION,
     STEP_CATALOG,
     BringUpStep,
     CalibrationPipelineSpec,
@@ -30,14 +31,16 @@ from qdash.datamodel.calibration_pipeline import (
     OneQubitFineTuneStep,
     PipelineStep,
     TwoQubitCalibrationStep,
+    migrate_pipeline_spec,
+    step_id,
 )
-from qdash.workflow.engine.task_parameters import task_parameters_from_run_parameters
+from qdash.workflow.service._internal.runs import run_calibration, workflow_settings
 from qdash.workflow.service.calib_service import (
-    CalibService,
     on_flow_cancellation,
     on_flow_crashed,
     on_flow_failure,
 )
+from qdash.workflow.service.context import resolve_calib_context
 from qdash.workflow.service.steps import (
     BringUp,
     ConfigureAll,
@@ -63,42 +66,81 @@ def build_targets(spec: CalibrationPipelineSpec) -> Target:
     return QubitTargets(qids=list(targets.qids))
 
 
+def _qubit_rounds(rounds: list[list[str]] | None) -> list[list[str]] | None:
+    return [list(round_) for round_ in rounds] if rounds is not None else None
+
+
+def _two_qubit_mode(step: TwoQubitCalibrationStep | CustomTwoQubitStep) -> dict[str, Any]:
+    """Mode arguments: manual rounds as tuples, or the automatic group cap."""
+    if step.execution_mode == "manual":
+        rounds = [[(pair[0], pair[1]) for pair in round_] for round_ in step.rounds or []]
+        return {"execution_mode": "manual", "rounds": rounds}
+    return {"execution_mode": "automatic", "max_parallel_ops": step.max_parallel_ops}
+
+
 def build_step(step: PipelineStep) -> Step:
-    """The Step object for one spec entry."""
+    """The Step object for one spec entry.
+
+    Task calls are passed through unchanged; the Step classes apply the same
+    defaults and call id rules as the spec.
+    """
     if isinstance(step, ConfigureAllStep):
-        return ConfigureAll(mux_ids=list(step.mux_ids) if step.mux_ids is not None else None)
+        return ConfigureAll(
+            mux_ids=list(step.mux_ids) if step.mux_ids is not None else None,
+            call=step.call,
+            step_id=step.step_id,
+        )
     if isinstance(step, BringUpStep):
-        return BringUp(tasks=list(step.tasks)) if step.tasks is not None else BringUp()
+        if step.tasks is not None:
+            return BringUp(tasks=list(step.tasks), step_id=step.step_id)
+        return BringUp(step_id=step.step_id)
     if isinstance(step, OneQubitCheckStep):
         return OneQubitCheck(
-            mode=step.mode,
+            execution_mode=step.execution_mode,
             tasks=list(step.tasks) if step.tasks is not None else None,
             configure=step.configure,
+            rounds=_qubit_rounds(step.rounds),
+            step_id=step.step_id,
         )
     if isinstance(step, OneQubitFineTuneStep):
         return OneQubitFineTune(
-            mode=step.mode,
+            execution_mode=step.execution_mode,
             tasks=list(step.tasks) if step.tasks is not None else None,
             configure=step.configure,
+            rounds=_qubit_rounds(step.rounds),
+            step_id=step.step_id,
         )
     if isinstance(step, CustomOneQubitStep):
-        return CustomOneQubit(step_name=step.step_name, tasks=list(step.tasks), mode=step.mode)
+        return CustomOneQubit(
+            step_name=step.step_name,
+            tasks=list(step.tasks),
+            execution_mode=step.execution_mode,
+            continue_on_failure=step.continue_on_failure,
+            rounds=_qubit_rounds(step.rounds),
+        )
     if isinstance(step, FilterByStatusStep):
-        return FilterByStatus()
+        return FilterByStatus(step=step.step, call_id=step.call_id)
     if isinstance(step, FilterByMetricStep):
-        return FilterByMetric(metric=step.metric, threshold=step.threshold)
+        return FilterByMetric(
+            metric=step.metric,
+            threshold=step.threshold,
+            step=step.step,
+            call_id=step.call_id,
+        )
     if isinstance(step, GenerateCRScheduleStep):
         return GenerateCRSchedule(max_parallel_ops=step.max_parallel_ops, inverse=step.inverse)
     if isinstance(step, TwoQubitCalibrationStep):
         return TwoQubitCalibration(
             tasks=list(step.tasks) if step.tasks is not None else None,
-            max_parallel_ops=step.max_parallel_ops,
+            **_two_qubit_mode(step),
+            step_id=step.step_id,
         )
     if isinstance(step, CustomTwoQubitStep):
         return CustomTwoQubit(
             step_name=step.step_name,
             tasks=list(step.tasks),
-            max_parallel_ops=step.max_parallel_ops,
+            **_two_qubit_mode(step),
+            continue_on_failure=step.continue_on_failure,
         )
     raise ValueError(f"unsupported pipeline step: {step!r}")
 
@@ -119,10 +161,13 @@ def pipeline_note(spec: CalibrationPipelineSpec, steps: list[Step]) -> dict[str,
     return {
         "pipeline": {
             "name": spec.name,
+            "spec_version": SPEC_VERSION,
+            "spec_digest": spec.plan_digest(),
             "steps": [
                 {
                     "index": index,
                     "name": built.name,
+                    "step_id": step_id(step),
                     "type": step.type,
                     "kind": STEP_CATALOG[step.type].kind,
                 }
@@ -130,6 +175,25 @@ def pipeline_note(spec: CalibrationPipelineSpec, steps: list[Step]) -> dict[str,
             ],
         }
     }
+
+
+def parse_dispatched_spec(spec: dict[str, Any], logger: Any) -> CalibrationPipelineSpec:
+    """Parse a spec handed to the worker, converting a queued version 1 request.
+
+    The API only dispatches version 2 specs. A run queued before the upgrade can
+    still carry a version 1 spec; it is converted here, at the flow boundary,
+    with :func:`migrate_pipeline_spec` (the same conversion the API offers), and
+    the conversion is logged. Nothing else accepts version 1. A queued spec that
+    still uses the removed one-qubit ``mode`` raises
+    :class:`~qdash.datamodel.calibration_pipeline.LegacyExecutionModeError`.
+    """
+    migration = migrate_pipeline_spec(spec)
+    if migration.changed:
+        logger.warning(
+            "Converted a queued version 1 calibration pipeline spec to version 2: "
+            + "; ".join(migration.notes or ["task names became TaskCall entries"])
+        )
+    return CalibrationPipelineSpec.model_validate(migration.spec)
 
 
 @flow(
@@ -153,33 +217,32 @@ def calibration_pipeline(
         username: User the execution is attributed to.
         chip_id: Chip to calibrate.
         spec: ``CalibrationPipelineSpec`` as JSON. Re-validated here so a spec
-            that bypassed the API is still held to the same shape.
+            that bypassed the API is still held to the same shape; a queued
+            version 1 spec is converted first (see ``parse_dispatched_spec``).
         project_id: Project the execution belongs to (injected by the API).
         flow_name: Display name of the execution; defaults to the spec name.
         tags: Extra tags; merged with the spec's tags.
         backend_name: Hardware backend; defaults to the configured backend.
     """
     logger = get_run_logger()
-    parsed = CalibrationPipelineSpec.model_validate(spec)
+    parsed = parse_dispatched_spec(spec, logger)
     targets = build_targets(parsed)
     steps = build_steps(parsed)
     all_tags = sorted({*(tags or []), *parsed.tags, "pipeline"})
     name = flow_name or parsed.name
 
     logger.info(
-        f"Pipeline '{name}': {len(steps)} steps, {len(parsed.all_tasks())} task runs, "
+        f"Pipeline '{name}': {len(steps)} steps, {len(parsed.all_tasks())} task calls per target, "
         f"targets={parsed.targets.model_dump(exclude_none=True)}"
     )
 
-    cal = CalibService(
-        username,
-        chip_id,
+    context = resolve_calib_context(username, chip_id, project_id=project_id, backend=backend_name)
+    settings = workflow_settings(
+        context,
         flow_name=name,
         tags=all_tags,
-        project_id=project_id,
-        backend_name=backend_name,
-        task_parameters=task_parameters_from_run_parameters(parsed.task_run_parameters),
-        default_run_parameters=parsed.default_run_parameters or None,
         note=pipeline_note(parsed, steps),
+        default_run_parameters=parsed.default_run_parameters or None,
+        task_defaults=parsed.canonical_task_parameters(),
     )
-    return cal.run(targets, steps=steps)
+    return run_calibration(settings, targets, steps)

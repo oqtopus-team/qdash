@@ -27,6 +27,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
+from qdash.datamodel.task_call import TaskCallResult
+
 # =============================================================================
 # Base Result Types
 # =============================================================================
@@ -53,14 +55,54 @@ def normalize_metric_value(parameter: Any) -> float | None:
         raise ValueError(f"Metric value must be numeric, got {parameter!r}") from exc
 
 
+class _CallAccess:
+    """Ordered call results of one target, read from its raw step result."""
+
+    raw: dict[str, Any]
+
+    @property
+    def calls(self) -> list[TaskCallResult]:
+        """Every call of the step on this target, in call order."""
+        entries = self.raw.get("calls")
+        if not isinstance(entries, list):
+            return []
+        return [
+            TaskCallResult.model_validate(entry) for entry in entries if isinstance(entry, dict)
+        ]
+
+    def call(self, call_id: str) -> TaskCallResult | None:
+        """The result of one call by its call_id, or None if the step has no such call."""
+        return next((call for call in self.calls if call.call_id == call_id), None)
+
+    def calls_of(self, task_name: str) -> list[TaskCallResult]:
+        """Every call of one task, in call order."""
+        return [call for call in self.calls if call.name == task_name]
+
+    def latest_call(self, task_name: str) -> TaskCallResult | None:
+        """The last call of a task in the step, whatever its status."""
+        calls = self.calls_of(task_name)
+        return calls[-1] if calls else None
+
+    def call_metric(self, call_id: str, name: str) -> float | None:
+        """An output parameter of one call, or None when the call did not succeed.
+
+        A failed or skipped call yields None even if an earlier call of the same
+        task produced the parameter.
+        """
+        call = self.call(call_id)
+        if call is None or call.status != "success":
+            return None
+        return normalize_metric_value(call.output.get(name))
+
+
 @dataclass
-class QubitCalibData:
+class QubitCalibData(_CallAccess):
     """Calibration data for a single qubit.
 
     Attributes:
         status: Calibration status ("success" or "failed")
         metrics: Named metrics extracted from calibration (e.g., {"x90_fidelity": 0.95})
-        raw: Raw backend-specific results
+        raw: Raw backend-specific results, including the ordered ``calls``
     """
 
     status: Literal["success", "failed"] = "failed"
@@ -73,13 +115,13 @@ class QubitCalibData:
 
 
 @dataclass
-class CouplingCalibData:
+class CouplingCalibData(_CallAccess):
     """Calibration data for a coupling pair.
 
     Attributes:
         status: Calibration status ("success" or "failed")
         metrics: Named metrics extracted from calibration (e.g., {"zx90_fidelity": 0.92})
-        raw: Raw backend-specific results
+        raw: Raw backend-specific results, including the ordered ``calls``
     """
 
     status: Literal["success", "failed"] = "failed"
@@ -105,9 +147,11 @@ class OneQubitResult:
 
     Attributes:
         qubits: Mapping from qubit ID to calibration data
+        step_id: The step that produced the result, when known
     """
 
     qubits: dict[str, QubitCalibData] = field(default_factory=dict)
+    step_id: str = ""
 
     def add_qubit(self, qid: str, data: QubitCalibData) -> None:
         """Add calibration data for a qubit."""
@@ -155,6 +199,26 @@ class OneQubitResult:
         """Get all qubit IDs."""
         return sorted(self.qubits.keys())
 
+    def call_succeeded_qids(self, call_id: str) -> list[str]:
+        """Qubit IDs on which one call succeeded."""
+        return sorted(
+            qid
+            for qid, data in self.qubits.items()
+            if (call := data.call(call_id)) is not None and call.status == "success"
+        )
+
+    def filter_by_call_metric(self, call_id: str, metric_name: str, threshold: float) -> list[str]:
+        """Qubit IDs where one call's output parameter meets the threshold.
+
+        Qubits whose call failed, was skipped, or lacks the parameter are left out;
+        there is no fallback to another call of the same task.
+        """
+        return sorted(
+            qid
+            for qid, data in self.qubits.items()
+            if (value := data.call_metric(call_id, metric_name)) is not None and value >= threshold
+        )
+
 
 @dataclass
 class TwoQubitResult:
@@ -162,9 +226,11 @@ class TwoQubitResult:
 
     Attributes:
         couplings: Mapping from coupling ID (e.g., "Q00-Q01") to calibration data
+        step_id: The step that produced the result, when known
     """
 
     couplings: dict[str, CouplingCalibData] = field(default_factory=dict)
+    step_id: str = ""
 
     def add_coupling(self, coupling_id: str, data: CouplingCalibData) -> None:
         """Add calibration data for a coupling."""
@@ -228,3 +294,52 @@ class FilterResult:
         if not self.input_qids:
             return 0.0
         return len(self.output_qids) / len(self.input_qids)
+
+
+# =============================================================================
+# Builders
+# =============================================================================
+
+
+def build_one_qubit_result(
+    raw_results: dict[str, Any],
+    step_id: str,
+    extract_metrics: Any = None,
+) -> OneQubitResult:
+    """Build a typed result from strategy output (stage -> qid -> target result)."""
+    result = OneQubitResult(step_id=step_id)
+    for stage_data in raw_results.values():
+        if not isinstance(stage_data, dict):
+            continue
+        for qid, raw in stage_data.items():
+            if not isinstance(raw, dict):
+                continue
+            result.add_qubit(
+                qid,
+                QubitCalibData(
+                    status="success" if raw.get("status") == "success" else "failed",
+                    metrics=extract_metrics(raw) if extract_metrics is not None else {},
+                    raw=raw,
+                ),
+            )
+    return result
+
+
+def build_two_qubit_result(
+    raw_results: dict[str, Any],
+    step_id: str,
+    extract_metrics: Any = None,
+) -> TwoQubitResult:
+    """Build a typed result from coupling output (coupling_id -> target result)."""
+    result = TwoQubitResult(step_id=step_id)
+    for coupling_id, raw in raw_results.items():
+        if isinstance(raw, dict):
+            result.add_coupling(
+                coupling_id,
+                CouplingCalibData(
+                    status="success" if raw.get("status") == "success" else "failed",
+                    metrics=extract_metrics(raw) if extract_metrics is not None else {},
+                    raw=raw,
+                ),
+            )
+    return result

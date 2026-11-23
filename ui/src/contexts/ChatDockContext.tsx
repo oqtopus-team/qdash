@@ -1,6 +1,15 @@
 "use client";
 
-import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { usePathname } from "next/navigation";
 import { useCopilotChatSessionContext } from "@/contexts/CopilotChatSessionContext";
 import type {
@@ -11,10 +20,10 @@ import type {
 } from "@/types/copilotChat";
 import { matchesEditTarget } from "@/lib/copilotEditTarget";
 import {
+  sameInvestigation,
   investigationKey,
   investigationPrompt,
   investigationTitle,
-  sameInvestigation,
 } from "@/lib/copilotInvestigation";
 
 /**
@@ -25,8 +34,61 @@ import {
 export interface PageContextProvider {
   /** Read at the moment a turn is sent, so an editor's buffer is current. */
   current(): PageContext | null;
-  /** Replace the page's editable code, for an edit the assistant proposed. */
-  applyCode?(code: string): void;
+  /**
+   * Replace the page's editable code, for an edit the assistant proposed. Returns false when
+   * the page refused it (e.g. a dashboard draft that does not parse); the page says why.
+   */
+  applyCode?(code: string): void | boolean;
+  /**
+   * Bring the code just applied into view and move focus to it, after the chat stepped aside
+   * so the page could be seen. Without it, the page is shown as it is.
+   */
+  revealAppliedCode?(): void;
+  /** Requests the empty chat offers on this page instead of the general ones. */
+  suggestions?(): string[];
+}
+
+/**
+ * What the chat shows about the page next to its composer: the route, title, and whether a
+ * turn sent now carries an editor's code. Unlike the page context, it holds no code, so an
+ * editor keystroke leaves it unchanged.
+ */
+export interface PageContextSummary {
+  path: string;
+  title: string;
+  withEditorCode: boolean;
+  /** What the editor code is, when it is not a file: a dashboard's draft. */
+  editorKind?: "dashboard";
+  /** The page's own starter requests for an empty chat. */
+  suggestions?: string[];
+}
+
+function summarizePage(
+  page: PageContext | null,
+  suggestions: string[] | undefined,
+): PageContextSummary | null {
+  return page
+    ? {
+        path: page.path,
+        title: page.title,
+        withEditorCode: Boolean(page.flow || page.metricScript || page.dashboard),
+        ...(page.dashboard && !page.flow && !page.metricScript
+          ? { editorKind: "dashboard" as const }
+          : {}),
+        ...(suggestions?.length ? { suggestions } : {}),
+      }
+    : null;
+}
+
+function sameSummary(a: PageContextSummary | null, b: PageContextSummary | null): boolean {
+  if (a === null || b === null) return a === b;
+  return (
+    a.path === b.path &&
+    a.title === b.title &&
+    a.withEditorCode === b.withEditorCode &&
+    a.editorKind === b.editorKind &&
+    (a.suggestions ?? []).join("\n") === (b.suggestions ?? []).join("\n")
+  );
 }
 
 /**
@@ -55,12 +117,28 @@ interface ChatDockValue {
 
   /**
    * Start an AI investigation of a failure, or resume the one already started
-   * for it. The first turn is sent once, here; a rerender sends nothing.
+   * for it. The first turn is sent once, here; a rerender sends nothing. A
+   * resumed chat that turns out to hold no turn is asked again.
    */
   investigate: (target: InvestigationTarget, surface?: InvestigationSurface) => void;
+  /**
+   * The user left this chat with New chat. When it is an investigation, the
+   * next Investigate click for that failure starts a fresh run; the chat itself
+   * stays in the history.
+   */
+  endInvestigation: (sessionId: string | null | undefined) => void;
 
   /** Tell the chat what this page shows; returns the unregister function for unmount. */
   registerPage: (provider: PageContextProvider) => () => void;
+  /**
+   * Tell the chat the registered page's state may have changed, e.g. after each commit of its
+   * editor. Cheap to call often: the chat rerenders only when its page summary changes.
+   */
+  refreshPage: () => void;
+  /** Subscribe to page summary changes; returns the unsubscribe function. */
+  subscribePage: (listener: () => void) => () => void;
+  /** The summary of currentPage(), the same object until a shown field changes. */
+  pageSummary: () => PageContextSummary | null;
   /** The page a turn sent now would describe; null on the chat page itself. */
   currentPage: () => PageContext | null;
   /** Hand proposed code to the open editor; false when no page takes code. */
@@ -70,10 +148,24 @@ interface ChatDockValue {
 
 const ChatDockCtx = createContext<ChatDockValue | null>(null);
 
+/**
+ * Where the docked sidebar covers the whole page instead of sitting beside it: below the `lg`
+ * breakpoint, the exact complement of the `lg:` and `max-lg:` variants ChatSidebar uses.
+ */
+export const SIDEBAR_COVERS_PAGE_QUERY = "not all and (min-width: 64rem)";
+
+function sidebarCoversPage(): boolean {
+  return (
+    typeof window !== "undefined" && Boolean(window.matchMedia?.(SIDEBAR_COVERS_PAGE_QUERY).matches)
+  );
+}
+
 export function ChatDockProvider({ children }: { children: React.ReactNode }) {
   const {
     activeSession,
     sessions,
+    runs,
+    detachedTurns,
     findSessionByContext,
     switchSession,
     createNewSession,
@@ -81,33 +173,79 @@ export function ChatDockProvider({ children }: { children: React.ReactNode }) {
     sendMessage,
   } = useCopilotChatSessionContext();
   const [isOpen, setIsOpen] = useState(false);
+  // Read by applyCode, which keeps one identity across renders.
+  const isOpenRef = useRef(isOpen);
+  useEffect(() => {
+    isOpenRef.current = isOpen;
+  }, [isOpen]);
   const [miniOpen, setMiniOpen] = useState(false);
   const pathname = usePathname();
   const pageProvider = useRef<PageContextProvider | null>(null);
   const [canApplyCode, setCanApplyCode] = useState(false);
+  const pageListeners = useRef(new Set<() => void>());
 
-  const registerPage = useCallback((provider: PageContextProvider) => {
-    pageProvider.current = provider;
-    setCanApplyCode(Boolean(provider.applyCode));
+  const refreshPage = useCallback(() => {
+    for (const listener of pageListeners.current) listener();
+  }, []);
+
+  const subscribePage = useCallback((listener: () => void) => {
+    pageListeners.current.add(listener);
     return () => {
-      if (pageProvider.current !== provider) return;
-      pageProvider.current = null;
-      setCanApplyCode(false);
+      pageListeners.current.delete(listener);
     };
   }, []);
+
+  const registerPage = useCallback(
+    (provider: PageContextProvider) => {
+      pageProvider.current = provider;
+      setCanApplyCode(Boolean(provider.applyCode));
+      refreshPage();
+      return () => {
+        if (pageProvider.current !== provider) return;
+        pageProvider.current = null;
+        setCanApplyCode(false);
+        refreshPage();
+      };
+    },
+    [refreshPage],
+  );
 
   const currentPage = useCallback((): PageContext | null => {
     // The chat page is the chat; there is nothing else on it to describe.
     if (!pathname || pathname.startsWith("/chat")) return null;
     const page = pageProvider.current?.current();
     if (page) return page;
-    return { path: pathname, title: typeof document === "undefined" ? "" : document.title };
+    return {
+      path: pathname,
+      title: typeof document === "undefined" ? "" : document.title,
+    };
   }, [pathname]);
+
+  // The last summary handed out, so an unchanged page returns the same object.
+  const lastSummary = useRef<PageContextSummary | null>(null);
+  const pageSummary = useCallback((): PageContextSummary | null => {
+    const page = currentPage();
+    // Page suggestions only while that page's own context is the one a turn describes.
+    const next = summarizePage(
+      page,
+      page && pageProvider.current ? pageProvider.current.suggestions?.() : undefined,
+    );
+    if (!sameSummary(lastSummary.current, next)) lastSummary.current = next;
+    return lastSummary.current;
+  }, [currentPage]);
 
   const applyCode = useCallback((edit: EditProposal): boolean => {
     const provider = pageProvider.current;
     if (!provider?.applyCode || !matchesEditTarget(edit, provider.current())) return false;
-    provider.applyCode(edit.code);
+    if (provider.applyCode(edit.code) === false) return false;
+    // Where the sidebar covers the page, the change applied behind it: step aside so the user
+    // sees it. The chat, its session, and the card stay as they are; the tab reopens them. A
+    // refused or stale proposal never gets here, so its card stays on screen.
+    if (isOpenRef.current && sidebarCoversPage()) {
+      isOpenRef.current = false;
+      setIsOpen(false);
+      provider.revealAppliedCode?.();
+    }
     return true;
   }, []);
 
@@ -130,14 +268,22 @@ export function ChatDockProvider({ children }: { children: React.ReactNode }) {
     [focusContext],
   );
 
+  // Whether the active chat has a turn going, streamed or not: reopening the chat shows it.
+  const activeBusy = Boolean(
+    activeSession && (activeSession.id in runs || activeSession.id in detachedTurns),
+  );
+
   const openGeneralChat = useCallback(() => {
     // Keep the chat the user was in; start fresh only when there is none or it
-    // is about a specific result.
-    if (!activeSession || activeSession.context || activeSession.investigation) {
+    // is about a specific result and has no answer going. A running answer is
+    // never replaced by an empty chat: the user reopened the chat to see it.
+    if (!activeSession || ((activeSession.context || activeSession.investigation) && !activeBusy)) {
       createNewSession(null);
     }
+    // One surface at a time: the sidebar replaces the floating window.
+    setMiniOpen(false);
     setIsOpen(true);
-  }, [activeSession, createNewSession]);
+  }, [activeBusy, activeSession, createNewSession]);
 
   const openSidebar = useCallback(() => {
     setMiniOpen(false);
@@ -149,6 +295,7 @@ export function ChatDockProvider({ children }: { children: React.ReactNode }) {
   const openMiniChat = useCallback(
     (context: TaskChatContext) => {
       focusContext(context);
+      setIsOpen(false);
       setMiniOpen(true);
     },
     [focusContext],
@@ -168,27 +315,96 @@ export function ChatDockProvider({ children }: { children: React.ReactNode }) {
   // Investigations started in this tab, by failure. Written in the click handler
   // itself, so a double click resumes the session the first click created.
   const investigations = useRef<Map<string, string>>(new Map());
+  // Investigations the user left with New chat: Investigate starts over instead
+  // of resuming them, unless the chat is the one on screen.
+  const ended = useRef<Set<string>>(new Set());
   const sessionsRef = useRef(sessions);
-  sessionsRef.current = sessions;
+  const activeIdRef = useRef(activeSession?.id ?? null);
+  useEffect(() => {
+    sessionsRef.current = sessions;
+  }, [sessions]);
+  useEffect(() => {
+    activeIdRef.current = activeSession?.id ?? null;
+  }, [activeSession?.id]);
+
+  const endInvestigation = useCallback((sessionId: string | null | undefined) => {
+    if (!sessionId) return;
+    const session = sessionsRef.current?.find((s) => s.id === sessionId);
+    if (!session?.investigation) return;
+    const key = investigationKey(session.investigation);
+    // Reset this failure, including older runs loaded from history.
+    for (const candidate of sessionsRef.current ?? []) {
+      if (sameInvestigation(candidate.investigation, session.investigation)) {
+        ended.current.add(candidate.id);
+      }
+    }
+    investigations.current.delete(key);
+    // New chat can be followed by Investigate before React renders the switch.
+    activeIdRef.current = null;
+  }, []);
+
+  // A resumed investigation whose stored chat may hold no turn (its first one
+  // was never saved). Checked once its messages are loaded.
+  const emptyCheck = useRef<{
+    sessionId: string;
+    target: InvestigationTarget;
+  } | null>(null);
+
+  const askAgainIfEmpty = useCallback(() => {
+    const pending = emptyCheck.current;
+    if (!pending) return;
+    const session = sessionsRef.current?.find((s) => s.id === pending.sessionId);
+    if (!session || pending.sessionId !== activeIdRef.current) {
+      emptyCheck.current = null;
+      return;
+    }
+    if (!session.messagesLoaded) return;
+    emptyCheck.current = null;
+    if (session.messages.length > 0) return;
+    sendMessage(investigationPrompt(pending.target), {
+      sessionId: pending.sessionId,
+      page: currentPage(),
+    });
+  }, [currentPage, sendMessage]);
+
+  useEffect(() => {
+    askAgainIfEmpty();
+  }, [askAgainIfEmpty, sessions, activeSession?.id]);
 
   const investigate = useCallback(
     (target: InvestigationTarget, surface: InvestigationSurface = "sidebar") => {
       const key = investigationKey(target);
+      const resumable = (id: string) => !ended.current.has(id) || id === activeIdRef.current;
       const known = investigations.current.get(key);
+      // Deleting the known run starts fresh instead of reviving older history.
       const resumed =
-        known && hasSession(known)
+        known && hasSession(known) && resumable(known)
           ? known
-          : sessionsRef.current?.find((s) => sameInvestigation(s.investigation, target))?.id;
+          : known && !hasSession(known)
+            ? undefined
+            : sessionsRef.current?.find(
+                (s) => sameInvestigation(s.investigation, target) && resumable(s.id),
+              )?.id;
       if (resumed) {
         investigations.current.set(key, resumed);
         switchSession(resumed);
+        // Current before the switch renders, so the check below and a double
+        // click see the chat this click opened.
+        activeIdRef.current = resumed;
+        emptyCheck.current = { sessionId: resumed, target };
+        askAgainIfEmpty();
       } else {
         const sessionId = createNewSession(null, {
           title: investigationTitle(target),
           investigation: target,
         });
         investigations.current.set(key, sessionId);
-        sendMessage(investigationPrompt(target), { sessionId, page: currentPage() });
+        activeIdRef.current = sessionId;
+        emptyCheck.current = null;
+        sendMessage(investigationPrompt(target), {
+          sessionId,
+          page: currentPage(),
+        });
       }
       if (surface === "mini") {
         setIsOpen(false);
@@ -198,7 +414,7 @@ export function ChatDockProvider({ children }: { children: React.ReactNode }) {
         setIsOpen(true);
       }
     },
-    [createNewSession, currentPage, hasSession, sendMessage, switchSession],
+    [askAgainIfEmpty, createNewSession, currentPage, hasSession, sendMessage, switchSession],
   );
 
   const value = useMemo(
@@ -214,7 +430,11 @@ export function ChatDockProvider({ children }: { children: React.ReactNode }) {
       openMiniChatForSession,
       closeMiniChat,
       investigate,
+      endInvestigation,
       registerPage,
+      refreshPage,
+      subscribePage,
+      pageSummary,
       currentPage,
       applyCode,
       canApplyCode,
@@ -231,7 +451,11 @@ export function ChatDockProvider({ children }: { children: React.ReactNode }) {
       openMiniChatForSession,
       closeMiniChat,
       investigate,
+      endInvestigation,
       registerPage,
+      refreshPage,
+      subscribePage,
+      pageSummary,
       currentPage,
       applyCode,
       canApplyCode,
@@ -252,4 +476,18 @@ export function useChatDock() {
 /** The dock when there is one; null where the chat renders without it (tests, isolated pages). */
 export function useOptionalChatDock(): ChatDockValue | null {
   return useContext(ChatDockCtx);
+}
+
+const noDock = () => () => undefined;
+const noPage = () => null;
+
+/**
+ * The summary of the page a turn sent now would describe, kept current as the page registers,
+ * updates, or unregisters and as the route changes; null without a dock or on the chat page.
+ */
+export function useChatPageSummary(): PageContextSummary | null {
+  const dock = useContext(ChatDockCtx);
+  const subscribe = dock?.subscribePage ?? noDock;
+  const snapshot = dock?.pageSummary ?? noPage;
+  return useSyncExternalStore(subscribe, snapshot, snapshot);
 }

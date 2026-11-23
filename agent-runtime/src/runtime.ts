@@ -5,53 +5,73 @@ import { fileURLToPath } from "node:url";
 
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import type { Api, Model } from "@earendil-works/pi-ai";
-import {
-  DefaultResourceLoader,
-  ModelRuntime,
-  type ToolDefinition as CodingAgentTool,
-} from "@earendil-works/pi-coding-agent";
+import { ModelRuntime, type ToolDefinition as CodingAgentTool } from "@earendil-works/pi-coding-agent";
 import {
   AssistantEntry,
   createRegistry,
-  defineExtension,
   Harness,
-  section,
+  ROOT_CONVERSATION_ID,
   ToolResultEntry,
-  UserEntry,
   type Conversation,
+  type ConversationId,
   type EntryId,
   type Harness as DurableHarness,
+  type HarnessSettings,
   type ModelRef,
 } from "@earendil-works/pi-durable";
 import { openNodeSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/node";
-import { createCodingTools } from "@earendil-works/pi-durable/tools";
 
 import { createQDashConnection, type QDashAuth, type QDashConnection } from "./auth.ts";
 import {
   ALLOWED_TOOL_NAMES,
   ALLOWLISTED_PACKAGES,
+  isDeferredTool,
   REVIEWED_WRITE_TOOL_NAMES,
-  TRUSTED_EXTENSION_PACKAGES,
+  SESSION_GRANTED_WRITE_TOOL_NAMES,
 } from "./allowed-tools.ts";
 import { compactionBudget, type CompactionBudget } from "./budget.ts";
 import { chartTool } from "./chart-tool.ts";
+import { buildCompactionExtension } from "./compaction.ts";
+import {
+  buildChatRegistry as buildChatRegistryFor,
+  buildCopilotExtension,
+  USER_PREFERENCES_SECTION,
+  type ChatRegistry,
+  type ChatRegistryParts,
+} from "./chat-registry.ts";
+import { BranchError, branchFrom, openBranch } from "./branch.ts";
+import { CHAT_QUEUE_SETTINGS, isUserMessage, readSteerReceipt, type SteerOutcome } from "./chat-control.ts";
+import { removeStore, workspaceMarker } from "./store-identity.ts";
+import {
+  CODEMODE_GUIDELINE,
+  CODEMODE_TOOL_NAME,
+  deferredToolsGuideline,
+  TOOL_SEARCH_TOOL_NAME,
+} from "./codemode.ts";
+import { uiTool } from "./ui-tool.ts";
+import {
+  buildPresentationTools,
+  PRESENTATION_GUIDELINE,
+  PRESENTATION_INTERNAL_CALLS,
+  PRESENT_TOOL,
+  configurePresentation,
+} from "./presentation-tool.ts";
+import { configureClassifierModels, readClassifierConfig } from "./classifier-models.ts";
+import { buildClassifyChatTool, CLASSIFY_CHAT_TOOL, CLASSIFY_GUIDELINE, configureClassify } from "./classify-tool.ts";
 import { loadLanguageConfig } from "./config.ts";
 import { ExecWorkspace, execConfigFromEnv, removeWorkspace, WORKSPACE_TOOL_NAMES } from "./exec-env.ts";
 import { askUserTool } from "./ask-tool.ts";
 import {
   buildLocalToolGuide,
-  bundledExtensionCheckouts,
-  withExtensionOverrides,
-  localToolNames,
-  describeExtensionError,
+  bundledExtensions,
+  createBundledResourceLoader,
+  describeBundledExtensions,
   extensionPackage,
   isTrustedExtension,
-  withoutReplacedInstalls,
-  discoverExtensionCheckouts,
-  trustedCheckoutRoots,
-} from "./local-extensions.ts";
+  localToolNames,
+  trustedBundleRoots,
+} from "./bundled-extensions.ts";
 import {
-  buildQDashExtension,
   runCodingAgentTool,
   type ApprovalRequest,
   type QDashWriteTools,
@@ -74,44 +94,61 @@ import {
 } from "./evaluate.ts";
 import { formatSettledDetail } from "./events.ts";
 import { logDurableReport } from "./durable-report.ts";
-import { fetchKnowledgeDraft, fetchTaskExamples, fetchTaskKnowledge } from "./knowledge-context.ts";
-import { chatCompactionOverrides, PROVIDER_ALIASES, writeModelsConfig } from "./models-config.ts";
-import {
-  buildPageContextSection,
-  buildProposeCodeEditTool,
-  PAGE_SECTION,
-  type PageContext,
-} from "./page-context.ts";
+import { examplesOf, fetchKnowledgeDraft, fetchTaskKnowledgeResponse, renderReference } from "./knowledge-context.ts";
+import type { TaskKnowledgeLike } from "./knowledge-context.ts";
+import { resolveCopilotModelFiles } from "./copilot-profile.ts";
+import { chatCompactionOverrides, missingCredentialMessage, NATIVE_API_KEY_ENV, PROVIDER_ALIASES, supportedThinkingLevel, writeModelsConfig } from "./models-config.ts";
+import type { PageContext } from "./page-context.ts";
 import { buildSystemPrompt, buildUserInstructionsSection } from "./prompt.ts";
-import { buildSkillTool, type SkillSummary } from "./skill-tool.ts";
-import { extractToolGuide, TOOL_GUIDE_SKILL } from "./tool-guide.ts";
+import {
+  buildSkillTool,
+  expandSkillCommand,
+  skillCommands,
+  type SkillCommand,
+  type SkillSummary,
+} from "./skill-tool.ts";
+import { extractToolGuide, TOOL_GUIDE_SKILL, toolGuideNames } from "./tool-guide.ts";
 
 const AGENT_DIR = process.env.PI_CODING_AGENT_DIR ?? "/app/.pi-agent";
 const WORK_DIR = process.env.AGENT_WORK_DIR ?? "/app/workspace";
 const STATE_DIR = process.env.AGENT_STATE_DIR ?? "/app/state";
 const COPILOT_CONFIG_PATH = process.env.COPILOT_CONFIG_PATH ?? "/app/config/copilot/config.yaml";
-const CHAT_CONFIG_PATH = process.env.CHAT_CONFIG_PATH ?? "/app/config/copilot/chat.yaml";
-const EVALUATION_CONFIG_PATH =
-  process.env.EVALUATION_CONFIG_PATH ?? "/app/config/copilot/evaluation.yaml";
+// chat.yaml and evaluation.yaml, or those of QDASH_COPILOT_PROFILE, resolved
+// once per process in SharedRuntime.create (see copilot-profile.ts).
+// Optional: the classifier models QDash features may use; present_results and
+// classify are offered when one of them is usable.
+const CLASSIFIER_CONFIG_PATH =
+  process.env.CLASSIFIER_CONFIG_PATH ?? "/app/config/copilot/classifier.yaml";
 // One model request; a whole turn is bounded by the server's own timers.
 const MODEL_STREAM_TIMEOUT_MS = Number(process.env.MODEL_STREAM_TIMEOUT_MS ?? 180_000);
 // The Copilot workspace (agent-exec container); without it the chat has no
 // shell or files, only QDash tools.
 const EXEC_CONFIG = execConfigFromEnv();
-// Local extension checkouts: compose mounts agent-runtime/extensions/ here. It
-// is empty in production and in a clone without checkouts. Every checkout is
-// loaded (replacing the bundled or installed copy of the same package); only those outside
-// the allowlisted packages are trusted as a whole.
-const EXTENSIONS_DIR = "/app/extensions";
-const BUNDLED = bundledExtensionCheckouts(fileURLToPath(new URL("../../packages/", import.meta.url)));
+// The pi packages built into this image are the only extensions and skills
+// loaded (see bundled-extensions.ts). Those outside the allowlisted packages
+// are trusted as a whole.
+const BUNDLED = bundledExtensions(fileURLToPath(new URL("../../packages/", import.meta.url)));
 const BUNDLED_PATHS = BUNDLED.map(({ path }) => path);
-const CHECKOUTS = withExtensionOverrides(BUNDLED, discoverExtensionCheckouts(EXTENSIONS_DIR));
-const CHECKOUT_PATHS = CHECKOUTS.map((checkout) => checkout.path);
-const EXTENSION_PATHS = trustedCheckoutRoots(CHECKOUTS, ALLOWLISTED_PACKAGES);
+const EXTENSION_PATHS = trustedBundleRoots(BUNDLED, ALLOWLISTED_PACKAGES);
 
 export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high";
 
-export interface SessionRequest {
+/**
+ * Where a chat's durable state lives: the store (one SQLite file and one
+ * workspace per owner and store session) and the conversation in it. A chat
+ * that was never branched uses its own session ID as the store and the root
+ * conversation; a branch uses the store of the chat it was branched from and
+ * its own conversation. QDash's API resolves both from the chat session it
+ * stored, never from what a browser sends.
+ */
+export interface StoreTarget {
+  /** The store's session ID; unset, the chat's own `sessionId`. */
+  storeSessionId?: string;
+  /** The branch conversation in the store; unset, the root conversation. */
+  conversationId?: ConversationId;
+}
+
+export interface SessionRequest extends StoreTarget {
   ownerId: string;
   sessionId: string;
   requestId?: string;
@@ -125,9 +162,6 @@ export interface SessionRequest {
   /** What the user has open in QDash while chatting from the sidebar; rebuilt every turn. */
   pageContext?: PageContext;
 }
-
-/** Section key of the user's preferences in the system prompt. */
-const USER_PREFERENCES_SECTION = "user-preferences";
 
 /** What `chatSystemPrompt` returns. */
 export interface ChatSystemPrompt {
@@ -161,9 +195,15 @@ export interface OpenDurableSession {
   close(): Promise<void>;
 }
 
-/** The file beside a session's store that says its workspace directory was created. */
-export function workspaceMarker(storePath: string): string {
-  return `${storePath}.workspace`;
+/** A branch to fork: the source conversation of a store, the answer, and the QDash session it is for. */
+export interface BranchRequest {
+  ownerId: string;
+  storeSessionId: string;
+  /** The conversation the user branches from; unset, the root. */
+  sourceConversationId?: ConversationId;
+  at: EntryId;
+  /** The QDash session the branch belongs to; the same one again returns the same branch. */
+  targetSessionId: string;
 }
 
 /** Return a stable non-identifying filename for one user's QDash session. */
@@ -174,9 +214,25 @@ export function sessionStorageName(ownerId: string, sessionId: string): string {
 /** Where an evaluation reads its knowledge: an uploaded draft when named, else the task's shared knowledge. */
 function knowledgeSource(connection: QDashConnection, draftId: string | undefined, signal?: AbortSignal) {
   if (draftId) return draftKnowledge(() => fetchKnowledgeDraft(connection, draftId, signal));
+  // One knowledge request per task serves both the reference and the examples.
+  const responses = new Map<string, Promise<TaskKnowledgeLike | undefined>>();
+  const load = (taskName: string) => {
+    let pending = responses.get(taskName);
+    if (!pending) {
+      pending = fetchTaskKnowledgeResponse(connection, taskName, signal);
+      responses.set(taskName, pending);
+    }
+    return pending;
+  };
   return {
-    fetchKnowledge: (taskName: string) => fetchTaskKnowledge(connection, taskName, signal),
-    fetchExamples: (taskName: string) => fetchTaskExamples(connection, taskName, signal),
+    fetchKnowledge: async (taskName: string) => {
+      const knowledge = await load(taskName);
+      return knowledge ? renderReference(knowledge) : undefined;
+    },
+    fetchExamples: async (taskName: string) => {
+      const knowledge = await load(taskName);
+      return knowledge ? examplesOf(knowledge) : [];
+    },
   };
 }
 
@@ -194,17 +250,26 @@ export class SharedRuntime {
       connection: QDashConnection,
       userInstructions?: string,
       pageContext?: PageContext,
-    ) => {
-      registry: ReturnType<typeof createRegistry>;
-      writeTools: QDashWriteTools;
-    },
+    ) => ChatRegistry,
     private readonly toolNames: string[],
     /** The same tools the chat registry adapts, for running outside a conversation. */
     private readonly enabledTools: ReadonlyMap<string, EnabledTool>,
     /** QDash's system prompt for chats, as built at startup. */
     private readonly systemPrompt: string,
     private readonly modelCompactionOverrides: Readonly<Record<string, CompactionBudget>> = {},
+    /** The skills `read_skill` offers, which the user may also invoke as `/skill:name`. */
+    private readonly skills: readonly SkillSummary[] = [],
   ) {}
+
+  /** The skills the chat composer offers after `/`, with their descriptions. */
+  chatSkills(): SkillCommand[] {
+    return skillCommands(this.skills);
+  }
+
+  /** The user's message with a leading `/skill:name` expanded to that skill. */
+  expandSkillCommand(message: string): string {
+    return expandSkillCommand(message, this.skills);
+  }
 
   /**
    * The system prompt a chat of this user gets, as the model receives it:
@@ -215,7 +280,7 @@ export class SharedRuntime {
     return chatSystemPromptOf(this.systemPrompt, this.toolNames, userInstructions);
   }
 
-  /** Load the Pi model catalog and adapt the installed pi-qdash extension once. */
+  /** Load the Pi model catalog and adapt the bundled pi extensions once. */
   static async create(): Promise<SharedRuntime> {
     mkdirSync(STATE_DIR, { recursive: true });
     if (EXEC_CONFIG) {
@@ -225,26 +290,18 @@ export class SharedRuntime {
     }
 
     const { responseLanguage, thinkingLanguage } = loadLanguageConfig(COPILOT_CONFIG_PATH);
-    const loader = new DefaultResourceLoader({
-      cwd: WORK_DIR,
-      agentDir: AGENT_DIR,
-      additionalExtensionPaths: CHECKOUT_PATHS,
-    });
+    const loader = createBundledResourceLoader({ cwd: WORK_DIR, agentDir: AGENT_DIR, bundled: BUNDLED });
     await loader.reload();
-    // pi reports one conflict per tool name, so a checkout that replaces an
-    // installed package yields the same replacement notice dozens of times.
-    const reported = new Set<string>();
     for (const { path, error } of loader.getExtensions().errors) {
-      const report = describeExtensionError(path, error, CHECKOUT_PATHS);
-      if (reported.has(report.message)) continue;
-      reported.add(report.message);
-      if (report.level === "error") console.error(report.message);
-      else console.log(report.message);
+      console.error(`[agent-runtime] extension ${path}: ${error}`);
     }
 
-    const modelsPath = writeModelsConfig(
-      CHAT_CONFIG_PATH,
-      EVALUATION_CONFIG_PATH,
+    const modelFiles = resolveCopilotModelFiles(process.env, COPILOT_CONFIG_PATH);
+    console.log(
+      `[agent-runtime] copilot models: ${modelFiles.profile === undefined ? "default" : `profile ${modelFiles.profile}`} (${modelFiles.chatPath}, ${modelFiles.evaluationPath})`,
+    );
+    const { path: modelsPath, yaml: modelYaml } = writeModelsConfig(
+      modelFiles,
       join(AGENT_DIR, "models.json"),
     );
     const modelRuntime = await ModelRuntime.create({
@@ -264,18 +321,17 @@ export class SharedRuntime {
       `[agent-runtime] skills: ${skills.map((skill) => skill.name).join(", ") || "none"}`,
     );
 
-    const extensions = withoutReplacedInstalls(loader.getExtensions().extensions, CHECKOUTS);
-    // Local checkouts and trusted installed packages are trusted as a whole
-    // (see buildQDashExtension); reviewed write names still require approval.
-    const localTools = localToolNames(extensions, EXTENSION_PATHS, TRUSTED_EXTENSION_PACKAGES);
-    if (CHECKOUT_PATHS.length || localTools.length) {
-      console.log(
-        `[agent-runtime] trusted extensions: packages=${TRUSTED_EXTENSION_PACKAGES.join(", ") || "none"}; local=${EXTENSION_PATHS.join(", ") || "none"} (tools: ${localTools.join(", ") || "none"}); allowlisted checkouts=${CHECKOUT_PATHS.filter((path) => !EXTENSION_PATHS.includes(path)).join(", ") || "none"}`,
-      );
+    const extensions = loader.getExtensions().extensions;
+    for (const line of describeBundledExtensions(BUNDLED, EXTENSION_PATHS, extensions, loader.getSkills().skills)) {
+      console.log(line);
     }
+    // Trusted bundled roots offer every tool they define (see
+    // buildQDashExtension); reviewed write names still require approval.
+    const localTools = localToolNames(extensions, EXTENSION_PATHS);
     const allowed = new Set<string>([
       ...ALLOWED_TOOL_NAMES,
       ...REVIEWED_WRITE_TOOL_NAMES,
+      ...SESSION_GRANTED_WRITE_TOOL_NAMES,
       ...localTools,
     ]);
     const qdashToolNames = [
@@ -286,16 +342,24 @@ export class SharedRuntime {
       ),
     ];
     const guideSkill = skills.find((skill) => skill.name === TOOL_GUIDE_SKILL);
+    // Listed in the prompt or marked in the guide, so the model loads them before calling.
+    const deferredToolNames = qdashToolNames.filter(isDeferredTool);
     const toolGuide = guideSkill
-      ? extractToolGuide(readFileSync(guideSkill.filePath, "utf8"), qdashToolNames)
+      ? extractToolGuide(readFileSync(guideSkill.filePath, "utf8"), qdashToolNames, deferredToolNames)
       : null;
     if (!toolGuide) console.warn("[agent-runtime] no tool guide: qdash skill not found");
-    const localToolGuide = buildLocalToolGuide(
-      extensions,
-      EXTENSION_PATHS,
-      new Set(localTools),
-      TRUSTED_EXTENSION_PACKAGES,
+    const localToolGuide = buildLocalToolGuide(extensions, EXTENSION_PATHS, new Set(localTools));
+
+    const classifiers = configureClassifierModels(
+      readClassifierConfig(CLASSIFIER_CONFIG_PATH),
+      modelRuntime,
+      process.env,
+      console,
     );
+    const presentation = configurePresentation(classifiers, console);
+    const presentationTools = presentation ? buildPresentationTools(presentation) : [];
+    // On-demand classification the model asks for; separate from present_results' layouts.
+    const classify = configureClassify(classifiers, console);
 
     // Built once: the same text every chat gets and Settings shows read-only.
     const systemPrompt = buildSystemPrompt(
@@ -305,67 +369,51 @@ export class SharedRuntime {
       toolGuide,
       localToolGuide,
       EXEC_CONFIG !== undefined,
+      presentation ? PRESENTATION_GUIDELINE : null,
+      classify ? CLASSIFY_GUIDELINE : null,
+      {
+        codemode: CODEMODE_GUIDELINE,
+        deferredTools: deferredToolsGuideline(deferredToolNames, toolGuideNames(toolGuide)),
+      },
     );
-    const copilotExtension = defineExtension({
-      name: "qdash-copilot",
-      sections: [section("qdash-copilot", () => systemPrompt, { tag: false })],
-      tools: [chartTool, askUserTool, ...(skills.length ? [buildSkillTool(skills)] : [])],
-    });
+    const copilotExtension = buildCopilotExtension(systemPrompt, [
+      chartTool,
+      uiTool,
+      ...presentationTools,
+      ...(classify ? [buildClassifyChatTool(classify)] : []),
+      askUserTool,
+      ...(skills.length ? [buildSkillTool(skills)] : []),
+    ]);
+    const chatParts: ChatRegistryParts = {
+      extensions,
+      modelRuntime,
+      workDir: WORK_DIR,
+      extensionPaths: EXTENSION_PATHS,
+      copilot: copilotExtension,
+      internalCalls: presentation ? PRESENTATION_INTERNAL_CALLS : {},
+      codingTools: EXEC_CONFIG !== undefined,
+      compaction: buildCompactionExtension({ timeoutMs: MODEL_STREAM_TIMEOUT_MS }),
+    };
     const buildChatRegistry = (
       connection: QDashConnection,
       userInstructions?: string,
       pageContext?: PageContext,
-    ) => {
-      const registry = createRegistry();
-      const qdash = buildQDashExtension(
-        extensions,
-        modelRuntime,
-        WORK_DIR,
-        connection,
-        EXTENSION_PATHS,
-        TRUSTED_EXTENSION_PACKAGES,
-      );
-      registry.install(qdash.extension);
-      registry.install(copilotExtension);
-      // After QDash's own rules, so they come first and the user's preferences
-      // read as adjustments to them.
-      const preferences = buildUserInstructionsSection(userInstructions);
-      if (preferences) {
-        registry.install(
-          defineExtension({
-            name: "qdash-user-preferences",
-            sections: [section(USER_PREFERENCES_SECTION, () => preferences)],
-          }),
-        );
-      }
-      // The page the user has open, after their preferences; on the Workflow
-      // editor it brings the edit tool, which proposes and never saves.
-      const pageSection = buildPageContextSection(pageContext);
-      if (pageSection) {
-        registry.install(
-          defineExtension({
-            name: PAGE_SECTION,
-            sections: [section(PAGE_SECTION, () => pageSection)],
-            tools: pageContext?.flow ? [buildProposeCodeEditTool(pageContext.flow, pageContext.path)] : [],
-          }),
-        );
-      }
-      // The workspace's read/write/edit/bash, which run in the agent-exec
-      // container through the environment `openSession` gives the harness.
-      if (EXEC_CONFIG) registry.install(createCodingTools());
-      return { registry, writeTools: qdash.writeTools };
-    };
+    ) => buildChatRegistryFor(chatParts, connection, userInstructions, pageContext);
     const toolNames = [
       ...qdashToolNames,
       "render_chart",
+      "render_ui",
+      ...(presentation ? [PRESENT_TOOL] : []),
+      ...(classify ? [CLASSIFY_CHAT_TOOL] : []),
       "ask_user",
       ...(EXEC_CONFIG ? WORKSPACE_TOOL_NAMES : []),
       ...(skills.length ? ["read_skill"] : []),
+      CODEMODE_TOOL_NAME,
+      TOOL_SEARCH_TOOL_NAME,
     ];
     // Pinned definitions first so a trusted one replaces, as in buildQDashExtension.
     const enabledTools = new Map<string, EnabledTool>();
-    const trusted = (extension: { path: string }) =>
-      isTrustedExtension(extension.path, EXTENSION_PATHS, TRUSTED_EXTENSION_PACKAGES);
+    const trusted = (extension: { path: string }) => isTrustedExtension(extension.path, EXTENSION_PATHS);
     for (const extension of [...extensions].sort((a, b) => Number(trusted(a)) - Number(trusted(b)))) {
       for (const [name, registered] of extension.tools) {
         if (allowed.has(name)) enabledTools.set(name, { definition: registered.definition, path: extension.path });
@@ -373,7 +421,7 @@ export class SharedRuntime {
     }
 
     const modelCompactionOverrides = chatCompactionOverrides(
-      readFileSync(CHAT_CONFIG_PATH, "utf8"),
+      modelYaml.chatYaml,
       (provider, modelId) => modelRuntime.getModel(provider, modelId),
     );
     return new SharedRuntime(
@@ -383,6 +431,7 @@ export class SharedRuntime {
       enabledTools,
       systemPrompt,
       modelCompactionOverrides,
+      skills,
     );
   }
 
@@ -455,7 +504,7 @@ export class SharedRuntime {
           )) as ToolRun;
         },
         ...knowledgeSource(connection, request.knowledgeDraftId, signal),
-        evaluator: evaluation.path ? extensionPackage(evaluation.path, CHECKOUT_PATHS, BUNDLED_PATHS) : undefined,
+        evaluator: evaluation.path ? extensionPackage(evaluation.path, BUNDLED_PATHS) : undefined,
       });
     } finally {
       await connection.close();
@@ -602,7 +651,7 @@ export class SharedRuntime {
       return recordFromDetails(request.taskId, outcome.details, {
         mode: "planner",
         usage: outcome.usage,
-        evaluator: evaluation.path ? extensionPackage(evaluation.path, CHECKOUT_PATHS, BUNDLED_PATHS) : undefined,
+        evaluator: evaluation.path ? extensionPackage(evaluation.path, BUNDLED_PATHS) : undefined,
         planner: {
           model: `${providerId}/${request.modelName}`,
           answer,
@@ -644,37 +693,103 @@ export class SharedRuntime {
     return [...new Set(this.toolNames)].sort();
   }
 
-  /** Delete the closed durable store and the workspace of one deleted QDash session. */
-  async deleteSessionState(ownerId: string, sessionId: string): Promise<void> {
-    const path = join(STATE_DIR, sessionStorageName(ownerId, sessionId));
+  /**
+   * Where one steer stands, read from the session's store without opening a
+   * harness: no recovery, task, or admission. SQLite may still take the store's
+   * lock briefly (see `readSteerReceipt`).
+   */
+  async steerReceipt(
+    ownerId: string,
+    sessionId: string,
+    projectId: string | undefined,
+    requestId: string,
+    target: StoreTarget = {},
+  ): Promise<SteerOutcome | "wrong_project"> {
+    const path = join(STATE_DIR, sessionStorageName(ownerId, target.storeSessionId ?? sessionId));
+    return readSteerReceipt(
+      path,
+      projectId,
+      requestId,
+      BACKGROUND_CONTEXT,
+      target.conversationId ?? ROOT_CONVERSATION_ID,
+    );
+  }
+
+  /** Where the SQLite store of one owner and store session lives. */
+  storePath(ownerId: string, storeSessionId: string): string {
+    return join(STATE_DIR, sessionStorageName(ownerId, storeSessionId));
+  }
+
+  /**
+   * Delete a closed durable store and its workspace, if the store is
+   * `generation` (see store-identity.ts). A store holds a chat and every branch
+   * of it, so QDash deletes it only with the last chat session that uses it; Pi
+   * has no way to delete one conversation of a store. The caller holds the store.
+   */
+  async deleteSessionState(
+    ownerId: string,
+    sessionId: string,
+    generation?: string,
+  ): Promise<"removed" | "absent" | "stale"> {
     // Only a session that used its workspace has a directory to remove; for the
     // others (most evaluations, chats that never ran code) no daemon is started.
-    const marker = workspaceMarker(path);
-    const hadWorkspace = existsSync(marker);
-    for (const suffix of ["", "-wal", "-shm"]) rmSync(`${path}${suffix}`, { force: true });
-    rmSync(marker, { force: true });
-    if (!EXEC_CONFIG || !hadWorkspace) return;
+    const { outcome, hadWorkspace } = removeStore(this.storePath(ownerId, sessionId), generation);
+    if (outcome === "stale" || !EXEC_CONFIG || !hadWorkspace) return outcome;
     try {
       await removeWorkspace(EXEC_CONFIG, ownerId, sessionId);
     } catch (error) {
       // The store is gone either way; a workspace left behind is only disk.
       console.warn(`[agent-runtime] could not remove the workspace of ${sessionId}:`, error);
     }
+    return outcome;
   }
 
-  /** Open or recover the SQLite-backed root conversation for one user/session. */
-  async openSession(request: SessionRequest, auth: QDashAuth): Promise<OpenDurableSession> {
-    const {
-      ref: model,
-      contextWindow,
-      maxTokens,
-    } = this.resolveModelWithLimits(request.provider, request.modelName);
-    const storageName = sessionStorageName(request.ownerId, request.sessionId);
+  /**
+   * Open a store only to cancel work in it (see `stopStoredConversation`):
+   * no extension, so no tool, hook, or extension task of the chat is
+   * registered, no workspace, and no QDash connection. Scheduling starts
+   * paused. The caller holds the store and has checked that it exists.
+   */
+  async openStoreForCleanup(ownerId: string, storeSessionId: string): Promise<{ harness: DurableHarness; close(): Promise<void> }> {
+    const storageName = sessionStorageName(ownerId, storeSessionId);
+    const harness = await Harness.open(
+      await openNodeSqliteStorage(join(STATE_DIR, storageName)),
+      {
+        // Only for a deferred response a stopped run still polls: its abort cancels it.
+        models: this.modelRuntime,
+        registry: createRegistry(),
+        onReport: (report) => logDurableReport(storageName, report),
+        settings: { ...CHAT_QUEUE_SETTINGS },
+      },
+      BACKGROUND_CONTEXT,
+    );
+    return { harness, close: () => harness.close(BACKGROUND_CONTEXT) };
+  }
+
+  /**
+   * Open a chat's store with its tools, as `openSession` and `forkSession` do.
+   * Scheduling starts paused. The workspace and its marker belong to the store,
+   * so every conversation of it shares the same directory.
+   */
+  private async openStore(
+    ownerId: string,
+    storeSessionId: string,
+    auth: QDashAuth,
+    options: {
+      userInstructions?: string;
+      pageContext?: PageContext;
+      settings?: Pick<HarnessSettings, "compaction">;
+    } = {},
+  ): Promise<{
+    harness: DurableHarness;
+    writeTools: QDashWriteTools;
+    workspace: ExecWorkspace | undefined;
+    close(): Promise<void>;
+  }> {
+    const storageName = sessionStorageName(ownerId, storeSessionId);
     const path = join(STATE_DIR, storageName);
     const connection = await createQDashConnection(auth);
-    const workspace = EXEC_CONFIG
-      ? new ExecWorkspace(EXEC_CONFIG, request.ownerId, request.sessionId)
-      : undefined;
+    const workspace = EXEC_CONFIG ? new ExecWorkspace(EXEC_CONFIG, ownerId, storeSessionId) : undefined;
     // Remembered next to the store once the directory exists, so deleting the
     // session later knows whether there is a workspace to remove.
     const marker = workspaceMarker(path);
@@ -688,56 +803,142 @@ export class SharedRuntime {
       return env;
     };
     let harness: DurableHarness | undefined;
+    let closeTools: (() => Promise<void>) | undefined;
     const close = async () => {
       try {
         await harness?.close(BACKGROUND_CONTEXT);
       } finally {
-        workspace?.close();
-        await connection.close();
+        // After the harness: no script starts once its sandbox is closed, and
+        // a script still running resumes with the session's next sandbox.
+        try {
+          await closeTools?.();
+        } finally {
+          workspace?.close();
+          await connection.close();
+        }
       }
     };
     try {
-      const { registry, writeTools } = this.buildChatRegistry(
+      const { registry, writeTools, close: closeRegistry } = this.buildChatRegistry(
         connection,
-        request.userInstructions,
-        request.pageContext,
+        options.userInstructions,
+        options.pageContext,
       );
-      const selectedBudget = compactionBudget(contextWindow, maxTokens);
+      closeTools = closeRegistry;
       harness = await Harness.open(
         await openNodeSqliteStorage(path),
         {
           models: this.modelRuntime,
           registry,
           ...(workspace ? { env: workspaceEnv } : {}),
-          onReport: (error, info) => logDurableReport(storageName, error, info),
+          onReport: (report) => logDurableReport(storageName, report),
           settings: {
             stream: { timeoutMs: MODEL_STREAM_TIMEOUT_MS },
-            compaction: {
-              enabled: true,
-              ...selectedBudget,
-              modelOverrides: {
-                ...this.modelCompactionOverrides,
-                [`${model.provider}/${model.modelId}`]: selectedBudget,
-              },
-            },
+            ...CHAT_QUEUE_SETTINGS,
+            ...options.settings,
           },
         },
         BACKGROUND_CONTEXT,
       );
+      return { harness, writeTools, workspace, close };
+    } catch (error) {
+      await close();
+      throw error;
+    }
+  }
+
+  /**
+   * Open or recover the SQLite-backed conversation of one user/session: the
+   * root of its own store, or the branch `request.conversationId` of the store
+   * `request.storeSessionId`. Task scheduling starts paused;
+   * `harness.resume()` or a submit starts it.
+   */
+  async openSession(request: SessionRequest, auth: QDashAuth): Promise<OpenDurableSession> {
+    const {
+      ref: model,
+      contextWindow,
+      maxTokens,
+    } = this.resolveModelWithLimits(request.provider, request.modelName);
+    // A native catalog model without its key is refused here, named, never swapped for another.
+    const missing =
+      model.provider in NATIVE_API_KEY_ENV
+        ? missingCredentialMessage(
+            model.provider,
+            model.modelId,
+            (await this.modelRuntime.checkAuth(model.provider)) !== undefined,
+          )
+        : undefined;
+    if (missing) throw new Error(missing);
+    const selectedBudget = compactionBudget(contextWindow, maxTokens);
+    const opened = await this.openStore(request.ownerId, request.storeSessionId ?? request.sessionId, auth, {
+      userInstructions: request.userInstructions,
+      pageContext: request.pageContext,
+      settings: {
+        compaction: {
+          enabled: true,
+          ...selectedBudget,
+          modelOverrides: {
+            ...this.modelCompactionOverrides,
+            [`${model.provider}/${model.modelId}`]: selectedBudget,
+          },
+        },
+      },
+    });
+    const { harness, writeTools, workspace, close } = opened;
+    try {
+      // A level the model cannot run (Off on a model whose thinking is always on) runs at the
+      // nearest one it can, not at pi's fallback effort (see supportedThinkingLevel).
+      const thinkingLevel = supportedThinkingLevel(
+        this.modelRuntime.getModel(model.provider, model.modelId),
+        request.thinkingLevel,
+      );
       const agent = {
         model,
-        ...(request.thinkingLevel ? { thinkingLevel: request.thinkingLevel } : {}),
+        ...(thinkingLevel ? { thinkingLevel } : {}),
         // Where the harness builds the workspace environment: a directory of
         // the agent-exec container, not of this one.
         cwd: workspace?.cwd ?? WORK_DIR,
       };
-      const conversation = await harness.root(BACKGROUND_CONTEXT, { agent });
+      // A branch keeps the agent it was forked with; this turn's model and
+      // thinking level apply from here, as for the root.
+      const conversation =
+        request.conversationId === undefined
+          ? await harness.root(BACKGROUND_CONTEXT, { agent })
+          : await openBranch(harness, request.conversationId, BACKGROUND_CONTEXT);
       await conversation.configure(agent, BACKGROUND_CONTEXT);
-      harness.resume();
+      // Scheduling is not resumed here: the first call that asks for progress
+      // (a submit) resumes it, or the caller does once it watches the
+      // conversation, so a run recovered from a crash is seen from its start.
       return { harness, conversation, writeTools, close };
     } catch (error) {
       await close();
       throw error;
+    }
+  }
+
+  /**
+   * Fork a branch of a chat at one of its answers, in the chat's store (see
+   * branch.ts). Opens the store with the caller's credentials and never resumes
+   * scheduling, so nothing runs while it checks and forks; the caller holds
+   * the store exclusively. Writes nothing to the source conversation.
+   */
+  async forkSession(
+    request: BranchRequest,
+    auth: QDashAuth,
+  ): Promise<{ conversationId: ConversationId; created: boolean }> {
+    const path = join(STATE_DIR, sessionStorageName(request.ownerId, request.storeSessionId));
+    // Opening a missing store would create an empty one.
+    if (!existsSync(path)) throw new BranchError("store_not_found", "the chat's store was not found");
+    const { harness, close } = await this.openStore(request.ownerId, request.storeSessionId, auth);
+    try {
+      const source =
+        request.sourceConversationId === undefined
+          ? await harness.conversation(ROOT_CONVERSATION_ID, BACKGROUND_CONTEXT)
+          : await openBranch(harness, request.sourceConversationId, BACKGROUND_CONTEXT);
+      if (!source) throw new BranchError("conversation_not_found", "the chat's conversation was not found");
+      return await branchFrom(harness, source, request.at, request.targetSessionId, BACKGROUND_CONTEXT);
+    } finally {
+      await close();
     }
   }
 }
@@ -756,7 +957,7 @@ export async function pendingApproval(
   const view = await conversation.context(BACKGROUND_CONTEXT);
   for (let i = view.entries.length - 1; i >= 0; i--) {
     const entry = view.entries[i];
-    if (UserEntry.is(entry)) return undefined;
+    if (isUserMessage(entry)) return undefined;
     if (!ToolResultEntry.is(entry)) continue;
     const details = entry.model?.[0]?.role === "toolResult" ? entry.model[0].details : undefined;
     const approval = (details as { approval?: ApprovalRequest } | undefined)?.approval;

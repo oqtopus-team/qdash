@@ -4,6 +4,8 @@ import type { ReactNode } from "react";
 import { createContext, useCallback, useContext, useState, useEffect, useMemo } from "react";
 
 import { useQueryClient } from "@tanstack/react-query";
+
+import type { Query, QueryClient } from "@tanstack/react-query";
 import { usePathname } from "next/navigation";
 
 import { useAuth } from "./AuthContext";
@@ -38,6 +40,43 @@ const ROLE_PERMISSIONS: Record<ProjectRole, ProjectPermission[]> = {
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
 
 const PROJECT_STORAGE_KEY = "qdash_current_project_id";
+
+/**
+ * Query parameters that name a record of one project: a chip, a cooldown, or an execution and
+ * its target. An explicit project switch removes them, so the next project's pages start from
+ * their own defaults instead of asking the API for the previous project's records. Filters that
+ * mean the same thing in every project (dates, views, task names) are kept.
+ */
+const PROJECT_SCOPED_QUERY_PARAMS = [
+  "chip",
+  "chip_id",
+  "cooldown",
+  "execution",
+  "executionChip",
+  "executionTarget",
+  "sourceTaskId",
+] as const;
+
+/** Queries whose answer does not depend on the `X-Project-Id` header. */
+function isProjectIndependentQuery(query: Query): boolean {
+  const head = query.queryKey[0];
+  return typeof head === "string" && (head.startsWith("/projects") || head.startsWith("/auth"));
+}
+
+/**
+ * Drops the cached answers of the previous project and refetches the queries on screen.
+ *
+ * Requests carry the project from storage, and generated query keys do not include it, so data
+ * cached for one project would otherwise show under the same key in the next one (a chip ID can
+ * exist in both). Resetting, unlike invalidating, also clears the data shown while the refetch
+ * runs and cancels requests still in flight, so a late answer for the previous project is never
+ * written to the cache.
+ */
+function resetProjectScopedQueries(queryClient: QueryClient) {
+  void queryClient.resetQueries({
+    predicate: (query) => !isProjectIndependentQuery(query),
+  });
+}
 
 export function ProjectProvider({ children }: { children: ReactNode }) {
   const { user, accessToken } = useAuth();
@@ -83,10 +122,17 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   );
 
   const writeProjectToUrl = useCallback(
-    (nextProjectId: string, mode: "push" | "replace" = "replace") => {
+    (
+      nextProjectId: string,
+      mode: "push" | "replace" = "replace",
+      options: { clearProjectScopedParams?: boolean } = {},
+    ) => {
       try {
         const url = new URL(window.location.href);
         url.searchParams.set("project", nextProjectId);
+        if (options.clearProjectScopedParams) {
+          for (const key of PROJECT_SCOPED_QUERY_PARAMS) url.searchParams.delete(key);
+        }
         const nextUrl = `${url.pathname}?${url.searchParams.toString()}${url.hash}`;
         if (mode === "push") {
           window.history.pushState(null, "", nextUrl);
@@ -151,12 +197,15 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     if (!nextProject) return;
 
     if (nextProject.project_id !== projectId) {
+      // Requests so far carried the stored project. When the URL (a deep link, or Back to an
+      // entry of another project) names a different one, their answers belong to that project.
+      const requestedProjectId = localStorage.getItem(PROJECT_STORAGE_KEY);
       setCurrentProject(nextProject);
       setProjectId(nextProject.project_id);
       localStorage.setItem(PROJECT_STORAGE_KEY, nextProject.project_id);
 
-      if (projectId !== null) {
-        queryClient.invalidateQueries();
+      if (projectId !== null || requestedProjectId !== nextProject.project_id) {
+        resetProjectScopedQueries(queryClient);
       }
     }
 
@@ -198,9 +247,9 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         setCurrentProject(project);
         setProjectId(project.project_id);
         localStorage.setItem(PROJECT_STORAGE_KEY, project.project_id);
-        writeProjectToUrl(project.project_id, "push");
-        // Invalidate all queries to refresh data for new project
-        queryClient.invalidateQueries();
+        // A new history entry, so Back returns to the previous project with its chip intact.
+        writeProjectToUrl(project.project_id, "push", { clearProjectScopedParams: true });
+        resetProjectScopedQueries(queryClient);
       }
     },
     [projects, projectId, queryClient, writeProjectToUrl],

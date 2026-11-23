@@ -1,4 +1,4 @@
-# Keep `bun test` out of extensions/, where local pi extension checkouts bring
-# their own test setup (see compose.extensions.yaml).
+# Run only the runtime's own tests, not those of any leftover checkout under the
+# retired extensions/ directory.
 [test]
 root = "test"

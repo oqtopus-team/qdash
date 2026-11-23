@@ -1,8 +1,14 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  executionListProblems,
+  QDashApiError,
   QDashClient,
   QDashConfig,
+  QDashNotFoundError,
+  QDashTimeoutError,
   QDashValidationError,
   type AgentSessionPolicy,
 } from "../src/index.js";
@@ -157,7 +163,7 @@ describe("QDashClient", () => {
       skill_name: "pi-extension",
       skill_version: "0.1.0",
       skill_hash: "hash",
-      model_name: "model",
+      model: { provider: "ollama", model_id: "qwen3:32b", host: "pi" },
     });
 
     expect(request?.method).toBe("POST");
@@ -166,7 +172,65 @@ describe("QDashClient", () => {
       policy: { allowed_qids: ["32"] },
       skill_name: "pi-extension",
       expires_in_seconds: 21600,
+      model: { provider: "ollama", model_id: "qwen3:32b", host: "pi" },
     });
+  });
+
+  it("wraps the metric script and dashboard endpoints", async () => {
+    const requests: Request[] = [];
+    const fetch = vi.fn(async (input: RequestInfo | URL) => {
+      requests.push(new Request(input));
+      return jsonResponse({});
+    });
+    const client = new QDashClient(
+      new QDashConfig({ baseUrl: "https://qdash.example/api", apiToken: "token" }),
+      { fetch },
+    );
+
+    await client.listMetricScripts();
+    await client.getMetricScript("ms_0123456789ab");
+    await client.listMetricScriptTemplates();
+    await client.getMetricScriptCatalog();
+    await client.validateMetricScript("x = 1");
+    await client.evaluateMetricScriptDraft({
+      source: "x = 1",
+      metric_id: "m",
+      chip_id: "chip-1",
+      period: { kind: "relative", days: 14 },
+    });
+    await client.evaluateMetricScript("ms_1", { metric_id: "m", chip_id: "chip-1", revision: 2 });
+    await client.createMetricScript({ name: "Median", source: "x = 1" });
+    await client.updateMetricScript("ms_1", { source: "x = 2", expected_revision: 3 });
+    await client.copyMetricScript("ms_1");
+    await client.deleteMetricScript("ms_1");
+    await client.listDashboards();
+    await client.getDashboard("cd/1");
+    await client.listDashboardTemplates();
+    await client.previewDashboardTemplate("frequency-collision-map");
+    await client.createDashboard({ name: "Board" });
+    await client.updateDashboard("cd_1", { panels: [] });
+
+    expect(requests.map((request) => `${request.method} ${new URL(request.url).pathname}`)).toEqual([
+      "GET /api/metric-scripts",
+      "GET /api/metric-scripts/ms_0123456789ab",
+      "GET /api/metric-scripts/templates",
+      "GET /api/metric-scripts/catalog",
+      "POST /api/metric-scripts/validate",
+      "POST /api/metric-scripts/evaluate",
+      "POST /api/metric-scripts/ms_1/evaluate",
+      "POST /api/metric-scripts",
+      "PATCH /api/metric-scripts/ms_1",
+      "POST /api/metric-scripts/ms_1/copy",
+      "DELETE /api/metric-scripts/ms_1",
+      "GET /api/dashboards",
+      "GET /api/dashboards/cd%2F1",
+      "GET /api/dashboards/templates",
+      "GET /api/dashboards/templates/frequency-collision-map/preview",
+      "POST /api/dashboards",
+      "PATCH /api/dashboards/cd_1",
+    ]);
+    expect(await requests[8]?.json()).toEqual({ source: "x = 2", expected_revision: 3 });
+    expect(await requests[6]?.json()).toEqual({ metric_id: "m", chip_id: "chip-1", revision: 2 });
   });
 
   it("sends an agent action's source execution only as provenance", async () => {
@@ -188,6 +252,198 @@ describe("QDashClient", () => {
       source_execution_id: "exec-1",
       update_params: false,
       reconfigure: false,
+    });
+  });
+
+  it("sends autonomous steps only when asked and reads the authenticated user", async () => {
+    const requests: Array<{ method: string; path: string; body: unknown }> = [];
+    const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const request = new Request(input, init);
+      requests.push({
+        method: request.method,
+        path: new URL(request.url).pathname,
+        body: request.method === "POST" ? await request.json() : undefined,
+      });
+      return jsonResponse(request.method === "GET" ? { username: "alice" } : { action_id: "a-1" });
+    });
+    const client = new QDashClient(
+      new QDashConfig({ baseUrl: "https://qdash.example/api", apiToken: "token" }),
+      { fetch },
+    );
+
+    expect((await client.getCurrentUser()).username).toBe("alice");
+    const step = { idempotencyKey: "k", expectedStateVersion: 2, actionType: "run_task" as const, taskName: "CheckRabi", qids: ["Q00"] };
+    await client.submitAgentAction("s-1", step);
+    await client.submitAgentAction("s-1", { ...step, autonomous: true, repeatOfActionId: "a-0" });
+    await client.executeAgentAction("s-1", "a-1", { autonomous: true });
+    await client.createAgentIntervention("s-1", { idempotencyKey: "h", reason: "agent_request", summary: "s", question: "q", autonomous: true });
+    const model = { provider: "vllm", model_id: "qwen3-32b", host: "qdash-web-agent" };
+    await client.submitAgentAction("s-1", { ...step, model });
+    await client.createAgentIntervention("s-1", { idempotencyKey: "h2", reason: "agent_request", summary: "s", question: "q", model });
+
+    expect(requests[0]).toMatchObject({ method: "GET", path: "/api/auth/me" });
+    // Without the flag the request is what an older server already accepts.
+    expect(requests[1]!.body).not.toHaveProperty("autonomous");
+    expect(requests[1]!.body).not.toHaveProperty("repeat_of_action_id");
+    expect(requests[2]!.body).toMatchObject({ autonomous: true, repeat_of_action_id: "a-0" });
+    expect(requests[3]!.body).toEqual({ update_params: false, reconfigure: false, autonomous: true });
+    expect(requests[4]!.body).toMatchObject({ idempotency_key: "h", autonomous: true });
+    // The host's model is sent only when the host reported one.
+    expect(requests[1]!.body).not.toHaveProperty("model");
+    expect(requests[4]!.body).not.toHaveProperty("model");
+    expect(requests[5]!.body).toMatchObject({ model });
+    expect(requests[6]!.body).toMatchObject({ model });
+  });
+
+  it("reads a session's interventions without changing them", async () => {
+    const requests: Request[] = [];
+    const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const request = new Request(input, init);
+      requests.push(request);
+      return request.url.endsWith("/interventions")
+        ? jsonResponse({ items: [{ intervention_id: "int-1" }], total: 1 })
+        : jsonResponse({ intervention_id: "int-1" });
+    });
+    const client = new QDashClient(
+      new QDashConfig({ baseUrl: "https://qdash.example/api", apiToken: "token" }),
+      { fetch },
+    );
+
+    const items = await client.listAgentInterventions("session 1");
+    const one = await client.getAgentIntervention("session 1", "int-1");
+
+    expect(items.map((item) => item.intervention_id)).toEqual(["int-1"]);
+    expect(one.intervention_id).toBe("int-1");
+    expect(requests.map((request) => `${request.method} ${new URL(request.url).pathname}`)).toEqual([
+      "GET /api/agent-sessions/session%201/interventions",
+      "GET /api/agent-sessions/session%201/interventions/int-1",
+    ]);
+  });
+
+  it("records decisions and reads the audit in pages and as an export", async () => {
+    const requests: Array<{ method: string; url: URL; body: unknown }> = [];
+    const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const request = new Request(input, init);
+      requests.push({
+        method: request.method,
+        url: new URL(request.url),
+        body: request.method === "POST" ? await request.json() : undefined,
+      });
+      if (request.method === "POST") return jsonResponse({ decision_id: "d-1" });
+      if (request.url.endsWith("/decisions")) return jsonResponse({ items: [{ decision_id: "d-1" }], total: 1 });
+      return jsonResponse({ events: [], complete: true, total_events: 0 });
+    });
+    const client = new QDashClient(
+      new QDashConfig({ baseUrl: "https://qdash.example/api", apiToken: "token" }),
+      { fetch },
+    );
+
+    await client.recordAgentDecision("s 1", {
+      idempotencyKey: "k",
+      interpretation: "R2 0.4 fails the criterion",
+      nextAction: "request_human",
+      evidenceActionIds: ["a-1"],
+    });
+    await client.recordAgentDecision("s 1", {
+      idempotencyKey: "k2",
+      assessment: "pass",
+      interpretation: "ok",
+      nextAction: "next_task",
+      nextActionId: "a-2",
+      supersedesDecisionId: "d-0",
+      model: { provider: "ollama", model_id: "qwen3:32b", host: "pi" },
+    });
+    expect((await client.listAgentDecisions("s 1")).map((item) => item.decision_id)).toEqual(["d-1"]);
+    await client.getAgentSessionAudit("s 1", { cursor: "c-1", limit: 50 });
+    await client.exportAgentSessionAudit("s 1");
+
+    expect(requests[0]!.url.pathname).toBe("/api/agent-sessions/s%201/decisions");
+    expect(requests[0]!.body).toEqual({
+      idempotency_key: "k",
+      interpretation: "R2 0.4 fails the criterion",
+      next_action: "request_human",
+      next_detail: "",
+      evidence_action_ids: ["a-1"],
+      evaluation_ids: [],
+    });
+    expect(requests[1]!.body).toMatchObject({
+      assessment: "pass",
+      next_action_id: "a-2",
+      supersedes_decision_id: "d-0",
+      model: { provider: "ollama", model_id: "qwen3:32b", host: "pi" },
+    });
+    expect(requests[3]!.url.pathname).toBe("/api/agent-sessions/s%201/audit");
+    expect(requests[3]!.url.searchParams.get("cursor")).toBe("c-1");
+    expect(requests[3]!.url.searchParams.get("limit")).toBe("50");
+    expect(requests[4]!.url.pathname).toBe("/api/agent-sessions/s%201/audit/export");
+  });
+
+  it("stops an agent session with the stop's key and reason", async () => {
+    const requests: Array<{ url: URL; body: unknown }> = [];
+    const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const request = new Request(input, init);
+      requests.push({ url: new URL(request.url), body: await request.json() });
+      return jsonResponse({ outcome: "stopped", session: { session_id: "s 1" }, in_flight: [], closed_intervention_ids: [] });
+    });
+    const client = new QDashClient(
+      new QDashConfig({ baseUrl: "https://qdash.example/api", apiToken: "token" }),
+      { fetch },
+    );
+    const result = await client.stopAgentSession("s 1", { idempotencyKey: "stop-1", reason: "The user asked" });
+    expect(result.outcome).toBe("stopped");
+    expect(requests[0]!.url.pathname).toBe("/api/agent-sessions/s%201/stop");
+    expect(requests[0]!.body).toEqual({ idempotency_key: "stop-1", reason: "The user asked" });
+  });
+
+  it("lists sessions with repeated status filters and records an intervention", async () => {
+    const requests: Request[] = [];
+    const bodies: unknown[] = [];
+    const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const request = new Request(input, init);
+      requests.push(request);
+      if (request.method === "POST") {
+        bodies.push(await request.json());
+        return jsonResponse({ intervention_id: "int-2" });
+      }
+      return jsonResponse({ items: [{ session_id: "s-1" }], total: 1 });
+    });
+    const client = new QDashClient(
+      new QDashConfig({ baseUrl: "https://qdash.example/api", apiToken: "token" }),
+      { fetch },
+    );
+
+    const sessions = await client.listAgentSessions({
+      chipId: "chip-001",
+      statuses: ["active", "waiting_for_human"],
+      mine: true,
+    });
+    const created = await client.createAgentIntervention("s-1", {
+      idempotencyKey: "k-1",
+      reason: "unknown_outcome",
+      summary: "CheckRabi showed no oscillation",
+      question: "Is the drive line connected?",
+      taskName: "CheckRabi",
+      qids: ["Q00"],
+      attempts: [{ action_id: "a-1", task_name: "CheckRabi", qid: "Q00" }],
+    });
+
+    expect(sessions.map((item) => item.session_id)).toEqual(["s-1"]);
+    expect(created.intervention_id).toBe("int-2");
+    const listUrl = new URL(requests[0]!.url);
+    expect(listUrl.pathname).toBe("/api/agent-sessions");
+    expect(listUrl.searchParams.getAll("status")).toEqual(["active", "waiting_for_human"]);
+    expect(listUrl.searchParams.get("chip_id")).toBe("chip-001");
+    expect(listUrl.searchParams.get("mine")).toBe("true");
+    expect(listUrl.searchParams.has("limit")).toBe(false);
+    expect(new URL(requests[1]!.url).pathname).toBe("/api/agent-sessions/s-1/interventions");
+    expect(bodies[0]).toEqual({
+      idempotency_key: "k-1",
+      reason: "unknown_outcome",
+      summary: "CheckRabi showed no oscillation",
+      question: "Is the drive line connected?",
+      task_name: "CheckRabi",
+      qids: ["Q00"],
+      attempts: [{ action_id: "a-1", task_name: "CheckRabi", qid: "Q00" }],
     });
   });
 
@@ -372,5 +628,349 @@ describe("QDashClient", () => {
       "policy.qids: Field required; policy.allowed_tasks: Field required",
     );
     await expect(result).rejects.not.toThrow("[object Object]");
+  });
+});
+
+describe("SDK-facing client helpers", () => {
+  function recording(replies: Response[]) {
+    const projects: (string | null)[] = [];
+    const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      projects.push(new Request(input, init).headers.get("X-Project-Id"));
+      const reply = replies.shift();
+      if (!reply) throw new Error("unexpected request");
+      return reply;
+    });
+    return { fetch, projects };
+  }
+
+  it("waitForExecution still throws on 404 unless asked to treat it as pending", async () => {
+    const { fetch } = recording([
+      jsonResponse({ detail: "missing" }, 404),
+      jsonResponse({ detail: "missing" }, 404),
+    ]);
+    const base = new QDashClient(
+      new QDashConfig({ baseUrl: "https://qdash.example/api", apiToken: "token" }),
+      { fetch },
+    );
+    await expect(base.waitForExecution("exec-1", { pollIntervalSeconds: 0 })).rejects.toBeInstanceOf(
+      QDashNotFoundError,
+    );
+    const timeout = await base
+      .waitForExecution("exec-1", { timeoutSeconds: 0, notFoundAsPending: true })
+      .catch((caught: unknown) => caught);
+    expect(timeout).toBeInstanceOf(QDashTimeoutError);
+    expect(timeout).toBeInstanceOf(Error);
+    expect((timeout as Error).message).toBe(
+      "Execution 'exec-1' did not reach a terminal state within 0 seconds",
+    );
+  });
+
+  it("withProject returns a scoped copy and keeps transport options", async () => {
+    const { fetch, projects } = recording([jsonResponse({ chips: [] })]);
+    const base = new QDashClient(
+      new QDashConfig({ baseUrl: "https://qdash.example/api", apiToken: "token", projectId: "a" }),
+      { fetch },
+    );
+    const scoped = base.withProject("b");
+    expect(base.config.projectId).toBe("a");
+    expect(scoped.config).toMatchObject({ baseUrl: base.config.baseUrl, apiToken: "token", projectId: "b" });
+    await scoped.listChips();
+    expect(projects).toEqual(["b"]);
+  });
+});
+
+// The published contract: query and path parameters of each route, from docs/oas/openapi.json.
+const openapi = JSON.parse(readFileSync(new URL("../../../docs/oas/openapi.json", import.meta.url), "utf8")) as {
+  paths: Record<string, Record<string, { parameters?: { name: string; in: string; required?: boolean }[] }>>;
+};
+function routeParameters(path: string, where: "query" | "path") {
+  const parameters = (openapi.paths[path]!.get!.parameters ?? []).filter((parameter) => parameter.in === where);
+  return {
+    all: parameters.map((parameter) => parameter.name).sort(),
+    required: parameters.filter((parameter) => parameter.required).map((parameter) => parameter.name).sort(),
+  };
+}
+
+function recordingClient(body: unknown = { executions: [], total: 0 }) {
+  const requests: URL[] = [];
+  const fetch = vi.fn(async (input: RequestInfo | URL) => {
+    requests.push(new URL(new Request(input).url));
+    return jsonResponse(body);
+  });
+  const client = new QDashClient(
+    new QDashConfig({ baseUrl: "https://qdash.example/api", apiToken: "token", retry: { maxAttempts: 1 } }),
+    { fetch },
+  );
+  return { client, requests, fetch };
+}
+
+describe("execution lists", () => {
+  it("sends the chip and only the query parameters GET /executions declares", async () => {
+    const { client, requests } = recordingClient();
+    await client.listExecutions({ chipId: "C", skip: 20, limit: 100, date: "20261123", timezone: "Asia/Tokyo" });
+    expect(requests[0]!.pathname).toBe("/api/executions");
+    expect(Object.fromEntries(requests[0]!.searchParams)).toEqual({
+      chip_id: "C",
+      skip: "20",
+      limit: "100",
+      date: "20261123",
+      timezone: "Asia/Tokyo",
+    });
+    expect([...requests[0]!.searchParams.keys()].sort()).toEqual(routeParameters("/executions", "query").all);
+    await client.listExecutions({ chipId: "C" });
+    expect([...requests[1]!.searchParams.keys()]).toEqual(routeParameters("/executions", "query").required);
+  });
+
+  it.each([
+    [{}, /chipId is required/],
+    [{ chipId: "" }, /chipId is required/],
+    [{ chipId: "  " }, /chipId is required/],
+    [{ chipId: "C", limit: 200 }, /limit must be an integer from 1 to 100 \(got 200\)/],
+    [{ chipId: "C", limit: 0 }, /limit must be an integer from 1 to 100/],
+    [{ chipId: "C", limit: 2.5 }, /limit must be an integer from 1 to 100 \(got 2\.5\)/],
+    [{ chipId: "C", skip: -1 }, /skip must be an integer of 0 or more \(got -1\)/],
+    [{ chipId: "C", date: "2026-11-23" }, /date must be YYYYMMDD/],
+    [{ chipId: "C", timezone: "" }, /timezone must be a non-empty IANA time zone name/],
+    [{ chipId: "C", flowName: "one_qubit" }, /flowName cannot filter executions/],
+    [{ chipId: "C", status: "running" }, /status cannot filter executions/],
+    [{ chipId: "C", flowName: "f", status: "running" }, /flowName and status cannot filter executions.*filter the returned rows/],
+    [{ chipId: "C", flow_name: "f" }, /flow_name is not an option of listExecutions/],
+  ])("rejects %o before any request", async (options, message) => {
+    const { client, fetch } = recordingClient();
+    const call = () => client.listExecutions(options as Parameters<QDashClient["listExecutions"]>[0]);
+    await expect(call()).rejects.toThrow(QDashValidationError);
+    await expect(call()).rejects.toThrow(message);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("reports every problem at once, and treats an undefined option as omitted", () => {
+    expect(executionListProblems({ status: "running", limit: 0, skip: undefined, date: "x" })).toEqual([
+      expect.stringMatching(/^status cannot filter executions/),
+      "limit must be an integer from 1 to 100 (got 0)",
+      'date must be YYYYMMDD (got "x")',
+    ]);
+    expect(executionListProblems({ flowName: undefined, status: undefined, skip: 0, limit: 1 })).toEqual([]);
+  });
+});
+
+describe("task histories", () => {
+  const history = { name: "CheckT1", data: { "t-2": { task_id: "t-2", name: "CheckT1", qid: "6" } } };
+
+  it("sends chip_id and task, the only query parameters the history routes declare", async () => {
+    const { client, requests } = recordingClient(history);
+    await expect(client.getQubitTaskHistory({ chipId: "C", qid: "6", task: "CheckT1" })).resolves.toEqual(history);
+    await client.getCouplingTaskHistory({ chipId: "C", couplingId: "6-7", task: "CheckCrossResonance" });
+    expect(requests.map((url) => [url.pathname, Object.fromEntries(url.searchParams)])).toEqual([
+      ["/api/task-results/qubits/6/history", { chip_id: "C", task: "CheckT1" }],
+      ["/api/task-results/couplings/6-7/history", { chip_id: "C", task: "CheckCrossResonance" }],
+    ]);
+    for (const path of ["/task-results/qubits/{qid}/history", "/task-results/couplings/{coupling_id}/history"]) {
+      expect(routeParameters(path, "query")).toEqual({ all: ["chip_id", "task"], required: ["chip_id", "task"] });
+    }
+  });
+
+  it("encodes the target as one path segment", async () => {
+    const { client, requests } = recordingClient(history);
+    await client.getQubitTaskHistory({ chipId: "C", qid: "a/b", task: "CheckT1" });
+    expect(requests[0]!.pathname).toBe("/api/task-results/qubits/a%2Fb/history");
+  });
+
+  it.each([
+    ["qubit", { qid: "6", task: "CheckT1" }, /chipId is required/],
+    ["qubit", { chipId: "C", task: "CheckT1" }, /qid is required/],
+    ["qubit", { chipId: "C", qid: "6" }, /task is required/],
+    ["coupling", { chipId: "C", task: "CheckCrossResonance" }, /couplingId is required/],
+    ["qubit", { chipId: "C", qid: "6", task: "CheckT1", date: "20261120" }, /date cannot filter a task history.*listTaskResults\(\{ chipId, qid, taskName, startFrom, startTo \}\)/],
+    ["coupling", { chipId: "C", couplingId: "6-7", task: "X", date: "20261120" }, /date cannot filter a task history.*qid: couplingId/],
+    ["qubit", { chipId: "C", qid: "6", task: "CheckT1", limit: 5 }, /limit is not an option of a task history/],
+  ])("rejects a %s history call %o before any request", async (kind, options, message) => {
+    const { client, fetch } = recordingClient(history);
+    const call = () =>
+      kind === "qubit"
+        ? client.getQubitTaskHistory(options as Parameters<QDashClient["getQubitTaskHistory"]>[0])
+        : client.getCouplingTaskHistory(options as Parameters<QDashClient["getCouplingTaskHistory"]>[0]);
+    await expect(call()).rejects.toThrow(QDashValidationError);
+    await expect(call()).rejects.toThrow(message);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [[], /the body is not an object/],
+    [{ data: {} }, /name is not a string/],
+    [{ name: "CheckT1", data: [] }, /data is not an object/],
+    [{ name: "CheckT1", data: { "t-1": null } }, /a data entry is not an object/],
+  ])("rejects a malformed history body %o instead of returning it", async (body, message) => {
+    const { client } = recordingClient(body);
+    const call = () => client.getQubitTaskHistory({ chipId: "C", qid: "6", task: "CheckT1" });
+    await expect(call()).rejects.toThrow(QDashApiError);
+    await expect(call()).rejects.toThrow(message);
+  });
+});
+
+describe("task result pages", () => {
+  const row = (index: number) => ({
+    task_id: `t-${index}`,
+    task_name: "CheckT1",
+    qid: "6",
+    chip_id: "C",
+    status: "completed",
+    execution_id: "e-1",
+  });
+
+  /** A fixture holding `total` rows; it answers each request with the rows at skip..skip+limit. */
+  function pagedClient(total: number, options: { failAt?: number; shortAt?: number } = {}) {
+    const requests: URL[] = [];
+    const fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(new Request(input).url);
+      requests.push(url);
+      const skip = Number(url.searchParams.get("skip") ?? 0);
+      const limit = Number(url.searchParams.get("limit") ?? 50);
+      if (options.failAt === skip) return jsonResponse({ detail: "boom" }, 500);
+      const end = options.shortAt === skip ? skip + 1 : Math.min(total, skip + limit);
+      const items = Array.from({ length: Math.max(0, end - skip) }, (_, index) => row(skip + index));
+      return jsonResponse({ items, total, skip, limit, status_counts: { completed: total } });
+    });
+    const client = new QDashClient(
+      new QDashConfig({
+        baseUrl: "https://qdash.example/api",
+        apiToken: "token",
+        retry: { maxAttempts: 1 },
+      }),
+      { fetch },
+    );
+    return { client, requests, fetch };
+  }
+
+  it("sends the API's own filter names, with qid passed through exactly", async () => {
+    const { client, requests } = pagedClient(3);
+    await client.listTaskResults({
+      chipId: "C",
+      qid: "6-7",
+      taskName: "CheckCR",
+      startFrom: "2026-11-01T00:00:00Z",
+      startTo: "2026-11-02T00:00:00Z",
+      messageContains: "fit",
+      limit: 100,
+      skip: 0,
+    });
+    expect(Object.fromEntries(requests[0]!.searchParams)).toEqual({
+      chip_id: "C",
+      qid: "6-7",
+      task_name: "CheckCR",
+      start_from: "2026-11-01T00:00:00Z",
+      start_to: "2026-11-02T00:00:00Z",
+      message_contains: "fit",
+      limit: "100",
+      skip: "0",
+    });
+  });
+
+  it.each([
+    [{ limit: 200 }, /limit must be an integer from 1 to 100 \(got 200\).*collectTaskResults/],
+    [{ limit: 0 }, /limit must be an integer from 1 to 100/],
+    [{ limit: 2.5 }, /limit must be an integer/],
+    [{ skip: -1 }, /skip must be an integer 0 or more/],
+    [{ skip: 1.5 }, /skip must be an integer 0 or more/],
+  ])("rejects %o before any request instead of clamping it", async (options, message) => {
+    const { client, fetch } = pagedClient(300);
+    await expect(client.listTaskResults(options)).rejects.toThrow(QDashValidationError);
+    await expect(client.listTaskResults(options)).rejects.toThrow(message);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("collects 200 rows in two pages of 100, keeping every filter", async () => {
+    const { client, requests } = pagedClient(250);
+    const result = await client.collectTaskResults({ chipId: "C", qid: "6", status: "failed", maxItems: 200 });
+    expect(result.items).toHaveLength(200);
+    expect(result.items[0]?.task_id).toBe("t-0");
+    expect(result.items[199]?.task_id).toBe("t-199");
+    expect(result).toMatchObject({ total: 250, skip: 0, pages: 2, truncated: true });
+    expect(requests.map((url) => [url.searchParams.get("skip"), url.searchParams.get("limit")])).toEqual([
+      ["0", "100"],
+      ["100", "100"],
+    ]);
+    for (const url of requests) {
+      expect(url.searchParams.get("chip_id")).toBe("C");
+      expect(url.searchParams.get("qid")).toBe("6");
+      expect(url.searchParams.get("status")).toBe("failed");
+    }
+  });
+
+  it("stops at the last matching row and reports a complete read", async () => {
+    const { client, requests } = pagedClient(130);
+    const result = await client.collectTaskResults({ maxItems: 500, skip: 20 });
+    expect(result).toMatchObject({ total: 130, skip: 20, pages: 2, truncated: false });
+    expect(result.items).toHaveLength(110);
+    expect(requests.map((url) => url.searchParams.get("skip"))).toEqual(["20", "120"]);
+  });
+
+  it("asks only for the rows still needed and stops after an empty or short page", async () => {
+    const empty = pagedClient(0);
+    await expect(empty.client.collectTaskResults({ maxItems: 50 })).resolves.toMatchObject({ items: [], total: 0, pages: 1, truncated: false });
+    const short = pagedClient(300, { shortAt: 100 });
+    const result = await short.client.collectTaskResults({ maxItems: 150 });
+    expect(short.requests.map((url) => url.searchParams.get("limit"))).toEqual(["100", "50"]);
+    expect(result.items).toHaveLength(101);
+    expect(result.truncated).toBe(true);
+  });
+
+  it("bounds duplicate pages even when totals keep growing", async () => {
+    const { client, fetch } = pagedClient(10);
+    let calls = 0;
+    fetch.mockImplementation(async () => {
+      calls += 1;
+      if (calls > 2) throw new Error("page budget exceeded");
+      return jsonResponse({ items: [row(0)], total: 100 + calls, skip: calls - 1, limit: 1, status_counts: {} });
+    });
+    const result = await client.collectTaskResults({ maxItems: 2, pageSize: 1 });
+    expect(calls).toBe(2);
+    expect(result).toMatchObject({ pages: 2, truncated: true });
+    expect(result.items).toHaveLength(1);
+  });
+
+  it("does not claim completeness when duplicate pages reach the reported end", async () => {
+    const { client, fetch } = pagedClient(2);
+    fetch.mockImplementation(async () => jsonResponse({ items: [row(0)], total: 2, skip: fetch.mock.calls.length - 1, limit: 1, status_counts: {} }));
+    const result = await client.collectTaskResults({ maxItems: 2, pageSize: 1 });
+    expect(result).toMatchObject({ pages: 2, truncated: true });
+    expect(result.items).toHaveLength(1);
+  });
+
+  it("cancels between pages without requesting another page", async () => {
+    const { client, fetch } = pagedClient(2);
+    const controller = new AbortController();
+    const list = client.listTaskResults.bind(client);
+    vi.spyOn(client, "listTaskResults").mockImplementation(async (options) => {
+      const page = await list(options);
+      controller.abort(new Error("cancelled between pages"));
+      return page;
+    });
+    await expect(client.collectTaskResults({ maxItems: 2, pageSize: 1, signal: controller.signal })).rejects.toThrow("cancelled between pages");
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects the whole read when a page fails, a page is malformed, or the caller cancels", async () => {
+    const failing = pagedClient(300, { failAt: 100 });
+    await expect(failing.client.collectTaskResults({ maxItems: 200 })).rejects.toThrow();
+
+    const fetch = vi.fn(async () => jsonResponse({ results: [], count: 0 }));
+    const malformed = new QDashClient(new QDashConfig({ baseUrl: "https://qdash.example/api", apiToken: "t" }), { fetch });
+    await expect(malformed.listTaskResults()).rejects.toThrow(/items is not an array; total is not an integer/);
+
+    const controller = new AbortController();
+    controller.abort(new Error("stopped by caller"));
+    const cancelled = pagedClient(300);
+    await expect(cancelled.client.collectTaskResults({ maxItems: 200, signal: controller.signal })).rejects.toThrow("stopped by caller");
+    expect(cancelled.fetch).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [{ maxItems: 0 }, /maxItems must be an integer from 1 to 10000/],
+    [{ maxItems: 20_000 }, /maxItems must be an integer from 1 to 10000/],
+    [{ maxItems: 10, pageSize: 200 }, /pageSize must be an integer from 1 to 100/],
+  ])("rejects collect options %o before any request", async (options, message) => {
+    const { client, fetch } = pagedClient(10);
+    await expect(client.collectTaskResults(options)).rejects.toThrow(message);
+    expect(fetch).not.toHaveBeenCalled();
   });
 });

@@ -238,13 +238,14 @@ src/tools/schedule/*
 .mcp.json
 .tmp/*
 /.claude/settings.local.json
+# Isolated pi agent dir of `task pi-local` (generated models.json, sessions).
+/.pi-local/
 docs/internal/*
 docs/papers/*
 config/qubex-config
-# Local pi extension checkouts mounted into the Agent Runtime during development.
-# The directory itself is tracked (.gitkeep) so the compose bind mount always exists.
-agent-runtime/extensions/*
-!agent-runtime/extensions/.gitkeep
+# Leftover checkouts of the retired agent-runtime/extensions/ mount; the Agent
+# Runtime loads only the packages bundled into its image.
+agent-runtime/extensions/
 scripts/estimate_qubit_frequency
 scripts/estimate-resonator-frequency
 .direnv

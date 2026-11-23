@@ -5,7 +5,9 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { PipelineStepTypeInfoDefaultStepId } from './pipelineStepTypeInfoDefaultStepId';
 import type { PipelineStepTypeInfoTaskScope } from './pipelineStepTypeInfoTaskScope';
+import type { TaskCall } from './taskCall';
 
 /**
  * One step type an agent may use.
@@ -19,5 +21,10 @@ export interface PipelineStepTypeInfo {
   provides: string[];
   /** "qubit" or "coupling" for steps that run tasks. */
   task_scope: PipelineStepTypeInfoTaskScope;
-  default_tasks: string[];
+  /** step_id of a calibration step that sets none. */
+  default_step_id?: PipelineStepTypeInfoDefaultStepId;
+  /** Calls the step runs without tasks. */
+  default_tasks: TaskCall[];
+  /** Metrics FilterByMetric can read from the step itself. */
+  step_metrics?: string[];
 }

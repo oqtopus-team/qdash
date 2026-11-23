@@ -8,9 +8,11 @@ on:
       - "agent-runtime/**"
       - "packages/**"
       - "clients/typescript/**"
+      - "sdks/typescript/**"
       - "package.json"
       - "bun.lock"
       - "Taskfile.yaml"
+      - ".github/scripts/audit-exceptions*.mjs"
       - ".github/workflows/frontend-ci.yml"
   pull_request:
     branches: [main, develop]
@@ -19,9 +21,11 @@ on:
       - "agent-runtime/**"
       - "packages/**"
       - "clients/typescript/**"
+      - "sdks/typescript/**"
       - "package.json"
       - "bun.lock"
       - "Taskfile.yaml"
+      - ".github/scripts/audit-exceptions*.mjs"
       - ".github/workflows/frontend-ci.yml"
 
 permissions:

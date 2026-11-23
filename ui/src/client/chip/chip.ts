@@ -181,7 +181,9 @@ export function useListChips<TData = Awaited<ReturnType<typeof listChips>>, TErr
  * configuration tree (``system_id == chip_id``) unless ``config.create`` is
  * false or the directory already exists. Wiring and hardware files are copied
  * from ``config.source_system_id`` when given; parameter files always start
- * from QDash's templates.
+ * from QDash's templates. ``config.preset`` writes a complete virtual
+ * configuration instead; the ``fake`` preset is accepted only when the
+ * deployment backend is fake and the chip uses the preset's topology.
  *
  * Parameters
  * ----------

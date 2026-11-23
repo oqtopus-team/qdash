@@ -7,6 +7,7 @@
  */
 import type { QuickRunTaskRequestBackendName } from './quickRunTaskRequestBackendName';
 import type { QuickRunTaskRequestInputParameterOverrides } from './quickRunTaskRequestInputParameterOverrides';
+import type { QuickRunTaskRequestPersistOutputParameters } from './quickRunTaskRequestPersistOutputParameters';
 import type { QuickRunTaskRequestRunParameterOverrides } from './quickRunTaskRequestRunParameterOverrides';
 import type { QuickRunTaskRequestSourceTaskId } from './quickRunTaskRequestSourceTaskId';
 
@@ -23,6 +24,12 @@ export interface QuickRunTaskRequest {
   /** Run parameter values keyed by name. A bare value takes the task's declared type. A parameter that declares a generated range also takes {"value": [...], "value_type": ...} with np.linspace, np.logspace, np.arange, range, or list to run the sweep in another form. */
   run_parameter_overrides?: QuickRunTaskRequestRunParameterOverrides;
   reconfigure?: boolean;
-  persist_output_parameters?: boolean;
+  /** Replace the current calibration values with the task's validated outputs. When false, the run still saves its task history, figures and raw data. */
+  update_calibration_parameters?: boolean;
   update_params?: boolean;
+  /**
+     * Deprecated alias of update_calibration_parameters; it will be removed. A value that differs from update_calibration_parameters is rejected.
+     * @deprecated
+     */
+  persist_output_parameters?: QuickRunTaskRequestPersistOutputParameters;
 }

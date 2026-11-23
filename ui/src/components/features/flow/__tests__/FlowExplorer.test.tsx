@@ -38,7 +38,9 @@ vi.mock("@/client/flow/flow", () => ({
   getListFlowsQueryKey: () => ["/flows"],
   moveFlow: (...args: unknown[]) => mockMoveFlow(...args),
 }));
-vi.mock("@/components/ui/Toast/useToast", () => ({ useToast: () => mockToast }));
+vi.mock("@/components/ui/Toast/useToast", () => ({
+  useToast: () => mockToast,
+}));
 vi.mock("@/components/ui/PierreFileTree", () => ({
   PierreFileTree: (props: TreeProps) => {
     treeProps.current = props;
@@ -103,7 +105,10 @@ const target = (directoryPath: string | null): FileTreeDropTarget => ({
   kind: directoryPath === null ? "root" : "directory",
 });
 const menuContext = { close: vi.fn() } as unknown as ContextMenuOpenContext;
-const menuModel = { add: vi.fn(), startRenaming: vi.fn() } as unknown as FileTreeModel;
+const menuModel = {
+  add: vi.fn(),
+  startRenaming: vi.fn(),
+} as unknown as FileTreeModel;
 
 beforeEach(() => {
   treeProps.current = null;
@@ -137,7 +142,9 @@ describe("FlowExplorer", () => {
     expect(paths(tree().nodes)).toEqual(["zoes"]);
     // The open flow belongs to another space, so nothing is selected here.
     expect(tree().selectedPath).toBeNull();
-    fireEvent.change(screen.getByLabelText("Space"), { target: { value: "mia" } });
+    fireEvent.change(screen.getByLabelText("Space"), {
+      target: { value: "mia" },
+    });
     expect(paths(tree().nodes)).toEqual(["daily", "root_flow.py"]);
     cleanup();
     // A space the list does not know falls back to the open flow's.
@@ -159,12 +166,24 @@ describe("FlowExplorer", () => {
   it("re-files dropped rows through the move API and reloads the list", async () => {
     renderExplorer();
     const { dnd } = tree();
-    expect(dnd.canDrop?.({ draggedPaths: ["root_flow.py"], target: target("daily") })).toBe(true);
     expect(
-      dnd.canDrop?.({ draggedPaths: ["root_flow.py"], target: target("daily/daily_a.py") }),
+      dnd.canDrop?.({
+        draggedPaths: ["root_flow.py"],
+        target: target("daily"),
+      }),
+    ).toBe(true);
+    expect(
+      dnd.canDrop?.({
+        draggedPaths: ["root_flow.py"],
+        target: target("daily/daily_a.py"),
+      }),
     ).toBe(false);
     // A folder dropped on its own parent is a no-op.
-    dnd.onDropComplete?.({ draggedPaths: ["daily"], target: target(null), operation: "move" });
+    dnd.onDropComplete?.({
+      draggedPaths: ["daily"],
+      target: target(null),
+      operation: "move",
+    });
     expect(mockMoveFlow).not.toHaveBeenCalled();
     dnd.onDropComplete?.({
       draggedPaths: ["root_flow.py", "daily/t1"],
@@ -190,10 +209,16 @@ describe("FlowExplorer", () => {
     expect(renaming.canRename?.({ isFolder: false, path: "root_flow.py" })).toBe(false);
     expect(renaming.canRename?.({ isFolder: true, path: "daily" })).toBe(true);
 
-    renaming.onRename?.({ sourcePath: "daily", destinationPath: "nightly", isFolder: true });
+    renaming.onRename?.({
+      sourcePath: "daily",
+      destinationPath: "nightly",
+      isFolder: true,
+    });
     await waitFor(() => expect(mockMoveFlow).toHaveBeenCalledTimes(2));
     expect(mockMoveFlow).toHaveBeenCalledWith("daily_a", { folder: "nightly" });
-    expect(mockMoveFlow).toHaveBeenCalledWith("daily_t1", { folder: "nightly/t1" });
+    expect(mockMoveFlow).toHaveBeenCalledWith("daily_t1", {
+      folder: "nightly/t1",
+    });
     expect(mockToast.success).toHaveBeenCalledWith("Moved 2 workflows");
 
     // A placeholder folder named in place holds no flow: it is kept on the page only.
@@ -229,7 +254,9 @@ describe("FlowExplorer", () => {
 
   it("reports a failed move, reloads and resets the tree", async () => {
     mockMoveFlow.mockImplementation(() =>
-      Promise.reject({ response: { data: { detail: "Editor role required" } } }),
+      Promise.reject({
+        response: { data: { detail: "Editor role required" } },
+      }),
     );
     renderExplorer();
     const before = tree().resetToken ?? 0;
@@ -257,7 +284,9 @@ describe("FlowExplorer", () => {
     expect(screen.getByRole("button", { name: "Top of the space" })).toBeDisabled();
     fireEvent.click(screen.getByRole("button", { name: "daily/t1" }));
     await waitFor(() =>
-      expect(mockMoveFlow).toHaveBeenCalledWith("root_flow", { folder: "daily/t1" }),
+      expect(mockMoveFlow).toHaveBeenCalledWith("root_flow", {
+        folder: "daily/t1",
+      }),
     );
   });
 
@@ -273,7 +302,9 @@ describe("FlowExplorer", () => {
     render(<>{menu}</>);
     fireEvent.click(screen.getByRole("button", { name: "New folder" }));
     expect(add).toHaveBeenCalledWith("daily/new_folder/");
-    expect(startRenaming).toHaveBeenCalledWith("daily/new_folder", { removeIfCanceled: true });
+    expect(startRenaming).toHaveBeenCalledWith("daily/new_folder", {
+      removeIfCanceled: true,
+    });
     fireEvent.click(screen.getByRole("button", { name: "Rename folder" }));
     expect(startRenaming).toHaveBeenCalledWith("daily");
     expect(close).toHaveBeenCalled();

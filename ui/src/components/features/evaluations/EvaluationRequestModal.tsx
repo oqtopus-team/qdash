@@ -80,10 +80,12 @@ interface EvaluationRequestModalProps {
   scopeLabel: string;
   /**
    * Opens a chat about the result instead of an evaluation. When given, the
-   * modal is the one "Ask AI" entry for a single result: a recorded evaluation
+   * modal is the one "Ask Agent" entry for a single result: a recorded evaluation
    * (model only or via Copilot) or a conversation, chosen the same way.
    */
   onChat?: () => void;
+  /** Called once an evaluation run has been created, before the modal closes. */
+  onRequested?: () => void;
 }
 
 /** What the modal can do for one result: a recorded evaluation, or a chat about it. */
@@ -122,7 +124,7 @@ const MODE_OPTIONS: ReadonlyArray<Option<EvaluationMode>> = [
     value: "planner",
     title: "Via Copilot",
     description:
-      "Copilot (the chat planner) summarises the result and calls the evaluation itself, as AI Chat does. Slower; what Copilot did and answered is recorded too.",
+      "Copilot (the chat planner) summarises the result and calls the evaluation itself, as Agent does. Slower; what Copilot did and answered is recorded too.",
   },
 ];
 
@@ -148,14 +150,14 @@ function RadioCards<T extends string | boolean>({
       {options.map((option) => (
         <label
           key={String(option.value)}
-          className={`flex cursor-pointer gap-3 rounded-lg border p-3 ${
+          className={`choice-field gap-3 rounded-lg border p-3 ${
             value === option.value ? "border-primary bg-primary/5" : "border-base-300"
           }`}
         >
           <input
             type="radio"
             name={name}
-            className="radio radio-primary radio-sm mt-0.5"
+            className="radio radio-primary radio-sm"
             checked={value === option.value}
             onChange={() => onChange(option.value)}
             disabled={disabled}
@@ -280,9 +282,9 @@ function TargetPicker({
           return (
             <label
               key={target.qid}
-              className={`flex cursor-pointer items-center gap-1 rounded border px-1.5 py-0.5 font-mono text-xs ${
+              className={`choice-field items-center gap-1 rounded border px-1.5 py-0.5 font-mono text-xs ${
                 target.blocked
-                  ? "cursor-not-allowed border-base-300 text-base-content/40"
+                  ? "border-base-300 text-base-content/40"
                   : selected
                     ? "border-primary bg-primary/10"
                     : "border-base-300"
@@ -326,6 +328,7 @@ export function EvaluationRequestModal({
   scope,
   scopeLabel,
   onChat,
+  onRequested,
 }: EvaluationRequestModalProps) {
   const router = useRouter();
   const toast = useToast();
@@ -403,6 +406,7 @@ export function EvaluationRequestModal({
       );
       setDraft(null);
       setExcluded(new Set());
+      onRequested?.();
       onClose();
     } catch (error) {
       toast.error(errorDetail(error));
@@ -416,7 +420,7 @@ export function EvaluationRequestModal({
           <div className="flex items-center gap-2">
             <Bot className="h-5 w-5 text-primary" />
             <DialogTitle className="font-medium">
-              {onChat ? "Ask AI" : "Request AI evaluation"}
+              {onChat ? "Ask Agent" : "Request AI evaluation"}
             </DialogTitle>
           </div>
           <button
@@ -578,14 +582,14 @@ export function EvaluationRequestModal({
           </button>
           <button
             type="button"
-            className="btn btn-sm btn-primary gap-2"
+            className="btn btn-sm btn-primary"
             onClick={submit}
             disabled={isSubmitting || (!chatting && nothingChosen)}
           >
             {isSubmitting ? (
-              <span className="loading loading-spinner loading-xs" />
+              <span data-icon="inline-start" className="loading loading-spinner loading-xs" />
             ) : (
-              <Bot className="h-4 w-4" />
+              <Bot data-icon="inline-start" />
             )}
             {chatting ? "Open chat" : "Evaluate"}
           </button>

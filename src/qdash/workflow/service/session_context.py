@@ -1,34 +1,36 @@
-"""Session context management for Python Flow Editor.
+"""The session that owns the current pipeline step, for in-process Prefect tasks.
 
-This module provides thread-safe session context management for Prefect flows,
-replacing direct global variable access with a more structured approach.
+A pipeline registers its owner session here while it runs, so in-process
+Prefect tasks (serial strategies, batch calls) can reach it without receiving
+it as a task parameter. Isolated worker processes never read it; they receive a
+``WorkerSpec`` instead.
 """
 
 import threading
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from qdash.workflow.service.calib_service import CalibService
+    from qdash.workflow.service._internal.session import CalibSession
 
 
 class SessionContext:
     """Thread-safe session context manager.
 
-    This class provides a structured way to manage CalibService instances
+    This class provides a structured way to manage the current CalibSession
     in a thread-safe manner.
 
     Attributes
     ----------
     _local : threading.local
         Thread-local storage for session instances
-    _global_session : CalibService | None
+    _global_session : CalibSession | None
         Fallback global session
     """
 
     _instance: "SessionContext | None" = None
     _lock = threading.Lock()
     _local: threading.local
-    _global_session: "CalibService | None"
+    _global_session: "CalibSession | None"
 
     def __new__(cls) -> "SessionContext":
         """Singleton pattern for global access."""
@@ -40,23 +42,23 @@ class SessionContext:
                     cls._instance._global_session = None
         return cls._instance
 
-    def set_session(self, session: "CalibService | None") -> None:
+    def set_session(self, session: "CalibSession | None") -> None:
         """Set the current session.
 
         Parameters
         ----------
-        session : CalibService | None
+        session : CalibSession | None
             Session to set as current, or None to clear
         """
         self._local.session = session
         self._global_session = session
 
-    def get_session(self) -> "CalibService | None":
+    def get_session(self) -> "CalibSession | None":
         """Get the current session.
 
         Returns
         -------
-        CalibService | None
+        CalibSession | None
             Current session or None if not set
         """
         # Try thread-local first, fallback to global
@@ -72,23 +74,23 @@ class SessionContext:
 _session_context = SessionContext()
 
 
-def set_current_session(session: "CalibService | None") -> None:
+def set_current_session(session: "CalibSession | None") -> None:
     """Set the current session (convenience function).
 
     Parameters
     ----------
-    session : CalibService | None
+    session : CalibSession | None
         Session to set as current
     """
     _session_context.set_session(session)
 
 
-def get_current_session() -> "CalibService | None":
+def get_current_session() -> "CalibSession | None":
     """Get the current session (convenience function).
 
     Returns
     -------
-    CalibService | None
+    CalibSession | None
         Current session or None
     """
     return _session_context.get_session()
@@ -97,3 +99,12 @@ def get_current_session() -> "CalibService | None":
 def clear_current_session() -> None:
     """Clear the current session (convenience function)."""
     _session_context.clear_session()
+
+
+def get_session() -> "CalibSession":
+    """Return the current owner session or raise when no pipeline is running."""
+    session = get_current_session()
+    if session is None:
+        msg = "No active calibration session."
+        raise RuntimeError(msg)
+    return session

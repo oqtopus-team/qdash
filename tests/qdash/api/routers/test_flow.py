@@ -1,10 +1,13 @@
 """Tests for flow router endpoints."""
 
 from datetime import datetime
+from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from qdash.api.services.flow_service.deployment_client import DeploymentServiceClient
 from qdash.datamodel.project import ProjectRole
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.flow import FlowDocument
@@ -444,5 +447,310 @@ class TestFlowTemplates:
         data = response.json()
         assert data["id"] == "fast_full_calibration"
         assert "Shortened full calibration" in data["description"]
+        assert "Filter -> ConfigureAll -> 1Q fine-tune" in data["description"]
+        assert 'ConfigureAll(step_id="configure_all_before_fine_tune")' in data["code"]
         fine_tune_tasks_block = data["code"].split("FAST_1Q_FINE_TUNE_TASKS", 1)[1].split("]", 1)[0]
         assert "CheckT1Average" not in fine_tune_tasks_block
+
+
+class _RecordingDeploymentClient(DeploymentServiceClient):
+    """Deployment client stub that records registrations instead of calling the service."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.calls: list[dict[str, str | None]] = []
+
+    async def register(
+        self,
+        *,
+        file_path: str,
+        flow_function_name: str,
+        deployment_name: str,
+        old_deployment_id: str | None = None,
+    ) -> str:
+        """Record the registration."""
+        self.calls.append(
+            {
+                "file_path": file_path,
+                "flow_function_name": flow_function_name,
+                "deployment_name": deployment_name,
+                "old_deployment_id": old_deployment_id,
+            }
+        )
+        return f"deployment-{len(self.calls)}"
+
+
+@pytest.fixture
+def flow_service_on_tmp(tmp_path, monkeypatch):
+    """Route /flows saves to a real flow service on a temporary flow tree."""
+    from qdash.api.dependencies import get_flow_repository, get_flow_service
+    from qdash.api.main import app
+    from qdash.api.services.flow_service.service import FlowService
+    from qdash.api.services.flow_service.source_store import FlowSourceStore
+
+    deployment = _RecordingDeploymentClient()
+    store = FlowSourceStore(tmp_path / "user_flows")
+    previous_overrides = app.dependency_overrides.copy()
+    app.dependency_overrides[get_flow_service] = lambda: FlowService(
+        flow_repository=get_flow_repository(),
+        source_store=store,
+        deployment_client=deployment,
+    )
+    try:
+        yield SimpleNamespace(deployment=deployment, store=store)
+    finally:
+        app.dependency_overrides.clear()
+        app.dependency_overrides.update(previous_overrides)
+
+
+FLOW_SOURCE = "from prefect import flow\n\n\n@flow\ndef first_calibration():\n    pass\n"
+
+
+class TestFlowCreateOnly:
+    """Tests for create-only saves used when a new flow is created."""
+
+    def _request(self, **overrides):
+        body = {
+            "name": "first_calibration",
+            "code": FLOW_SOURCE,
+            "chip_id": "chip-1",
+            "create_only": True,
+        }
+        body.update(overrides)
+        return body
+
+    def test_second_create_only_save_returns_409_and_keeps_the_flow(
+        self, test_client, test_project, auth_headers, flow_service_on_tmp
+    ):
+        """Repeating a create-only save conflicts and leaves the first flow untouched."""
+        first = test_client.post("/flows", json=self._request(), headers=auth_headers)
+        assert first.status_code == 200
+        stored = FlowDocument.find_by_project_and_name("test_project", "first_calibration")
+        assert stored is not None
+        file_path = Path(stored.file_path)
+
+        second = test_client.post(
+            "/flows",
+            json=self._request(code=FLOW_SOURCE + "# overwrite\n", chip_id="chip-2"),
+            headers=auth_headers,
+        )
+
+        assert second.status_code == 409
+        assert second.json() == {
+            "detail": "Flow 'first_calibration' already exists. Choose another name."
+        }
+        after = FlowDocument.find_by_project_and_name("test_project", "first_calibration")
+        assert after is not None
+        assert after.chip_id == "chip-1"
+        assert after.deployment_id == stored.deployment_id
+        assert file_path.read_text(encoding="utf-8") == FLOW_SOURCE
+        assert len(flow_service_on_tmp.deployment.calls) == 1
+
+    def test_save_without_create_only_overwrites_as_before(
+        self, test_client, test_project, auth_headers, flow_service_on_tmp
+    ):
+        """The flow editor's save keeps overwriting an existing flow."""
+        assert (
+            test_client.post("/flows", json=self._request(), headers=auth_headers).status_code
+            == 200
+        )
+        legacy = self._request(code=FLOW_SOURCE + "# edited\n", chip_id="chip-2")
+        del legacy["create_only"]
+
+        response = test_client.post("/flows", json=legacy, headers=auth_headers)
+
+        assert response.status_code == 200
+        after = FlowDocument.find_by_project_and_name("test_project", "first_calibration")
+        assert after is not None
+        assert after.chip_id == "chip-2"
+        assert Path(after.file_path).read_text(encoding="utf-8").endswith("# edited\n")
+
+
+UNFORMATTED_FLOW = "from prefect import flow\n@flow\ndef first_calibration( ):\n  pass\n"
+
+
+class TestFlowFormat:
+    """Formatting flow source formats data only; saves store the formatted source."""
+
+    def test_format_returns_the_formatted_source_and_saves_nothing(
+        self, test_client, test_project, auth_headers, flow_service_on_tmp
+    ):
+        response = test_client.post(
+            "/flows/format", json={"source": UNFORMATTED_FLOW}, headers=auth_headers
+        )
+
+        assert response.status_code == 200
+        assert response.json() == {"status": "formatted", "source": FLOW_SOURCE, "diagnostic": None}
+        assert FlowDocument.find_by_project_and_name("test_project", "first_calibration") is None
+        assert not flow_service_on_tmp.store.exists(
+            flow_service_on_tmp.store.path_for("test_project", "first_calibration")
+        )
+        assert flow_service_on_tmp.deployment.calls == []
+
+    def test_format_reports_a_syntax_error_with_the_input(
+        self, test_client, test_project, auth_headers
+    ):
+        source = "from prefect import flow\n\ndef broken(:\n"
+
+        response = test_client.post("/flows/format", json={"source": source}, headers=auth_headers)
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["status"] == "syntax_error"
+        assert body["source"] == source
+        assert body["diagnostic"]["line"] == 3
+
+    def test_format_reports_an_unavailable_formatter(
+        self, test_client, test_project, auth_headers, monkeypatch
+    ):
+        from qdash.api.lib import python_format
+
+        def unavailable(_source):
+            raise python_format.FormatterUnavailableError("Formatting took longer than 10 s")
+
+        monkeypatch.setattr(
+            "qdash.api.services.source_format_service.format_python_source", unavailable
+        )
+
+        response = test_client.post(
+            "/flows/format", json={"source": "x = 1\n"}, headers=auth_headers
+        )
+
+        assert response.status_code == 503
+        assert "longer than" in response.json()["detail"]
+
+    def test_format_requires_an_editor(self, test_client, test_project):
+        payload = {"source": "x = 1\n"}
+
+        assert test_client.post("/flows/format", json=payload).status_code == 401
+        assert (
+            test_client.post("/flows/format", json=payload, headers=_viewer_headers()).status_code
+            == 403
+        )
+
+    def test_save_validates_stores_and_returns_the_formatted_source(
+        self, test_client, test_project, auth_headers, flow_service_on_tmp
+    ):
+        body = {"name": "first_calibration", "code": UNFORMATTED_FLOW, "chip_id": "chip-1"}
+
+        response = test_client.post("/flows", json=body, headers=auth_headers)
+
+        assert response.status_code == 200
+        assert response.json()["code"] == FLOW_SOURCE
+        stored = FlowDocument.find_by_project_and_name("test_project", "first_calibration")
+        assert stored is not None
+        assert Path(stored.file_path).read_text(encoding="utf-8") == FLOW_SOURCE
+
+    def test_save_still_rejects_a_syntax_error(
+        self, test_client, test_project, auth_headers, flow_service_on_tmp
+    ):
+        body = {"name": "first_calibration", "code": "def broken(:\n", "chip_id": "chip-1"}
+
+        response = test_client.post("/flows", json=body, headers=auth_headers)
+
+        assert response.status_code == 400
+        assert "syntax error" in response.json()["detail"]
+        assert flow_service_on_tmp.deployment.calls == []
+
+
+MANUAL_FLOW = """
+from qdash.workflow import TaskCall
+from qdash.workflow.service import CalibService
+from qdash.workflow.service.steps import CustomOneQubit
+from qdash.workflow.service.targets import QubitTargets
+
+
+def run_manual(username, chip_id):
+    cal = CalibService(username, chip_id)
+    return cal.run(
+        QubitTargets(["0", "8"]),
+        steps=[
+            CustomOneQubit(
+                execution_mode="manual",
+                rounds=[["0", "8"]],
+                tasks=[TaskCall(name="CheckRabi")],
+            )
+        ],
+    )
+"""
+
+
+@pytest.fixture
+def manual_flow(test_project, tmp_path):
+    """A saved flow with manual rounds, its source file and its chip."""
+    from qdash.dbmodel.chip import ChipDocument
+
+    path = tmp_path / "manual_flow.py"
+    path.write_text(MANUAL_FLOW, encoding="utf-8")
+    ChipDocument(
+        chip_id="test_chip",
+        username="test_user",
+        project_id="test_project",
+        size=64,
+        system_info=SystemInfoModel(),
+    ).insert()
+    flow = FlowDocument(
+        project_id="test_project",
+        name="manual_flow",
+        username="test_user",
+        chip_id="test_chip",
+        flow_function_name="run_manual",
+        file_path=str(path),
+        deployment_id="manual-deployment",
+    )
+    flow.insert()
+    return flow
+
+
+def _viewer_headers() -> dict[str, str]:
+    user = UserDocument(
+        username="viewer_user",
+        hashed_password="hashed",
+        access_token="viewer_token",
+        default_project_id="test_project",
+        system_info=SystemInfoModel(),
+    )
+    user.insert()
+    ProjectMembershipDocument(
+        project_id="test_project",
+        user_id=user.user_id,
+        username="viewer_user",
+        role=ProjectRole.VIEWER,
+        status="active",
+        invited_by_user_id=user.user_id,
+        invited_by="test_user",
+    ).insert()
+    return {"Authorization": "Bearer viewer_token", "X-Project-Id": "test_project"}
+
+
+class TestFlowExecutionPlan:
+    """GET /flows/{name}/execution-plan is a read-only, project-scoped preview."""
+
+    def test_a_viewer_reads_the_plan_without_changing_the_flow(self, test_client, manual_flow):
+        before = FlowDocument.find_by_project_and_name("test_project", "manual_flow")
+        response = test_client.get("/flows/manual_flow/execution-plan", headers=_viewer_headers())
+
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert body["chip_id"] == "test_chip"
+        assert body["runs"][0]["steps"][0]["rounds"] == [{"number": 1, "targets": ["0", "8"]}]
+        assert body["target_override_allowed"] is False
+        after = FlowDocument.find_by_project_and_name("test_project", "manual_flow")
+        assert after is not None and before is not None
+        assert after.updated_at == before.updated_at
+
+    def test_the_plan_requires_authentication(self, test_client, manual_flow):
+        assert test_client.get("/flows/manual_flow/execution-plan").status_code == 401
+
+    def test_other_projects_and_chips_are_not_visible(self, test_client, manual_flow, auth_headers):
+        other = test_client.get(
+            "/flows/manual_flow/execution-plan",
+            headers={**auth_headers, "X-Project-Id": "other_project"},
+        )
+        assert other.status_code in {403, 404}
+        chip = test_client.get(
+            "/flows/manual_flow/execution-plan",
+            headers=auth_headers,
+            params={"chip_id": "unknown_chip"},
+        )
+        assert chip.status_code == 404

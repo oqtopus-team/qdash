@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { GlobalCommandPalette } from "@/components/layout/GlobalCommandPalette";
+import { AVAILABLE_THEMES } from "@/constants/themes";
 
 const push = vi.fn();
 const switchProject = vi.fn();
@@ -9,7 +10,9 @@ const setTheme = vi.fn();
 const success = vi.fn();
 const error = vi.fn();
 const taskInfoRequests = vi.fn();
+const openGeneralChat = vi.fn();
 const mockPathname = vi.hoisted(() => vi.fn(() => "/inbox"));
+const mockCanEdit = vi.hoisted(() => vi.fn(() => false));
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push }),
@@ -50,7 +53,7 @@ vi.mock("@/contexts/AuthContext", () => ({
 
 vi.mock("@/contexts/ProjectContext", () => ({
   useProject: () => ({
-    canEdit: false,
+    canEdit: mockCanEdit(),
     projectId: "project-1",
     projects: [
       { project_id: "project-1", name: "Current lab" },
@@ -58,6 +61,10 @@ vi.mock("@/contexts/ProjectContext", () => ({
     ],
     switchProject,
   }),
+}));
+
+vi.mock("@/contexts/ChatDockContext", () => ({
+  useChatDock: () => ({ openGeneralChat }),
 }));
 
 vi.mock("@/contexts/ThemeContext", () => ({
@@ -87,6 +94,7 @@ describe("GlobalCommandPalette", () => {
     vi.clearAllMocks();
     vi.unstubAllGlobals();
     mockPathname.mockReturnValue("/inbox");
+    mockCanEdit.mockReturnValue(false);
     window.history.replaceState({}, "", "/inbox");
   });
 
@@ -135,6 +143,38 @@ describe("GlobalCommandPalette", () => {
     expect(screen.getByRole("dialog")).toBeTruthy();
   });
 
+  it("copies the page link over HTTP when the Clipboard API is unavailable", async () => {
+    vi.stubGlobal(
+      "navigator",
+      new Proxy(navigator, {
+        get(target, property) {
+          if (property === "clipboard") return undefined;
+          return Reflect.get(target, property, target);
+        },
+      }),
+    );
+    let copiedValue: string | undefined;
+    Object.defineProperty(document, "execCommand", {
+      configurable: true,
+      writable: true,
+      value: vi.fn(() => {
+        copiedValue = (document.activeElement as HTMLTextAreaElement | null)?.value;
+        return true;
+      }),
+    });
+
+    try {
+      render(<GlobalCommandPalette />);
+      fireEvent.keyDown(window, { key: "k", metaKey: true });
+      fireEvent.click(screen.getByRole("option", { name: "Copy current page link" }));
+      await waitFor(() => expect(success).toHaveBeenCalledWith("Page link copied"));
+      expect(copiedValue).toBe(window.location.href);
+      expect(error).not.toHaveBeenCalled();
+    } finally {
+      Reflect.deleteProperty(document, "execCommand");
+    }
+  });
+
   it("ignores shortcut repeats and IME composition", () => {
     render(<GlobalCommandPalette />);
     fireEvent.keyDown(window, { key: "k", metaKey: true, isComposing: true });
@@ -152,9 +192,9 @@ describe("GlobalCommandPalette", () => {
     expect(screen.getByRole("dialog")).toBeTruthy();
     expect(screen.getByRole("combobox", { name: "QDash navigation" })).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("option", { name: "Dashboard" }));
+    fireEvent.click(screen.getByRole("option", { name: "Overview" }));
 
-    expect(push).toHaveBeenCalledWith("/dashboard");
+    expect(push).toHaveBeenCalledWith("/overview");
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
@@ -167,10 +207,10 @@ describe("GlobalCommandPalette", () => {
     expect(screen.getByRole("option", { name: "Settings" })).toBeTruthy();
   });
 
-  it("shows dashboard metrics and jumps to the selected metric", async () => {
-    mockPathname.mockReturnValue("/dashboard");
+  it("shows overview metrics and jumps to the selected metric", async () => {
+    mockPathname.mockReturnValue("/overview");
     const target = document.createElement("div");
-    target.id = "dashboard-coupling-metric-zx90_gate_fidelity";
+    target.id = "overview-coupling-metric-zx90_gate_fidelity";
     const scrollIntoView = vi.fn();
     Object.defineProperty(target, "scrollIntoView", { value: scrollIntoView });
     document.body.appendChild(target);
@@ -236,5 +276,161 @@ describe("GlobalCommandPalette", () => {
     window.history.replaceState({}, "", "/tasks?backend=second");
     rerender(<GlobalCommandPalette />);
     expect(taskInfoRequests).toHaveBeenLastCalledWith({ backend: "second" });
+  });
+  it("lists create actions first and focuses the search input", () => {
+    mockCanEdit.mockReturnValue(true);
+    render(<GlobalCommandPalette />);
+    fireEvent.keyDown(window, { key: "k", metaKey: true });
+
+    const input = screen.getByRole("combobox", { name: "QDash navigation" });
+    expect(document.activeElement).toBe(input);
+    const options = screen.getAllByRole("option");
+    expect(options[0].textContent).toContain("Create new workflow");
+    expect(options[1].textContent).toContain("Create new thread");
+    expect(options[0].getAttribute("aria-selected")).toBe("true");
+  });
+
+  it("opens the new workflow editor without saving anything for an editor", () => {
+    mockCanEdit.mockReturnValue(true);
+    render(<GlobalCommandPalette />);
+    fireEvent.keyDown(window, { key: "k", metaKey: true });
+    fireEvent.keyDown(screen.getByRole("combobox"), { key: "Enter", keyCode: 13 });
+
+    expect(push).toHaveBeenCalledOnce();
+    expect(push).toHaveBeenCalledWith("/workflow/new");
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("offers a viewer only the thread action, since workflows need write access", () => {
+    render(<GlobalCommandPalette />);
+    fireEvent.keyDown(window, { key: "k", metaKey: true });
+
+    expect(screen.queryByRole("option", { name: /Create new workflow/ })).toBeNull();
+    const [first] = screen.getAllByRole("option");
+    expect(first.textContent).toContain("Create new thread");
+    fireEvent.keyDown(screen.getByRole("combobox"), { key: "Enter", keyCode: 13 });
+    expect(push).toHaveBeenCalledWith("/forum/new");
+  });
+
+  it("keeps the forum list filters when creating a thread from the forum", () => {
+    mockPathname.mockReturnValue("/forum");
+    window.history.replaceState({}, "", "/forum?status=open&category=question");
+    render(<GlobalCommandPalette />);
+    fireEvent.keyDown(window, { key: "k", metaKey: true });
+    fireEvent.click(screen.getByRole("option", { name: /Create new thread/ }));
+
+    expect(push).toHaveBeenCalledWith(
+      `/forum/new?from=${encodeURIComponent("status=open&category=question")}`,
+    );
+  });
+
+  it("moves through results with the arrow keys and runs the selection with Enter", async () => {
+    mockCanEdit.mockReturnValue(true);
+    render(<GlobalCommandPalette />);
+    fireEvent.keyDown(window, { key: "k", metaKey: true });
+    const input = screen.getByRole("combobox");
+
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    await waitFor(() =>
+      expect(
+        screen.getByRole("option", { name: /Create new thread/ }).getAttribute("aria-selected"),
+      ).toBe("true"),
+    );
+    // The list loops: up from the first result reaches the last theme.
+    fireEvent.keyDown(input, { key: "ArrowUp" });
+    fireEvent.keyDown(input, { key: "ArrowUp" });
+    const lastTheme = AVAILABLE_THEMES[AVAILABLE_THEMES.length - 1];
+    await waitFor(() =>
+      expect(
+        screen
+          .getByRole("option", { name: `Use ${lastTheme} theme` })
+          .getAttribute("aria-selected"),
+      ).toBe("true"),
+    );
+    fireEvent.keyDown(input, { key: "Enter", keyCode: 13 });
+    expect(setTheme).toHaveBeenCalledWith(lastTheme);
+  });
+
+  it("closes with Escape and returns focus to the trigger", async () => {
+    render(<GlobalCommandPalette />);
+    const trigger = screen.getByRole("button", { name: "Open navigation search" });
+    trigger.focus();
+    fireEvent.click(trigger);
+    const input = screen.getByRole("combobox");
+    expect(document.activeElement).toBe(input);
+
+    fireEvent.keyDown(input, { key: "Escape" });
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() => expect(document.activeElement).toBe(trigger));
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("returns focus to the element focused before the shortcut opened the palette", async () => {
+    const field = document.createElement("input");
+    document.body.appendChild(field);
+    field.focus();
+    render(<GlobalCommandPalette />);
+
+    fireEvent.keyDown(window, { key: "k", ctrlKey: true });
+    expect(document.activeElement).toBe(screen.getByRole("combobox"));
+    fireEvent.keyDown(window, { key: "k", ctrlKey: true });
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() => expect(document.activeElement).toBe(field));
+    field.remove();
+  });
+
+  it("opens the agent chat through the chat dock and closes the palette", () => {
+    render(<GlobalCommandPalette />);
+    fireEvent.keyDown(window, { key: "k", metaKey: true });
+    fireEvent.click(screen.getByRole("option", { name: "Open agent chat" }));
+
+    expect(openGeneralChat).toHaveBeenCalledOnce();
+    expect(push).not.toHaveBeenCalled();
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it.each(["agent", "chat", "copilot", "チャット", "エージェント"])(
+    "finds the agent chat action by %s",
+    async (query) => {
+      render(<GlobalCommandPalette />);
+      fireEvent.keyDown(window, { key: "k", metaKey: true });
+      fireEvent.change(screen.getByRole("combobox"), { target: { value: query } });
+
+      await waitFor(() =>
+        expect(screen.queryByRole("option", { name: "Create new thread" })).toBeNull(),
+      );
+      fireEvent.click(screen.getByRole("option", { name: "Open agent chat" }));
+      expect(openGeneralChat).toHaveBeenCalledOnce();
+      expect(screen.queryByRole("dialog")).toBeNull();
+    },
+  );
+
+  it("runs the agent chat action with Enter when it is the top search result", async () => {
+    render(<GlobalCommandPalette />);
+    fireEvent.keyDown(window, { key: "k", metaKey: true });
+    const input = screen.getByRole("combobox");
+    fireEvent.change(input, { target: { value: "copilot" } });
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole("option", { name: "Open agent chat" }).getAttribute("aria-selected"),
+      ).toBe("true"),
+    );
+    fireEvent.keyDown(input, { key: "Enter", keyCode: 13 });
+    expect(openGeneralChat).toHaveBeenCalledOnce();
+    expect(push).not.toHaveBeenCalled();
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("omits the agent chat action on the chat page, where the chat sidebar is hidden", () => {
+    mockPathname.mockReturnValue("/chat");
+    render(<GlobalCommandPalette />);
+    fireEvent.keyDown(window, { key: "k", metaKey: true });
+
+    expect(screen.queryByRole("option", { name: "Open agent chat" })).toBeNull();
+    expect(screen.getByRole("option", { name: "Agent" })).toBeTruthy();
+    expect(openGeneralChat).not.toHaveBeenCalled();
   });
 });

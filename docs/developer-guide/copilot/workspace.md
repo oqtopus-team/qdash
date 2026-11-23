@@ -9,9 +9,8 @@ code itself.
 
 | Part | Owns | Leaves to others |
 | --- | --- | --- |
-| `agent-exec` container (`agent-runtime/exec/`) | Running commands and file operations, one pi-env daemon per conversation as the owner's own uid | Authentication, QDash data, model access |
+| `agent-exec` container (`agent-runtime/exec/`) | Running commands and file operations, one pi-env daemon per conversation as the owner's own uid | Authentication, QDash data, model access, [metric scripts](../architecture/metric-scripts.md) (the `metric-runner` container) |
 | Agent Runtime (`agent-runtime/src/exec-env.ts`) | One connection per open conversation, the conversation's directory, the four tools | Executing anything locally |
-| QDash API | Nothing | The former `/copilot/sandbox/python` route and its Bubblewrap sandbox are gone |
 
 The model gets data into the workspace by writing it into a file. The container uses
 `network_mode: none`; the runtime connects through a shared Unix socket.
@@ -33,7 +32,9 @@ sequenceDiagram
     H->>D: exec / readTextFile / writeFile ... through RemoteExecutionEnv
 ```
 
-1. `SharedRuntime.openSession` creates an `ExecWorkspace` for the owner and session and
+1. `SharedRuntime.openSession` creates an `ExecWorkspace` for the owner and the chat's store
+   session (the chat's own session ID, or for a branch the store it shares; see
+   [Branches](./chat-streaming.md#branches)) and
    passes `env: (target) => workspace.env(target.cwd)` to `Harness.open`, with the agent's
    `cwd` set to the conversation's directory.
 2. The first tool call creates that directory (`createDir`, recursive) and starts the
@@ -47,9 +48,11 @@ sequenceDiagram
    container.
 5. Closing the conversation closes the connection; the daemon then kills every process it
    started. The first tool call also writes a marker file beside the session's SQLite store
-   (`<store>.workspace`); deleting a QDash chat session removes the directory only when that
-   marker exists (`deleteSessionState` → `removeWorkspace`), so a chat or evaluation that never
-   ran code starts no daemon and creates no owner directory.
+   (`<store>.workspace`); deleting the last QDash chat session that uses the store removes the
+   directory only when that marker exists (`deleteSessionState` → `removeWorkspace`), so a chat
+   or evaluation that never ran code starts no daemon and creates no owner directory. A chat and
+   its branches share one directory: a branch sees the files as they are now, not as they were at
+   the answer it was branched from.
 
 ## Isolation
 
@@ -58,7 +61,7 @@ sequenceDiagram
 | Credentials | No `env_file`; the daemon's environment is `PATH`, `HOME`, `TMPDIR`, locale, and Python settings (`daemonEnv` in `exec/server.ts`) |
 | Network | `network_mode: none`; no TCP listener |
 | Users | A distinct uid in 20000–59999 per owner, persisted as directory ownership; 0700 owner directories |
-| Container | `read_only` root with `/tmp` as tmpfs, `cap_drop: ALL` plus the capabilities `setpriv` and `chown` need, `no-new-privileges`, a pid limit, a memory limit (`AGENT_EXEC_MEMORY_LIMIT`, default 2g) |
+| Container | `read_only` root with `/tmp` as tmpfs, `cap_drop: ALL` plus the capabilities `setpriv` and `chown` need, `no-new-privileges`, a pid limit (512), a memory limit (`AGENT_EXEC_MEMORY_LIMIT`, default 2g), a CPU limit (`AGENT_EXEC_CPU_LIMIT`, default 2) |
 | Runtime access | A root-owned Unix socket (0660) in a root-owned directory (0750), both assigned to the runtime's group (gid 1000 in Compose); workspace users have no access |
 
 The `agent-exec-socket` volume exposes the socket to the runtime as a read-only mount.
@@ -82,12 +85,15 @@ the chat only through `render_chart`.
 
 ## In the chat
 
-The trace under an answer shows a workspace step as what it did: the command for `bash`, the
-file and its code for `write`, the old and new text of each `edit`, the file for `read`, and
-under each the tool's answer (`output` on `tool_end`, the tail when long, with the exit code of a
-failed command). While the model is still writing a call, the row shows the code as it is typed
-(`tool_draft` and `tool_args_delta` in [Chat Streaming](./chat-streaming.md)); a save of a flow
-(`qdash_save_flow`) shows the whole flow as code on its approval card. Components:
+Workspace tool rows start collapsed, with a tool icon and a short activity label such as
+**Running bun** or **Writing fit.py**. Opening a row shows the command for `bash`, the file and
+its code for `write`, the old and new text of each `edit`, or the file for `read`. The expanded
+row also shows the tool's answer (`output` on `tool_end`, the tail when long, with the exit code
+of a failed command). The user's open or closed choice persists as the call starts and finishes.
+While the model writes a call, an expanded row shows the code as it is typed (`tool_draft` and
+`tool_args_delta` in [Chat Streaming](./chat-streaming.md)). A save of a flow
+(`qdash_save_flow`) or a metric script (`qdash_save_metric_script`) shows the whole source as
+code on its approval card. Components:
 `ui/src/components/features/chat/ToolStepDetails.tsx`, `ChatInteractionCards.tsx`.
 
 ## Configuration
@@ -99,6 +105,7 @@ failed command). While the model is still writing a call, the row shows the code
 | `AGENT_EXEC_WORKSPACE_ROOT` | both | Owner directories, default `/workspace` (the `agent-exec-workspace` volume) |
 | `AGENT_EXEC_ISOLATE_USERS` | agent-exec | Per-owner uids; default on when the server runs as root |
 | `AGENT_EXEC_MEMORY_LIMIT` | agent-exec | Container memory limit, default `2g` |
+| `AGENT_EXEC_CPU_LIMIT` | agent-exec | Container CPU limit, default `2` |
 
 The Python packages are pinned in `agent-runtime/exec/requirements.txt`; the daemon binary
 comes from the `@earendil-works/pi-env` package the runtime depends on, so its version follows

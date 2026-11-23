@@ -6,6 +6,7 @@ import { ChevronRight, History, FileText, GitBranch, ListTodo } from "lucide-rea
 
 import type { TaskResult as Task } from "@/schemas";
 
+import { firstPublishedParameter, inExecution } from "@/lib/provenanceTarget";
 import { formatDateTime, formatDateTimeCompact } from "@/lib/utils/datetime";
 
 import { useGetExecution } from "@/client/execution/execution";
@@ -18,7 +19,7 @@ import {
 } from "@/components/features/task-history/ExecutionHistoryModalContent";
 import { ParametersTable } from "@/components/features/metrics/ParametersTable";
 import { useManualOverrides } from "@/hooks/useManualOverrides";
-import { AskAiButton } from "@/components/features/evaluations/AskAiButton";
+import { LineageButton } from "@/components/features/provenance/ParameterLineageDialog";
 import { TaskResultEvaluations } from "@/components/features/evaluations/TaskResultEvaluations";
 import { TaskResultThreads } from "@/components/features/forum/TaskResultThreads";
 import { TaskResultMemo } from "@/components/features/metrics/TaskResultMemo";
@@ -66,12 +67,6 @@ export function TaskHistoryModal({
     if (!isOpen) setIsChatOpen(false);
   }, [isOpen]);
   const manualOverrides = useManualOverrides(qid);
-
-  const buildProvenanceUrl = (parameterName: string, qidValue: string) => {
-    const p = encodeURIComponent(parameterName);
-    const q = encodeURIComponent(qidValue);
-    return `/provenance?tab=lineage&parameter=${p}&qid=${q}`;
-  };
 
   const { data, isLoading, isError } = useGetQubitTaskHistory(
     qid,
@@ -454,43 +449,27 @@ export function TaskHistoryModal({
               <span>{formatDateTime(String(selectedTask.end_at))}</span>
             </div>
           )}
-          <TaskArtifactDownloads jsonFigurePaths={jsonFigures} rawDataPaths={rawDataPaths} />
-          {/* Provenance link and Ask AI */}
+          <TaskArtifactDownloads
+            jsonFigurePaths={jsonFigures}
+            rawDataPaths={rawDataPaths}
+            imagePaths={figures}
+          />
+          {/* Lineage */}
           <div className="pt-2 mt-2 border-t border-base-300 flex items-center gap-2 flex-wrap">
-            <Link
-              href={(() => {
-                const outputs = selectedTask.output_parameters
-                  ? Object.entries(selectedTask.output_parameters)
-                  : [];
-                const inputs = selectedTask.input_parameters
-                  ? Object.entries(selectedTask.input_parameters)
-                  : [];
-                const [key, paramValue] =
-                  (outputs[0] as [string, Record<string, unknown>] | undefined) ??
-                  (inputs[0] as [string, Record<string, unknown>] | undefined) ??
-                  [];
-                if (key && paramValue) {
-                  const parameterName = (paramValue?.parameter_name as string | undefined) || key;
-                  return buildProvenanceUrl(parameterName, qid);
-                }
-                return "/provenance";
-              })()}
-              className="btn btn-xs btn-outline gap-1"
+            <LineageButton
+              target={inExecution(
+                firstPublishedParameter(
+                  qid,
+                  selectedTask.output_parameters,
+                  selectedTask.input_parameters,
+                ),
+                selectedExecutionId,
+              )}
+              className="btn btn-xs btn-outline"
             >
-              <GitBranch className="h-3 w-3" />
-              View Provenance Lineage
-            </Link>
-            {chatContext && (
-              <AskAiButton
-                taskId={chatContext.taskId}
-                chipId={chatContext.chipId}
-                taskName={chatContext.taskName}
-                qid={chatContext.qid}
-                chatContext={chatContext}
-                onChat={() => handleAskAi(chatContext)}
-                size="xs"
-              />
-            )}
+              <GitBranch data-icon="inline-start" />
+              Lineage
+            </LineageButton>
           </div>
         </div>
       )}
@@ -501,7 +480,7 @@ export function TaskHistoryModal({
 
       {/* Parameters */}
       {selectedTask && (
-        <div className="flex flex-col gap-2 mt-2">
+        <div className="flex flex-col gap-2 mt-2 mb-6">
           {selectedTask.input_parameters &&
             Object.keys(selectedTask.input_parameters).length > 0 && (
               <ParametersTable
@@ -536,6 +515,7 @@ export function TaskHistoryModal({
           chipId={chipId}
           taskName={selectedTask.name || taskName}
           qid={qid}
+          executionId={selectedExecutionId || undefined}
           onChat={chatContext ? () => handleAskAi(chatContext) : undefined}
         />
       )}

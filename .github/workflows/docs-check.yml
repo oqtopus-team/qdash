@@ -6,6 +6,7 @@ on:
     paths:
       - "docs/**"
       - "lychee.toml"
+      - ".github/scripts/docs-link-inputs*.mjs"
       - ".github/workflows/docs-check.yml"
   schedule:
     - cron: "17 3 * * 1"
@@ -43,23 +44,25 @@ jobs:
         run: bun run docs:build
         working-directory: docs
 
+      - name: Install Chromium for the Mermaid render check
+        run: bunx playwright install --with-deps --only-shell chromium
+        working-directory: docs
+
+      - name: Check Mermaid diagrams render
+        run: bun run docs:check-mermaid
+        working-directory: docs
+
+      - name: Test link input selection
+        run: node --test .github/scripts/docs-link-inputs.test.mjs
+
+      # A pull request checks only the pages it changes. A workflow or configuration-only change,
+      # and every scheduled or manual run, checks the complete page set.
       - name: Select documentation files
-        shell: bash
+        id: select
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
-            git diff --name-only --diff-filter=ACMR "${BASE_SHA}" "${HEAD_SHA}" -- docs \
-              | awk '/\.md$/ { print }' > .lychee-inputs
-          else
-            git ls-files docs | awk '/\.md$/ { print }' > .lychee-inputs
-          fi
-
-          # A workflow or configuration-only change must exercise the complete link set.
-          if [[ ! -s .lychee-inputs ]]; then
-            git ls-files docs | awk '/\.md$/ { print }' > .lychee-inputs
-          fi
+        run: node .github/scripts/docs-link-inputs.mjs .lychee-inputs
 
       - name: Prepare link roots
         shell: bash
@@ -79,7 +82,8 @@ jobs:
         with:
           args: --config lychee.toml --root-dir "${{ github.workspace }}/.lychee-source-root" --files-from .lychee-inputs
           fail: true
-          failIfEmpty: true
+          # Changed pages may legitimately contain no links; the complete page set must not.
+          failIfEmpty: ${{ steps.select.outputs.scope == 'full' }}
           jobSummary: true
 
       - name: Check generated site links and anchors

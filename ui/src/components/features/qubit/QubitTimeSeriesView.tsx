@@ -112,7 +112,7 @@ export function QubitTimeSeriesView({ chipId, qubitId }: QubitTimeSeriesViewProp
   return (
     <div className="space-y-8">
       {/* Parameter Selection Card */}
-      <div className="card bg-base-100 shadow-sm rounded-xl p-8 border border-base-300">
+      <div className="card bg-base-100 shadow-sm p-8 border border-base-300">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-sm font-medium flex items-center gap-2">
             <svg
@@ -134,12 +134,12 @@ export function QubitTimeSeriesView({ chipId, qubitId }: QubitTimeSeriesViewProp
           <button
             onClick={handleRefresh}
             disabled={isLoading || isLoadingMeta}
-            className="btn btn-sm btn-outline gap-2"
+            className="btn btn-sm btn-outline"
             title="Refresh data and time range"
           >
             <svg
+              data-icon="inline-start"
               xmlns="http://www.w3.org/2000/svg"
-              className="w-4 h-4"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -258,14 +258,14 @@ export function QubitTimeSeriesView({ chipId, qubitId }: QubitTimeSeriesViewProp
         searchable={false}
         actions={
           <button
-            className="btn btn-sm btn-outline gap-2"
+            className="btn btn-sm btn-outline"
             onClick={handleDownloadCSV}
             disabled={tableData.length === 0}
             title="Download all data as CSV"
           >
             <svg
+              data-icon="inline-start"
               xmlns="http://www.w3.org/2000/svg"
-              className="w-4 h-4"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"

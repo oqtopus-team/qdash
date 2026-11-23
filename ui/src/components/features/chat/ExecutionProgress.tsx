@@ -1,13 +1,24 @@
 "use client";
 
 import { useMemo } from "react";
-import { CheckCircle2, Circle, ExternalLink, Loader2, MinusCircle, XCircle } from "lucide-react";
+import {
+  Ban,
+  CheckCircle2,
+  Circle,
+  ExternalLink,
+  Loader2,
+  MinusCircle,
+  XCircle,
+} from "lucide-react";
 import { useGetExecution } from "@/client/execution/execution";
 import { FigureStrip } from "@/components/features/chat/ChatFigures";
-import type { PipelineProgress, Task } from "@/schemas";
+import { ChatLink } from "@/components/features/chat/ChatPreviewLink";
+import { chatLinkPagePath } from "@/lib/chatLinks";
+import type { PipelineProgress, PipelineStepProgress, Task } from "@/schemas";
 
 const POLL_MS = 5000;
 const RECENT_TASKS = 6;
+const ACTIVE_TASKS = 3;
 
 /** Execution ids pi-qdash's wait tool takes; `executionId` is its argument name. */
 export function executionIdFromArgs(args: unknown): string | null {
@@ -23,15 +34,100 @@ export function finishedTasks(tasks: Task[]): Task[] {
   return tasks.filter((t) => t.status === "completed" || t.status === "failed");
 }
 
+/** Whether an execution, step, or task status means work is still under way. */
+function isActive(status: string | undefined): boolean {
+  return status === "running" || status === "scheduled";
+}
+
+/**
+ * The execution page, under its chip when known; otherwise `/executions/{id}`,
+ * which looks the chip up and redirects.
+ */
+export function executionPagePath(executionId: string, chipId?: string | null): string {
+  return chatLinkPagePath({ kind: "execution", executionId, chipId: chipId || null, href: "" })!;
+}
+
+function taskResultPath(taskId: string): string {
+  return chatLinkPagePath({ kind: "task-result", taskId, href: "" })!;
+}
+
 function taskLabel(task: Task): string {
   return task.qid ? `${task.name ?? "task"} · ${task.qid}` : (task.name ?? "task");
 }
 
+/** One icon per status; the status is always also given in words next to it. */
+function StatusIcon({ status }: { status: string | undefined }) {
+  const common = "w-3 h-3 shrink-0";
+  switch (status) {
+    case "running":
+    case "scheduled":
+      return <Loader2 className={`${common} animate-spin text-primary`} aria-hidden="true" />;
+    case "completed":
+      return <CheckCircle2 className={`${common} text-success`} aria-hidden="true" />;
+    case "failed":
+      return <XCircle className={`${common} text-error`} aria-hidden="true" />;
+    case "cancelled":
+      return <Ban className={`${common} text-base-content/50`} aria-hidden="true" />;
+    case "skipped":
+      return <MinusCircle className={`${common} text-base-content/30`} aria-hidden="true" />;
+    default:
+      return <Circle className={`${common} text-base-content/30`} aria-hidden="true" />;
+  }
+}
+
+/** The full execution page, in a new tab so the conversation stays open. */
+function OpenExecutionLink({ href }: { href: string }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="link link-hover ml-auto inline-flex shrink-0 items-center gap-1 text-base-content/60 hover:text-base-content"
+    >
+      Open execution
+      <ExternalLink className="w-3 h-3" aria-hidden="true" />
+    </a>
+  );
+}
+
+/**
+ * A task of the execution. A finished task links to its result, which opens
+ * as a preview over the chat (figures and parameters) when one is available.
+ */
+function TaskRow({ task }: { task: Task }) {
+  const label = taskLabel(task);
+  const failed = task.status === "failed";
+  const active = isActive(task.status);
+  const finished = failed || task.status === "completed";
+  return (
+    <li className="flex min-w-0 items-center gap-1.5">
+      <StatusIcon status={task.status} />
+      {finished && task.task_id ? (
+        <ChatLink
+          href={taskResultPath(task.task_id)}
+          className="link link-hover min-w-0 truncate text-base-content/70 hover:text-base-content"
+        >
+          {label}
+        </ChatLink>
+      ) : (
+        <span className="min-w-0 truncate text-base-content/70">{label}</span>
+      )}
+      <span
+        className={`ml-auto shrink-0 ${
+          failed ? "text-error" : active ? "text-base-content/50" : "sr-only"
+        }`}
+      >
+        {task.status}
+      </span>
+    </li>
+  );
+}
+
 /**
  * What an execution is doing right now, for the chat to show while the
- * assistant waits on it: progress, the latest finished tasks, and their
- * figures as they appear. Polls while the execution runs and stops once it
- * reaches a terminal state.
+ * assistant waits on it: progress, the tasks running now, the latest finished
+ * tasks with links to their results, and their figures as they appear. Polls
+ * while the execution runs and stops once it reaches a terminal state.
  */
 export function ExecutionProgress({ executionId }: { executionId: string }) {
   const query = useGetExecution(executionId, {
@@ -39,9 +135,7 @@ export function ExecutionProgress({ executionId }: { executionId: string }) {
       refetchInterval: (q) => {
         const detail = q.state.data?.data;
         const status = detail?.pipeline?.status ?? detail?.status;
-        return status === "running" || status === "scheduled" || status === undefined
-          ? POLL_MS
-          : false;
+        return isActive(status) || status === undefined ? POLL_MS : false;
       },
       staleTime: 0,
     },
@@ -49,6 +143,7 @@ export function ExecutionProgress({ executionId }: { executionId: string }) {
   const execution = query.data?.data;
   const tasks = useMemo(() => execution?.task ?? [], [execution?.task]);
   const finished = useMemo(() => finishedTasks(tasks), [tasks]);
+  const active = useMemo(() => tasks.filter((t) => isActive(t.status)), [tasks]);
   // A task can carry several figures; show them all, in task order.
   const figures = useMemo(
     () =>
@@ -61,9 +156,24 @@ export function ExecutionProgress({ executionId }: { executionId: string }) {
   );
 
   if (!execution) {
+    if (query.isError) {
+      return (
+        <div
+          className="chat-execution-progress flex flex-wrap items-center gap-x-2 gap-y-1 text-xs"
+          data-testid="execution-progress-error"
+        >
+          <XCircle className="w-3 h-3 shrink-0 text-error" aria-hidden="true" />
+          <span className="text-error">Could not load execution {executionId}.</span>
+          <OpenExecutionLink href={executionPagePath(executionId)} />
+        </div>
+      );
+    }
     return (
-      <div className="chat-execution-progress text-xs text-base-content/50">
-        <Loader2 className="w-3 h-3 animate-spin" />
+      <div
+        role="status"
+        className="chat-execution-progress flex items-center gap-2 text-xs text-base-content/50"
+      >
+        <Loader2 className="w-3 h-3 shrink-0 animate-spin" aria-hidden="true" />
         Loading execution {executionId}…
       </div>
     );
@@ -74,55 +184,55 @@ export function ExecutionProgress({ executionId }: { executionId: string }) {
   }
 
   const failed = finished.filter((t) => t.status === "failed").length;
-  const running = execution.status === "running" || execution.status === "scheduled";
-  const href = execution.chip_id
-    ? `/execution/${encodeURIComponent(execution.chip_id)}/${encodeURIComponent(executionId)}`
-    : null;
+  const running = isActive(execution.status);
+  const earlier = finished.slice(0, Math.max(0, finished.length - RECENT_TASKS));
+  const recent = finished.slice(-RECENT_TASKS);
+  const shownActive = active.slice(0, ACTIVE_TASKS);
 
   return (
     <div className="chat-execution-progress" data-testid="execution-progress">
-      <div className="flex items-center gap-2 text-xs">
-        {running ? (
-          <Loader2 className="w-3 h-3 animate-spin text-primary" />
-        ) : execution.status === "completed" ? (
-          <CheckCircle2 className="w-3 h-3 text-success" />
-        ) : (
-          <XCircle className="w-3 h-3 text-error" />
-        )}
-        <span className="font-medium">{execution.name || executionId}</span>
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+        <StatusIcon status={execution.status} />
+        <span className="min-w-0 truncate font-medium">{execution.name || executionId}</span>
         <span className="text-base-content/50">
           · {execution.status} · {finished.length}/{tasks.length} tasks
           {failed > 0 ? ` · ${failed} failed` : ""}
         </span>
-        {href && (
-          <a
-            href={href}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="ml-auto inline-flex items-center gap-1 text-base-content/50 hover:text-base-content"
-            aria-label="Open execution"
-          >
-            <ExternalLink className="w-3 h-3" />
-          </a>
-        )}
+        <OpenExecutionLink href={executionPagePath(executionId, execution.chip_id)} />
       </div>
 
-      {finished.length > 0 && (
-        <ul className="mt-1.5 space-y-0.5 text-xs">
-          {finished.slice(-RECENT_TASKS).map((task) => (
-            <li key={task.task_id ?? taskLabel(task)} className="flex items-center gap-1.5">
-              {task.status === "failed" ? (
-                <XCircle className="w-3 h-3 shrink-0 text-error" />
-              ) : (
-                <CheckCircle2 className="w-3 h-3 shrink-0 text-success" />
-              )}
-              <span className="truncate text-base-content/70">{taskLabel(task)}</span>
+      {(finished.length > 0 || shownActive.length > 0) && (
+        <ul className="mt-1.5 space-y-0.5 text-xs" aria-label="Tasks">
+          {earlier.length > 0 && (
+            <li>
+              <details>
+                <summary className="cursor-pointer select-none text-base-content/50 hover:text-base-content/80">
+                  {earlier.length} earlier finished
+                </summary>
+                <ul className="mt-0.5 space-y-0.5">
+                  {earlier.map((task, i) => (
+                    <TaskRow key={task.task_id ?? `earlier-${i}`} task={task} />
+                  ))}
+                </ul>
+              </details>
             </li>
+          )}
+          {recent.map((task, i) => (
+            <TaskRow key={task.task_id ?? `recent-${i}`} task={task} />
           ))}
-          {finished.length > RECENT_TASKS && (
-            <li className="text-base-content/40">+{finished.length - RECENT_TASKS} earlier</li>
+          {shownActive.map((task, i) => (
+            <TaskRow key={task.task_id ?? `active-${i}`} task={task} />
+          ))}
+          {active.length > ACTIVE_TASKS && (
+            <li className="text-base-content/50">+{active.length - ACTIVE_TASKS} more running</li>
           )}
         </ul>
+      )}
+
+      {tasks.length === 0 && (
+        <p className="mt-1.5 text-xs text-base-content/50">
+          {running ? "Waiting for the first task…" : "No tasks were recorded."}
+        </p>
       )}
 
       {figures.length > 0 && <FigureStrip paths={figures} compact className="mt-2" />}
@@ -130,77 +240,68 @@ export function ExecutionProgress({ executionId }: { executionId: string }) {
   );
 }
 
-function StepIcon({ status }: { status: string }) {
-  switch (status) {
-    case "running":
-    case "scheduled":
-      return <Loader2 className="w-3 h-3 shrink-0 animate-spin text-primary" />;
-    case "completed":
-      return <CheckCircle2 className="w-3 h-3 shrink-0 text-success" />;
-    case "failed":
-    case "cancelled":
-      return <XCircle className="w-3 h-3 shrink-0 text-error" />;
-    case "skipped":
-      return <MinusCircle className="w-3 h-3 shrink-0 text-base-content/30" />;
-    default:
-      return <Circle className="w-3 h-3 shrink-0 text-base-content/30" />;
+function StepName({ step, chipId }: { step: PipelineStepProgress; chipId?: string }) {
+  const label = `${step.index}. ${step.name}`;
+  const muted = step.status === "pending" || step.status === "skipped";
+  if (step.kind !== "transform" && step.execution_id) {
+    // A step's own execution also reports the whole pipeline, so it opens as
+    // a page (with that step's tasks) rather than as the same card again.
+    return (
+      <a
+        href={executionPagePath(step.execution_id, chipId)}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="link link-hover min-w-0 truncate text-base-content/70 hover:text-base-content"
+      >
+        {label}
+      </a>
+    );
   }
+  return (
+    <span className={`min-w-0 truncate ${muted ? "text-base-content/40" : "text-base-content/70"}`}>
+      {label}
+    </span>
+  );
 }
 
 /**
- * A pipeline run: every planned step with its own progress, and the figures
- * of all finished tasks so far. Steps that only filter are listed but do not
- * run hardware.
+ * A pipeline run: every planned step with its own progress and a link to its
+ * execution once it has one, and the figures of all finished tasks so far.
+ * Steps that only filter are listed but do not run hardware.
  */
 function PipelineCard({ pipeline, chipId }: { pipeline: PipelineProgress; chipId?: string }) {
-  const running = pipeline.status === "running";
+  const running = isActive(pipeline.status);
   const figures = pipeline.steps.flatMap((step) => step.figure_paths ?? []);
-  const href = chipId
-    ? `/execution/${encodeURIComponent(chipId)}/${encodeURIComponent(pipeline.root_execution_id)}`
-    : null;
-  const finishedSteps = pipeline.steps.filter(
-    (s) => s.kind !== "transform" && (s.status === "completed" || s.status === "failed"),
+  const calibrationSteps = pipeline.steps.filter((s) => s.kind !== "transform");
+  const finishedSteps = calibrationSteps.filter(
+    (s) => s.status === "completed" || s.status === "failed",
   ).length;
-  const totalSteps = pipeline.steps.filter((s) => s.kind !== "transform").length;
+  const failedTasks = calibrationSteps.reduce((sum, s) => sum + (s.task_failed ?? 0), 0);
 
   return (
     <div className="chat-execution-progress" data-testid="execution-progress">
-      <div className="flex items-center gap-2 text-xs">
-        <StepIcon status={pipeline.status} />
-        <span className="font-medium">{pipeline.name}</span>
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+        <StatusIcon status={pipeline.status} />
+        <span className="min-w-0 truncate font-medium">{pipeline.name}</span>
         <span className="text-base-content/50">
-          · {pipeline.status} · {finishedSteps}/{totalSteps} steps
+          · {pipeline.status} · {finishedSteps}/{calibrationSteps.length} steps
+          {failedTasks > 0 ? ` · ${failedTasks} failed tasks` : ""}
         </span>
-        {href && (
-          <a
-            href={href}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="ml-auto inline-flex items-center gap-1 text-base-content/50 hover:text-base-content"
-            aria-label="Open execution"
-          >
-            <ExternalLink className="w-3 h-3" />
-          </a>
-        )}
+        <OpenExecutionLink href={executionPagePath(pipeline.root_execution_id, chipId)} />
       </div>
 
-      <ol className="mt-1.5 space-y-0.5 text-xs">
+      <ol className="mt-1.5 space-y-0.5 text-xs" aria-label="Pipeline steps">
         {pipeline.steps.map((step) => (
-          <li key={step.index} className="flex items-center gap-1.5">
-            <StepIcon status={step.status} />
-            <span
-              className={`truncate ${
-                step.status === "pending" || step.status === "skipped"
-                  ? "text-base-content/40"
-                  : "text-base-content/70"
-              }`}
-            >
-              {step.index}. {step.name}
-            </span>
+          <li key={step.index} className="flex min-w-0 items-center gap-1.5">
+            <StatusIcon status={step.status} />
+            <StepName step={step} chipId={chipId} />
+            <span className="sr-only">{step.status}</span>
             {step.kind !== "transform" && step.execution_id && (
-              <span className="ml-auto shrink-0 tabular-nums text-base-content/40">
+              <span className="ml-auto shrink-0 tabular-nums text-base-content/50">
                 {step.task_finished ?? 0}/{step.task_total ?? 0}
-                {step.task_failed ? ` · ${step.task_failed} failed` : ""}
+                {step.task_failed ? (
+                  <span className="text-error"> · {step.task_failed} failed</span>
+                ) : null}
               </span>
             )}
           </li>
@@ -209,7 +310,7 @@ function PipelineCard({ pipeline, chipId }: { pipeline: PipelineProgress; chipId
 
       {figures.length > 0 && <FigureStrip paths={figures} compact className="mt-2" />}
       {running && finishedSteps === 0 && figures.length === 0 && (
-        <div className="mt-1.5 text-xs text-base-content/40">Waiting for the first results…</div>
+        <p className="mt-1.5 text-xs text-base-content/50">Waiting for the first results…</p>
       )}
     </div>
   );

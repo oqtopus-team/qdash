@@ -5,8 +5,11 @@ import { ExternalLink, X, XCircle } from "lucide-react";
 
 import { useGetTaskFileSettings, useListTaskInfo } from "@/client/task-file/task-file";
 import { useGetTaskResult } from "@/client/task/task";
+import { FigureStrip } from "@/components/charts/FigureStrip";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { ExecutionTaskProgress } from "@/components/features/execution/ExecutionTaskProgress";
+import { useRecordJourneyResultView } from "@/components/features/first-calibration/useRecordJourneyResultView";
+import { TaskLineageSection } from "@/components/features/provenance/TaskLineageSection";
 import { QubitTile } from "@/components/ui/QubitTile";
 import { TaskMessagePanel } from "@/components/ui/TaskMessagePanel";
 import { InvestigateWithAiButton } from "@/components/features/chat/InvestigateWithAiButton";
@@ -159,6 +162,7 @@ export function TaskResultPreviewSidebar({
     },
   });
   const taskResult = response?.data;
+  useRecordJourneyResultView(isOpen ? taskResult : null);
   const { data: taskFileSettings } = useGetTaskFileSettings({ query: { enabled: isOpen } });
   const defaultBackend = taskFileSettings?.data?.default_backend || "qubex";
   const { data: taskInfoData } = useListTaskInfo(
@@ -211,8 +215,8 @@ export function TaskResultPreviewSidebar({
             )}
             <p className="mt-1 font-mono text-xs text-base-content/50">{taskId}</p>
             <div className="mt-3 flex flex-wrap gap-2">
-              <Link href={`/task-results/${taskId}`} className="btn btn-primary btn-sm gap-1">
-                <ExternalLink className="h-3.5 w-3.5" />
+              <Link href={`/task-results/${taskId}`} className="btn btn-primary btn-sm">
+                <ExternalLink data-icon="inline-start" />
                 Open full page
               </Link>
               {showExecutionLink && taskResult?.chip_id && taskResult?.execution_id && (
@@ -220,9 +224,9 @@ export function TaskResultPreviewSidebar({
                   href={`/execution/${encodeURIComponent(taskResult.chip_id)}/${encodeURIComponent(
                     taskResult.execution_id,
                   )}`}
-                  className="btn btn-ghost btn-sm gap-1"
+                  className="btn btn-ghost btn-sm"
                 >
-                  <ExternalLink className="h-3.5 w-3.5" />
+                  <ExternalLink data-icon="inline-start" />
                   Execution
                 </Link>
               )}
@@ -241,9 +245,9 @@ export function TaskResultPreviewSidebar({
           ) : (
             <div className="space-y-4">
               {(figures.length > 0 || jsonFigures.length > 0) && (
-                <div>
+                <div data-coachmark="task-result-figure" data-task-id={taskId}>
                   <h3 className="mb-2 text-xs font-medium text-base-content/60">Figures</h3>
-                  <div className="flex h-56 items-center gap-3 overflow-x-auto rounded-lg bg-base-200/60 p-3">
+                  <FigureStrip className="h-56 gap-3 rounded-lg bg-base-200/60 p-3">
                     {figures.length > 0 ? (
                       figures.map((figure, index) => (
                         <TaskFigure
@@ -261,7 +265,7 @@ export function TaskResultPreviewSidebar({
                         className="h-full w-auto shrink-0 rounded object-contain"
                       />
                     )}
-                  </div>
+                  </FigureStrip>
                 </div>
               )}
 
@@ -297,6 +301,16 @@ export function TaskResultPreviewSidebar({
                 </dl>
               </div>
 
+              <TaskLineageSection
+                taskId={taskId}
+                executionId={taskResult.execution_id}
+                qid={taskResult.qid ?? ""}
+                outputParameters={
+                  taskResult.output_parameters as Record<string, unknown> | undefined
+                }
+                className="rounded-lg bg-base-200/60 p-3"
+              />
+
               <TaskMessagePanel
                 status={taskResult.status}
                 message={taskResult.message}
@@ -310,10 +324,12 @@ export function TaskResultPreviewSidebar({
                 }
               />
 
-              <ParameterPreview
-                title="Output Parameters"
-                parameters={taskResult.output_parameters as Record<string, unknown> | undefined}
-              />
+              <div data-coachmark="task-result-metrics" data-task-id={taskId}>
+                <ParameterPreview
+                  title="Output Parameters"
+                  parameters={taskResult.output_parameters as Record<string, unknown> | undefined}
+                />
+              </div>
               <ParameterPreview
                 title="Input Parameters"
                 parameters={taskResult.input_parameters as Record<string, unknown> | undefined}

@@ -322,9 +322,9 @@ export function ForumNewPage() {
           type="button"
           className="btn btn-square btn-ghost btn-sm shrink-0"
           onClick={() => router.push(forumReturnHref)}
-          title="Back to Forum"
+          aria-label="Back to Forum"
         >
-          <ArrowLeft className="h-4 w-4" />
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
         </button>
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-start gap-2">
@@ -397,13 +397,13 @@ export function ForumNewPage() {
               </span>
               <button
                 type="submit"
-                className="btn btn-sm btn-primary gap-2"
+                className="btn btn-sm btn-primary"
                 disabled={isSubmitting || createMutation.isPending}
               >
                 {createMutation.isPending ? (
-                  <span className="loading loading-spinner loading-xs" />
+                  <span data-icon="inline-start" className="loading loading-spinner loading-xs" />
                 ) : (
-                  <Send className="h-4 w-4" />
+                  <Send data-icon="inline-start" />
                 )}
                 Post
               </button>
@@ -622,11 +622,7 @@ export function ForumNewPage() {
               Author
             </div>
             <div className="flex items-center gap-2">
-              <UserAvatar
-                username={user?.username ?? "you"}
-                avatarKey={user?.avatar_key}
-                size={24}
-              />
+              <UserAvatar username={user?.username ?? ""} size={24} />
               <span className="text-sm font-medium">{user?.username ?? "you"}</span>
             </div>
           </section>

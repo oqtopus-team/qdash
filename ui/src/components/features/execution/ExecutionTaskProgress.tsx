@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { LoaderCircle } from "lucide-react";
 
+import { AnimatedNumber, AnimatedText } from "@/components/ui/AnimatedNumber";
 import { isExecutionInProgress } from "@/lib/executionStatus";
 
 type TaskProgress = {
@@ -141,6 +142,21 @@ export function ExecutionTaskProgress({ status, note }: ExecutionTaskProgressPro
         : `${progress.phase} / ${progress.phaseTotalMin}–${progress.phaseTotalMax}`;
 
   const displayedPercentage = overallPercentage ?? percentage;
+  // Never round an unfinished run up to 100%.
+  const shownPercentage =
+    displayedPercentage === null
+      ? null
+      : displayedPercentage < 100
+        ? Math.min(Math.round(displayedPercentage), 99)
+        : 100;
+  const hasPointTotal = progress.total != null && progress.total > 0;
+  const countLabel = hasExactPhaseTotal
+    ? `${completedSweeps} / ${progress.phaseTotalMax} sweeps completed`
+    : `${progress.hasMultiplePhases ? "Current sweep · " : ""}${
+        hasPointTotal
+          ? `${progress.current} / ${progress.total} points`
+          : `${progress.current} points measured`
+      }`;
   const progressLabel = hasExactPhaseTotal
     ? "All sweeps"
     : progress.hasMultiplePhases
@@ -159,10 +175,13 @@ export function ExecutionTaskProgress({ status, note }: ExecutionTaskProgressPro
     >
       <div className="flex items-baseline justify-between gap-3">
         <span className="text-sm font-medium">{progressLabel}</span>
-        {displayedPercentage !== null && (
-          <span className="shrink-0 text-sm font-medium tabular-nums text-primary">
-            {displayedPercentage < 100 ? Math.min(Math.round(displayedPercentage), 99) : 100}%
-          </span>
+        {shownPercentage !== null && (
+          <AnimatedText
+            label={`${shownPercentage}%`}
+            className="shrink-0 text-sm font-medium tabular-nums text-primary"
+          >
+            <AnimatedNumber value={shownPercentage} suffix="%" />
+          </AnimatedText>
         )}
       </div>
       {displayedPercentage !== null ? (
@@ -186,15 +205,20 @@ export function ExecutionTaskProgress({ status, note }: ExecutionTaskProgressPro
           <span className="min-w-0 break-words text-base-content/80">
             {progress.description || "Measurement in progress"}
           </span>
-          <span className="shrink-0 tabular-nums text-base-content/60">
-            {hasExactPhaseTotal
-              ? `${completedSweeps} / ${progress.phaseTotalMax} sweeps completed`
-              : `${progress.hasMultiplePhases ? "Current sweep · " : ""}${
-                  progress.total != null && progress.total > 0
-                    ? `${progress.current} / ${progress.total} points`
-                    : `${progress.current} points measured`
-                }`}
-          </span>
+          <AnimatedText label={countLabel} className="shrink-0 tabular-nums text-base-content/60">
+            {hasExactPhaseTotal ? (
+              <>
+                <AnimatedNumber value={completedSweeps} /> / {progress.phaseTotalMax} sweeps
+                completed
+              </>
+            ) : (
+              <>
+                {progress.hasMultiplePhases && "Current sweep · "}
+                <AnimatedNumber value={progress.current} />
+                {hasPointTotal ? ` / ${progress.total} points` : " points measured"}
+              </>
+            )}
+          </AnimatedText>
         </div>
         <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-base-content/60">
           {progress.hasMultiplePhases && !hasExactPhaseTotal && (

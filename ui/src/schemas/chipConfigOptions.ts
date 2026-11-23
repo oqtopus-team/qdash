@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { ChipConfigOptionsBackend } from './chipConfigOptionsBackend';
+import type { ChipConfigOptionsPreset } from './chipConfigOptionsPreset';
 import type { ChipConfigOptionsSourceSystemId } from './chipConfigOptionsSourceSystemId';
 
 /**
@@ -18,4 +19,6 @@ export interface ChipConfigOptions {
   source_system_id?: ChipConfigOptionsSourceSystemId;
   /** Backend of the new system; taken from the source system when one is given */
   backend?: ChipConfigOptionsBackend;
+  /** Write a complete virtual configuration instead of hardware files. 'fake' is offered only when the deployment backend is fake and needs its preset topology */
+  preset?: ChipConfigOptionsPreset;
 }

@@ -18,4 +18,6 @@ export interface ApplyAgentCandidateRequest {
   /** @minimum 0 */
   expected_state_version: number;
   push_to_github?: boolean;
+  /** Apply under the session's parameter_updates authority instead of a per-call approval. QDash then also requires that the signed-in user created the auto session, that its approval granted apply_backend, that the commit was made under that authority in this session and is still the stored value, and that no earlier apply of it was requested. push_to_github must stay false. */
+  autonomous?: boolean;
 }

@@ -1,8 +1,11 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { QDashClient } from "@oqtopus-team/qdash-client";
+import { QDash } from "@oqtopus-team/qdash-sdk";
 import { Type } from "typebox";
 
+import { pausedSessionConflict } from "../lib/agent-loop.js";
 import { toTextToolResult } from "../lib/results.js";
+import { requireWriteApproval } from "../lib/write-approval.js";
 
 /**
  * Declarative calibration pipelines.
@@ -13,25 +16,55 @@ import { toTextToolResult } from "../lib/results.js";
  * Step classes and task names QDash exposes, so QDash owns the validation and
  * these tools only relay it. The spec schema is deliberately not restated
  * here: `qdash_get_pipeline_catalog` returns QDash's own JSON schema.
+ *
+ * The routes are reached through the SDK's `qdash.pipelines`, which owns the
+ * request shape; the project is the profile's, or the server's default when
+ * none is set. Confirmation, the structured result and the 422/503 handling
+ * stay here. A run returns its execution ID at once; following it is
+ * qdash_wait_execution's job.
  */
 
 type ConnectionParams = { profile?: string; configPath?: string; useEnv?: boolean };
 
+/** The qubits a spec names, or undefined when it targets MUXes or names none. */
+export function specQids(spec: Record<string, unknown>): string[] | undefined {
+  const targets = spec.targets as { qids?: unknown; mux_ids?: unknown } | undefined;
+  if (!targets || targets.mux_ids != null) return undefined;
+  const qids = targets.qids;
+  return Array.isArray(qids) && qids.length > 0 && qids.every((qid) => typeof qid === "string") ? (qids as string[]) : undefined;
+}
+
 export type PipelineProblem = { path: string; message: string };
+
+/** One call as QDash will run it: identity, failure policy, effective settings. */
+export type ResolvedTaskCall = {
+  call_id: string;
+  name: string;
+  on_failure: string;
+  settings: Record<string, unknown>;
+};
 
 export type ResolvedPipelineStep = {
   index: number;
   type: string;
   name: string;
+  step_id?: string | null;
   kind: string;
+  /** Task names in call order, with repeats. */
   tasks: string[];
+  calls?: ResolvedTaskCall[];
+  reference?: { step?: string | null; call_id?: string | null } | null;
 };
 
 export type PipelineValidation = {
   valid: boolean;
   problems?: PipelineProblem[];
+  warnings?: PipelineProblem[];
   backend_name: string;
+  spec_version?: number | null;
   spec?: Record<string, unknown> | null;
+  migrated_spec?: Record<string, unknown> | null;
+  plan_digest?: string | null;
   targets?: { qids?: string[]; mux_ids?: number[]; exclude_qids?: string[] } | null;
   steps?: ResolvedPipelineStep[];
   task_run_count?: number;
@@ -45,6 +78,31 @@ export type PipelineExecution = {
   message: string;
   steps?: ResolvedPipelineStep[];
   targets?: PipelineValidation["targets"];
+  /** Set when the run was recorded in a calibration session. */
+  calibration_session_id?: string | null;
+  pipeline_run_id?: string | null;
+  /** A retry of the same call returned the run the first attempt started. */
+  replayed?: boolean;
+};
+
+/**
+ * The idempotency key of a pipeline run recorded in a calibration session: one per tool
+ * call, so a replayed or retried call returns the run it started instead of starting
+ * another. The call id comes from the host, never from the model's arguments.
+ */
+export function pipelineRunKey(toolCallId: string): string {
+  const key = `qdash_run_pipeline:${toolCallId}`;
+  return key.length <= 128 ? key : `qdash_run_pipeline:${toolCallId.slice(-100)}`;
+}
+
+/** What `qdash_run_pipeline` reports as its origin; QDash stores it as client reported. */
+export const PIPELINE_TOOL_ORIGIN = { source: "agent_tool", tool: "qdash_run_pipeline", client: "pi-qdash" } as const;
+
+export type TaskDocumentation = {
+  description: string;
+  when_to_use?: string;
+  /** Explanatory only: QDash enforces inputs from task metadata, not from this list. */
+  prerequisites?: string[];
 };
 
 export type PipelineCatalog = {
@@ -56,24 +114,22 @@ export type PipelineCatalog = {
     requires: string[];
     provides: string[];
     task_scope?: string | null;
-    default_tasks: string[];
+    default_step_id?: string | null;
+    default_tasks: Array<{ name: string; call_id?: string | null }>;
+    step_metrics?: string[];
   }>;
-  one_qubit_modes: string[];
+  one_qubit_execution_modes: string[];
+  two_qubit_execution_modes?: string[];
   tasks: Record<string, string[]>;
+  /** Guidance declared by task classes, keyed by task name; undocumented tasks are absent. */
+  task_documentation?: Record<string, TaskDocumentation>;
+  spec_version?: number;
   spec_schema: Record<string, unknown>;
   example?: Record<string, unknown>;
 };
 
-type PipelineRequest = { chip_id: string; spec: Record<string, unknown>; backend_name?: string };
-
-/** The slice of QDashClient these tools use; tests pass a stub. */
-export type PipelineClient = {
-  api: {
-    getCalibrationPipelineCatalog(params?: { backend_name?: string }): Promise<unknown>;
-    validateCalibrationPipeline(request: PipelineRequest): Promise<unknown>;
-    executeCalibrationPipeline(request: PipelineRequest): Promise<unknown>;
-  };
-};
+/** The client these tools use; tests pass a stub with the same `api` methods and `config`. */
+export type PipelineClient = QDashClient;
 
 export type CalibrationPipelineDependencies = {
   makeClient(params: ConnectionParams): Promise<PipelineClient>;
@@ -93,18 +149,30 @@ function describeTargets(targets: PipelineValidation["targets"]): string {
   return "targets unknown";
 }
 
-function taskList(tasks: string[]): string {
-  if (tasks.length === 0) return "no tasks (transform)";
-  const shown = tasks.slice(0, TASK_PREVIEW).join(", ");
-  const rest = tasks.length - TASK_PREVIEW;
-  return rest > 0 ? `${tasks.length} tasks: ${shown}, +${rest} more` : `${tasks.length} task${tasks.length === 1 ? "" : "s"}: ${shown}`;
+/** A call's label: the task name, plus its call_id when the two differ. */
+function callLabel(call: { name: string; call_id: string }): string {
+  return call.call_id === call.name ? call.name : `${call.call_id}=${call.name}`;
+}
+
+function callList(step: ResolvedPipelineStep): string {
+  const labels = step.calls?.length ? step.calls.map(callLabel) : step.tasks;
+  if (labels.length === 0) {
+    if (!step.reference?.step) return "no tasks (transform)";
+    const source = step.reference.call_id ? `${step.reference.step}.${step.reference.call_id}` : step.reference.step;
+    return `reads ${source}`;
+  }
+  const shown = labels.slice(0, TASK_PREVIEW).join(", ");
+  const rest = labels.length - TASK_PREVIEW;
+  const noun = labels.length === 1 ? "call" : "calls";
+  return rest > 0 ? `${labels.length} calls: ${shown}, +${rest} more` : `${labels.length} ${noun}: ${shown}`;
 }
 
 export function stepLines(steps: ResolvedPipelineStep[] | undefined): string[] {
   if (!steps?.length) return ["- (no steps resolved)"];
   return steps.map((step) => {
+    const id = step.step_id && step.step_id !== step.name ? ` [${step.step_id}]` : "";
     const label = step.name === step.type ? step.type : `${step.name} (${step.type})`;
-    return `${step.index}. ${label} — ${taskList(step.tasks)}`;
+    return `${step.index}. ${label}${id} — ${callList(step)}`;
   });
 }
 
@@ -120,21 +188,33 @@ export function formatPipelinePlan(result: PipelineValidation, chipId: string): 
   const problems = problemLines(result.problems);
   const lines = [header, `Targets: ${describeTargets(result.targets)}`, ""];
   if (result.valid) {
-    lines.push(`Valid. ${result.task_run_count ?? 0} task runs per target.`);
+    lines.push(`Valid. ${result.task_run_count ?? 0} task calls per target.`);
   } else {
     lines.push(`Not valid: ${problems.length} problem${problems.length === 1 ? "" : "s"}. Fix the spec and validate again.`, ...problems);
   }
+  if (result.migrated_spec) {
+    lines.push(
+      "",
+      `This is a version ${result.spec_version ?? 1} spec. details.data.migrated_spec holds the same pipeline as spec_version 2; review it (rename generated call_ids if useful) and plan it instead.`,
+    );
+  }
+  const warnings = problemLines(result.warnings);
+  if (warnings.length) lines.push("", "Warnings (the spec is still valid):", ...warnings);
   if (result.steps?.length) lines.push("", "Steps:", ...stepLines(result.steps));
   return lines.join("\n");
 }
 
 export function formatPipelineExecution(result: PipelineExecution, chipId: string): string {
   const stepCount = result.steps?.length ?? 0;
-  const taskRuns = (result.steps ?? []).reduce((count, step) => count + step.tasks.length, 0);
+  const taskRuns = (result.steps ?? []).reduce((count, step) => count + (step.calls?.length ?? step.tasks.length), 0);
+  const recorded = result.calibration_session_id
+    ? [`Recorded in calibration session ${result.calibration_session_id} as pipeline run ${result.pipeline_run_id ?? "(unknown)"}${result.replayed ? " (this call had already started it; nothing new was started)" : ""}.`]
+    : [];
   return [
-    `Started: ${result.message}`,
+    `${result.replayed ? "Already started" : "Started"}: ${result.message}`,
     `execution_id ${result.execution_id}`,
-    `chip ${chipId}, ${describeTargets(result.targets)}, ${stepCount} step${stepCount === 1 ? "" : "s"}, ${taskRuns} task runs per target`,
+    `chip ${chipId}, ${describeTargets(result.targets)}, ${stepCount} step${stepCount === 1 ? "" : "s"}, ${taskRuns} task calls per target`,
+    ...recorded,
     `qdash ${result.qdash_ui_url}`,
     `prefect ${result.flow_run_url}`,
     "",
@@ -142,21 +222,111 @@ export function formatPipelineExecution(result: PipelineExecution, chipId: strin
   ].join("\n");
 }
 
-export function formatPipelineCatalog(catalog: PipelineCatalog): string {
+/** The detail string of an HTTP error, if it carries one. */
+function errorDetail(error: unknown): string | undefined {
+  if (!error || typeof error !== "object") return undefined;
+  const payload = (error as { payload?: unknown }).payload;
+  const detail = payload && typeof payload === "object" ? (payload as { detail?: unknown }).detail : undefined;
+  return typeof detail === "string" ? detail : undefined;
+}
+
+/** The first sentence of a task description, which keeps the unexpanded listing short. */
+export function firstSentence(text: string): string {
+  const match = /^.*?[.!?](?=\s+[A-Z(]|$)/s.exec(text.trim());
+  return match ? match[0] : text.trim();
+}
+
+/**
+ * Declared task guidance: the first sentence of each documented task's description,
+ * plus the full description, when-to-use, and prerequisites for the tasks named
+ * in `expand`.
+ */
+function formatTaskDocumentation(documentation: Record<string, TaskDocumentation>, expand: string[]): string[] {
+  const names = Object.keys(documentation).sort();
+  const expanded = new Set(expand);
+  const lines: string[] = [];
+  if (names.length) {
+    lines.push("", `Task documentation (${names.length} documented; pass taskNames for the full description, when to use, and prerequisites):`);
+    for (const name of names) {
+      const doc = documentation[name];
+      if (!expanded.has(name)) {
+        lines.push(`- ${name}: ${firstSentence(doc.description)}`);
+        continue;
+      }
+      lines.push(`- ${name}: ${doc.description}`);
+      if (doc.when_to_use) lines.push(`  When to use: ${doc.when_to_use}`);
+      if (doc.prerequisites?.length) {
+        lines.push("  Prerequisites (explanatory; validation reports what is actually missing):");
+        for (const item of doc.prerequisites) lines.push(`  - ${item}`);
+      }
+    }
+  }
+  const undocumented = [...expanded].filter((name) => !(name in documentation));
+  if (undocumented.length) {
+    lines.push("", `No declared documentation for: ${undocumented.join(", ")}`);
+  }
+  return lines;
+}
+
+/** The declared parameters of one task, as `GET /tasks` lists them. */
+export type TaskParameters = {
+  name: string;
+  input_parameters?: Record<string, { unit?: string }>;
+  output_parameters?: Record<string, { unit?: string }>;
+};
+
+function parameterList(parameters: Record<string, { unit?: string }> | undefined): string {
+  const names = Object.keys(parameters ?? {}).sort();
+  return names.length ? names.map((name) => (parameters?.[name]?.unit ? `${name} (${parameters[name].unit})` : name)).join(", ") : "none";
+}
+
+/**
+ * The declared inputs and outputs of the requested tasks, with their units, or
+ * why they could not be listed. Output names are what a session's
+ * allowed_overrides must name for a result to become a committable candidate.
+ */
+export function formatTaskParameters(tasks: readonly TaskParameters[] | string, names: readonly string[]): string[] {
+  if (!names.length) return [];
+  if (typeof tasks === "string") return ["", `Declared task parameters unavailable: ${tasks}`];
+  const lines = ["", "Declared task parameters (names and units as QDash stores them):"];
+  for (const name of names) {
+    const task = tasks.find((item) => item.name === name);
+    if (!task) {
+      lines.push(`- ${name}: not in this backend's task list`);
+      continue;
+    }
+    lines.push(`- ${name}`, `  Inputs: ${parameterList(task.input_parameters)}`, `  Outputs: ${parameterList(task.output_parameters)}`);
+  }
+  return lines;
+}
+
+export function formatPipelineCatalog(catalog: PipelineCatalog, expandTasks: string[] = []): string {
   const lines = [`Calibration pipeline catalog (backend ${catalog.backend_name})`, "", "Step types:"];
   for (const step of catalog.step_types) {
     const needs = step.requires.length ? ` needs ${step.requires.join(" or ")};` : "";
     const scope = step.task_scope ? ` ${step.task_scope} tasks` : "";
-    const defaults = step.default_tasks.length ? `; default ${step.default_tasks.length} tasks` : "";
+    const defaults = step.default_tasks.length ? `; default ${step.default_tasks.length} calls` : "";
     lines.push(`- ${step.type} [${step.kind}${scope}]: ${step.description}${needs}${defaults}`);
   }
-  lines.push("", `One-qubit modes: ${catalog.one_qubit_modes.join(", ")}`, "", "Tasks by type:");
+  lines.push("", `One-qubit execution_mode values: ${catalog.one_qubit_execution_modes.join(", ")}`);
+  if (catalog.two_qubit_execution_modes?.length) {
+    lines.push(`Two-qubit execution_mode values: ${catalog.two_qubit_execution_modes.join(", ")}`);
+  }
+  if ([...catalog.one_qubit_execution_modes, ...(catalog.two_qubit_execution_modes ?? [])].includes("manual")) {
+    lines.push(
+      'execution_mode "manual" requires rounds and runs them exactly as written: [["0", "8"], ["1", "9"]] for qubits, [[["0", "1"], ["4", "5"]], [["8", "9"]]] for directed pairs. Validate the spec to check rounds against the chip.',
+    );
+  }
+  lines.push("", "Tasks by type:");
   for (const [taskType, names] of Object.entries(catalog.tasks)) {
     lines.push(`- ${taskType} (${names.length}): ${names.join(", ")}`);
   }
+  lines.push(...formatTaskDocumentation(catalog.task_documentation ?? {}, expandTasks));
   lines.push(
     "",
-    "Targets are either {qids: [...]} or {mux_ids: [...], exclude_qids?: [...]}.",
+    `Specs need spec_version: ${catalog.spec_version ?? 2}. Targets are either {qids: [...]} or {mux_ids: [...], exclude_qids?: [...]}.`,
+    'A step\'s tasks are calls: {"name": "CheckRamsey", "call_id"?, "run"?, "input"?, "update_calibration_parameters"?, "on_failure"?}. A task may run more than once in one step when every occurrence has its own call_id.',
+    "Filters read the latest OneQubitCheck/OneQubitFineTune unless they set step (a step_id) and optionally call_id.",
     "The full spec JSON schema is in details.data.spec_schema; validate with qdash_plan_pipeline.",
   );
   return lines.join("\n");
@@ -190,28 +360,39 @@ const connectionParams = {
 // and a union-heavy schema here would be ignored by vLLM guided decoding anyway.
 const specParam = Type.Object({}, {
   additionalProperties: true,
-  description: "CalibrationPipelineSpec: {name?, targets: {qids} | {mux_ids, exclude_qids?}, steps: [{type, ...}], task_run_parameters?, default_run_parameters?, tags?}. Get step types and tasks from qdash_get_pipeline_catalog.",
+  description: "CalibrationPipelineSpec: {spec_version: 2, name?, targets: {qids} | {mux_ids, exclude_qids?}, steps: [{type, step_id?, tasks?: [{name, call_id?, run?, input?, update_calibration_parameters?, on_failure?}], ...}], default_run_parameters?, tags?}. Put per-call settings on each task call; task_parameters (per-task defaults) is deprecated and only kept so existing specs still run. Get step types and tasks from qdash_get_pipeline_catalog.",
 });
 
 export function registerCalibrationPipelineTools(pi: Pick<ExtensionAPI, "registerTool">, deps: CalibrationPipelineDependencies): void {
   pi.registerTool({
     name: "qdash_get_pipeline_catalog",
     label: "QDash Pipeline Catalog",
-    description: "List the step types, task names, and spec schema for composing a calibration pipeline. Read-only. Call this before writing a pipeline spec.",
-    promptSnippet: "Look up the step types and tasks available for a QDash calibration pipeline",
+    description: "List the step types, task names, declared task documentation, and spec schema for composing a calibration pipeline. Read-only. Call this before writing a pipeline spec, or with taskNames to read what a task does, when to use it, its prerequisites, and its declared input and output parameters with units.",
+    promptSnippet: "Look up the step types, tasks, and task documentation available for a QDash calibration pipeline",
     promptGuidelines: [
       "Use qdash_get_pipeline_catalog before composing a pipeline spec; use only the step types and task names it lists.",
+      "Pass taskNames to qdash_get_pipeline_catalog to read a task's purpose, when to use it, and prerequisites before choosing it; documented prerequisites explain, while qdash_plan_pipeline reports what is actually missing.",
     ],
     parameters: Type.Object({
       ...connectionParams,
       backendName: Type.Optional(Type.String({ description: "Backend to list tasks for. Defaults to the configured backend." })),
+      taskNames: Type.Optional(Type.Array(Type.String(), { description: "Task names whose full documentation (when to use, prerequisites) to include." })),
     }),
-    async execute(_toolCallId, params: ConnectionParams & { backendName?: string }) {
+    async execute(_toolCallId, params: ConnectionParams & { backendName?: string; taskNames?: string[] }) {
       const client = await deps.makeClient(params);
-      const catalog = (await client.api.getCalibrationPipelineCatalog(
-        params.backendName ? { backend_name: params.backendName } : undefined,
-      )) as PipelineCatalog;
-      return toTextToolResult(formatPipelineCatalog(catalog), catalog, { tool: "qdash_get_pipeline_catalog", backendName: catalog.backend_name });
+      const qdash = new QDash(client);
+      const catalog = (await qdash.pipelines.catalog({ backendName: params.backendName })) as PipelineCatalog;
+      const taskNames = params.taskNames ?? [];
+      let declared: TaskParameters[] | string = [];
+      if (taskNames.length) {
+        try {
+          declared = ((await client.listTasks(catalog.backend_name)) as { tasks?: TaskParameters[] }).tasks ?? [];
+        } catch (error) {
+          declared = error instanceof Error ? error.message : String(error);
+        }
+      }
+      const text = [formatPipelineCatalog(catalog, taskNames), ...formatTaskParameters(declared, taskNames)].join("\n");
+      return toTextToolResult(text, catalog, { tool: "qdash_get_pipeline_catalog", backendName: catalog.backend_name });
     },
   });
 
@@ -222,7 +403,8 @@ export function registerCalibrationPipelineTools(pi: Pick<ExtensionAPI, "registe
     promptSnippet: "Validate a QDash calibration pipeline spec and preview the tasks it will run",
     promptGuidelines: [
       "Use qdash_plan_pipeline after composing a spec and after every edit; a spec with problems is not an error, fix it and plan again.",
-      "Show the user the resolved steps and task counts before running.",
+      "When the plan returns migrated_spec, the spec was version 1; plan the migrated spec instead of editing the old shape.",
+      "Show the user the resolved steps, their call ids and settings, and any warnings before running.",
     ],
     parameters: Type.Object({
       ...connectionParams,
@@ -233,10 +415,9 @@ export function registerCalibrationPipelineTools(pi: Pick<ExtensionAPI, "registe
     async execute(_toolCallId, params: ConnectionParams & { chipId?: string; spec: Record<string, unknown>; backendName?: string }) {
       const client = await deps.makeClient(params);
       const chipId = await deps.resolveChipId(client, params.chipId);
-      const result = (await client.api.validateCalibrationPipeline({
-        chip_id: chipId,
-        spec: params.spec,
-        ...(params.backendName ? { backend_name: params.backendName } : {}),
+      const result = (await new QDash(client).pipelines.validate(params.spec, {
+        chipId,
+        backendName: params.backendName,
       })) as PipelineValidation;
       return toTextToolResult(formatPipelinePlan(result, chipId), result, {
         tool: "qdash_plan_pipeline",
@@ -254,6 +435,8 @@ export function registerCalibrationPipelineTools(pi: Pick<ExtensionAPI, "registe
     promptSnippet: "Run a validated QDash calibration pipeline spec",
     promptGuidelines: [
       "Use qdash_run_pipeline only for a spec that qdash_plan_pipeline reported valid.",
+      "When the run serves a calibration objective, pass that objective's calibrationSessionId (from qdash_create_calibration_session or the user) so QDash records the run, with all its step executions, in it. It grants nothing: the user still approves this exact run.",
+      "If QDash reports that a run's launch outcome is unknown, do not start it again: check qdash_list_executions and tell the user.",
       "Tell the user before running that completed tasks update calibrated parameters in QDash directly.",
       "Do not use qdash_run_pipeline to run a task an agent session action failed to run; that skips the session's candidate gate. Report the failure instead.",
       "After it starts, follow the execution with qdash_wait_execution and summarize failed targets.",
@@ -263,26 +446,32 @@ export function registerCalibrationPipelineTools(pi: Pick<ExtensionAPI, "registe
       chipId: Type.String({ description: "Chip to run on." }),
       spec: specParam,
       backendName: Type.Optional(Type.String({ description: "Defaults to the configured backend." })),
-      confirmWrite: Type.Optional(Type.Boolean({ description: "Required for non-interactive execution. Set true only after explicit user confirmation." })),
+      calibrationSessionId: Type.Optional(Type.String({ description: "Record the run in this calibration session (open, on this chip, created by the user). Grants nothing." })),
     }),
-    async execute(_toolCallId, params: ConnectionParams & { chipId: string; spec: Record<string, unknown>; backendName?: string; confirmWrite?: boolean }, _signal, _onUpdate, ctx) {
-      if (!params.confirmWrite) {
-        if (!ctx.hasUI || !(await ctx.ui.confirm("Run QDash calibration pipeline?", `This starts a calibration execution on chip ${params.chipId}. Completed tasks update calibrated parameters in QDash directly.`))) {
-          throw new Error("qdash_run_pipeline requires explicit confirmation");
-        }
-      }
+    async execute(toolCallId, params: ConnectionParams & { chipId: string; spec: Record<string, unknown>; backendName?: string; calibrationSessionId?: string }, _signal, _onUpdate, ctx) {
+      const recordedIn = params.calibrationSessionId ? ` It is recorded in calibration session ${params.calibrationSessionId}, which groups it and grants nothing.` : "";
+      await requireWriteApproval("qdash_run_pipeline", toolCallId, params, ctx, { title: "Run QDash calibration pipeline?", message: `This starts a calibration execution on chip ${params.chipId}. Completed tasks update calibrated parameters in QDash directly.${recordedIn}` });
       const client = await deps.makeClient(params);
+      // A paused agent session's targets must not be measured around its pause.
+      const conflict = await pausedSessionConflict(client, params.chipId, specQids(params.spec));
+      if (conflict) {
+        return toTextToolResult(conflict, { blocked: true }, { tool: "qdash_run_pipeline", chipId: params.chipId, started: false, blockedByPausedSession: true });
+      }
+      const qdash = new QDash(client);
       try {
-        const result = (await client.api.executeCalibrationPipeline({
-          chip_id: params.chipId,
-          spec: params.spec,
-          ...(params.backendName ? { backend_name: params.backendName } : {}),
-        })) as PipelineExecution;
+        // Dispatch only: the run handle's wait() is deliberately not called here.
+        const recording = params.calibrationSessionId ? { calibrationSessionId: params.calibrationSessionId, idempotencyKey: pipelineRunKey(toolCallId) } : undefined;
+        // The origin is this tool's own constant, never the model's arguments: QDash shows it as
+        // reported, so a run started here is told apart from one the user started directly.
+        const run = await qdash.pipelines.execute(params.spec, { chipId: params.chipId, backendName: params.backendName }, recording, { reportedOrigin: PIPELINE_TOOL_ORIGIN });
+        const result = run.response as PipelineExecution;
         return toTextToolResult(formatPipelineExecution(result, params.chipId), result, {
           tool: "qdash_run_pipeline",
           chipId: params.chipId,
           executionId: result.execution_id,
           started: true,
+          ...(result.calibration_session_id ? { calibrationSessionId: result.calibration_session_id, pipelineRunId: result.pipeline_run_id ?? undefined } : {}),
+          ...(result.replayed ? { replayed: true } : {}),
         });
       } catch (error) {
         const problems = problemsFromError(error);
@@ -297,6 +486,11 @@ export function registerCalibrationPipelineTools(pi: Pick<ExtensionAPI, "registe
         }
         if (statusOf(error) === 503) {
           throw new Error("QDash cannot run pipelines right now: the worker has not registered the calibration-pipeline deployment. Ask an operator to restart the worker, then try again.");
+        }
+        const detail = errorDetail(error);
+        if (params.calibrationSessionId && detail && /unknown|may have started|being dispatched/i.test(detail)) {
+          // Never retried with a new call: the first launch may be running.
+          throw new Error(`${detail} Do not start this run again; check qdash_list_executions and tell the user.`);
         }
         throw error;
       }

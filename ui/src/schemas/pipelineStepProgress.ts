@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { PipelineStepProgressExecutionId } from './pipelineStepProgressExecutionId';
+import type { PipelineStepProgressStepId } from './pipelineStepProgressStepId';
 
 /**
  * One planned step of a pipeline run and how far its execution got.
@@ -14,6 +15,8 @@ export interface PipelineStepProgress {
   /** 1-based position in the pipeline spec */
   index: number;
   name: string;
+  /** Plan-scoped step id; null for transforms and older runs */
+  step_id?: PipelineStepProgressStepId;
   type?: string;
   /** "calibration" or "transform" */
   kind?: string;

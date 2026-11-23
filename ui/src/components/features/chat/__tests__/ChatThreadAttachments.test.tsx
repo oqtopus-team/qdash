@@ -3,21 +3,35 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { stageAttachment, type StagedAttachment } from "@/lib/chatAttachments";
 import { ChatThread } from "../ChatThread";
 
-const { send } = vi.hoisted(() => ({ send: vi.fn() }));
+const { send, steer, chat } = vi.hoisted(() => ({
+  send: vi.fn(),
+  steer: vi.fn(),
+  chat: { isStreaming: false, steers: [] as unknown[], notice: null as string | null },
+}));
 vi.mock("@/client/copilot/copilot", () => ({
   useGetCopilotPreferences: () => ({ data: undefined }),
+  useListCopilotSkills: () => ({ data: undefined }),
 }));
 vi.mock("@/hooks/useCopilotChat", () => ({
   useCopilotChat: () => ({
     session: { id: "s1", context: null },
     messages: [],
     isLoadingMessages: false,
-    isStreaming: false,
+    isStreaming: chat.isStreaming,
     liveTurn: null,
     model: { options: [], selected: { key: "default" }, select: vi.fn() },
     thinking: { choice: "auto", select: vi.fn(), modelDefault: null },
     send,
     stop: vi.fn(),
+    steers: chat.steers,
+    steer,
+    resendSteer: vi.fn(),
+    dismissSteer: vi.fn(),
+    notice: chat.notice,
+    dismissNotice: vi.fn(),
+    continueLast: vi.fn(),
+    canContinue: false,
+    canEditMessage: () => false,
   }),
 }));
 vi.mock("@/hooks/useChatSuggestions", () => ({ useChatSuggestions: () => [] }));
@@ -44,6 +58,10 @@ const image: StagedAttachment = {
 };
 beforeEach(() => {
   send.mockReset();
+  steer.mockReset();
+  chat.isStreaming = false;
+  chat.steers = [];
+  chat.notice = null;
   vi.mocked(stageAttachment).mockReset();
 });
 
@@ -77,5 +95,33 @@ describe("ChatThread attachment submission", () => {
     ]);
     expect(screen.getByRole("textbox")).toHaveValue("");
     expect(screen.queryByAltText("plot.png")).not.toBeInTheDocument();
+  });
+
+  it("sends while an answer streams as a steer, not as a new turn", () => {
+    chat.isStreaming = true;
+    steer.mockReturnValue(true);
+    render(<ChatThread variant="panel" />);
+    const box = screen.getByRole("textbox");
+    expect(box).toHaveAttribute("placeholder", "Add a note; it is read after the current step");
+    // Nothing typed: only Stop.
+    expect(screen.queryByRole("button", { name: "Send to the answer in progress" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Stop generating" })).toBeInTheDocument();
+
+    fireEvent.change(box, { target: { value: "Use Q5 instead" } });
+    fireEvent.keyDown(box, { key: "Enter" });
+    expect(steer).toHaveBeenCalledWith("Use Q5 instead");
+    expect(send).not.toHaveBeenCalled();
+    expect(box).toHaveValue("");
+  });
+
+  it("keeps the text when the steer could not be sent", () => {
+    chat.isStreaming = true;
+    steer.mockReturnValue(false);
+    render(<ChatThread variant="panel" />);
+    const box = screen.getByRole("textbox");
+    fireEvent.change(box, { target: { value: "Use Q5" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send to the answer in progress" }));
+    expect(steer).toHaveBeenCalledWith("Use Q5");
+    expect(box).toHaveValue("Use Q5");
   });
 });

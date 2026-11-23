@@ -282,7 +282,7 @@ class ProjectService:
         project.delete()
 
     def list_members(self, project_id: str) -> list[ProjectMembershipDocument]:
-        """List all members of a project.
+        """List active members of a project.
 
         Parameters
         ----------
@@ -292,10 +292,10 @@ class ProjectService:
         Returns
         -------
         list[ProjectMembershipDocument]
-            List of memberships.
+            List of active memberships.
 
         """
-        return self._membership_repo.find_by_project(project_id)
+        return self._membership_repo.find_by_project(project_id, status="active")
 
     def invite_member(
         self,

@@ -21,7 +21,8 @@ from typing import Any
 
 from prefect import flow
 
-from qdash.workflow import sweep
+from qdash.datamodel.one_qubit_execution_mode import OneQubitExecutionMode
+from qdash.workflow import TaskCall, sweep
 from qdash.workflow.service import CalibService
 from qdash.workflow.service.calib_service import (
     on_flow_cancellation,
@@ -43,7 +44,7 @@ def box_setup(
     mux_ids: list[int] | None = None,
     exclude_qids: list[str] | None = None,
     qids: list[str] | None = None,
-    mode: str = "scheduled",
+    execution_mode: OneQubitExecutionMode = "parallel_by_mux",
     tags: list[str] | None = None,
     flow_name: str | None = None,
     project_id: str | None = None,
@@ -56,10 +57,13 @@ def box_setup(
         mux_ids: MUX IDs to correct (required)
         exclude_qids: Qubit IDs to exclude
         qids: Not used (for UI compatibility)
-        mode: Execution mode:
-            - "scheduled": Box-based parallelism with hardware constraints (default)
-            - "serial": Fully sequential execution (one MUX at a time)
-            - "synchronized": Step-based synchronized execution
+        execution_mode: How the one-qubit targets run (default: "parallel_by_mux"):
+            - "parallel_by_mux": MUXes run in parallel within the scheduler's hardware
+              stages; the qubits of one MUX run one after another
+            - "parallel_by_round": the scheduler forms rounds of qubits from different
+              MUXes; the next round starts after every qubit of the round has run
+              all of its tasks
+            - "sequential": one MUX and one qubit at a time
         tags: Flow tags
         flow_name: Flow name (auto-injected)
         project_id: Project ID (auto-injected)
@@ -74,25 +78,29 @@ def box_setup(
 
     targets = MuxTargets(mux_ids=mux_ids, exclude_qids=exclude_qids)
 
-    task_parameters: dict[str, dict[str, Any]] = {
-        "CorrectCaptureDelay": {
-            "run": {
-                # Fixed readout tone in GHz, away from the resonators. Leave unset to
-                # use 0.25 GHz above the connected readout box's default resonator
-                # spectroscopy range (11.0 GHz for the high band, 7.0 GHz for the low
-                # band), or set it to a frequency inside the readout band.
-                # "readout_frequency": 11.0,
-                # QuEL-1: coarse sweep in 128 ns units with capture_delay_word fixed at 0.
-                "delay_range": sweep.range(0, 19, 1),
-                # QuEL-1: word sweep in 8 ns units at the chosen coarse delay (32 ns steps).
-                "capture_delay_word_range": sweep.range(0, 16, 4),
-                # QuEL-3: sweep in ns; every value must be a multiple of 0.8 ns.
-                "capture_delay_ns_range": sweep.arange(0, 2432, 128),
-                "shots": 1024,
-            },
+    correct_capture_delay = TaskCall(
+        name="CorrectCaptureDelay",
+        run={
+            # Fixed readout tone in GHz, away from the resonators. Leave unset to
+            # use 0.25 GHz above the connected readout box's default resonator
+            # spectroscopy range (11.0 GHz for the high band, 7.0 GHz for the low
+            # band), or set it to a frequency inside the readout band.
+            # "readout_frequency": 11.0,
+            # QuEL-1: coarse sweep in 128 ns units with capture_delay_word fixed at 0.
+            "delay_range": sweep.range(0, 19, 1),
+            # QuEL-1: word sweep in 8 ns units at the chosen coarse delay (32 ns steps).
+            "capture_delay_word_range": sweep.range(0, 16, 4),
+            # QuEL-3: sweep in ns; every value must be a multiple of 0.8 ns.
+            "capture_delay_ns_range": sweep.arange(0, 2432, 128),
+            "shots": 1024,
         },
-    }
-    steps = [BringUp(mode=mode, tasks=["CorrectCaptureDelay"])]
+    )
+    steps = [
+        BringUp(
+            execution_mode=execution_mode,
+            tasks=[correct_capture_delay],
+        )
+    ]
 
     cal = CalibService(
         username,
@@ -103,6 +111,5 @@ def box_setup(
         default_run_parameters={
             "readout_duration": 1024,
         },
-        task_parameters=task_parameters,
     )
     return cal.run(targets, steps=steps)

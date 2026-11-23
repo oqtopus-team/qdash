@@ -5,9 +5,12 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { ResolvedPipelineStepReference } from './resolvedPipelineStepReference';
+import type { ResolvedPipelineStepStepId } from './resolvedPipelineStepStepId';
+import type { ResolvedTaskCall } from './resolvedTaskCall';
 
 /**
- * A step as it will run: effective tasks filled in from the catalog defaults.
+ * A step as it will run: effective calls filled in from the catalog defaults.
  */
 export interface ResolvedPipelineStep {
   /** 1-based position in the pipeline. */
@@ -15,8 +18,14 @@ export interface ResolvedPipelineStep {
   type: string;
   /** Step name as it appears in execution history. */
   name: string;
+  /** Plan-scoped id of a calibration step; filters reference it. */
+  step_id?: ResolvedPipelineStepStepId;
   /** "calibration" runs hardware; "transform" only filters. */
   kind: string;
-  /** Tasks the step runs, in order; empty for transforms. */
+  /** Task names in call order, with repeats; empty for transforms. */
   tasks: string[];
+  /** The calls each target runs, in order. */
+  calls?: ResolvedTaskCall[];
+  /** For filters: the step and call they read, or null for the default. */
+  reference?: ResolvedPipelineStepReference;
 }

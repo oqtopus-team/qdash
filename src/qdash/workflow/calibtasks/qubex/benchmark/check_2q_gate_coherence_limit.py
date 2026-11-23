@@ -7,6 +7,7 @@ from qubex.analysis.util import calc_2q_gate_coherence_limit
 from qdash.datamodel.task import (
     InputParameterSpec,
     OutputParameterSpec,
+    TaskDocumentation,
 )
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -21,6 +22,23 @@ class Check2QGateCoherenceLimit(QubexTask):
 
     name: str = "Check2QGateCoherenceLimit"
     task_type: str = "coupling"
+    documentation: ClassVar[TaskDocumentation] = TaskDocumentation(
+        description=(
+            "Computes the coherence-limited two-qubit gate fidelity from both qubits' "
+            "t1_average and t2_echo_average and the pair's zx90_gate_time. It measures nothing."
+        ),
+        when_to_use=(
+            "Run it after CreateZX90 and the averaged coherence tasks to compare ZX90 "
+            "benchmarking with the decoherence limit."
+        ),
+        prerequisites=(
+            "zx90_gate_time stored by CreateZX90; the task fails when it is missing.",
+            (
+                "t1_average and t2_echo_average stored for both qubits; missing values default "
+                "to 0 and give no meaningful limit."
+            ),
+        ),
+    )
 
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
         "control_t1_average": InputParameterSpec.database_or_default(

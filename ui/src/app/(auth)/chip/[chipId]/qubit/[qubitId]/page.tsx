@@ -89,8 +89,8 @@ function QubitDetailPageContent() {
     <div className="w-full px-6 py-6">
       <div className="space-y-6">
         {/* Back navigation */}
-        <Link href="/chip" className="btn btn-ghost btn-sm gap-2 w-fit">
-          <ArrowLeft size={16} />
+        <Link href="/chip" className="btn btn-ghost btn-sm w-fit">
+          <ArrowLeft data-icon="inline-start" />
           Back to Chip View
         </Link>
 
@@ -105,22 +105,22 @@ function QubitDetailPageContent() {
                 className={`join-item btn btn-sm ${viewMode === "dashboard" ? "btn-primary" : ""}`}
                 onClick={() => setViewMode("dashboard")}
               >
-                <Eye size={18} />
-                <span className="ml-2">Dashboard</span>
+                <Eye data-icon="inline-start" />
+                <span>Dashboard</span>
               </button>
               <button
                 className={`join-item btn btn-sm ${viewMode === "history" ? "btn-primary" : ""}`}
                 onClick={() => setViewMode("history")}
               >
-                <Clock size={18} />
-                <span className="ml-2">History</span>
+                <Clock data-icon="inline-start" />
+                <span>History</span>
               </button>
               <button
                 className={`join-item btn btn-sm ${viewMode === "timeseries" ? "btn-primary" : ""}`}
                 onClick={() => setViewMode("timeseries")}
               >
-                <TrendingUp size={18} />
-                <span className="ml-2">Time Series</span>
+                <TrendingUp data-icon="inline-start" />
+                <span>Time Series</span>
               </button>
             </div>
           </div>

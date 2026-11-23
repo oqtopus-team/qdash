@@ -1,59 +1,74 @@
 import { describe, expect, it } from "vitest";
 
-import { spectroscopyCorrectionParameterNames } from "../SpectroscopyManualCorrection";
+import {
+  correctionValuesFromPoint,
+  sourceOutputName,
+  spectroscopyCorrectionParameterNames,
+} from "../SpectroscopyManualCorrection";
 
 describe("spectroscopyCorrectionParameterNames", () => {
-  it("restores declared correction fields for failed qubit spectroscopy", () => {
-    expect(
-      spectroscopyCorrectionParameterNames("CheckQubitSpectroscopy", "failed", [], {}),
-    ).toEqual([
-      "coarse_qubit_frequency",
-      "qubit_anharmonicity",
-      "f01_repr_db",
-      "f01_quality_level",
+  it("offers only operational readout parameters for resonator spectroscopy", () => {
+    expect(spectroscopyCorrectionParameterNames("CheckResonatorSpectroscopy")).toEqual([
+      "readout_frequency",
+      "readout_amplitude",
+    ]);
+  });
+
+  it("offers only operational control parameters for qubit spectroscopy", () => {
+    expect(spectroscopyCorrectionParameterNames("CheckQubitSpectroscopy")).toEqual([
+      "control_frequency",
       "coarse_control_amplitude",
     ]);
   });
 
-  it("keeps recorded fields and appends missing declarations after failure", () => {
-    expect(
-      spectroscopyCorrectionParameterNames(
-        "CheckQubitSpectroscopy",
-        "failed",
-        ["coarse_qubit_frequency"],
-        { f01_repr_db: { value: -30 } },
-      ),
-    ).toEqual([
+  it("offers nothing for unsupported tasks", () => {
+    expect(spectroscopyCorrectionParameterNames("CheckT1")).toEqual([]);
+  });
+});
+
+describe("sourceOutputName", () => {
+  it("reads the measured frequency from the source output", () => {
+    expect(sourceOutputName("CheckResonatorSpectroscopy", "readout_frequency")).toBe(
+      "resonator_frequency",
+    );
+    expect(sourceOutputName("CheckQubitSpectroscopy", "control_frequency")).toBe(
       "coarse_qubit_frequency",
-      "f01_repr_db",
-      "qubit_anharmonicity",
-      "f01_quality_level",
-      "coarse_control_amplitude",
-    ]);
+    );
   });
 
-  it("does not add undeclared fields to a completed result", () => {
-    expect(
-      spectroscopyCorrectionParameterNames(
-        "CheckQubitSpectroscopy",
-        "completed",
-        ["coarse_qubit_frequency"],
-        {},
-      ),
-    ).toEqual(["coarse_qubit_frequency"]);
+  it("falls back to the parameter itself", () => {
+    expect(sourceOutputName("CheckResonatorSpectroscopy", "readout_amplitude")).toBe(
+      "readout_amplitude",
+    );
+    expect(sourceOutputName("CheckT1", "t1")).toBe("t1");
   });
+});
 
-  it("normalizes the legacy anharmonicity output name", () => {
+describe("correctionValuesFromPoint", () => {
+  it("maps a resonator point to readout frequency and amplitude", () => {
     expect(
-      spectroscopyCorrectionParameterNames("CheckQubitSpectroscopy", "failed", ["anharmonicity"], {
-        anharmonicity: { value: -0.3, unit: "GHz" },
+      correctionValuesFromPoint("CheckResonatorSpectroscopy", {
+        x: 10.1,
+        y: -20,
       }),
-    ).toEqual([
-      "qubit_anharmonicity",
-      "coarse_qubit_frequency",
-      "f01_repr_db",
-      "f01_quality_level",
-      "coarse_control_amplitude",
-    ]);
+    ).toEqual({
+      readout_frequency: "10.1",
+      readout_amplitude: String(10 ** (-20 / 20)),
+    });
+  });
+
+  it("maps a qubit point to control frequency and a capped coarse amplitude", () => {
+    expect(correctionValuesFromPoint("CheckQubitSpectroscopy", { x: 7.5, y: -30 })).toEqual({
+      control_frequency: "7.5",
+      coarse_control_amplitude: String(10 ** (-20 / 20)),
+    });
+    expect(
+      correctionValuesFromPoint("CheckQubitSpectroscopy", { x: 7.5, y: 0 })
+        .coarse_control_amplitude,
+    ).toBe("1");
+  });
+
+  it("returns nothing for unsupported tasks", () => {
+    expect(correctionValuesFromPoint("CheckT1", { x: 1, y: 2 })).toEqual({});
   });
 });

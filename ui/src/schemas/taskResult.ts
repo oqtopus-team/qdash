@@ -10,6 +10,7 @@ import type { TaskResultEndAt } from './taskResultEndAt';
 import type { TaskResultExecutionId } from './taskResultExecutionId';
 import type { TaskResultFigurePath } from './taskResultFigurePath';
 import type { TaskResultInputParameters } from './taskResultInputParameters';
+import type { TaskResultInvocation } from './taskResultInvocation';
 import type { TaskResultJsonFigurePath } from './taskResultJsonFigurePath';
 import type { TaskResultMessage } from './taskResultMessage';
 import type { TaskResultNote } from './taskResultNote';
@@ -46,5 +47,7 @@ export interface TaskResult {
   end_at?: TaskResultEndAt;
   elapsed_time?: TaskResultElapsedTime;
   task_type?: TaskResultTaskType;
+  /** Planned step and call this result executed; null for older results. */
+  invocation?: TaskResultInvocation;
   default_view?: boolean;
 }

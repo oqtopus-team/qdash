@@ -3,7 +3,7 @@
 from datetime import datetime, timedelta
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, field_serializer, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
 
 from qdash.common.utils.datetime import format_elapsed_time, parse_elapsed_time
 from qdash.datamodel.task import (
@@ -11,6 +11,9 @@ from qdash.datamodel.task import (
     TaskResultInputParameter,
     TaskResultOutputParameter,
 )
+from qdash.datamodel.task_invocation import TaskInvocation
+
+_INVOCATION = "Planned step and call this result executed; null for older results."
 
 
 class TaskResult(BaseModel):
@@ -35,6 +38,7 @@ class TaskResult(BaseModel):
     end_at: datetime | None = None
     elapsed_time: timedelta | None = None
     task_type: str | None = None
+    invocation: TaskInvocation | None = Field(default=None, description=_INVOCATION)
     default_view: bool = True
 
     @field_validator("elapsed_time", mode="before")
@@ -78,6 +82,7 @@ class TaskResultListItem(BaseModel):
     message: str = ""
     has_stack_trace: bool = False
     source_task_id: str | None = None
+    invocation: TaskInvocation | None = Field(default=None, description=_INVOCATION)
     start_at: datetime | None = None
     end_at: datetime | None = None
     elapsed_time: timedelta | None = None

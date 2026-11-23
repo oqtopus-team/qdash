@@ -410,6 +410,8 @@ def test_create_zx90_uses_calibrated_cr_values_and_resolved_control_x180(
             "n1": {"fig": object()},
             "n3": {"fig": object()},
             "fig": object(),
+            "root": 0.27,
+            "amplitude_range": [0.2, 0.3],
         }
     )
     cr_params = {
@@ -422,7 +424,7 @@ def test_create_zx90_uses_calibrated_cr_values_and_resolved_control_x180(
         "cancel_beta": 0.05,
         "rotary_amplitude": 0.06,
         "zx_rotation_rate": 0.004,
-        "ramptime": 24.0,
+        "ramptime": 16.0,
     }
     zx90 = MagicMock(return_value=SimpleNamespace(duration=120.0))
     exp = SimpleNamespace(
@@ -430,6 +432,8 @@ def test_create_zx90_uses_calibrated_cr_values_and_resolved_control_x180(
         get_qubit_label=lambda qid: f"Q0{qid}",
         calibrate_zx90=calibrate_zx90,
         calib_note=SimpleNamespace(get_cr_param=lambda _label: cr_params),
+        qubits={"Q00": SimpleNamespace(frequency=8.0), "Q01": SimpleNamespace(frequency=8.1)},
+        calc_control_amplitude=lambda _qubit, rabi_rate: rabi_rate * 10,
         zx90=zx90,
     )
     monkeypatch.setattr(task, "save_calibration", lambda _backend: None)
@@ -442,7 +446,7 @@ def test_create_zx90_uses_calibrated_cr_values_and_resolved_control_x180(
         "target_qubit": "Q01",
         "x180": {"Q00": control_x180},
         "cr_duration": 128.0,
-        "cr_ramptime": 24.0,
+        "cr_ramptime": 16.0,
         "cr_amplitude": 0.27,
         "cr_phase": 0.12,
         "cr_beta": 0.013,

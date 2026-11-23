@@ -1,5 +1,6 @@
 """The chat opens an investigation from project-scoped logs; source routes are read-only and authenticated."""
 
+import asyncio
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -84,6 +85,8 @@ def test_investigation_opens_with_server_built_context(monkeypatch, user):
     checked = []
 
     def project_context(current_user, project_id):
+        with pytest.raises(RuntimeError, match="no running event loop"):
+            asyncio.get_running_loop()
         checked.append((current_user.username, project_id))
         return SimpleNamespace(project_id=project_id)
 

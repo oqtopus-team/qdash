@@ -47,7 +47,7 @@ def _source(**overrides: Any) -> SimpleNamespace:
         "status": "completed",
         "chip_id": "16Q",
         "qid": "4",
-        "output_parameter_names": ["readout_frequency", "optimal_power"],
+        "output_parameter_names": ["resonator_frequency", "optimal_power", "readout_amplitude"],
     }
     values.update(overrides)
     return SimpleNamespace(**values)
@@ -75,14 +75,18 @@ def test_validate_source_accepts_failed_spectroscopy_result() -> None:
         assert service._validate_source_task(_request(), "project") is source
 
 
-def test_validate_source_accepts_declared_parameter_from_failed_qubit_spectroscopy() -> None:
+@pytest.mark.parametrize("status", ["completed", "failed"])
+@pytest.mark.parametrize("parameter", ["control_frequency", "coarse_control_amplitude"])
+def test_validate_source_accepts_operational_parameters_for_qubit_spectroscopy(
+    status: str, parameter: str
+) -> None:
     service = ManualUpdateService()
     source = _source(
         name="CheckQubitSpectroscopy",
-        status="failed",
-        output_parameter_names=[],
+        status=status,
+        output_parameter_names=["coarse_qubit_frequency", "f01_repr_db"],
     )
-    request = _request(parameters={"coarse_qubit_frequency": {"value": 5.0, "unit": "GHz"}})
+    request = _request(parameters={parameter: {"value": 0.5}})
 
     with patch(
         "qdash.api.services.manual_update_service.TaskResultHistoryDocument.find_one"
@@ -91,60 +95,36 @@ def test_validate_source_accepts_declared_parameter_from_failed_qubit_spectrosco
         assert service._validate_source_task(request, "project") is source
 
 
-def test_validate_source_accepts_canonical_name_for_legacy_anharmonicity_output() -> None:
+@pytest.mark.parametrize(
+    ("name", "parameter"),
+    [
+        ("CheckResonatorSpectroscopy", "resonator_frequency"),
+        ("CheckResonatorSpectroscopy", "optimal_power"),
+        ("CheckResonatorSpectroscopy", "control_frequency"),
+        ("CheckQubitSpectroscopy", "coarse_qubit_frequency"),
+        ("CheckQubitSpectroscopy", "qubit_frequency"),
+        ("CheckQubitSpectroscopy", "anharmonicity"),
+        ("CheckQubitSpectroscopy", "qubit_anharmonicity"),
+        ("CheckQubitSpectroscopy", "readout_frequency"),
+    ],
+)
+def test_validate_source_rejects_measured_and_diagnostic_parameters(
+    name: str, parameter: str
+) -> None:
+    """Measured frequencies and diagnostics are never corrected by hand, even when the
+    source result recorded them as its own outputs."""
     service = ManualUpdateService()
-    source = _source(
-        name="CheckQubitSpectroscopy",
-        status="completed",
-        output_parameter_names=["anharmonicity"],
-    )
-    request = _request(parameters={"qubit_anharmonicity": {"value": -0.3, "unit": "GHz"}})
-
-    with patch(
-        "qdash.api.services.manual_update_service.TaskResultHistoryDocument.find_one"
-    ) as find_one:
-        find_one.return_value.run.return_value = source
-        assert service._validate_source_task(request, "project") is source
-
-
-def test_validate_source_does_not_invent_parameters_for_completed_qubit_spectroscopy() -> None:
-    service = ManualUpdateService()
-    source = _source(
-        name="CheckQubitSpectroscopy",
-        status="completed",
-        output_parameter_names=[],
-    )
+    source = _source(name=name, status="failed", output_parameter_names=[parameter])
 
     with (
         patch(
             "qdash.api.services.manual_update_service.TaskResultHistoryDocument.find_one"
         ) as find_one,
-        pytest.raises(HTTPException, match="Unknown source output parameter"),
+        pytest.raises(HTTPException, match="not correctable"),
     ):
         find_one.return_value.run.return_value = source
         service._validate_source_task(
-            _request(parameters={"coarse_qubit_frequency": {"value": 5.0, "unit": "GHz"}}),
-            "project",
-        )
-
-
-def test_validate_source_rejects_unknown_parameter_from_failed_qubit_spectroscopy() -> None:
-    service = ManualUpdateService()
-    source = _source(
-        name="CheckQubitSpectroscopy",
-        status="failed",
-        output_parameter_names=[],
-    )
-
-    with (
-        patch(
-            "qdash.api.services.manual_update_service.TaskResultHistoryDocument.find_one"
-        ) as find_one,
-        pytest.raises(HTTPException, match="Unknown source output parameter"),
-    ):
-        find_one.return_value.run.return_value = source
-        service._validate_source_task(
-            _request(parameters={"unsupported": {"value": 5.0, "unit": "GHz"}}),
+            _request(parameters={parameter: {"value": 5.0, "unit": "GHz"}}),
             "project",
         )
 
@@ -170,18 +150,18 @@ def test_validate_source_rejects_unrelated_task(source: SimpleNamespace, detail:
         service._validate_source_task(_request(), "project")
 
 
-def test_validate_source_rejects_unknown_output_parameter() -> None:
+def test_validate_source_rejects_unknown_parameter() -> None:
     service = ManualUpdateService()
 
     with (
         patch(
             "qdash.api.services.manual_update_service.TaskResultHistoryDocument.find_one"
         ) as find_one,
-        pytest.raises(HTTPException, match="Unknown source output parameter"),
+        pytest.raises(HTTPException, match="not correctable"),
     ):
         find_one.return_value.run.return_value = _source()
         service._validate_source_task(
-            _request(parameters={"qubit_frequency": {"value": 5.0, "unit": "GHz"}}),
+            _request(parameters={"unsupported": {"value": 5.0, "unit": "GHz"}}),
             "project",
         )
 
@@ -522,15 +502,15 @@ def test_failure_after_database_write_restores_database_and_yaml(manual_backend)
     }
 
 
-def test_database_only_diagnostic_does_not_require_yaml(manual_backend):
+def test_database_only_parameter_does_not_require_yaml(manual_backend):
     service, path = manual_backend
     path.unlink()
     service.update_parameters(
-        _request(parameters={"coarse_qubit_frequency": {"value": 4.2}}),
+        _request(parameters={"coarse_control_amplitude": {"value": 0.42}}),
         "project",
         "tester",
     )
-    assert _qubit_data()["coarse_qubit_frequency"]["value"] == 4.2
+    assert _qubit_data()["coarse_control_amplitude"]["value"] == 0.42
 
 
 def test_foreign_project_cannot_change_yaml(manual_backend):

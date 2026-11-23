@@ -27,7 +27,7 @@
 
     <rect x="645" y="20" width="170" height="56" rx="8" class="qd-ui"/>
     <text x="730" y="44" class="qd-title">Task result chat</text>
-    <text x="730" y="62" class="qd-sub">Ask AI · sidebar</text>
+    <text x="730" y="62" class="qd-sub">Ask Agent · sidebar</text>
 
     <!-- Row 2: MongoDB, API -->
     <path d="M25,158 v40 a85,8 0 0,0 170,0 v-40" class="qd-data"/>

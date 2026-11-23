@@ -3,8 +3,10 @@
 import { useEffect, useState } from "react";
 import { Check, Copy, Eye, EyeOff, Info, Loader2, Play } from "lucide-react";
 
+import { useToast } from "@/components/ui/Toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProject } from "@/contexts/ProjectContext";
+import { copyText } from "@/lib/utils/clipboard";
 
 type CurlMode = "standard" | "cloudflare";
 
@@ -60,6 +62,7 @@ function formatResponseBody(responseText: string, contentType: string) {
 export function ApiAccessTokenPanel() {
   const { accessToken } = useAuth();
   const { projectId } = useProject();
+  const toast = useToast();
   const [copied, setCopied] = useState(false);
   const [copiedCurl, setCopiedCurl] = useState(false);
   const [copiedResponse, setCopiedResponse] = useState(false);
@@ -113,20 +116,35 @@ export function ApiAccessTokenPanel() {
 
   const handleCopyToken = async () => {
     if (!accessToken) return;
-    await navigator.clipboard.writeText(accessToken);
+    try {
+      await copyText(accessToken);
+    } catch {
+      toast.error("Failed to copy token");
+      return;
+    }
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
   const handleCopyCurl = async () => {
-    await navigator.clipboard.writeText(curlCommand);
+    try {
+      await copyText(curlCommand);
+    } catch {
+      toast.error("Failed to copy curl command");
+      return;
+    }
     setCopiedCurl(true);
     setTimeout(() => setCopiedCurl(false), 2000);
   };
 
   const handleCopyResponse = async () => {
     if (!testResult) return;
-    await navigator.clipboard.writeText(testResult.responseBody);
+    try {
+      await copyText(testResult.responseBody);
+    } catch {
+      toast.error("Failed to copy response");
+      return;
+    }
     setCopiedResponse(true);
     setTimeout(() => setCopiedResponse(false), 2000);
   };
@@ -193,14 +211,18 @@ export function ApiAccessTokenPanel() {
               />
               <div className="flex gap-2">
                 <button className="btn btn-sm flex-1" onClick={() => setShowToken(!showToken)}>
-                  {showToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  {showToken ? (
+                    <EyeOff data-icon="inline-start" />
+                  ) : (
+                    <Eye data-icon="inline-start" />
+                  )}
                   <span className="hidden sm:inline">{showToken ? "Hide" : "Show"}</span>
                 </button>
                 <button
                   className={`btn btn-sm flex-1 ${copied ? "btn-success" : "btn-primary"}`}
                   onClick={handleCopyToken}
                 >
-                  {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                  {copied ? <Check data-icon="inline-start" /> : <Copy data-icon="inline-start" />}
                   <span className="hidden sm:inline">{copied ? "Copied!" : "Copy"}</span>
                 </button>
               </div>
@@ -308,9 +330,9 @@ export function ApiAccessTokenPanel() {
                   type="button"
                 >
                   {isTestingCurl ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <Loader2 data-icon="inline-start" className="animate-spin" />
                   ) : (
-                    <Play className="h-4 w-4" />
+                    <Play data-icon="inline-start" />
                   )}
                   <span className="hidden sm:inline">Run</span>
                 </button>
@@ -319,7 +341,11 @@ export function ApiAccessTokenPanel() {
                   onClick={handleCopyCurl}
                   type="button"
                 >
-                  {copiedCurl ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                  {copiedCurl ? (
+                    <Check data-icon="inline-start" />
+                  ) : (
+                    <Copy data-icon="inline-start" />
+                  )}
                   <span className="hidden sm:inline">{copiedCurl ? "Copied!" : "Copy"}</span>
                 </button>
               </div>
@@ -346,7 +372,11 @@ export function ApiAccessTokenPanel() {
                     onClick={handleCopyResponse}
                     type="button"
                   >
-                    {copiedResponse ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                    {copiedResponse ? (
+                      <Check data-icon="inline-start" />
+                    ) : (
+                      <Copy data-icon="inline-start" />
+                    )}
                     <span className="hidden sm:inline">{copiedResponse ? "Copied!" : "Copy"}</span>
                   </button>
                 </div>

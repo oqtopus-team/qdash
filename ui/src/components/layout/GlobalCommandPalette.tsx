@@ -1,6 +1,18 @@
 "use client";
 
-import { Braces, Check, FolderKanban, Gauge, Inbox, Link, Palette, Search } from "lucide-react";
+import {
+  Bot,
+  Braces,
+  Check,
+  FolderKanban,
+  Gauge,
+  Inbox,
+  Link,
+  MessageSquarePlus,
+  Palette,
+  Search,
+  SquarePen,
+} from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -16,12 +28,28 @@ import {
   CommandList,
 } from "@/components/ui/Command";
 import { useAuth } from "@/contexts/AuthContext";
+import { useChatDock } from "@/contexts/ChatDockContext";
 import { useProject } from "@/contexts/ProjectContext";
 import { useMetricsConfig } from "@/hooks/useMetricsConfig";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AVAILABLE_THEMES } from "@/constants/themes";
 import { useToast } from "@/components/ui/Toast";
+import { copyText } from "@/lib/utils/clipboard";
 
+/**
+ * The new-thread form. From the forum list it carries the list filters, as the forum's own New
+ * Thread button does, so the created thread links back to the same list.
+ */
+function newThreadHref(pathname: string): string {
+  const listQuery = pathname === "/forum" ? window.location.search.replace(/^\?/, "") : "";
+  return listQuery ? `/forum/new?from=${encodeURIComponent(listQuery)}` : "/forum/new";
+}
+
+/**
+ * The app-wide command palette (Ctrl/Cmd+K). Create actions come first, then the current page's
+ * commands, pages, other actions, projects, and themes. A create action only opens the existing
+ * form; nothing is saved until the user submits it there.
+ */
 export function GlobalCommandPalette() {
   const router = useRouter();
   const pathname = usePathname();
@@ -30,12 +58,15 @@ export function GlobalCommandPalette() {
   const { canEdit, projects, projectId, switchProject } = useProject();
   const { theme, setTheme } = useTheme();
   const toast = useToast();
+  const { openGeneralChat } = useChatDock();
   const [shortcut, setShortcut] = useState("Ctrl K");
   const [open, setOpen] = useState(false);
-  const isDashboard = pathname === "/dashboard";
+  const isOverview = pathname === "/overview";
   const isMetrics = pathname === "/metrics";
   const isTasks = pathname === "/tasks";
-  const hasMetricCommands = isDashboard || isMetrics;
+  // The /chat page is the chat itself and hides the chat sidebar, so opening it there shows nothing.
+  const isChatPage = pathname === "/chat";
+  const hasMetricCommands = isOverview || isMetrics;
   const { qubitMetrics, couplingMetrics } = useMetricsConfig(hasMetricCommands);
   const { data: taskFileSettings } = useGetTaskFileSettings({
     query: { enabled: isTasks, staleTime: 60_000 },
@@ -77,9 +108,15 @@ export function GlobalCommandPalette() {
     router.push(href);
   };
 
+  // Resumes the current general chat in the sidebar, or starts one, as the Ask Agent tab does.
+  const openAgentChat = () => {
+    setOpen(false);
+    openGeneralChat();
+  };
+
   const copyPageLink = async () => {
     try {
-      await navigator.clipboard.writeText(window.location.href);
+      await copyText(window.location.href);
       setOpen(false);
       toast.success("Page link copied");
     } catch {
@@ -109,7 +146,7 @@ export function GlobalCommandPalette() {
       selectMetricsPageMetric(metricType, metricKey);
       return;
     }
-    jumpToMetric(`dashboard-${metricType}-metric-${metricKey}`);
+    jumpToMetric(`overview-${metricType}-metric-${metricKey}`);
   };
 
   const selectTask = (taskName: string) => {
@@ -127,10 +164,10 @@ export function GlobalCommandPalette() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="btn btn-ghost btn-sm gap-2 text-base-content/60"
+        className="btn btn-ghost btn-sm text-base-content/60"
         aria-label="Open navigation search"
       >
-        <Search size={15} aria-hidden="true" />
+        <Search data-icon="inline-start" aria-hidden="true" />
         <span className="hidden sm:inline">Commands</span>
         <kbd className="hidden rounded border border-base-300 bg-base-200 px-1.5 py-0.5 text-xs font-normal md:inline">
           {shortcut}
@@ -141,20 +178,81 @@ export function GlobalCommandPalette() {
         open={open}
         onOpenChange={setOpen}
         title="Commands"
-        description="Search pages, actions, projects, and themes. Use arrow keys to choose and Enter to run."
+        description="Create workflows and threads, or search pages, actions, projects, and themes. Use arrow keys to choose and Enter to run."
       >
         <Command loop label="QDash navigation">
           <CommandInput
             placeholder={
               hasMetricCommands
-                ? "Search pages, metrics, and actions..."
+                ? "Type a command or search metrics"
                 : isTasks
-                  ? "Search pages, tasks, and actions..."
-                  : "Search pages and actions..."
+                  ? "Type a command or search tasks"
+                  : "Type a command or search"
             }
           />
           <CommandList>
             <CommandEmpty>No matching results</CommandEmpty>
+            <CommandGroup heading="Create">
+              {canEdit && (
+                <CommandItem
+                  value="Create new workflow"
+                  keywords={["flow", "new", "add", "editor", "ワークフロー", "作成"]}
+                  onSelect={() => navigate("/workflow/new")}
+                >
+                  <SquarePen size={15} className="shrink-0 opacity-60" aria-hidden="true" />
+                  <span>Create new workflow</span>
+                  <span className="ml-auto text-xs text-base-content/40">Workflow</span>
+                </CommandItem>
+              )}
+              <CommandItem
+                value="Create new thread"
+                keywords={["forum", "post", "discussion", "new", "スレッド", "投稿", "作成"]}
+                onSelect={() => navigate(newThreadHref(pathname))}
+              >
+                <MessageSquarePlus size={15} className="shrink-0 opacity-60" aria-hidden="true" />
+                <span>Create new thread</span>
+                <span className="ml-auto text-xs text-base-content/40">Forum</span>
+              </CommandItem>
+            </CommandGroup>
+            <CommandGroup heading="Actions">
+              {!isChatPage && (
+                <CommandItem
+                  value="Open agent chat"
+                  keywords={[
+                    "agent",
+                    "chat",
+                    "copilot",
+                    "ai",
+                    "ask",
+                    "assistant",
+                    "チャット",
+                    "エージェント",
+                  ]}
+                  onSelect={openAgentChat}
+                >
+                  <Bot size={15} className="shrink-0 opacity-60" aria-hidden="true" />
+                  <span>Open agent chat</span>
+                </CommandItem>
+              )}
+              <CommandItem
+                value="Open inbox"
+                keywords={["notifications", "inbox", "mentions", "通知", "受信箱"]}
+                onSelect={() => navigate("/inbox")}
+              >
+                <Inbox size={15} className="shrink-0 opacity-60" aria-hidden="true" />
+                <span>Open inbox</span>
+              </CommandItem>
+              <CommandItem
+                value="Copy current page link"
+                keywords={["url", "share", "clipboard", "リンク", "コピー", "共有"]}
+                onSelect={() => {
+                  void copyPageLink();
+                }}
+              >
+                <Link size={15} className="shrink-0 opacity-60" aria-hidden="true" />
+                <span>Copy current page link</span>
+              </CommandItem>
+            </CommandGroup>
             {isTasks && taskCommands.length > 0 && (
               <CommandGroup heading="Open task">
                 {taskCommands.map((task) => (
@@ -174,12 +272,12 @@ export function GlobalCommandPalette() {
               </CommandGroup>
             )}
             {hasMetricCommands && (qubitMetrics.length > 0 || couplingMetrics.length > 0) && (
-              <CommandGroup heading={isMetrics ? "Switch metric" : "Dashboard metrics"}>
+              <CommandGroup heading={isMetrics ? "Switch metric" : "Overview metrics"}>
                 {qubitMetrics.map((metric) => (
                   <CommandItem
                     key={`qubit-${metric.key}`}
                     value={`${metric.title} qubit metric`}
-                    keywords={[metric.key, "dashboard", "qubit"]}
+                    keywords={[metric.key, "overview", "qubit"]}
                     onSelect={() => selectMetric("qubit", metric.key)}
                   >
                     <Gauge size={15} className="shrink-0 opacity-60" aria-hidden="true" />
@@ -191,7 +289,7 @@ export function GlobalCommandPalette() {
                   <CommandItem
                     key={`coupling-${metric.key}`}
                     value={`${metric.title} coupling metric`}
-                    keywords={[metric.key, "dashboard", "coupling"]}
+                    keywords={[metric.key, "overview", "coupling"]}
                     onSelect={() => selectMetric("coupling", metric.key)}
                   >
                     <Gauge size={15} className="shrink-0 opacity-60" aria-hidden="true" />
@@ -221,26 +319,6 @@ export function GlobalCommandPalette() {
                 </CommandGroup>
               );
             })}
-            <CommandGroup heading="Actions">
-              <CommandItem
-                value="Open inbox"
-                keywords={["notifications", "inbox", "mentions", "通知", "受信箱"]}
-                onSelect={() => navigate("/inbox")}
-              >
-                <Inbox size={15} className="shrink-0 opacity-60" aria-hidden="true" />
-                <span>Open inbox</span>
-              </CommandItem>
-              <CommandItem
-                value="Copy current page link"
-                keywords={["url", "share", "clipboard", "リンク", "コピー", "共有"]}
-                onSelect={() => {
-                  void copyPageLink();
-                }}
-              >
-                <Link size={15} className="shrink-0 opacity-60" aria-hidden="true" />
-                <span>Copy current page link</span>
-              </CommandItem>
-            </CommandGroup>
             {projects.length > 1 && (
               <CommandGroup heading="Switch project">
                 {projects.map((project) => (
@@ -283,15 +361,20 @@ export function GlobalCommandPalette() {
               ))}
             </CommandGroup>
           </CommandList>
-          <div className="flex gap-4 border-t border-base-300 px-3 py-2 text-xs text-base-content/60">
-            <span>
-              <kbd>↑ ↓</kbd> Navigate
+          {/* Keyboard hints; touch layouts have no keyboard to hint at. */}
+          <div className="hidden items-center gap-4 border-t border-base-content/10 px-4 py-2 text-xs text-base-content/50 sm:flex">
+            <span className="flex items-center gap-1.5">
+              <kbd className="kbd kbd-xs">↑</kbd>
+              <kbd className="kbd kbd-xs">↓</kbd>
+              Navigate
             </span>
-            <span>
-              <kbd>Enter</kbd> Run
+            <span className="flex items-center gap-1.5">
+              <kbd className="kbd kbd-xs">Enter</kbd>
+              Run
             </span>
-            <span>
-              <kbd>Esc</kbd> Close
+            <span className="flex items-center gap-1.5">
+              <kbd className="kbd kbd-xs">Esc</kbd>
+              Close
             </span>
           </div>
         </Command>

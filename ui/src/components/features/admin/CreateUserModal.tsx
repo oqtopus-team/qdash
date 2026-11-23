@@ -6,6 +6,8 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/Dialog";
+import { useToast } from "@/components/ui/Toast";
+import { copyText } from "@/lib/utils/clipboard";
 
 type CreateUserModalProps = {
   onClose: () => void;
@@ -33,6 +35,7 @@ type CreateUserFormData = z.output<typeof createUserSchema>;
 export function CreateUserModal({ onClose, onSave, isLoading, error }: CreateUserModalProps) {
   const [temporaryPassword, setTemporaryPassword] = useState<string | null>(null);
   const [createdUsername, setCreatedUsername] = useState("");
+  const toast = useToast();
   const [copied, setCopied] = useState(false);
   const {
     register,
@@ -65,7 +68,12 @@ export function CreateUserModal({ onClose, onSave, isLoading, error }: CreateUse
 
   const handleCopyPassword = async () => {
     if (!temporaryPassword) return;
-    await navigator.clipboard.writeText(temporaryPassword);
+    try {
+      await copyText(temporaryPassword);
+    } catch {
+      toast.error("Failed to copy password");
+      return;
+    }
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -168,20 +176,18 @@ export function CreateUserModal({ onClose, onSave, isLoading, error }: CreateUse
                 {...register("organization")}
               />
             </div>
-            <label className="block cursor-pointer rounded-lg border border-base-300 bg-base-100 p-3">
-              <div className="flex items-start gap-3">
-                <input
-                  type="checkbox"
-                  className="checkbox checkbox-primary mt-1"
-                  {...register("createDefaultProject")}
-                />
-                <div>
-                  <div className="font-medium">Create default project</div>
-                  <div className="text-sm text-base-content/60">
-                    Provision a personal project for this user and set it as their default project.
-                  </div>
-                </div>
-              </div>
+            <label className="choice-field gap-3 rounded-lg border border-base-300 bg-base-100 p-3">
+              <input
+                type="checkbox"
+                className="checkbox checkbox-primary"
+                {...register("createDefaultProject")}
+              />
+              <span>
+                <span className="block font-medium">Create default project</span>
+                <span className="block text-sm text-base-content/60">
+                  Provision a personal project for this user and set it as their default project.
+                </span>
+              </span>
             </label>
             <div className="modal-action">
               <button type="button" className="btn" onClick={onClose} disabled={isLoading}>

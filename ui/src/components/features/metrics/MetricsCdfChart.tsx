@@ -190,14 +190,14 @@ export function MetricsCdfChart(props: MetricsCdfChartProps) {
         </button>
         <button
           type="button"
-          className="btn btn-xs btn-ghost ml-auto gap-1"
+          className="btn btn-xs btn-ghost ml-auto"
           onClick={() => setIsCompact((compact) => !compact)}
           title={isCompact ? "Expand width" : "Compact width"}
         >
           {isCompact ? (
-            <MoveHorizontal className="h-3.5 w-3.5" aria-hidden="true" />
+            <MoveHorizontal data-icon="inline-start" aria-hidden="true" />
           ) : (
-            <Minimize2 className="h-3.5 w-3.5" aria-hidden="true" />
+            <Minimize2 data-icon="inline-start" aria-hidden="true" />
           )}
           <span className="text-xs">{isCompact ? "Expand" : "Compact"}</span>
         </button>

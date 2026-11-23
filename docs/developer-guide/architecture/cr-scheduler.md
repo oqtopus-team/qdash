@@ -1,7 +1,7 @@
 # CR Gate Scheduler
 
-`CRScheduler` converts valid chip couplings into sequential groups of CR operations that are safe
-to run in parallel within each group.
+`CRScheduler` converts valid chip couplings into sequential groups of CR operations that satisfy
+its modeled wiring constraints.
 
 ## Inputs and Output
 
@@ -43,7 +43,7 @@ flowchart TD
     candidates -->|Yes| filterCandidates[Keep pairs with two candidates]
     candidates -->|No| direction
     filterCandidates --> direction[Select CR direction]
-    direction --> muxFilter[Remove pairs missing MUX mappings]
+    direction --> muxFilter[Remove pairs with unwired MUX qubits]
     muxFilter --> split{Same MUX?}
     split -->|Yes| fast[Intra-MUX pairs]
     split -->|No| slow[Inter-MUX pairs]
@@ -65,17 +65,111 @@ Direction selection uses this priority:
 survives direction or MUX filtering, `generate()` raises `ValueError` instead of returning an empty
 schedule.
 
-## Conflict Invariants
+## Explicit Pairs
 
-Two CR pairs receive different colors when they:
+`schedule_pairs(pairs, max_parallel_ops=10, coloring_strategy="largest_first")` groups a caller's
+directed `(control, target)` pairs without the candidate, direction, or MUX-membership filters.
+It never adds, drops, or reverses a pair, so a run calibrates exactly the selection. It raises
+`ValueError` when the list is empty or repeats a pair, when a pair's exact `control-target` ID is
+not a repository coupling, or when either qubit is neither a member of a wired topology MUX nor a
+standalone qubit. MUX membership comes from the chip topology, as in `generate()`, and a chip whose
+topology declares no MUX needs no `wiring.yaml`. Valid pairs then go through the same
+intra/inter-MUX split, conflict coloring, and chunking as `generate()`.
+`metadata["direction_method"]` and `filtering_stats["direction_method"]` are `explicit`.
 
-- share a qubit;
-- use any of the same MUXes; or
-- use MUXes whose wiring entries share a control, read-in, read-out, or pump module.
+## Manual Rounds
 
-The final chunking step can reduce parallelism but cannot introduce a conflict. Execution code must
-preserve group order: the scheduler deliberately places all intra-MUX groups before inter-MUX
-groups.
+`CustomTwoQubit` and `TwoQubitCalibration` take `execution_mode` (`TwoQubitExecutionMode` in
+`datamodel/two_qubit_execution_mode.py`): `automatic`, the default, keeps the behavior in
+[Workflow Integration](#workflow-integration), and `manual` runs the step's `rounds` of directed
+pairs without `CRScheduler`, without an earlier `cr_schedule`, and without chunking.
+`max_parallel_ops` now defaults to `None`, meaning 10 for automatic steps, so a manual step that
+sets it is rejected instead of silently ignoring or applying it. A spec treats an omitted cap and
+`null` alike and rejects a manual step only when the cap is a number. `pair_round_issues()` in `common/manual_rounds.py` applies the
+`schedule_pairs()` membership checks (exact `control-target` coupling ID, qubits that are wired
+MUX members or standalone qubits of the chip topology, with membership from the same
+`MuxMapping`) and the
+conflict rules of `group_cr_pairs_by_conflict()` (shared MUX, MUXes in `mux_conflicts()`, which
+`build_mux_conflict_map()` now delegates to) to each written round; shared qubits and repeated
+pairs fail in `parse_pair_rounds()`. Unlike automatic grouping, manual rounds may mix intra- and
+inter-MUX pairs. A pair with a standalone qubit must be alone in its round, as
+`schedule_pairs()` never groups it. `pair_candidate_issues()` requires both qubits of each pair among the current
+candidates. The user procedure is
+[Write Two-Qubit Rounds](../../user-guide/manual-execution-rounds.md#write-two-qubit-rounds).
+
+## Conflict Graph and Groups
+
+`group_cr_pairs_by_conflict()` builds a conflict graph whose nodes are directed pairs, not qubits,
+colors it greedily, and turns each color into one or more groups. An edge means the two pairs
+must not share a group; it is not a coupling. The checks run in this order, and the first match
+adds the edge:
+
+1. The pairs share a qubit.
+2. Either pair contains a qubit without a known MUX.
+3. Any MUX of one pair equals any MUX of the other, even with four different qubits.
+4. A MUX of one pair conflicts with a MUX of the other in the MUX conflict map.
+
+<Diagram name="cr-schedule-conflict-graph" caption="Example fixture with max_parallel_ops = 4: selected pairs on a schematic wiring, their conflict graph with the graph color of each pair, and the execution groups G1 to G4. Colors mark execution groups, not graph colors." />
+
+`build_qubit_to_mux_map()` takes MUX membership from the chip topology's MUX mapping and joins
+it to the wiring by MUX ID, so a wired MUX the topology does not define has no qubits. A chip
+without a topology keeps the legacy convention: qubits `4N` to `4N + 3` belong to MUX `N`.
+`CRScheduler` resolves that mapping from the chip's `topology_id` only when the caller passes no
+`mux_mapping`. Workflow callers (`CustomTwoQubit`, `GenerateCRSchedule`, `TwoQubitCalibration`
+and the coupling target override) pass the session's mapping, which the reservation and workers
+already use, so a topology edited during the run does not change MUX membership in the schedule.
+Coupling direction and `checkerboard_cr` geometry still load the current topology; this is not
+a snapshot of the full topology.
+`build_mux_conflict_map()` makes two MUXes conflict when their entries claim a common module
+through `mux_module_resources()` in `src/qdash/common/wiring_resources.py`. That function reads
+only `read_out` and `ctrl`; other wiring fields, such as read-in or pump channels, do not create
+conflicts. A module is the part of a channel ID before the first `:`, or before the first `-`
+when the ID has no `:`, so `C1:0` and `C1:2` share module `C1`. Readout and control modules are
+compared separately: a readout module and a control module with the same name do not conflict.
+These rules cover the shared resources the scheduler models, not every hardware constraint.
+With `<box ID>:<port>` wiring from the `quel1` or `quel3` template, the module is the whole box ID,
+so `quel3-02-a01:4` and `quel3-02-a01:2` share module `quel3-02-a01`, and two MUXes with `ctrl`
+ports on the same box conflict. The rules do not model finer QuEL-3 port independence, read-in or
+pump ports, or a collision between a control port and a readout port of the same box; see
+[Check Parallel Execution on QuEL-3](../../user-guide/setup/qubex-backend.md#check-parallel-execution-on-quel-3).
+The same function feeds hardware reservations between executions, which are separate from the
+grouping inside one execution; see
+[Hardware Reservations](../workflow/engine-architecture.md#hardware-reservations).
+
+A standalone qubit (one the topology lists in no MUX) has no wiring row, so the scheduler does
+not know which resources it shares. Its pairs are kept but always run alone in their group. A pair
+is intra-MUX only when both qubits are in the same declared MUX; two standalone qubits are not.
+`MuxMembershipFilter` keeps standalone pairs through `FilterContext.standalone_qids`.
+
+`split_fast_slow_pairs()` puts pairs whose two qubits share a MUX in the intra-MUX list and the
+rest in the inter-MUX list. Each list gets its own graph and coloring, and every intra-MUX group
+precedes every inter-MUX group. Pairs from different lists are never compared because they can
+never share a group. Execution code must preserve this group order.
+
+`nx.coloring.greedy_color()` uses `coloring_strategy`, `largest_first` by default. Greedy coloring
+does not guarantee the minimum number of colors, and another strategy can produce different
+groups for the same pairs. Colors become groups in color order, and pairs keep the order in
+which the coloring visited them. `max_parallel_ops` then cuts each color into consecutive chunks
+of at most that many pairs. Chunking only splits a conflict-free color, so it cannot introduce a
+conflict; the remainder becomes its own group even when its pairs conflict with nothing.
+
+In the diagram, `4-5` and `8-9` conflict through shared control module `C1`. `3-2` conflicts
+with `0-1` through a MUX and with `3-1` through qubit 3. The inter-MUX pair `7-10` runs last.
+At `max_parallel_ops=4`, the three intra-MUX colors and one inter-MUX color produce:
+
+```text
+[[("0", "1"), ("4", "5"), ("12", "13"), ("16", "17")], [("3", "1"), ("8", "9")], [("3", "2")], [("7", "10")]]
+```
+
+At a cap of 2, the first group splits in half, producing five groups.
+
+`tests/qdash/workflow/engine/scheduler/test_cr_schedule_docs_example.py` recomputes these groups,
+the groups at a cap of 2, the colors, and the edges with `schedule_pairs()`, the plugin
+schedulers, and the helpers. The fixture lives in `docs/demos/two_qubit_cr_schedule.py`, which
+also draws the execution GIF in
+[Schedule Two-Qubit Calibration](../../user-guide/creating-workflows.md#schedule-two-qubit-calibration)
+and its copy in the workflow editor's **Execution help**. Update the diagram, the script, and the
+test together.
 
 ## Configurable Pipeline
 
@@ -90,9 +184,11 @@ The built-in filters are `CandidateQubitFilter`, `MuxMembershipFilter`,
 `MuxConflictScheduler` and `IntraThenInterMuxScheduler`.
 
 When no plugins are supplied, `generate_with_plugins()` uses only the directionality filter and an
-intra-then-inter MUX conflict scheduler capped at 10 operations per group. Unlike `generate()`, its
-default filter pipeline does not add candidate or explicit MUX-membership filters. Callers that
-need those policies must supply them.
+intra-then-inter MUX conflict scheduler capped at 10 operations per group. Its default filter
+pipeline does not add a candidate filter; callers that need one must supply it. Whatever the
+filters, `generate_with_plugins()` then drops any pair with a qubit that is neither a wired MUX
+member nor a standalone qubit of the topology, as `generate()` does, and reports the count as
+`mux_filtered_out` in `filtering_stats`.
 
 Custom filters must preserve the `control-target` string format. Custom schedulers must not place
 conflicting pairs together and should return enough metadata to identify their policy in stored
@@ -102,18 +198,26 @@ diagnostics.
 
 `GenerateCRSchedule` reads `StepContext.candidate_qids`, stores `parallel_groups` in
 `StepContext.metadata["cr_schedule"]`, and publishes the flattened coupling IDs in
-`candidate_couplings`. `SetCRSchedule` supplies an explicit schedule through the same metadata key.
-`MuxTargets` and `QubitTargets` also use `CRScheduler` to resolve eligible coupling IDs.
+`candidate_couplings`. With `CouplingTargets`, it calls `schedule_pairs()` on only the listed
+directed pairs whose qubits remain candidates. `inverse=True` is rejected for these targets,
+because their direction is explicit. With `MuxTargets` or `QubitTargets`, it generates pairs
+from the current candidate qubits. A per-run pair override replaces the `CouplingTargets` before
+the pipeline starts; see [Per-run Target Overrides](../workflow/services.md#per-run-target-overrides).
 
 `CustomTwoQubit` and `TwoQubitCalibration` reuse the stored schedule when present; otherwise they
-generate one internally. When reusing a schedule, their own `max_parallel_ops` does not regroup
-it. Set direction and parallelism on `GenerateCRSchedule` before execution. Changing candidate
-qubits or calibration values after generation does not refresh the stored groups: place filters
-before schedule generation, or regenerate the schedule after a change.
+schedule pairs using the same target-dependent rules. Reuse drops pairs whose qubits were
+filtered out since generation and drops empty groups, without regrouping the remaining pairs.
+Their own `max_parallel_ops` does not change stored groups: set the cap on `GenerateCRSchedule`,
+or regenerate after a change. An empty generated schedule replaces any previously stored groups.
+Manual steps validate and run their own rounds and ignore stored automatic groups.
 
-The execution steps run groups sequentially and submit coupling pairs within a group to isolated
-worker processes. Each worker runs its pair's tasks sequentially; there is no barrier between
-the same task on different pairs. See [State Between Steps](../workflow/quickstart.md#state-between-steps)
+The execution steps run groups sequentially through `_run_coupling_groups()` and submit the
+coupling pairs of a group to isolated worker processes with
+`run_coupling_calibrations_parallel()`. Each worker runs its pair's tasks sequentially; there is
+no barrier between the same task on different pairs, and the next group starts after every pair
+of the current group returns. The Dask cluster for a group has `_DEFAULT_DASK_WORKERS` (16)
+processes, so `max_parallel_ops` bounds the pairs per group but does not guarantee that they all
+run at once. See [State Between Steps](../workflow/quickstart.md#state-between-steps)
 for context, calibration inputs, and worker settings. For the application procedure, see
 [Schedule Two-Qubit Calibration](../../user-guide/creating-workflows.md#schedule-two-qubit-calibration).
 
@@ -128,6 +232,8 @@ the scheduler.
 - `workflow/engine/scheduler/plugins/` owns the filter and scheduling interfaces.
 - `tests/qdash/workflow/engine/scheduler/test_cr_scheduler.py` covers the standard pipeline.
 - `tests/qdash/workflow/engine/scheduler/test_plugins.py` covers configurable pipelines.
+- `tests/qdash/workflow/engine/scheduler/test_cr_schedule_docs_example.py` keeps the docs example
+  in step with the scheduler.
 
-Run the two scheduler test modules after changing this design. Wiring resource semantics are shared
+Run the scheduler test modules after changing this design. Wiring resource semantics are shared
 with [Square Lattice Topology](./square-lattice-topology.md).

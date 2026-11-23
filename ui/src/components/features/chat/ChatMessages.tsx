@@ -1,22 +1,30 @@
 "use client";
 
-import React, { memo, useCallback, useEffect, useRef, useState } from "react";
+import React, { memo, useCallback, useEffect, useId, useRef, useState } from "react";
 import {
   AlertTriangle,
+  Bug,
   Check,
   CheckCircle2,
+  CircleSlash,
   Copy,
+  Download,
+  ExternalLink,
+  GitBranch,
   ImageIcon,
+  LoaderCircle,
   Pencil,
   RotateCcw,
   Square,
+  StepForward,
   ThumbsDown,
   ThumbsUp,
   XCircle,
 } from "lucide-react";
 import { ChatPlotlyChart } from "@/components/features/chat/ChatPlotlyChart";
+import { ChatUiBlock } from "@/components/features/chat/ChatUiBlock";
 import { ChatMarkdown } from "@/components/features/chat/ChatMarkdown";
-import { ChatTraceSummary, LiveTrace } from "@/components/features/chat/ChatTrace";
+import { ChatTraceSummary, LiveTrace, TurnActivity } from "@/components/features/chat/ChatTrace";
 import { FigureStrip, figuresInSteps } from "@/components/features/chat/ChatFigures";
 import {
   ApprovalCard,
@@ -25,11 +33,20 @@ import {
   type InteractionState,
 } from "@/components/features/chat/ChatInteractionCards";
 import { useOptionalChatDock } from "@/contexts/ChatDockContext";
-import { matchesEditTarget } from "@/lib/copilotEditTarget";
+import { editTargetCode } from "@/lib/copilotEditTarget";
 import { ImagePreviewDialog } from "@/components/ui/ImagePreviewDialog";
-import { Loader } from "@/components/ui/Loader";
-import { QdashBotAvatar } from "@/components/ui/UserAvatar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
+import { useToast } from "@/components/ui/Toast";
+import { copyText } from "@/lib/utils/clipboard";
+import { BUG_REPORT_URL, buildChatErrorReport, classifyChatError } from "@/lib/chatErrorReport";
+import {
+  answerFileName,
+  answerMarkdown,
+  downloadText,
+  hasAnswerMarkdown,
+  writtenFiles,
+  type WrittenFile,
+} from "@/lib/chatDownloads";
 import { answerStartIndex } from "@/lib/copilotChatStream";
 import { answerFeedback } from "@/hooks/useCopilotChat";
 import type {
@@ -38,6 +55,7 @@ import type {
   ChatMessage as CopilotMessage,
   CopilotBlocksResult,
   LiveTurn,
+  TurnConnection,
 } from "@/types/copilotChat";
 
 // ---------------------------------------------------------------------------
@@ -57,13 +75,17 @@ function parseBlocksContent(content: string): CopilotBlocksResult | null {
   return null;
 }
 
-/** Plain text of an assistant message, for copying. */
-function messageText(content: string): string {
+/** Plain text of an assistant message, for copying; a composed UI contributes its fallback text. */
+export function messageText(content: string): string {
   const parsed = parseBlocksContent(content);
   if (!parsed) return content;
   return parsed.blocks
-    .filter((b) => b.type === "text" && b.content)
-    .map((b) => b.content)
+    .map((b) => {
+      if (b.type === "text") return b.content;
+      if (b.type === "ui") return typeof b.ui?.fallback === "string" ? b.ui.fallback : b.content;
+      return null;
+    })
+    .filter((text): text is string => typeof text === "string" && text.length > 0)
     .join("\n\n");
 }
 
@@ -77,35 +99,63 @@ function isErrorMessage(message: CopilotMessage): boolean {
 
 function ActionButton({
   label,
+  hint,
   onClick,
-  active = false,
+  active,
+  disabled = false,
   children,
 }: {
   label: string;
+  /** What the action does, shown under the label before the user clicks. */
+  hint?: string;
   onClick: () => void;
-  /** A toggle that is on, e.g. the rating the user gave. */
+  /** A toggle and whether it is on, e.g. the rating the user gave; unset for a plain action. */
   active?: boolean;
+  disabled?: boolean;
   children: React.ReactNode;
 }) {
+  const hintId = useId();
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <button
           type="button"
           onClick={onClick}
+          disabled={disabled}
           className={`btn btn-ghost btn-xs btn-square ${
             active ? "text-primary" : "text-base-content/45 hover:text-base-content"
           }`}
           aria-label={label}
           aria-pressed={active}
+          aria-describedby={hint ? hintId : undefined}
         >
           {children}
         </button>
       </TooltipTrigger>
-      <TooltipContent>{label}</TooltipContent>
+      <TooltipContent>
+        {hint ? (
+          <>
+            <span className="block font-medium">{label}</span>
+            <span className="block text-base-content/70">{hint}</span>
+          </>
+        ) : (
+          label
+        )}
+      </TooltipContent>
+      {hint && (
+        // The description stays in the page for assistive technology while the tooltip is closed.
+        <span id={hintId} className="sr-only">
+          {hint}
+        </span>
+      )}
     </Tooltip>
   );
 }
+
+/** What branching does, shown before the user branches. */
+const BRANCH_HINT =
+  "Starts a new chat with this conversation up to this answer. It shares this chat's workspace " +
+  "files as they are now, not as they were then, and only one of the two can answer at a time.";
 
 /** One assistant turn: full-width text, no avatar, like ChatGPT and Claude. */
 function AssistantRow({ className = "", children, ...rest }: React.HTMLAttributes<HTMLDivElement>) {
@@ -117,16 +167,20 @@ function AssistantRow({ className = "", children, ...rest }: React.HTMLAttribute
 }
 
 function CopyButton({ text }: { text: string }) {
+  const toast = useToast();
   const [copied, setCopied] = useState(false);
   const copy = useCallback(() => {
-    navigator.clipboard.writeText(text).then(
+    copyText(text).then(
       () => {
         setCopied(true);
         setTimeout(() => setCopied(false), 1500);
       },
-      () => {},
+      () => {
+        setCopied(false);
+        toast.error("Failed to copy to clipboard");
+      },
     );
-  }, [text]);
+  }, [text, toast]);
   return (
     <ActionButton label={copied ? "Copied" : "Copy"} onClick={copy}>
       {copied ? <Check className="w-3.5 h-3.5 text-success" /> : <Copy className="w-3.5 h-3.5" />}
@@ -200,7 +254,7 @@ function ImageSentBadge({ imagesSent }: { imagesSent: BlocksResult["images_sent"
             key={key}
             type="button"
             onClick={() => setPreviewSrc(src)}
-            className="flex-shrink-0 rounded-lg border border-base-300 overflow-hidden hover:border-primary/50 hover:shadow-md transition-colors cursor-pointer"
+            className="flex-shrink-0 rounded-lg border border-base-300 overflow-hidden hover:border-primary/50 transition-colors cursor-pointer"
           >
             {/* eslint-disable-next-line @next/next/no-img-element -- runtime-generated API preview */}
             <img
@@ -217,6 +271,35 @@ function ImageSentBadge({ imagesSent }: { imagesSent: BlocksResult["images_sent"
   );
 }
 
+/**
+ * Downloads of what the answer's `write` calls wrote, from the content the chat
+ * holds. Labeled as the original write: the workspace file may have changed since.
+ */
+function WrittenFiles({ files }: { files: WrittenFile[] }) {
+  return (
+    <div role="group" aria-label="Files written in this answer" className="mt-2">
+      <p className="mb-1 text-xs text-base-content/50">
+        Original write content from this answer. Later changes to these files are not included.
+      </p>
+      <div className="flex flex-wrap gap-1">
+        {files.map((file) => (
+          <button
+            key={file.path}
+            type="button"
+            className="btn btn-ghost btn-sm"
+            title={file.path}
+            aria-label={`Download original write content of ${file.path}`}
+            onClick={() => downloadText(file.fileName, file.content)}
+          >
+            <Download data-icon="inline-start" aria-hidden="true" />
+            <span className="max-w-60 truncate font-mono">{file.fileName}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function BlocksContent({
   blocks,
   interaction,
@@ -225,16 +308,14 @@ function BlocksContent({
   interaction: InteractionState;
 }) {
   const figures = blocks.trace ? figuresInSteps(blocks.trace.steps) : [];
+  const files = writtenFiles(blocks.trace?.steps);
   // Preview only the proposal's target; the dock checks again when applying it.
   const dock = useOptionalChatDock();
   const state: InteractionState = dock?.canApplyCode
     ? {
         ...interaction,
         applyCode: dock.applyCode,
-        currentCode: (edit) => {
-          const page = dock.currentPage();
-          return matchesEditTarget(edit, page) ? (page?.flow?.code ?? null) : null;
-        },
+        currentCode: (edit) => editTargetCode(edit, dock.currentPage()),
       }
     : interaction;
   return (
@@ -260,9 +341,15 @@ function BlocksContent({
         if (block.type === "edit" && block.edit) {
           return <EditProposalCard key={i} edit={block.edit} state={state} />;
         }
+        if (block.type === "ui") {
+          return <ChatUiBlock key={i} ui={block.ui ?? { fallback: block.content ?? "" }} />;
+        }
         if (block.type === "chart" && block.chart) {
           return (
-            <div key={i} className="my-3 rounded-xl border border-base-300/60 overflow-hidden">
+            <div
+              key={i}
+              className="my-3 rounded-[var(--radius-box)] border border-base-300/60 overflow-hidden"
+            >
               <ChatPlotlyChart
                 data={block.chart.data as Record<string, unknown>[]}
                 layout={block.chart.layout as Record<string, unknown>}
@@ -272,10 +359,23 @@ function BlocksContent({
         }
         return null;
       })}
+      {files.length > 0 && <WrittenFiles files={files} />}
       {blocks.stopped && (
         <div className="mt-2 inline-flex items-center gap-1.5 text-xs text-base-content/45">
           <Square className="w-3 h-3" />
           Stopped
+        </div>
+      )}
+      {blocks.in_progress && !blocks.stopped && (
+        <div className="mt-2 inline-flex items-center gap-1.5 text-xs text-base-content/45">
+          <LoaderCircle className="w-3 h-3" />
+          Answer in progress, saved by the server
+        </div>
+      )}
+      {blocks.interrupted && !blocks.stopped && (
+        <div className="mt-2 inline-flex items-center gap-1.5 text-xs text-base-content/45">
+          <CircleSlash className="w-3 h-3" />
+          Interrupted before it ended
         </div>
       )}
     </>
@@ -346,14 +446,14 @@ export const UserMessage = memo(function UserMessage({
           className="w-full resize-none bg-transparent border-none outline-none focus:ring-0 text-sm leading-6"
         />
         <div className="flex items-center justify-end gap-2 mt-2">
-          <button type="button" onClick={cancelEdit} className="btn btn-ghost btn-sm rounded-full">
+          <button type="button" onClick={cancelEdit} className="btn btn-ghost btn-sm">
             Cancel
           </button>
           <button
             type="button"
             onClick={submitEdit}
             disabled={!draft.trim()}
-            className="btn btn-primary btn-sm rounded-full"
+            className="btn btn-primary btn-sm"
           >
             Send
           </button>
@@ -372,7 +472,7 @@ export const UserMessage = memo(function UserMessage({
               key={i}
               src={src}
               alt={`Attached figure ${i + 1}`}
-              className="h-24 max-w-[200px] rounded-xl object-contain border border-base-300 bg-base-200"
+              className="h-24 max-w-[200px] rounded-[var(--radius-box)] object-contain border border-base-300 bg-base-200"
             />
           ))}
         </div>
@@ -387,6 +487,11 @@ export const UserMessage = memo(function UserMessage({
       <div className="chat-bubble-user-soft rounded-3xl px-4 py-2.5 max-w-[85%] text-sm leading-relaxed whitespace-pre-wrap break-words">
         {message.content}
       </div>
+      {message.steer?.placement === "approximate" && (
+        <span className="text-xs text-base-content/55">
+          Sent while the answer above was written; it read this during or after that answer
+        </span>
+      )}
       <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
         <CopyButton text={message.content} />
         {canEdit && (
@@ -399,6 +504,67 @@ export const UserMessage = memo(function UserMessage({
   );
 });
 
+/**
+ * A bug-report draft for the last answer that ended with an application error. The user
+ * reads and copies it and opens the repository's bug form themselves; nothing is sent.
+ */
+function ChatErrorReport({ error }: { error: string }) {
+  const toast = useToast();
+  const [open, setOpen] = useState(false);
+  const draftId = useId();
+  const draft = open
+    ? buildChatErrorReport({ message: error, path: window.location.pathname })
+    : "";
+  const copy = () =>
+    copyText(draft).then(
+      () => toast.success("Report draft copied"),
+      () => toast.error("Failed to copy to clipboard"),
+    );
+  return (
+    <div className="flex w-full flex-col gap-2">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        className="btn btn-ghost btn-sm self-start"
+        aria-expanded={open}
+        aria-controls={draftId}
+      >
+        <Bug data-icon="inline-start" />
+        Report this error
+      </button>
+      {open && (
+        <div id={draftId} className="flex flex-col gap-2">
+          <p className="text-xs text-base-content/60">
+            This looks like an application fault. Review the draft, remove anything private, and
+            post it yourself; QDash does not file issues.
+          </p>
+          <textarea
+            readOnly
+            value={draft}
+            aria-label="Bug report draft"
+            className="textarea textarea-sm h-48 w-full font-mono"
+          />
+          <div className="flex flex-wrap gap-1">
+            <button type="button" onClick={copy} className="btn btn-ghost btn-sm">
+              <Copy data-icon="inline-start" />
+              Copy draft
+            </button>
+            <a
+              href={BUG_REPORT_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-ghost btn-sm"
+            >
+              Open the GitHub bug form
+              <ExternalLink data-icon="inline-end" />
+            </a>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export const AssistantMessage = memo(function AssistantMessage({
   message,
   isLast,
@@ -409,11 +575,24 @@ export const AssistantMessage = memo(function AssistantMessage({
   onDecide,
   onOther,
   onRate,
+  canContinue = false,
+  onContinue,
+  canBranch = false,
+  branching = false,
+  onBranch,
 }: {
   message: CopilotMessage;
   isLast: boolean;
   canRetry: boolean;
   onRetry: () => void;
+  /** The answer stopped or failed and can go on from where it ended, without a new message. */
+  canContinue?: boolean;
+  onContinue?: () => void;
+  /** A new chat can start from this answer: it is complete, saved with its runtime entry, and nothing runs. */
+  canBranch?: boolean;
+  /** A branch from this answer is being created. */
+  branching?: boolean;
+  onBranch?: () => void;
   /** The user message that follows this answer, if any. */
   answer?: string;
   onAnswer: InteractionState["onAnswer"];
@@ -424,20 +603,33 @@ export const AssistantMessage = memo(function AssistantMessage({
   if (isErrorMessage(message)) {
     return (
       <AssistantRow className="animate-fade-in-up">
-        <div className="flex items-start gap-2 text-sm text-error bg-error/5 rounded-xl px-4 py-3 border border-error/20">
+        <div className="flex items-start gap-2 text-sm text-error bg-error/5 rounded-[var(--radius-box)] px-4 py-3 border border-error/20">
           <XCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
           <span className="break-words min-w-0">{message.content.slice("Error: ".length)}</span>
         </div>
-        {isLast && canRetry && (
-          <button
-            type="button"
-            onClick={onRetry}
-            className="btn btn-ghost btn-sm gap-1.5 mt-2 rounded-full"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            Retry
-          </button>
-        )}
+        <div className="flex flex-wrap items-center gap-1 mt-2">
+          {isLast && canContinue && onContinue && (
+            <button
+              type="button"
+              onClick={onContinue}
+              className="btn btn-ghost btn-sm"
+              title="Go on from where the answer ended, without sending your message again"
+            >
+              <StepForward data-icon="inline-start" />
+              Continue
+            </button>
+          )}
+          {isLast && canRetry && (
+            <button type="button" onClick={onRetry} className="btn btn-ghost btn-sm">
+              <RotateCcw data-icon="inline-start" />
+              Retry
+            </button>
+          )}
+          {/* Only the latest error, and only one that looks like a fault, offers a report. */}
+          {isLast && classifyChatError(message.content.slice("Error: ".length)).reportable && (
+            <ChatErrorReport error={message.content.slice("Error: ".length)} />
+          )}
+        </div>
       </AssistantRow>
     );
   }
@@ -456,12 +648,22 @@ export const AssistantMessage = memo(function AssistantMessage({
       )}
       <div
         className={`mt-1.5 -ml-1.5 flex items-center gap-0.5 transition-opacity ${
-          isLast || feedback
+          isLast || feedback || branching
             ? "opacity-100"
             : "opacity-0 group-hover:opacity-100 focus-within:opacity-100"
         }`}
       >
         <CopyButton text={messageText(message.content)} />
+        {!blocks?.in_progress && !blocks?.stopped && hasAnswerMarkdown(message.content) && (
+          <ActionButton
+            label="Save as Markdown"
+            onClick={() =>
+              downloadText(answerFileName(message.content), answerMarkdown(message.content))
+            }
+          >
+            <Download className="w-3.5 h-3.5" />
+          </ActionButton>
+        )}
         <ActionButton
           label={feedback === "up" ? "Rated helpful" : "Helpful"}
           active={feedback === "up"}
@@ -476,6 +678,25 @@ export const AssistantMessage = memo(function AssistantMessage({
         >
           <ThumbsDown className="w-3.5 h-3.5" />
         </ActionButton>
+        {isLast && canContinue && onContinue && (
+          <ActionButton label="Continue" onClick={onContinue}>
+            <StepForward className="w-3.5 h-3.5" />
+          </ActionButton>
+        )}
+        {onBranch && (canBranch || branching) && (
+          <ActionButton
+            label={branching ? "Creating branch" : "Branch from here"}
+            hint={BRANCH_HINT}
+            onClick={onBranch}
+            disabled={branching}
+          >
+            {branching ? (
+              <span className="loading loading-spinner loading-xs" aria-hidden="true" />
+            ) : (
+              <GitBranch className="w-3.5 h-3.5" />
+            )}
+          </ActionButton>
+        )}
         {isLast && canRetry && (
           <ActionButton label="Regenerate" onClick={onRetry}>
             <RotateCcw className="w-3.5 h-3.5" />
@@ -490,9 +711,12 @@ export const AssistantMessage = memo(function AssistantMessage({
 export function LiveAssistantMessage({
   turn,
   statusMessage,
+  connection = null,
 }: {
   turn: LiveTurn;
   statusMessage: string | null;
+  /** The stream's health, shown apart from what the turn does. */
+  connection?: TurnConnection | null;
 }) {
   const split = answerStartIndex(turn.steps);
   const work = turn.steps.slice(0, split);
@@ -505,27 +729,30 @@ export function LiveAssistantMessage({
       (s.kind === "tool" && (s.status === "running" || s.status === "drafting")) ||
       (s.kind === "thinking" && s.endedAt === undefined),
   );
+  const idle = !answer && !busy;
+  const figures = answer ? figuresInSteps(work) : [];
 
   return (
-    <AssistantRow className="animate-fade-in-up" aria-live="polite" aria-busy="true">
-      <LiveTrace steps={work} />
-      {answer && figuresInSteps(work).length > 0 && (
-        <FigureStrip paths={figuresInSteps(work)} className="mb-3" />
+    // The activity footer is the live region; the streaming text itself is not announced.
+    <AssistantRow className="animate-fade-in-up" aria-busy="true">
+      <LiveTrace steps={work} figuresOutside={figures.length > 0} />
+      {figures.length > 0 && <FigureStrip paths={figures} className="mb-3" />}
+      {turn.blocks?.map((block, i) =>
+        block.type === "ui" ? (
+          <ChatUiBlock key={i} ui={block.ui} />
+        ) : block.content ? (
+          <ChatMarkdown key={i}>{block.content}</ChatMarkdown>
+        ) : null,
       )}
-      {answer ? (
-        <ChatMarkdown className="chat-streaming">{answer}</ChatMarkdown>
-      ) : (
-        !busy && (
-          <div className="flex items-center gap-2.5 h-7 text-sm">
-            <QdashBotAvatar size={20} className="chat-avatar-active chat-bot-mark" />
-            {statusMessage ? (
-              <Loader variant="text-shimmer" size="sm" text={statusMessage} />
-            ) : (
-              <Loader variant="typing" size="sm" />
-            )}
-          </div>
-        )
-      )}
+      {answer && <ChatMarkdown streaming>{answer}</ChatMarkdown>}
+      {/* Drawn only when no trace row already shows the activity; always announced. */}
+      <TurnActivity
+        steps={turn.steps}
+        startedAt={turn.startedAt}
+        statusMessage={statusMessage}
+        connection={connection}
+        className={`h-7 gap-2.5 ${idle ? "text-sm" : "mt-1"}`}
+      />
     </AssistantRow>
   );
 }

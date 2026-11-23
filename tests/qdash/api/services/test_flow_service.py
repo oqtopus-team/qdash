@@ -1,5 +1,8 @@
 """Tests for the flow application service."""
 
+import asyncio
+import subprocess
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
@@ -7,6 +10,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 from fastapi import HTTPException
+from pymongo.errors import DuplicateKeyError
 
 from qdash.api.schemas.execution import ExecutionAvailabilityRequest
 from qdash.api.schemas.flow import ExecuteFlowRequest, SaveFlowRequest
@@ -187,9 +191,12 @@ def _service(
     repo: _FakeFlowRepository | None = None,
     coordinator: _StubCoordinator | None = None,
     deployment: _StubDeploymentClient | None = None,
+    coupling_ids: list[str] | None = None,
 ) -> FlowService:
     """Build a service with fakes and a temporary flow tree."""
+    chip_repo = SimpleNamespace(get_coupling_ids=lambda _project, _chip: coupling_ids or [])
     return FlowService(
+        chip_repository=cast("Any", chip_repo),
         flow_repository=cast("MongoFlowRepository", repo or _FakeFlowRepository()),
         coordinator=cast("ExecutionCoordinator", coordinator or _StubCoordinator()),
         source_store=FlowSourceStore(tmp_path / "user_flows"),
@@ -206,7 +213,7 @@ async def test_save_flow_writes_the_source_and_registers_the_deployment(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Saving writes the file, registers the deployment and records metadata."""
-    monkeypatch.setattr(flow_service_module, "format_with_ruff", lambda _path: None)
+    monkeypatch.setattr(flow_service_module, "format_source_for_save", lambda code: code)
     repo = _FakeFlowRepository()
     deployment = _StubDeploymentClient()
     service = _service(tmp_path, repo=repo, deployment=deployment)
@@ -238,7 +245,7 @@ async def test_save_flow_keeps_the_stored_folder_when_the_request_omits_it(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """An omitted folder leaves the existing folder and replaces the deployment."""
-    monkeypatch.setattr(flow_service_module, "format_with_ruff", lambda _path: None)
+    monkeypatch.setattr(flow_service_module, "format_source_for_save", lambda code: code)
     file_path = tmp_path / "user_flows" / "project-1" / "my_flow.py"
     repo = _FakeFlowRepository(flow=_make_flow(file_path, folder="daily"))
     service = _service(tmp_path, repo=repo)
@@ -261,7 +268,7 @@ async def test_save_flow_removes_the_file_when_registration_fails(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A failed registration does not leave the new source behind."""
-    monkeypatch.setattr(flow_service_module, "format_with_ruff", lambda _path: None)
+    monkeypatch.setattr(flow_service_module, "format_source_for_save", lambda code: code)
     service = _service(
         tmp_path,
         deployment=_StubDeploymentClient(
@@ -287,7 +294,7 @@ async def test_save_flow_removes_the_file_when_metadata_cannot_be_saved(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A failed metadata write does not leave the new source behind."""
-    monkeypatch.setattr(flow_service_module, "format_with_ruff", lambda _path: None)
+    monkeypatch.setattr(flow_service_module, "format_source_for_save", lambda code: code)
     repo = _FakeFlowRepository()
     repo.create_failure = RuntimeError("mongo is down")
     service = _service(tmp_path, repo=repo)
@@ -616,7 +623,7 @@ async def test_execute_single_task_uses_the_requested_execution_name(
     call = coordinator.run_calls[0]
     assert call["name"] == expected_flow_name
     assert call["parameters"]["flow_name"] == expected_flow_name
-    assert call["parameters"]["persist_output_parameters"] is True
+    assert call["parameters"]["update_calibration_parameters"] is True
     assert call.get("workflow", False) is False
 
 
@@ -639,7 +646,7 @@ async def test_execute_single_task_supports_quick_run_without_snapshot(
         execution_name="quick-run:CheckRabi",
         backend_name="fake",
         task_run_parameters=task_run_parameters,
-        persist_output_parameters=False,
+        update_calibration_parameters=False,
         update_params=False,
     )
 
@@ -647,7 +654,7 @@ async def test_execute_single_task_supports_quick_run_without_snapshot(
     assert parameters["source_execution_id"] is None
     assert parameters["backend_name"] == "fake"
     assert parameters["task_run_parameters"] == task_run_parameters
-    assert parameters["persist_output_parameters"] is False
+    assert parameters["update_calibration_parameters"] is False
     assert parameters["update_params"] is False
 
 
@@ -761,6 +768,7 @@ async def test_execute_agent_candidate_apply_dispatches_in_the_background(
     }
     assert response.execution_id == "flow-run-7"
     assert response.flow_run_id == "flow-run-7"
+    assert response.flow_run_url.endswith("/prefect/runs/flow-run/flow-run-7")
 
 
 @pytest.mark.asyncio
@@ -861,7 +869,7 @@ async def test_save_flow_restores_old_source_when_update_metadata_fails(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """On update, a failed metadata write restores the previous source."""
-    monkeypatch.setattr(flow_service_module, "format_with_ruff", lambda _path: None)
+    monkeypatch.setattr(flow_service_module, "format_source_for_save", lambda code: code)
     file_path = tmp_path / "user_flows" / "project-1" / "my_flow.py"
     file_path.parent.mkdir(parents=True)
     file_path.write_text(FLOW_CODE, encoding="utf-8")
@@ -889,7 +897,7 @@ async def test_save_flow_restores_old_source_when_update_registration_fails(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """On update, a failed registration restores the previous source."""
-    monkeypatch.setattr(flow_service_module, "format_with_ruff", lambda _path: None)
+    monkeypatch.setattr(flow_service_module, "format_source_for_save", lambda code: code)
     file_path = tmp_path / "user_flows" / "project-1" / "my_flow.py"
     file_path.parent.mkdir(parents=True)
     file_path.write_text(FLOW_CODE, encoding="utf-8")
@@ -915,3 +923,378 @@ async def test_save_flow_restores_old_source_when_update_registration_fails(
     assert file_path.exists()
     assert file_path.read_text(encoding="utf-8") == FLOW_CODE
     assert repo.updated == []
+
+
+class _StatefulFlowRepository(_FakeFlowRepository):
+    """Flow repository stub whose lookups see the flows it created."""
+
+    def find_by_project_and_name(self, project_id: str, name: str) -> SimpleNamespace | None:
+        """Return the flow created under this name, if any."""
+        for created in self.created:
+            if created["project_id"] == project_id and created["name"] == name:
+                return SimpleNamespace(**created)
+        return self.flow
+
+
+class _SlowDeploymentClient(_StubDeploymentClient):
+    """Deployment client stub that yields to the event loop while registering."""
+
+    async def register(self, **kwargs: Any) -> str:
+        """Pause, so a concurrent save can run while this one is in flight."""
+        await asyncio.sleep(0.05)
+        return await super().register(**kwargs)
+
+
+@pytest.mark.asyncio
+async def test_create_only_save_creates_a_new_flow(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A create-only save of a free name stores and registers the flow."""
+    monkeypatch.setattr(flow_service_module, "format_source_for_save", lambda code: code)
+    repo = _FakeFlowRepository()
+    service = _service(tmp_path, repo=repo)
+
+    response = await service.save_flow(
+        SaveFlowRequest(name="my_flow", code=FLOW_CODE, chip_id="chip-1", create_only=True),
+        "operator",
+        "project-1",
+    )
+
+    file_path = tmp_path / "user_flows" / "project-1" / "my_flow.py"
+    assert file_path.read_text(encoding="utf-8") == FLOW_CODE
+    assert repo.created[0]["name"] == "my_flow"
+    assert response.message == "Flow 'my_flow' created successfully"
+
+
+@pytest.mark.asyncio
+async def test_create_only_save_rejects_an_existing_flow_without_changes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A create-only save of a taken name returns 409 and leaves the flow as it was."""
+    monkeypatch.setattr(flow_service_module, "format_source_for_save", lambda code: code)
+    file_path = tmp_path / "user_flows" / "project-1" / "my_flow.py"
+    file_path.parent.mkdir(parents=True)
+    file_path.write_text(FLOW_CODE, encoding="utf-8")
+    repo = _FakeFlowRepository(flow=_make_flow(file_path))
+    deployment = _StubDeploymentClient()
+    service = _service(tmp_path, repo=repo, deployment=deployment)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await service.save_flow(
+            SaveFlowRequest(
+                name="my_flow", code=FLOW_CODE + "# new\n", chip_id="chip-2", create_only=True
+            ),
+            "operator",
+            "project-1",
+        )
+
+    assert exc_info.value.status_code == 409
+    assert exc_info.value.detail == "Flow 'my_flow' already exists. Choose another name."
+    assert file_path.read_text(encoding="utf-8") == FLOW_CODE
+    assert deployment.calls == []
+    assert repo.created == []
+    assert repo.updated == []
+
+
+@pytest.mark.asyncio
+async def test_create_only_save_never_replaces_a_source_without_metadata(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A flow file left without metadata still blocks a create-only save of its name."""
+    monkeypatch.setattr(flow_service_module, "format_source_for_save", lambda code: code)
+    file_path = tmp_path / "user_flows" / "project-1" / "my_flow.py"
+    file_path.parent.mkdir(parents=True)
+    file_path.write_text("# someone else's work\n", encoding="utf-8")
+    repo = _FakeFlowRepository()
+    deployment = _StubDeploymentClient()
+    service = _service(tmp_path, repo=repo, deployment=deployment)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await service.save_flow(
+            SaveFlowRequest(name="my_flow", code=FLOW_CODE, chip_id="chip-1", create_only=True),
+            "operator",
+            "project-1",
+        )
+
+    assert exc_info.value.status_code == 409
+    assert file_path.read_text(encoding="utf-8") == "# someone else's work\n"
+    assert deployment.calls == []
+    assert repo.created == []
+
+
+@pytest.mark.asyncio
+async def test_create_only_save_reports_a_concurrent_metadata_insert_as_conflict(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A unique-index violation on insert is a 409 and removes the file this save wrote."""
+    monkeypatch.setattr(flow_service_module, "format_source_for_save", lambda code: code)
+    repo = _FakeFlowRepository()
+    repo.create_failure = DuplicateKeyError("E11000 duplicate key")
+    service = _service(tmp_path, repo=repo)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await service.save_flow(
+            SaveFlowRequest(name="my_flow", code=FLOW_CODE, chip_id="chip-1", create_only=True),
+            "operator",
+            "project-1",
+        )
+
+    assert exc_info.value.status_code == 409
+    assert not (tmp_path / "user_flows" / "project-1" / "my_flow.py").exists()
+
+
+@pytest.mark.asyncio
+async def test_concurrent_create_only_saves_create_the_flow_once(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Of two concurrent create-only saves of one name, one wins and the other gets 409."""
+    monkeypatch.setattr(flow_service_module, "format_source_for_save", lambda code: code)
+    repo = _StatefulFlowRepository()
+    deployment = _SlowDeploymentClient()
+    service = _service(tmp_path, repo=repo, deployment=deployment)
+    first = FLOW_CODE + "# first\n"
+    second = FLOW_CODE + "# second\n"
+
+    results = await asyncio.gather(
+        service.save_flow(
+            SaveFlowRequest(name="my_flow", code=first, chip_id="chip-1", create_only=True),
+            "operator",
+            "project-1",
+        ),
+        service.save_flow(
+            SaveFlowRequest(name="my_flow", code=second, chip_id="chip-2", create_only=True),
+            "operator",
+            "project-1",
+        ),
+        return_exceptions=True,
+    )
+
+    conflicts = [r for r in results if isinstance(r, HTTPException) and r.status_code == 409]
+    successes = [r for r in results if not isinstance(r, BaseException)]
+    assert len(successes) == 1
+    assert len(conflicts) == 1
+    assert len(repo.created) == 1
+    assert len(deployment.calls) == 1
+    winner = first if repo.created[0]["chip_id"] == "chip-1" else second
+    file_path = tmp_path / "user_flows" / "project-1" / "my_flow.py"
+    assert file_path.read_text(encoding="utf-8") == winner
+
+
+@pytest.mark.asyncio
+async def test_create_only_save_waits_for_a_save_in_another_process(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A save holding the lock in another process finishes first; the create-only save then 409s."""
+    monkeypatch.setattr(flow_service_module, "format_source_for_save", lambda code: code)
+    project_dir = tmp_path / "user_flows" / "project-1"
+    project_dir.mkdir(parents=True)
+    file_path = project_dir / "my_flow.py"
+    ready = tmp_path / "ready"
+    holder = subprocess.Popen(  # noqa: S603
+        [
+            sys.executable,
+            "-c",
+            (
+                "import sys, time\n"
+                "from pathlib import Path\n"
+                "from filelock import FileLock\n"
+                "lock_path, flow_path, ready = map(Path, sys.argv[1:4])\n"
+                "with FileLock(lock_path):\n"
+                "    ready.write_text('1')\n"
+                "    time.sleep(0.5)\n"
+                "    flow_path.write_text('# other process\\n')\n"
+            ),
+            str(project_dir / ".my_flow.py.lock"),
+            str(file_path),
+            str(ready),
+        ],
+    )
+    try:
+        for _ in range(200):
+            if ready.exists():
+                break
+            await asyncio.sleep(0.025)
+        assert ready.exists()
+        deployment = _StubDeploymentClient()
+        service = _service(tmp_path, deployment=deployment)
+
+        with pytest.raises(HTTPException) as exc_info:
+            await service.save_flow(
+                SaveFlowRequest(name="my_flow", code=FLOW_CODE, chip_id="chip-1", create_only=True),
+                "operator",
+                "project-1",
+            )
+    finally:
+        holder.wait(timeout=10)
+
+    assert exc_info.value.status_code == 409
+    assert file_path.read_text(encoding="utf-8") == "# other process\n"
+    assert deployment.calls == []
+
+
+@pytest.mark.asyncio
+async def test_save_without_create_only_still_overwrites_an_existing_flow(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The default save keeps its overwrite behavior for the flow editor."""
+    monkeypatch.setattr(flow_service_module, "format_source_for_save", lambda code: code)
+    file_path = tmp_path / "user_flows" / "project-1" / "my_flow.py"
+    file_path.parent.mkdir(parents=True)
+    file_path.write_text(FLOW_CODE, encoding="utf-8")
+    repo = _FakeFlowRepository(flow=_make_flow(file_path))
+    service = _service(tmp_path, repo=repo)
+
+    new_code = FLOW_CODE + "# edited\n"
+    response = await service.save_flow(
+        SaveFlowRequest(name="my_flow", code=new_code, chip_id="chip-1"),
+        "operator",
+        "project-1",
+    )
+
+    assert file_path.read_text(encoding="utf-8") == new_code
+    assert response.message == "Flow 'my_flow' updated successfully"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "signature", ["", "qids=None", "mux_ids=None, qids=None, exclude_qids=None"]
+)
+async def test_target_override_uses_context_without_adding_unknown_parameters(tmp_path, signature):
+    from qdash.datamodel.flow_targets import TARGET_CONTEXT_KEY, FlowTargetOverride
+
+    file_path = tmp_path / "my_flow.py"
+    source = f'def my_flow({signature}):\n    CalibService("user", "chip", qids=["0"])\n'
+    file_path.write_text(source)
+    coordinator = _StubCoordinator()
+    service = _service(
+        tmp_path, repo=_FakeFlowRepository(flow=_make_flow(file_path)), coordinator=coordinator
+    )
+    override = FlowTargetOverride(mux_ids=[2], exclude_qids=["9"])
+    await service.execute_flow(
+        "my_flow", ExecuteFlowRequest(target_override=override), "user", "project-1"
+    )
+    call = coordinator.run_calls[0]
+    assert call["context"] == {TARGET_CONTEXT_KEY: {"mux_ids": [2], "exclude_qids": ["9"]}}
+    if "mux_ids" in signature:
+        assert call["parameters"]["mux_ids"] == [2]
+        assert call["parameters"]["exclude_qids"] == ["9"]
+        assert call["parameters"]["qids"] is None
+    else:
+        # A flow that cannot receive MUX targets keeps its saved qids; the
+        # run context still carries the override to CalibService.
+        assert "mux_ids" not in call["parameters"]
+        assert "qids" not in call["parameters"]
+    assert file_path.read_text() == source
+
+
+PAIR_FLOW = """
+def my_flow(username, chip_id, schedule, project_id=None):
+    targets = CouplingTargets(pairs=[pair for group in schedule for pair in group])
+    steps = [GenerateCRSchedule(), TwoQubitCalibration()]
+    return CalibService(username, chip_id, project_id=project_id).run(targets, steps=steps)
+"""
+
+
+def _pair_service(tmp_path: Path, coordinator: _StubCoordinator, **flow: Any) -> FlowService:
+    file_path = tmp_path / "my_flow.py"
+    file_path.write_text(PAIR_FLOW)
+    return _service(
+        tmp_path,
+        repo=_FakeFlowRepository(flow=_make_flow(file_path, **flow)),
+        coordinator=coordinator,
+        coupling_ids=["63-85", "85-63", "64-42"],
+    )
+
+
+@pytest.mark.asyncio
+async def test_get_flow_offers_pairs_only_for_automatic_coupling_flows(tmp_path: Path) -> None:
+    coordinator = _StubCoordinator()
+    response = await _pair_service(tmp_path, coordinator).get_flow("my_flow", "op", "project-1")
+    assert response.target_modes == ["coupling_pairs"]
+    assert response.target_defaults is None
+
+    (tmp_path / "my_flow.py").write_text(FLOW_CODE)
+    service = _service(tmp_path, repo=_FakeFlowRepository(flow=_make_flow(tmp_path / "my_flow.py")))
+    assert (await service.get_flow("my_flow", "op", "project-1")).target_modes == [
+        "mux_ids",
+        "qids",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_coupling_override_dispatches_directed_pairs_without_touching_schedule(
+    tmp_path: Path,
+) -> None:
+    from qdash.datamodel.flow_targets import TARGET_CONTEXT_KEY, FlowTargetOverride
+
+    coordinator = _StubCoordinator()
+    saved = {"schedule": [[["0", "1"]]]}
+    service = _pair_service(tmp_path, coordinator, default_parameters=saved)
+    override = FlowTargetOverride(coupling_pairs=[["63", "85"], ["85", "63"], ["64", "42"]])
+
+    await service.execute_flow(
+        "my_flow", ExecuteFlowRequest(target_override=override), "user", "project-1"
+    )
+
+    call = coordinator.run_calls[0]
+    assert call["context"] == {
+        TARGET_CONTEXT_KEY: {
+            "coupling_pairs": [["63", "85"], ["85", "63"], ["64", "42"]],
+            "exclude_qids": [],
+        }
+    }
+    # The saved schedule still satisfies the template; the runtime replaces it.
+    assert call["parameters"]["schedule"] == [[["0", "1"]]]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("override", "message"),
+    [
+        ({"coupling_pairs": [["63", "86"]]}, "not found on chip 'chip-1': 63-86"),
+        ({"coupling_pairs": [["42", "64"]]}, "42-64"),
+        ({"qids": ["63"]}, "does not accept qids"),
+    ],
+)
+async def test_invalid_pair_overrides_are_rejected_before_dispatch(
+    tmp_path: Path, override: dict[str, Any], message: str
+) -> None:
+    from qdash.datamodel.flow_targets import FlowTargetOverride
+
+    coordinator = _StubCoordinator()
+    service = _pair_service(tmp_path, coordinator)
+    request = ExecuteFlowRequest(target_override=FlowTargetOverride.model_validate(override))
+
+    with pytest.raises(HTTPException) as exc_info:
+        await service.execute_flow("my_flow", request, "user", "project-1")
+
+    assert exc_info.value.status_code == 400
+    assert message in str(exc_info.value.detail)
+    assert coordinator.run_calls == []
+
+
+@pytest.mark.asyncio
+async def test_pair_override_is_rejected_for_qubit_flows(tmp_path: Path) -> None:
+    from qdash.datamodel.flow_targets import FlowTargetOverride
+
+    file_path = tmp_path / "my_flow.py"
+    file_path.write_text('def my_flow():\n    CalibService("u", "c").run(QubitTargets(["0"]))\n')
+    coordinator = _StubCoordinator()
+    service = _service(
+        tmp_path,
+        repo=_FakeFlowRepository(flow=_make_flow(file_path)),
+        coordinator=coordinator,
+        coupling_ids=["0-1"],
+    )
+    request = ExecuteFlowRequest(target_override=FlowTargetOverride(coupling_pairs=[["0", "1"]]))
+
+    with pytest.raises(HTTPException, match="does not accept coupling_pairs"):
+        await service.execute_flow("my_flow", request, "user", "project-1")
+    assert coordinator.run_calls == []

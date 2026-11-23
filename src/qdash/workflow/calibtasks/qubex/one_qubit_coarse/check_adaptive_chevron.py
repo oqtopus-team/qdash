@@ -9,6 +9,7 @@ from qdash.datamodel.task import (
     InputParameterSpec,
     OutputParameterSpec,
     RunParameterSpec,
+    TaskDocumentation,
 )
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -31,6 +32,27 @@ class CheckAdaptiveChevron(QubexTask):
 
     name: str = "CheckAdaptiveChevron"
     task_type: str = "qubit"
+    documentation: ClassVar[TaskDocumentation] = TaskDocumentation(
+        description=(
+            "Measures a coarse chevron (drive detuning versus pulse duration) over a wide "
+            "window, extends the search to the side bands when the peak is weak, then "
+            "remeasures a regular chevron with a rescaled amplitude. Qubex's matched-transform "
+            "analysis gives qubit_frequency (also published as control_frequency) and "
+            "control_amplitude."
+        ),
+        when_to_use=(
+            "Run it at the end of bring-up when the qubit frequency is known only to tens of "
+            "MHz. Use CheckChevron instead when the frequency is already within its fixed ±50 "
+            "MHz window."
+        ),
+        prerequisites=(
+            (
+                "control_frequency (or coarse_qubit_frequency), readout_frequency (or "
+                "resonator_frequency), readout_amplitude, and coarse_control_amplitude are "
+                "stored, normally by CheckQubitSpectroscopy and CheckControlAmplitude."
+            ),
+        ),
+    )
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
         "control_frequency": InputParameterSpec.required_database(
             fallback_parameter_names=("coarse_qubit_frequency",)

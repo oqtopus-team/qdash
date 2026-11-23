@@ -5,6 +5,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ExecutionPageContent } from "@/components/features/execution/ExecutionPageContent";
 
 let loadingNextPage = false;
+const DEFAULT_DETAIL = { note: { flow_run_id: "flow-123" }, task: [] };
+let executionDetail: Record<string, unknown> = DEFAULT_DETAIL;
+const mockInvestigate = vi.fn();
 const mockCancelMutate = vi.fn();
 const mockToastSuccess = vi.fn();
 const mockToastError = vi.fn();
@@ -29,59 +32,97 @@ vi.mock("@/client/chip/chip", () => ({
   }),
 }));
 
+type ListArgs = { skip: number; chip_id: string; date?: string };
+
+function flatExecutions({ skip, chip_id, date }: ListArgs) {
+  return {
+    total: date ? 0 : 40,
+    executions: date
+      ? [] // the API returns nothing for a day with no runs
+      : skip > 0 || chip_id === "chip-2"
+        ? [
+            {
+              execution_id: "exec-3",
+              name: "Other Execution",
+              status: "completed",
+              start_at: "2026-06-02T00:00:00Z",
+            },
+          ]
+        : [
+            {
+              execution_id: "exec-1",
+              name: "Running Execution",
+              status: "running",
+              start_at: "2026-06-01T00:00:00Z",
+              elapsed_time: "1m",
+              username: "tester",
+            },
+            {
+              execution_id: "exec-2",
+              name: "Completed Execution",
+              status: "completed",
+              start_at: "2026-06-01T00:00:00Z",
+              username: "tester",
+            },
+          ],
+  };
+}
+
+// Rows the grouped list returns; null means "the flat rows, none grouped".
+let groupedItems: Record<string, unknown>[] | null = null;
+let groupedSummary = { total: 0, total_executions: 0, grouped_executions: 0, agent_sessions: 0 };
+let groupedError = false;
+let currentProjectId = "project-1";
+const mockListExecutions = vi.fn();
+const mockListGroups = vi.fn();
+
+vi.mock("@/contexts/ProjectContext", () => ({
+  useProject: () => ({ projectId: currentProjectId }),
+}));
+
 vi.mock("@/client/execution/execution", () => ({
-  useListExecutions: ({
-    skip,
-    chip_id,
-    date,
-  }: {
-    skip: number;
-    chip_id: string;
-    date?: string;
-  }) => ({
-    data: {
+  useListExecutions: (args: ListArgs, options: { query: { enabled: boolean } }) => {
+    mockListExecutions(args, options);
+    return {
+      data: { data: flatExecutions(args) },
+      isError: false,
+      isLoading: args.skip > 0 && loadingNextPage,
+    };
+  },
+  useListExecutionGroups: (args: ListArgs, options: { query: { enabled: boolean } }) => {
+    mockListGroups(args, options);
+    const flat = flatExecutions(args);
+    const items =
+      groupedItems ??
+      flat.executions.map((execution) => ({
+        kind: "execution",
+        execution,
+        children: [],
+        children_total: 0,
+        children_in_filter: 0,
+        children_omitted: 0,
+      }));
+    return {
       data: {
-        total: date ? 0 : 40,
-        executions: date
-          ? [] // the API returns nothing for a day with no runs
-          : skip > 0 || chip_id === "chip-2"
-            ? [
-                {
-                  execution_id: "exec-3",
-                  name: "Other Execution",
-                  status: "completed",
-                  start_at: "2026-06-02T00:00:00Z",
-                },
-              ]
-            : [
-                {
-                  execution_id: "exec-1",
-                  name: "Running Execution",
-                  status: "running",
-                  start_at: "2026-06-01T00:00:00Z",
-                  elapsed_time: "1m",
-                  username: "tester",
-                },
-                {
-                  execution_id: "exec-2",
-                  name: "Completed Execution",
-                  status: "completed",
-                  start_at: "2026-06-01T00:00:00Z",
-                  username: "tester",
-                },
-              ],
+        data: groupedItems
+          ? { items, skip: args.skip, limit: 20, children_limit: 20, ...groupedSummary }
+          : {
+              items,
+              total: flat.total,
+              total_executions: flat.total,
+              grouped_executions: 0,
+              agent_sessions: 0,
+              skip: args.skip,
+              limit: 20,
+              children_limit: 20,
+            },
       },
-    },
-    isError: false,
-    isLoading: skip > 0 && loadingNextPage,
-  }),
+      isError: groupedError,
+      isLoading: args.skip > 0 && loadingNextPage,
+    };
+  },
   useGetExecution: () => ({
-    data: {
-      data: {
-        note: { flow_run_id: "flow-123" },
-        task: [],
-      },
-    },
+    data: { data: executionDetail },
     isLoading: false,
     isError: false,
   }),
@@ -93,7 +134,12 @@ vi.mock("@/client/execution/execution", () => ({
     error: null,
   }),
   getListExecutionsQueryKey: () => ["/executions"],
+  getListExecutionGroupsQueryKey: () => ["/executions/groups"],
   getGetExecutionQueryKey: (executionId: string) => [`/executions/${executionId}`],
+}));
+
+vi.mock("@/contexts/ChatDockContext", () => ({
+  useOptionalChatDock: () => ({ investigate: mockInvestigate }),
 }));
 
 vi.mock("@/hooks/useDateNavigation", () => ({
@@ -123,6 +169,7 @@ vi.mock("next/link", () => ({
 }));
 
 vi.mock("@/components/features/execution/ExecutionActivityChart", () => ({
+  DEFAULT_ACTIVITY_WINDOW: 30,
   ExecutionActivityChart: ({
     days,
     selectedDate,
@@ -191,6 +238,7 @@ describe("ExecutionPageContent cancel confirmation", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     loadingNextPage = false;
+    executionDetail = DEFAULT_DETAIL;
     // Reset the mutate implementation so callback-driven tests don't leak into others.
     mockCancelMutate.mockReset();
   });
@@ -235,6 +283,32 @@ describe("ExecutionPageContent cancel confirmation", () => {
 
     fireEvent.keyDown(document, { key: "Escape" });
     expect(panel.getAttribute("aria-hidden")).toBe("true");
+  });
+
+  it("links the details panel to the execution's calibration session in this project", () => {
+    executionDetail = {
+      ...DEFAULT_DETAIL,
+      calibration_session: {
+        calibration_session_id: "cs-1",
+        chip_id: "chip-1",
+        objective: "Bring up qubits",
+        status: "open",
+        via: "pipeline_run",
+        pipeline_run_id: "cpr-1",
+      },
+    };
+    render(<ExecutionPageContent />);
+    fireEvent.click(screen.getByText("Running Execution"));
+    const panel = screen.getByRole("complementary", { name: "Execution details" });
+    expect(
+      within(panel).getByRole("link", { name: "Open calibration session" }).getAttribute("href"),
+    ).toBe("/calibration-sessions/cs-1?project=project-1");
+  });
+
+  it("shows no calibration notice for an ordinary execution", () => {
+    render(<ExecutionPageContent />);
+    fireEvent.click(screen.getByText("Running Execution"));
+    expect(screen.queryByTestId("execution-calibration-notice")).toBeNull();
   });
 
   it("browses adjacent executions without closing the panel and resets its scroll", () => {
@@ -425,5 +499,361 @@ describe("ExecutionPageContent cancel confirmation", () => {
     fireEvent.click(screen.getByRole("button", { name: "Cancel Execution" }));
 
     expect(mockToastError).toHaveBeenCalledWith("Failed to cancel execution");
+  });
+});
+
+describe("ExecutionPageContent failure investigation", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    loadingNextPage = false;
+  });
+
+  afterEach(() => {
+    cleanup();
+    executionDetail = DEFAULT_DETAIL;
+  });
+
+  it("opens the investigation in the floating chat, not a second sidebar", () => {
+    const log = `Traceback (most recent call last):\n${"/app/qdash/workflow/calibtasks/qubex/".repeat(20)}base.py`;
+    executionDetail = { status: "failed", chip_id: "chip-1", message: log, task: [] };
+    render(<ExecutionPageContent />);
+
+    fireEvent.click(screen.getByText("Running Execution"));
+    const panel = screen.getByRole("complementary", { name: "Execution details" });
+    // The log sits in a scrolling block beside the action, not in a squeezed alert.
+    const body = within(panel).getByText((_, element) => element?.textContent === log);
+    expect(body.tagName).toBe("PRE");
+    expect(body.className).toContain("overflow-auto");
+    expect(within(panel).getByText("Error Log").parentElement).toContainElement(
+      within(panel).getByRole("button", { name: "Investigate with AI" }),
+    );
+
+    fireEvent.click(within(panel).getByRole("button", { name: "Investigate with AI" }));
+
+    expect(mockInvestigate).toHaveBeenCalledWith(
+      { executionId: "exec-1", chipId: "chip-1" },
+      "mini",
+    );
+    // The details panel stays open underneath the floating window.
+    expect(panel.getAttribute("aria-hidden")).toBe("false");
+  });
+
+  it("still offers an investigation when the failure recorded no message", () => {
+    executionDetail = { status: "failed", chip_id: "chip-1", message: "", task: [] };
+    render(<ExecutionPageContent />);
+
+    fireEvent.click(screen.getByText("Running Execution"));
+    const panel = screen.getByRole("complementary", { name: "Execution details" });
+    expect(within(panel).getByText("No error message recorded.")).toBeTruthy();
+    fireEvent.click(within(panel).getByRole("button", { name: "Investigate with AI" }));
+
+    expect(mockInvestigate).toHaveBeenCalledWith(
+      { executionId: "exec-1", chipId: "chip-1" },
+      "mini",
+    );
+  });
+});
+
+describe("ExecutionPageContent status presentation", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    loadingNextPage = false;
+  });
+
+  afterEach(() => {
+    cleanup();
+    executionDetail = DEFAULT_DETAIL;
+  });
+
+  it("labels list statuses with text and a static icon instead of a pulse", () => {
+    render(<ExecutionPageContent />);
+
+    const runningCard = screen.getByRole("button", {
+      name: "View Running Execution execution details",
+    });
+    const badge = within(runningCard).getByText("Running");
+    expect(badge.className).toContain("badge-info");
+    expect(badge.className).not.toContain("status-pulse");
+    expect(badge.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
+    expect(document.querySelector(".status-pulse")).toBeNull();
+  });
+
+  it("renders task rows flat with text status cues and toggles their figures", () => {
+    executionDetail = {
+      ...DEFAULT_DETAIL,
+      status: "running",
+      task: [
+        { name: "CheckRabi", qid: "0", status: "running", figure_path: ["a.png"] },
+        { name: "CheckT1", qid: "1", status: "unexpected" },
+      ],
+    };
+    render(<ExecutionPageContent />);
+    fireEvent.click(screen.getByText("Running Execution"));
+    const panel = screen.getByRole("complementary", { name: "Execution details" });
+
+    const row = within(panel).getByText("0-CheckRabi").closest("h4")?.parentElement
+      ?.parentElement as HTMLElement;
+    const runningLabel = within(row).getByText("Running");
+    expect(runningLabel.className).toContain("text-info");
+    expect(runningLabel.className).not.toContain("status-pulse");
+    expect(runningLabel.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
+    // Unknown task statuses keep reading as failed.
+    const unknownRow = within(panel).getByText("1-CheckT1").closest("h4")?.parentElement
+      ?.parentElement as HTMLElement;
+    expect(within(unknownRow).getByText("Failed").className).toContain("text-error");
+    expect(panel.querySelector(".status-pulse")).toBeNull();
+
+    expect(row.className).not.toMatch(/shadow-(md|lg)/);
+    expect(row.className).toContain("border-l-info");
+    expect(within(panel).queryByText("TaskFigure")).toBeNull();
+
+    fireEvent.click(row);
+    expect(row.className).toContain("border-l-info");
+    expect(within(panel).getByText("TaskFigure")).toBeTruthy();
+
+    fireEvent.click(row);
+    expect(within(panel).queryByText("TaskFigure")).toBeNull();
+  });
+});
+
+type ListOptions = {
+  query: { enabled?: boolean; queryKey?: unknown[] };
+  request?: { headers: Record<string, string> };
+};
+
+function latestCall(mock: { mock: { calls: unknown[][] } }) {
+  const calls = mock.mock.calls;
+  return calls[calls.length - 1] as [ListArgs, ListOptions] | undefined;
+}
+
+const SESSION_ROW = {
+  kind: "agent_session",
+  sort_at: "2026-06-03T00:00:00Z",
+  agent_session: {
+    session_id: "session-1",
+    project_id: "project-1",
+    chip_id: "chip-1",
+    created_by: "alice",
+    created_at: "2026-06-02T00:00:00Z",
+    updated_at: "2026-06-03T00:00:00Z",
+    expires_at: "2026-06-04T00:00:00Z",
+    status: "waiting_for_human",
+    stored_status: "waiting_for_human",
+    active_intervention_id: "int-1",
+    qids: ["Q00"],
+    allowed_tasks: ["CheckRabi"],
+    autonomy: "auto",
+    skill_name: "qdash-one-qubit-calibration",
+    model_name: "",
+    counts: {
+      actions: 4,
+      max_actions: 20,
+      measurements: 2,
+      pending_dispatch: 0,
+      dispatch_failed: 0,
+      in_flight: 0,
+      rejected_proposals: 1,
+      open_interventions: 1,
+      decisions: 1,
+    },
+    latest_activity_at: "2026-06-03T00:00:00Z",
+    missing: [],
+  },
+  children: [
+    {
+      action_id: "act-1",
+      sequence: 1,
+      attempt: 1,
+      task_name: "CheckRabi",
+      qid: "Q00",
+      in_filter: true,
+      execution: {
+        execution_id: "agent-exec-1",
+        name: "agent:CheckRabi-agent-exec-1",
+        status: "completed",
+        start_at: "2026-06-02T01:00:00Z",
+        tags: [],
+        note: {},
+      },
+    },
+    {
+      action_id: "act-2",
+      sequence: 2,
+      attempt: 2,
+      task_name: "CheckRabi",
+      qid: "Q00",
+      in_filter: true,
+      execution: {
+        execution_id: "agent-exec-2",
+        name: "agent:CheckRabi-agent-exec-2",
+        status: "failed",
+        start_at: "2026-06-03T00:00:00Z",
+        tags: [],
+        note: {},
+      },
+    },
+  ],
+  children_total: 2,
+  children_in_filter: 2,
+  children_omitted: 0,
+};
+
+const MANUAL_ROW = {
+  kind: "execution",
+  execution: {
+    execution_id: "exec-1",
+    name: "Running Execution",
+    status: "running",
+    start_at: "2026-06-01T00:00:00Z",
+    tags: [],
+    note: {},
+  },
+  children: [],
+};
+
+describe("ExecutionPageContent agent session groups", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    loadingNextPage = false;
+    executionDetail = DEFAULT_DETAIL;
+    currentProjectId = "project-1";
+    groupedError = false;
+    groupedItems = [SESSION_ROW, MANUAL_ROW];
+    groupedSummary = { total: 2, total_executions: 3, grouped_executions: 2, agent_sessions: 1 };
+  });
+
+  afterEach(() => {
+    cleanup();
+    groupedItems = null;
+    executionDetail = DEFAULT_DETAIL;
+  });
+
+  it("shows a session as one row with its own status and explains the counts", () => {
+    render(<ExecutionPageContent />);
+
+    expect(screen.getByText("qdash-one-qubit-calibration")).toBeTruthy();
+    // The group status is the session's, not a failure of its last execution.
+    expect(screen.getByText("Paused for an expert")).toBeTruthy();
+    expect(screen.getByText(/Waiting for an expert/)).toBeTruthy();
+    expect(screen.getByText("3 executions, 2 of them in 1 agent session; 2 rows")).toBeTruthy();
+    expect(screen.getByText(/1 rejected proposal/)).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Open session graph" }).getAttribute("href")).toBe(
+      "/execution/chip-1/sessions/session-1?project=project-1",
+    );
+    // Children stay folded until the row is expanded.
+    expect(screen.queryByText("agent:CheckRabi-agent-exec-1")).toBeNull();
+    const lastCall = latestCall(mockListGroups);
+    expect(lastCall?.[1].query.enabled).toBe(true);
+    expect(latestCall(mockListExecutions)?.[1].query.enabled).toBe(false);
+  });
+
+  it("expands a session and opens a child in the existing details panel", () => {
+    render(<ExecutionPageContent />);
+    const toggle = screen.getByRole("button", { expanded: false, name: /qdash-one-qubit/ });
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByText("agent:CheckRabi-agent-exec-1")).toBeTruthy();
+    expect(screen.getByText("#2 · try 2")).toBeTruthy();
+
+    fireEvent.click(screen.getByText("agent:CheckRabi-agent-exec-2"));
+    const panel = screen.getByRole("complementary", { name: "Execution details" });
+    expect(panel.getAttribute("aria-hidden")).toBe("false");
+    // Browsing covers the visible executions: both children and the manual run.
+    expect(within(panel).getByText("2 of 3 on this page")).toBeTruthy();
+
+    fireEvent.click(toggle);
+    expect(screen.queryByText("agent:CheckRabi-agent-exec-1")).toBeNull();
+  });
+
+  it("links the details panel to the execution's agent session", () => {
+    executionDetail = {
+      ...DEFAULT_DETAIL,
+      chip_id: "chip-1",
+      agent_session: {
+        session_id: "session-1",
+        linked: true,
+        action_id: "act-1",
+        status: "active",
+      },
+    };
+    render(<ExecutionPageContent />);
+    fireEvent.click(screen.getByText("Running Execution"));
+    const panel = screen.getByRole("complementary", { name: "Execution details" });
+    expect(within(panel).getByText(/One measurement of agent session/)).toBeTruthy();
+    expect(
+      within(panel).getByRole("link", { name: "Open session graph" }).getAttribute("href"),
+    ).toBe("/execution/chip-1/sessions/session-1");
+  });
+
+  it("switches to the flat list without grouping", () => {
+    render(<ExecutionPageContent />);
+    fireEvent.click(screen.getByRole("checkbox", { name: "Group agent sessions" }));
+
+    expect(latestCall(mockListExecutions)?.[1].query.enabled).toBe(true);
+    expect(latestCall(mockListGroups)?.[1].query.enabled).toBe(false);
+    expect(screen.queryByText("qdash-one-qubit-calibration")).toBeNull();
+    expect(screen.getByText("40 executions")).toBeTruthy();
+    expect(screen.getByText("Completed Execution")).toBeTruthy();
+  });
+
+  it("resets expanded groups and the panel when the project changes", () => {
+    const { rerender } = render(<ExecutionPageContent />);
+    fireEvent.click(screen.getByRole("button", { expanded: false, name: /qdash-one-qubit/ }));
+    fireEvent.click(screen.getByText("agent:CheckRabi-agent-exec-1"));
+    expect(
+      screen.getByRole("complementary", { name: "Execution details" }).getAttribute("aria-hidden"),
+    ).toBe("false");
+
+    currentProjectId = "project-2";
+    rerender(<ExecutionPageContent />);
+
+    expect(document.getElementById("execution-details-panel")?.getAttribute("aria-hidden")).toBe(
+      "true",
+    );
+    expect(screen.queryByText("agent:CheckRabi-agent-exec-1")).toBeNull();
+    // The grouped request is pinned to the new project.
+    const options = latestCall(mockListGroups)?.[1];
+    expect(options?.query.queryKey).toContain("project-2");
+    expect(options?.request?.headers["X-Project-Id"]).toBe("project-2");
+  });
+
+  it("gives a session card the accent of an execution card in the same state", () => {
+    const sessionCard = (status: string) => {
+      groupedItems = [
+        { ...SESSION_ROW, agent_session: { ...SESSION_ROW.agent_session, status } },
+        MANUAL_ROW,
+      ];
+      const view = render(<ExecutionPageContent />);
+      const card = screen.getByTestId("agent-session-card");
+      const className = card.className;
+      view.unmount();
+      return className;
+    };
+
+    // The manual row is a running execution card.
+    render(<ExecutionPageContent />);
+    const runningCard = screen.getByRole("button", {
+      name: "View Running Execution execution details",
+    });
+    expect(runningCard.className).toContain("border-l-info");
+    cleanup();
+
+    const active = sessionCard("active");
+    expect(active).toContain("border-l-4");
+    expect(active).toContain("border-l-info");
+    expect(sessionCard("completed")).toContain("border-l-success");
+    expect(sessionCard("cancelled")).toContain("border-l-neutral");
+    expect(sessionCard("waiting_for_human")).toContain("border-l-warning");
+    const expired = sessionCard("expired");
+    expect(expired).toContain("border-l-base-300");
+    expect(expired).not.toMatch(/border-l-(info|success|warning|error|neutral)/);
+  });
+
+  it("reports a grouped list that cannot be loaded", () => {
+    groupedError = true;
+    render(<ExecutionPageContent />);
+    expect(screen.getByRole("alert").textContent).toContain(
+      "Execution history could not be loaded",
+    );
   });
 });

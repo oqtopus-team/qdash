@@ -1,35 +1,52 @@
-![OQTOPUS](docs/public/images/oqtopus-logo.png)
+<img src="docs/public/images/oqtopus-logo.png" alt="OQTOPUS" width="100%" />
 
 # QDash
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![slack](https://img.shields.io/badge/slack-OQTOPUS-pink.svg?logo=slack&style=plastic")](https://join.slack.com/t/oqtopus/shared_invite/zt-3bpjb7yc3-Vg8IYSMY1m5wV3DR~TMSnw)
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/oqtopus-team/qdash)
+[![slack](https://img.shields.io/badge/slack-OQTOPUS-pink.svg?logo=slack&style=plastic)](https://join.slack.com/t/oqtopus/shared_invite/zt-3bpjb7yc3-Vg8IYSMY1m5wV3DR~TMSnw)
+[![Documentation](https://img.shields.io/badge/docs-online-blue)](https://oqtopus-team.github.io/qdash/)
 
-QDash is a web application that provides a user-friendly interface to manage and monitor the execution of qubit calibration workflows.
+QDash is a web platform for running qubit calibration workflows, reviewing measurement results,
+and tracking calibration parameters and their history.
 
-![screenshot](docs/public/images/qdash-screenshot.png)
+<img src="docs/public/images/qdash-demo.gif" alt="QDash calibration demo" width="100%" />
 
-> [!WARNING]
-> QDash is currently under development. Please check back later for updates.
+[Watch the demo with sound](https://oqtopus-team.github.io/qdash/user-guide/what-is-qdash#demo)
 
-![qdash-demo](docs/public/images/qdash-demo.gif)
+To try QDash without quantum hardware, follow
+[Setup](https://oqtopus-team.github.io/qdash/user-guide/setup) with the
+[Fake backend](https://oqtopus-team.github.io/qdash/user-guide/setup/fake-backend), then
+[Run Your First Calibration](https://oqtopus-team.github.io/qdash/user-guide/first-calibration);
+to connect a lab system, start with
+[Setup](https://oqtopus-team.github.io/qdash/user-guide/setup) and choose the
+[Qubex backend](https://oqtopus-team.github.io/qdash/user-guide/setup/qubex-backend). Read
+the release notes and [System Updates](https://oqtopus-team.github.io/qdash/user-guide/system-updates)
+before upgrading an existing deployment.
 
-[▶ Watch the 30-second demo with sound](https://oqtopus-team.github.io/qdash/getting-started/what-is-qdash#demo)
+## Features
 
-## Key Features
-
-- **⚡ Workflows**: Centrally manage and track the progress of calibration workflows, from creation to completion.
-
-- **📊 Observations**: Access and analyze the observational data utilized in calibration processes, ensuring transparency and insight.
-
-- **⚙️ Settings**: Configure calibration parameters and adjust workflow settings to meet specific requirements seamlessly.
+- **Run calibrations**: Create, schedule, and monitor calibration workflows, or run an individual
+  task from the workbench.
+- **Inspect results**: Compare chip metrics, task results, artifacts, parameter history, and
+  provenance.
+- **Collaborate**: Connect results to notes, forum threads, task knowledge, AI evaluations, and
+  notifications, scoped to a project.
 
 ## Documentation
 
-- [Documentation Home](https://oqtopus-team.github.io/qdash/)
+- [What is QDash?](https://oqtopus-team.github.io/qdash/user-guide/what-is-qdash): the
+  calibration loop and what QDash manages.
+- [Setup](https://oqtopus-team.github.io/qdash/user-guide/setup): choose a backend, deploy
+  QDash, and sign in.
+- [Run Your First Calibration](https://oqtopus-team.github.io/qdash/user-guide/first-calibration):
+  create a chip, run a workflow, and inspect its first result.
+- [Operations](https://oqtopus-team.github.io/qdash/user-guide/operations) and
+  [System Updates](https://oqtopus-team.github.io/qdash/user-guide/system-updates): run and
+  upgrade a deployment.
+- [Developer Guide](https://oqtopus-team.github.io/qdash/developer-guide/): architecture,
+  development setup, and contribution flow.
 
-## CITATION
+## Citation
 
 You can use the DOI to cite QDash in your research.
 
@@ -42,12 +59,12 @@ Citation information is also available in the [CITATION](https://github.com/oqto
 You can contact us by creating an issue in this repository,
 or you can contact us by email:
 
-- [oqtopus-team[at]googlegroups.com](mailto:oqtopus-team[at]googlegroups.com)
+- [oqtopus-team[at]googlegroups.com](mailto:oqtopus-team@googlegroups.com)
 
 or you can join our Slack workspace:
 
-[![slack](https://img.shields.io/badge/slack-OQTOPUS-pink.svg?logo=slack&style=plastic")](https://join.slack.com/t/oqtopus/shared_invite/zt-3bpjb7yc3-Vg8IYSMY1m5wV3DR~TMSnw)
+[![slack](https://img.shields.io/badge/slack-OQTOPUS-pink.svg?logo=slack&style=plastic)](https://join.slack.com/t/oqtopus/shared_invite/zt-3bpjb7yc3-Vg8IYSMY1m5wV3DR~TMSnw)
 
-## LICENSE
+## License
 
-OQTOPUS Cloud is released under the [Apache License 2.0](https://github.com/oqtopus-team/qdash/blob/main/LICENSE).
+QDash is released under the [Apache License 2.0](https://github.com/oqtopus-team/qdash/blob/main/LICENSE).

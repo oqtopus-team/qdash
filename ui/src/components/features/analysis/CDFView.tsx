@@ -16,6 +16,7 @@ import { TimeRangeSelector } from "@/components/ui/TimeRangeSelector";
 import { useCSVExport } from "@/hooks/useCSVExport";
 import { useMetricsConfig, type MetricConfig } from "@/hooks/useMetricsConfig";
 import { useMetricsQueryParams } from "@/hooks/useMetricsQueryParams";
+import { useSelectStyles } from "@/hooks/useSelectStyles";
 import { useCDFUrlState, useRangeModeUrlState } from "@/hooks/useUrlState";
 import { useIsDarkTheme } from "@/contexts/ThemeContext";
 import { chartTheme, seriesColor } from "@/lib/chartTheme";
@@ -130,6 +131,8 @@ export function CDFView() {
     });
     return configs;
   }, [selectedParameters, qubitMetrics, couplingMetrics]);
+
+  const parameterSelectStyles = useSelectStyles<{ value: string; label: string }, true>();
 
   // Check if any selected parameter has best mode supported
   const isBestModeSupported = useMemo(() => {
@@ -683,21 +686,21 @@ export function CDFView() {
   return (
     <div className="space-y-4 sm:space-y-6">
       {/* Controls Section */}
-      <div className="card bg-base-100 shadow-md">
+      <div className="card bg-base-100">
         <div className="card-body p-3 sm:p-4 gap-3 sm:gap-4">
           {/* Row 1: Main Controls */}
           <div className="flex flex-col gap-3 sm:gap-4">
             {/* Row 1a: Type + Chip + Parameters */}
             <div className="flex flex-col sm:flex-row flex-wrap items-start gap-2 sm:gap-3">
-              <div className="tabs tabs-boxed bg-base-200 h-8 sm:h-9">
+              <div className="tabs tabs-boxed tabs-sm">
                 <button
-                  className={`tab h-full ${currentMetricType === "qubit" ? "tab-active" : ""}`}
+                  className={`tab ${currentMetricType === "qubit" ? "tab-active" : ""}`}
                   onClick={() => handleMetricTypeChange("qubit")}
                 >
                   1Q
                 </button>
                 <button
-                  className={`tab h-full ${currentMetricType === "coupling" ? "tab-active" : ""}`}
+                  className={`tab ${currentMetricType === "coupling" ? "tab-active" : ""}`}
                   onClick={() => handleMetricTypeChange("coupling")}
                 >
                   2Q
@@ -724,22 +727,7 @@ export function CDFView() {
                   }}
                   placeholder="Select parameters"
                   className="text-base-content"
-                  styles={{
-                    control: (base) => ({
-                      ...base,
-                      minHeight: "36px",
-                      height: "auto",
-                      borderRadius: "0.5rem",
-                    }),
-                    valueContainer: (base) => ({
-                      ...base,
-                      padding: "2px 8px",
-                    }),
-                    menu: (base) => ({
-                      ...base,
-                      zIndex: 50,
-                    }),
-                  }}
+                  styles={parameterSelectStyles}
                 />
               </div>
             </div>
@@ -755,15 +743,15 @@ export function CDFView() {
 
             {/* Mode + Display Toggle + Export */}
             <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-              <div className="join h-8 sm:h-9">
+              <div className="join">
                 <button
-                  className={`join-item btn btn-xs sm:btn-sm h-full ${selectionMode === "latest" ? "btn-primary" : ""}`}
+                  className={`join-item btn btn-sm ${selectionMode === "latest" ? "btn-primary" : ""}`}
                   onClick={() => setSelectionMode("latest")}
                 >
                   Latest
                 </button>
                 <button
-                  className={`join-item btn btn-xs sm:btn-sm h-full ${selectionMode === "best" ? "btn-primary" : ""} ${!isBestModeSupported ? "btn-disabled" : ""}`}
+                  className={`join-item btn btn-sm ${selectionMode === "best" ? "btn-primary" : ""} ${!isBestModeSupported ? "btn-disabled" : ""}`}
                   onClick={() => setSelectionMode("best")}
                   disabled={!isBestModeSupported}
                   title={!isBestModeSupported ? "Best mode not available" : "Show best values"}
@@ -771,7 +759,7 @@ export function CDFView() {
                   Best
                 </button>
                 <button
-                  className={`join-item btn btn-xs sm:btn-sm h-full ${selectionMode === "average" ? "btn-primary" : ""}`}
+                  className={`join-item btn btn-sm ${selectionMode === "average" ? "btn-primary" : ""}`}
                   onClick={() => setSelectionMode("average")}
                   title="Show average values"
                 >
@@ -780,7 +768,7 @@ export function CDFView() {
               </div>
 
               {hasPercentageMetrics && (
-                <label className="cursor-pointer flex items-center gap-1 sm:gap-2 h-8 sm:h-9">
+                <label className="choice-field text-sm">
                   <span className="text-sm">Fidelity</span>
                   <input
                     type="checkbox"
@@ -793,7 +781,7 @@ export function CDFView() {
               )}
 
               <button
-                className="btn btn-outline btn-xs sm:btn-sm h-8 sm:h-9 ml-auto sm:ml-0"
+                className="btn btn-outline btn-sm ml-auto sm:ml-0"
                 onClick={handleExportCSV}
                 disabled={!primaryData.tableData || primaryData.tableData.length === 0}
               >
@@ -917,7 +905,7 @@ export function CDFView() {
       />
 
       {/* Data Table */}
-      <div className="card bg-base-100 shadow-md">
+      <div className="card bg-base-100">
         <div className="card-body px-2 sm:px-8">
           <DataTable
             title="Data Points"

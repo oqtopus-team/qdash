@@ -1,15 +1,26 @@
 # Copilot Architecture
 
-## Responsibility Boundary
+QDash Copilot is the chat assistant that helps experimentalists interpret qubit calibration
+results. It owns the chat request path from the UI through the API to the Pi Agent Runtime
+(`agent-runtime/`), the pi-qdash tools the runtime calls back into the API with, and the per-chat
+[workspace](./workspace.md). Recorded figure judgments belong to
+[Calibration Evaluation](./evaluation.md), agent-run calibration to the
+[Agent Platform](./agent-platform.md), and model and endpoint settings to
+[Copilot Model Configuration](./model-configuration.md).
 
-QDash Copilot is an AI-powered assistant that helps experimentalists interpret qubit calibration results. It provides two interaction modes:
+<a id="two-modes"></a>
+<a id="chat-about-a-task-result"></a>
+<a id="chat-page"></a>
 
-1. **Chat about a task result** (sidebar or floating window) -- Opened from a task result with that result's context and figures, for questions about one calibration result (e.g., CheckT1, CheckRabi).
-2. **Chat Page** -- A dedicated chat interface for chip-wide questions, cross-qubit comparisons, and exploratory data analysis.
+Every chat is the same planner on the same runtime, streamed to the browser over SSE. Chats differ
+only in what they open with:
 
-Both are the same chat with the same planner; the first just opens with a task result as its context. The evaluation model's recorded judgements are a separate thing (see [Calibration Evaluation](./evaluation.md)). Forum AI replies are one planner turn each on the same runtime.
-
-Both run on the Pi Agent Runtime (`agent-runtime/`) with the pi-qdash tools, a shell and files per conversation in a separate container (the [workspace](./workspace.md)), and SSE streaming for progress.
+| Entry point | Request | Opening context | Typical question |
+| --- | --- | --- | --- |
+| Chat about a task result (**Ask Agent** in a metrics modal, task history, or execution detail) | `POST /copilot/chat/stream` with `task: {task_name, chip_id, qid, execution_id, task_id}` | `TaskContext` (knowledge, qubit and coupling parameters, results, history, neighbors) and figures in the opening message | "Is this T1 result normal?" |
+| Chat page (`/copilot`, `useCopilotChat`) | `POST /copilot/chat/stream` | Chip ID, optional qubit ID, scoring thresholds | "Compare T1 across all qubits" |
+| Failure investigation | `POST /copilot/chat/stream` with `investigation` | Error message, stack trace, and source roots; see [Failure Investigations and Source Access](#failure-investigations-and-source-access) | "Why did this run fail?" |
+| Forum AI reply | `thread_reply` / `complete_once` in `pi_chat_service.py` | The thread's history and its latest post | One planner turn per reply |
 
 ## Component Diagram
 
@@ -18,21 +29,34 @@ Both run on the Pi Agent Runtime (`agent-runtime/`) with the pi-qdash tools, a s
 ## Key Files
 
 | File | Responsibility |
-|------|---------------|
+| --- | --- |
 | `src/qdash/api/routers/copilot.py` | FastAPI router with `/config`, `/chat/stream` (general and task chats), chat sessions |
 | `src/qdash/copilot/runtime.py` | Data loading: `build_task_context()`, `build_images_sent_metadata()`, qubit/task/history queries |
 | `src/qdash/api/services/pi_chat_service.py` | Runtime bridge: request payloads, the task chat's opening message and figures, NDJSON to SSE translation, `thread_reply` / `complete_once` for forum reply turns |
 | `src/qdash/copilot/` | Shared Copilot runtime used outside the API process |
+| `agent-runtime/src/codemode.ts` | `codemode` scripts, `tool_search`, and the hooks that keep scripts to audited read-only tools and internal tools to their callers ([Code Mode and deferred tools](#code-mode-and-deferred-tools)) |
+| `agent-runtime/src/branch.ts` | Branching a chat at an answer: the Pi fork, its checks, and the `qdash.branches` receipts ([Branches](./chat-streaming.md#branches)) |
+| `src/qdash/api/services/copilot_chat_session_service.py` | Chat sessions, the store each one uses, branch creation, store cleanup with the last session, and the recorded turn's writes ([Recording a Turn on the Server](./chat-streaming.md#recording-a-turn-on-the-server)) |
+| `src/qdash/api/services/chat_turn_runs.py` | Each chat turn's stream as a background task the HTTP responses subscribe to, which records the turn |
+| `src/qdash/api/services/chat_transcript.py` | The server's fold of a turn's SSE events into stored messages, and the transcript digest |
+| `agent-runtime/src/chat-registry.ts` | Per-session chat registry: QDash tools, copilot tools, preferences, page context, workspace tools, and Code Mode |
+| `agent-runtime/src/compaction.ts` | Compaction summaries sized to the chat's model, and the compaction failure message |
+| `agent-runtime/src/allowed-tools.ts` | Which pi-qdash tools the chat offers, which need approval, which scripts may call, and which are deferred |
 | `agent-runtime/src/exec-env.ts` | The workspace: one `agent-exec` connection per conversation behind `bash`, `read`, `write`, `edit` |
 | `src/qdash/copilot/contracts/models.py` | Pydantic models: `TaskContext`, `TaskContextBundle`, `ChatRequest` (with `task`); request schemas |
 | `src/qdash/api/lib/sse.py` | SSE utilities: `sse_event()` formatter |
-| `src/qdash/copilot/config/settings.py` | Configuration loader: `CopilotConfig`, `ModelConfig`, `TaskChatConfig`; YAML loading with local override |
+| `src/qdash/copilot/config/settings.py` | Configuration loader: `CopilotConfig`, `ModelConfig`, `TaskChatConfig`, loaded through `ConfigLoader.load_copilot` |
 | `src/qdash/datamodel/task_knowledge.py` | `TaskKnowledge` model with domain-specific knowledge per calibration task |
 | `config/copilot/config.yaml` | Enablement, languages, how a task chat opens |
 | `config/copilot/chat.yaml` | Planner models for every chat |
+| `config/copilot/profiles/<name>/` | A deployment's own `chat.yaml` and `evaluation.yaml`, selected by `QDASH_COPILOT_PROFILE` ([Deployment Profiles](./model-configuration.md#deployment-profiles)) |
+| `config/copilot/classifier.yaml` | Optional classifier models any feature can use; the first usable one is used |
+| `agent-runtime/src/classifier-models.ts` | Reads `classifier_models`, registers System One endpoints as Pi providers, and selects a feature's model |
+| `agent-runtime/src/presentation-tool.ts` | `present_results`: classifier-chosen layouts of values the chat passes, offered when a classifier is usable |
+| `agent-runtime/src/classify-tool.ts` | `classify`: the chat asks the classifier to pick one of the categories it defines, offered when a classifier is usable |
 | `config/copilot/evaluation.yaml` | Evaluation model (calibration VLM) |
-| `agent-runtime/src/evaluate.ts`                           | Planner-less evaluation of one task result: evidence tool, then `qcal_evaluate`, as one record                                     |
-| `src/qdash/api/services/evaluation_service.py`             | Bulk evaluation runs: selection per chip, background execution through the runtime, records and verdicts                          |
+| `agent-runtime/src/evaluate.ts` | Planner-less evaluation of one task result: evidence tool, then `qcal_evaluate`, as one record |
+| `src/qdash/api/services/evaluation_service.py` | Bulk evaluation runs: selection per chip, background execution through the runtime, records and verdicts |
 | `ui/src/hooks/useCopilotChat.ts` | React hook for the chat page: session management, SSE consumption, localStorage persistence |
 | `ui/src/contexts/ChatDockContext.tsx` | Where the chat is shown outside the chat page: the docked sidebar (`ChatSidebar`) or the floating window, and opening a chat about a task result or a failure investigation |
 | `src/qdash/api/services/copilot_investigation_service.py` | An investigation's opening message from project-scoped logs |
@@ -57,42 +81,259 @@ The pinned pi-qdash version accepts a configuration file rather than an injected
 
 ## Durable conversations
 
-`agent-runtime/src/runtime.ts` opens one Pi SQLite store per user and session in the
-`agent-runtime-state` volume. Pi 1.4 upgrades existing stores to schema version 2 on first open;
-Pi 1.3 cannot reopen an upgraded store. Back up the stopped volume before upgrading, and restore
-that backup before a rollback to Pi 1.3. See [System Updates](../../user-guide/system-updates.md#deploy-the-release).
+`agent-runtime/src/runtime.ts` opens one Pi SQLite store per user and store session in the
+`agent-runtime-state` volume. A chat that was never branched is the root conversation of its own
+store; a branch is another conversation in the store of the chat it was branched from (see
+[Branches](./chat-streaming.md#branches)). Pi 1.4 upgrades existing stores to schema version 2 on first open;
+Pi 1.3 cannot reopen an upgraded store. Pi 1.5 keeps that schema but stores the `pi.live`,
+`pi.tool`, and `pi.generation` documents at new versions when a conversation is next written; Pi 1.4
+cannot read such a conversation and leaves its tasks blocked. Pi 1.6 stores `pi.tool` and
+`pi.generation` at newer versions again; Pi 1.5 blocks those tasks as too new. Back up the stopped volume before
+upgrading, and restore that backup before a rollback to the earlier Pi release. See
+[System Updates](../../user-guide/system-updates.md#deploy-the-release).
 
 Each chat model in `config/copilot/chat.yaml` gets compaction thresholds based on its own context
 window and output limit. `agent-runtime/src/models-config.ts` resolves those models at startup,
-and `agent-runtime/src/budget.ts` calculates their thresholds. The runtime gives Pi 1.4 a
+and `agent-runtime/src/budget.ts` calculates their thresholds. The runtime gives Pi a
 `modelOverrides` entry for each resolved model, so a resumed task uses the budget of the model it
 started with even if the next request selects another model. The selected request model also gets
 an entry when it is absent from the startup list.
 
-Pi reports session failures, faulted or parked tasks, migrations, and extension errors through
-`onReport`. `agent-runtime/src/durable-report.ts` logs the report type, task and extension names,
-and error type under the hashed session filename. It omits error messages, prompts, tool
+`buildCompactionExtension` in `agent-runtime/src/compaction.ts` writes the compaction summary through
+Pi's `beforeCompact` hook. Pi's built-in summarizer sends the chat's thinking level, so reasoning and
+the summary share the model's output limit; on the local qwen model with a 64k window and 8k output,
+the reasoning can use all of it, and the turn fails with `Compaction failed: Summarization hit the
+token limit`. The hook sends the request with thinking off and an output cap that never exceeds the
+model's stated `maxTokens`. It serializes the whole summarized range: user and assistant text,
+including an earlier summary, is never cut or left out, and only tool arguments and tool results
+are shortened per call. When the summary is cut off, the hook retries once with shorter tool
+output, which makes a second cut-off less likely but does not rule it out. Pi still chooses the
+range and places the summary whole; raw entries stay in the store, and the task's durable memo
+keeps a written summary across restarts.
+
+The hook sends no request when the model states no context window, when its output limit is
+below 512 tokens, or when the whole serialized range, with the system prompt and instructions,
+does not fit the window with room for the output. It logs the reason and sizes, never
+conversation text, and hands the compaction to the built-in summarizer instead of summarizing a
+partial transcript. A provider error or a second cut-off also hands it over once. When the
+built-in summarizer fails too, the runtime sends the error code `compaction_failed` with a message
+that points to **Continue**. Continue resumes the turn without sending the message again or
+rerunning tool calls that finished. The message also says that the stored chat is intact, and that
+after a summary the model sees the earlier part only in summarized form. The provider's error text
+goes to the runtime log only.
+
+Pi reports storage failures, faulted or interrupted tasks, migrations, and extension errors through
+`onReport`. `agent-runtime/src/durable-report.ts` logs the report kind as `type`, the task and
+extension names, the reason and restart count, and the error type under the hashed session filename. It omits error messages, prompts, tool
 arguments, and user identifiers from these logs.
+
+## Code Mode and deferred tools
+
+The chat agent has two Pi tools besides the QDash tools: `codemode` runs a model-written
+JavaScript script, and `tool_search` loads deferred tools. Both come from
+`@earendil-works/pi-durable`; `agent-runtime/src/codemode.ts` defines them and the tool policy,
+and `buildChatRegistry` in `agent-runtime/src/chat-registry.ts` installs them for every chat.
+They have no configuration.
+
+A `codemode` script calls tools as `await tools.qdash_list_chips({})` in a QuickJS sandbox
+(`@earendil-works/pi-codemode`) and prints what it needs with `text(...)`. Only the printed output
+reaches the model, so one script can fetch a chip's qubits, filter them, and return a short table.
+Each call a script makes is a nested durable tool call: Pi journals its result, and a script
+interrupted by a restart reruns from its start with the journaled results, without repeating
+finished calls. The rerun ends the call with an error instead when the script's deadline passed
+meanwhile, or when the sandbox's fingerprint (QuickJS and prelude versions, heap limit) or the
+code mode version changed, as a Pi upgrade or a new `CODEMODE_MEMORY_LIMIT_BYTES` can do.
+
+Scripts hold no credentials and reach QDash only through tools, which run in the runtime with the
+requesting user's connection. A script may call only the bundled pi-qdash reads in
+`NESTED_READ_TOOL_NAMES`: QDash API reads without images, local files, or long waits. The list,
+`DEFERRED_TOOL_NAMES`, the data bound, and the script deadlines come from pi-qdash's
+`extensions/lib/tool-policy.ts`, which pi CLI enforces as well. Three mechanisms enforce the
+list here:
+
+- Each tool's `callers` field. `buildQDashExtension` gives listed reads `["model", "tools"]`; all
+  other tools, including writes, trusted extension tools, workspace tools, and the chat's own
+  tools, get `["model"]`.
+- The `codemode` tool gives a script, and the prompt section that describes script tools lists,
+  only the listed reads. Any other tool is absent from a script's `tools` and `searchTools()`.
+- A `beforeTool` hook in `toolPolicyExtension` blocks a nested call to a tool outside the list,
+  including a tool that was never given `callers`.
+
+A listed read returns its `details.data` to the script as structured output. Its
+`structuredOutputSchema` is the pi-qdash tool's `outputSchema` when it declares one (the
+response contracts in `extensions/lib/query-contracts.ts`), else the generic `QDASH_DATA_SCHEMA`,
+so a script sees the same declaration as in pi CLI. Pi validates the output against it and fails
+the nested call on a mismatch.
+
+The hook allows one other kind of nested call: an internal tool called by the tool that owns it.
+`present_results` calls its classifier, `qdash.presentation.classify` (`callers: ["tools"]`), as
+a nested call. `PRESENTATION_INTERNAL_CALLS` names `present_results` as the classifier's only
+caller. The hook reads which tool the parent task runs from the conversation's `pi.live` tool
+slots, which the Harness writes, and allows a classifier call only when that tool is
+`present_results`. A script's parent is the `codemode` call, so a script cannot reach the
+classifier even with Code Mode unfiltered. The slots are committed state, so the check does not
+depend on the caller's code running in this process: it also holds for a caller that parks (see
+below) or that started the call with `executeTool(..., { wait: false })`, and after a restart. A
+nested call whose parent has no slot is blocked, and `present_results` then falls back to
+`render_ui` or text. Its `sources` must name a tool the model is offered, or a listed read
+a script may call (in the agent's `callable` tools), so a script's deferred read counts before
+`tool_search` loads it.
+
+The `qdash` durable extension declares the code mode namespace `QDASH_TOOL_NAMESPACE` from
+pi-qdash's `extensions/lib/tool-policy.ts` (Pi 1.6 `Extension.namespace`). The prompt section
+lists the tools a script may call under `## qdash` with the namespace's one-line description. A
+script reads the longer instructions (the read-only rule, the data bound, deferred reads) with
+`describeNamespace("qdash")`, and `searchTools()` searches both. The namespace groups tools only;
+it does not widen what a script may call, and write tools in the same extension stay out of the
+listing, `describeNamespace()`, and `searchTools()`.
+
+Pi 1.6 also lets a durable tool's `execute()` park, returning `{ sleep }` or `{ wait }` instead of
+a result, and run again once a deadline, a signal, or its child tasks wake it. Other pi-qdash
+tools are pi CLI tools adapted by `adaptCodingAgentTool`, which runs the tool once and returns its
+result. Approval stays the card-and-next-message flow below rather than a parked call. The
+runtime's own layer passes a park through unchanged: `modelOnly` and the Code Mode wrapper keep the
+tool's `execute()` result and `cancel`, and the policy hook works for parked callers as described
+above.
+
+The pinned `qdash_wait_execution`, `qdash_wait_agent_action`, and `qdash_wait_agent_intervention`
+park between polls instead of running a polling loop (`agent-runtime/src/durable-waits.ts`).
+pi-qdash's `extensions/lib/waits.ts` (`WAIT_SPECS`) splits each tool into one poll, `check`, and
+its result, `result`. `check` stops on the same value as the client's loop: the whole pipeline's
+terminal status for an execution, and the requested `operation_id` or `execution_id`, or a failed
+`execution_status`, for an action. For an intervention it stops when the session leaves
+`waiting_for_human` or its intervention leaves `open` and `responding`, and returns the session's
+loop context. The pi CLI keeps the client's loop for the first two, runs `pollUntilSettled` for
+the third, and builds the same result with `result`. In chat, each run of the tool polls once with a client built from the chat's
+connection, then returns the result, throws the client's timeout error once the deadline passed,
+or parks with `{ sleep: { until } }` for one poll interval. The tool's inputs, defaults, results,
+and errors are those of the pi CLI tool. A parked wait differs from the loop in these ways:
+
+- It holds no process or open request. Its `pi.live` slot is `sleeping`, so the chat stream
+  still shows the call as running and the turn as busy, and Stop stays available.
+- Its deadline is fixed from the Harness clock when the call first runs, memoized, and carried in
+  every park's checkpoint. A wait recovered after a runtime restart polls once against that
+  original deadline, so it never outlives its timeout.
+- Stop ends a parked wait at once and drops a poll in flight. The tool has no `cancel`: waiting
+  only reads, so the execution or action keeps running in QDash. The model reads Pi's
+  `aborted` result.
+- A recovered poll uses the credentials of the request that reopened the chat; the checkpoint
+  holds only the deadline.
+
+Polls keep the requested interval, 0.5 seconds by default, so each poll also commits a park to
+the chat store. The intervention wait polls every 15 seconds by default, never more often than
+every 5 seconds, and caps its timeout at one hour: it is a bounded wait inside a turn the user
+started, not a background watcher, and nothing continues a chat after it ends. A trusted
+tool that replaces a waiting tool runs its own code. The waiting tools stay model-only, so a
+script cannot long-poll.
+
+Reviewed write tools therefore still run only after the user approves the model's own call on
+the approval card, and session-granted writes only from the model's own call; neither runs from
+a script. In a script, a listed read resolves to its redacted response
+data (`details.data` of the pi-qdash result) as JSON rather than its truncated text answer. A failed call rejects with
+the tool's error text. Pi journals nested results until the script ends and does not bound
+structured output, so the policy hook drops a nested result's `details` and fails a call whose
+data exceeds 512 KiB of JSON (`MAX_NESTED_DATA_BYTES`), with a message that asks for a narrower
+request.
+
+A script runs in its own worker thread with a 128 MiB QuickJS heap. The runtime admits at most
+eight script workers at once; these bound each VM, not the memory of the runtime process. A
+script without `timeout_ms` gets a deadline of 120 seconds, and longer deadlines are cut to 300
+seconds. A `timeout_ms` that Code Mode rejects, such as a string or `0`, is passed through
+unchanged, and the script fails with Code Mode's error. On Bun, a cancelled or timed-out worker can keep computing inside a long built-in call
+until that call returns. Scripts cannot start model calls (`models: false`). Each open session
+has its own sandbox, which `openSession` closes after the harness.
+
+Pi offers a tool with `deferred: true` to the model only after it is loaded. The pi-qdash tools in
+`DEFERRED_TOOL_NAMES` (cryostat and wiring context, forum, pipelines, agent workflow state, metric
+scripts and dashboards, source code, and similar narrower workflows) are deferred. The tool guide in the system prompt marks
+them with `*`, and the prompt lists the deferred tools the guide does not name. The
+model loads one with `tool_search`, which records it in the conversation's `modelTools`. The tool
+stays offered on that conversation branch, also after compaction or a runtime restart. A model
+that calls a deferred tool by name without loading it gets an error result; an `afterTool` hook in
+`toolPolicyExtension` loads the tool for the next request and asks the model to call it again.
+Scripts may call deferred read tools without loading them.
+
+Pi records the changed tool set in the transcript. pi-ai sends it as a mid-conversation tool
+addition only to providers whose compatibility settings declare mid-conversation system messages
+and tool additions (`supportsMidConvoToolAdditions`, off by default for OpenAI-compatible
+endpoints); for other providers it sends the full current tool list with each request. Loading a tool changes the request's tool list, so the prompt cache before the
+change is lost once.
+
+A finished `codemode` call's `tool_end` event carries the script output followed by one line per
+tool call (status, tool, duration, error). The chat shows the step as **Ran a script** with the
+script and that output, so failed nested calls are visible. Nested calls are not streamed while
+the script runs. The runtime log records blocked and failed nested calls. Tests: `agent-runtime/test/codemode.test.mjs`
+runs a Harness with a faux model through scripts, approval exclusion, the data limit, and
+deferred loading, including recovery of a direct call and persistence across a reopened store.
+`agent-runtime/test/chat-registry.test.mjs` runs the production `buildChatRegistry` assembly:
+`present_results` reaches its classifier, scripts reach only the listed reads, the policy hook
+blocks the classifier for any other parent, and a script past the worker limit is refused.
+`agent-runtime/test/tool-park.test.mjs` parks tools through the policy on a real Harness: a
+caller that sleeps on a signal and calls its internal tool after the wake, a caller that parks on
+an internal call it started without waiting, a non-caller that stays blocked after a wake, and an
+abort that runs the parked tool's `cancel`. `agent-runtime/test/durable-waits.test.mjs` runs the real pi-qdash
+waiting tools on a Harness against a QDash fixture: park and wake, the chat stream while parked,
+timeout, a failed request, Stop while parked and during a poll, and recovery after a restart
+against the original deadline, each compared with the pi CLI's result or error.
+`packages/pi-qdash/tests/waits.test.mjs` compares `WAIT_SPECS` with the client's polling loops.
 
 ## Page context and editor edits
 
 A chat from the sidebar or the floating window tells the assistant what the user has open.
-Every turn carries `ChatRequest.page` (`PageContext`: route, title, and on the Workflow editor
-the flow's name, chip, and the editor's current text, unsaved changes included); the runtime
+Every turn carries `ChatRequest.page` (`PageContext`: route, title, and on an editor the
+editor's current text, unsaved changes included: `flow` with the flow's name and chip on the
+Workflow editor, `metric_script` with the script's ID and name on the metric script editor at
+`/dashboards/scripts/<id>`); the runtime
 rebuilds a system prompt section from it each turn (`agent-runtime/src/page-context.ts`,
-`buildPageContextSection`). The chat page itself sends none.
+`buildPageContextSection`). The chat page itself sends none. Above the message box, every chat
+surface lists the page with the session's saved task result or investigation
+(`ui/src/components/features/chat/ChatContextBar.tsx`).
 
 Pages register what they show with the chat dock (`ChatDockContext.registerPage`): the
-registration reads the page's state when a turn is sent, so an editor's buffer is current, and
-may accept code back (`applyCode`). Without a registration the dock sends the route and the
-document title.
+registration reads the page's state when a turn is sent (`currentPage`), so an editor's buffer is
+current, and may accept code back (`applyCode`). Without a registration the dock sends the route
+and the document title. `ChatThread` subscribes to a summary of the same page (route, title, and
+whether the editor's code is sent) through `useChatPageSummary`. The dock notifies subscribers
+when a page registers or unregisters, and a registered page calls `refreshPage` after each of its
+commits, so the list follows navigation, the editor finishing loading, and a pane switch. The
+summary holds no code, so a keystroke in the editor does not rerender the chat.
 
-On the Workflow editor the runtime also offers `propose_code_edit`: the model passes the
-complete new file and a one-line summary, the call ends the turn, and the chat renders an
-`edit` block (`EditProposalCard`) with a diff against what the editor holds now. **Apply to
-editor** replaces the buffer and unlocks the editor; saving stays with the user and goes through
-the editor's Save, so `POST /flows` validation and deployment registration are unchanged. The
-runtime never writes the flow; `qdash_save_flow` stays for flows written from the chat alone.
+On either editor the runtime also offers `propose_code_edit` (`buildProposeCodeEditTool`, for
+the editor `editorOf` finds on the page): the model passes the complete new file and a one-line
+summary, the call ends the turn, and the chat renders an `edit` block (`EditProposalCard`) with a
+diff against what the editor holds now. The proposal carries `target` (`flow`,
+`metric_script`, or `dashboard`, described below), `pagePath`, and the editor's identity: `flowName` and `chipId` for a flow,
+`scriptId` and `scriptName` for a script (`flowName` repeats the script name). **Apply to
+editor** replaces the buffer only when the open editor matches (`ui/src/lib/copilotEditTarget.ts`)
+and unlocks the editor; saving stays with the user and goes through the editor's Save, so
+`POST /flows` validation and deployment registration, and metric script revisions, are
+unchanged. The runtime never writes the flow or the script. For a metric script, the page
+section also tells the model the file is a `qdash_metrics` module, points it to the
+`qdash-metric-scripts` skill, and has it check the draft with `qdash_validate_metric_script` and
+`qdash_preview_metric_script`; `qdash_save_flow` and `qdash_save_metric_script` stay for code
+written from the chat alone or saved at the user's request.
+
+A dashboard is the third editor. `DashboardPageContent` registers
+`PageContext.dashboard` (`DashboardEditorContext` in `src/qdash/copilot/contracts/models.py`)
+only when the user may save the dashboard: their own, or a new one on `/dashboards/new`,
+which has no `dashboard_id`. Its "code" is the draft as JSON written by
+`serializeDashboardDraft` (`ui/src/components/features/dashboards/dashboardDraft.ts`):
+`{"panels": [...]}` for a stored dashboard, plus `name`, `description`, `chip_id` and
+`template_id` for a new one. `panels` is required in a proposal, and `[]` with a `template_id`
+lets the page preview the template; a missing list is refused instead of being read as "remove
+every panel". Visibility is never part of a draft, so sharing stays an explicit action. For this editor `propose_code_edit` takes the draft JSON in `code`; the runtime checks
+its shape with `parseDashboardDraft` (`agent-runtime/src/page-context.ts`), fails the call with
+the problems so the model can correct it, and otherwise sends the draft in the page's key order
+with `target: "dashboard"` and `dashboardId` (null for a new dashboard). **Apply to draft** calls
+the page's `applyCode`, which parses the draft again and returns false, with a toast, for one it
+refuses; the card then stays unapplied. When `applyCode` succeeds while the sidebar covers the
+page (below the `lg` breakpoint, `SIDEBAR_COVERS_PAGE_QUERY` in `ChatDockContext.tsx`), the dock
+closes the sidebar and calls the registration's optional `revealAppliedCode`; the dashboard page
+uses it to move focus to its edit toolbar. The chat session and the card are unchanged. Applying replaces the page's local draft (entering edit
+mode for a stored dashboard) and never writes: the page's **Save** sends `PATCH` with
+`expected_version`, or for a new dashboard `POST /dashboards` as private, so a 409 or 422
+keeps the draft. A registration may also offer `suggestions`, which the empty chat shows in
+place of the general starters; picking one sends it like any suggestion.
 
 ## Failure investigations and source access
 
@@ -102,15 +343,23 @@ and, optionally, the task ID, task name, qid, and chip. `chat_stream` checks pro
 with `get_project_context` before it streams. `CopilotInvestigationService.build`
 (`src/qdash/api/services/copilot_investigation_service.py`) then loads the execution and task
 result from that project. It builds the opening message from the error message and stack trace,
-the source roots and their revisions, and the answer structure. A task without a result uses the
-execution's own task record. Long logs are clipped to their start and end. `pi_chat_service.stream`
+the source roots and their revisions, and the instructions: start at the raising frame, stop
+once the evidence explains the error, and answer with a likely cause, evidence, and one next
+step. A task without a result uses the execution's own task record. Long logs are clipped to their start and end. `pi_chat_service.stream`
 sends the opening as `initial_message`, which the runtime uses only for a new conversation. An
 unknown execution answers 404; `task` and `investigation` together answer 400.
 
-The UI starts it with `ChatDockContext.investigate`: the click handler creates the session, with
+The UI starts it with `ChatDockContext.investigate(target, surface)`. Execution pages, task
+details, and the task result preview pass `"mini"`, the floating window, because they already
+sit in a drawer or modal; the task result page uses the sidebar. The dock shows one surface at a
+time: opening either closes the other. The click handler creates the session, with
 `context: {investigation}` stored server-side, and sends the first turn once. A second click for
-the same failure resumes that session, including after a reload. Every turn of the session
-carries `investigation`, so a retried first turn still opens with the logs. The session's
+the same failure resumes that session, including after a reload, where the most recently updated
+match wins. **New chat** from an investigation calls `ChatDockContext.endInvestigation`, so the
+next click for that failure creates a fresh session and leaves the old one in the history; the
+ended set lives in the tab and is not restored after a reload. A resumed session that loads with
+no messages gets the first turn sent again. The first turn and retries of that turn carry `investigation`. Follow-ups use the existing
+conversation without reloading the execution, so they can continue after the execution record is removed. The session's
 `context` stays null, so task chats and their lookup are unchanged.
 
 The model reads code through three read-only pi-qdash tools backed by `GET /copilot/source/roots`,
@@ -128,126 +377,51 @@ refused. Only text source suffixes (`.py`, `.toml`, `.yaml`, `.md`, and similar)
 search is literal, capped at 200 matches and 20,000 files; a read returns at most 400 lines of a
 file under 1 MB. The routes require a signed-in user; source is the same for every project.
 
+`SourceAccessService.locate` maps a traceback path when `qdash_read_source` gets no root.
+It first matches configured root directories, preferring the most specific directory when roots
+overlap. This preserves editable dependency checkouts nested beneath a QDash checkout.
+For other paths under `site-packages` or `dist-packages`, the next segment names the package;
+a package that is not a root is not mapped. Elsewhere the `qdash` root is tried before dependencies, using its last
+segment in the path: `/app/qdash/workflow/calibtasks/qubex/base.py` is
+`qdash:workflow/calibtasks/qubex/base.py`, not a file of the qubex package.
+
 QDash does not record the revision an execution ran with. The opening message and
 `qdash_list_source_roots` say so, and the prompt tells the model not to claim that served source
-matches the failed run. Compose mounts `./src/qdash` read-only at `/app/source/qdash` on the API,
+matches the failed run.
+
+`qdash_query` reads calibration configuration through `FileService`, not source. It redirects
+source-looking requests to the source tools: `files_tree` with a path returns search guidance;
+`file_content` returns read guidance only after HTTP 400 or 404. Config reads, other misses,
+403, and server errors retain their behavior. See
+[Fallback tools](../../reference/pi-qdash.md#fallback-tools) for the contract.
+
+When a source endpoint returns a generic 404, `qdash_read_source` reports that the endpoint
+may be unavailable and suggests checking API routing, proxy configuration, and the API image
+version.
+
+Compose mounts `./src/qdash` read-only at `/app/source/qdash` on the API,
 with `CALIBTASKS_PATH` over its `workflow/calibtasks`, and sets `QDASH_SOURCE_ROOT`. The API
 image does not install qubex, so in Compose qubex source is reported unavailable. Set
 `QDASH_SOURCE_REVISION` in `.env` to report the deployed commit, because the mount has no `.git`.
 
 Tests: `tests/qdash/api/services/test_source_access_service.py`,
 `test_copilot_investigation_service.py`, `tests/qdash/api/routers/test_copilot_investigation.py`,
-`packages/pi-qdash/tests/source-code-tool.test.mjs`, and
-`ui/src/contexts/__tests__/ChatDockInvestigation.test.tsx`.
+`packages/pi-qdash/tests/source-code-tool.test.mjs`, `query-source-guidance.test.mjs`,
+`ui/src/contexts/__tests__/ChatDockInvestigation.test.tsx`, and the execution page tests
+`ExecutionPageContent.test.tsx` and `ExecutionClient.test.tsx`.
 
 ## Configuration
 
-### `config/copilot/`
+<a id="config-copilot"></a>
+<a id="presentation-classifier"></a>
+<a id="on-demand-classification"></a>
+<a id="cloudflare-access-authentication"></a>
+<a id="environment-variables"></a>
 
-Three small files, each with an optional `*.local.yaml` overlay, deep-merged by `ConfigLoader`:
+[Copilot Model Configuration](./model-configuration.md) covers models, endpoints, classifier tools,
+gateway compatibility, and Cloudflare Access authentication.
 
-```yaml
-# config.yaml
-enabled: true
-thinking_language: en      # Internal reasoning language
-response_language: auto    # Follow the latest user message; use ja/en to pin it
-task_chat:                 # How a chat about a task result opens
-  multimodal: true
-  max_expected_images: 2
-
-# chat.yaml: the planner models every chat can use; the first is the default
-chat_models:
-  - provider: openai-compatible-chat
-    name: qwen3.8-flash-next
-    api_style: completion
-    base_url: env:OPENAI_COMPATIBLE_BASE_URL_CHAT
-    api_key_env: OPENAI_COMPATIBLE_API_KEY_CHAT
-
-# evaluation.yaml: models pi-qcaleval can use to judge calibration plots
-evaluation_models:
-  - provider: openai-compatible-evaluation
-    name: nvidia/Ising-Calibration-1.5-31B-NVFP4
-    base_url: env:OPENAI_COMPATIBLE_BASE_URL_EVALUATION
-    api_key_env: OPENAI_COMPATIBLE_API_KEY_EVALUATION
-  - provider: openai-compatible-chat
-    name: qwen3.8-flash-next
-    base_url: env:OPENAI_COMPATIBLE_BASE_URL_CHAT
-    api_key_env: OPENAI_COMPATIBLE_API_KEY_CHAT
-```
-
-Custom OpenAI-compatible API base URLs must include `/v1`, for example
-`https://models.example.com/v1`. Do not include an operation path such as
-`/chat/completions` or `/responses`. The runtime passes the configured path to the model client
-without adding `/v1`.
-
-Name OpenAI-compatible endpoint variables with a descriptive suffix:
-`OPENAI_COMPATIBLE_BASE_URL_<SUFFIX>` and `OPENAI_COMPATIBLE_API_KEY_<SUFFIX>`.
-The suffix is not predefined; choose one that identifies the endpoint or its purpose, then use
-the exact variable names in `base_url: env:...` and `api_key_env`. The supplied templates use
-`CHAT` and `EVALUATION`.
-
-Give each endpoint a matching identifier with the form `openai-compatible-<suffix>` in its
-`provider` field. This value is an endpoint identifier, not the serving software name: Pi uses it
-as a key in the generated configuration. Endpoints with different base URLs must not share an
-identifier. The supplied templates use `openai-compatible-chat` and
-`openai-compatible-evaluation`.
-
-The default chat model also appears in `evaluation_models`, which makes its evaluation role
-explicit. When the same endpoint identifier and model name appear in both lists, the runtime keeps
-the full definition from `chat_models`. Qwen reasoning models receive the Qwen chat-template
-thinking format on that model only; other models sharing the endpoint keep their own response
-format.
-
-YAML string values support shell-style environment variable references such
-as `${OPENAI_API_KEY}`, so environment-specific or sensitive values should be supplied
-through environment variables instead of committed template files. The Pi runtime
-builds its `models.json` from `chat_models` and `evaluation_models` at startup.
-
-### Cloudflare Access Authentication
-
-`agent-runtime/src/models-config.ts` maps the shared `CF_ACCESS_CLIENT_ID` and
-`CF_ACCESS_CLIENT_SECRET` environment variables to Pi provider headers. It applies them to
-endpoints whose `base_url` references `env:OPENAI_COMPATIBLE_BASE_URL_<SUFFIX>`, for both chat
-and evaluation. Literal URLs and catalog providers are unaffected.
-
-The generated `models.json` stores environment references, not credential values. Pi 1.4.0
-resolves these headers when making requests through `ModelRuntime`, including evaluation calls
-through the model registry. Both Chat Completions and Responses preserve the origin server's
-Bearer authentication alongside the two Access headers. With Access configured and no origin
-API key, the runtime supplies Pi's required placeholder key automatically.
-
-Setting only one Access variable, or a whitespace-only value, fails configuration rather than
-sending partial authentication. Leaving both unset or empty preserves existing behavior.
-`agent-runtime/test/cloudflare-access.test.mjs` captures requests from the installed Pi runtime
-for both API styles and both model roles. Deployment steps are in
-[Configure AI](../../user-guide/setup.md#configure-ai).
-
-### Environment Variables
-
-| Variable | Purpose |
-|----------|---------|
-| `OPENAI_API_KEY` | OpenAI API authentication |
-| `OPENAI_COMPATIBLE_BASE_URL_<SUFFIX>` | OpenAI-compatible API base URL through `/v1`; the suffix is operator-defined |
-| `OPENAI_COMPATIBLE_API_KEY_<SUFFIX>` | API key for the endpoint with the matching suffix; it can be a placeholder for a keyless endpoint |
-| `CF_ACCESS_CLIENT_ID` / `CF_ACCESS_CLIENT_SECRET` | Shared Cloudflare Access service token for configured OpenAI-compatible endpoints; optional, set both |
-| `NEXT_PUBLIC_API_URL` | API base URL for frontend (default: `/api`) |
-
-Existing deployments must rename the earlier fixed variables and add `/v1` to each base URL:
-
-| Earlier variable | Replacement in the supplied configuration |
-| --- | --- |
-| `OPENAI_COMPATIBLE_BASE_URL` | `OPENAI_COMPATIBLE_BASE_URL_CHAT` |
-| `OPENAI_COMPATIBLE_API_KEY` | `OPENAI_COMPATIBLE_API_KEY_CHAT` |
-| `VLLM_BASE_URL` | `OPENAI_COMPATIBLE_BASE_URL_EVALUATION` |
-| `VLLM_API_KEY` | `OPENAI_COMPATIBLE_API_KEY_EVALUATION` |
-
-`OLLAMA_BASE_URL` and `OLLAMA_API_KEY` no longer have special meaning. If that endpoint remains
-in use, choose a suffix such as `OLLAMA`, name its variables
-`OPENAI_COMPATIBLE_BASE_URL_OLLAMA` and `OPENAI_COMPATIBLE_API_KEY_OLLAMA`, and reference them from
-the corresponding YAML model. Variable renaming does not transform the URL: for example, migrate
-`http://ollama:11434` to `http://ollama:11434/v1`.
-
-### Developing a pi extension against the runtime
+## Developing a pi extension against the runtime
 
 The Agent Runtime image includes `packages/pi-qdash/` and `packages/pi-qcaleval/`
 from the same QDash checkout. Edit those packages, run `task ci-pi-packages` and
@@ -264,55 +438,52 @@ The runtime loads their tools and skills directly; npm publication is not needed
 for QDash development or deployment. [Pi packages](./packages.md) describes
 independent distribution and release validation.
 
-`compose.yaml` also mounts `agent-runtime/extensions/` at `/app/extensions`
-(read-only) for additional development extensions. At startup, each subdirectory
-with a `pi` manifest is loaded. A checkout whose package name matches a bundled
-package replaces that package's tools and skills. Install any extra dependencies
-inside the checkout before starting the container, and restart the runtime after
-editing it. The image does not copy this gitignored directory.
+The runtime loads only these two packages and the skills their manifests declare
+(`createBundledResourceLoader` in `agent-runtime/src/bundled-extensions.ts`). It
+reads no packages from a pi `settings.json` and no extensions or skills that pi
+would discover under `PI_CODING_AGENT_DIR` or the working directory, so an
+installed or stale copy of a package cannot replace or extend the bundled tools
+and skills. A standalone pi installation keeps its own settings. The runtime
+neither mounts nor reads a leftover `agent-runtime/extensions/` directory from the
+retired development mount.
 
-The bundled pi-qdash package and overrides of it retain the per-name allowlist
-in `agent-runtime/src/allowed-tools.ts`. The bundled pi-qcaleval package is trusted
-as a whole. Additional checkouts are trusted by path, with these limits:
+The bundled pi-qdash package retains the per-name allowlist in
+`agent-runtime/src/allowed-tools.ts`. The bundled pi-qcaleval package is trusted
+as a whole by its package root, with these limits:
 
 - Reviewed write names (`REVIEWED_WRITE_TOOL_NAMES`) still require approval of
-  their arguments and execute with the requesting user's credentials.
-- A checkout tool is replayed after interruption only when its
+  their arguments and execute with the requesting user's credentials. Session-granted
+  write names (`SESSION_GRANTED_WRITE_TOOL_NAMES`) run without a card; see
+  [Supported hosts](./extensions.md#supported-hosts).
+- A trusted tool is replayed after interruption only when its
   `annotations.readOnlyHint` is `true`.
-- A trusted checkout that reuses a bundled tool's name replaces it, with a
+- A trusted tool that reuses a pi-qdash tool's name replaces it, with a
   replacement message in the startup log.
+- Trusted tools are callable only by the model, never from a `codemode` script,
+  including a replacement of a tool in `NESTED_READ_TOOL_NAMES`.
 
-Checkout tools receive the same extension context as pi-qdash tools, including
-`modelRegistry` for calling a model other than the conversation's. Their pi
-`promptSnippet` and `promptGuidelines` are inlined into the system prompt under
-"Additional tools", since the pi-qdash tool guide does not know them. A checkout
-tool that declares an `images` parameter (for example `qcal_evaluate`) gets it
-filled by the runtime: the newest figure in the conversation, whether a user
-attachment or a figure a pi-qdash tool returned, is taken from the durable
-transcript, so the model never has to copy image bytes into a call. Bytes the
-model copies anyway are replaced by that figure, since a retyped base64 string
-is usually corrupt; they are kept only when the conversation holds no figure.
+Trusted tools receive `modelRegistry` and the same context as pi-qdash tools. Their
+`promptSnippet` and `promptGuidelines` appear under "Additional tools" in the system prompt.
 
-A checkout tool that declares `task_name` and `knowledge` parameters (again
-`qcal_evaluate`) gets `knowledge` filled the same way: when the model names the
-task and passes no reference of its own, the runtime fetches the task's
-knowledge from the QDash API as the user (`GET /tasks/{task_name}/knowledge`)
-and passes its `reference`: the experiment background as `knowledge` (a few
-sentences: what the experiment does, what the expected plot looks like) and,
-when the tool declares it, `criteria` (the parameters to extract and the
-status codes with their criteria, derived from the task's Common failures).
-A task without a derived reference gets its full `prompt_text`, cut at 6000
-characters. Every evaluation of a task is thus read against the same
-host-maintained reference, kept in the task knowledge repository, rather than
-against a summary the planner improvised. The exact text the evaluation model
-received is stored in the tool result's `details.prompt`.
+For tools declaring `images`, the runtime supplies the newest durable conversation figure,
+replacing any model-copied bytes. Supplied bytes are kept only when the conversation has no
+figure.
+
+For tools declaring `task_name` and `knowledge`, a named task without a supplied reference
+triggers an authenticated `GET /tasks/{task_name}/knowledge`. The runtime fills `knowledge`
+and, when declared, `criteria` from the derived reference, falling back to `prompt_text` cut
+at 6000 characters. See [Calibration Evaluation](./evaluation.md#from-task-knowledge-to-the-prompt)
+for derivation. `details.prompt` records the text sent to the evaluation model.
 
 The runtime's `/chat` body carries two image lists: `initial_images` (the
 task chat's opening figures, attached only when the conversation is new)
-and `images` (attachments of the current turn, attached every time). Restart the
-runtime after editing the extension; the startup log lists the local paths and
-the tools they contributed. Anything placed under `agent-runtime/extensions/` on
-the host is trusted the same way, so keep that directory empty on production hosts.
+and `images` (attachments of the current turn, attached every time).
+
+At startup, the runtime logs one `skills:` line listing all loaded skills, then
+one `bundled extension` line per package with its name, `+source.<hash>` version,
+path, trust (`allowlisted` or `trusted`), tool count, and skills. Compare the
+version with an evaluation record's evaluator version to confirm which build a
+running runtime serves.
 
 ## Evaluation runs
 
@@ -321,23 +492,3 @@ chip page is another, and a single task result a third. All three leave the
 same record. The runtime's `POST /evaluate` route, the reference and examples
 it fills in from the task knowledge, the record, runs and their comparison are
 described in [Calibration Evaluation](./evaluation.md).
-
-## Two Modes
-
-### Chat about a task result
-
-Opened from a task result (metrics modal, task history, execution detail) with "Ask AI".
-
-- **Endpoint**: `POST /copilot/chat/stream` with `task: {task_name, chip_id, qid, execution_id, task_id}`
-- **Context**: Full `TaskContext` including task knowledge, qubit parameters, experiment results, historical data, neighbor qubit data, and coupling parameters, rendered into the opening message together with the result's figures
-- **Use case**: "Is this T1 result normal?", "Why does the fit R² look low?"
-
-### Chat Page
-
-A standalone page (`/copilot`) for general questions about the calibration system.
-
-- **Endpoint**: `POST /copilot/chat/stream`
-- **Hook**: `useCopilotChat`
-- **Context**: Chip ID, optional qubit ID, scoring thresholds
-- **Use case**: "Compare T1 across all qubits", "Show me the frequency trend for Q16"
-- **Sessions**: Persisted to localStorage with multi-session support

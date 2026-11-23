@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { RefreshCw } from "lucide-react";
 import Select, { type GroupBase, type SingleValue } from "react-select";
 
 import { CouplingMetricsGrid } from "./CouplingMetricsGrid";
@@ -28,6 +29,8 @@ import { useMetricsUrlState } from "@/hooks/useUrlState";
 import { getDaisySelectStyles } from "@/lib/react-select-theme";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { ErrorCard } from "@/components/ui/ErrorCard";
+import { RefreshErrorAlert } from "@/components/ui/RefreshErrorAlert";
 import {
   getStoredColorRanges,
   resolveMetricColorRange,
@@ -94,6 +97,9 @@ export function MetricsPageContent() {
     cdfGroups,
     isLoading: isConfigLoading,
     isError: isConfigError,
+    isFetching: isConfigFetching,
+    isRetryingAfterError: isConfigRetrying,
+    refetch: refetchConfig,
   } = useMetricsConfig();
 
   // Select appropriate metrics config based on type
@@ -133,12 +139,18 @@ export function MetricsPageContent() {
     selectedChip,
   });
 
-  const { data, isLoading, isError } = useGetChipMetrics(selectedChip, metricsQueryParams, {
-    query: {
-      enabled: canFetch,
-      staleTime: 30000,
+  // The query key carries the chip and the time range, so another scope never shows this data.
+  // A failed background refetch keeps the last data of the same scope on screen.
+  const { data, isLoading, isError, isFetching, errorUpdateCount, refetch } = useGetChipMetrics(
+    selectedChip,
+    metricsQueryParams,
+    {
+      query: {
+        enabled: canFetch,
+        staleTime: 30000,
+      },
     },
-  });
+  );
 
   // Get color scale as hex values for inline styles
   const hexColors = useMemo(() => {
@@ -360,8 +372,12 @@ export function MetricsPageContent() {
     return groups.find((group) => group.metrics.includes(selectedMetric)) || null;
   }, [metricType, cdfGroups, selectedMetric]);
 
+  // Retrying a failed first load puts a query back to pending; keep its error in place with the
+  // retry disabled instead of swapping it for the initial loading state.
+  const isMetricsRetrying = isLoading && errorUpdateCount > 0;
+
   // Show skeleton during initial loading
-  if (isConfigLoading || isChipsLoading) {
+  if ((isConfigLoading && !isConfigRetrying) || isChipsLoading) {
     return <MetricsPageSkeleton />;
   }
 
@@ -422,7 +438,7 @@ export function MetricsPageContent() {
 
           <section
             aria-labelledby="metrics-data-scope"
-            className="rounded-xl border border-base-300 bg-base-200/45 p-3 sm:p-4"
+            className="rounded-[var(--radius-box)] border border-base-300 bg-base-200/45 p-3 sm:p-4"
           >
             <h2 id="metrics-data-scope" className="mb-3 text-xs font-medium text-base-content/55">
               Data scope
@@ -473,7 +489,7 @@ export function MetricsPageContent() {
                       <button
                         type="button"
                         aria-pressed={selectionMode === "latest"}
-                        className={`join-item btn btn-sm ${selectionMode === "latest" ? "btn-primary" : ""}`}
+                        className={`join-item btn ${selectionMode === "latest" ? "btn-primary" : ""}`}
                         onClick={() => setSelectionMode("latest")}
                       >
                         Latest
@@ -481,7 +497,7 @@ export function MetricsPageContent() {
                       <button
                         type="button"
                         aria-pressed={selectionMode === "best"}
-                        className={`join-item btn btn-sm ${selectionMode === "best" ? "btn-primary" : ""}`}
+                        className={`join-item btn ${selectionMode === "best" ? "btn-primary" : ""}`}
                         onClick={() => setSelectionMode("best")}
                         disabled={!isBestModeSupported}
                         title={
@@ -495,7 +511,7 @@ export function MetricsPageContent() {
                       <button
                         type="button"
                         aria-pressed={selectionMode === "average"}
-                        className={`join-item btn btn-sm ${selectionMode === "average" ? "btn-primary" : ""}`}
+                        className={`join-item btn ${selectionMode === "average" ? "btn-primary" : ""}`}
                         onClick={() => setSelectionMode("average")}
                         title="Show average values within time range"
                       >
@@ -521,41 +537,51 @@ export function MetricsPageContent() {
         </div>
 
         {/* Metrics Grid */}
-        {!selectedChip ? (
+        {isConfigError || isConfigRetrying ? (
+          <ErrorCard
+            title="Could not load the metrics configuration"
+            message="Metric names, units and scales come from the server. Try loading them again."
+            onRetry={() => void refetchConfig()}
+            retrying={isConfigFetching}
+          />
+        ) : !selectedChip ? (
           <EmptyState
             title="No chip selected"
             description="Select a chip from the dropdown above to view metrics"
             emoji="microchip"
             size="lg"
           />
-        ) : isLoading ? (
+        ) : isLoading && !isMetricsRetrying ? (
           <div className="flex items-center justify-center h-96">
             <QuantumLoader size="lg" showLabel label="Loading metrics data..." />
           </div>
-        ) : isConfigLoading ? (
-          <div className="flex items-center justify-center h-96">
-            <QuantumLoader size="lg" showLabel label="Loading metrics configuration..." />
-          </div>
-        ) : isConfigError ? (
-          <EmptyState
-            title="Configuration error"
-            description="Failed to load metrics configuration. Please try refreshing the page."
-            emoji="warning"
-            size="lg"
-          />
-        ) : isError ? (
-          <EmptyState
-            title="Data loading failed"
-            description="Failed to load metrics data. Please try again later."
-            emoji="warning"
-            size="lg"
+        ) : (isError || isMetricsRetrying) && !data ? (
+          <ErrorCard
+            title="Could not load metrics data"
+            message="The request for this chip and time range failed. Try again."
+            onRetry={() => void refetch()}
+            retrying={isFetching}
           />
         ) : currentMetricConfig ? (
           <>
+            {isError && (
+              <RefreshErrorAlert
+                message="Could not refresh metrics data. The values below may be out of date."
+                onRetry={() => void refetch()}
+                retrying={isFetching}
+              />
+            )}
+
             {/* Metric Title */}
             <div className="flex items-center gap-3">
               <h2 className="text-sm font-medium">{currentMetricConfig.title}</h2>
               <span className="badge badge-outline badge-sm">{currentMetricConfig.unit}</span>
+              {isFetching && (
+                <span className="inline-flex items-center gap-1 text-xs text-base-content/60">
+                  <RefreshCw className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                  Refreshing
+                </span>
+              )}
             </div>
 
             {/* Stats Summary Cards */}
@@ -664,12 +690,7 @@ function CdfWithCoverage({
     <div className="space-y-2">
       {/* Linear Gauge for Coverage */}
       <Card variant="compact" padding="sm">
-        <LinearGauge
-          value={stats.coverage}
-          current={stats.withData}
-          total={stats.total}
-          duration={800}
-        />
+        <LinearGauge value={stats.coverage} current={stats.withData} total={stats.total} />
       </Card>
 
       {/* CDF Chart */}

@@ -26,8 +26,10 @@ scope, and status visible; surfaces stay flat as described in
 | Destructive confirmation | `ConfirmDialog` or shared `Dialog` |
 
 Icons supplement a visible label unless the meaning is conventional and the control has an
-accessible name. Use the size already established by neighboring controls; do not use Unicode
-symbols or emoji as interface icons.
+accessible name. Use the size already established by neighboring controls; in a labeled button,
+mark the icon with `data-icon` so the shared rule sets its size and spacing (see
+[Space Icon Buttons Optically](./guidelines.md#space-icon-buttons-optically)). Do not use
+Unicode symbols or emoji as interface icons.
 
 ## Use Semantic Color
 
@@ -88,6 +90,11 @@ arrow-key navigation and do not hide destructive intent behind an unlabeled icon
 Use motion to connect a trigger with its result or to show ongoing work. Avoid continuous or
 large-area animation on dashboards, topology grids, tables, and repeated cards. Respect
 `prefers-reduced-motion`; `globals.css` supplies the global fallback.
+
+Trigger-based UI elements, such as menus, popovers, and tooltips, animate from their trigger rather
+than from the center of the opened element. Set `transform-origin` from the trigger geometry or
+from the origin variable that the shared primitive provides, for example
+`--radix-dropdown-menu-content-transform-origin`, and keep the reduced-motion behavior.
 
 ## Meet the Accessibility Baseline
 

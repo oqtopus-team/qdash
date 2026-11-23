@@ -6,8 +6,11 @@ results, discussions, and files.
 ## Active Project
 
 Use the project selector to switch between projects. The active project determines which chips,
-workflows, executions, task results, notes, forum threads, and files QDash displays or changes.
-Confirm it before starting a calibration or editing shared state.
+workflows, executions, task results, notes, forum threads, dashboards, and files QDash
+displays or changes.
+Confirm it before starting a calibration or editing shared state. Switching project drops the
+previous project's chip, cooldown, and execution from the page address, so **Chip** opens the new
+project's most recent chip; the browser's Back button returns to the previous project and chip.
 
 Every new account receives a default project owned by that user. Users may also belong to other
 projects and switch between them without copying data.
@@ -20,9 +23,8 @@ projects and switch between them without copying data.
 | Editor | Viewer access plus calibration runs and changes to shared operational state. |
 | Owner | Editor access plus project settings, membership, and deletion. |
 
-Assign Viewer when a member only reviews or discusses work. Assign Editor when they run
-calibrations or change project data. Each project has one Owner; transfer ownership before that
-person leaves the project. The previous Owner remains an Editor after a transfer.
+Each project has one Owner; transfer ownership before that person leaves. The previous Owner
+remains an Editor.
 
 Project roles are independent of the system Admin role. A system Admin can manage accounts and
 projects from **Admin**, but needs project membership to open that project's calibration data.
@@ -39,17 +41,21 @@ not obvious.
 Project owners manage an existing project from **Settings**. They can update its name and
 description, invite existing QDash users, change member roles, and remove members.
 
-<!-- MEDIA PLACEHOLDER
-File: /images/guides/project-members.gif
-Start: Settings with the current project and member list visible to its Owner.
-Sequence: Add a demo Viewer, change that member to Editor, and leave the updated row visible.
-Alt: Project membership controls in Settings for adding a member and changing their role.
--->
-
 1. Open **Settings** in the project you own.
+
+   ![Opening the Project tab in Settings](/images/guides/open-project-settings.gif)
+
 2. Add an existing QDash user as a Viewer or Editor.
+
+   ![Adding a project member from Settings](/images/guides/add-project-member.gif)
+
 3. Change the role when that person's responsibilities change.
+
+   ![Changing a project member's role from Settings](/images/guides/change-project-role.gif)
+
 4. Remove the member when they no longer need project access.
+
+   ![Removing a project member from Settings](/images/guides/remove-project-member.gif)
 
 Deleting a project removes its project-scoped records and is not reversible through the UI.
 Review membership, chips, executions, and artifacts before confirming deletion.
@@ -68,6 +74,6 @@ another member will continue work from an existing result.
 
 ## Programmatic Access
 
-Use a saved [QDash Client](../reference/clients/python.md) profile for scripts and agents, then
-select the project through the profile or client API. Data cannot be moved between projects as a
+Scripts and agents select the project through a saved client profile, as
+[Connect to a Deployment](../reference/clients/python.md#connect-to-a-deployment) describes. Data cannot be moved between projects as a
 normal operation; create or import it in the intended project instead.

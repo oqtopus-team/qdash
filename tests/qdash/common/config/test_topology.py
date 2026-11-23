@@ -9,6 +9,7 @@ id: {topology_id}
 name: Test Topology
 grid_size: 2
 num_qubits: {num_qubits}
+muxes: {{}}
 qubits:
   0:
     row: 0
@@ -58,7 +59,30 @@ def test_builtin_16q_square_lattice_mux_topology(monkeypatch):
     assert topology.num_qubits == 16
     assert len(topology.qubits) == 16
     assert len(topology.couplings) == 24
-    assert topology.mux.enabled is True
-    assert topology.mux.size == 2
+    assert topology.muxes == {
+        0: [0, 1, 2, 3],
+        1: [4, 5, 6, 7],
+        2: [8, 9, 10, 11],
+        3: [12, 13, 14, 15],
+    }
+    assert topology.visualization.show_mux_boundaries is True
 
+    load_topology.cache_clear()
+
+
+def test_legacy_mux_template_is_normalized_on_load(monkeypatch, tmp_path):
+    """Old ``mux:`` templates stay loadable; they are normalized on load."""
+    topologies_dir = tmp_path / "domain" / "topologies"
+    topologies_dir.mkdir(parents=True)
+    (topologies_dir / "old.yaml").write_text(
+        "id: old\nname: Old\ngrid_size: 2\nnum_qubits: 2\nmux:\n  enabled: true\n  size: 2\n"
+        "qubits:\n  0: {row: 0, col: 0}\n  1: {row: 0, col: 1}\ncouplings: [[0, 1]]\n"
+    )
+    monkeypatch.setattr(ConfigLoader, "_CONFIG_DIR", tmp_path)
+    load_topology.cache_clear()
+
+    topology = load_topology("old")
+
+    assert topology.muxes_source == "legacy_qid_div_4"
+    assert topology.muxes == {0: [0, 1]}
     load_topology.cache_clear()

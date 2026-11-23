@@ -127,3 +127,21 @@ async def test_delete_deployment_tolerates_a_missing_deployment() -> None:
     await _gateway(client).delete_deployment("deployment-3")
 
     assert client.deleted == []
+
+
+@pytest.mark.asyncio
+async def test_create_flow_run_forwards_context_separately_from_parameters():
+    from unittest.mock import AsyncMock
+
+    client = _FakeClient()
+    client = AsyncMock(spec=_FakeClient)
+    client.create_flow_run_from_deployment = AsyncMock(
+        return_value=type("Run", (), {"id": "run-1"})()
+    )
+    context = {"qdash_target_override": {"qids": ["9"]}}
+    await _gateway(client).create_flow_run(
+        deployment_id="deployment-1", parameters={}, context=context
+    )
+    client.create_flow_run_from_deployment.assert_awaited_once_with(
+        deployment_id="deployment-1", parameters={}, context=context
+    )

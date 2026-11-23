@@ -7,6 +7,7 @@
  */
 import type { PipelineCatalogResponseExample } from './pipelineCatalogResponseExample';
 import type { PipelineCatalogResponseSpecSchema } from './pipelineCatalogResponseSpecSchema';
+import type { PipelineCatalogResponseTaskDocumentation } from './pipelineCatalogResponseTaskDocumentation';
 import type { PipelineCatalogResponseTasks } from './pipelineCatalogResponseTasks';
 import type { PipelineStepTypeInfo } from './pipelineStepTypeInfo';
 
@@ -16,9 +17,16 @@ import type { PipelineStepTypeInfo } from './pipelineStepTypeInfo';
 export interface PipelineCatalogResponse {
   backend_name: string;
   step_types: PipelineStepTypeInfo[];
-  one_qubit_modes: string[];
+  /** Values OneQubitCheck, OneQubitFineTune and CustomOneQubit accept for execution_mode; manual requires rounds. */
+  one_qubit_execution_modes: string[];
+  /** Values TwoQubitCalibration and CustomTwoQubit accept for execution_mode; manual requires rounds. */
+  two_qubit_execution_modes: string[];
   /** Available task names by task_type ("qubit", "coupling", ...). */
   tasks: PipelineCatalogResponseTasks;
+  /** Guidance declared by available tasks, keyed by task name. Tasks that declare no documentation are omitted. */
+  task_documentation?: PipelineCatalogResponseTaskDocumentation;
+  /** The spec version this QDash accepts. */
+  spec_version: number;
   /** JSON schema of CalibrationPipelineSpec. */
   spec_schema: PipelineCatalogResponseSpecSchema;
   example?: PipelineCatalogResponseExample;

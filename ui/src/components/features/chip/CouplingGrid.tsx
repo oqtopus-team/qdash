@@ -10,7 +10,7 @@ import {
   Minimize,
   ZoomIn,
 } from "lucide-react";
-import { useState, useMemo, useRef, useCallback, useEffect } from "react";
+import { useState, useMemo, useRef, useCallback, useEffect, type CSSProperties } from "react";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 
 import type { Task } from "@/schemas";
@@ -27,14 +27,27 @@ import {
   GridFullscreenButton,
   gridFullscreenPanelClass,
 } from "@/components/ui/GridFullscreenButton";
+import { LockedGridScroller } from "@/components/ui/LockedGridScroller";
+import { useToast } from "@/components/ui/Toast";
 import { GridZoomControls } from "@/components/ui/GridZoomControls";
 import { RegionZoomToggle } from "@/components/ui/RegionZoomToggle";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import { useCouplingTaskResults } from "@/hooks/useCouplingTaskResults";
 import { useFullscreenPanel } from "@/hooks/useFullscreenPanel";
+import { getApiErrorMessage, parseBlobErrorBody } from "@/lib/utils/apiError";
 import { useGridLayout } from "@/hooks/useGridLayout";
+import { usePanClickGuard } from "@/hooks/usePanClickGuard";
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
 import { getQubitGridPosition, type TopologyLayoutParams } from "@/lib/utils/grid-position";
+import {
+  buildMuxCellMap,
+  clipMuxBoxes,
+  muxLabelPosition,
+  type MuxGroupBox,
+} from "@/lib/utils/mux-groups";
 import { calculateGridDimension } from "@/lib/utils/grid-layout";
+
+const NO_MUX_GROUPS: MuxGroupBox[] = [];
 
 interface CouplingGridProps {
   chipId: string;
@@ -61,6 +74,32 @@ const DEFAULT_DOWNLOAD_OPTIONS: DownloadOptions = {
   jsonFigures: false,
   rawData: true,
 };
+
+interface CouplingStatusDotProps {
+  label: string;
+  className: string;
+  style: CSSProperties;
+  onClick: () => void;
+}
+
+// Status dot using the shared Tooltip primitive, whose portal keeps the tooltip from being
+// clipped by the grid's overflow-hidden container and pan/zoom transform.
+export function CouplingStatusDot({ label, className, style, onClick }: CouplingStatusDotProps) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          onClick={onClick}
+          aria-label={label}
+          style={style}
+          className={className}
+        />
+      </TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
+  );
+}
 
 function toPathList(paths: string[] | string | null | undefined): string[] {
   if (!paths) return [];
@@ -113,7 +152,14 @@ export function CouplingGrid({
     qubits: topologyQubits,
     couplings: topologyCouplings,
     gridSize: topologyGridSize,
+    muxGroups = NO_MUX_GROUPS,
   } = useTopologyConfig(topologyId) ?? {};
+
+  // Cell -> MUX box, so boundaries follow the topology's actual MUX groups
+  const muxCellMap = useMemo(
+    () => buildMuxCellMap(muxGroups, topologyQubits),
+    [muxGroups, topologyQubits],
+  );
 
   // Calculate actual grid dimensions from topology qubit positions
   const { gridRows, gridCols } = useMemo(() => {
@@ -151,21 +197,26 @@ export function CouplingGrid({
   // Download selection mode state
   const [downloadSelectionEnabled, setDownloadSelectionEnabled] = useState(false);
   const [selectedForDownload, setSelectedForDownload] = useState<Set<string>>(new Set());
+  const toast = useToast();
   const [isDownloading, setIsDownloading] = useState(false);
   const [isDownloadConfirmOpen, setIsDownloadConfirmOpen] = useState(false);
   const [downloadOptions, setDownloadOptions] = useState<DownloadOptions>(DEFAULT_DOWNLOAD_OPTIONS);
 
   // View mode state: 'pan-zoom' for DOM with pan/zoom, 'region' for region zoom
-  const [viewMode, setViewMode] = useState<"pan-zoom" | "region">("region");
+  const [viewMode, setViewMode] = useState<"pan-zoom" | "region">("pan-zoom");
   const [isDirectionReversed, setIsDirectionReversed] = useState(false);
   const { isFullscreen, toggleFullscreen, exitFullscreen } = useFullscreenPanel();
+  const panClickGuard = usePanClickGuard();
 
-  // Region tab is only available for square grids; fall back to pan-zoom otherwise.
+  // Lock works for every topology, but region zoom assumes a square grid; leave it when the
+  // grid is not square.
   useEffect(() => {
-    if (!isSquareGrid && viewMode === "region") {
-      setViewMode("pan-zoom");
+    if (!isSquareGrid) {
+      setZoomMode("full");
+      setSelectedRegion(null);
+      setRegionSelectionEnabled(false);
     }
-  }, [isSquareGrid, viewMode]);
+  }, [isSquareGrid]);
 
   // Region selection state
   const [regionSelectionEnabled, setRegionSelectionEnabled] = useState(false);
@@ -304,7 +355,6 @@ export function CouplingGrid({
       </div>
     );
 
-  const effectiveGridSize = gridSize;
   const displayCellSize = zoomMode === "region" ? cellSize * 0.8 : cellSize;
   const displayGridSize = zoomMode === "region" ? regionSize : gridSize;
   const displayGridStart = selectedRegion
@@ -410,8 +460,10 @@ export function CouplingGrid({
       setDownloadSelectionEnabled(false);
       setSelectedForDownload(new Set());
     } catch (error) {
-      console.error("Download error:", error);
-      alert("Download failed. Please try again.");
+      // Keep the dialog, options and selection so the download can be retried.
+      toast.error(
+        getApiErrorMessage(await parseBlobErrorBody(error), "Download failed. Please try again."),
+      );
     } finally {
       setIsDownloading(false);
     }
@@ -465,13 +517,11 @@ export function CouplingGrid({
             const x = displayCol * (displayCellSize + gap);
             const y = displayRow * (displayCellSize + gap);
 
-            const muxRow = Math.floor(row / muxSize);
-            const muxCol = Math.floor(col / muxSize);
-            const isEvenMux = (muxRow + muxCol) % 2 === 0;
+            const muxBox = muxCellMap.get(`${row},${col}`);
 
             const muxBgClass =
-              hasMux && showMuxBoundaries
-                ? isEvenMux
+              hasMux && showMuxBoundaries && muxBox
+                ? muxBox.isEven
                   ? "ring-2 ring-inset ring-primary/20"
                   : "ring-2 ring-inset ring-secondary/20"
                 : "";
@@ -498,36 +548,29 @@ export function CouplingGrid({
       {/* MUX labels - centered in each MUX group */}
       {hasMux && showMuxBoundaries && showLabels && (
         <>
-          {Array.from({
-            length: Math.pow(Math.ceil(displayGridSize / muxSize), 2),
-          }).map((_, idx) => {
-            const numMuxCols = Math.ceil(displayGridSize / muxSize);
-            const muxLocalRow = Math.floor(idx / numMuxCols);
-            const muxLocalCol = idx % numMuxCols;
-
-            const muxActualRow = Math.floor(displayGridStart.row / muxSize) + muxLocalRow;
-            const muxActualCol = Math.floor(displayGridStart.col / muxSize) + muxLocalCol;
-            const muxIndex = muxActualRow * Math.floor(effectiveGridSize / muxSize) + muxActualCol;
-
-            const muxCenterX =
-              (muxLocalCol * muxSize + muxSize / 2) * (displayCellSize + gap) - gap / 2;
-            const muxCenterY =
-              (muxLocalRow * muxSize + muxSize / 2) * (displayCellSize + gap) - gap / 2;
+          {clipMuxBoxes(muxGroups, {
+            row: displayGridStart.row,
+            col: displayGridStart.col,
+            rows: displayGridSize,
+            cols: displayGridSize,
+          }).map((box) => {
+            // Centered over several cells; a single cell gets its label at an edge.
+            const position = muxLabelPosition(box, displayCellSize, gap);
 
             return (
               <div
-                key={`mux-label-${idx}`}
+                key={`mux-label-${box.muxId}`}
                 className={`absolute z-10 pointer-events-none ${
                   zoomMode === "full" ? "hidden md:flex" : "flex"
                 }`}
                 style={{
-                  top: muxCenterY,
-                  left: muxCenterX,
-                  transform: "translate(-50%, -50%)",
+                  top: position.top,
+                  left: position.left,
+                  transform: position.transform,
                 }}
               >
                 <div className="text-[0.45rem] md:text-[0.6rem] font-medium text-base-content/30 bg-base-100/60 px-1 py-px rounded border border-base-content/5">
-                  MUX{muxIndex}
+                  MUX{box.muxId}
                 </div>
               </div>
             );
@@ -573,8 +616,9 @@ export function CouplingGrid({
           // Zoomed-out: status-colored dot
           if (!showFigures) {
             return (
-              <button
+              <CouplingStatusDot
                 key={task.couplingId}
+                label={`${task.couplingId}: ${task.status}`}
                 onClick={() => {
                   if (downloadSelectionEnabled) {
                     if (canBeDownloaded) toggleDownloadSelection(task.couplingId);
@@ -592,16 +636,12 @@ export function CouplingGrid({
                   width: displayCellSize * 0.45,
                   height: displayCellSize * 0.45,
                 }}
-                className={`rounded-md shadow-sm group cursor-pointer -translate-x-1/2 -translate-y-1/2 ${statusColor} ${
+                className={`rounded-md shadow-sm cursor-pointer -translate-x-1/2 -translate-y-1/2 ${statusColor} ${
                   downloadSelectionEnabled && isSelectedForDownload
                     ? "ring-2 ring-primary ring-offset-1"
                     : ""
                 }`}
-              >
-                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-base-100 text-base-content text-xs rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
-                  {task.couplingId}: {task.status}
-                </div>
-              </button>
+              />
             );
           }
 
@@ -628,7 +668,7 @@ export function CouplingGrid({
                 width: displayCellSize * 0.6,
                 height: displayCellSize * 0.6,
               }}
-              className={`rounded-xl bg-white shadow-md border border-base-300/60 overflow-hidden transition-transform duration-200 hover:shadow-xl hover:border-primary/40 -translate-x-1/2 -translate-y-1/2 ${
+              className={`rounded-xl bg-white shadow-xs border border-base-300/60 overflow-hidden transition-colors duration-200 hover:border-primary/40 -translate-x-1/2 -translate-y-1/2 ${
                 downloadSelectionEnabled && isSelectedForDownload
                   ? "ring-2 ring-primary ring-offset-2"
                   : ""
@@ -684,7 +724,7 @@ export function CouplingGrid({
                 key={index}
                 className={`absolute transition-colors duration-200 rounded-lg flex items-center justify-center z-20 ${
                   isHovered
-                    ? "bg-primary/30 border-2 border-primary shadow-lg"
+                    ? "bg-primary/30 border-2 border-primary"
                     : "bg-primary/5 border-2 border-primary/20 hover:border-primary/40 hover:bg-primary/10"
                 }`}
                 style={{
@@ -735,18 +775,6 @@ export function CouplingGrid({
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg py-2">
         <div className="flex items-center gap-4">
           <div className="tabs tabs-boxed bg-base-300 w-fit">
-            {isSquareGrid && (
-              <button
-                type="button"
-                className={`tab gap-2 ${viewMode === "region" ? "tab-active" : ""}`}
-                onClick={() => setViewMode("region")}
-                title="Lock"
-                aria-label="Lock"
-              >
-                <Lock className="h-4 w-4" />
-                <span className="hidden sm:inline">Lock</span>
-              </button>
-            )}
             <button
               type="button"
               className={`tab gap-2 ${viewMode === "pan-zoom" ? "tab-active" : ""}`}
@@ -761,6 +789,16 @@ export function CouplingGrid({
             >
               <ZoomIn className="h-4 w-4" />
               <span className="hidden sm:inline">Zoom</span>
+            </button>
+            <button
+              type="button"
+              className={`tab gap-2 ${viewMode === "region" ? "tab-active" : ""}`}
+              onClick={() => setViewMode("region")}
+              title="Lock"
+              aria-label="Lock"
+            >
+              <Lock className="h-4 w-4" />
+              <span className="hidden sm:inline">Lock</span>
             </button>
           </div>
 
@@ -783,10 +821,10 @@ export function CouplingGrid({
           <button
             type="button"
             onClick={() => setCouplingDirection(!isDirectionReversed)}
-            className={`btn btn-sm gap-1.5 ${isDirectionReversed ? "btn-secondary" : "btn-outline"}`}
+            className={`btn btn-sm ${isDirectionReversed ? "btn-secondary" : "btn-outline"}`}
             title={isDirectionReversed ? "Showing reverse direction" : "Showing forward direction"}
           >
-            <ArrowRightLeft className="h-3.5 w-3.5" />
+            <ArrowRightLeft data-icon="inline-start" />
             <span className="text-xs">{isDirectionReversed ? "Reverse" : "Forward"}</span>
           </button>
         </div>
@@ -800,28 +838,28 @@ export function CouplingGrid({
                   {selectedForDownload.size} / {availableForDownloadCount} selected
                 </span>
                 <button
-                  className="btn btn-xs btn-ghost"
+                  className="btn btn-sm btn-ghost"
                   onClick={selectAllForDownload}
                   title="Select all"
                 >
                   All
                 </button>
                 <button
-                  className="btn btn-xs btn-ghost"
+                  className="btn btn-sm btn-ghost"
                   onClick={clearDownloadSelection}
                   title="Clear selection"
                 >
                   Clear
                 </button>
                 <button
-                  className="btn btn-sm btn-primary gap-1"
+                  className="btn btn-sm btn-primary"
                   onClick={() => setIsDownloadConfirmOpen(true)}
                   disabled={selectedForDownload.size === 0 || isDownloading}
                 >
                   {isDownloading ? (
-                    <span className="loading loading-spinner loading-xs" />
+                    <span data-icon="inline-start" className="loading loading-spinner loading-xs" />
                   ) : (
-                    <Download size={16} />
+                    <Download data-icon="inline-start" />
                   )}
                   Download
                 </button>
@@ -839,7 +877,7 @@ export function CouplingGrid({
             ) : (
               <div className="flex items-center gap-2">
                 <button
-                  className="btn btn-sm btn-outline gap-2"
+                  className="btn btn-sm btn-outline"
                   onClick={() => {
                     setDownloadSelectionEnabled(true);
                     setRegionSelectionEnabled(false);
@@ -848,7 +886,7 @@ export function CouplingGrid({
                   title="Select figures to download"
                   disabled={availableForDownloadCount === 0}
                 >
-                  <Download size={16} />
+                  <Download data-icon="inline-start" />
                   Download
                 </button>
               </div>
@@ -891,7 +929,7 @@ export function CouplingGrid({
         className={`flex-1 relative flex justify-center ${
           viewMode === "pan-zoom"
             ? "bg-base-200/30 border-2 border-dashed border-base-300 rounded-lg"
-            : "bg-base-200/60 rounded-lg"
+            : "items-start overflow-hidden bg-base-200/60 rounded-lg"
         }`}
         style={{ padding: `${Math.max(4, padding / 4)}px` }}
         ref={containerRef}
@@ -913,6 +951,7 @@ export function CouplingGrid({
           >
             <GridZoomControls isFullscreen={isFullscreen} className="top-12" />
             <TransformComponent
+              contentProps={panClickGuard}
               wrapperStyle={{ width: "100%", height: "100%" }}
               contentStyle={{
                 display: "flex",
@@ -924,7 +963,7 @@ export function CouplingGrid({
             </TransformComponent>
           </TransformWrapper>
         ) : (
-          gridContent
+          <LockedGridScroller>{gridContent}</LockedGridScroller>
         )}
       </div>
 

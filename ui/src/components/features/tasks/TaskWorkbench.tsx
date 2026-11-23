@@ -89,7 +89,7 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
   const [runTypes, setRunTypes] = useState<Record<string, SweepFormType>>({});
   const [runSweepParts, setRunSweepParts] = useState<Record<string, string[]>>({});
   const [reconfigure, setReconfigure] = useState(false);
-  const [persistOutputParameters, setPersistOutputParameters] = useState(false);
+  const [updateCalibrationParameters, setUpdateCalibrationParameters] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
   const [isReloadingInputs, setIsReloadingInputs] = useState(false);
   const previousTask = useRef(`${backend}:${task.name}`);
@@ -118,7 +118,7 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
       ),
     );
     setReconfigure(false);
-    setPersistOutputParameters(false);
+    setUpdateCalibrationParameters(false);
     setInputValues(prefill.input);
     const taskKey = `${backend}:${task.name}`;
     if (previousTask.current !== taskKey) {
@@ -237,7 +237,7 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
           input_parameter_overrides: inputParameterOverrides,
           run_parameter_overrides: runParameterOverrides,
           reconfigure,
-          persist_output_parameters: persistOutputParameters,
+          update_calibration_parameters: updateCalibrationParameters,
           update_params: false,
           ...(sourceTask ? { source_task_id: sourceTask.task_id } : {}),
         },
@@ -520,9 +520,12 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
                       title="Reload current values from the calibration database"
                     >
                       {isReloadingInputs ? (
-                        <span className="loading loading-spinner loading-xs" />
+                        <span
+                          data-icon="inline-start"
+                          className="loading loading-spinner loading-xs"
+                        />
                       ) : (
-                        <RefreshCw size={13} />
+                        <RefreshCw data-icon="inline-start" />
                       )}
                       Reload
                     </button>
@@ -616,7 +619,7 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
                 </div>
               )}
 
-              <label className="label min-w-0 cursor-pointer items-start justify-start gap-3 whitespace-normal">
+              <label className="choice-field gap-3">
                 <input
                   type="checkbox"
                   className="toggle toggle-sm"
@@ -633,25 +636,26 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
                 </span>
               </label>
 
-              <label className="label min-w-0 cursor-pointer items-start justify-start gap-3 whitespace-normal">
+              <label className="choice-field gap-3">
                 <input
                   type="checkbox"
-                  className="toggle toggle-sm toggle-success mt-0.5 shrink-0"
-                  checked={persistOutputParameters}
-                  onChange={(event) => setPersistOutputParameters(event.target.checked)}
+                  className="toggle toggle-sm toggle-success"
+                  checked={updateCalibrationParameters}
+                  onChange={(event) => setUpdateCalibrationParameters(event.target.checked)}
                 />
                 <span className="min-w-0 break-words">
                   <span className="block break-words text-sm font-medium">
-                    Save calibrated outputs to DB
+                    Update calibration values
                   </span>
                   <span className="block break-words text-xs text-base-content/50">
-                    Store this run&apos;s output parameters as the current calibration values.
-                    Update mapped YAML files and push to GitHub when integration is enabled.
+                    Make this run&apos;s validated outputs the current calibration values, update
+                    mapped YAML files, and push to GitHub when integration is enabled. When off, the
+                    run is still saved in task history.
                   </span>
                 </span>
               </label>
 
-              {persistOutputParameters && (
+              {updateCalibrationParameters && (
                 <div className="alert alert-warning py-2 text-xs">
                   This run can change the calibration values used by later tasks.
                 </div>
@@ -680,9 +684,13 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
                 title={runDisabledReason ?? "Run task"}
               >
                 {isStarting || isRunInProgress ? (
-                  <span className="loading loading-spinner loading-sm" aria-hidden="true" />
+                  <span
+                    data-icon="inline-start"
+                    className="loading loading-spinner loading-sm"
+                    aria-hidden="true"
+                  />
                 ) : (
-                  <Play size={17} />
+                  <Play data-icon="inline-start" />
                 )}
                 {runLabel}
               </button>
@@ -807,14 +815,14 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
                         setSubmittedTargetQuery(null);
                       }}
                     >
-                      <RotateCcw size={15} />
+                      <RotateCcw data-icon="inline-start" />
                       Adjust and run again
                     </button>
                     <Link
                       className="btn btn-sm btn-outline"
                       href={`/execution/${encodeURIComponent(submittedChipId)}/${encodeURIComponent(executionId)}`}
                     >
-                      <ExternalLink size={15} />
+                      <ExternalLink data-icon="inline-start" />
                       Full execution
                     </Link>
                     {resultTask?.task_id && (

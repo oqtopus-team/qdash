@@ -2,14 +2,19 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { FolderLock, Settings, ShieldCheck } from "lucide-react";
 
 import { Navbar } from "./Navbar";
 import { Sidebar } from "./Sidebar";
-import { ChatSidebar } from "./ChatSidebar";
+import { AGENT_TAB_WIDTH, ChatSidebar, useAgentTabShown } from "./ChatSidebar";
 import { MiniChatWindow } from "./MiniChatWindow";
+import { MobileTabBar } from "./MobileTabBar";
 
+import { ChatNotifier } from "@/components/features/chat/ChatNotifier";
+
+import { FirstCalibrationBanner } from "@/components/features/first-calibration/FirstCalibrationBanner";
+import { FirstCalibrationCoachmarks } from "@/components/features/first-calibration/FirstCalibrationCoachmarks";
 import { SidebarProvider } from "@/contexts/SidebarContext";
 import { ChatDockProvider } from "@/contexts/ChatDockContext";
 import { CopilotChatSessionProvider } from "@/contexts/CopilotChatSessionContext";
@@ -41,13 +46,13 @@ function ProjectAccessState() {
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
           {isAdmin && (
-            <Link href="/admin" className="btn btn-primary gap-2">
-              <ShieldCheck size={16} aria-hidden="true" />
+            <Link href="/admin" className="btn btn-primary">
+              <ShieldCheck data-icon="inline-start" aria-hidden="true" />
               Open Admin
             </Link>
           )}
-          <Link href="/settings" className="btn btn-outline gap-2">
-            <Settings size={16} aria-hidden="true" />
+          <Link href="/settings" className="btn btn-outline">
+            <Settings data-icon="inline-start" aria-hidden="true" />
             Open Settings
           </Link>
         </div>
@@ -56,11 +61,32 @@ function ProjectAccessState() {
   );
 }
 
+/**
+ * The scrolling page area. While the Ask Agent tab floats over its right edge, it sets
+ * `--agent-tab-inset`, the room the tab takes plus a small gap; PageContainer keeps its right
+ * gutter at least that wide, so a control at the edge (a toolbar's Save) is not covered.
+ */
+function AppMain({ children }: { children: React.ReactNode }) {
+  const tabShown = useAgentTabShown();
+  return (
+    <main
+      className="flex-1 overflow-y-auto bg-base-100"
+      style={
+        tabShown
+          ? { ["--agent-tab-inset" as string]: `calc(${AGENT_TAB_WIDTH} + 0.25rem)` }
+          : undefined
+      }
+    >
+      {children}
+    </main>
+  );
+}
+
 export function AppLayout({ children }: AppLayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user } = useAuth();
-  const { currentProject, loading: projectLoading, projects } = useProject();
+  const { user, username } = useAuth();
+  const { currentProject, projectId, loading: projectLoading, projects } = useProject();
   const isPublicPage = PUBLIC_PATHS.includes(pathname);
   const isProjectOptionalPage = PROJECT_OPTIONAL_PATH_PREFIXES.some((prefix) =>
     pathname.startsWith(prefix),
@@ -83,21 +109,34 @@ export function AppLayout({ children }: AppLayoutProps) {
   // Authenticated pages - render with sidebar and navbar
   return (
     <SidebarProvider>
-      <CopilotChatSessionProvider>
+      <CopilotChatSessionProvider owner={username ?? null} project={projectId ?? null}>
         <ChatDockProvider>
-          <div className="flex w-full h-screen overflow-hidden">
+          <ChatNotifier owner={username ?? null} project={projectId ?? null} />
+          {/* `h-dvh` tracks the visible viewport on mobile browsers, so the tab bar at the
+              bottom of the column stays on screen; the side and top padding keep the
+              chrome clear of display cutouts once the viewport extends under them. */}
+          <div className="flex w-full h-dvh overflow-hidden pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] pt-[env(safe-area-inset-top)]">
             <Sidebar />
-            <div className="flex-1 flex flex-col h-screen w-0 min-w-0 transition-[flex] duration-300 ease-in-out">
+            <div className="flex-1 flex flex-col h-full w-0 min-w-0 transition-[flex] duration-300 ease-in-out">
               <Navbar />
-              <main className="flex-1 overflow-y-auto bg-base-100">
-                <div key={pathname} className="page-transition">
+              {!showProjectAccessState && <FirstCalibrationBanner />}
+              <AppMain>
+                {/* Full height of the area under the navbar and the guide banner, so editor
+                    pages can fill it with h-full; taller pages overflow and scroll in main. */}
+                <div key={pathname} className="page-transition h-full">
                   {showProjectAccessState ? <ProjectAccessState /> : children}
                 </div>
-              </main>
+              </AppMain>
+              <MobileTabBar />
             </div>
             <ChatSidebar />
           </div>
           {!showProjectAccessState && <MiniChatWindow />}
+          {!showProjectAccessState && (
+            <Suspense fallback={null}>
+              <FirstCalibrationCoachmarks />
+            </Suspense>
+          )}
         </ChatDockProvider>
       </CopilotChatSessionProvider>
     </SidebarProvider>

@@ -452,8 +452,8 @@ export function EvaluationComparePageContent() {
         </div>
       </div>
       {runA && runB && (
-        <button type="button" className="btn btn-ghost btn-sm gap-1" onClick={swap}>
-          <ArrowLeftRight className="h-4 w-4" />
+        <button type="button" className="btn btn-ghost btn-sm" onClick={swap}>
+          <ArrowLeftRight data-icon="inline-start" />
           Swap
         </button>
       )}
@@ -556,14 +556,14 @@ export function EvaluationComparePageContent() {
           <span className="text-sm font-medium">
             {visibleRows.length} of {rows.length} entities
           </span>
-          <label className="label cursor-pointer gap-2 py-0">
+          <label className="choice-field text-xs">
             <input
               type="checkbox"
               className="checkbox checkbox-sm"
               checked={onlyDifferences}
               onChange={(event) => setOnlyDifferences(event.target.checked)}
             />
-            <span className="label-text text-xs">Only differences</span>
+            <span>Only differences</span>
           </label>
         </div>
         {visibleRows.length === 0 ? (

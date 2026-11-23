@@ -14,7 +14,8 @@ from typing import Any
 
 import networkx as nx
 
-from qdash.common.wiring_resources import mux_module_resources
+from qdash.common.manual_rounds import mux_conflicts
+from qdash.common.mux_mapping import MuxMapping
 
 logger = logging.getLogger(__name__)
 
@@ -118,30 +119,27 @@ def build_mux_conflict_map(yaml_mux_list: list[dict[str, Any]]) -> dict[int, set
 
     MUXes conflict if they share the same readout or control module.
     """
-    module_to_muxes: dict[str, set[int]] = defaultdict(set)
-    for entry in yaml_mux_list:
-        for resource in mux_module_resources(entry):
-            module_to_muxes[resource].add(entry["mux"])
-
-    conflict_map: dict[int, set[int]] = defaultdict(set)
-    for muxes in module_to_muxes.values():
-        for mux_a, mux_b in itertools.combinations(muxes, 2):
-            conflict_map[mux_a].add(mux_b)
-            conflict_map[mux_b].add(mux_a)
-    return dict(conflict_map)
+    # One copy of the model, shared with the manual-round checks.
+    return mux_conflicts(yaml_mux_list)
 
 
-def build_qubit_to_mux_map(yaml_mux_list: list[dict[str, Any]]) -> dict[str, int]:
-    """Build mapping from qubit ID to MUX ID.
+def build_qubit_to_mux_map(
+    yaml_mux_list: list[dict[str, Any]], mux_mapping: MuxMapping | None = None
+) -> dict[str, int]:
+    """Build mapping from qubit ID to MUX ID for the wired MUXes.
 
-    Each MUX controls 4 qubits: MUX_N controls qubits [4N, 4N+1, 4N+2, 4N+3].
+    Membership comes from ``mux_mapping`` (the chip topology) and is joined to
+    the wiring rows by MUX ID. Without a mapping the legacy convention applies:
+    MUX_N controls qubits [4N, 4N+1, 4N+2, 4N+3].
+
+    Raises:
+        MuxMappingError: If a member slot has no control port in the wiring
     """
-    qid_to_mux = {}
-    for entry in yaml_mux_list:
-        mux_id = entry["mux"]
-        for offset in range(4):
-            qid_to_mux[str(mux_id * 4 + offset)] = mux_id
-    return qid_to_mux
+    mapping = mux_mapping if mux_mapping is not None else MuxMapping.legacy()
+    mapping.check_wiring(yaml_mux_list)
+    return mapping.qid_to_mux(
+        entry["mux"] for entry in yaml_mux_list if mapping.has_mux(entry["mux"])
+    )
 
 
 def group_cr_pairs_by_conflict(
@@ -182,15 +180,21 @@ def group_cr_pairs_by_conflict(
             conflict_graph.add_edge(pair_a, pair_b)
             continue
 
-        # Conflict 2: Same MUX usage
-        mux_a1, mux_a2 = qid_to_mux[q1a], qid_to_mux[q2a]
-        mux_b1, mux_b2 = qid_to_mux[q1b], qid_to_mux[q2b]
+        mux_a1, mux_a2 = qid_to_mux.get(q1a), qid_to_mux.get(q2a)
+        mux_b1, mux_b2 = qid_to_mux.get(q1b), qid_to_mux.get(q2b)
 
+        # Conflict 2: A qubit without a MUX (standalone, or not wired) has no
+        # known hardware resources, so its pair never shares a step.
+        if mux_a1 is None or mux_a2 is None or mux_b1 is None or mux_b2 is None:
+            conflict_graph.add_edge(pair_a, pair_b)
+            continue
+
+        # Conflict 3: Same MUX usage
         if mux_a1 in (mux_b1, mux_b2) or mux_a2 in (mux_b1, mux_b2):
             conflict_graph.add_edge(pair_a, pair_b)
             continue
 
-        # Conflict 3: MUX resource conflicts
+        # Conflict 4: MUX resource conflicts
         conflict_muxes = mux_conflict_map.get(mux_a1, set()) | mux_conflict_map.get(mux_a2, set())
         if mux_b1 in conflict_muxes or mux_b2 in conflict_muxes:
             conflict_graph.add_edge(pair_a, pair_b)
@@ -221,13 +225,20 @@ def group_cr_pairs_by_conflict(
 def split_fast_slow_pairs(
     cr_pairs: list[str], qid_to_mux: dict[str, int]
 ) -> tuple[list[str], list[str]]:
-    """Separate CR pairs into fast (intra-MUX) and slow (inter-MUX) categories."""
-    fast_pairs = [
-        p for p in cr_pairs if qid_to_mux.get(p.split("-")[0]) == qid_to_mux.get(p.split("-")[1])
-    ]
-    slow_pairs = [
-        p for p in cr_pairs if qid_to_mux.get(p.split("-")[0]) != qid_to_mux.get(p.split("-")[1])
-    ]
+    """Separate CR pairs into fast (intra-MUX) and slow (inter-MUX) categories.
+
+    A pair is intra-MUX only when both qubits are in the same known MUX. Two
+    qubits without a MUX (standalone or not wired) are not "the same MUX", so
+    such pairs are slow.
+    """
+
+    def intra_mux(pair: str) -> bool:
+        control, target = pair.split("-")
+        mux_id = qid_to_mux.get(control)
+        return mux_id is not None and mux_id == qid_to_mux.get(target)
+
+    fast_pairs = [p for p in cr_pairs if intra_mux(p)]
+    slow_pairs = [p for p in cr_pairs if not intra_mux(p)]
     return fast_pairs, slow_pairs
 
 

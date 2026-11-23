@@ -25,15 +25,23 @@ the expiry, the skill identity, the model identity, and whether hardware reconfi
 permitted. QDash rejects an action outside that grant, an action based on a stale state version,
 and a duplicate request whose idempotency key carries different arguments. The budget counts
 proposed actions; committing an accepted candidate advances the state version without spending
-one.
+one, and so does a `request_human` action, which QDash accepts even when the budget is spent.
+A request for a person records an intervention and pauses the session until an expert answers
+in QDash; see [Human interventions](./agentic-calibration.md#human-interventions).
 
-The policy also records how much a person delegated: `autonomy` is `confirm_each` (every
-measurement confirmed by a person, the default) or `auto` (the plan, bounds, and budget
-confirmed once; the plan then chooses each next node from the calibration evaluation of the
-last result and the task knowledge's `next_actions` table), and `max_rounds_per_target` caps how
-often one node runs on a target in `auto`. The grant changes nothing server-side: every action
-still passes the same policy checks. It is what the client's evaluation planner requires before
-it runs unattended, and what the audit shows a reviewer.
+The immutable policy also records `autonomy`: `confirm_each` (default) requires per-measurement
+confirmation; `auto` grants the approved scope, bounds, and budget once. In pi and the web
+Agent, `auto` lets the model run the session's own steps and expert requests without asking
+again ([The model-driven loop](./agentic-calibration.md#the-model-driven-loop)), and
+`max_rounds_per_target` limits how often one task runs on one qubit. In the Python client, the
+[evaluation planner](./agentic-calibration.md#the-evaluation-planner) requires this grant and
+`max_rounds_per_target` limits node visits. Server-side action checks are the same for both,
+except that a request marked `autonomous` (pi's session-granted tools) also needs the signed-in
+creator of an `auto` session and passes QDash's own checks of running measurements, rounds, and
+repeats; see [Server checks](./agentic-calibration.md#server-checks). The optional
+`parameter_updates` grant extends the same one-time approval to commits, and optionally backend
+applies, of named parameters after a recorded pass assessment; see
+[Update authority](./agentic-calibration.md#update-authority).
 
 ## Operation dispatch
 
@@ -48,9 +56,12 @@ writes.
 
 ## Candidate commit
 
-Task output parameters stay staged until the session's parameter bounds and quality gates accept
-them. The candidate is derived from the authoritative task result; R² is normalised to `r2` and
-persisted as task-result provenance, and a missing required metric rejects the candidate. A
+Task output parameters stay staged until the session accepts them: inside the parameter's
+bounds, or, for a parameter the update grant names without bounds, on its task's own completion
+checks, and in both cases only when the quality gates of that task hold. The candidate is
+derived from the authoritative task result; R² is normalised to `r2` and persisted as
+task-result provenance, and a missing metric a gate of that task requires rejects the
+candidate ([Quality gates](./agentic-calibration.md#quality-gates)). A
 plan ending in `pass` may revalidate the latest accepted candidate per parameter and persist
 the same-qid set with one Qubit save and one audit record. There is no multi-document MongoDB
 transaction behind that save.
@@ -72,7 +83,9 @@ key, and a timeout after that point is returned to the operator. Revisited nodes
 deterministic idempotency key; transport retries before dispatch reuse the same one.
 
 The client package carries the runners and the `qdash-agent` command
-([Python client](../../reference/clients/python.md#agent-calibration)).
+([Python client](../../reference/clients/python.md#agent-calibration)). The runner is the
+deterministic path; the primary path lets the model choose each step in pi or the web Agent, as
+[The model-driven loop](./agentic-calibration.md#the-model-driven-loop) describes.
 
 ## Safety invariants
 
@@ -81,12 +94,21 @@ The client package carries the runners and the `qdash-agent` command
   off unless the immutable session policy grants it.
 - Every action is idempotent and bound to an expected state version.
 - An agent disconnect leaves the session resumable and not running.
-- A parameter write-back needs the deterministic bounds and quality gates; a model's proposal
-  alone cannot commit a value.
+- A paused session starts no new measurement, commit, or backend apply until an expert
+  answers; one already dispatched before the pause continues, and resume waits for it. A resume
+  keeps the policy, budget, expiry, and visit counts, and a stopped, completed, or expired
+  session is never reactivated.
+- A parameter write-back needs an accepted candidate (deterministic bounds or the grant's task
+  checks, and the task's quality gates); a model's proposal alone cannot commit a value. A commit without a per-call approval also needs the session's
+  `parameter_updates` grant and a recorded `pass` assessment, and is never made from a result
+  assessed `fail` or `inconclusive`. A failed or questionable result stops the session's
+  autonomous steps, a repeat included, until an expert answers an intervention citing it.
 - Each action records its skill hash, model identity, evidence references, decision, and the
   resulting operation.
 - Decision-graph references are validated before dispatch, every node visit is audited, and the
   maximum visits must fit within the session's remaining budget.
+- An expert's guidance is stored text: it changes no scope, bound, budget, or expiry, and the
+  model-driven loop treats it as evidence, not permission.
 - A dynamic planner cannot grow the graph or the budget. Invalid choices, planner failures, and
   completion after a rollback escalate to a human.
 - Plan finalisation re-resolves every referenced task result and validates the whole set
@@ -107,6 +129,8 @@ claim needs results measured on QDash's own hardware, tasks, and gates.
 - `src/qdash/api/routers/agent_session.py`, `src/qdash/api/services/agent_session_service.py`,
   `src/qdash/api/schemas/agent_session.py`: session contract, actions, state versions, audit
 - `src/qdash/datamodel/agent_session.py`, `src/qdash/dbmodel/agent_session.py`: stored session
+  and interventions
+- `src/qdash/api/services/agent_intervention_service.py`: interventions, expert answers, resume
 - `src/qdash/workflow/register_system_flows.py`,
   `src/qdash/workflow/service/agent_candidate_apply_flow.py`: system deployments, backend apply
 - `clients/python/src/qdash/client/services/agent_runner.py`,

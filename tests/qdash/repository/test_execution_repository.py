@@ -100,3 +100,23 @@ def test_returns_none_when_mongo_call_raises(repository: MongoExecutionRepositor
         )
 
     assert claimed_id is None
+
+
+def test_connects_to_configured_host_side_mongo(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A host-side process reaches MONGO_HOST and MONGO_PORT, not the Docker host name."""
+    monkeypatch.setenv("MONGO_HOST", "127.0.0.1")
+    monkeypatch.setenv("MONGO_PORT", "27018")
+
+    repository = MongoExecutionRepository(database=DATABASE_NAME)
+
+    assert (repository._host, repository._port) == ("127.0.0.1", 27018)
+
+
+def test_defaults_to_docker_mongo_on_internal_port(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Inside Docker the service name is used and the host-side port mapping is ignored."""
+    monkeypatch.delenv("MONGO_HOST", raising=False)
+    monkeypatch.setenv("MONGO_PORT", "27018")
+
+    repository = MongoExecutionRepository(database=DATABASE_NAME)
+
+    assert (repository._host, repository._port) == ("mongo", 27017)

@@ -56,7 +56,7 @@ class GitHubPushConfig(BaseModel):
     """Configuration for GitHub push operations.
 
     Attributes:
-        enabled: Whether to push to GitHub on finish_calibration()
+        enabled: Whether to push to GitHub when a calibration step completes
         file_types: List of file types to push (default: [CALIB_NOTE, ALL_PARAMS])
         params_file_names: Optional allowlist for ALL_PARAMS, such as
             ["params.yaml", "drag.yaml"]. If omitted, defaults to

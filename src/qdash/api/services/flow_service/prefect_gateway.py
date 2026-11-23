@@ -29,13 +29,19 @@ class PrefectGateway:
         self._client_factory = client_factory or get_client
 
     async def create_flow_run(
-        self, *, deployment_id: UUID | str, parameters: dict[str, Any]
+        self,
+        *,
+        deployment_id: UUID | str,
+        parameters: dict[str, Any],
+        context: dict[str, Any] | None = None,
     ) -> str:
         """Create a flow run from a deployment and return its Prefect run ID."""
+        context_kwargs: dict[str, Any] = {"context": context} if context else {}
         async with self._client_factory() as client:
             flow_run = await client.create_flow_run_from_deployment(
                 deployment_id=cast("UUID", deployment_id),
                 parameters=parameters,
+                **context_kwargs,
             )
         return str(flow_run.id)
 

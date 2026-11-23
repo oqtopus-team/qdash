@@ -16,6 +16,7 @@ from qdash.datamodel.task import (
     validate_task_result_input_parameters,
     validate_task_result_output_parameters,
 )
+from qdash.datamodel.task_invocation import TaskInvocation
 from qdash.dbmodel.user import UserDocument
 
 
@@ -76,6 +77,10 @@ class TaskResultHistoryDocument(Document):
     task_type: str = Field(..., description="The task type")
     system_info: SystemInfoModel = Field(..., description="The system information")
     qid: str = Field("", description="The qubit ID")
+    invocation: TaskInvocation | None = Field(
+        default=None,
+        description="Planned step and call this result executed; absent on older results.",
+    )
 
     execution_id: str = Field(..., description="The execution ID")
     tags: list[str] = Field(..., description="The tags")
@@ -276,6 +281,7 @@ class TaskResultHistoryDocument(Document):
             task_type=task.task_type,
             system_info=task.system_info.model_dump(),
             qid=getattr(task, "qid", ""),
+            invocation=task.invocation,
             execution_id=execution_model.execution_id,
             tags=execution_model.tags,
             chip_id=execution_model.chip_id,
@@ -319,6 +325,7 @@ class TaskResultHistoryDocument(Document):
         doc.task_type = task.task_type
         doc.system_info = task.system_info
         doc.qid = getattr(task, "qid", "")
+        doc.invocation = task.invocation
         doc.execution_id = execution_model.execution_id
         doc.tags = execution_model.tags
         doc.chip_id = execution_model.chip_id

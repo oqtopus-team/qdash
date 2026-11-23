@@ -1,38 +1,57 @@
 name: Publish TypeScript packages
 
+# This is the common QDash release pipeline. Its client job computes one QDash version
+# per run and publishes the npm client; the TypeScript SDK releases at that exact
+# version after the client, and both pi packages derive their versions from it, so a
+# QDash vX.Y.Z tag releases all of them as X.Y.Z. The client job also uploads a
+# qdash-client-release record, and publish-qdash-client.yml publishes the PyPI client
+# from it when this run completes. The paths therefore include the Python client.
 on:
   pull_request:
     branches: [develop]
     paths:
-      - "packages/**"
+      - "clients/python/**"
+      - "sdks/python/**"
       - "clients/typescript/**"
+      - "sdks/typescript/**"
+      - "packages/**"
       - "docs/oas/openapi.json"
       - "ui/src/schemas/**"
       - "Taskfile.yaml"
       - "agent-runtime/**"
+      - "pyproject.toml"
+      - "uv.lock"
       - "package.json"
       - "bun.lock"
-      - ".github/scripts/pi-package-*"
       - ".github/scripts/client-release*"
+      - ".github/scripts/pi-package-*"
+      - ".github/scripts/sdk-package-*"
+      - ".github/workflows/publish-qdash-client.yml"
       - ".github/workflows/publish-qdash-typescript-client.yml"
       - ".github/workflows/publish-typescript-packages.yml"
   push:
     branches: [develop]
     paths:
-      - "packages/**"
+      - "clients/python/**"
+      - "sdks/python/**"
       - "clients/typescript/**"
+      - "sdks/typescript/**"
+      - "packages/**"
       - "docs/oas/openapi.json"
       - "ui/src/schemas/**"
       - "Taskfile.yaml"
+      - "pyproject.toml"
+      - "uv.lock"
       - "package.json"
       - "bun.lock"
-      - ".github/scripts/pi-package-*"
       - ".github/scripts/client-release*"
+      - ".github/scripts/pi-package-*"
+      - ".github/scripts/sdk-package-*"
+      - ".github/workflows/publish-qdash-client.yml"
       - ".github/workflows/publish-qdash-typescript-client.yml"
       - ".github/workflows/publish-typescript-packages.yml"
     tags:
-      - "pi-qdash/v*"
-      - "pi-qcaleval/v*"
+      - "v[0-9]+.[0-9]+.[0-9]+"
   workflow_dispatch:
 
 permissions:
@@ -50,12 +69,125 @@ jobs:
       contents: read
       id-token: write
     with:
-      publish: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/develop') || startsWith(github.ref, 'refs/tags/pi-qdash/v') }}
-    secrets:
-      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+      # The called workflow also publishes the stable client for QDash vX.Y.Z tags.
+      publish: ${{ github.event_name == 'push' && github.ref == 'refs/heads/develop' }}
+
+  sdk:
+    needs: client
+    name: Build TypeScript SDK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: "1.4.0"
+          no-cache: true
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build local TypeScript client
+        run: bun run build:client
+
+      - name: Check and test SDK
+        working-directory: sdks/typescript
+        run: bun run check
+
+      - name: Test release versioning
+        run: node --test .github/scripts/sdk-package-release.test.mjs
+
+      # The SDK takes the client's exact version and pins the client to it.
+      - name: Set package version
+        env:
+          QDASH_CLIENT_VERSION: ${{ needs.client.outputs.version }}
+        run: node .github/scripts/sdk-package-release.mjs
+
+      - name: Build package
+        working-directory: sdks/typescript
+        run: |
+          bun run build
+          npm pack --pack-destination dist --ignore-scripts
+
+      - name: Download matching client tarball
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
+        with:
+          name: qdash-typescript-client-dist
+          path: client-dist
+
+      - name: Verify standalone tarball
+        shell: bash
+        # This tests a fresh consumer install and typechecks it with Node's resolution.
+        # jactionlint ignore=adhoc-packages
+        run: |
+          consumer="$(mktemp -d)"
+          npm install --prefix "$consumer" --ignore-scripts --no-audit --no-fund \
+            "$(realpath sdks/typescript/dist/oqtopus-team-qdash-sdk-*.tgz)" "$(realpath client-dist/*.tgz)" \
+            typescript@5.9.3 @types/node@24
+          node .github/scripts/sdk-package-smoke.mjs "$consumer"
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: qdash-typescript-sdk-dist
+          path: sdks/typescript/dist/oqtopus-team-qdash-sdk-*.tgz
+          if-no-files-found: error
+
+  publish-sdk:
+    name: Publish TypeScript SDK
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # The client job published the client first; the SDK pins that exact version.
+    needs: [client, sdk]
+    if: >-
+      startsWith(github.ref, 'refs/tags/v') ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/develop')
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout release scripts
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      - name: Download package artifact
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
+        with:
+          name: qdash-typescript-sdk-dist
+          path: dist
+
+      - name: Publish package
+        # Authenticates with npm Trusted Publishing (OIDC) as this workflow.
+        run: |
+          archive="$(realpath dist/*.tgz)"
+          # A rerun finds the version already published and skips it.
+          tag="$(node .github/scripts/sdk-package-release.mjs --publish-tag "$archive")"
+          if [ -z "$tag" ]; then
+            echo "Skipping @oqtopus-team/qdash-sdk: no new version to publish for $GITHUB_REF"
+            exit 0
+          fi
+          npm publish "$archive" --access public --provenance --tag "$tag"
 
   build:
-    needs: client
+    needs: [client, sdk]
     name: Build ${{ matrix.package }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -84,8 +216,10 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Build local TypeScript client
-        run: bun run build:client
+      - name: Build local TypeScript client and SDK
+        run: |
+          bun run build:client
+          bun run build:sdk
 
       - name: Check and test package
         working-directory: packages/${{ matrix.package }}
@@ -116,6 +250,13 @@ jobs:
           name: qdash-typescript-client-dist
           path: client-dist
 
+      - name: Download matching SDK tarball
+        if: matrix.package == 'pi-qdash'
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
+        with:
+          name: qdash-typescript-sdk-dist
+          path: sdk-dist
+
       - name: Verify standalone tarball
         env:
           PI_PACKAGE: ${{ matrix.package }}
@@ -127,10 +268,10 @@ jobs:
           archive="$(realpath packages/"$PI_PACKAGE"/*.tgz)"
           client=()
           if [ "$PI_PACKAGE" = "pi-qdash" ]; then
-            client=("$(realpath client-dist/*.tgz)")
+            client=("$(realpath client-dist/*.tgz)" "$(realpath sdk-dist/*.tgz)")
           fi
           npm install --prefix "$consumer" --ignore-scripts --no-audit --no-fund \
-            "$archive" "${client[@]}" @earendil-works/pi-coding-agent@1.4.0 @earendil-works/pi-ai@1.4.0 typebox@1.3.27
+            "$archive" "${client[@]}" @earendil-works/pi-coding-agent@1.6.0 @earendil-works/pi-ai@1.6.0 typebox@1.3.27
           bun .github/scripts/pi-package-smoke.mjs "$consumer" "$PI_PACKAGE"
 
       - name: Upload package artifact
@@ -144,10 +285,11 @@ jobs:
     name: Publish ${{ matrix.package }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: [client, build]
+    # pi-qdash depends on the SDK, so the SDK publishes first.
+    needs: [client, publish-sdk, build]
+    # QDash vX.Y.Z tags are the only stable path; every package releases as X.Y.Z.
     if: >-
-      startsWith(github.ref, 'refs/tags/pi-qdash/v') ||
-      startsWith(github.ref, 'refs/tags/pi-qcaleval/v') ||
+      startsWith(github.ref, 'refs/tags/v') ||
       (github.event_name == 'push' && github.ref == 'refs/heads/develop')
     strategy:
       fail-fast: false
@@ -157,6 +299,12 @@ jobs:
       contents: read
       id-token: write
     steps:
+      - name: Checkout release scripts
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+
       - name: Set up Node.js
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
@@ -170,10 +318,15 @@ jobs:
           path: dist
 
       - name: Publish package
-        if: >-
-          github.ref == 'refs/heads/develop' ||
-          startsWith(github.ref, format('refs/tags/{0}/v', matrix.package))
+        env:
+          PI_PACKAGE: ${{ matrix.package }}
         run: |
-          tag=latest
-          if [ "$GITHUB_REF" = "refs/heads/develop" ]; then tag=beta; fi
-          npm publish ./dist/*.tgz --access public --provenance --tag "$tag"
+          # npm reads a bare "dist/x.tgz" as GitHub shorthand, so pass an absolute path.
+          archive="$(realpath dist/*.tgz)"
+          # A rerun of a QDash tag finds X.Y.Z already published and skips it.
+          tag="$(node .github/scripts/pi-package-release.mjs --publish-tag "$PI_PACKAGE" "$archive")"
+          if [ -z "$tag" ]; then
+            echo "Skipping $PI_PACKAGE: no new version to publish for $GITHUB_REF"
+            exit 0
+          fi
+          npm publish "$archive" --access public --provenance --tag "$tag"

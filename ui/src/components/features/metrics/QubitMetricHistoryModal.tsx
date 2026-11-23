@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import Link from "next/link";
 
 import { ChevronRight, GitBranch, History, ListTodo, FileText } from "lucide-react";
 
@@ -16,7 +15,7 @@ import { formatDateTime, formatDateTimeCompact } from "@/lib/utils/datetime";
 import { useManualOverrides } from "@/hooks/useManualOverrides";
 
 import { ParametersTable } from "./ParametersTable";
-import { AskAiButton } from "@/components/features/evaluations/AskAiButton";
+import { LineageButton } from "@/components/features/provenance/ParameterLineageDialog";
 import { TaskResultEvaluations } from "@/components/features/evaluations/TaskResultEvaluations";
 import { TaskResultThreads } from "@/components/features/forum/TaskResultThreads";
 import { TaskResultMemo } from "./TaskResultMemo";
@@ -506,26 +505,15 @@ export function QubitMetricHistoryModal({
               </span>
             </div>
           )}
-          {/* Provenance link and Ask AI */}
+          {/* Lineage */}
           <div className="pt-2 mt-2 border-t border-base-300 flex items-center gap-2 flex-wrap">
-            <Link
-              href={`/provenance?parameter=${encodeURIComponent(metricName)}&qid=${encodeURIComponent(qid)}&tab=lineage`}
-              className="btn btn-xs btn-outline gap-1"
+            <LineageButton
+              target={{ parameterName: metricName, qid: qid }}
+              className="btn btn-xs btn-outline"
             >
-              <GitBranch className="h-3 w-3" />
-              View Provenance Lineage
-            </Link>
-            {chatContext && (
-              <AskAiButton
-                taskId={chatContext.taskId}
-                chipId={chatContext.chipId}
-                taskName={chatContext.taskName}
-                qid={chatContext.qid}
-                chatContext={chatContext}
-                onChat={() => openMiniChat(chatContext)}
-                size="xs"
-              />
-            )}
+              <GitBranch data-icon="inline-start" />
+              Lineage
+            </LineageButton>
             {selectedHistoryItem?.task_id && (
               <TaskResultExcludeButton
                 taskId={selectedHistoryItem.task_id}
@@ -579,6 +567,7 @@ export function QubitMetricHistoryModal({
           chipId={chipId}
           taskName={selectedTask.name || undefined}
           qid={qid}
+          executionId={selectedExecutionId || undefined}
           onChat={chatContext ? () => openMiniChat(chatContext) : undefined}
         />
       )}

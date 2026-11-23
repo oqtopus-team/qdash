@@ -1,5 +1,5 @@
 import dynamic from "next/dynamic";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { useMemo, useState, useEffect } from "react";
 
 import type { PlotData, Layout, Config, Font } from "plotly.js";
@@ -55,7 +55,9 @@ export function PlotCard({
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  // Adjust layout for mobile (hide legend, reduce margins)
+  // Adjust layout for mobile: hide the legend, use compact margins, and let
+  // axes grow the margins so tick labels and titles (including a right-hand
+  // secondary axis) are not clipped by the compact defaults.
   const responsiveLayout = useMemo<Partial<Layout>>(() => {
     if (!isMobile) return layout;
 
@@ -67,6 +69,11 @@ export function PlotCard({
         ...(layout.xaxis ?? {}),
         automargin: true,
       },
+      yaxis: {
+        ...(layout.yaxis ?? {}),
+        automargin: true,
+      },
+      ...(layout.yaxis2 ? { yaxis2: { ...layout.yaxis2, automargin: true } } : {}),
       title: layout.title
         ? typeof layout.title === "string"
           ? { text: layout.title, font: { size: 14 } }
@@ -104,31 +111,34 @@ export function PlotCard({
     [defaultConfig, config],
   );
 
+  // One plot instance; CSS variables carry the per-breakpoint heights so the
+  // container height switches at the same `sm` breakpoint as `isMobile`.
+  const plotAreaStyle = {
+    "--plot-card-height": height,
+    "--plot-card-mobile-height": mobileHeight,
+  } as CSSProperties;
+
   return (
-    <div
-      className={`card bg-base-100 shadow-sm rounded-xl p-4 sm:p-8 border border-base-300 ${className}`}
-    >
-      <div className="flex items-center justify-between mb-4 sm:mb-6">
-        <h2 className="text-sm font-medium flex items-center gap-2">
+    <div className={`card bg-base-100 border border-base-300 shadow-sm p-3 sm:p-4 ${className}`}>
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+        <h2 className="text-sm font-medium flex items-center gap-2 min-w-0">
           {icon}
           {title}
         </h2>
         {children}
       </div>
 
-      {/* Mobile height */}
       <div
-        className="w-full bg-base-200/50 rounded-xl p-2 sm:p-4 relative sm:hidden"
-        style={{ height: mobileHeight }}
+        className="relative w-full h-(--plot-card-mobile-height) sm:h-(--plot-card-height)"
+        style={plotAreaStyle}
+        data-testid="plot-card-area"
       >
-        {/* Loading state */}
         {isLoading && (
           <div className="flex items-center justify-center h-full absolute inset-0 z-10">
             <div className="loading loading-spinner loading-lg text-primary"></div>
           </div>
         )}
 
-        {/* Empty state */}
         {!isLoading && !hasData && (
           <div className="flex items-center justify-center h-full text-base-content/70">
             <div className="text-center">
@@ -152,59 +162,10 @@ export function PlotCard({
           </div>
         )}
 
-        {/* Plot area */}
         {!isLoading && hasData && plotData.length > 0 && (
           <Plot
             data={plotData}
             layout={responsiveLayout}
-            config={mergedConfig}
-            style={{ width: "100%", height: "100%" }}
-            useResizeHandler={true}
-          />
-        )}
-      </div>
-
-      {/* Desktop height */}
-      <div
-        className="w-full bg-base-200/50 rounded-xl p-4 relative hidden sm:block"
-        style={{ height }}
-      >
-        {/* Loading state */}
-        {isLoading && (
-          <div className="flex items-center justify-center h-full absolute inset-0 z-10">
-            <div className="loading loading-spinner loading-lg text-primary"></div>
-          </div>
-        )}
-
-        {/* Empty state */}
-        {!isLoading && !hasData && (
-          <div className="flex items-center justify-center h-full text-base-content/70">
-            <div className="text-center">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="w-12 h-12 mx-auto mb-4 opacity-50"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M3 3v18h18"></path>
-                <path d="M3 12h18"></path>
-                <path d="M12 3v18"></path>
-              </svg>
-              <p className="text-sm">{emptyStateMessage}</p>
-            </div>
-          </div>
-        )}
-
-        {/* Plot area */}
-        {!isLoading && hasData && plotData.length > 0 && (
-          <Plot
-            data={plotData}
-            layout={layout}
             config={mergedConfig}
             style={{ width: "100%", height: "100%" }}
             useResizeHandler={true}

@@ -6,20 +6,25 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { ExecutionActivityDay } from './executionActivityDay';
+import type { ExecutionActivityResponseChipId } from './executionActivityResponseChipId';
+import type { ExecutionActivityResponseGranularity } from './executionActivityResponseGranularity';
 
 /**
- * Daily execution counts for a chip over a trailing window of days.
+ * Execution counts for a chip, or a whole project, over a trailing window of days.
  */
 export interface ExecutionActivityResponse {
-  chip_id: string;
+  /** Chip the counts are for, or null when every chip in the project counts */
+  chip_id: ExecutionActivityResponseChipId;
   /** Length of the window in calendar days */
   days: number;
   /** IANA time zone the days are bucketed in */
   timezone: string;
-  /** First day of the window, YYYY-MM-DD */
+  /** Bucket length: `day` for one bucket per calendar day, `6h` for four buckets per day starting at local 00:00, 06:00, 12:00, and 18:00 */
+  granularity: ExecutionActivityResponseGranularity;
+  /** Day the first bucket starts on, YYYY-MM-DD */
   since: string;
-  /** Last day of the window (today), YYYY-MM-DD */
+  /** Day the last bucket starts on (today), YYYY-MM-DD */
   until: string;
-  /** One entry per calendar day, oldest first, including empty days */
+  /** One entry per bucket, oldest first, including empty buckets. Daily: one per calendar day ending today. 6-hour: `days` x 4 slots ending with the slot that contains the current time, so no bucket lies entirely in the future */
   buckets: ExecutionActivityDay[];
 }

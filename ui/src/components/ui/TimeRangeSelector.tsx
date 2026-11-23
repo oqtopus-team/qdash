@@ -84,14 +84,15 @@ export function TimeRangeSelector({
         {collapsible && (
           <button
             type="button"
-            className={`btn btn-sm gap-1.5 ${showCustomRange ? "btn-ghost bg-base-200" : "btn-ghost"}`}
+            className={`btn btn-sm ${showCustomRange ? "btn-ghost bg-base-200" : "btn-ghost"}`}
             aria-expanded={showCustomRange}
             aria-controls="custom-time-range"
             onClick={() => setShowCustomRange((visible) => !visible)}
           >
-            <CalendarRange className="h-4 w-4" aria-hidden="true" />
+            <CalendarRange data-icon="inline-start" aria-hidden="true" />
             Custom
             <ChevronDown
+              data-icon="inline-end"
               className={`h-3.5 w-3.5 transition-transform ${showCustomRange ? "rotate-180" : ""}`}
               aria-hidden="true"
             />

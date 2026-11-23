@@ -1,11 +1,7 @@
 import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { MetricsStatsCards } from "@/components/features/metrics/MetricsStatsCards";
-
-vi.mock("@/components/ui/AnimatedCounter", () => ({
-  AnimatedCounter: ({ value }: { value: number }) => <span>{value}</span>,
-}));
 
 describe("MetricsStatsCards", () => {
   afterEach(() => cleanup());
@@ -37,5 +33,25 @@ describe("MetricsStatsCards", () => {
     );
 
     expect(screen.getByText("Median T1").parentElement?.textContent).toContain("2");
+  });
+
+  it("shows final values on first render with a neutral maximum", () => {
+    render(
+      <MetricsStatsCards
+        metricData={{ "0": { value: 12.345 }, "1": { value: 0.0123 }, "2": { value: 2500 } }}
+        title="T1"
+        unit="us"
+        gridSize={2}
+        metricType="qubit"
+      />,
+    );
+
+    const valueOf = (title: string) =>
+      screen.getByText(title).parentElement?.querySelector(".stat-value");
+
+    expect(valueOf("Minimum")?.textContent).toBe("0.012");
+    expect(valueOf("Median T1")?.textContent).toBe("12.35");
+    expect(valueOf("Maximum")?.textContent).toBe((2500).toLocaleString());
+    expect(valueOf("Maximum")?.className).not.toContain("text-success");
   });
 });

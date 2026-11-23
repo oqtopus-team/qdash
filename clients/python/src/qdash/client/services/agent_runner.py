@@ -3,20 +3,25 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import StrEnum
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 from uuid import uuid4
 
-from qdash.client.services.errors import QDashApiError, QDashTransportError
+from qdash.client.services.errors import (
+    QDashApiError,
+    QDashTransportError,
+    QDashValidationError,
+)
 
 if TYPE_CHECKING:
     from qdash.client.services.client import QDashClient
-    from qdash.client.services.models import (
+    from qdash.client.services.client_models import (
         AgentActionResponse,
         AgentCandidateCommitResponse,
         AgentCandidateResponse,
         AgentCandidateSetCommitResponse,
+        AgentInterventionResponse,
         AgentSessionResponse,
     )
 
@@ -37,6 +42,92 @@ class AgentSkillTransition(StrEnum):
     RETRY = "retry"
     ROLLBACK = "rollback"
     HUMAN_ESCALATION = "human_escalation"
+
+
+class AgentInterventionReason(StrEnum):
+    """Why a plan stopped for a person; the same values as QDash's intervention reasons."""
+
+    UNKNOWN_OUTCOME = "unknown_outcome"
+    RECOVERY_EXHAUSTED = "recovery_exhausted"
+    EVALUATION_FAILED = "evaluation_failed"
+    PLATFORM_ERROR = "platform_error"
+    POLICY_LIMIT = "policy_limit"
+    AGENT_REQUEST = "agent_request"
+
+
+_CHECKPOINT_REJECTED = "checkpoint_rejected"
+_NO_CHECKPOINT_SUFFIX = "-nocp"
+_FALLBACK_KEY_ROOM = 128 - len(_NO_CHECKPOINT_SUFFIX)
+_NO_CHECKPOINT_NOTE = (
+    "\n\nQDash rejected the plan checkpoint, so this intervention cannot resume the plan."
+)
+
+
+def _checkpoint_rejection(exc: QDashApiError) -> str | None:
+    """QDash's reason when it rejected only the checkpoint, else ``None``.
+
+    Only a 422 whose detail carries ``code=checkpoint_rejected`` qualifies; a malformed,
+    unauthorized, out-of-scope, conflicting, or unanswered request never does.
+    """
+    if not isinstance(exc, QDashValidationError) or not isinstance(exc.payload, dict):
+        return None
+    detail = exc.payload.get("detail")
+    if not isinstance(detail, dict) or detail.get("code") != _CHECKPOINT_REJECTED:
+        return None
+    message = detail.get("message")
+    return message if isinstance(message, str) and message else "checkpoint rejected"
+
+
+_INTERVENTION_QUESTIONS: dict[AgentInterventionReason, str] = {
+    AgentInterventionReason.UNKNOWN_OUTCOME: (
+        "The plan has no known next step for this result. Is the result usable, and should the "
+        "plan resume from one of its nodes or stop?"
+    ),
+    AgentInterventionReason.RECOVERY_EXHAUSTED: (
+        "The plan's recovery steps ran out. Should it try a plan node again within the "
+        "remaining budget, or stop?"
+    ),
+    AgentInterventionReason.EVALUATION_FAILED: (
+        "The result could not be evaluated reliably. Is the measurement usable, and should the "
+        "plan resume or stop?"
+    ),
+    AgentInterventionReason.PLATFORM_ERROR: (
+        "QDash, the workflow, or the hardware reported an error. Check the execution, then "
+        "resume or stop the plan."
+    ),
+    AgentInterventionReason.POLICY_LIMIT: (
+        "The session's scope, budget, or expiry stops the plan. Stop it, or start a newly "
+        "authorized session if more work is needed."
+    ),
+    AgentInterventionReason.AGENT_REQUEST: (
+        "The task knowledge asks for a person for this result. Review it, then resume or stop "
+        "the plan."
+    ),
+}
+_MAX_ATTEMPTS = 10
+
+
+def safe_error_reason(operation: str, exc: BaseException) -> str:
+    """A fixed diagnostic for a failed operation that never carries the error's own text.
+
+    Plan reasons end up in durable QDash records (intervention summaries, attempt
+    reasons, resume outcomes) and in expert notifications. An exception message, a
+    transport error, or a service's error text can echo request data, so only the
+    exception class and an HTTP status code go into the reason. References to the
+    objects involved (action, execution, evaluation ids) travel as separate fields.
+    """
+    detail = type(exc).__name__
+    status = getattr(exc, "status_code", None)
+    if isinstance(status, int):
+        detail = f"{detail}, HTTP {status}"
+    return f"{operation} failed ({detail})"
+
+
+def _reason_or(value: str, default: AgentInterventionReason) -> AgentInterventionReason:
+    try:
+        return AgentInterventionReason(value)
+    except ValueError:
+        return default
 
 
 @dataclass(frozen=True)
@@ -86,6 +177,10 @@ class AgentPlannerDecision:
     target_node_id: str
     reason: str = ""
     parameter_overrides: dict[str, float] = field(default_factory=dict)
+    escalation_reason: str = ""
+    """For ``$escalate``: an ``AgentInterventionReason`` value classifying the stop."""
+    evidence: dict[str, str] = field(default_factory=dict)
+    """References the decision was based on (evaluation id, run id, status) for the audit."""
 
 
 class AgentPlanner(Protocol):
@@ -147,6 +242,56 @@ class AgentPlanOutcome:
     node_path: tuple[str, ...] = ()
     candidate_set_commit: AgentCandidateSetCommitResponse | None = None
     planner_decisions: tuple[AgentPlannerDecision, ...] = ()
+    escalation_reason: AgentInterventionReason | None = None
+    """Why a non-pass ending needs a person."""
+    checkpoint: dict[str, Any] | None = None
+    """Where a non-pass ending stopped, in the shape QDash stores for a resume."""
+    intervention_attempts: tuple[dict[str, Any], ...] = ()
+    """Each step outcome as references, for the intervention record."""
+    intervention: AgentInterventionResponse | None = None
+    """The intervention recorded in QDash for this ending, if one was recorded."""
+    intervention_error: str | None = None
+    """Why recording the intervention failed; the plan still stopped."""
+    checkpoint_rejection: str | None = None
+    """Why QDash rejected the plan checkpoint, when the stop was recorded without one.
+
+    Such an intervention still pauses the session and notifies, but no runner can resume
+    the plan from it; an expert's resume only reactivates the session.
+    """
+
+
+@dataclass(frozen=True)
+class AgentPlanResumeState:
+    """Plan state restored from a claimed intervention checkpoint."""
+
+    intervention_id: str
+    start_node_id: str
+    node_path: tuple[str, ...]
+    visit_counts: dict[str, int]
+    accepted_candidates: tuple[dict[str, str], ...]
+    planner_history: dict[str, list[dict[str, Any]]]
+    guidance: str = ""
+
+
+def _attempt_record(
+    node_id: str, task_name: str, qid: str, outcome: AgentStepOutcome
+) -> dict[str, Any]:
+    """One step outcome as the references an intervention keeps."""
+    record: dict[str, Any] = {
+        "node_id": node_id,
+        "task_name": task_name,
+        "qid": qid,
+        "transition": outcome.transition.value,
+        "reason": outcome.reason[:1000],
+        "status": outcome.action.execution_status if outcome.action else "",
+    }
+    if outcome.action_id:
+        record["action_id"] = outcome.action_id
+    if outcome.execution_id:
+        record["execution_id"] = outcome.execution_id
+    if outcome.candidate is not None and outcome.candidate.task_id:
+        record["task_id"] = outcome.candidate.task_id
+    return record
 
 
 def _api_error_outcome(
@@ -169,7 +314,7 @@ def _api_error_outcome(
     )
     return AgentStepOutcome(
         transition=transition,
-        reason=f"QDash API request failed: {exc}",
+        reason=safe_error_reason("QDash API request", exc),
         session_id=session_id,
         action_id=action_id,
         operation_id=operation_id,
@@ -260,7 +405,8 @@ class AgentCalibrationRunner:
         if dispatched.execution_status == "failed":
             return AgentStepOutcome(
                 transition=AgentSkillTransition.RETRY,
-                reason=dispatched.reason,
+                # The action's reason is its authorization; QDash keeps the dispatch error.
+                reason="Agent action dispatch failed",
                 session_id=session_id,
                 action_id=action.action_id,
                 action=dispatched,
@@ -276,7 +422,7 @@ class AgentCalibrationRunner:
         except TimeoutError as exc:
             return AgentStepOutcome(
                 transition=AgentSkillTransition.RETRY,
-                reason=str(exc),
+                reason=safe_error_reason("Waiting for QDash", exc),
                 session_id=session_id,
                 action_id=action.action_id,
                 action=action,
@@ -309,7 +455,7 @@ class AgentCalibrationRunner:
         except TimeoutError as exc:
             return AgentStepOutcome(
                 transition=AgentSkillTransition.RETRY,
-                reason=str(exc),
+                reason=safe_error_reason("Waiting for QDash", exc),
                 session_id=session_id,
                 action_id=action.action_id,
                 operation_id=operation_id,
@@ -344,7 +490,7 @@ class AgentCalibrationRunner:
         except TimeoutError as exc:
             return AgentStepOutcome(
                 transition=AgentSkillTransition.RETRY,
-                reason=str(exc),
+                reason=safe_error_reason("Waiting for QDash", exc),
                 session_id=session_id,
                 action_id=action.action_id,
                 operation_id=operation_id,
@@ -467,7 +613,7 @@ class AgentCalibrationRunner:
                 except TimeoutError as exc:
                     return AgentStepOutcome(
                         transition=AgentSkillTransition.RETRY,
-                        reason=str(exc),
+                        reason=safe_error_reason("Waiting for the backend apply", exc),
                         session_id=session_id,
                         action_id=action.action_id,
                         operation_id=operation_id,
@@ -491,9 +637,11 @@ class AgentCalibrationRunner:
                     return AgentStepOutcome(
                         execution_id=execution_id,
                         transition=AgentSkillTransition.HUMAN_ESCALATION,
+                        # backend_error holds the backend's own error text; the commit id
+                        # on the outcome leads to it in QDash.
                         reason=(
-                            committed.backend_error
-                            or "Backend application failed deterministic verification"
+                            f"Backend application of commit {committed.commit_id} ended "
+                            f"{committed.backend_status or 'unknown'} and was not verified"
                         ),
                         session_id=session_id,
                         action_id=action.action_id,
@@ -626,12 +774,20 @@ class AgentPlanRunner:
         planner: AgentPlanner | None = None,
         max_node_visits: int | None = None,
         idempotency_prefix: str | None = None,
+        record_interventions: bool = False,
+        resume: AgentPlanResumeState | None = None,
+        planner_name: str = "none",
     ) -> AgentPlanOutcome:
         """Run a bounded decision graph while preserving a fixed source snapshot.
 
         ``max_node_visits`` bounds how often any one node runs, whichever rule
         (planner, ``$default``, ``on_pass``, ``on_rollback``) led back to it; a visit
         past the limit ends the plan as ``human_escalation`` before dispatch.
+
+        Every ending other than ``pass`` carries a checkpoint of the plan. With
+        ``record_interventions`` the runner records that ending in QDash as an
+        intervention, which pauses the session until an expert answers. ``resume``
+        continues a plan from such a checkpoint with its counters restored, never reset.
         """
         if not nodes:
             raise ValueError("plan requires at least one node")
@@ -646,6 +802,8 @@ class AgentPlanRunner:
             raise ValueError("idempotency_prefix must contain 1 to 96 characters")
         if max_node_visits is not None and max_node_visits <= 0:
             raise ValueError("max_node_visits must be positive")
+        if resume is not None and idempotency_prefix is None:
+            raise ValueError("a resumed plan needs the idempotency prefix of its checkpoint")
         per_node_writes = any(
             node.commit_candidate or node.apply_backend or node.push_to_github for node in nodes
         )
@@ -660,6 +818,146 @@ class AgentPlanRunner:
                 "use commit_on_success"
             )
 
+        outcome = self._run_plan(
+            session_id=session_id,
+            qid=qid,
+            source_execution_id=source_execution_id,
+            nodes=nodes,
+            max_pre_dispatch_retries=max_pre_dispatch_retries,
+            execution_limit=execution_limit,
+            commit_on_success=commit_on_success,
+            planner=planner,
+            max_node_visits=max_node_visits,
+            prefix=idempotency_prefix or f"plan-{uuid4()}",
+            resume=resume,
+            planner_name=planner_name,
+        )
+        if record_interventions and outcome.transition != AgentSkillTransition.PASS:
+            outcome = self._record_intervention(
+                outcome,
+                previous_intervention_id=resume.intervention_id if resume else None,
+            )
+        return outcome
+
+    def _record_intervention(
+        self,
+        outcome: AgentPlanOutcome,
+        *,
+        previous_intervention_id: str | None,
+    ) -> AgentPlanOutcome:
+        """Record a stopped plan in QDash; a failure is reported, never raised."""
+        reason = outcome.escalation_reason or AgentInterventionReason.PLATFORM_ERROR
+        checkpoint = outcome.checkpoint
+        path_length = len(checkpoint["node_path"]) if checkpoint else 0
+        key = f"{checkpoint['idempotency_prefix'] if checkpoint else 'plan'}-i-{path_length}-{outcome.attempts}"
+        if previous_intervention_id:
+            key = f"{key}-after-{previous_intervention_id[:8]}"
+        node = None
+        if checkpoint is not None:
+            node = next(
+                (n for n in checkpoint["nodes"] if n["id"] == checkpoint["stopped_node_id"]), None
+            )
+        summary = outcome.reason[:2000] or "The plan stopped"
+        request: dict[str, Any] = {
+            "reason": reason.value,
+            "question": _INTERVENTION_QUESTIONS[reason],
+            "node_id": node["id"] if node else None,
+            "task_name": node["task_name"] if node else None,
+            "qids": [outcome.qid],
+            "attempts": list(outcome.intervention_attempts[-_MAX_ATTEMPTS:]),
+            "previous_intervention_id": previous_intervention_id,
+        }
+        try:
+            intervention = self._client.create_agent_intervention(
+                outcome.session_id,
+                idempotency_key=key[:128],
+                summary=summary,
+                checkpoint=checkpoint,
+                **request,
+            )
+        except QDashApiError as exc:
+            rejection = _checkpoint_rejection(exc) if checkpoint is not None else None
+            if rejection is None:
+                return replace(
+                    outcome, intervention_error=f"Recording the intervention failed: {exc}"
+                )
+        else:
+            return replace(outcome, intervention=intervention)
+
+        # QDash's records do not support the checkpoint (for example the session also ran
+        # manual run_task actions), so the stop is recorded without one: the session still
+        # pauses and notifies, but nothing can resume the plan from this record. Its own key
+        # keeps a retry, which hits the same rejection, idempotent.
+        try:
+            intervention = self._client.create_agent_intervention(
+                outcome.session_id,
+                idempotency_key=f"{key[:_FALLBACK_KEY_ROOM]}{_NO_CHECKPOINT_SUFFIX}",
+                summary=f"{summary[: 2000 - len(_NO_CHECKPOINT_NOTE)]}{_NO_CHECKPOINT_NOTE}",
+                checkpoint=None,
+                **request,
+            )
+        except QDashApiError as exc:
+            return replace(
+                outcome,
+                checkpoint_rejection=rejection,
+                intervention_error=(
+                    f"QDash rejected the plan checkpoint ({rejection}) and recording the "
+                    f"intervention without it failed: {exc}"
+                ),
+            )
+        return replace(outcome, intervention=intervention, checkpoint_rejection=rejection)
+
+    def _restore(
+        self,
+        session_id: str,
+        resume: AgentPlanResumeState,
+    ) -> tuple[dict[str, AgentCandidateResponse], str | None]:
+        """Re-read every carried candidate from QDash instead of trusting the checkpoint."""
+        restored: dict[str, AgentCandidateResponse] = {}
+        for reference in resume.accepted_candidates:
+            try:
+                candidates = self._client.list_agent_action_candidates(
+                    session_id, reference["action_id"]
+                )
+            except QDashApiError as exc:
+                return {}, safe_error_reason(
+                    f"Re-reading candidate {reference['parameter_name']} from action "
+                    f"{reference['action_id']}",
+                    exc,
+                )
+            match = next(
+                (
+                    c
+                    for c in candidates
+                    if c.parameter_name == reference["parameter_name"]
+                    and c.task_id == reference["task_id"]
+                ),
+                None,
+            )
+            if match is None or not match.accepted:
+                return {}, (
+                    f"Candidate {reference['parameter_name']} from action "
+                    f"{reference['action_id']} is no longer accepted"
+                )
+            restored[match.parameter_name] = match
+        return restored, None
+
+    def _run_plan(
+        self,
+        *,
+        session_id: str,
+        qid: str,
+        source_execution_id: str | None,
+        nodes: list[AgentPlanNode],
+        max_pre_dispatch_retries: int,
+        execution_limit: int,
+        commit_on_success: bool,
+        planner: AgentPlanner | None,
+        max_node_visits: int | None,
+        prefix: str,
+        resume: AgentPlanResumeState | None,
+        planner_name: str,
+    ) -> AgentPlanOutcome:
         node_ids, graph_error = self._validate_graph(nodes)
         if graph_error is not None:
             return AgentPlanOutcome(
@@ -671,40 +969,13 @@ class AgentPlanRunner:
                 completed_nodes=0,
                 attempts=0,
                 outcomes=(),
+                escalation_reason=AgentInterventionReason.POLICY_LIMIT,
             )
         node_indexes = {node_id: index for index, node_id in enumerate(node_ids)}
 
-        try:
-            session = self._client.get_agent_session(session_id)
-        except QDashApiError as exc:
-            step = _api_error_outcome(exc, session_id=session_id)
-            return AgentPlanOutcome(
-                transition=step.transition,
-                reason=step.reason,
-                session_id=session_id,
-                qid=qid,
-                source_execution_id=source_execution_id,
-                completed_nodes=0,
-                attempts=0,
-                outcomes=(),
-            )
-
-        policy_error = self._policy_error(session, qid, nodes, execution_limit)
-        if policy_error is not None:
-            return AgentPlanOutcome(
-                transition=AgentSkillTransition.HUMAN_ESCALATION,
-                reason=policy_error,
-                session_id=session_id,
-                qid=qid,
-                source_execution_id=source_execution_id,
-                completed_nodes=0,
-                attempts=0,
-                outcomes=(),
-            )
-
-        prefix = idempotency_prefix or f"plan-{uuid4()}"
         carried: dict[str, float] = {}
         outcomes: list[AgentStepOutcome] = []
+        attempt_records: list[dict[str, Any]] = []
         completed_nodes = 0
         node_path: list[str] = []
         visit_counts: dict[int, int] = {}
@@ -713,18 +984,127 @@ class AgentPlanRunner:
         planner_decisions: list[AgentPlannerDecision] = []
         # Overrides a planner attached to its decision; consumed by the next node run.
         planner_overrides: dict[str, float] = {}
+        if resume is not None:
+            if resume.start_node_id not in node_indexes:
+                raise ValueError(f"resume node '{resume.start_node_id}' is not a plan node")
+            node_path = list(resume.node_path)
+            visit_counts = {
+                node_indexes[node_id]: count
+                for node_id, count in resume.visit_counts.items()
+                if node_id in node_indexes
+            }
+            current_index = node_indexes[resume.start_node_id]
+            restore = getattr(planner, "restore_history", None)
+            if callable(restore):
+                restore(resume.planner_history)
+
+        def checkpoint() -> dict[str, Any]:
+            export = getattr(planner, "export_history", None)
+            return {
+                "version": 1,
+                "qid": qid,
+                "source_execution_id": source_execution_id,
+                "nodes": [
+                    {
+                        "id": node_ids[i],
+                        "task_name": node.task_name,
+                        "candidate_parameter": node.candidate_parameter,
+                        "on_pass": node.on_pass,
+                        "on_rollback": node.on_rollback,
+                        "parameter_overrides": dict(node.parameter_overrides),
+                        "diagnosis": node.diagnosis,
+                        "reconfigure_before_task": node.reconfigure_before_task,
+                        "commit_candidate": node.commit_candidate,
+                        "apply_backend": node.apply_backend,
+                        "push_to_github": node.push_to_github,
+                    }
+                    for i, node in enumerate(nodes)
+                ],
+                "idempotency_prefix": prefix,
+                "node_path": list(node_path),
+                "visit_counts": {node_ids[i]: count for i, count in visit_counts.items()},
+                "stopped_node_id": node_ids[current_index],
+                "accepted_candidates": [
+                    {
+                        "action_id": candidate.action_id,
+                        "parameter_name": candidate.parameter_name,
+                        "task_id": candidate.task_id,
+                    }
+                    for candidate in final_candidates.values()
+                ],
+                "max_pre_dispatch_retries": max_pre_dispatch_retries,
+                "max_node_executions": execution_limit,
+                "max_node_visits": max_node_visits,
+                "commit_on_success": commit_on_success,
+                "planner": planner_name,
+                "planner_history": export() if callable(export) else {},
+            }
+
+        def stop(
+            transition: AgentSkillTransition,
+            reason: str,
+            kind: AgentInterventionReason,
+        ) -> AgentPlanOutcome:
+            return AgentPlanOutcome(
+                transition=transition,
+                reason=reason,
+                session_id=session_id,
+                qid=qid,
+                source_execution_id=source_execution_id,
+                completed_nodes=completed_nodes,
+                attempts=len(outcomes),
+                outcomes=tuple(outcomes),
+                carried_overrides=dict(carried),
+                node_path=tuple(node_path),
+                planner_decisions=tuple(planner_decisions),
+                escalation_reason=kind,
+                checkpoint=checkpoint(),
+                intervention_attempts=tuple(attempt_records),
+            )
+
+        try:
+            session = self._client.get_agent_session(session_id)
+        except QDashApiError as exc:
+            step = _api_error_outcome(exc, session_id=session_id)
+            return stop(step.transition, step.reason, AgentInterventionReason.PLATFORM_ERROR)
+
+        required_actions = execution_limit - len(node_path)
+        if required_actions <= 0:
+            return stop(
+                AgentSkillTransition.HUMAN_ESCALATION,
+                f"Plan reached the {execution_limit} node execution limit",
+                AgentInterventionReason.RECOVERY_EXHAUSTED,
+            )
+        policy_error = self._policy_error(session, qid, nodes, required_actions)
+        if policy_error is not None:
+            return stop(
+                AgentSkillTransition.HUMAN_ESCALATION,
+                policy_error,
+                AgentInterventionReason.POLICY_LIMIT,
+            )
+        if resume is not None:
+            final_candidates, restore_error = self._restore(session_id, resume)
+            if restore_error is not None:
+                return stop(
+                    AgentSkillTransition.HUMAN_ESCALATION,
+                    restore_error,
+                    AgentInterventionReason.PLATFORM_ERROR,
+                )
+            carried = {name: c.value for name, c in final_candidates.items()}
+            completed_nodes = len(final_candidates)
 
         def choose_planner_target(
             node_id: str,
             outcome: AgentStepOutcome,
-        ) -> tuple[str | None, str | None]:
+        ) -> tuple[str | None, str | None, AgentInterventionReason]:
             """The planner's target node, or None to follow the plan; an error stops the plan.
 
             ``$default`` is recorded and returns None so the node's own transition
             applies. ``$escalate`` returns the decision's reason as the error.
             """
+            platform = AgentInterventionReason.PLATFORM_ERROR
             if planner is None:
-                return None, None
+                return None, None, platform
             observation = AgentPlannerObservation(
                 session_id=session_id,
                 qid=qid,
@@ -741,65 +1121,52 @@ class AgentPlanRunner:
             try:
                 decision = planner.choose_next(observation)
             except Exception as exc:
-                return None, f"Planner failed: {exc}"
+                return None, safe_error_reason("The planner", exc), platform
+            if decision.evidence and attempt_records:
+                attempt_records[-1] = {**attempt_records[-1], **decision.evidence}
             target = decision.target_node_id
             if not target:
-                return None, "Planner returned an empty target"
+                return None, "Planner returned an empty target", platform
             if target == PLAN_ESCALATE:
                 planner_decisions.append(decision)
-                return None, f"Planner requested human review: {decision.reason}"
+                kind = _reason_or(decision.escalation_reason, AgentInterventionReason.AGENT_REQUEST)
+                return None, f"Planner requested human review: {decision.reason}", kind
             if decision.parameter_overrides and target in _PLANNER_SENTINELS:
-                return None, f"Planner attached overrides to '{target}'"
+                return None, f"Planner attached overrides to '{target}'", platform
             if any(not math.isfinite(value) for value in decision.parameter_overrides.values()):
-                return None, "Planner overrides must be finite"
+                return None, "Planner overrides must be finite", platform
             if target == PLAN_COMPLETE:
                 if outcome.transition != AgentSkillTransition.PASS:
-                    return None, "Planner cannot complete after a rollback"
+                    return None, "Planner cannot complete after a rollback", platform
             elif target == PLAN_DEFAULT:
                 planner_decisions.append(decision)
-                return None, None
+                return None, None, platform
             elif target not in node_indexes:
-                return None, f"Planner selected unknown node '{target}'"
+                return None, f"Planner selected unknown node '{target}'", platform
             planner_decisions.append(decision)
             planner_overrides.clear()
             planner_overrides.update(decision.parameter_overrides)
-            return target, None
+            return target, None, platform
 
         while True:
             if len(node_path) >= execution_limit:
-                return AgentPlanOutcome(
-                    transition=AgentSkillTransition.HUMAN_ESCALATION,
-                    reason=f"Plan reached the {execution_limit} node execution limit",
-                    session_id=session_id,
-                    qid=qid,
-                    source_execution_id=source_execution_id,
-                    completed_nodes=completed_nodes,
-                    attempts=len(outcomes),
-                    outcomes=tuple(outcomes),
-                    carried_overrides=dict(carried),
-                    node_path=tuple(node_path),
-                    planner_decisions=tuple(planner_decisions),
+                return stop(
+                    AgentSkillTransition.HUMAN_ESCALATION,
+                    f"Plan reached the {execution_limit} node execution limit",
+                    AgentInterventionReason.RECOVERY_EXHAUSTED,
                 )
 
             node = nodes[current_index]
             node_id = node_ids[current_index]
             visit = visit_counts.get(current_index, 0)
             if max_node_visits is not None and visit >= max_node_visits:
-                return AgentPlanOutcome(
-                    transition=AgentSkillTransition.HUMAN_ESCALATION,
-                    reason=(
+                return stop(
+                    AgentSkillTransition.HUMAN_ESCALATION,
+                    (
                         f"Plan node {node_id} ({node.task_name}) already ran {visit} times "
                         f"(limit {max_node_visits})"
                     ),
-                    session_id=session_id,
-                    qid=qid,
-                    source_execution_id=source_execution_id,
-                    completed_nodes=completed_nodes,
-                    attempts=len(outcomes),
-                    outcomes=tuple(outcomes),
-                    carried_overrides=dict(carried),
-                    node_path=tuple(node_path),
-                    planner_decisions=tuple(planner_decisions),
+                    AgentInterventionReason.RECOVERY_EXHAUSTED,
                 )
             visit_counts[current_index] = visit + 1
             node_path.append(node_id)
@@ -827,6 +1194,7 @@ class AgentPlanRunner:
                     backend_apply_idempotency_key=f"{key_base}-apply",
                 )
                 outcomes.append(outcome)
+                attempt_records.append(_attempt_record(node_id, node.task_name, qid, outcome))
                 safe_to_retry = (
                     outcome.transition == AgentSkillTransition.RETRY
                     and outcome.operation_id is None
@@ -840,94 +1208,47 @@ class AgentPlanRunner:
                 break
 
             if outcome.transition not in {AgentSkillTransition.PASS, AgentSkillTransition.ROLLBACK}:
-                return AgentPlanOutcome(
-                    transition=outcome.transition,
-                    reason=(
-                        f"Plan stopped at node {current_index} ({node.task_name}): {outcome.reason}"
-                    ),
-                    session_id=session_id,
-                    qid=qid,
-                    source_execution_id=source_execution_id,
-                    completed_nodes=completed_nodes,
-                    attempts=len(outcomes),
-                    outcomes=tuple(outcomes),
-                    carried_overrides=dict(carried),
-                    node_path=tuple(node_path),
-                    planner_decisions=tuple(planner_decisions),
+                rejected = outcome.action is not None and outcome.action.decision != "authorized"
+                return stop(
+                    outcome.transition,
+                    f"Plan stopped at node {current_index} ({node.task_name}): {outcome.reason}",
+                    AgentInterventionReason.POLICY_LIMIT
+                    if rejected
+                    else AgentInterventionReason.PLATFORM_ERROR,
                 )
 
             if outcome.transition == AgentSkillTransition.ROLLBACK:
-                planner_target, planner_error = choose_planner_target(node_id, outcome)
+                planner_target, planner_error, kind = choose_planner_target(node_id, outcome)
                 if planner_error is not None:
-                    return AgentPlanOutcome(
-                        transition=AgentSkillTransition.HUMAN_ESCALATION,
-                        reason=planner_error,
-                        session_id=session_id,
-                        qid=qid,
-                        source_execution_id=source_execution_id,
-                        completed_nodes=completed_nodes,
-                        attempts=len(outcomes),
-                        outcomes=tuple(outcomes),
-                        carried_overrides=dict(carried),
-                        node_path=tuple(node_path),
-                        planner_decisions=tuple(planner_decisions),
-                    )
+                    return stop(AgentSkillTransition.HUMAN_ESCALATION, planner_error, kind)
                 if planner_target is not None:
                     current_index = node_indexes[planner_target]
                     continue
                 if node.on_rollback is None:
-                    return AgentPlanOutcome(
-                        transition=outcome.transition,
-                        reason=(
+                    return stop(
+                        outcome.transition,
+                        (
                             f"Plan stopped at node {current_index} "
                             f"({node.task_name}): {outcome.reason}"
                         ),
-                        session_id=session_id,
-                        qid=qid,
-                        source_execution_id=source_execution_id,
-                        completed_nodes=completed_nodes,
-                        attempts=len(outcomes),
-                        outcomes=tuple(outcomes),
-                        carried_overrides=dict(carried),
-                        node_path=tuple(node_path),
-                        planner_decisions=tuple(planner_decisions),
+                        AgentInterventionReason.RECOVERY_EXHAUSTED,
                     )
                 current_index = node_indexes[node.on_rollback]
                 continue
 
             if outcome.candidate is None:
-                return AgentPlanOutcome(
-                    transition=AgentSkillTransition.HUMAN_ESCALATION,
-                    reason=(f"Plan node {current_index} passed without an authoritative candidate"),
-                    session_id=session_id,
-                    qid=qid,
-                    source_execution_id=source_execution_id,
-                    completed_nodes=completed_nodes,
-                    attempts=len(outcomes),
-                    outcomes=tuple(outcomes),
-                    carried_overrides=dict(carried),
-                    node_path=tuple(node_path),
-                    planner_decisions=tuple(planner_decisions),
+                return stop(
+                    AgentSkillTransition.HUMAN_ESCALATION,
+                    f"Plan node {current_index} passed without an authoritative candidate",
+                    AgentInterventionReason.PLATFORM_ERROR,
                 )
             carried[outcome.candidate.parameter_name] = outcome.candidate.value
             final_candidates[outcome.candidate.parameter_name] = outcome.candidate
             completed_nodes += 1
 
-            planner_target, planner_error = choose_planner_target(node_id, outcome)
+            planner_target, planner_error, kind = choose_planner_target(node_id, outcome)
             if planner_error is not None:
-                return AgentPlanOutcome(
-                    transition=AgentSkillTransition.HUMAN_ESCALATION,
-                    reason=planner_error,
-                    session_id=session_id,
-                    qid=qid,
-                    source_execution_id=source_execution_id,
-                    completed_nodes=completed_nodes,
-                    attempts=len(outcomes),
-                    outcomes=tuple(outcomes),
-                    carried_overrides=dict(carried),
-                    node_path=tuple(node_path),
-                    planner_decisions=tuple(planner_decisions),
-                )
+                return stop(AgentSkillTransition.HUMAN_ESCALATION, planner_error, kind)
             if planner_target == _PLAN_COMPLETE:
                 break
             if planner_target is not None:
@@ -961,18 +1282,10 @@ class AgentPlanRunner:
                     expected_state_version=latest_session.state_version,
                 )
             except QDashApiError as exc:
-                return AgentPlanOutcome(
-                    transition=AgentSkillTransition.HUMAN_ESCALATION,
-                    reason=f"Plan passed but final candidate commit failed: {exc}",
-                    session_id=session_id,
-                    qid=qid,
-                    source_execution_id=source_execution_id,
-                    completed_nodes=completed_nodes,
-                    attempts=len(outcomes),
-                    outcomes=tuple(outcomes),
-                    carried_overrides=dict(carried),
-                    node_path=tuple(node_path),
-                    planner_decisions=tuple(planner_decisions),
+                return stop(
+                    AgentSkillTransition.HUMAN_ESCALATION,
+                    safe_error_reason("Plan passed but the final candidate commit", exc),
+                    AgentInterventionReason.PLATFORM_ERROR,
                 )
 
         return AgentPlanOutcome(
@@ -989,3 +1302,55 @@ class AgentPlanRunner:
             candidate_set_commit=candidate_set_commit,
             planner_decisions=tuple(planner_decisions),
         )
+
+
+def resume_state_from_intervention(
+    intervention: AgentInterventionResponse,
+) -> tuple[list[AgentPlanNode], AgentPlanResumeState, dict[str, Any]]:
+    """The plan, the restored state, and the plan settings of a claimed intervention.
+
+    The node list is the approved plan exactly as the checkpoint holds it; the resumed run
+    starts at the node the expert chose and keeps the visit counts, path, and prefix.
+    """
+    checkpoint = intervention.checkpoint
+    response = intervention.response or {}
+    if checkpoint is None:
+        raise ValueError("the intervention has no plan checkpoint to resume")
+    nodes = [
+        AgentPlanNode(
+            task_name=item["task_name"],
+            candidate_parameter=item["candidate_parameter"],
+            node_id=item["id"],
+            on_pass=item.get("on_pass"),
+            on_rollback=item.get("on_rollback"),
+            parameter_overrides={
+                k: float(v) for k, v in item.get("parameter_overrides", {}).items()
+            },
+            diagnosis=item.get("diagnosis", ""),
+            reconfigure_before_task=bool(item.get("reconfigure_before_task", False)),
+            commit_candidate=bool(item.get("commit_candidate", False)),
+            apply_backend=bool(item.get("apply_backend", False)),
+            push_to_github=bool(item.get("push_to_github", False)),
+        )
+        for item in checkpoint["nodes"]
+    ]
+    state = AgentPlanResumeState(
+        intervention_id=intervention.intervention_id,
+        start_node_id=response.get("resume_node_id") or checkpoint["stopped_node_id"],
+        node_path=tuple(checkpoint.get("node_path", [])),
+        visit_counts=dict(checkpoint.get("visit_counts", {})),
+        accepted_candidates=tuple(checkpoint.get("accepted_candidates", [])),
+        planner_history=dict(checkpoint.get("planner_history", {})),
+        guidance=str(response.get("guidance") or ""),
+    )
+    settings = {
+        "qid": checkpoint["qid"],
+        "source_execution_id": checkpoint.get("source_execution_id"),
+        "idempotency_prefix": checkpoint["idempotency_prefix"],
+        "max_pre_dispatch_retries": int(checkpoint.get("max_pre_dispatch_retries", 1)),
+        "max_node_executions": int(checkpoint["max_node_executions"]),
+        "max_node_visits": checkpoint.get("max_node_visits"),
+        "commit_on_success": bool(checkpoint.get("commit_on_success", False)),
+        "planner": checkpoint.get("planner", "none"),
+    }
+    return nodes, state, settings

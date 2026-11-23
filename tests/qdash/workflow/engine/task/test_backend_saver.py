@@ -94,7 +94,7 @@ def test_save_calibration_stages_outputs_when_persistence_is_disabled() -> None:
         username="alice",
         calib_dir="/tmp/calib",
         task_manager_id="tm-1",
-        persist_output_parameters=False,
+        update_calibration_parameters=False,
     )
 
     with (
@@ -136,7 +136,7 @@ def test_save_mux_qid_marks_outputs_when_persistence_is_disabled() -> None:
         username="alice",
         calib_dir="/tmp/calib",
         task_manager_id="tm-1",
-        persist_output_parameters=False,
+        update_calibration_parameters=False,
     )
 
     with patch("qdash.repository.MongoQubitCalibrationRepository") as repo_cls:

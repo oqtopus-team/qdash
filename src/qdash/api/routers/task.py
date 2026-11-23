@@ -120,7 +120,7 @@ async def quick_run_task(
         project_id=ctx.project_id,
         input_overrides=body.input_parameter_overrides,
         run_overrides=body.run_parameter_overrides,
-        persist_output_parameters=body.persist_output_parameters,
+        update_calibration_parameters=body.update_calibration_parameters,
         update_params=body.update_params,
         reconfigure=body.reconfigure,
         execution_name=f"quick-run:{task_name}",

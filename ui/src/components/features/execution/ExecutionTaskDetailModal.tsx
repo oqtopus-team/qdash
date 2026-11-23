@@ -8,12 +8,13 @@ import type { Task } from "@/schemas";
 
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { ExecutionTaskProgress } from "@/components/features/execution/ExecutionTaskProgress";
+import { distinctCallId } from "@/components/features/execution/executionTopologyTasks";
 import {
   ExecutionHistoryModalContent,
   type ExecutionHistoryMobileTab,
 } from "@/components/features/task-history/ExecutionHistoryModalContent";
 import { ParametersTable } from "@/components/features/metrics/ParametersTable";
-import { AskAiButton } from "@/components/features/evaluations/AskAiButton";
+import { LineageButton } from "@/components/features/provenance/ParameterLineageDialog";
 import { TaskResultEvaluations } from "@/components/features/evaluations/TaskResultEvaluations";
 import { TaskResultThreads } from "@/components/features/forum/TaskResultThreads";
 import { TaskResultMemo } from "@/components/features/metrics/TaskResultMemo";
@@ -22,6 +23,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { TaskMessagePanel } from "@/components/ui/TaskMessagePanel";
 import { useChatDock } from "@/contexts/ChatDockContext";
 import type { InvestigationTarget, TaskChatContext } from "@/types/copilotChat";
+import { firstPublishedParameter, inExecution } from "@/lib/provenanceTarget";
 import { formatDateTime, formatDateTimeCompact } from "@/lib/utils/datetime";
 
 interface ExecutionTaskDetailModalProps {
@@ -40,22 +42,6 @@ function statusBadgeClass(status?: string | null) {
   if (status === "failed") return "badge-error";
   if (status === "cancelled") return "badge-neutral";
   return "badge-warning";
-}
-
-function resolveQid(taskQid: string, qidRole?: string): string {
-  if (!qidRole || qidRole === "self" || qidRole === "coupling") return taskQid;
-  const match = taskQid.match(/^(\d+)-(\d+)$/);
-  if (!match) return taskQid;
-  const [, control, target] = match;
-  if (qidRole === "control") return control;
-  if (qidRole === "target") return target;
-  return taskQid;
-}
-
-function buildProvenanceUrl(parameterName: string, qidValue: string) {
-  const parameter = encodeURIComponent(parameterName);
-  const encodedQid = encodeURIComponent(qidValue);
-  return `/provenance?tab=lineage&parameter=${parameter}&qid=${encodedQid}`;
 }
 
 /** Details of one execution's tasks for a qubit or coupling. */
@@ -177,6 +163,11 @@ export function ExecutionTaskDetailModal({
                   <div className="flex justify-between items-start">
                     <div className="min-w-0 flex-1">
                       <div className="font-medium text-sm truncate">{task.name || "Unnamed"}</div>
+                      {distinctCallId(task) && (
+                        <div className="text-xs font-mono opacity-70 truncate">
+                          {distinctCallId(task)}
+                        </div>
+                      )}
                       <div className="text-xs opacity-70 mt-1">
                         {task.start_at ? formatDateTimeCompact(String(task.start_at)) : ""}
                       </div>
@@ -275,6 +266,16 @@ export function ExecutionTaskDetailModal({
               <span className="font-mono">{selectedTask.name}</span>
             </div>
           )}
+          {selectedTask.invocation?.call_id && (
+            <div className="flex items-center gap-2">
+              <span className="font-medium">Call:</span>
+              <span className="font-mono truncate">
+                {selectedTask.invocation.step_id
+                  ? `${selectedTask.invocation.step_id}.${selectedTask.invocation.call_id}`
+                  : selectedTask.invocation.call_id}
+              </span>
+            </div>
+          )}
           <div className="flex items-center gap-2">
             <span className="font-medium">Execution ID:</span>
             <span className="font-mono truncate">{executionId}</span>
@@ -303,41 +304,20 @@ export function ExecutionTaskDetailModal({
             </div>
           )}
           <div className="pt-2 mt-2 border-t border-base-300 flex items-center gap-2 flex-wrap">
-            <Link
-              href={(() => {
-                const outputs = selectedTask.output_parameters
-                  ? Object.entries(selectedTask.output_parameters)
-                  : [];
-                const inputs = selectedTask.input_parameters
-                  ? Object.entries(selectedTask.input_parameters)
-                  : [];
-                const [key, paramValue] =
-                  (outputs[0] as [string, Record<string, unknown>] | undefined) ??
-                  (inputs[0] as [string, Record<string, unknown>] | undefined) ??
-                  [];
-                if (key && paramValue) {
-                  const parameterName = (paramValue?.parameter_name as string | undefined) || key;
-                  const resolvedQid = resolveQid(qid, paramValue?.qid_role as string | undefined);
-                  return buildProvenanceUrl(parameterName, resolvedQid);
-                }
-                return "/provenance";
-              })()}
-              className="btn btn-xs btn-outline gap-1"
+            <LineageButton
+              target={inExecution(
+                firstPublishedParameter(
+                  qid,
+                  selectedTask.output_parameters,
+                  selectedTask.input_parameters,
+                ),
+                executionId,
+              )}
+              className="btn btn-xs btn-outline"
             >
-              <GitBranch className="h-3 w-3" />
-              View Provenance Lineage
-            </Link>
-            {chatContext && (
-              <AskAiButton
-                taskId={chatContext.taskId}
-                chipId={chatContext.chipId}
-                taskName={chatContext.taskName}
-                qid={chatContext.qid}
-                chatContext={chatContext}
-                onChat={() => openMiniChat(chatContext)}
-                size="xs"
-              />
-            )}
+              <GitBranch data-icon="inline-start" />
+              Lineage
+            </LineageButton>
           </div>
         </div>
       )}
@@ -357,7 +337,7 @@ export function ExecutionTaskDetailModal({
       )}
 
       {selectedTask && (
-        <div className="flex flex-col gap-2 mt-2">
+        <div className="flex flex-col gap-2 mt-2 mb-6">
           {selectedTask.input_parameters &&
             Object.keys(selectedTask.input_parameters).length > 0 && (
               <ParametersTable
@@ -388,6 +368,7 @@ export function ExecutionTaskDetailModal({
           chipId={chipId}
           taskName={selectedTask.name || undefined}
           qid={qid}
+          executionId={executionId || undefined}
           onChat={chatContext ? () => openMiniChat(chatContext) : undefined}
         />
       )}

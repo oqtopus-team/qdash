@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { registerSourceCodeTools, sourceRootsMarkdown } from "../.test-dist/tools/source-code.js";
+import { registerSourceCodeTools, searchMarkdown, sourceRootsMarkdown } from "../.test-dist/tools/source-code.js";
 
 function registeredTools(client) {
   const tools = new Map();
@@ -85,4 +85,22 @@ test("a refused or missing file is reported, other errors propagate", async () =
     async getSourceFile() { const error = new Error("server down"); error.statusCode = 503; throw error; },
   });
   await assert.rejects(failing.get("qdash_read_source").execute("t", { path: "x.py" }), /server down/);
+});
+
+for (const mode of ["content", "path"]) {
+  test(`empty ${mode} search distinguishes incomplete and complete scans`, () => {
+    const data = { query: "missing", mode, matches: [] };
+    assert.match(searchMarkdown({ ...data, truncated: true }), /unsearched files may match/);
+    assert.match(searchMarkdown({ ...data, truncated: true }), /Narrow root or pathPrefix/);
+    assert.equal(searchMarkdown({ ...data, truncated: false }),
+      `No ${mode === "path" ? "file paths" : "lines"} match \`missing\`.`);
+  });
+}
+
+test("an API without the source routes is reported as outdated, not as a missing file", async () => {
+  const tool = registeredTools({
+    async getSourceFile() { const error = new Error("404 /copilot/source/file: Not Found"); error.statusCode = 404; throw error; },
+  }).get("qdash_read_source");
+  const text = (await tool.execute("t", { path: "qdash/workflow/engine/task/executor.py" })).content[0].text;
+  assert.match(text, /endpoint may be unavailable.*routing\/proxy configuration.*update the API image/);
 });

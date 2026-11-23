@@ -3,14 +3,26 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
-import { ArrowLeft, Calendar, Clock, Download, StopCircle, UserRound } from "lucide-react";
+import {
+  ArrowLeft,
+  Calendar,
+  ChevronRight,
+  Clock,
+  Download,
+  StopCircle,
+  UserRound,
+} from "lucide-react";
 import Select, { type SingleValue, type StylesConfig } from "react-select";
 
 import { isExecutionCancellable } from "@/lib/executionStatus";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
 import { formatDateTime as formatDateTimeUtil } from "@/lib/utils/datetime";
 
+import { ExecutionAgentSessionNotice } from "./ExecutionAgentSessionNotice";
+import { ExecutionCalibrationNotice, ReportedOriginBadge } from "./ExecutionCalibrationContext";
 import { ExecutionDAG } from "./ExecutionDAG";
+import { ExecutionParameterChanges } from "./ExecutionParameterChanges";
+import { ExecutionRunSummary } from "./ExecutionRunSummary";
 
 import type { ExecutionResponseDetail } from "@/schemas";
 
@@ -18,11 +30,20 @@ import { useGetExecution, useCancelExecution } from "@/client/execution/executio
 import { InvestigateWithAiButton } from "@/components/features/chat/InvestigateWithAiButton";
 import { CancelExecutionModal } from "@/components/features/execution/CancelExecutionModal";
 import { ExecutionTopologyView } from "@/components/features/execution/ExecutionTopologyView";
+import {
+  ExecutionActor,
+  isAgentDispatched,
+  recordedUserLabel,
+} from "@/components/features/execution/ExecutionAttribution";
+import { distinctCallId } from "@/components/features/execution/executionTopologyTasks";
 import { gridFullscreenPanelClass } from "@/components/ui/GridFullscreenButton";
 import { ExecutionDetailPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
+import { TaskMessagePanel } from "@/components/ui/TaskMessagePanel";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import { useToast } from "@/components/ui/Toast";
+import { useProject } from "@/contexts/ProjectContext";
 import { useFullscreenPanel } from "@/hooks/useFullscreenPanel";
+import { useSelectStyles } from "@/hooks/useSelectStyles";
 
 type FilterOption = {
   value: string;
@@ -31,25 +52,17 @@ type FilterOption = {
 
 type TopologyMode = "1q" | "2q";
 
-type ActorFields = {
-  user_id?: string | null;
-  username?: string;
-};
-
 interface ExecutionDetailClientProps {
   chipId: string;
   executionId: string;
-}
-
-function formatActorLabel(actor?: ActorFields | null) {
-  if (actor?.username) return `@${actor.username}`;
-  return actor?.user_id || "Unknown";
 }
 
 export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailClientProps) {
   const [topologyMode, setTopologyMode] = useState<TopologyMode>("1q");
   const [filterTaskName, setFilterTaskName] = useState<string>("");
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  // Folded by default; the comparison is fetched only once the user opens it.
+  const [parameterChangesOpen, setParameterChangesOpen] = useState(false);
   const { isFullscreen, toggleFullscreen } = useFullscreenPanel();
 
   const calculateDetailedDuration = (
@@ -75,6 +88,8 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
     return parts.join(", ");
   };
 
+  // The project the execution was read from; links to its calibration session stay in it.
+  const { projectId } = useProject();
   const {
     data: executionDetailData,
     isLoading: isDetailLoading,
@@ -146,27 +161,16 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
     }
   }, [filterTaskName, uniqueTaskNames]);
 
+  const selectStyles = useSelectStyles<FilterOption>();
   const filterSelectStyles = useMemo<StylesConfig<FilterOption, false>>(
     () => ({
-      control: (provided) => ({
-        ...provided,
-        minHeight: 34,
-        height: 34,
-      }),
-      valueContainer: (provided) => ({
-        ...provided,
-        padding: "2px 8px",
-      }),
-      indicatorsContainer: (provided) => ({
-        ...provided,
-        height: 34,
-      }),
-      menu: (provided) => ({
-        ...provided,
+      ...selectStyles,
+      menu: (provided, state) => ({
+        ...(selectStyles.menu?.(provided, state) ?? provided),
         zIndex: 40,
       }),
     }),
-    [],
+    [selectStyles],
   );
 
   // Filter tasks based on selected filters
@@ -187,7 +191,8 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
     return execution.task
       .filter((task) => task.task_id)
       .map((task) => {
-        const taskName = task.name || "Unnamed Task";
+        const callId = distinctCallId(task);
+        const taskName = `${task.name || "Unnamed Task"}${callId ? ` (${callId})` : ""}`;
         const displayName = task.qid ? `${task.qid}-${taskName}` : taskName;
         return {
           task_id: task.task_id as string,
@@ -214,13 +219,16 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
     <div className="w-full px-4 py-6">
       <div className="space-y-6">
         {/* Back navigation */}
-        <Link href="/execution" className="btn btn-ghost btn-sm gap-2 w-fit">
-          <ArrowLeft size={16} />
+        <Link href="/execution" className="btn btn-ghost btn-sm w-fit">
+          <ArrowLeft data-icon="inline-start" />
           Back to Executions
         </Link>
 
         <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+          <div
+            className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4"
+            data-coachmark="execution-header"
+          >
             <h1 className="text-xl font-medium break-all">{execution.name}</h1>
             <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
               {isCancellable && (
@@ -260,33 +268,86 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
               </TooltipContent>
             </Tooltip>
             <div className="flex items-center text-base-content/70 min-w-0">
-              <UserRound className="mr-2 text-info/70 flex-shrink-0" size={14} />
-              <span className="font-medium mr-1">User:</span>
-              <span className="truncate">{formatActorLabel(execution)}</span>
+              {isAgentDispatched(execution.agent_session) ? (
+                <>
+                  <span className="font-medium mr-1">Run by:</span>
+                  <ExecutionActor actor={execution} link={execution.agent_session} />
+                </>
+              ) : (
+                <>
+                  <UserRound className="mr-2 text-info/70 flex-shrink-0" size={14} />
+                  <span className="font-medium mr-1">User:</span>
+                  <span className="truncate">{recordedUserLabel(execution)}</span>
+                  {execution.reported_origin ? (
+                    <span className="ml-2">
+                      <ReportedOriginBadge origin={execution.reported_origin} />
+                    </span>
+                  ) : null}
+                </>
+              )}
             </div>
           </div>
+          <ExecutionAgentSessionNotice
+            link={execution.agent_session}
+            chipId={execution.chip_id || chipId}
+          />
+          <ExecutionCalibrationNotice
+            link={execution.calibration_session}
+            origin={execution.reported_origin}
+            projectId={projectId}
+          />
+          <ExecutionRunSummary status={execution.status} tasks={execution.task ?? []} />
           {execution.status === "failed" && (
-            <div role="alert" className="alert alert-error items-start">
-              <span className="flex-1 break-words whitespace-pre-wrap">
-                {execution.message || "The execution failed without an error message."}
-              </span>
-              <InvestigateWithAiButton
-                target={{ executionId, chipId: execution.chip_id || chipId }}
-              />
-            </div>
+            <TaskMessagePanel
+              status="failed"
+              message={execution.message}
+              showEmptyFallback
+              action={
+                <InvestigateWithAiButton
+                  target={{ executionId, chipId: execution.chip_id || chipId }}
+                  surface="mini"
+                />
+              }
+            />
           )}
         </div>
 
-        <div className="bg-base-100 rounded-lg shadow-md p-6">
+        <div className="card bg-base-100 p-6">
           <h2 className="text-sm font-medium mb-4">Execution Flow</h2>
           <ExecutionDAG tasks={validTasks} />
+        </div>
+
+        <div id="parameter-changes" className="card bg-base-100 p-6">
+          <details className="group" open={parameterChangesOpen}>
+            <summary
+              className="flex cursor-pointer list-none items-start gap-1.5"
+              onClick={(event) => {
+                // Controlled so the comparison (and its requests) exists only while open.
+                event.preventDefault();
+                setParameterChangesOpen((current) => !current);
+              }}
+            >
+              <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-base-content/60 transition-transform group-open:rotate-90" />
+              <div>
+                <h2 className="text-sm font-medium mb-1">Parameter changes</h2>
+                <p className="text-xs text-base-content/60">
+                  Values this run wrote to the calibration database, against the previous run.
+                </p>
+              </div>
+            </summary>
+            {parameterChangesOpen && (
+              <div className="mt-3">
+                <ExecutionParameterChanges chipId={chipId} executionId={executionId} />
+              </div>
+            )}
+          </details>
         </div>
 
         {/* Execution Note (if available) */}
         {execution.note &&
           typeof execution.note === "object" &&
           Object.keys(execution.note).length > 0 && (
-            <div className="bg-base-100 rounded-lg shadow-md p-6">
+            <div className="card bg-base-100 p-6">
               <details className="collapse collapse-arrow border border-base-300">
                 <summary className="collapse-title text-sm font-medium">Execution Note</summary>
                 <div className="collapse-content">
@@ -307,9 +368,9 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
                           document.body.removeChild(link);
                           URL.revokeObjectURL(url);
                         }}
-                        className="btn btn-sm btn-primary gap-2"
+                        className="btn btn-sm btn-primary"
                       >
-                        <Download size={14} />
+                        <Download data-icon="inline-start" />
                         Download JSON
                       </button>
                     </div>
@@ -322,11 +383,7 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
             </div>
           )}
 
-        <div
-          className={
-            isFullscreen ? gridFullscreenPanelClass : "bg-base-100 rounded-lg shadow-md p-4 sm:p-6"
-          }
-        >
+        <div className={isFullscreen ? gridFullscreenPanelClass : "card bg-base-100 p-4 sm:p-6"}>
           <div
             className={`flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 ${
               isFullscreen ? "shrink-0" : "mb-4"

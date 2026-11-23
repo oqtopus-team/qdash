@@ -76,14 +76,14 @@ export function SearchInput({
   }, []);
 
   return (
-    <label className={`input input-bordered input-sm flex items-center gap-2 ${className}`}>
+    <label className={`input input-sm flex min-w-0 items-center gap-2 ${className}`}>
       <Search className="h-4 w-4 shrink-0 text-base-content/40" />
       <input
         ref={inputRef}
         type="text"
         aria-label={placeholder || "Search"}
         aria-keyshortcuts="/"
-        className="grow"
+        className="min-w-0 grow"
         placeholder={placeholder}
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -95,24 +95,27 @@ export function SearchInput({
           }
         }}
       />
-      <kbd
-        className="hidden rounded border border-base-300 px-1 text-xs text-base-content/60 sm:inline"
-        title="Press / to focus search; Esc to clear"
-        aria-hidden="true"
-      >
-        /
-      </kbd>
-      {value && (
-        <button
-          type="button"
-          onClick={handleClear}
-          aria-label="Clear search"
-          title="Clear search (Esc)"
-          className="btn btn-ghost btn-xs p-0 h-auto min-h-0 shrink-0"
-        >
-          <X className="h-3 w-3" />
-        </button>
-      )}
+      <span className="flex h-6 w-6 shrink-0 items-center justify-center">
+        {value ? (
+          <button
+            type="button"
+            onClick={handleClear}
+            aria-label="Clear search"
+            title="Clear search (Esc)"
+            className="btn btn-ghost btn-xs btn-square"
+          >
+            <X className="h-4 w-4" aria-hidden="true" />
+          </button>
+        ) : (
+          <kbd
+            className="hidden rounded border border-base-300 px-1 text-xs text-base-content/60 sm:inline"
+            title="Press / to focus search; Esc to clear"
+            aria-hidden="true"
+          >
+            /
+          </kbd>
+        )}
+      </span>
     </label>
   );
 }

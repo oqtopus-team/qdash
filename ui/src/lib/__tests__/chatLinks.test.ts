@@ -49,7 +49,7 @@ describe("classifyChatLink", () => {
 
   it("leaves other links alone", () => {
     expect(classifyChatLink("/forum/new", ORIGIN).kind).toBe("internal");
-    expect(classifyChatLink("/dashboard", ORIGIN).kind).toBe("internal");
+    expect(classifyChatLink("/overview", ORIGIN).kind).toBe("internal");
     expect(classifyChatLink("/task-results", ORIGIN).kind).toBe("internal");
     expect(classifyChatLink("https://arxiv.org/abs/1", ORIGIN).kind).toBe("external");
     expect(classifyChatLink("not a url at all", "::bad").kind).toBe("external");
@@ -63,6 +63,6 @@ describe("chatLinkPagePath", () => {
       "/execution/64Qv3/x",
     );
     expect(chatLinkPagePath(classifyChatLink("/executions/x", ORIGIN))).toBe("/executions/x");
-    expect(chatLinkPagePath(classifyChatLink("/dashboard", ORIGIN))).toBeNull();
+    expect(chatLinkPagePath(classifyChatLink("/overview", ORIGIN))).toBeNull();
   });
 });

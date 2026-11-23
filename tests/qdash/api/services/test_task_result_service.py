@@ -105,6 +105,8 @@ def _doc(task_id: str, qid: str, end_at: datetime) -> _TaskResultDoc:
         tags=[],
         chip_id="chip-1",
         source_task_id=None,
+        # Results recorded before task calls have no invocation.
+        invocation=None,
         user_note=NoteModel(),
     )
 
@@ -213,6 +215,11 @@ def test_list_task_results_filters_failed_rows_and_paginates(monkeypatch: Any) -
                 and (not query.get("status") or doc.status == query["status"])
                 and (not query.get("chip_id") or doc.chip_id == query["chip_id"])
                 and (not query.get("message") or "calibration" in doc.message)
+                and all(
+                    getattr(doc.invocation, field, None) == query[f"invocation.{field}"]
+                    for field in ("step_id", "call_id")
+                    if f"invocation.{field}" in query
+                )
             ]
             return _Finder(filtered)
 
@@ -239,6 +246,71 @@ def test_list_task_results_filters_failed_rows_and_paginates(monkeypatch: Any) -
     assert response.items[0].status == "failed"
     assert response.items[0].message == "RuntimeError: bad calibration"
     assert response.items[0].has_stack_trace is True
+    assert response.items[0].invocation is None
+
+
+def test_list_task_results_selects_one_call_by_its_identity(monkeypatch: Any) -> None:
+    from qdash.datamodel.task_invocation import TaskInvocation
+
+    now = datetime(2026, 5, 5, tzinfo=timezone.utc)
+    coarse = _doc("coarse-q0", "0", now)
+    fine = _doc("fine-q0", "0", now - timedelta(minutes=1))
+    coarse.invocation = TaskInvocation(step_id="ramsey", call_id="ramsey_coarse")
+    fine.invocation = TaskInvocation(step_id="ramsey", call_id="ramsey_fine")
+    queries: list[dict[str, Any]] = []
+
+    class _Finder:
+        def __init__(self, rows: list[_TaskResultDoc]) -> None:
+            self.rows = rows
+
+        def count(self) -> int:
+            return len(self.rows)
+
+        def sort(self, sort: list[tuple[str, Any]]) -> _Finder:
+            return self
+
+        def skip(self, skip: int) -> _Finder:
+            return self
+
+        def limit(self, limit: int) -> _Finder:
+            return self
+
+        def run(self) -> list[_TaskResultDoc]:
+            return self.rows
+
+    class _Aggregate:
+        def run(self) -> list[dict[str, Any]]:
+            return []
+
+    class _Document:
+        @staticmethod
+        def find(query: dict[str, Any]) -> _Finder:
+            queries.append(query)
+            return _Finder(
+                [
+                    doc
+                    for doc in (coarse, fine)
+                    if doc.invocation.call_id == query.get("invocation.call_id")
+                ]
+            )
+
+        @staticmethod
+        def aggregate(pipeline: list[dict[str, Any]]) -> _Aggregate:
+            return _Aggregate()
+
+    import qdash.dbmodel.task_result_history as task_result_history
+
+    monkeypatch.setattr(task_result_history, "TaskResultHistoryDocument", _Document)
+
+    response = _service(_TaskResultRepo([])).list_task_results(
+        project_id="proj-1", step_id="ramsey", call_id="ramsey_fine"
+    )
+
+    assert queries[0]["invocation.step_id"] == "ramsey"
+    assert queries[0]["invocation.call_id"] == "ramsey_fine"
+    assert [item.task_id for item in response.items] == ["fine-q0"]
+    assert response.items[0].invocation is not None
+    assert response.items[0].invocation.call_id == "ramsey_fine"
 
 
 def test_create_figures_zip_maps_container_calib_data_path(tmp_path, monkeypatch) -> None:

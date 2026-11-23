@@ -24,11 +24,12 @@ tasks:
         OPENAPI_TMP="$(mktemp)"
         ENV=test uv run python -c 'import json, os; from dotenv import load_dotenv; load_dotenv(".env"); os.environ["ENV"] = "test"; from qdash.api.main import app; print(json.dumps(app.openapi(), ensure_ascii=False, indent=2))' > "$OPENAPI_TMP"
         mv "$OPENAPI_TMP" docs/oas/openapi.json
+      - task: generate-python-schema
       - cd clients/typescript && bun run generate:ui
       - cd clients/typescript && bun run generate
       - cd ui && bun run fmt
       - cd ui && bun run lint:fix
-    desc: Generate the TypeScript clients
+    desc: Generate the OpenAPI document and the Python and TypeScript clients
 
   generate-task-catalog:
     desc: Generate task metadata catalog from workflow classes
@@ -36,33 +37,9 @@ tasks:
       - uv run --all-packages scripts/generate_task_catalog.py
 
   generate-python-schema:
-    desc: Generate Python Pydantic schema models from OpenAPI
-    vars:
-      OPENAPI_INPUT: '{{default "docs/oas/openapi.json" .OPENAPI_INPUT}}'
-      PY_SCHEMA_OUTPUT: '{{default "scripts/generated/openapi_models/models.py" .PY_SCHEMA_OUTPUT}}'
+    desc: Generate the Python client's Pydantic models from the OpenAPI document
     cmds:
-      - mkdir -p "$(dirname {{.PY_SCHEMA_OUTPUT}})"
-      - |
-        uvx --from datamodel-code-generator datamodel-codegen \
-          --use-schema-description \
-          --target-python-version 3.12 \
-          --field-constraints \
-          --use-annotated \
-          --use-field-description \
-          --input {{.OPENAPI_INPUT}} \
-          --input-file-type openapi \
-          --collapse-root-models \
-          --enum-field-as-literal one \
-          --set-default-enum-member \
-          --use-union-operator \
-          --use-subclass-enum \
-          --output-model-type pydantic_v2.BaseModel \
-          --disable-timestamp \
-          --use-standard-collections \
-          --strict-nullable \
-          --use-default \
-          --output {{.PY_SCHEMA_OUTPUT}}
-      - uv run ruff format {{.PY_SCHEMA_OUTPUT}}
+      - uv run python scripts/generate_python_client_models.py
 
   knowledge-pull:
     desc: Pull task-knowledge.json from the knowledge repository (KNOWLEDGE_REPO_URL)
@@ -136,9 +113,11 @@ tasks:
   # =============================================================================
 
   dev-services:
-    desc: Start only the services needed by host-side API/UI development
+    desc: Start Caddy and the services behind the development API and UI
     cmds:
-      - docker compose up -d mongo postgres prefect-server deployment-service user-flow-worker
+      # compose.dev-local.yaml points Caddy on UI_PORT at the API and UI of
+      # dev-api-local and dev-ui-local and publishes the loopback ports they use.
+      - docker compose -f compose.yaml -f compose.dev-local.yaml up -d mongo postgres prefect-server deployment-service user-flow-worker agent-runtime caddy
 
   dev-local-down:
     desc: Stop host API/UI processes and Docker Compose services started for development
@@ -192,8 +171,9 @@ tasks:
         stop_command "uvicorn src.qdash.api.main:app" "API"
         stop_command "bun run dev" "UI"
         stop_port "${API_PORT:-5715}" "API"
-        stop_port "${UI_PORT:-5714}" "UI"
-      - docker compose down
+        # Not UI_PORT: Caddy's published port belongs to Docker.
+        stop_port "${UI_DEV_PORT:-5713}" "UI"
+      - docker compose -f compose.yaml -f compose.dev-local.yaml down
 
   dev-local-setup:
     desc: Install dependencies and tools needed by local development
@@ -209,32 +189,53 @@ tasks:
       - uv sync --all-groups --all-packages --no-cache --upgrade
 
   dev-api-local:
-    desc: Start the API on the host against Docker services
+    desc: Start the API with hot reload behind the development Caddy
     dotenv: [.env]
     silent: true
     cmds:
+      # Caddy reaches this listener at QDASH_DEV_HOST (see compose.dev-local.yaml):
+      # host loopback through Docker Desktop or OrbStack on macOS, the Docker host
+      # gateway on Linux, and custom_net in the DevContainer. QDASH_DEV_BIND overrides.
       - |
         /bin/sh -c '
         mkdir -p .tmp
         echo "$$" > .tmp/dev-api-local.pid
-        MONGO_HOST="${MONGO_HOST:-localhost}" PREFECT_API_URL="http://127.0.0.1:${PREFECT_PORT:-4200}/api" DEPLOYMENT_SERVICE_URL="http://127.0.0.1:${DEPLOYMENT_SERVICE_PORT:-4006}" exec uv run uvicorn src.qdash.api.main:app --reload --host 127.0.0.1 --port "${API_PORT:-5715}"
+        # This API is not in the api container, so it cannot reach the metric-runner
+        # container's socket: run metric scripts as local subprocesses (development only).
+        export METRIC_RUNNER_MODE="${METRIC_RUNNER_MODE:-local}"
+        if [ "${QDASH_DEV_HOST:-}" = devcontainer ]; then
+          bind="${QDASH_DEV_BIND:-0.0.0.0}"
+          export MONGO_HOST=mongo PREFECT_API_URL=http://prefect-server:4200/api DEPLOYMENT_SERVICE_URL=http://deployment-service:8001 PI_AGENT_RUNTIME_URL="http://agent-runtime:${AGENT_RUNTIME_PORT:-8002}"
+        else
+          if [ "$(uname -s)" = Darwin ]; then bind="${QDASH_DEV_BIND:-127.0.0.1}"; else bind="${QDASH_DEV_BIND:-0.0.0.0}"; fi
+          export MONGO_HOST="${MONGO_HOST:-localhost}" PREFECT_API_URL="http://127.0.0.1:${PREFECT_PORT:-4200}/api" DEPLOYMENT_SERVICE_URL="http://127.0.0.1:${DEPLOYMENT_SERVICE_PORT:-4006}" PI_AGENT_RUNTIME_URL="http://127.0.0.1:${AGENT_RUNTIME_PORT:-8002}"
+        fi
+        if [ -z "${AGENT_RUNTIME_TOKEN:-}" ]; then
+          AGENT_RUNTIME_TOKEN="$(docker compose -f compose.yaml -f compose.dev-local.yaml exec -T agent-runtime cat /run/agent-runtime-auth/token 2>/dev/null)" \
+            || echo "Pi Agent Runtime is not running: Copilot chat fails until task dev-services starts it" >&2
+          export AGENT_RUNTIME_TOKEN
+        fi
+        exec uv run uvicorn src.qdash.api.main:app --reload --host "$bind" --port "${API_PORT:-5715}" --forwarded-allow-ips "*"
         '
 
   dev-ui-local:
-    desc: Start the UI on the host against the local API
+    desc: Start the Next.js dev server behind the development Caddy
     dir: ui
     dotenv: [../.env]
     silent: true
     cmds:
+      # Browsers use Caddy on UI_PORT; Next.js listens on UI_DEV_PORT. The bind
+      # follows dev-api-local.
       - |
         /bin/sh -c '
         mkdir -p ../.tmp
         echo "$$" > ../.tmp/dev-ui-local.pid
-        PORT="${UI_PORT:-5714}" INTERNAL_API_URL="http://127.0.0.1:${API_PORT:-5715}" exec bun run dev
+        if [ "${QDASH_DEV_HOST:-}" = devcontainer ] || [ "$(uname -s)" != Darwin ]; then bind="${QDASH_DEV_BIND:-0.0.0.0}"; else bind="${QDASH_DEV_BIND:-127.0.0.1}"; fi
+        PORT="${UI_DEV_PORT:-5713}" exec bun run dev --hostname "$bind"
         '
 
   dev-local:
-    desc: Start lightweight local development services, API, and UI
+    desc: Start Caddy, Docker services, and the API and UI with hot reload
     cmds:
       - task: dev-services
       - task --parallel dev-api-local dev-ui-local
@@ -246,12 +247,12 @@ tasks:
   test:
     desc: Run all Python tests
     cmds:
-      - uv run pytest tests/ clients/python/tests/ -v
+      - uv run pytest tests/ clients/python/tests/ sdks/python/tests/ -v
 
   test-fast:
     desc: Run tests, stop on first failure
     cmds:
-      - uv run pytest tests/ clients/python/tests/ -v -x --tb=short
+      - uv run pytest tests/ clients/python/tests/ sdks/python/tests/ -v -x --tb=short
 
   test-api:
     desc: Run API router tests
@@ -263,14 +264,39 @@ tasks:
     cmds:
       - uv run pytest clients/python/tests/ -v
 
+  test-sdk:
+    desc: Run Python SDK tests
+    cmds:
+      - uv run pytest sdks/python/tests/ -v
+
   build-client-ts:
-    desc: Build the local TypeScript client for pi packages and the runtime
+    desc: Build the local TypeScript client and SDK for pi packages and the runtime
     cmds:
       - bun run build:client
+      - bun run build:sdk
+
+  pi-local:
+    desc: Run the pi CLI with pi-qdash and the Copilot chat models from .env (args after --)
+    deps: [build-client-ts]
+    cmds:
+      - bun agent-runtime/src/local-cli.ts {{range .CLI_ARGS_LIST}}{{shellQuote .}} {{end}}
+
+  validate-agent-fake-loop:
+    desc: Opt-in real-model agent loop validation against a local fake-backend QDash (args after --)
+    deps: [build-client-ts]
+    cmds:
+      - bun agent-runtime/validation/fake-loop/run.ts {{range .CLI_ARGS_LIST}}{{shellQuote .}} {{end}}
 
   test-client-ts:
     desc: Run TypeScript client checks
     dir: clients/typescript
+    cmds:
+      - bun run check
+
+  test-sdk-ts:
+    desc: Run TypeScript SDK checks against the built client
+    deps: [build-client-ts]
+    dir: sdks/typescript
     cmds:
       - bun run check
 
@@ -293,12 +319,12 @@ tasks:
   test-coverage:
     desc: Run tests with coverage report
     cmds:
-      - uv run pytest tests/ clients/python/tests/ --cov=src/qdash --cov=clients/python/src/qdash/client --cov-report=term --cov-report=html
+      - uv run pytest tests/ clients/python/tests/ sdks/python/tests/ --cov=src/qdash --cov=clients/python/src/qdash/client --cov=sdks/python/src/qdash/sdk --cov-report=term --cov-report=html
 
   test-parallel:
     desc: Run tests in parallel (requires pytest-xdist)
     cmds:
-      - uv run pytest tests/ clients/python/tests/ -v -n auto
+      - uv run pytest tests/ clients/python/tests/ sdks/python/tests/ -v -n auto
 
   test-watch:
     desc: Run tests in watch mode (requires pytest-watch)
@@ -326,6 +352,14 @@ tasks:
     dir: docs
     cmds:
       - bun run docs:build
+
+  check-docs-mermaid:
+    desc: Build docs and render every Mermaid diagram in headless Chromium
+    deps: [build-docs]
+    dir: docs
+    cmds:
+      - bunx playwright install --only-shell chromium
+      - bun run docs:check-mermaid
 
   check-docs-links:
     desc: Build docs and check external links, local links, and anchors
@@ -395,18 +429,20 @@ tasks:
     cmds:
       - trufflehog git file://. --fail --exclude-paths=.trufflehog-exclude-paths.txt
 
+  check-betterleaks-version:
+    desc: Verify betterleaks matches BETTERLEAKS_VERSION in .devcontainer/Dockerfile
+    cmds:
+      - bash scripts/check_betterleaks_version.sh
+
   scan-leaks:
     desc: Run Betterleaks scan over git history (full repository)
     cmds:
+      - task: check-betterleaks-version
       - |
-        if command -v betterleaks >/dev/null 2>&1; then
-          GIT_CONFIG_COUNT=1 \
-            GIT_CONFIG_KEY_0=safe.directory \
-            GIT_CONFIG_VALUE_0="$PWD" \
-            betterleaks git "$(git rev-parse --absolute-git-dir)" --config .betterleaks.toml --verbose
-        else
-          echo "betterleaks not installed; skipping leak scan"
-        fi
+        GIT_CONFIG_COUNT=1 \
+          GIT_CONFIG_KEY_0=safe.directory \
+          GIT_CONFIG_VALUE_0="$PWD" \
+          betterleaks git "$(git rev-parse --absolute-git-dir)" --config .betterleaks.toml --verbose
 
   scan-leaks-staged:
     desc: Run Betterleaks on staged files only (same as pre-commit)
@@ -427,12 +463,15 @@ tasks:
   check:
     desc: Run all checks locally (lint, typecheck, test, UI, audit)
     cmds:
+      # Fail fast on the wrong scanner before the slower checks run.
+      - task: check-betterleaks-version
       - task: lint
       - task: ci-lint
       - task: ci-typecheck
       - task: ci-test
       - task: ci-ui
       - task: test-client-ts
+      - task: test-sdk-ts
       - task: ci-pi-packages
       - task: ci-agent-runtime
       - task: scan-leaks-local
@@ -457,18 +496,19 @@ tasks:
     desc: Check Python linting (no auto-fix)
     cmds:
       - uv run --all-packages scripts/generate_task_catalog.py --check
+      - uv run python scripts/generate_python_client_models.py --check
       - uv run ruff check .
       - uv run ruff format --check .
 
   ci-typecheck:
     desc: Run mypy type checking
     cmds:
-      - uv run mypy src/qdash/common src/qdash/datamodel src/qdash/dbmodel src/qdash/repository src/qdash/api src/qdash/workflow clients/python/src/qdash/client clients/python/tests tests
+      - uv run mypy src/qdash/common src/qdash/datamodel src/qdash/dbmodel src/qdash/repository src/qdash/api src/qdash/workflow clients/python/src/qdash/client sdks/python/src/qdash/sdk clients/python/tests sdks/python/tests tests
 
   ci-test:
     desc: Run all tests with coverage
     cmds:
-      - uv run pytest tests/ clients/python/tests/ -v --tb=short --cov=src/qdash --cov=clients/python/src/qdash/client --cov-report=xml --cov-report=term
+      - uv run pytest tests/ clients/python/tests/ sdks/python/tests/ -v --tb=short --cov=src/qdash --cov=clients/python/src/qdash/client --cov=sdks/python/src/qdash/sdk --cov-report=xml --cov-report=term
 
   knip:
     desc: Check for unused exports, dependencies, and files in UI
@@ -493,7 +533,9 @@ tasks:
       - bun run fmt:check
       - bun run knip
       # Bun <1.4 cannot read the current lockfile format, even when other UI commands succeed.
-      - bunx bun@1.4.0 audit
+      # The wrapper adds time-limited advisory exceptions and fails once any of them expires.
+      - node --test ../.github/scripts/audit-exceptions.test.mjs
+      - node ../.github/scripts/audit-exceptions.mjs -- bunx bun@1.4.0 audit
 
   ci-pi-packages:
     desc: Typecheck and test the independently published pi packages
@@ -503,7 +545,7 @@ tasks:
       - bun run --filter '@oqtopus-team/pi-qdash' test
       - bun run --filter '@oqtopus-team/pi-qcaleval' check
       - bun run --filter '@oqtopus-team/pi-qcaleval' test
-      - node --test .github/scripts/pi-package-release.test.mjs .github/scripts/client-release.test.mjs
+      - node --test .github/scripts/pi-package-release.test.mjs .github/scripts/client-release.test.mjs .github/scripts/sdk-package-release.test.mjs
 
   ci-agent-runtime:
     desc: Run all agent-runtime CI checks
@@ -577,10 +619,9 @@ tasks:
     desc: Stop the local fake Docker Compose stack
 
   dev-ui:
-    dir: ui
     cmds:
-      - bun run dev
-    desc: Start the UI development server
+      - task: dev-ui-local
+    desc: Start the Next.js dev server behind the development Caddy (alias of dev-ui-local)
 
   deploy:
     dotenv: [.env]
