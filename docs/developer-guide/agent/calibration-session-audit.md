@@ -173,8 +173,8 @@ the session's ID stay ordinary rows.
 pi-qdash records with `qdash_record_calibration_decision`, a session-granted write like
 `qdash_record_agent_decision`, and reads with `qdash_get_calibration_session_audit`;
 `qdash_run_pipeline` passes `decisionId`. See the [pi-qdash reference](../../reference/pi-qdash.md).
-The UI shows the timeline with the agent session's `AuditTimeline` component
-(`ui/src/components/features/agent-session/AuditTimeline.tsx`).
+The UI shows the timeline with the shared `AuditTimeline` component
+(`ui/src/components/features/audit/AuditTimeline.tsx`).
 
 ## Testing
 

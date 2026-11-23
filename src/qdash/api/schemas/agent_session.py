@@ -8,7 +8,13 @@ from typing import Annotated, Any, Literal
 from pydantic import BaseModel, Field, model_validator
 
 # Re-exported: the audit services import the shared event from this module.
+from qdash.api.schemas.audit import (
+    AgentAuditActorKind as AgentAuditActorKind,  # noqa: PLC0414
+)
 from qdash.api.schemas.audit import AgentAuditEvent as AgentAuditEvent  # noqa: PLC0414, TC001
+from qdash.api.schemas.audit import (
+    AgentAuditProvenance as AgentAuditProvenance,  # noqa: PLC0414
+)
 from qdash.datamodel.agent_session import (
     AgentActionDecision,
     AgentActionType,
