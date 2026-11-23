@@ -4,33 +4,13 @@ from __future__ import annotations
 
 import json
 import math
-from collections.abc import AsyncGenerator
 from typing import TYPE_CHECKING, Any
 
 import anyio
 from starlette.responses import StreamingResponse
 
 if TYPE_CHECKING:
-    from starlette.types import Receive, Scope, Send
-
-
-class ClosingStreamingResponse(StreamingResponse):
-    """Close the response's async generator when sending ends or disconnects.
-
-    Starlette's ASGI 2.4 send-error path does not close its body iterator. A chat
-    subscriber must release its queue without waiting for garbage collection of
-    the response or its exception traceback. Closing that subscriber does not
-    cancel the independent task that owns the chat turn.
-    """
-
-    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        """Finish generator cleanup even when the request's cancel scope is cancelled."""
-        try:
-            await super().__call__(scope, receive, send)
-        finally:
-            if isinstance(self.body_iterator, AsyncGenerator):
-                with anyio.CancelScope(shield=True):
-                    await self.body_iterator.aclose()
+    from starlette.types import Send
 
 
 def _sanitize_for_json(obj: Any) -> Any:
@@ -71,3 +51,24 @@ def sse_event(event: str, data: dict[str, Any]) -> str:
 
     """
     return f"event: {event}\ndata: {json.dumps(_sanitize_for_json(data), default=str, ensure_ascii=False)}\n\n"
+
+
+class ClosingStreamingResponse(StreamingResponse):
+    """A streaming response that closes its async iterator when the response ends.
+
+    Starlette does not close ``body_iterator``. On an ASGI 2.4 server a client
+    disconnect surfaces as an ``OSError`` from ``send`` while the generator is
+    suspended at ``yield``, so the generator's ``finally`` would only run once
+    the garbage collector finalizes it. Closing it here runs that cleanup as soon
+    as the response ends, whether it finished, failed, or was cancelled.
+    """
+
+    async def stream_response(self, send: Send) -> None:
+        try:
+            await super().stream_response(send)
+        finally:
+            aclose = getattr(self.body_iterator, "aclose", None)
+            if aclose is not None:
+                # Cleanup runs even when an ASGI 2.3 disconnect cancelled the response.
+                with anyio.CancelScope(shield=True):
+                    await aclose()

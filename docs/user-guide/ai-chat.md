@@ -211,6 +211,22 @@ the unsaved draft and proposes a new one as a diff. **Apply to draft** puts it o
 sent until you pick one or type your own. See
 [Create a Dashboard with the Agent](./dashboards.md#create-a-dashboard-with-the-agent).
 
+### Save Answers and Files
+
+Select **Save as Markdown** under a finished answer to save its text and any proposed code change
+as a `.md` file named after the answer's first heading. An answer that is still running or was
+stopped does not offer it. Select **Download** on a code block to save that code as a file. A
+block whose opening fence names a file, for example ```` ```python title="fit.py" ````, is saved
+under that name; other blocks are saved as `snippet` with an extension for their language.
+
+When the assistant writes a file in its workspace, the answer lists the file's name under
+**Original write content from this answer**. Select the name to download the content that write
+produced, as the chat holds it. The download is the original write, not the file as it is now:
+it does not include later changes made by a script, and the chat never reads the file back from
+the workspace. The chat stops offering a file when a later edit or overwrite in the same answer
+changes it, or might have changed it, and when the answer stopped while the write ran. The
+contents of large or many files are not kept, so after a reload those files are not offered.
+
 ### Calculations and Scripts
 
 When the deployment enables it, the assistant has a private workspace for each chat: a shell with

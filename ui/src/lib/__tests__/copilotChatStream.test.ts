@@ -251,4 +251,62 @@ describe("copilotChatStream", () => {
     ]);
     expect(stoppedBlocks({ steps: [], startedAt: 0 })).toEqual([]);
   });
+
+  it("stores finished writes in full within a shared budget, and marks interrupted calls", () => {
+    const finished = (id: string, path: string, content: string) =>
+      endTool(startTool([], { id, tool: "write", label: "Write", args: { path, content } }), {
+        id,
+        tool: "write",
+        output: "ok",
+      });
+    const large = "x".repeat(40_000);
+    const steps: TraceStep[] = [
+      ...finished("w1", "a.txt", large),
+      // Does not fit in what the first write left.
+      ...finished("w2", "b.txt", large),
+      ...finished("w3", "small.txt", "tiny"),
+      ...endTool(
+        startTool([], {
+          id: "w4",
+          tool: "write",
+          label: "Write",
+          args: { path: "e", content: large },
+        }),
+        { id: "w4", tool: "write", is_error: true },
+      ),
+      ...startTool([], { id: "b1", tool: "bash", label: "Bash", args: { command: large } }),
+      ...startTool([], {
+        id: "w5",
+        tool: "write",
+        label: "Write",
+        args: { path: "r", content: "x" },
+      }),
+      { kind: "text", text: "stopped" },
+    ];
+    const trace = toPersistedTrace({ steps, startedAt: 0 }, 10)!;
+    const stored = JSON.parse(JSON.stringify(trace)) as typeof trace;
+
+    expect(tool(stored.steps, 0).args).toEqual({ path: "a.txt", content: large });
+    expect(typeof tool(stored.steps, 1).args).toBe("string");
+    expect((tool(stored.steps, 1).args as string).length).toBe(4001);
+    expect(tool(stored.steps, 2).args).toEqual({ path: "small.txt", content: "tiny" });
+    expect(tool(stored.steps, 3)).toMatchObject({ status: "error" });
+    expect(typeof tool(stored.steps, 3).args).toBe("string");
+    // Calls still running when the turn ended are stored done, marked interrupted.
+    expect(tool(stored.steps, 4)).toMatchObject({ status: "done", interrupted: true });
+    expect(typeof tool(stored.steps, 4).args).toBe("string");
+    expect(tool(stored.steps, 5)).toMatchObject({
+      status: "done",
+      interrupted: true,
+      args: { path: "r", content: "x" },
+    });
+    expect(tool(stored.steps, 0)).not.toHaveProperty("interrupted");
+    // A stored trace stored again keeps the mark and the full write.
+    const again = toPersistedTrace(
+      { steps: [...stored.steps, { kind: "text", text: "" }], startedAt: 0 },
+      20,
+    )!;
+    expect(tool(again.steps, 0).args).toEqual({ path: "a.txt", content: large });
+    expect(tool(again.steps, 5).interrupted).toBe(true);
+  });
 });

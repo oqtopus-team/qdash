@@ -24,6 +24,9 @@ MAX_PERSISTED_THINKING = 20_000
 MAX_PERSISTED_ARGS = 4_000
 MAX_PERSISTED_PROMPT = 12_000
 MAX_PERSISTED_OUTPUT = 2_000
+# Room for the full arguments of an answer's finished ``write`` calls, shared by them
+# in order, so the page can offer the written content after a reload.
+MAX_PERSISTED_WRITE_ARGS = 64_000
 
 TurnEnd = Literal["completed", "failed", "stopped", "noop"]
 
@@ -189,6 +192,14 @@ def _truncate_args(args: Any) -> Any:
     except (TypeError, ValueError):
         return None
     return f"{text[:MAX_PERSISTED_ARGS]}…" if len(text) > MAX_PERSISTED_ARGS else args
+
+
+def _json_length(value: Any) -> int | None:
+    """Serialized length as the page measures it (UTF-16 code units of ``JSON.stringify``)."""
+    try:
+        return len(to_json(value).encode("utf-16-le")) // 2
+    except (TypeError, ValueError):
+        return None
 
 
 class LiveTurn:
@@ -360,21 +371,32 @@ class LiveTurn:
         if not work:
             return None
         budget = MAX_PERSISTED_THINKING
+        write_budget = MAX_PERSISTED_WRITE_ARGS
         steps: list[Step] = []
-        for s in work:
+        for index, s in enumerate(work):
             if s["kind"] == "thinking":
                 text = s["text"][: max(0, budget)]
                 budget -= len(text)
                 steps.append({**s, "text": text})
             elif s["kind"] == "tool":
                 rest = {k: v for k, v in s.items() if k not in ("draft", "draftIndex", "output")}
+                # Closing marks a running call done; keep that its end was not seen.
+                interrupted = self.steps[index].get("status") == "running"
                 args = _truncate_args(
                     s.get("args") if s.get("args") is not None else s.get("draft")
                 )
+                full = s.get("args")
+                if s["tool"] == "write" and s.get("status") == "done" and not interrupted and full:
+                    length = _json_length(full)
+                    if length is not None and MAX_PERSISTED_ARGS < length <= write_budget:
+                        write_budget -= length
+                        args = full
                 if args is None:
                     rest.pop("args", None)
                 else:
                     rest["args"] = args
+                if interrupted:
+                    rest["interrupted"] = True
                 output = s.get("output")
                 if output:
                     rest["output"] = (

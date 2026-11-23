@@ -239,6 +239,11 @@ export type TraceStep =
        * `cancelled`: the turn ended before the call was made; nothing ran.
        */
       status: "drafting" | "running" | "done" | "error" | "cancelled";
+      /**
+       * Stored as `done` because the call was still running when the turn ended or was
+       * saved in progress; whether it finished is unknown.
+       */
+      interrupted?: boolean;
       startedAt: number;
       endedAt?: number;
       /** Arguments written so far, by JSON path such as `content` or `path` (while drafting). */

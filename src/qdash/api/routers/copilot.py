@@ -463,7 +463,8 @@ async def chat_stream(
         return active.get("running") is True
 
     # The turn's stream runs in the API apart from this response: closing it, or every
-    # window, never ends the turn or what the server records of it.
+    # window, never ends the turn or what the server records of it. The response closes
+    # its subscription as soon as it ends, without waiting for garbage collection.
     return ClosingStreamingResponse(
         chat_turn_runs.stream_turn(
             request,

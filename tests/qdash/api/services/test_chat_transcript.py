@@ -84,8 +84,54 @@ def test_progress_is_the_answer_so_far_marked_in_progress() -> None:
     payload = _payload(partial)
     assert payload["in_progress"] is True
     assert payload["blocks"] == [{"type": "text", "content": "Waiting", "chart": None}]
-    # A call still running when the progress was taken shows as done in the stored trace.
-    assert payload["trace"]["steps"][0]["tool"] == "qdash_wait_execution"
+    # A call still running when the progress was taken shows as done in the stored trace,
+    # marked interrupted because its end was not seen.
+    step = payload["trace"]["steps"][0]
+    assert step["tool"] == "qdash_wait_execution"
+    assert step["status"] == "done"
+    assert step["interrupted"] is True
+
+
+def _write(fold: TurnTranscript, call_id: str, path: str, content: str, *, error: bool) -> None:
+    fold.apply(
+        "tool_start",
+        {
+            "id": call_id,
+            "tool": "write",
+            "label": "Write",
+            "args": {"path": path, "content": content},
+        },
+    )
+    fold.apply("tool_end", {"id": call_id, "tool": "write", "is_error": error, "output": "ok"})
+
+
+def test_finished_writes_keep_full_arguments_within_a_shared_budget() -> None:
+    fold = TurnTranscript("r1", _user(), clock=_clock())
+    # Measured as the page measures it: UTF-16 code units, so astral characters count twice.
+    large = "😀" * 20_000
+    _write(fold, "w1", "a.txt", large, error=False)
+    _write(fold, "w2", "b.txt", large, error=False)
+    _write(fold, "w3", "small.txt", "tiny", error=False)
+    _write(fold, "w4", "e.txt", large, error=True)
+    fold.apply(
+        "tool_start",
+        {"id": "w5", "tool": "write", "label": "Write", "args": {"path": "r", "content": "x"}},
+    )
+    fold.apply("delta", {"text": "Stopped"})
+    fold.stop()
+
+    steps = _payload(fold.messages()[-1])["trace"]["steps"]
+    assert steps[0]["args"] == {"path": "a.txt", "content": large}
+    assert "interrupted" not in steps[0]
+    # What the first write left is not enough for the second.
+    assert isinstance(steps[1]["args"], str)
+    assert len(steps[1]["args"]) == 4_001
+    assert steps[2]["args"] == {"path": "small.txt", "content": "tiny"}
+    assert steps[3]["status"] == "error"
+    assert isinstance(steps[3]["args"], str)
+    assert steps[4]["status"] == "done"
+    assert steps[4]["interrupted"] is True
+    assert steps[4]["args"] == {"path": "r", "content": "x"}
 
 
 def test_a_steer_closes_off_the_answer_so_far_and_follows_it() -> None:
