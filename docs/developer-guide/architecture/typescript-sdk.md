@@ -34,6 +34,11 @@ reconciliation, not a new launch key; see [Calibration Sessions](../agent/calibr
 `taskResults.compareLatest` combines client reads and checks result identity before comparing
 values. Keep this reusable comparison logic in the SDK rather than duplicating it in tool hosts.
 
+`taskResults.evidence` joins a result with its execution and current target state. Secondary
+read failures remain explicit context states. A caller can name a cooldown to check, but the
+SDK never infers a cooldown association that the result API does not expose. See the
+[result context contract](../../reference/clients/typescript.md#read-a-result-with-context).
+
 ## Packaging and release
 
 The package is ESM and requires Node.js 20 or later. Workspace development uses `workspace:*`;
@@ -48,7 +53,8 @@ release artifacts pin the matching client version and publish after it. See
 | `sdks/typescript/src/session.ts` | Scoped session |
 | `sdks/typescript/src/pipelines.ts` | Pipeline and chip operations |
 | `sdks/typescript/src/workflows.ts` | Registered workflows |
-| `sdks/typescript/src/results.ts` | Compound result comparisons |
+| `sdks/typescript/src/results.ts` | Compound result operations |
+| `sdks/typescript/src/evidence.ts` | Result context joins and typed partial failures |
 | `sdks/typescript/src/dashboards.ts` | Script and dashboard authoring |
 
 ## Tests

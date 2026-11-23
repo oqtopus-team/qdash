@@ -43,6 +43,7 @@ import { registerFlowAuthoringTools } from "./tools/flow-authoring.js";
 import { isMetricScriptQueryAction, metricScriptQuery, registerMetricScriptTools, type MetricScriptQueryAction } from "./tools/metric-scripts.js";
 import { registerSourceCodeTools } from "./tools/source-code.js";
 import { notFound, registerTaskKnowledgeTool } from "./tools/task-knowledge.js";
+import { registerTaskResultEvidenceTool } from "./tools/task-result-evidence.js";
 import { agentSessionApprovalText, pausedSessionConflict } from "./lib/agent-loop.js";
 import { agentSessionPolicyProblems, agentSessionPolicySchema, type AgentSessionPolicyInput } from "./lib/agent-session-policy.js";
 import { installQDashToolPolicy } from "./lib/script-policy.js";
@@ -1596,6 +1597,7 @@ export default function qdashExtension(host: ExtensionAPI) {
   installQcalHydration(pi, { loadTaskKnowledge });
   registerCurrentTimeTool(pi);
   registerTaskKnowledgeTool(pi, { makeClient });
+  registerTaskResultEvidenceTool(pi, { makeClient });
   registerSourceCodeTools(pi, { makeClient });
   registerAgentLoopTools(pi, { makeClient });
   registerAgentSessionEndTool(pi, { makeClient });
@@ -1889,7 +1891,7 @@ export default function qdashExtension(host: ExtensionAPI) {
   registerQueryTool({
     name: "qdash_get_task_result",
     label: "QDash Task Result",
-    description: "Get a single task result by taskId.",
+    description: "Get a single task result by taskId, as QDash stores it. To diagnose it with its execution, target, and cooldown context, use qdash_get_task_result_evidence.",
     promptSnippet: "Get a QDash task result by task ID",
     action: "task_result",
     parameters: Type.Object({ ...connectionParams, taskId: Type.String() }),

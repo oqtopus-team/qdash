@@ -11,7 +11,8 @@
  * `qdash.scripts` and `qdash.dashboards` save metric scripts and custom
  * dashboards defined with `Script` and `Dashboard`. `qdash.taskResults`
  * combines task-result reads, such as `compareLatest` for a target's two
- * newest results per task. `qdash.client` reads other QDash data, such as
+ * newest results per task and `evidence` for one result with its execution,
+ * target and a named cooldown. `qdash.client` reads other QDash data, such as
  * `collectTaskResults({ maxItems })` for task results in bounded pages.
  */
 export { QDash } from "./session.js";
@@ -46,6 +47,16 @@ export type {
   OutputParameterChange,
   TaskResultComparison,
 } from "./results.js";
+export { COOLDOWN_NOT_ASSOCIATED } from "./evidence.js";
+export type {
+  CooldownContext,
+  ExecutionContext,
+  StoredOutput,
+  TargetContext,
+  TaskResultContext,
+  TaskResultEvidence,
+  TaskResultEvidenceOptions,
+} from "./evidence.js";
 export { runStatus } from "./runs.js";
 export type { RunResult, WaitOptions } from "./runs.js";
 export { calibrationSpec, customOneQubit, muxTargets, qubitTargets, sweep } from "./definitions.js";
@@ -78,6 +89,8 @@ export type {
   DashboardPanelModel,
   ExecuteFlowResponse,
   ExecutePipelineResponse,
+  CooldownResponse,
+  CouplingResponse,
   ExecutionResponseDetail,
   FlowSummary,
   GetFlowResponse,
@@ -91,6 +104,8 @@ export type {
   PipelineCatalogResponse,
   PipelineProblem,
   PipelineTargets,
+  QubitResponse,
+  Task,
   TaskCall,
   TaskResultListItem,
   TaskHistoryResponse,

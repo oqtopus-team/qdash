@@ -31,6 +31,7 @@ Set `QDASH_WEB_URL` if the web UI is not the API base URL without `/api`.
 | `qdash_get_cooldown_wiring`, `qdash_wiring_insights`, `qdash_list_cooldown_wiring_events` | Wiring, attenuation insights, and event history. |
 | `qdash_get_timeseries`, `qdash_inspect_timeseries_csv`, `qdash_compare_timeseries` | Timeseries retrieval, local CSV inspection, and comparison. |
 | `qdash_list_task_results`, `qdash_get_task_result`, `qdash_get_task_knowledge` | Task results and full or summarized task knowledge. |
+| `qdash_get_task_result_evidence` | One result with execution, current target values, and optional named cooldown checks; accepts `taskId` and optional `cooldownId`. Deferred, read-only, and available in scripts. |
 | `qdash_list_flows`, `qdash_get_flow` | Saved flows. |
 | `qdash_list_executions`, `qdash_get_execution`, `qdash_wait_execution`, `qdash_compare_executions` | Execution history, status, and comparison. |
 | `qdash_get_provenance_stats` | Provenance statistics. |
@@ -42,6 +43,13 @@ Lists are paginated: task results and executions accept `skip` and `limit` (1–
 Executions require one chip and support `date` (`YYYYMMDD`) and `timezone`, not flow/status filters.
 Task history has no date filter; use task results with `startFrom` and `startTo` for a period.
 See [client contracts](./clients/typescript.md#high-level-client) for response shapes.
+
+`qdash_get_task_result_evidence` reports each context part as `ok`, `failed`, `not_applicable`,
+or `not_associated`. A failed result read fails the tool; a failed context read leaves the other
+parts available. Target values are current and may come from a later result. The API does not
+expose the result's cooldown association: without `cooldownId`, cooldown is `not_associated`.
+A supplied cooldown is checked for chip membership and time compatibility, not proven provenance.
+The same reads are available through the [SDK](./clients/typescript.md#read-a-result-with-context).
 
 Timeseries parameters use exact stored names. Local CSV comparison never uploads files; each file
 is limited to 10 MB. `qdash_current_time` reads the tool host's clock, not hardware time; give an
@@ -172,6 +180,11 @@ cancelled turn invalidate approval. Session-granted writes remain limited to the
 `tool_search` loads specialist tools. `codemode` batches audited reads as JSON; writes, figures,
 shell tools, and unaudited calls are blocked. Call them directly. A script result is limited to
 512 KiB; the default timeout is 120 seconds, capped at 300.
+
+Classified deferred tools include a `Request type` line in their searchable descriptions.
+Search with purpose words such as `diagnosis task result evidence` or `measurement preparation`,
+or use an exact tool name. The shared guide covers stored values, diagnosis, measurement
+preparation, and writes; it does not restrict access when the request changes or combines purposes.
 
 Tool selections persist across sessions. `PI_QDASH_CODEMODE=off` disables default activation.
 Without `tool_search`, deferred tools become directly available. Load only one copy of pi-qdash;

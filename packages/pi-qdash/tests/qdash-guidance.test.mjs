@@ -198,7 +198,11 @@ test("routing follows the selected tools between runs", async () => {
   // A hidden tool is not callable directly, so the routing leaves it out.
   options.hiddenTools = ["qdash_list_cryostats"];
   await runHooks(handlers, options);
-  assert.doesNotMatch(options.sections[QDASH_GUIDANCE_SECTION], /qdash_list_cryostats|qdash_list_cooldowns/);
+  const hiddenRouting = options.sections[QDASH_GUIDANCE_SECTION].split("QDash tool routing:")[1] ?? "";
+  assert.doesNotMatch(hiddenRouting, /qdash_list_cryostats|qdash_list_cooldowns/);
+  // The request-type guide never names a hidden tool; a declared one stays.
+  assert.doesNotMatch(options.sections[QDASH_GUIDANCE_SECTION], /qdash_list_cryostats/);
+  assert.match(options.sections[QDASH_GUIDANCE_SECTION], /QDash tools by request type:[\s\S]*`qdash_list_cooldowns`/);
   assert.match(options.sections[QDASH_GUIDANCE_SECTION], /qdash_get_default_chip/);
 
   options.selectedTools = ["read", "qdash_list_chips"];

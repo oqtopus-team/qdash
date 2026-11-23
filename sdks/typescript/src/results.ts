@@ -7,6 +7,8 @@ import { isDeepStrictEqual } from "node:util";
 import { QDashApiError, QDashValidationError, type QDashClient } from "@oqtopus-team/qdash-client";
 import type { TaskResultListItem, TaskResultResponse } from "@oqtopus-team/qdash-client/models";
 
+import { readTaskResultEvidence, type TaskResultEvidence, type TaskResultEvidenceOptions } from "./evidence.js";
+
 /** List rows `compareLatest` reads when `limit` is omitted. */
 export const COMPARE_LATEST_DEFAULT_ROWS = 20;
 /** Most list rows `compareLatest` reads: one `GET /task-results` page. */
@@ -189,6 +191,26 @@ export class TaskResults {
       };
     });
     return { chipId, qid, rows: { read: page.items.length, total: page.total }, compared, insufficient };
+  }
+
+  /**
+   * Read one task result with the context to interpret it.
+   *
+   * Reads `GET /tasks/{task_id}/result`, then the execution it names (with this
+   * result's entry in it), the current state of its qubit or coupling with the
+   * stored values of the parameters it outputs, and the cooldown named by
+   * `cooldownId`, checked against the result's chip and start time. QDash's
+   * task result does not record its cooldown, so without `cooldownId` the
+   * cooldown part is `not_associated`; none is inferred.
+   *
+   * Every context part reports `ok`, `failed`, `not_applicable` or
+   * `not_associated` (`TaskResultContext`); a failed part is never filled from
+   * other data. Invalid arguments throw `QDashValidationError` before any
+   * request; a failed result read rejects the call, and a result that is not an
+   * object or names another task ID throws `QDashApiError`.
+   */
+  evidence(taskId: string, options: TaskResultEvidenceOptions = {}): Promise<TaskResultEvidence> {
+    return readTaskResultEvidence(this.client, taskId, options);
   }
 
   private async parameters(row: TaskResultListItem): Promise<Record<string, unknown> | string> {

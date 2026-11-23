@@ -31,8 +31,8 @@ export function buildSystemPrompt(
   presentationGuideline: string | null = null,
   /** Guideline of `classify`, when a classifier is usable; see classify-tool.ts. */
   classifyGuideline: string | null = null,
-  /** Guidelines of `codemode` and of the deferred tools; see codemode.ts. */
-  tooling: { codemode?: string | null; deferredTools?: string | null } = {},
+  /** Guidelines of `codemode` and of the deferred tools (codemode.ts), and the request-type guide (tool-guide.ts). */
+  tooling: { codemode?: string | null; deferredTools?: string | null; intentGuide?: string | null } = {},
 ): string {
   const thinkingLanguageName = languageName(thinkingLanguage);
   return [
@@ -65,6 +65,7 @@ export function buildSystemPrompt(
     "- The exception is `qdash_run_agent_session_step` and `qdash_request_agent_human`: they run at once, without a card, because the user already approved the agent session (autonomy auto) they act in; they refuse anything outside that session. `qdash_record_agent_decision` also runs without a card: it only appends your reading of a result to the audit of a session you created. `qdash_record_calibration_decision` does the same for a calibration session you created; each `qdash_run_pipeline` it plans still waits for its own card. `qdash_commit_agent_session_update` runs without a card only in a session whose approval granted parameter updates (`policy.parameter_updates`): it commits a candidate of a result you assess as pass, within that grant; for a failed, uncertain, or unexplained result commit nothing and call `qdash_request_agent_human`. A stopped conversation does not continue by itself: after an expert answers, continue when the user asks, or while a `qdash_wait_agent_intervention` you started is still waiting.",
     "- Recording a decision with `nextAction` `stop` or `complete` changes no session state. To stop or finish an agent session, call `qdash_end_agent_session` (it shows a card); say a session is stopped or completed only when its result reports that status, report what it lists as still running as running (QDash does not cancel a measurement already sent), and link the session page it returns.",
     `- Reason internally in ${thinkingLanguageName}. ${responseInstruction(responseLanguage)}`,
+    ...(tooling.intentGuide ? ["", "Tools by request type:", tooling.intentGuide] : []),
     ...(toolGuide
       ? [
           "",

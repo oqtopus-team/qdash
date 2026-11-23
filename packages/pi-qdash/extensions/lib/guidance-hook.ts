@@ -14,6 +14,7 @@ import {
   TOOL_SEARCH_TOOL_NAME,
   toolRoutingNames,
 } from "./qdash-guidance.js";
+import { intentRoutingGuide } from "./tool-intents.js";
 
 /**
  * pi CLI integration of the shared QDash guidance (qdash-guidance.ts).
@@ -72,10 +73,11 @@ export function buildQDashGuidanceSection(
   if (!reachable.some((name) => name.startsWith("qdash_"))) return null;
   const guide = skillMarkdown ? extractToolRouting(skillMarkdown, reachable) : null;
   const routing = guide ? markDeferredTools(guide, deferred) : null;
+  const byRequest = intentRoutingGuide(reachable, deferred);
   const scripts = availableTools.includes(CODEMODE_TOOL_NAME) && availableTools.some((name) => name.startsWith("qdash_"));
   const deferredRule = deferredToolsGuideline(
     deferred.filter((name) => name.startsWith("qdash_")),
-    toolRoutingNames(routing),
+    new Set([...toolRoutingNames(routing), ...toolRoutingNames(byRequest)]),
   );
   const orchestrationRules = [...(scripts ? [QDASH_SCRIPT_GUIDELINE] : []), ...(deferredRule ? [deferredRule] : [])];
   return [
@@ -86,6 +88,7 @@ export function buildQDashGuidanceSection(
     "",
     "Plain-language requests:",
     ...requestPolicyBullets(),
+    ...(byRequest ? ["", "QDash tools by request type:", byRequest] : []),
     ...(routing ? ["", "QDash tool routing:", routing] : []),
     ...(orchestrationRules.length ? ["", "QDash scripts and tool loading:", ...orchestrationRules] : []),
   ].join("\n");

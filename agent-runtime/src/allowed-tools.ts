@@ -34,6 +34,7 @@ export const ALLOWED_TOOL_NAMES = [
   "qdash_get_task_figures",
   "qdash_get_task_knowledge",
   "qdash_get_task_result",
+  "qdash_get_task_result_evidence",
   "qdash_get_timeseries",
   "qdash_inspect_timeseries_csv",
   "qdash_investigate",

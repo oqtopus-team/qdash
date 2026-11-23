@@ -21,6 +21,7 @@ Prefer the dedicated tool that matches the question. Use `qdash_query` only as a
    - `qdash_get_timeseries` — inspect one target metric over time
    - `qdash_inspect_timeseries_csv`, `qdash_compare_timeseries` — validate and compare multiple QDash or CSV timeseries
    - `qdash_list_task_results`, `qdash_get_task_result` — find and inspect calibration results
+   - `qdash_get_task_result_evidence` — diagnose one result with its execution, the stored values of its target, and a cooldown you name; missing context is reported, never inferred
    - `qdash_get_task_knowledge` — interpret a task's purpose, expected result, failure modes, and check questions
    - `qdash_list_flows`, `qdash_get_flow` — list or inspect calibration flows
    - `qdash_validate_metric_script`, `qdash_preview_metric_script` — check and preview a metric script on a chip; they run the code on the server but save nothing (see the `qdash-metric-scripts` skill)
