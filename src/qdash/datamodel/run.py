@@ -104,31 +104,18 @@ class RunAdmission(StrEnum):
 class RunAssociation(StrEnum):
     """How a run came to belong to its calibration session, or that it belongs to none.
 
-    ``explicit``: the request named the session. ``automatic``: QDash created or chose an
-    automatic session for it because automatic grouping was on. ``agent_session``: an agent
-    action's run, in the calibration session its agent session was admitted to. ``none``: the
-    run joins no session (automatic grouping was off and the request named none, or the
-    agent session it serves has no calibration session).
+    ``explicit``: the request named the session. ``automatic``: the request named none, so
+    QDash created or chose an automatic session for it. ``agent_session``: an agent action's
+    run, in the calibration session its agent session was admitted to. ``none``: the run joins
+    no session. QDash records it only for an action of an agent session that has no
+    calibration session (one created before agent sessions were grouped); a run recorded
+    earlier may also carry it, and is read as it is.
     """
 
     EXPLICIT = "explicit"
     AUTOMATIC = "automatic"
     AGENT_SESSION = "agent_session"
     NONE = "none"
-
-
-class CalibrationSessionGrouping(StrEnum):
-    """Deployment setting: whether QDash groups runs that name no calibration session.
-
-    ``automatic`` (the default): a run started without a calibration session ID, and an agent
-    session started without one, gets an automatic session of its own. ``explicit``: they
-    join no session; only a run or agent session that names a session joins one. Either way a
-    named session is checked and reserved before anything starts, and a refusal is returned,
-    never turned into an ungrouped run.
-    """
-
-    AUTOMATIC = "automatic"
-    EXPLICIT = "explicit"
 
 
 class RunIdentity(BaseModel):

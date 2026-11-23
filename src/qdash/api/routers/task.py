@@ -107,8 +107,7 @@ async def quick_run_task(
     """Execute one task without requiring a previous execution snapshot.
 
     The run is recorded before it is launched. It joins ``calibration_session_id`` when given;
-    otherwise an automatic calibration session when the server groups runs automatically, or
-    none.
+    otherwise an automatic calibration session created for it.
     """
     task, backend_name = resolve_catalog_task(task_file_service, task_name, body.backend_name)
 

@@ -635,8 +635,7 @@ async def re_execute_task_result(
             description=(
                 "Add the run to this calibration session (open, on the task's chip, created "
                 "by the signed-in user); otherwise the request is refused before anything "
-                "starts. Without it, the run joins an automatic session when the server groups "
-                "runs automatically, or none."
+                "starts. Without it, the run joins an automatic session created for it."
             ),
             embed=True,
             min_length=1,

@@ -323,15 +323,29 @@ class TestSavedWorkflowRun:
         assert [r["executions_total"] for r in row["pipeline_runs"]] == [2, 2]
 
 
+def _without_session(run_id: str, dispatched: dict[str, Any]) -> None:
+    """Remove a launched run's session, as a run recorded without one has none."""
+    record = CalibrationPipelineRunDocument.find_one({"run_id": run_id}).run()
+    assert record is not None and record.calibration_session_id is not None
+    CalibrationSessionDocument.get_motor_collection().delete_one(
+        {"calibration_session_id": record.calibration_session_id}
+    )
+    CalibrationPipelineRunDocument.get_motor_collection().update_one(
+        {"run_id": run_id},
+        {"$set": {"calibration_session_id": None, "association": "none"}},
+    )
+    dispatched["context"]["qdash_calibration_run"]["calibration_session_id"] = None
+
+
 @pytest.mark.usefixtures("saved")
-class TestGroupingOff:
-    """CALIBRATION_SESSION_GROUPING=explicit: runs that name no session join none."""
+class TestRunsWithoutASession:
+    """A run recorded without a calibration session keeps every guarantee.
 
-    @pytest.fixture(autouse=True)
-    def _explicit(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        from qdash.config import get_settings
-
-        monkeypatch.setattr(get_settings(), "calibration_session_grouping", "explicit")
+    QDash gives every launch that names no session an automatic one, so a run without a
+    session is history (or an action of an agent session that has none). The test launches
+    normally and then removes the run's session from its record, the session record itself,
+    and the identity handed to the worker, before the worker runs.
+    """
 
     def test_a_run_without_a_session_is_still_one_bound_replayable_run(
         self,
@@ -344,12 +358,11 @@ class TestGroupingOff:
         )
         assert response.status_code == 200, response.text
         body = response.json()
-        assert body["calibration_session_id"] is None
         run_id = body["calibration_run_id"]
         [run] = coordinator.runs
         handed = run["context"]["qdash_calibration_run"]
-        assert handed["run_id"] == run_id and handed["calibration_session_id"] is None
         assert handed["dispatch_token"] and handed["dispatch_token"] not in response.text
+        _without_session(run_id, run)
 
         _run_as_worker(run, monkeypatch, flow_run_id="flow-run-1")
 
@@ -405,29 +418,31 @@ class TestGroupingOff:
             assert response.status_code in (404, 409), response.text
         assert coordinator.runs == []
         assert CalibrationPipelineRunDocument.find_all().count() == 0
+        # Refused, never turned into a run of an automatic session.
+        assert CalibrationSessionDocument.find_all().count() == 1
 
-    def test_history_recorded_while_grouping_was_on_stays_readable(
+    def test_grouped_runs_and_runs_without_a_session_read_side_by_side(
         self,
         test_client: TestClient,
         coordinator: _RecordingCoordinator,  # noqa: F811
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        from qdash.config import get_settings
-
-        monkeypatch.setattr(get_settings(), "calibration_session_grouping", "automatic")
         grouped = test_client.post(
             f"/flows/{FLOW_NAME}/execute", headers=HEADERS, json={"idempotency_key": "before"}
         ).json()
         _run_as_worker(coordinator.runs[-1], monkeypatch, flow_run_id="flow-run-1")
-        monkeypatch.setattr(get_settings(), "calibration_session_grouping", "explicit")
         from qdash.workflow.service._internal import run_identity
 
         run_identity._resolved.clear()
         ungrouped = test_client.post(
             f"/flows/{FLOW_NAME}/execute", headers=HEADERS, json={"idempotency_key": "after"}
         ).json()
+        _without_session(ungrouped["calibration_run_id"], coordinator.runs[-1])
         _run_as_worker(coordinator.runs[-1], monkeypatch, flow_run_id="flow-run-2")
-        assert ungrouped["calibration_session_id"] is None
+        recorded = CalibrationPipelineRunDocument.find_one(
+            {"run_id": ungrouped["calibration_run_id"]}
+        ).run()
+        assert recorded is not None and recorded.calibration_session_id is None
 
         session_id = grouped["calibration_session_id"]
         detail = test_client.get(f"/calibration-sessions/{session_id}", headers=HEADERS).json()

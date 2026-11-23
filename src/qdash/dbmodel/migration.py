@@ -38,7 +38,7 @@ Run migrations with:
     python -m qdash.dbmodel.migration migrate-forum-status          # dry-run
     python -m qdash.dbmodel.migration migrate-forum-status --execute  # execute
 
-    python -m qdash.dbmodel.migration prepare-run-scope          # dry-run
+    python -m qdash.dbmodel.migration prepare-run-scope          # dry-run (optional cleanup)
     python -m qdash.dbmodel.migration prepare-run-scope --execute --writers-quiesced
 
     python -m qdash.dbmodel.migration run          # dry-run all pending migrations
@@ -1790,13 +1790,15 @@ def migrate_prepare_run_scope(
 ) -> dict[str, Any]:
     """Drop the unique index runs were keyed by before they had a scope.
 
-    Runs recorded by this release are kept unique by ``RUN_SCOPE_INDEX``: project and
-    idempotency scope, unique only where the scope is a string. The API and the worker
-    create it at start-up. The earlier unique index, ``(project_id, calibration_session_id,
-    idempotency_key)``, holds every run without a calibration session to one shared null
-    session, so once automatic grouping is off it refuses two users' runs with the same key.
-    This release never relies on it: a run recorded before scopes existed is found by its
-    original scope with an ordinary query, and is never inserted again.
+    Optional cleanup; no deployment step requires it. Runs recorded by this release are kept
+    unique by ``RUN_SCOPE_INDEX``: project and idempotency scope, unique only where the scope
+    is a string. The API and the worker create it at start-up. The earlier unique index,
+    ``(project_id, calibration_session_id, idempotency_key)``, holds every run without a
+    calibration session to one shared null session. This release never relies on it, and no
+    run it records collides on it: a run that names no session gets an automatic one, and a
+    run recorded without one (an action of an agent session that has none) is keyed by its
+    action. A run recorded before scopes existed is found by its original scope with an
+    ordinary query, and is never inserted again.
 
     The earlier index is dropped only when every check passes, read again just before the
     drop:
@@ -2349,10 +2351,7 @@ if __name__ == "__main__":
 
     run_scope_parser = subparsers.add_parser(
         "prepare-run-scope",
-        help=(
-            "Drop the unique index of the earlier run scope; required before "
-            "CALIBRATION_SESSION_GROUPING=explicit"
-        ),
+        help="Optionally drop the unused unique index of the earlier run scope",
     )
     run_scope_parser.add_argument(
         "--execute",

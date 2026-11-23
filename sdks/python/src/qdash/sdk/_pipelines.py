@@ -106,8 +106,7 @@ class Pipelines:
         :meth:`PipelineRun.wait` to follow it.
 
         The run is recorded before it is launched. It joins ``calibration_session_id`` when
-        given; otherwise an automatic session when the server groups runs automatically, or
-        none. A retry with the same ``idempotency_key`` returns the recorded run
+        given; otherwise an automatic session created for it. A retry with the same ``idempotency_key`` returns the recorded run
         instead of starting another; without a key every call starts a new run. Grouping
         grants nothing.
 

@@ -1167,7 +1167,7 @@ export function useGetFlowExecutionPlan<TData = Awaited<ReturnType<typeof getFlo
  *
  * The run is recorded before it is launched. It joins ``calibration_session_id`` when given
  * (refused before launch if that session cannot take it); otherwise an automatic session
- * when the server groups runs automatically, or none. Every step execution of the run
+ * created for it. Every step execution of the run
  * carries the run ID, and the session ID when it has one. ``idempotency_key`` makes a retry
  * return the recorded run instead of starting another.
  * @summary Execute a flow

@@ -73,8 +73,7 @@ Task results store the worker-resolved plan digest in `invocation.plan_digest`, 
 when the worker deployment is not registered.
 
 `execute` records the run before it is launched. It joins `calibration_session_id` when given;
-otherwise an automatic calibration session when the server groups runs automatically (the
-default), or none. A retry with the same
+otherwise an automatic calibration session created for it. A retry with the same
 `idempotency_key` returns the recorded run (`replayed: true`) instead of starting another;
 without a key every request starts a new run. The response adds `calibration_session_id`,
 `calibration_run_id`, and `pipeline_run_id`, and every step execution carries the run in

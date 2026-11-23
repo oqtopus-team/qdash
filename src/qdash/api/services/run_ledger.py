@@ -5,14 +5,15 @@ makes the launch safe: the request hash a retry must repeat, the idempotency sco
 found by, the dispatch token of the attempt that holds the launch, the attempt's admission, the
 dispatch outcome, and the response a retry gets back. A calibration session is an optional
 association: a request that names one is checked and reserved in it before anything starts,
-and with automatic grouping on, a request that names none gets an automatic one. Neither the
+and a request that names none gets an automatic one. Neither the
 session's existence nor its state is read to decide whether a recorded run may be replayed,
 retried, or carried out.
 
 A launch with a session is four writes: a reservation pushed into the open session (the
 session's admission control), the run (``admission`` ``pending``), the removal of the
 reservation by the same request (``finalize``), and the run's ``admission`` ``admitted``. Only
-then is the flow run created. A launch without a session writes the run already admitted.
+then is the flow run created. A run recorded without a session (an action of an agent session
+that has none) is written already admitted.
 A close of the session between these writes either refuses the run before it launches or, once
 it was admitted, leaves it alone: closing a session stops new runs from joining it and never
 invalidates one already admitted.
@@ -55,7 +56,6 @@ from qdash.repository.run_ledger import (
     RunMismatch,
     RunScopeIndexConflict,
     agent_action_scope,
-    automatic_grouping,
     insert_run,
     key_scope,
 )
@@ -124,10 +124,10 @@ def pipeline_request_hash(
 def scoped_request_hash(request_hash: str, calibration_session_id: str | None) -> str:
     """The hash a run recorded with a scope stores: the request and the session it named.
 
-    A request that names no session hashes as the request alone, so its retry matches
-    whichever session automatic grouping gave it, or none, even if grouping changed between
-    the attempts. A request that names one also hashes that session, so the same key with
-    another session, or without one, is a different request.
+    A request that names no session hashes as the request alone, so its retry matches the
+    automatic session the first attempt was given, or none for a run recorded without one. A
+    request that names one also hashes that session, so the same key with another session, or
+    without one, is a different request.
     """
     if calibration_session_id is None:
         return request_hash
@@ -186,9 +186,8 @@ class RunLedger:
         key), wherever the run was grouped, and gets the recorded answer. Otherwise the run is
         new: with ``calibration_session_id`` it joins that session, which must be the
         signed-in user's, open, and on the run's chip, or the request is refused before
-        anything is recorded or launched. Without one it joins an automatic session while
-        automatic grouping is on, and no session while it is off. Without a key, every request
-        is a new run, as an unkeyed request always was a new launch.
+        anything is recorded or launched. Without one it joins an automatic session. Without a
+        key, every request is a new run, as an unkeyed request always was a new launch.
 
         The request is validated before an automatic session is created, so a refused request
         leaves nothing behind.
@@ -224,7 +223,7 @@ class RunLedger:
                 decision_id=decision_id,
             )
 
-        session: CalibrationSessionDocument | None
+        session: CalibrationSessionDocument
         if calibration_session_id is not None:
             # Checked before anything is validated or recorded: a session that does not exist,
             # is another user's, or is on another chip refuses the request here, and one that
@@ -240,7 +239,7 @@ class RunLedger:
                 )
             association = RunAssociation.EXPLICIT
             validated = validate()
-        elif automatic_grouping():
+        else:
             validated = validate()
             try:
                 session = insert_or_load_automatic_session(
@@ -253,11 +252,7 @@ class RunLedger:
             except RunMismatch as exc:
                 raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
             association = RunAssociation.AUTOMATIC
-        else:
-            validated = validate()
-            session = None
-            association = RunAssociation.NONE
-        session_id = session.calibration_session_id if session is not None else None
+        session_id = session.calibration_session_id
         self._check_decision(project_id, session_id, decision_id, validated, session=session)
         return await self._attempt(
             existing=None,

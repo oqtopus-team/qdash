@@ -730,8 +730,7 @@ class QDashClient:
         """Run a saved flow; ``parameters`` override its saved defaults for this run only.
 
         The run is recorded before it is launched. It joins ``calibration_session_id`` when
-        given; otherwise an automatic calibration session when the server groups runs
-        automatically (the default), or none. The response names the run, and its session
+        given; otherwise an automatic calibration session created for it. The response names the run, and its session
         when it has one. ``idempotency_key`` makes a retry return the recorded run
         instead of starting another; without one every call starts a new run.
         """
@@ -902,7 +901,7 @@ class QDashClient:
         A spec with problems raises :class:`QDashValidationError` (422) whose ``payload`` holds
         the server's problem list; nothing is dispatched. The run is recorded before it is
         launched. It joins ``calibration_session_id`` when given; otherwise an automatic
-        session when the server groups runs automatically, or none. A retry with the same ``idempotency_key`` returns the
+        session created for it. A retry with the same ``idempotency_key`` returns the
         recorded run; without a key every call starts a new run.
         ``decision_id`` names the decision of that session the run carries out; it needs
         ``calibration_session_id``. A response that does not echo the decision means the link

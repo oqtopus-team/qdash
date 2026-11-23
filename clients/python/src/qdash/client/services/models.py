@@ -1103,7 +1103,7 @@ class BodyLogin(BaseModel):
 class CalibrationSessionId(RootModel[str]):
     root: Annotated[str, Field(max_length=200, min_length=1, title="Calibration Session Id")]
     """
-    Add the run to this calibration session (open, on the task's chip, created by the signed-in user); otherwise the request is refused before anything starts. Without it, the run joins an automatic session when the server groups runs automatically, or none.
+    Add the run to this calibration session (open, on the task's chip, created by the signed-in user); otherwise the request is refused before anything starts. Without it, the run joins an automatic session created for it.
     """
 
 
@@ -1133,7 +1133,7 @@ class BodyReExecuteTaskResult(BaseModel):
         CalibrationSessionId | None, Field(title="Calibration Session Id")
     ] = None
     """
-    Add the run to this calibration session (open, on the task's chip, created by the signed-in user); otherwise the request is refused before anything starts. Without it, the run joins an automatic session when the server groups runs automatically, or none.
+    Add the run to this calibration session (open, on the task's chip, created by the signed-in user); otherwise the request is refused before anything starts. Without it, the run joins an automatic session created for it.
     """
     idempotency_key: Annotated[IdempotencyKey | None, Field(title="Idempotency Key")] = None
     """
@@ -1844,7 +1844,7 @@ class PreviousInterventionId(RootModel[str]):
 class CalibrationSessionId1(RootModel[str]):
     root: Annotated[str, Field(max_length=200, min_length=1, title="Calibration Session Id")]
     """
-    Create the session in this calibration session, which must be open, on the same chip, and created by the signed-in user. It groups the session with the objective's other work and grants nothing beyond the policy. Without it, the session joins an automatic calibration session when the server groups runs automatically, or none.
+    Create the session in this calibration session, which must be open, on the same chip, and created by the signed-in user. It groups the session with the objective's other work and grants nothing beyond the policy. Without it, the session joins an automatic calibration session created for it.
     """
 
 
@@ -2382,7 +2382,7 @@ class ExecuteAgentActionRequest(BaseModel):
 class CalibrationSessionId2(RootModel[str]):
     root: Annotated[str, Field(max_length=200, min_length=1, title="Calibration Session Id")]
     """
-    Add the run to this calibration session, which must exist, be open, be on the run's chip, and be created by the signed-in user; otherwise the request is refused before anything starts. It groups the run with the session's other work and grants nothing. Without it, the run joins an automatic session when the server groups runs automatically (the default), or no session when it does not.
+    Add the run to this calibration session, which must exist, be open, be on the run's chip, and be created by the signed-in user; otherwise the request is refused before anything starts. It groups the run with the session's other work and grants nothing. Without it, the run joins an automatic session created for it.
     """
 
 
@@ -5006,7 +5006,7 @@ class QuickRunTaskRequest(BaseModel):
         CalibrationSessionId2 | None, Field(title="Calibration Session Id")
     ] = None
     """
-    Add the run to this calibration session, which must exist, be open, be on the run's chip, and be created by the signed-in user; otherwise the request is refused before anything starts. It groups the run with the session's other work and grants nothing. Without it, the run joins an automatic session when the server groups runs automatically (the default), or no session when it does not.
+    Add the run to this calibration session, which must exist, be open, be on the run's chip, and be created by the signed-in user; otherwise the request is refused before anything starts. It groups the run with the session's other work and grants nothing. Without it, the run joins an automatic session created for it.
     """
     idempotency_key: Annotated[IdempotencyKey1 | None, Field(title="Idempotency Key")] = None
     """
@@ -8315,7 +8315,7 @@ class CreateAgentSessionRequest(BaseModel):
         CalibrationSessionId1 | None, Field(title="Calibration Session Id")
     ] = None
     """
-    Create the session in this calibration session, which must be open, on the same chip, and created by the signed-in user. It groups the session with the objective's other work and grants nothing beyond the policy. Without it, the session joins an automatic calibration session when the server groups runs automatically, or none.
+    Create the session in this calibration session, which must be open, on the same chip, and created by the signed-in user. It groups the session with the objective's other work and grants nothing beyond the policy. Without it, the session joins an automatic calibration session created for it.
     """
 
 
@@ -8793,7 +8793,7 @@ class ExecuteFlowRequest(BaseModel):
         CalibrationSessionId2 | None, Field(title="Calibration Session Id")
     ] = None
     """
-    Add the run to this calibration session, which must exist, be open, be on the run's chip, and be created by the signed-in user; otherwise the request is refused before anything starts. It groups the run with the session's other work and grants nothing. Without it, the run joins an automatic session when the server groups runs automatically (the default), or no session when it does not.
+    Add the run to this calibration session, which must exist, be open, be on the run's chip, and be created by the signed-in user; otherwise the request is refused before anything starts. It groups the run with the session's other work and grants nothing. Without it, the run joins an automatic session created for it.
     """
     idempotency_key: Annotated[IdempotencyKey1 | None, Field(title="Idempotency Key")] = None
     """
@@ -8819,7 +8819,7 @@ class ExecutePipelineRequest(BaseModel):
         CalibrationSessionId2 | None, Field(title="Calibration Session Id")
     ] = None
     """
-    Add the run to this calibration session, which must exist, be open, be on the run's chip, and be created by the signed-in user; otherwise the request is refused before anything starts. It groups the run with the session's other work and grants nothing. Without it, the run joins an automatic session when the server groups runs automatically (the default), or no session when it does not.
+    Add the run to this calibration session, which must exist, be open, be on the run's chip, and be created by the signed-in user; otherwise the request is refused before anything starts. It groups the run with the session's other work and grants nothing. Without it, the run joins an automatic session created for it.
     """
     idempotency_key: Annotated[IdempotencyKey1 | None, Field(title="Idempotency Key")] = None
     """

@@ -2,8 +2,9 @@
 
 The ledger is driven directly with the real ``CalibrationSessionService`` and an in-memory
 MongoDB; ``validate`` and ``dispatch`` are stubs that record what they were given, so a test
-can tell whether anything was launched. Grouping is switched with the deployment setting, as
-an operator would.
+can tell whether anything was launched. A request that names no session gets an automatic
+one; runs recorded without a session (history, or actions of an agent session that has none) are
+inserted directly, so the run's guarantees are shown not to depend on a session.
 """
 
 from __future__ import annotations
@@ -19,7 +20,6 @@ from qdash.api.schemas.flow import ExecuteFlowResponse
 from qdash.api.services.calibration_session_service import CalibrationSessionService
 from qdash.api.services.run_ledger import RunLedger, run_request_hash, scoped_request_hash
 from qdash.common.utils.datetime import now
-from qdash.config import get_settings
 from qdash.datamodel.calibration_session import CalibrationChildKind, CalibrationSessionStatus
 from qdash.datamodel.run import (
     RunAdmission,
@@ -31,26 +31,20 @@ from qdash.datamodel.run import (
 from qdash.dbmodel.calibration_session import CalibrationSessionDocument
 from qdash.dbmodel.migration import migrate_prepare_run_scope
 from qdash.dbmodel.run import LEGACY_SESSION_KEY_INDEX, RUN_COLLECTION, RunDocument
-from qdash.repository.calibration_run import automatic_session_id_for_key
+from qdash.repository.calibration_run import (
+    automatic_session_id_for_flow_run,
+    automatic_session_id_for_key,
+)
 from qdash.repository.run_ledger import (
     RunMismatch,
     bind_flow_run,
     key_scope,
     record_worker_run,
+    run_id_for_flow_run,
 )
 
 PROJECT = "p"
 CHIP = "c"
-
-
-@pytest.fixture
-def grouping(monkeypatch: pytest.MonkeyPatch) -> Any:
-    """Set CALIBRATION_SESSION_GROUPING for the test, as the deployment would."""
-
-    def set_mode(mode: str) -> None:
-        monkeypatch.setattr(get_settings(), "calibration_session_grouping", mode)
-
-    return set_mode
 
 
 class _Launcher:
@@ -131,35 +125,71 @@ def _bind(identity: RunIdentity, flow_run_id: str = "fr-1", **overrides: Any) ->
     return bind_flow_run(identity, flow_run_id=flow_run_id, **{**fields, **overrides})
 
 
-class TestGroupingOff:
+def _sessionless_run(
+    run_id: str = "cpr-alone",
+    *,
+    key: str = "k-1",
+    status: RunDispatchStatus = RunDispatchStatus.DISPATCHED,
+    flow_run_id: str | None = "fr-alone",
+) -> RunDocument:
+    """A run recorded without a calibration session, as history or an agent action has one."""
+    doc = RunDocument(
+        run_id=run_id,
+        project_id=PROJECT,
+        association=RunAssociation.NONE,
+        chip_id=CHIP,
+        run_kind=RunKind.WORKFLOW,
+        idempotency_key=key,
+        idempotency_scope=key_scope("alice", key),
+        request_hash=scoped_request_hash(run_request_hash(RunKind.WORKFLOW, CHIP, {"a": 1}), None),
+        requested_by="alice",
+        status=status,
+        dispatch_token="t-alone",
+        admission=RunAdmission.ADMITTED,
+        flow_run_id=flow_run_id,
+        response=(
+            {
+                "execution_id": flow_run_id,
+                "flow_run_id": flow_run_id,
+                "flow_run_url": "",
+                "qdash_ui_url": "",
+                "message": "started",
+            }
+            if status == RunDispatchStatus.DISPATCHED
+            else None
+        ),
+    )
+    doc.insert()
+    return doc
+
+
+class TestAutomaticSession:
     @pytest.mark.asyncio
-    async def test_a_run_naming_no_session_joins_none_and_keeps_every_guarantee(
-        self, launch: _Launcher, grouping: Any
+    async def test_a_run_naming_no_session_gets_an_automatic_one_and_keeps_every_guarantee(
+        self, launch: _Launcher
     ) -> None:
-        grouping("explicit")
         first = await launch()
-        assert first.calibration_session_id is None and not first.replayed
+        automatic = automatic_session_id_for_key(PROJECT, "alice", "k-1")
+        assert first.calibration_session_id == automatic and not first.replayed
         run = _run(first.run_id)
-        assert run.calibration_session_id is None
-        assert run.association == RunAssociation.NONE
+        assert run.calibration_session_id == automatic
+        assert run.association == RunAssociation.AUTOMATIC
         assert run.admission == RunAdmission.ADMITTED
         assert run.idempotency_scope == key_scope("alice", "k-1")
-        assert CalibrationSessionDocument.find_all().count() == 0
+        assert CalibrationSessionDocument.find_all().count() == 1
 
         # The flow run QDash created binds the run with the token it was handed.
         [identity] = launch.dispatched
-        assert identity.calibration_session_id is None
+        assert identity.calibration_session_id == automatic
         assert _bind(identity) == identity
-        # A retry is the recorded answer, not a second launch.
+        # A retry is the recorded answer, not a second launch or a second session.
         again = await launch()
         assert again.replayed and again.run_id == first.run_id
         assert len(launch.dispatched) == 1
+        assert CalibrationSessionDocument.find_all().count() == 1
 
     @pytest.mark.asyncio
-    async def test_an_unknown_outcome_without_a_session_is_never_launched_again(
-        self, launch: _Launcher, grouping: Any
-    ) -> None:
-        grouping("explicit")
+    async def test_an_unknown_outcome_is_never_launched_again(self, launch: _Launcher) -> None:
         launch.fail_with = HTTPException(status_code=500, detail="Prefect timed out")
         with pytest.raises(HTTPException) as failed:
             await launch()
@@ -170,6 +200,27 @@ class TestGroupingOff:
         assert retried.value.status_code == 409 and "unknown" in str(retried.value.detail)
         assert launch.dispatched == []
 
+    def test_the_worker_records_an_unlaunched_flow_run_in_an_automatic_session(
+        self, init_db: Any
+    ) -> None:
+        fields: dict[str, Any] = {
+            "project_id": PROJECT,
+            "chip_id": CHIP,
+            "username": "alice",
+            "flow_run_id": "fr-9",
+            "flow_name": "nightly",
+            "run_name": "nightly",
+            "auto_scheduled": True,
+        }
+        identity = record_worker_run(**fields)
+        assert identity.calibration_session_id == automatic_session_id_for_flow_run("fr-9")
+        assert _run(identity.run_id).association == RunAssociation.AUTOMATIC
+        # A retry of the same flow run finds the same records.
+        assert record_worker_run(**fields) == identity
+        assert CalibrationSessionDocument.find_all().count() == 1
+
+
+class TestExplicitSession:
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
         ("prepare", "status_code"),
@@ -182,25 +233,19 @@ class TestGroupingOff:
         ids=["missing", "another-owner", "another-chip", "closed"],
     )
     async def test_a_named_session_that_cannot_take_the_run_refuses_it_before_launch(
-        self, launch: _Launcher, grouping: Any, prepare: Any, status_code: int
+        self, launch: _Launcher, prepare: Any, status_code: int
     ) -> None:
-        for mode in ("explicit", "automatic"):
-            grouping(mode)
-            RunDocument.get_motor_collection().delete_many({})
-            CalibrationSessionDocument.get_motor_collection().delete_many({})
-            prepare()
-            with pytest.raises(HTTPException) as refused:
-                await launch(session="cs-1")
-            assert refused.value.status_code == status_code
-            assert launch.dispatched == []
-            # Never turned into a run without the session.
-            assert RunDocument.find({"calibration_session_id": None}).count() == 0
+        prepare()
+        with pytest.raises(HTTPException) as refused:
+            await launch(session="cs-1")
+        assert refused.value.status_code == status_code
+        assert launch.dispatched == []
+        # Never turned into a run without the session, or into an automatic session.
+        assert RunDocument.find_all().count() == 0
+        assert CalibrationSessionDocument.find({"origin": "automatic"}).count() == 0
 
     @pytest.mark.asyncio
-    async def test_a_named_session_still_groups_its_runs(
-        self, launch: _Launcher, grouping: Any
-    ) -> None:
-        grouping("explicit")
+    async def test_a_named_session_groups_its_runs(self, launch: _Launcher) -> None:
         _manual_session()
         first = await launch(session="cs-1", key="k-1")
         second = await launch(session="cs-1", key="k-2")
@@ -209,11 +254,54 @@ class TestGroupingOff:
         session = CalibrationSessionDocument.find_one({"calibration_session_id": "cs-1"}).run()
         assert session is not None and session.child_count == 2
         assert session.pending_children == []
+        assert CalibrationSessionDocument.find_all().count() == 1
 
-    def test_the_worker_records_an_unlaunched_flow_run_without_a_session(
-        self, init_db: Any, grouping: Any
+    @pytest.mark.asyncio
+    async def test_the_same_key_with_another_session_is_a_different_request(
+        self, launch: _Launcher
     ) -> None:
-        grouping("explicit")
+        _manual_session()
+        await launch(session="cs-1")
+        with pytest.raises(HTTPException) as other:
+            await launch()
+        assert other.value.status_code == 409 and "different request" in other.value.detail
+        assert len(launch.dispatched) == 1
+
+
+class TestRunsWithoutASession:
+    """A run recorded without a session keeps every guarantee and is never regrouped."""
+
+    @pytest.mark.asyncio
+    async def test_a_retry_replays_it_without_creating_a_session(self, launch: _Launcher) -> None:
+        _sessionless_run()
+        again = await launch()
+        assert again.replayed and again.run_id == "cpr-alone"
+        assert again.calibration_session_id is None
+        assert launch.dispatched == []
+        assert CalibrationSessionDocument.find_all().count() == 0
+
+    def test_its_flow_run_binds_with_its_token(self, init_db: Any) -> None:
+        _sessionless_run(status=RunDispatchStatus.DISPATCHING, flow_run_id=None)
+        identity = RunIdentity(run_id="cpr-alone", dispatch_token="t-alone")
+        assert _bind(identity) == identity
+        assert _run("cpr-alone").flow_run_id == "fr-1"
+        assert CalibrationSessionDocument.find_all().count() == 0
+
+    def test_a_worker_run_recorded_without_one_stays_without_one(self, init_db: Any) -> None:
+        RunDocument(
+            run_id=run_id_for_flow_run("fr-9"),
+            project_id=PROJECT,
+            association=RunAssociation.NONE,
+            chip_id=CHIP,
+            idempotency_key="flow-run:fr-9",
+            idempotency_scope="flow-run:fr-9",
+            request_hash="",
+            requested_by="alice",
+            status=RunDispatchStatus.DISPATCHED,
+            dispatch_token="worker:fr-9",
+            admission=RunAdmission.ADMITTED,
+            flow_run_id="fr-9",
+        ).insert()
         identity = record_worker_run(
             project_id=PROJECT,
             chip_id=CHIP,
@@ -225,71 +313,11 @@ class TestGroupingOff:
         )
         assert identity.calibration_session_id is None
         assert CalibrationSessionDocument.find_all().count() == 0
-        # Turning grouping back on does not move a run already recorded for the flow run.
-        grouping("automatic")
-        again = record_worker_run(
-            project_id=PROJECT,
-            chip_id=CHIP,
-            username="alice",
-            flow_run_id="fr-9",
-            flow_name="nightly",
-            run_name="nightly",
-            auto_scheduled=True,
-        )
-        assert again == identity
-        assert CalibrationSessionDocument.find_all().count() == 0
-
-
-class TestGroupingChangesBetweenAttempts:
-    @pytest.mark.asyncio
-    async def test_a_retry_after_grouping_was_turned_off_replays_the_grouped_run(
-        self, launch: _Launcher, grouping: Any
-    ) -> None:
-        grouping("automatic")
-        first = await launch()
-        assert first.calibration_session_id == automatic_session_id_for_key(PROJECT, "alice", "k-1")
-        grouping("explicit")
-        again = await launch()
-        assert again.replayed
-        assert (again.run_id, again.calibration_session_id) == (
-            first.run_id,
-            first.calibration_session_id,
-        )
-        assert len(launch.dispatched) == 1
-
-    @pytest.mark.asyncio
-    async def test_a_retry_after_grouping_was_turned_on_replays_the_ungrouped_run(
-        self, launch: _Launcher, grouping: Any
-    ) -> None:
-        grouping("explicit")
-        first = await launch()
-        grouping("automatic")
-        again = await launch()
-        assert again.replayed and again.run_id == first.run_id
-        assert again.calibration_session_id is None
-        # No automatic session was created for a run that already exists.
-        assert CalibrationSessionDocument.find_all().count() == 0
-
-    @pytest.mark.asyncio
-    async def test_the_same_key_with_another_session_is_a_different_request(
-        self, launch: _Launcher, grouping: Any
-    ) -> None:
-        grouping("automatic")
-        _manual_session()
-        await launch(session="cs-1")
-        with pytest.raises(HTTPException) as other:
-            await launch()
-        assert other.value.status_code == 409 and "different request" in other.value.detail
-        assert len(launch.dispatched) == 1
 
 
 class TestScope:
     @pytest.mark.asyncio
-    @pytest.mark.parametrize("mode", ["automatic", "explicit"])
-    async def test_two_users_with_the_same_key_get_two_runs(
-        self, launch: _Launcher, grouping: Any, mode: str
-    ) -> None:
-        grouping(mode)
+    async def test_two_users_with_the_same_key_get_two_runs(self, launch: _Launcher) -> None:
         alice = await launch(username="alice")
         bob = await launch(username="bob")
         assert alice.run_id != bob.run_id and not bob.replayed
@@ -297,11 +325,9 @@ class TestScope:
         assert len(launch.dispatched) == 2
 
     @pytest.mark.asyncio
-    @pytest.mark.parametrize("mode", ["automatic", "explicit"])
     async def test_the_same_key_on_another_chip_is_refused_not_launched(
-        self, launch: _Launcher, grouping: Any, mode: str
+        self, launch: _Launcher
     ) -> None:
-        grouping(mode)
         await launch(chip_id=CHIP)
         with pytest.raises(HTTPException) as refused:
             await launch(chip_id="other")
@@ -318,9 +344,8 @@ class TestScope:
 class TestAdmissionLivesOnTheRun:
     @pytest.mark.asyncio
     async def test_a_run_admitted_to_a_session_binds_after_the_session_is_closed(
-        self, launch: _Launcher, grouping: Any
+        self, launch: _Launcher
     ) -> None:
-        grouping("automatic")
         _manual_session()
         launch.dispatched.clear()
         await launch(session="cs-1")
@@ -333,10 +358,7 @@ class TestAdmissionLivesOnTheRun:
         assert _bind(identity) == identity
 
     @pytest.mark.asyncio
-    async def test_a_run_binds_even_if_its_session_record_is_gone(
-        self, launch: _Launcher, grouping: Any
-    ) -> None:
-        grouping("automatic")
+    async def test_a_run_binds_even_if_its_session_record_is_gone(self, launch: _Launcher) -> None:
         await launch()
         [identity] = launch.dispatched
         CalibrationSessionDocument.get_motor_collection().delete_many({})
@@ -384,9 +406,8 @@ class TestAdmissionLivesOnTheRun:
 
     @pytest.mark.asyncio
     async def test_a_lost_admission_write_launches_nothing_and_the_key_may_retry(
-        self, launch: _Launcher, grouping: Any, monkeypatch: pytest.MonkeyPatch
+        self, launch: _Launcher, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        grouping("automatic")
         _manual_session()
         original = RunLedger._admit
 
@@ -452,10 +473,7 @@ class TestUpgradedRecords:
         return doc
 
     @pytest.mark.asyncio
-    async def test_a_key_of_a_named_session_still_replays_its_run(
-        self, launch: _Launcher, grouping: Any
-    ) -> None:
-        grouping("explicit")
+    async def test_a_key_of_a_named_session_still_replays_its_run(self, launch: _Launcher) -> None:
         _manual_session()
         self._legacy(session_id="cs-1")
         again = await launch(session="cs-1")
@@ -463,11 +481,9 @@ class TestUpgradedRecords:
         assert launch.dispatched == []
 
     @pytest.mark.asyncio
-    @pytest.mark.parametrize("mode", ["automatic", "explicit"])
     async def test_a_key_of_an_automatic_session_still_replays_its_run(
-        self, launch: _Launcher, grouping: Any, mode: str
+        self, launch: _Launcher
     ) -> None:
-        grouping(mode)
         self._legacy(session_id=automatic_session_id_for_key(PROJECT, "alice", "k-1"))
         again = await launch()
         assert again.replayed and again.run_id == "cpr-old"
@@ -475,9 +491,8 @@ class TestUpgradedRecords:
 
     @pytest.mark.asyncio
     async def test_a_refused_old_run_is_launched_again_in_place_with_its_admission(
-        self, launch: _Launcher, grouping: Any
+        self, launch: _Launcher
     ) -> None:
-        grouping("automatic")
         _manual_session()
         self._legacy(session_id="cs-1", status="rejected")
         again = await launch(session="cs-1")
@@ -504,8 +519,8 @@ class TestUpgradedRecords:
 
 class TestEarlierUniqueIndex:
     @pytest.mark.asyncio
-    async def test_it_refuses_runs_without_a_session_until_the_migration_drops_it(
-        self, launch: _Launcher, grouping: Any, init_db: Any
+    async def test_it_refuses_no_run_qdash_records_and_may_be_dropped_optionally(
+        self, launch: _Launcher, init_db: Any
     ) -> None:
         collection = init_db[RUN_COLLECTION]
         collection.create_index(
@@ -517,19 +532,36 @@ class TestEarlierUniqueIndex:
             unique=True,
             name=LEGACY_SESSION_KEY_INDEX,
         )
-        grouping("explicit")
-        await launch(username="alice")
-        with pytest.raises(HTTPException) as refused:
-            await launch(username="bob")
-        assert refused.value.status_code == 503
-        assert "prepare-run-scope" in refused.value.detail
-        assert len(launch.dispatched) == 1
+        # Two users with the same key: each run joins its own automatic session.
+        alice = await launch(username="alice")
+        bob = await launch(username="bob")
+        assert alice.run_id != bob.run_id and len(launch.dispatched) == 2
+        # Actions of agent sessions without a calibration session are keyed by the action.
+        for action_id in ("a-1", "a-2"):
+            run, _ = RunLedger.begin_agent_action_run(
+                project_id=PROJECT,
+                calibration_session_id=None,
+                chip_id=CHIP,
+                agent_session_id="as-old",
+                action_id=action_id,
+                requested_by="alice",
+                run_name="CheckRabi",
+            )
+            assert run.calibration_session_id is None
+            RunLedger.settle_agent_action_run(
+                run,
+                dispatched=ExecuteFlowResponse(
+                    execution_id=f"fr-{action_id}",
+                    flow_run_id=f"fr-{action_id}",
+                    flow_run_url="",
+                    qdash_ui_url="",
+                    message="started",
+                ),
+            )
 
         assert migrate_prepare_run_scope(init_db, dry_run=True)["dropped"] is False
         stats = migrate_prepare_run_scope(init_db, dry_run=False, writers_quiesced=True)
         assert stats["dropped"] is True and stats["legacy_index_present"] is True
-        bob = await launch(username="bob")
-        assert not bob.replayed and len(launch.dispatched) == 2
         rerun = migrate_prepare_run_scope(init_db, dry_run=False, writers_quiesced=True)
         assert rerun["dropped"] is False and rerun["already_dropped"] is True
 
@@ -537,9 +569,8 @@ class TestEarlierUniqueIndex:
 class TestStaleReservation:
     @pytest.mark.asyncio
     async def test_a_run_whose_request_stopped_before_launch_may_launch_again(
-        self, launch: _Launcher, grouping: Any
+        self, launch: _Launcher
     ) -> None:
-        grouping("automatic")
         _manual_session()
 
         # Record an attempt whose request stopped after reserving it, before admission.

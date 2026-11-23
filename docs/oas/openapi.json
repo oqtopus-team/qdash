@@ -5505,7 +5505,7 @@
           "calibration-pipeline"
         ],
         "summary": "Validate and run a calibration pipeline spec",
-        "description": "Runs the spec as one execution through the worker's calibration-pipeline\ndeployment. A spec with problems is rejected with 422 and the same problem\nlist that /validate returns.\n\nThe run is recorded before it is launched. It joins ``calibration_session_id``\nwhen given; otherwise an automatic calibration session when the server groups\nruns automatically, or none. ``idempotency_key`` makes a retry return the\nrecorded run instead of starting another.",
+        "description": "Runs the spec as one execution through the worker's calibration-pipeline\ndeployment. A spec with problems is rejected with 422 and the same problem\nlist that /validate returns.\n\nThe run is recorded before it is launched. It joins ``calibration_session_id``\nwhen given; otherwise an automatic calibration session created for it.\n``idempotency_key`` makes a retry return the\nrecorded run instead of starting another.",
         "operationId": "executeCalibrationPipeline",
         "security": [
           {
@@ -8656,7 +8656,7 @@
           "task"
         ],
         "summary": "Execute a single task from the task catalog",
-        "description": "Execute one task without requiring a previous execution snapshot.\n\nThe run is recorded before it is launched. It joins ``calibration_session_id`` when given;\notherwise an automatic calibration session when the server groups runs automatically, or\nnone.",
+        "description": "Execute one task without requiring a previous execution snapshot.\n\nThe run is recorded before it is launched. It joins ``calibration_session_id`` when given;\notherwise an automatic calibration session created for it.",
         "operationId": "quickRunTask",
         "security": [
           {
@@ -13695,7 +13695,7 @@
           "flow"
         ],
         "summary": "Execute a flow",
-        "description": "Execute a Flow via Prefect deployment, as one run of a calibration session.\n\nThe run is recorded before it is launched. It joins ``calibration_session_id`` when given\n(refused before launch if that session cannot take it); otherwise an automatic session\nwhen the server groups runs automatically, or none. Every step execution of the run\ncarries the run ID, and the session ID when it has one. ``idempotency_key`` makes a retry\nreturn the recorded run instead of starting another.",
+        "description": "Execute a Flow via Prefect deployment, as one run of a calibration session.\n\nThe run is recorded before it is launched. It joins ``calibration_session_id`` when given\n(refused before launch if that session cannot take it); otherwise an automatic session\ncreated for it. Every step execution of the run\ncarries the run ID, and the session ID when it has one. ``idempotency_key`` makes a retry\nreturn the recorded run instead of starting another.",
         "operationId": "executeFlow",
         "security": [
           {
@@ -25332,7 +25332,7 @@
               }
             ],
             "title": "Calibration Session Id",
-            "description": "Add the run to this calibration session (open, on the task's chip, created by the signed-in user); otherwise the request is refused before anything starts. Without it, the run joins an automatic session when the server groups runs automatically, or none."
+            "description": "Add the run to this calibration session (open, on the task's chip, created by the signed-in user); otherwise the request is refused before anything starts. Without it, the run joins an automatic session created for it."
           },
           "idempotency_key": {
             "anyOf": [
@@ -28914,7 +28914,7 @@
               }
             ],
             "title": "Calibration Session Id",
-            "description": "Create the session in this calibration session, which must be open, on the same chip, and created by the signed-in user. It groups the session with the objective's other work and grants nothing beyond the policy. Without it, the session joins an automatic calibration session when the server groups runs automatically, or none."
+            "description": "Create the session in this calibration session, which must be open, on the same chip, and created by the signed-in user. It groups the session with the objective's other work and grants nothing beyond the policy. Without it, the session joins an automatic calibration session created for it."
           }
         },
         "type": "object",
@@ -31399,7 +31399,7 @@
               }
             ],
             "title": "Calibration Session Id",
-            "description": "Add the run to this calibration session, which must exist, be open, be on the run's chip, and be created by the signed-in user; otherwise the request is refused before anything starts. It groups the run with the session's other work and grants nothing. Without it, the run joins an automatic session when the server groups runs automatically (the default), or no session when it does not."
+            "description": "Add the run to this calibration session, which must exist, be open, be on the run's chip, and be created by the signed-in user; otherwise the request is refused before anything starts. It groups the run with the session's other work and grants nothing. Without it, the run joins an automatic session created for it."
           },
           "idempotency_key": {
             "anyOf": [
@@ -31537,7 +31537,7 @@
               }
             ],
             "title": "Calibration Session Id",
-            "description": "Add the run to this calibration session, which must exist, be open, be on the run's chip, and be created by the signed-in user; otherwise the request is refused before anything starts. It groups the run with the session's other work and grants nothing. Without it, the run joins an automatic session when the server groups runs automatically (the default), or no session when it does not."
+            "description": "Add the run to this calibration session, which must exist, be open, be on the run's chip, and be created by the signed-in user; otherwise the request is refused before anything starts. It groups the run with the session's other work and grants nothing. Without it, the run joins an automatic session created for it."
           },
           "idempotency_key": {
             "anyOf": [
@@ -40279,7 +40279,7 @@
               }
             ],
             "title": "Calibration Session Id",
-            "description": "Add the run to this calibration session, which must exist, be open, be on the run's chip, and be created by the signed-in user; otherwise the request is refused before anything starts. It groups the run with the session's other work and grants nothing. Without it, the run joins an automatic session when the server groups runs automatically (the default), or no session when it does not."
+            "description": "Add the run to this calibration session, which must exist, be open, be on the run's chip, and be created by the signed-in user; otherwise the request is refused before anything starts. It groups the run with the session's other work and grants nothing. Without it, the run joins an automatic session created for it."
           },
           "idempotency_key": {
             "anyOf": [

@@ -27,14 +27,13 @@ export interface PipelineTarget {
 
 /**
  * How `Pipelines.execute` records a run, under one retry key: in a calibration session, or,
- * without one, in an automatic session when the server groups runs automatically, or in none.
+ * without one, in an automatic session created for it.
  */
 export interface PipelineRecording {
   /**
    * The calibration session to record the run in: open, on the same chip, and created by
    * the signed-in user. Grouping grants nothing; the run is still the request itself.
-   * Without it, the run joins an automatic session when the server groups runs
-   * automatically, or none.
+   * Without it, the run joins an automatic session created for it.
    */
   calibrationSessionId?: string;
   /**

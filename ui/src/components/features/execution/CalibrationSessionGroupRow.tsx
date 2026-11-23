@@ -133,7 +133,7 @@ function PipelineRunGroup({
  * One calibration session in the Execution list: the objective and what its records hold, and,
  * expanded, every run (a workflow, pipeline, or task launch) with its step executions and every
  * admitted agent session with the executions it dispatched. A run started without a session is
- * shown in the automatic session QDash created for it, if it got one; a run in no session is an
+ * shown in the automatic session QDash created for it; a run recorded without a session is an
  * ordinary execution row. Membership comes from the server's records only.
  */
 export function CalibrationSessionGroupRow({

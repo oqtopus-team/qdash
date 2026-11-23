@@ -9,10 +9,10 @@ expiry, and pause; a run the approval of its exact request and the execution loc
 relation is an explicit server record written when the child was started. Nothing is grouped
 by chip, time, tag, or chat.
 
-A run is its own durable record (``qdash.datamodel.run``); its session is an optional
-association. With automatic grouping on (the default), a run or agent session started without
-a session ID gets a session of its own (``origin`` ``automatic``), created before the launch.
-With it off (``CALIBRATION_SESSION_GROUPING=explicit``), it joins no session.
+A run is its own durable record (``qdash.datamodel.run``); its session is an association, not
+part of the run's identity. A run or agent session started without a session ID gets a session
+of its own (``origin`` ``automatic``), created before the launch; one started with a session
+ID joins that session or is refused.
 """
 
 from __future__ import annotations

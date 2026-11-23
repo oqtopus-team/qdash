@@ -14,7 +14,7 @@ The identity is read once per flow run:
 - A flow run without one (a cron or one-time schedule, or a run started in Prefect directly)
   is recorded by the worker as a run of its own, with IDs derived from the flow run, so
   every step and every retry of the flow run reaches the same records. It joins an automatic
-  session while automatic grouping is on.
+  session of its own.
 
 A failure to resolve the identity fails the step before any hardware is used: a run whose
 history cannot be attributed is not started. Outside a Prefect flow run (a local script or a

@@ -27,10 +27,10 @@ from qdash.datamodel.run import (
 RUN_COLLECTION = "calibration_pipeline_runs"
 # The unique index of the run scope (see ``RunDocument.idempotency_scope``).
 RUN_SCOPE_INDEX = "run_idempotency_scope_unique"
-# The unique index runs were keyed by before they had a scope. A run without a calibration
-# session cannot be held to it (every such run would share the null session), so
-# ``python -m qdash.dbmodel.migration prepare-run-scope`` drops it before
-# automatic grouping is turned off. It is no longer declared, so it is not created again.
+# The unique index runs were keyed by before they had a scope. It is no longer declared, so it
+# is not created again; on a database that still has it, it is harmless, because every run
+# recorded without a calibration session is keyed by its own action. The optional
+# ``python -m qdash.dbmodel.migration prepare-run-scope`` removes it.
 LEGACY_SESSION_KEY_INDEX = "project_id_1_calibration_session_id_1_idempotency_key_1"
 # Ordered keys of the two indexes above, as ``index_information()`` reports them.
 RUN_SCOPE_INDEX_KEYS = (("project_id", 1), ("idempotency_scope", 1))
@@ -64,7 +64,8 @@ class RunDocument(Document):
     whose ``note.flow_run_id`` is ``flow_run_id``.
 
     Grouping: ``calibration_session_id`` is the calibration session the run belongs to, or
-    None. Removing the association, or turning grouping off, changes none of the above.
+    None for a run recorded without one. None of the above depends on it, so the association
+    can change form later without rewriting how a run is retried or carried out.
 
     A run the worker found unrecorded (a scheduled flow run) is inserted by the worker when
     the flow starts, already ``dispatched``, with IDs derived from its flow run, so a Prefect

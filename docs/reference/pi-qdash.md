@@ -111,7 +111,7 @@ Set `QDASH_WEB_URL` when the web UI is not at the API base URL minus `/api`.
 
 ## Calibration session tools
 
-A calibration session records one calibration objective on one chip and groups the runs (workflows, pipelines, tasks) and agent sessions started in it; a run or agent session started without one gets an automatic session while the server groups runs automatically, and joins none otherwise. It grants nothing. All five tools are deferred. See [Calibration Sessions](../developer-guide/agent/calibration-sessions.md) and [Calibration Session Audit](../developer-guide/agent/calibration-session-audit.md).
+A calibration session records one calibration objective on one chip and groups the runs (workflows, pipelines, tasks) and agent sessions started in it; a run or agent session started without one gets an automatic session of its own. It grants nothing. All five tools are deferred. See [Calibration Sessions](../developer-guide/agent/calibration-sessions.md) and [Calibration Session Audit](../developer-guide/agent/calibration-session-audit.md).
 
 | Tool | Result or limit |
 | --- | --- |

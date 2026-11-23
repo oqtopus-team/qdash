@@ -1396,19 +1396,43 @@ async def test_execute_action_applies_the_workbench_override_rules(
     assert stored.execution_status == "failed"
 
 
+def test_a_session_started_without_a_calibration_session_gets_an_automatic_one(
+    service: AgentSessionService,
+) -> None:
+    session = _create_session(service)
+    assert session.calibration_session_id is not None
+    assert session.calibration_session_id.startswith("cs-auto-")
+    assert session.calibration_admission == "admitted"
+    parent = CalibrationSessionDocument.find_one(
+        {"calibration_session_id": session.calibration_session_id}
+    ).run()
+    assert parent is not None and parent.origin == "automatic"
+    assert parent.pending_children == []
+    assert CalibrationSessionDocument.find_all().count() == 1
+
+
 @pytest.mark.asyncio
-async def test_with_grouping_off_a_session_stands_alone_and_its_actions_record_runs(
+async def test_a_stand_alone_session_record_still_records_its_action_runs_without_a_session(
     service: AgentSessionService,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from qdash.config import get_settings
+    """A run's guarantees do not depend on a calibration session.
 
-    monkeypatch.setattr(get_settings(), "calibration_session_grouping", "explicit")
+    QDash no longer creates an agent session without one; the record is written directly to
+    show that the action's run is recorded and handed to the worker without a session.
+    """
     session = _create_session(service)
-    # No automatic parent and no admission to wait for: the policy is the only authority.
-    assert session.calibration_session_id is None
-    assert session.calibration_admission is None
-    assert CalibrationSessionDocument.find_all().count() == 0
+    AgentSessionDocument.get_motor_collection().update_one(
+        {"session_id": session.session_id},
+        {
+            "$set": {
+                "calibration_session_id": None,
+                "calibration_admission": None,
+                "calibration_reservation_id": None,
+            }
+        },
+    )
+    CalibrationSessionDocument.get_motor_collection().delete_many({})
     action = service.submit_action(
         project_id="project-1", session_id=session.session_id, body=_run_task_action()
     )
@@ -1443,12 +1467,9 @@ async def test_with_grouping_off_a_session_stands_alone_and_its_actions_record_r
     )
 
 
-def test_with_grouping_off_a_named_closed_calibration_session_still_refuses_the_start(
-    service: AgentSessionService, monkeypatch: pytest.MonkeyPatch
+def test_a_named_closed_calibration_session_refuses_the_start(
+    service: AgentSessionService,
 ) -> None:
-    from qdash.config import get_settings
-
-    monkeypatch.setattr(get_settings(), "calibration_session_grouping", "explicit")
     CalibrationSessionDocument(
         calibration_session_id="cs-closed",
         project_id="project-1",
@@ -1472,3 +1493,5 @@ def test_with_grouping_off_a_named_closed_calibration_session_still_refuses_the_
         )
     assert refused.value.status_code == 409
     assert AgentSessionDocument.find_all().count() == 0
+    # Refused, never turned into a session in an automatic calibration session.
+    assert CalibrationSessionDocument.find({"origin": "automatic"}).count() == 0

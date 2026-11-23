@@ -2,8 +2,8 @@
 
 Every launch path the API offers records its run before the flow run is created, so the
 worker can stamp the run (and its calibration session, if it has one) on every step
-execution. The run joins the session the request names, an automatic session while automatic
-grouping is on, or none. A pipeline launch does the same through its own router, which also
+execution. The run joins the session the request names, or an automatic session when it names
+none. A pipeline launch does the same through its own router, which also
 records decisions and the requested spec.
 """
 

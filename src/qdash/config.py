@@ -1,5 +1,4 @@
 from functools import lru_cache
-from typing import Literal
 
 from pydantic import field_validator
 from pydantic_settings import BaseSettings
@@ -37,25 +36,11 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     # Timezone
     timezone: str = "Asia/Tokyo"
-    # Whether a run or agent session started without a calibration session gets an automatic
-    # one (``automatic``) or joins none (``explicit``). Set it to the same value for the API
-    # and the workers; see ``qdash.datamodel.run.CalibrationSessionGrouping``. Before the
-    # first ``explicit`` deployment on a database with the legacy session-key index, run
-    # ``python -m qdash.dbmodel.migration prepare-run-scope --execute --writers-quiesced``.
-    calibration_session_grouping: Literal["automatic", "explicit"] = "automatic"
 
     @property
     def public_url(self) -> str:
         """Return the browser-facing QDash URL: CLIENT_URL, else the local UI port."""
         return self.client_url.rstrip("/") or f"http://localhost:{self.ui_port}"
-
-    @field_validator("calibration_session_grouping", mode="before")
-    @classmethod
-    def _empty_grouping_as_automatic(cls, value: object) -> object:
-        """Treat an unset grouping (an empty string) as the default, ``automatic``."""
-        if isinstance(value, str):
-            return value.strip().lower() or "automatic"
-        return value
 
     @field_validator("slack_forum_notification", "slack_agent_notification", mode="before")
     @classmethod

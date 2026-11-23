@@ -116,7 +116,6 @@ from qdash.repository.calibration_run import (
     automatic_objective,
     insert_or_load_automatic_session,
 )
-from qdash.repository.run_ledger import automatic_grouping
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -356,12 +355,11 @@ class AgentSessionService:
         session_id = str(uuid4())
         calibration = CalibrationSessionService()
         calibration_session_id = body.calibration_session_id
-        if calibration_session_id is None and automatic_grouping():
-            # A session started without a calibration session gets an automatic one while
-            # automatic grouping is on, so the runs its actions launch are recorded with a
-            # purpose like every other run. It is created after the checks above, and the
-            # start is reserved and admitted in it exactly as in a named one; the relation
-            # grants nothing.
+        if calibration_session_id is None:
+            # A session started without a calibration session gets an automatic one, so the
+            # runs its actions launch are recorded with a purpose like every other run. It is
+            # created after the checks above, and the start is reserved and admitted in it
+            # exactly as in a named one; the relation grants nothing.
             calibration_session_id = insert_or_load_automatic_session(
                 calibration_session_id=f"cs-auto-{uuid4().hex}",
                 project_id=project_id,
@@ -371,21 +369,16 @@ class AgentSessionService:
                     CalibrationRunKind.AGENT_ACTION, body.skill_name or ""
                 ),
             ).calibration_session_id
-        reservation = None
-        if calibration_session_id is not None:
-            # Checked and reserved in the calibration session before the session exists; the
-            # relation grants nothing, so the policy above stays the only authority.
-            reservation = calibration.reserve_child(
-                project_id=project_id,
-                calibration_session_id=calibration_session_id,
-                chip_id=body.chip_id,
-                username=username,
-                kind=CalibrationChildKind.AGENT_SESSION,
-                child_id=session_id,
-            )
-        # Without one (grouping is off and none was named) the session stands alone, with no
-        # admission to wait for, as a session created alone always did; its actions still
-        # record their runs.
+        # Checked and reserved in the calibration session before the session exists; the
+        # relation grants nothing, so the policy above stays the only authority.
+        reservation = calibration.reserve_child(
+            project_id=project_id,
+            calibration_session_id=calibration_session_id,
+            chip_id=body.chip_id,
+            username=username,
+            kind=CalibrationChildKind.AGENT_SESSION,
+            child_id=session_id,
+        )
         try:
             timestamp = now()
             doc = AgentSessionDocument(
@@ -405,41 +398,33 @@ class AgentSessionService:
                 start_notification=initial_start_notification(self.notifications.enabled),
                 calibration_session_id=calibration_session_id,
                 # Written unadmitted: no operation passes until the reservation is finalized.
-                calibration_admission=(
-                    CalibrationAdmission.PENDING if reservation is not None else None
-                ),
-                calibration_reservation_id=(
-                    reservation.reservation_id if reservation is not None else None
-                ),
+                calibration_admission=CalibrationAdmission.PENDING,
+                calibration_reservation_id=reservation.reservation_id,
                 records_runs=True,
             )
         except BaseException:
-            if reservation is not None:
-                calibration.release_child(
-                    project_id=project_id,
-                    calibration_session_id=str(calibration_session_id),
-                    reservation_id=reservation.reservation_id,
-                )
+            calibration.release_child(
+                project_id=project_id,
+                calibration_session_id=calibration_session_id,
+                reservation_id=reservation.reservation_id,
+            )
             raise
         try:
             doc.insert()
         except DuplicateKeyError:
             # Not written: nothing can run in it.
-            if reservation is not None:
-                calibration.release_child(
-                    project_id=project_id,
-                    calibration_session_id=str(calibration_session_id),
-                    reservation_id=reservation.reservation_id,
-                )
+            calibration.release_child(
+                project_id=project_id,
+                calibration_session_id=calibration_session_id,
+                reservation_id=reservation.reservation_id,
+            )
             raise
-        if reservation is None:
-            return self._session_response(doc)
         # Any other insert failure leaves the reservation pending: whether the session was
         # written is unknown, and a close reports it until it is found or acknowledged. A
         # session written meanwhile stays unadmitted until a load decides it.
         finalized = calibration.finalize_child(
             project_id=project_id,
-            calibration_session_id=str(calibration_session_id),
+            calibration_session_id=calibration_session_id,
             reservation_id=reservation.reservation_id,
             admit=True,
         )

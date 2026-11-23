@@ -28,9 +28,7 @@ from typing import Any
 from pymongo.errors import DuplicateKeyError
 
 from qdash.common.utils.datetime import now
-from qdash.config import get_settings
 from qdash.datamodel.run import (
-    CalibrationSessionGrouping,
     RunAdmission,
     RunAssociation,
     RunDispatchStatus,
@@ -63,9 +61,10 @@ class RunScopeIndexConflict(RuntimeError):
     """A run without a calibration session hit the unique index of the earlier run scope.
 
     That index (``LEGACY_SESSION_KEY_INDEX``) holds every run without a session to one
-    shared null session, so two users' runs with the same key collide on it. Nothing was
-    recorded or launched; ``python -m qdash.dbmodel.migration prepare-run-scope`` removes
-    the index.
+    shared null session. Runs QDash records without a session today (actions of an agent
+    session that has none) are keyed by their action, so they do not collide on it; this
+    reports a collision as itself, instead of as a concurrent retry, should one occur.
+    Nothing was recorded or launched.
     """
 
 
@@ -103,16 +102,6 @@ def run_kind_of_flow(flow_name: str | None) -> RunKind:
     return SYSTEM_FLOW_KINDS.get(flow_name or "", RunKind.WORKFLOW)
 
 
-def automatic_grouping() -> bool:
-    """Whether runs and agent sessions that name no calibration session get an automatic one.
-
-    A deployment setting (``CALIBRATION_SESSION_GROUPING``), never a request field: whether a
-    run is grouped is decided by the server, and a run that named a session is never
-    affected by it.
-    """
-    return get_settings().calibration_session_grouping == CalibrationSessionGrouping.AUTOMATIC.value
-
-
 def insert_run(doc: RunDocument) -> None:
     """Insert a run; a run without a session refused by the earlier index says so."""
     try:
@@ -123,10 +112,9 @@ def insert_run(doc: RunDocument) -> None:
         # either is the earlier index refusing a run without a session.
         if doc.calibration_session_id is None and not _held(doc):
             raise RunScopeIndexConflict(
-                f"Run {doc.run_id} joins no calibration session, and the database still has "
-                f"the unique index {LEGACY_SESSION_KEY_INDEX}, which refuses it. Nothing was "
-                "started. An administrator removes it with `python -m qdash.dbmodel.migration "
-                "prepare-run-scope`, after stopping every writer of runs."
+                f"Run {doc.run_id} joins no calibration session, and the unique index "
+                f"{LEGACY_SESSION_KEY_INDEX} of the earlier run scope refuses it. Nothing was "
+                "started."
             ) from exc
         raise
 
@@ -274,13 +262,13 @@ def record_worker_run(
     run_name: str,
     auto_scheduled: bool,
 ) -> RunIdentity:
-    """Record a flow run QDash did not launch, in an automatic session when grouping is on.
+    """Record a flow run QDash did not launch, in an automatic session of its own.
 
     ``username`` is the user the flow run's parameters name, which QDash wrote into the
     deployment when the schedule was saved; it is never taken from a model or a client. The
     records are keyed by the flow run, so a retry of the same flow run, or a later step of it,
     finds them instead of adding others. A run already recorded for the flow run keeps the
-    session it was recorded with, whatever grouping is now.
+    session it was recorded with, or none if it was recorded without one.
     """
     run_id = run_id_for_flow_run(flow_run_id)
     existing = RunDocument.find_one({"run_id": run_id}).run()
@@ -288,30 +276,26 @@ def record_worker_run(
         return _recorded_worker_run(existing, project_id, chip_id, username, flow_run_id)
 
     kind = run_kind_of_flow(flow_name)
-    calibration_session_id: str | None = None
-    if automatic_grouping():
-        from qdash.repository.calibration_run import (
-            automatic_objective,
-            automatic_session_id_for_flow_run,
-            insert_or_load_automatic_session,
-        )
+    from qdash.repository.calibration_run import (
+        automatic_objective,
+        automatic_session_id_for_flow_run,
+        insert_or_load_automatic_session,
+    )
 
-        calibration_session_id = insert_or_load_automatic_session(
-            calibration_session_id=automatic_session_id_for_flow_run(flow_run_id),
-            project_id=project_id,
-            chip_id=chip_id,
-            username=username,
-            objective=automatic_objective(kind, run_name),
-            child_count=1,
-        ).calibration_session_id
+    calibration_session_id = insert_or_load_automatic_session(
+        calibration_session_id=automatic_session_id_for_flow_run(flow_run_id),
+        project_id=project_id,
+        chip_id=chip_id,
+        username=username,
+        objective=automatic_objective(kind, run_name),
+        child_count=1,
+    ).calibration_session_id
     timestamp = now()
     run = RunDocument(
         run_id=run_id,
         project_id=project_id,
         calibration_session_id=calibration_session_id,
-        association=(
-            RunAssociation.AUTOMATIC if calibration_session_id is not None else RunAssociation.NONE
-        ),
+        association=RunAssociation.AUTOMATIC,
         chip_id=chip_id,
         run_kind=kind,
         trigger=RunTrigger.SCHEDULE if auto_scheduled else RunTrigger.WORKER,

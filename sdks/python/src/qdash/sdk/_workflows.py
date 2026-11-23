@@ -171,8 +171,7 @@ class Workflows:
 
         The server records the run, with every step execution, before launching it. The run
         joins ``calibration_session_id`` when given (open, on the run's chip, created by the
-        signed-in user); otherwise an automatic session when the server groups runs
-        automatically, or none. A retry with the same ``idempotency_key`` returns the
+        signed-in user); otherwise an automatic session created for it. A retry with the same ``idempotency_key`` returns the
         recorded run instead of starting another; without a key every call starts a new run.
         """
         checked = _checked_name(name)

@@ -24,8 +24,7 @@ export interface WorkflowRunOptions {
   parameters?: Record<string, unknown>;
   /**
    * Add the run to this calibration session (open, on the run's chip, created by the
-   * signed-in user). Without it, the run joins an automatic session when the server groups
-   * runs automatically, or none.
+   * signed-in user). Without it, the run joins an automatic session created for it.
    */
   calibrationSessionId?: string;
   /** A retry with the same key returns the recorded run instead of starting another. */

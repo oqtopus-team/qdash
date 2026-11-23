@@ -7,6 +7,6 @@
  */
 
 /**
- * Create the session in this calibration session, which must be open, on the same chip, and created by the signed-in user. It groups the session with the objective's other work and grants nothing beyond the policy. Without it, the session joins an automatic calibration session when the server groups runs automatically, or none.
+ * Create the session in this calibration session, which must be open, on the same chip, and created by the signed-in user. It groups the session with the objective's other work and grants nothing beyond the policy. Without it, the session joins an automatic calibration session created for it.
  */
 export type CreateAgentSessionRequestCalibrationSessionId = string | null;

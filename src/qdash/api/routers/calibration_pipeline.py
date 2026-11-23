@@ -91,8 +91,8 @@ async def execute_pipeline(
     list that /validate returns.
 
     The run is recorded before it is launched. It joins ``calibration_session_id``
-    when given; otherwise an automatic calibration session when the server groups
-    runs automatically, or none. ``idempotency_key`` makes a retry return the
+    when given; otherwise an automatic calibration session created for it.
+    ``idempotency_key`` makes a retry return the
     recorded run instead of starting another."""
 
     def validate() -> ValidatePipelineResponse:

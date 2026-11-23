@@ -31,25 +31,19 @@ gets back. `RunLedger` in `src/qdash/api/services/run_ledger.py` writes and read
 measurement data stay in `execution_history` and `task_result_history`; the run only says which
 launch they came from. `calibration_session_id` on the run is an optional association with a
 purpose. Nothing that decides whether a run may be replayed, retried, or carried out reads the
-session, so closing a session, losing its record, or turning grouping off leaves every recorded
-run valid.
+session, so closing a session or losing its record leaves every recorded run valid. The run
+and its session are separate records so that grouping can change form later without rewriting
+how a run is retried or carried out.
 
-Every launch path records its run before the flow run is created. A request that names
-`calibration_session_id` adds the run to that session. A request without one follows the
-deployment setting `CALIBRATION_SESSION_GROUPING` (`Settings.calibration_session_grouping`,
-read through `automatic_grouping` in `src/qdash/repository/run_ledger.py`):
-
-| Setting | A run or agent session that names no session | A run or agent session that names one |
-| --- | --- | --- |
-| `automatic` (default) | Joins an automatic session (`CalibrationSessionDocument.origin` `automatic`) created for it | Checked and reserved in that session, or refused |
-| `explicit` | Joins no session (`RunDocument.association` `none`) | Checked and reserved in that session, or refused |
-
-The setting is server configuration, never a request field, so a client cannot opt a run out of
-the checks of a session it names. A named session that does not exist, belongs to another user,
-is on another chip, or is closed refuses the request before anything is recorded or launched in
-either mode; QDash never turns such a request into a run without a session. An automatic session
-is an ordinary session: a later request may name it to add another run, and its creator closes
-it like any other.
+API launches with a known chip record their run before the flow run is created. The worker
+records scheduled and direct Prefect launches when they start. A request that names
+`calibration_session_id` is checked and reserved in that session, or refused. A request that
+names none joins an automatic session (`CalibrationSessionDocument.origin` `automatic`) created
+for it. A named session that does not exist, belongs to another user, is on another chip, or is
+closed refuses the request before anything is recorded or launched; QDash never turns such a
+request into a run without a session or into a run of an automatic session. An automatic
+session is an ordinary session: a later request may name it to add another run, and its creator
+closes it like any other.
 
 | Launch path | Run kind | Where the run is recorded |
 | --- | --- | --- |
@@ -95,8 +89,8 @@ Isolated workers borrow their owner's execution and stamp nothing of their own.
 
 A flow run whose context names no run was not launched through the API. The worker records it
 as a run with IDs derived from the flow run (`cpr-flow-{flow_run_id}`, scope
-`flow-run:{flow_run_id}`), in an automatic session of its own (`cs-flow-{flow_run_id}`) while
-grouping is `automatic` and in none while it is `explicit`, already `dispatched`, with `trigger` `schedule` when Prefect's
+`flow-run:{flow_run_id}`), in an automatic session of its own (`cs-flow-{flow_run_id}`),
+already `dispatched`, with `trigger` `schedule` when Prefect's
 scheduler created it from a cron schedule and `worker` otherwise. A Prefect retry of the same
 flow run, or a later step of it, inserts nothing new and keeps the session the run was recorded
 with; the next cron occurrence is a new flow run and a new run. The session's `created_by` is the user named in the flow run's parameters,
@@ -105,17 +99,16 @@ model or a client. Recording happens when the flow starts, not before Prefect cr
 run, because QDash does not create scheduled flow runs.
 
 An agent session created without `calibration_session_id` gets an automatic session in the same
-request while grouping is `automatic`, created after the chip and pause checks, and is reserved
-and admitted in it through the same steps as a named one. While grouping is `explicit` it stands
-alone with no `calibration_admission`, as a session created alone always did. Either way it is
-written with `records_runs`, and each action dispatch records a run (`cpr-action-{action_id}`,
-`admission` `admitted`) before the launch: in the calibration session the agent session was
-admitted to, or in none. The agent session remains the execution
+request, created after the chip and pause checks, and is reserved and admitted in it through the
+same steps as a named one. It is written with `records_runs`, and each action dispatch records a
+run (`cpr-action-{action_id}`, `admission` `admitted`) before the launch, in the calibration
+session the agent session was admitted to. `begin_agent_action_run` still records a run with no
+session for an agent session record that has none. The agent session remains the execution
 control: its policy, admission, budget, gates, approvals, pause, and expiry are checked in the
 same order as before, and the run grants nothing. The session detail, close checks, audit, and
 grouped list show those executions through the agent session, not as separate runs.
 
-Two launches stay outside any session. A saved flow whose chip QDash cannot tell before the
+Some legacy and non-calibration paths have different attribution. A saved flow whose chip QDash cannot tell before the
 launch (no `chip_id` in its parameters or saved flow) is launched without an identity and
 recorded by the worker on the chip it calibrates. That holds only for a request without
 `calibration_session_id` and `idempotency_key`: `launch_run` refuses either one for such a flow
@@ -156,7 +149,8 @@ A child is started in three steps, each one conditional update of one document:
    own record (`RunLedger._admit`) and is launched only after both writes succeeded; if the
    second fails, nothing is launched and the attempt is `rejected`, so the same key may retry.
 
-A run that joins no session skips all three steps and is written `admitted`.
+A run recorded without a session (see `RunAssociation.NONE`) skips all three steps and is
+written `admitted`.
 
 A failure known to have written nothing (an invalid record, a duplicate key, a refused claim)
 releases the reservation at once. Any other failure leaves it pending, so a close sees it.
@@ -310,8 +304,8 @@ backend, and decision (`pipeline_request_hash`); a workflow or task run hashes i
 and request fields (`run_request_hash`). For a request that names a session, the stored hash
 also includes that session (`scoped_request_hash`), so the same key with another session, or
 with none, is a different request. A request that names none hashes the request alone, so its
-retry replays the run whichever session automatic grouping gave it, even if the setting changed
-between the attempts.
+retry replays the run in the automatic session the first attempt was given, or a run recorded
+without a session.
 `rejected` covers only refusals raised before any flow run exists: the execution lock is held
 (409) or the worker deployment is missing (503). Any other launch error may have created a flow
 run, so the run becomes `unknown` and the API answers with the original status and a detail that
@@ -337,7 +331,7 @@ The idempotency key separates the intent from the launch. A retry is found by th
   names its session, or names none and reaches its automatic session
   (`automatic_session_id_for_key`), with the same key replays it, and a refused one is launched
   again in place. Nothing is backfilled.
-- With a key, no session, and grouping `automatic`, the automatic session's ID is derived from
+- With a key and no session, the automatic session's ID is derived from
   the project, the user, and the key (`automatic_session_id_for_key`), so two concurrent first
   requests insert one session; the second claim of the run is a 409.
 - Without a key, the server uses a key of its own (`srv-…`), so every request is a new run, as
@@ -443,13 +437,13 @@ runs it through `POST /flows/{name}/execute`, and runs the dispatched entrypoint
 backend: both step executions carry one session and one run, and the session detail, grouped
 list, execution links, and audit show them once. It also covers repeated runs in a named
 session, a cron run recorded by the worker once per flow run, a forged run identity, the
-session checks, an unknown launch, a busy chip, and, with grouping `explicit`, a run in no
-session that is still bound, stamped, and replayed, a closed or missing named session refused
-before dispatch, and history recorded while grouping was on.
-`tests/qdash/api/services/test_run_ledger.py` covers runs without a session, grouping changed
-between attempts, scope across users and chips, admission read from the run (after a close and
-without the session record), records written before scopes and admission existed, and the
-earlier unique index refusing a run until `prepare-run-scope` drops it.
+session checks, an unknown launch, a busy chip, a run whose session was removed from its record
+that is still bound, stamped, and replayed, and a closed or missing named session refused
+before dispatch.
+`tests/qdash/api/services/test_run_ledger.py` covers automatic and named sessions, runs recorded
+without a session (inserted directly), scope across users and chips, admission read from the run
+(after a close and without the session record), records written before scopes and admission
+existed, and the earlier unique index refusing none of the runs QDash records.
 `tests/qdash/dbmodel/test_prepare_run_scope.py` covers the migration: an absent replacement,
 replacement and earlier indexes with another spec, each in-flight blocker, stale and unknown
 records reported and left unchanged, a writer appearing before the recheck, a dry run, a
@@ -479,8 +473,8 @@ and `calibration-pipeline-tool.test.mjs`; the UI in
 
 ## Implementation Files
 
-- `src/qdash/datamodel/run.py`: run kinds, statuses, `RunAdmission`, `RunAssociation`,
-  `RunIdentity`, and `CalibrationSessionGrouping`
+- `src/qdash/datamodel/run.py`: run kinds, statuses, `RunAdmission`, `RunAssociation`, and
+  `RunIdentity`
 - `src/qdash/datamodel/calibration_session.py`: session statuses and reservations
 - `src/qdash/dbmodel/run.py`: `RunDocument` and its indexes
 - `src/qdash/dbmodel/calibration_session.py`: `CalibrationSessionDocument`
@@ -492,7 +486,8 @@ and `calibration-pipeline-tool.test.mjs`; the UI in
 - `src/qdash/repository/run_ledger.py`: scopes, the worker's binding, and worker run records
   shared by the API and the worker
 - `src/qdash/repository/calibration_run.py`: automatic sessions
-- `src/qdash/dbmodel/migration.py`: `prepare-run-scope`
+- `src/qdash/dbmodel/migration.py`: `prepare-run-scope`, an optional cleanup of the earlier
+  unique index
 - `src/qdash/workflow/service/_internal/run_identity.py`: the worker's stamp on every step
 - `src/qdash/api/services/calibration_session_links.py`: the Execution list's links back
 - `src/qdash/datamodel/launch_origin.py`, `src/qdash/dbmodel/pipeline_launch.py`,
@@ -546,10 +541,12 @@ dropped. Upgrade the API and the worker together: an older worker refuses an ide
 session (it fails the step before any hardware is used), and it reads admission only from the
 session.
 
-Turning automatic grouping off is a configuration change, made once every API and worker runs
-this release. The operator steps are in
-[Turn Off Automatic Calibration Session Grouping](../../user-guide/operations.md#turn-off-automatic-calibration-session-grouping);
-`migrate_prepare_run_scope` in `src/qdash/dbmodel/migration.py` enforces what it can:
+The earlier index needs no action. Every run QDash records without a session is keyed by its own
+action (`agent-action:<action_id>`) or flow run, and every request's run joins a named or an
+automatic session derived from the user and key, so no new run collides on it, and a fresh
+installation never creates it. `migrate_prepare_run_scope` in `src/qdash/dbmodel/migration.py`
+(`python -m qdash.dbmodel.migration prepare-run-scope`) is an optional cleanup that drops it; it
+is not part of `migration run`. When run, it enforces what it can:
 
 - `run_idempotency_scope_unique` must exist with exactly the keys `(project_id,
   idempotency_scope)`, `unique`, and the partial filter `{idempotency_scope: {$type: "string"}}`,
@@ -561,21 +558,16 @@ this release. The operator steps are in
   and every run recorded without a scope. Pending work and every `unknown` run block the
   drop regardless of age. Older findings appear under `unresolved_stale_or_unknown`;
   age does not prove that a request ended. Recent unscoped inserts also block the drop.
-  Reconcile findings through normal operational paths before migration; the migration
-  never clears or rewrites records to pass its checks.
+  The migration never clears or rewrites records to pass its checks.
 - `--execute` also requires `--writers-quiesced`: the operator's statement that every API,
-  worker, scheduler, agent runtime, and external client that writes runs is stopped for the
-  migration. This includes writers on the new release. The CLI cannot observe external
-  processes; its checks are evidence, not a lock. Keep writers stopped until the command
-  finishes, and restart only compatible releases afterward.
+  worker, scheduler, agent runtime, and external client that writes runs is stopped. The CLI
+  cannot observe external processes; its checks are evidence, not a lock.
 - Every check is read again immediately before `drop_index`. A rerun after the drop reports
   `already_dropped`.
 
-Until the index is dropped, a run without a session whose key another user already used in the
-project is refused with 503 before anything is recorded or launched (`RunScopeIndexConflict`).
-Turning grouping on again changes the setting only; neither direction moves, deletes, or
-regroups a recorded run, session, or execution, and `execution_history` and
-`task_result_history` are never rewritten.
+`RunScopeIndexConflict` reports a collision on the earlier index as itself (503, nothing
+recorded or launched) instead of as a concurrent retry, should one occur.
+`execution_history` and `task_result_history` are never rewritten.
 
 The run scope is not applied retroactively. A run recorded before scopes existed keeps
 `(project_id, calibration_session_id, idempotency_key)` as its scope and its unscoped
@@ -586,7 +578,8 @@ one run across sessions, while the request hash, which includes a named session,
 whether a retry repeats it.
 
 Grouping is kept separate from execution so that it can change later without rewriting
-execution data. The run owns retry, admission, and binding; a calibration session is an
+execution data; it is an architectural boundary, not an operator setting. The run owns retry,
+admission, and binding; a calibration session is an
 optional link that no replay, binding, or execution path reads for an admitted run recorded
 with `admission`, and no record is deleted with it. A later change to grouping (another policy, another kind of parent, or no
 sessions at all) can leave runs, executions, and results in place and stop writing or reading
@@ -601,12 +594,12 @@ delete association records to make an older deployment appear compatible.
 Quiescence must cover every API instance, external client, scheduler, and agent runtime that
 can start work; a one-time query while new requests continue is not a rollback barrier.
 
-A code downgrade is different from turning grouping off. A release before durable runs cannot
-load a run with a null `calibration_session_id` (grouping `explicit`, or an agent session that
-stood alone), and it re-creates the earlier unique index at start-up, which fails if two such
-runs share a key. Downgrading to it is therefore not supported once such runs exist or the
-index was dropped; no compatibility release exists for that path. A downgrade while every run
-still has a session and the earlier index is in place follows the rollback steps above.
+A release before durable runs cannot load a run with a null `calibration_session_id`, and it
+re-creates the earlier unique index at start-up. This release records such a run only for an
+agent session record without a calibration session, which it does not create. Downgrading is
+not supported once such runs exist or the optional cleanup dropped the index; no compatibility
+release exists for that path. A downgrade while every run still has a session and the earlier
+index is in place follows the rollback steps above.
 
 Check `agent_sessions.calibration_admission` for `pending`, the parents' `pending_children`,
 and `calibration_pipeline_runs` for `dispatching` or `unknown` outcomes. Use the new API's

@@ -2,8 +2,8 @@
 
 The run ledger itself (recording, binding, and the worker's checks) is
 ``qdash.repository.run_ledger``; the names it had here are re-exported below. This module only
-creates or loads the automatic session a run or agent session joins while automatic grouping
-is on. The session is a record of purpose: a run's guarantees never depend on it.
+creates or loads the automatic session a run or agent session joins when it names none. The
+session is a record of purpose: a run's guarantees never depend on it.
 """
 
 from __future__ import annotations

@@ -16,7 +16,7 @@ export interface BodyReExecuteTaskResult {
   update_params?: boolean;
   /** Run Configure (system_manager load + push) before executing the task */
   reconfigure?: boolean;
-  /** Add the run to this calibration session (open, on the task's chip, created by the signed-in user); otherwise the request is refused before anything starts. Without it, the run joins an automatic session when the server groups runs automatically, or none. */
+  /** Add the run to this calibration session (open, on the task's chip, created by the signed-in user); otherwise the request is refused before anything starts. Without it, the run joins an automatic session created for it. */
   calibration_session_id?: BodyReExecuteTaskResultCalibrationSessionId;
   /** A retry with the same key and request returns the recorded run instead of starting another. Without a key, every request starts a new run. */
   idempotency_key?: BodyReExecuteTaskResultIdempotencyKey;

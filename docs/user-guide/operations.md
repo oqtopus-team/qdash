@@ -118,67 +118,6 @@ readable after a later upgrade.
 The [admission and dispatch records](../developer-guide/agent/calibration-sessions.md#deployment-compatibility)
 explain which states must be resolved before rollback.
 
-## Turn Off Automatic Calibration Session Grouping
-
-By default QDash creates an automatic calibration session for every workflow, pipeline, task,
-or agent session started without one. Turn this off when you want runs to stay plain rows in the
-**Execution** list unless someone starts them in a calibration session on purpose. Runs keep
-their retry protection and their link to every step either way, and nothing already recorded is
-moved, regrouped, or deleted.
-
-| Setting | Meaning | Default |
-| --- | --- | --- |
-| `CALIBRATION_SESSION_GROUPING` | `automatic`: a run started without a calibration session gets one of its own. `explicit`: it joins none; a run started in a calibration session is grouped as before. | `automatic` |
-
-Fresh installations need no additional environment setting or migration: startup creates only
-the new run-scope index. To use `explicit` on a fresh installation, go directly to step 4.
-Steps 2–3 apply only to databases with the legacy session-key index from an earlier release.
-
-1. Make sure every API and workflow worker already runs the same release; finish the
-   [upgrade](#upgrade-calibration-session-support) first.
-2. Check the database. This command changes nothing; it reports whether an index used by
-   earlier releases is still present, whether the index this release relies on is correct, and
-   any launch still in progress:
-
-   ```bash
-   docker compose run --rm calibration-migration python -m qdash.dbmodel.migration prepare-run-scope
-   ```
-
-3. Stop new launches: the API, the workflow workers, the deployment service, schedules, and any
-   script or agent that starts runs. Reconcile pending and unknown work through the normal
-   recovery procedures; elapsed time alone does not resolve it. If recovery needs a service,
-   keep new launches disabled while using it. Then stop all writers, including those on the
-   new release, and repeat step 2 until it reports no blockers. Keep them stopped while
-   removing the earlier index. `--writers-quiesced` is your statement that nothing else
-   writes runs; QDash cannot verify it for processes it cannot see:
-
-   ```bash
-   docker compose run --rm calibration-migration python -m qdash.dbmodel.migration prepare-run-scope --execute --writers-quiesced
-   ```
-
-   The command deletes and rewrites no record. It refuses, and keeps the index, when the
-   replacement index is missing or different, when dispatches, reservations, or agent
-   admissions remain unresolved regardless of age, when a run was recently inserted without
-   a scope, or when the statement is missing. Running it again after it succeeded
-   changes nothing.
-4. Add `CALIBRATION_SESSION_GROUPING=explicit` to `.env`, then recreate the API and the workers
-   so they read it:
-
-   ```bash
-   docker compose up -d api user-flow-worker deployment-service
-   ```
-
-If the legacy index exists and you skip step 3, a run started without a calibration session can be refused with "Nothing
-was started" until an administrator runs it.
-
-To turn grouping back on, set the value to `automatic` (or remove the line) and recreate the
-same services. Either direction keeps every recorded run, execution, and result: runs recorded
-while grouping was off stay without a calibration session, and runs recorded while it was on
-keep theirs. Changing the setting is not a code downgrade. A QDash release from before this
-setting existed cannot read runs recorded without a calibration session, and it relies on the
-index that step 3 removed; downgrading to such a release is not supported once either has
-happened.
-
 ## Open a Database Shell
 
 MongoDB and PostgreSQL open no host port, so run their clients inside the containers with the
