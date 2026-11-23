@@ -1379,6 +1379,50 @@ class CopilotChatSteerSchema(BaseModel):
     """
 
 
+class Status2(StrEnum):
+    """
+    Whether the turn still runs, or how it ended
+    """
+
+    running = "running"
+    completed = "completed"
+    failed = "failed"
+    stopped = "stopped"
+    noop = "noop"
+
+
+class CopilotChatTurnSchema(BaseModel):
+    """
+    The latest turn the server records for a chat, as a reloaded page needs it.
+
+    A page that reattaches to a turn, or follows one another window started, finds
+    the turn's messages by ``request_id`` (each carries it as ``turn_request_id``)
+    and uses ``status`` to tell a running turn from one whose end is saved.
+    """
+
+    request_id: Annotated[str, Field(title="Request Id")]
+    """
+    The turn's request ID
+    """
+    project_id: Annotated[str | None, Field(title="Project Id")] = None
+    """
+    The project it was sent from
+    """
+    status: Annotated[Status2, Field(title="Status")]
+    """
+    Whether the turn still runs, or how it ended
+    """
+    start_index: Annotated[int, Field(title="Start Index")]
+    """
+    How many messages precede the turn
+    """
+    continuing: Annotated[bool, Field(title="Continuing")] = False
+    """
+    A continue: no user message
+    """
+    started_at: Annotated[AwareDatetime | None, Field(title="Started At")] = None
+
+
 class CopilotPreferences(BaseModel):
     """
     The current user's Copilot preferences.
@@ -1771,7 +1815,7 @@ class EvaluationFigureModel(BaseModel):
     """
 
 
-class Status2(StrEnum):
+class Status3(StrEnum):
     pending = "pending"
     running = "running"
     completed = "completed"
@@ -1909,7 +1953,7 @@ class Mode1(StrEnum):
     planner = "planner"
 
 
-class Status3(StrEnum):
+class Status4(StrEnum):
     running = "running"
     completed = "completed"
     interrupted = "interrupted"
@@ -2354,7 +2398,7 @@ class FileTreeNode(BaseModel):
     children: Annotated[list[FileTreeNode] | None, Field(title="Children")] = None
 
 
-class Status4(StrEnum):
+class Status5(StrEnum):
     """
     resolved: every run and step was read from literals. unresolved: the source decides its steps at run time; reason says why. invalid: manual rounds that cannot run were found; execution would fail before measuring.
     """
@@ -2582,7 +2626,7 @@ class FormatSourceRequest(BaseModel):
     """
 
 
-class Status5(StrEnum):
+class Status6(StrEnum):
     """
     formatted: source differs from the input; unchanged: the input is already formatted; syntax_error: the input cannot be parsed and is returned as given
     """
@@ -2597,7 +2641,7 @@ class FormatSourceResponse(BaseModel):
     The source formatted with Ruff, or the input unchanged when it cannot be parsed.
     """
 
-    status: Annotated[Status5, Field(title="Status")]
+    status: Annotated[Status6, Field(title="Status")]
     """
     formatted: source differs from the input; unchanged: the input is already formatted; syntax_error: the input cannot be parsed and is returned as given
     """
@@ -2873,7 +2917,7 @@ class AssigneeUsername(RootModel[str]):
     """
 
 
-class Status6(StrEnum):
+class Status7(StrEnum):
     """
     Thread workflow status
     """
@@ -2960,7 +3004,7 @@ class ForumPostCreate(BaseModel):
     """
     Assigned project member username
     """
-    status: Annotated[Status6, Field(title="Status")] = Status6.open
+    status: Annotated[Status7, Field(title="Status")] = Status7.open
     """
     Thread workflow status
     """
@@ -3022,7 +3066,7 @@ class AssigneeUsername1(RootModel[str]):
     """
 
 
-class Status8(StrEnum):
+class Status9(StrEnum):
     """
     Updated thread workflow status
     """
@@ -3090,7 +3134,7 @@ class ForumPostUpdate(BaseModel):
     """
     Updated assigned project member username
     """
-    status: Annotated[Status8 | None, Field(title="Status")] = None
+    status: Annotated[Status9 | None, Field(title="Status")] = None
     """
     Updated thread workflow status
     """
@@ -3481,7 +3525,7 @@ class MetricCatalogEntry(BaseModel):
     description: Annotated[str, Field(title="Description")]
 
 
-class Status9(StrEnum):
+class Status10(StrEnum):
     ok = "ok"
     missing = "missing"
     empty = "empty"
@@ -3725,7 +3769,7 @@ class Revision(RootModel[int]):
     """
 
 
-class Status10(StrEnum):
+class Status11(StrEnum):
     valid = "valid"
     invalid = "invalid"
 
@@ -3783,7 +3827,7 @@ class MetricScriptValidateRequest(BaseModel):
     source: Annotated[str, Field(max_length=262144, title="Source")]
 
 
-class Status13(StrEnum):
+class Status14(StrEnum):
     """
     ok (has a value), no_data or insufficient (a gap)
     """
@@ -3818,7 +3862,7 @@ class MetricSeriesPoint(BaseModel):
     """
     Observations behind the value
     """
-    status: Annotated[Status13, Field(title="Status")]
+    status: Annotated[Status14, Field(title="Status")]
     """
     ok (has a value), no_data or insufficient (a gap)
     """
@@ -7537,6 +7581,10 @@ class CopilotChatSessionResponse(BaseModel):
     context: Annotated[dict[str, Any] | None, Field(title="Context")] = None
     messages: Annotated[list[CopilotChatMessageSchema] | None, Field(title="Messages")] = None
     branch: CopilotChatBranchSchema | None = None
+    turn: CopilotChatTurnSchema | None = None
+    """
+    The latest turn the server records for the chat
+    """
     created_at: Annotated[AwareDatetime, Field(title="Created At")]
     updated_at: Annotated[AwareDatetime, Field(title="Updated At")]
 
@@ -7940,7 +7988,7 @@ class EvaluationItem(BaseModel):
     The task result's figures, for display
     """
     json_figure_path: Annotated[list[str] | None, Field(title="Json Figure Path")] = None
-    status: Annotated[Status2, Field(title="Status")]
+    status: Annotated[Status3, Field(title="Status")]
     requested_at: Annotated[AwareDatetime, Field(title="Requested At")]
     started_at: Annotated[AwareDatetime | None, Field(title="Started At")] = None
     completed_at: Annotated[AwareDatetime | None, Field(title="Completed At")] = None
@@ -8025,7 +8073,7 @@ class EvaluationRunSummary(BaseModel):
     requested_by: Annotated[str, Field(title="Requested By")]
     requested_at: Annotated[AwareDatetime, Field(title="Requested At")]
     completed_at: Annotated[AwareDatetime | None, Field(title="Completed At")] = None
-    status: Annotated[Status3, Field(title="Status")]
+    status: Annotated[Status4, Field(title="Status")]
     total: Annotated[int, Field(title="Total")]
     completed_count: Annotated[int, Field(title="Completed Count")]
     failed_count: Annotated[int, Field(title="Failed Count")]
@@ -8191,7 +8239,7 @@ class FlowExecutionPlanResponse(BaseModel):
     """
     Version of the saved source the plan was read from
     """
-    status: Annotated[Status4, Field(title="Status")]
+    status: Annotated[Status5, Field(title="Status")]
     """
     resolved: every run and step was read from literals. unresolved: the source decides its steps at run time; reason says why. invalid: manual rounds that cannot run were found; execution would fail before measuring.
     """
@@ -8269,7 +8317,7 @@ class ForumPostResponse(BaseModel):
     """
     Assigned project member username
     """
-    status: Annotated[Status6, Field(title="Status")] = Status6.open
+    status: Annotated[Status7, Field(title="Status")] = Status7.open
     """
     Thread workflow status
     """
@@ -8779,7 +8827,7 @@ class MetricCell(BaseModel):
     source: Annotated[str | None, Field(title="Source")] = None
     target: Annotated[str | None, Field(title="Target")] = None
     hops: Annotated[int | None, Field(title="Hops")] = None
-    status: Annotated[Status9, Field(title="Status")]
+    status: Annotated[Status10, Field(title="Status")]
     value: Annotated[float | None, Field(title="Value")] = None
     color: Annotated[str | None, Field(title="Color")] = None
     label: Annotated[str | None, Field(title="Label")] = None
@@ -8904,7 +8952,7 @@ class MetricScriptRevision(BaseModel):
     revision: Annotated[int, Field(title="Revision")]
     source: Annotated[str, Field(title="Source")]
     created_at: Annotated[AwareDatetime, Field(title="Created At")]
-    status: Annotated[Status10, Field(title="Status")]
+    status: Annotated[Status11, Field(title="Status")]
     metrics: Annotated[list[MetricInfo] | None, Field(title="Metrics")] = None
     """
     Catalog of this revision (valid revisions only)
@@ -8921,7 +8969,7 @@ class MetricScriptSummary(BaseModel):
     name: Annotated[str, Field(title="Name")]
     description: Annotated[str, Field(title="Description")]
     visibility: Annotated[Visibility, Field(title="Visibility")]
-    status: Annotated[Status10, Field(title="Status")]
+    status: Annotated[Status11, Field(title="Status")]
     revision: Annotated[int, Field(title="Revision")]
     active_revision: Annotated[int | None, Field(title="Active Revision")]
     metrics: Annotated[list[MetricInfo], Field(title="Metrics")]
@@ -9826,7 +9874,7 @@ class MetricScriptResponse(BaseModel):
     name: Annotated[str, Field(title="Name")]
     description: Annotated[str, Field(title="Description")]
     visibility: Annotated[Visibility, Field(title="Visibility")]
-    status: Annotated[Status10, Field(title="Status")]
+    status: Annotated[Status11, Field(title="Status")]
     revision: Annotated[int, Field(title="Revision")]
     active_revision: Annotated[int | None, Field(title="Active Revision")]
     metrics: Annotated[list[MetricInfo], Field(title="Metrics")]

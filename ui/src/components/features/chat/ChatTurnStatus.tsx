@@ -31,6 +31,7 @@ export interface ChatStatus {
     | "question"
     | "edit"
     | "stopped"
+    | "interrupted"
     | "in_progress"
     | "failed"
     | "answered";
@@ -86,6 +87,7 @@ function settledStatus(messages: ChatMessage[]): ChatStatus | null {
     payload = null;
   }
   if (payload?.stopped) return { kind: "stopped", label: "Stopped", tone: "neutral" };
+  if (payload?.interrupted) return { kind: "interrupted", label: "Interrupted", tone: "neutral" };
   // Saved by the server while the turn ran, and no stream of it is followed here.
   if (payload?.in_progress) {
     return { kind: "in_progress", label: "Answer in progress", tone: "info", stale: true };

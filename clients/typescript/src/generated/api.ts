@@ -2013,6 +2013,11 @@ const createCopilotChatSession = (
 
 /**
  * Return one chat session including the full message list.
+ *
+ * The session's ``turn`` is named only in the project it was sent from, like
+ * ``/chat/active``: the project the request names (``X-Project-Id``, else the
+ * user's default), and only one the user may read. Elsewhere it is null. As the
+ * reply depends on that project, no cache keeps it for a request from another.
  * @summary Get a chat session with messages
  */
 const getCopilotChatSession = (

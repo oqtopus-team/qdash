@@ -8,6 +8,7 @@
 import type { CopilotChatMessageSchema } from './copilotChatMessageSchema';
 import type { CopilotChatSessionResponseBranch } from './copilotChatSessionResponseBranch';
 import type { CopilotChatSessionResponseContext } from './copilotChatSessionResponseContext';
+import type { CopilotChatSessionResponseTurn } from './copilotChatSessionResponseTurn';
 
 /**
  * Full session payload returned to the client.
@@ -18,6 +19,8 @@ export interface CopilotChatSessionResponse {
   context?: CopilotChatSessionResponseContext;
   messages?: CopilotChatMessageSchema[];
   branch?: CopilotChatSessionResponseBranch;
+  /** The latest turn the server records for the chat */
+  turn?: CopilotChatSessionResponseTurn;
   created_at: string;
   updated_at: string;
 }

@@ -275,6 +275,11 @@ export type CopilotBlocksResult = BlocksResult & {
    * answer's end once the turn ends.
    */
   in_progress?: boolean;
+  /**
+   * The answer so far of a turn that no process ran any more when a later turn
+   * replaced it (its API process restarted mid-turn): it never ended.
+   */
+  interrupted?: boolean;
   /** The user's rating of this answer, kept with it for later evaluation. */
   feedback?: AnswerFeedback;
 };

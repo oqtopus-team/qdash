@@ -193,6 +193,10 @@ async def abort_runtime_turn(
     return "unknown"
 
 
+# ``active_runtime_turn`` when the runtime could not say whether a turn runs.
+RUNTIME_TURN_UNKNOWN: dict[str, Any] = {"running": False, "unavailable": True}
+
+
 async def active_runtime_turn(
     username: str,
     session_id: str,
@@ -204,8 +208,10 @@ async def active_runtime_turn(
 
     Read-only: it opens no store and starts nothing. The runtime names the turn
     only for the user's own chat (``owner_id`` is the signed-in user) in the
-    project the turn was sent from. When the runtime cannot be reached or answers
-    unexpectedly, nothing is reported as running: the chat asks again later.
+    project the turn was sent from. ``running`` false is the runtime's own answer
+    that no turn of the chat runs. When the runtime cannot be reached or answers
+    unexpectedly, the reply is ``unavailable`` (with ``running`` false): a turn may
+    still run, so no caller may take it for ended; the chat asks again later.
     """
     try:
         async with httpx.AsyncClient(timeout=10, trust_env=False) as client:
@@ -221,14 +227,22 @@ async def active_runtime_turn(
         body = response.json() if response.status_code == httpx.codes.OK else None
     except (httpx.HTTPError, RuntimeError, ValueError):
         logger.warning("Could not read the running turn of session %s", session_id, exc_info=True)
-        return {"running": False}
-    if not isinstance(body, dict) or body.get("running") is not True:
+        return dict(RUNTIME_TURN_UNKNOWN)
+    if not isinstance(body, dict) or not isinstance(body.get("running"), bool):
+        logger.warning(
+            "Pi runtime answered HTTP %s to reading the running turn of session %s",
+            response.status_code,
+            session_id,
+        )
+        return dict(RUNTIME_TURN_UNKNOWN)
+    if body["running"] is False:
         return {"running": False}
     if body.get("other_project") is True:
         return {"running": True, "other_project": True}
     request_id = body.get("request_id")
     if not isinstance(request_id, str) or not request_id:
-        return {"running": False}
+        logger.warning("Pi runtime named no request for the running turn of %s", session_id)
+        return dict(RUNTIME_TURN_UNKNOWN)
     started_at = body.get("started_at")
     try:
         turn_start = ChatTurnStart.model_validate(body.get("turn_start")).model_dump()

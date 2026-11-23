@@ -84,12 +84,7 @@ def test_progress_is_the_answer_so_far_marked_in_progress() -> None:
     payload = _payload(partial)
     assert payload["in_progress"] is True
     assert payload["blocks"] == [{"type": "text", "content": "Waiting", "chart": None}]
-    # A call still running when the progress was taken shows as done in the stored trace,
-    # marked interrupted because its end was not seen.
-    step = payload["trace"]["steps"][0]
-    assert step["tool"] == "qdash_wait_execution"
-    assert step["status"] == "done"
-    assert step["interrupted"] is True
+    assert payload["trace"]["steps"][0]["tool"] == "qdash_wait_execution"
 
 
 def _write(fold: TurnTranscript, call_id: str, path: str, content: str, *, error: bool) -> None:
@@ -132,6 +127,40 @@ def test_finished_writes_keep_full_arguments_within_a_shared_budget() -> None:
     assert steps[4]["status"] == "done"
     assert steps[4]["interrupted"] is True
     assert steps[4]["args"] == {"path": "r", "content": "x"}
+
+
+def test_progress_keeps_open_tools_open_and_the_end_closes_them() -> None:
+    # Two tools: one done, one waiting; a third call is still being written.
+    fold = TurnTranscript("r1", _user(), clock=_clock())
+    fold.apply("tool_start", {"id": "c1", "tool": "qdash_get", "label": "Get"})
+    fold.apply("tool_end", {"id": "c1", "tool": "qdash_get", "is_error": False})
+    fold.apply("tool_start", {"id": "c2", "tool": "qdash_wait_execution", "label": "Wait"})
+    fold.apply("tool_draft", {"id": "c3", "tool": "qdash_get", "index": 0})
+
+    _, partial = fold.messages()
+    steps = _payload(partial)["trace"]["steps"]
+    # Progress of a running turn reports no tool as done or as not run that is not.
+    assert [(s["tool"], s["status"]) for s in steps] == [
+        ("qdash_get", "done"),
+        ("qdash_wait_execution", "running"),
+        ("qdash_get", "drafting"),
+    ]
+    assert "endedAt" not in steps[1]
+    assert "interrupted" not in steps[1]
+
+    fold.stop()
+    _, stopped = fold.messages()
+    assert [s["status"] for s in _payload(stopped)["trace"]["steps"]] == [
+        "done",
+        "done",
+        "cancelled",
+    ]
+    # Stopping closed the waiting call without seeing its end.
+    assert [s.get("interrupted") for s in _payload(stopped)["trace"]["steps"]] == [
+        None,
+        True,
+        None,
+    ]
 
 
 def test_a_steer_closes_off_the_answer_so_far_and_follows_it() -> None:

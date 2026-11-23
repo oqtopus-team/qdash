@@ -64,12 +64,13 @@ from qdash.api.schemas.copilot_chat_session import (
     CopilotChatSessionResponse,
     CopilotChatSessionSummary,
     CopilotChatSteerSchema,
+    CopilotChatTurnSchema,
     CreateCopilotChatBranchRequest,
     CreateCopilotChatSessionRequest,
     ListCopilotChatSessionsResponse,
     UpdateCopilotChatSessionRequest,
 )
-from qdash.api.services.chat_transcript import to_json, transcript_digest
+from qdash.api.services.chat_transcript import interrupted_content, to_json, transcript_digest
 from qdash.common.utils.datetime import now
 from qdash.dbmodel.copilot_chat_session import (
     CopilotChatBranchOrigin,
@@ -395,13 +396,45 @@ class _BegunBranch:
     source_missing: bool = False
 
 
-def _to_response(doc: CopilotChatSessionDocument) -> CopilotChatSessionResponse:
+class _NoTurn:
+    """A response that names no recorded turn: its reader's project is not known."""
+
+
+NO_TURN = _NoTurn()
+
+
+def _to_turn_schema(
+    doc: CopilotChatSessionDocument, project_id: str | None
+) -> CopilotChatTurnSchema | None:
+    """The session's recorded turn, named only to a reader in the project it was sent from.
+
+    A reader in no project (``project_id`` None) is named no turn, even one recorded
+    without a project.
+    """
+    turn = doc.turn
+    if turn is None or project_id is None or turn.project_id != project_id:
+        return None
+    return CopilotChatTurnSchema(
+        request_id=turn.request_id,
+        project_id=turn.project_id,
+        status=turn.status,
+        start_index=turn.start_index,
+        continuing=turn.continuing,
+        started_at=turn.started_at,
+    )
+
+
+def _to_response(
+    doc: CopilotChatSessionDocument, *, turn_project: str | None | _NoTurn = NO_TURN
+) -> CopilotChatSessionResponse:
+    """The session as returned to its owner; ``turn`` only for a reader in ``turn_project``."""
     return CopilotChatSessionResponse(
         session_id=doc.session_id,
         title=doc.title,
         context=doc.context,
         messages=[_to_schema_message(m) for m in doc.messages],
         branch=_to_branch_schema(doc),
+        turn=None if isinstance(turn_project, _NoTurn) else _to_turn_schema(doc, turn_project),
         created_at=doc.created_at,
         updated_at=doc.updated_at,
     )
@@ -432,9 +465,15 @@ class CopilotChatSessionService:
         )
         return ListCopilotChatSessionsResponse(sessions=[_to_summary(d) for d in docs])
 
-    def get_session(self, *, username: str, session_id: str) -> CopilotChatSessionResponse:
+    def get_session(
+        self, *, username: str, session_id: str, project_id: str | None
+    ) -> CopilotChatSessionResponse:
+        """The session; its recorded turn only when it was sent from ``project_id``.
+
+        ``project_id`` is the project the reader is in and may read (None: none).
+        """
         doc = self._require_session(username=username, session_id=session_id)
-        return _to_response(doc)
+        return _to_response(doc, turn_project=project_id)
 
     def create_session(
         self,
@@ -1305,6 +1344,19 @@ def merge_saved_messages(
 ClaimOutcome = Literal["claimed", "same_turn", "conflict", "busy", "gone"]
 
 
+def _interrupted(messages: list[CopilotChatMessage], request_id: str) -> list[CopilotChatMessage]:
+    """``messages`` with the progress turn ``request_id`` saved marked interrupted."""
+    out: list[CopilotChatMessage] = []
+    for m in messages:
+        content = (
+            interrupted_content(m.content)
+            if m.turn_request_id == request_id and m.role == "assistant"
+            else None
+        )
+        out.append(m if content is None else m.model_copy(update={"content": content}))
+    return out
+
+
 def claim_turn(
     username: str,
     session_id: str,
@@ -1343,6 +1395,10 @@ def claim_turn(
         prefix = doc.messages[:start_index]
         if transcript_digest([*prefix, *([user_message] if user_message else [])]) != digest:
             return "conflict"
+        if doc.turn is not None and doc.turn.status == "running":
+            # The turn replaced runs nowhere: what it saved stays, marked interrupted, not
+            # as an answer still in progress.
+            prefix = _interrupted(prefix, doc.turn.request_id)
         timestamp = now()
         turn = CopilotChatServerTurn(
             request_id=request_id,

@@ -1222,11 +1222,17 @@ async def test_a_refused_steer_status_raises(
         ),
         (200, {"running": True, "other_project": True}, {"running": True, "other_project": True}),
         (200, {"running": False}, {"running": False}),
-        # Malformed or failed answers report nothing running; the chat asks again later.
-        (200, {"running": True}, {"running": False}),
-        (200, ValueError("not json"), {"running": False}),
-        (401, {"error": "unauthorized"}, {"running": False}),
-        (500, {"error": "internal"}, {"running": False}),
+        # Malformed or failed answers say nothing of the turn: unavailable, never ended.
+        (200, {"running": True}, {"running": False, "unavailable": True}),
+        (200, {"running": True, "request_id": ""}, {"running": False, "unavailable": True}),
+        (200, {"running": "no"}, {"running": False, "unavailable": True}),
+        (200, {}, {"running": False, "unavailable": True}),
+        (200, ["running"], {"running": False, "unavailable": True}),
+        (200, None, {"running": False, "unavailable": True}),
+        (200, ValueError("not json"), {"running": False, "unavailable": True}),
+        (401, {"error": "unauthorized"}, {"running": False, "unavailable": True}),
+        (500, {"error": "internal"}, {"running": False, "unavailable": True}),
+        (503, {"running": False}, {"running": False, "unavailable": True}),
     ],
 )
 async def test_the_running_turn_is_read_for_the_user_and_project(
@@ -1254,18 +1260,29 @@ async def test_the_running_turn_is_read_for_the_user_and_project(
 
 
 @pytest.mark.asyncio
-async def test_an_unreachable_runtime_reports_no_running_turn(
-    monkeypatch: pytest.MonkeyPatch,
+@pytest.mark.parametrize(
+    "error",
+    ["connect", "timeout", "read", "runtime"],
+)
+async def test_an_unreachable_runtime_reports_the_turn_unavailable(
+    monkeypatch: pytest.MonkeyPatch, error: str
 ) -> None:
     import httpx
 
     from qdash.api.services import pi_chat_service
 
+    errors: dict[str, Exception] = {
+        "connect": httpx.ConnectError("down"),
+        "timeout": httpx.ReadTimeout("slow"),
+        "read": httpx.RemoteProtocolError("cut"),
+        "runtime": RuntimeError("event loop closed"),
+    }
     monkeypatch.setenv("AGENT_RUNTIME_TOKEN", "runtime-token")
-    _failing_runtime(monkeypatch, httpx.ConnectError("down"))
+    _failing_runtime(monkeypatch, errors[error])
+    # An outage is never the runtime's answer that nothing runs.
     assert await pi_chat_service.active_runtime_turn(
         "alice", "s1", auth=pi_chat_service.QDashAuth("t", "p1")
-    ) == {"running": False}
+    ) == {"running": False, "unavailable": True}
 
 
 def _failing_runtime(monkeypatch: pytest.MonkeyPatch, error: Exception) -> None:
