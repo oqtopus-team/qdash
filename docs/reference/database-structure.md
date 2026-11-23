@@ -92,3 +92,11 @@ are defined in `src/qdash/api/services/agent_chat_session_service.py`.
 See [calibration data](../developer-guide/workflow/calibration-data-lifecycle.md),
 [session records](../developer-guide/agent/calibration-sessions.md), and
 [provenance](../developer-guide/architecture/provenance.md) for lifecycle rules.
+
+Automatic session lifecycle fields:
+
+| Collection | Fields | Meaning |
+| --- | --- | --- |
+| `calibration_sessions` | `close_origin`, `closed_by`, `closing_note` | Manual or system closure and its recorded reason |
+| `calibration_sessions` | `lifecycle_checked_at` | Sweep ordering; indexed with status and origin |
+| `calibration_pipeline_runs` | `flow_end_state`, `flow_end_observed_at` | Last terminal-state evidence from lifecycle checks; not live execution status |

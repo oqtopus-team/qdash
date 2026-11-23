@@ -29,9 +29,36 @@ so a multi-step workflow appears as one run without losing its individual execut
 
 ## Closing
 
-Only the creator closes a session. Closing blocks new admission, but cancels no admitted child,
-grants no success verdict, and may leave already admitted work in progress. Pending reservations
-and unknown dispatches are handled explicitly before closing.
+The creator can close a session explicitly. QDash also closes automatic sessions once all their
+work has ended. Manual objective sessions remain open for further trials. Closing blocks new
+admission; it neither cancels admitted work nor declares success.
+
+`CalibrationSessionLifecycle` checks automatic sessions every 60 seconds in each API process
+and on detail reads. It checks all children, independently of display pagination. Every dispatched
+run must have a recorded flow ID and a current Prefect state of COMPLETED, FAILED, CANCELLED,
+or CRASHED. Agent sessions must have ended with no in-flight measurements, commits, or backend
+applies, or have been rejected before operating. Pending reservations, unknown dispatches,
+missing flow records, and retries still waiting to run prevent automatic close.
+
+A rejected non-agent run keeps its session open so the same key can retry. Existing stale
+pipeline-reservation recovery can reject an unlaunched attempt; it does not make that session
+eligible to close. Automatic close never acknowledges unknown work.
+
+A sweep visits 50 sessions, least recently checked first, and reads at most 1,000 flow IDs in
+five batched Prefect requests. Deferred sessions retain their place for a later sweep. A single
+session with more than 1,000 flow IDs requires explicit close. There is no configuration step;
+backlogs and Prefect outages can delay closure beyond one interval. List requests do not query
+Prefect. Existing automatic sessions use the same evidence checks without inventing old outcomes.
+
+The close update compares the child count and requires no pending reservations. A concurrent
+child admission makes it fail. Prefect reads and MongoDB updates are not atomic: an external
+restart after the final read can race with close. Closed sessions are not reopened or monitored;
+start a new QDash run for new work.
+
+`close_origin=automatic` and `closed_by=system:auto-close` identify a system close. The note
+records observed outcomes. `flow_end_state` is display evidence from lifecycle checks, not a
+live status or authorization: it clears when a check observes a resumed flow, but can remain
+stale when Prefect is unavailable or the session is no longer checked.
 
 ## Reported launch origin
 
@@ -57,6 +84,7 @@ process does not make it safe.
 | File | Responsibility |
 | --- | --- |
 | `src/qdash/api/services/calibration_session_service.py` | Creation, admission, closing |
+| `src/qdash/api/services/calibration_session_lifecycle.py` | Automatic close and reconciliation |
 | `src/qdash/api/services/run_ledger.py` | Idempotent dispatch |
 | `src/qdash/api/services/calibration_session_links.py` | Execution relationships |
 | `src/qdash/api/services/calibration_session_groups.py` | Grouped projections |
@@ -67,3 +95,6 @@ process does not make it safe.
 Run `uv run pytest tests/qdash/workflow/test_calibration_run_grouping_fake_e2e.py` for whole-run
 association. API tests must cover admission/close races, duplicate requests, unknown dispatches,
 legacy records, and project isolation when these boundaries change.
+
+Run `uv run pytest tests/qdash/api/services/test_calibration_session_lifecycle.py` for terminal
+state checks, retry blockers, admission races, resumed flows, and bounded sweep recovery.

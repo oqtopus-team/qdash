@@ -1441,6 +1441,20 @@ class CalibrationRunTrigger(StrEnum):
     worker = "worker"
 
 
+class CalibrationSessionCloseOrigin(StrEnum):
+    """
+    Who closed a calibration session.
+
+    ``manual``: the person who created it closed it (every session closed before this was
+    recorded). ``automatic``: QDash closed an automatic session once every run and agent
+    session in it had ended and nothing was being started, dispatched, or settled in it. An
+    automatic close only stops new runs from joining; it cancels nothing and judges nothing.
+    """
+
+    manual = "manual"
+    automatic = "automatic"
+
+
 class CalibrationSessionOrigin(StrEnum):
     """
     How a calibration session came to exist.
@@ -1458,8 +1472,10 @@ class CalibrationSessionStatus(StrEnum):
     """
     Whether a calibration session accepts new runs.
 
-    ``closed`` is a person's statement that work on the objective has ended. It says nothing
-    about whether the objective was met and is refused while a child still runs or waits.
+    ``closed`` says that work on the objective has ended: a person's statement, or, for an
+    automatic session, QDash's record that everything started in it ended (see
+    ``CalibrationSessionCloseOrigin``). It says nothing about whether the objective was met or
+    how the runs ended, and is refused while a child still runs or waits.
     """
 
     open = "open"
@@ -5514,6 +5530,23 @@ class RespondAgentInterventionRequest(BaseModel):
     """
 
 
+class RunFlowEndState(StrEnum):
+    """
+    How the whole flow run that carried out a run ended, as Prefect reported it.
+
+    Recorded once QDash reads a terminal Prefect state for the run's flow run: the flow as a
+    whole, after its retries, never one step of it. A state Prefect may still leave (scheduled,
+    awaiting retry, pending, running, paused, cancelling) is never recorded. ``completed``,
+    ``failed``, ``cancelled``, and ``crashed`` are Prefect's own terminal state types; they say
+    how the flow run ended, not whether its calibration results are good.
+    """
+
+    completed = "completed"
+    failed = "failed"
+    cancelled = "cancelled"
+    crashed = "crashed"
+
+
 class SaveFileRequest(BaseModel):
     """
     Request model for saving file content.
@@ -8103,6 +8136,13 @@ class CalibrationSessionResponse(BaseModel):
     updated_at: Annotated[AwareDatetime, Field(title="Updated At")]
     closed_at: Annotated[AwareDatetime | None, Field(title="Closed At")] = None
     closed_by: Annotated[str | None, Field(title="Closed By")] = None
+    """
+    The user who closed it, or system:auto-close when QDash closed it automatically
+    """
+    close_origin: CalibrationSessionCloseOrigin | None = None
+    """
+    manual when the creator closed it; automatic when QDash closed an automatic session because every run and agent session in it ended. Null while open, and for a session closed before this was recorded (closed by its creator). Closing says nothing about how the runs ended.
+    """
     closing_note: Annotated[str, Field(title="Closing Note")] = ""
     closed_with_unknown_runs: Annotated[
         list[str] | None, Field(title="Closed With Unknown Runs")
@@ -10636,6 +10676,10 @@ class CalibrationPipelineRunResponse(BaseModel):
     pipeline_name: Annotated[str, Field(title="Pipeline Name")]
     backend_name: Annotated[str, Field(title="Backend Name")]
     flow_run_id: Annotated[str | None, Field(title="Flow Run Id")] = None
+    flow_end_state: RunFlowEndState | None = None
+    """
+    How the run's whole flow run ended, as Prefect reported it once it was terminal (completed, failed, cancelled, or crashed); null while it may still run or was not observed
+    """
     execution_id: Annotated[str | None, Field(title="Execution Id")] = None
     """
     The first step's execution, as returned at dispatch
@@ -10675,6 +10719,13 @@ class CalibrationSessionDetailResponse(BaseModel):
     updated_at: Annotated[AwareDatetime, Field(title="Updated At")]
     closed_at: Annotated[AwareDatetime | None, Field(title="Closed At")] = None
     closed_by: Annotated[str | None, Field(title="Closed By")] = None
+    """
+    The user who closed it, or system:auto-close when QDash closed it automatically
+    """
+    close_origin: CalibrationSessionCloseOrigin | None = None
+    """
+    manual when the creator closed it; automatic when QDash closed an automatic session because every run and agent session in it ended. Null while open, and for a session closed before this was recorded (closed by its creator). Closing says nothing about how the runs ended.
+    """
     closing_note: Annotated[str, Field(title="Closing Note")] = ""
     closed_with_unknown_runs: Annotated[
         list[str] | None, Field(title="Closed With Unknown Runs")

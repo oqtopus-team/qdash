@@ -22,6 +22,7 @@ from qdash.datamodel.run import (
     CalibrationRunTrigger,
     RunAdmission,
     RunAssociation,
+    RunFlowEndState,
 )
 
 RUN_COLLECTION = "calibration_pipeline_runs"
@@ -130,6 +131,11 @@ class RunDocument(Document):
     # The decision of the session this run carries out, named by the request; None when the
     # request named none (every run recorded before decisions existed).
     decision_id: str | None = None
+    # How the flow run in ``flow_run_id`` ended as a whole, once QDash read a terminal Prefect
+    # state for it; None while it may still run, and for a run never observed. Written once,
+    # for the flow run it names, and never inferred from the step executions or the time.
+    flow_end_state: RunFlowEndState | None = None
+    flow_end_observed_at: datetime | None = None
     requested_at: datetime = Field(default_factory=now)
     updated_at: datetime = Field(default_factory=now)
 

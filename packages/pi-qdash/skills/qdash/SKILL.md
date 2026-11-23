@@ -126,8 +126,8 @@ not the objective itself.
 - Pass its ID as `calibrationSessionId` to every `qdash_run_pipeline`, `qdash_execute_flow`, and
   `qdash_create_agent_session` call for that goal. QDash records the run before it starts; one
   run covers all its step executions. A run started without the ID goes to an automatic session
-  of its own, or to no session when the server does not group runs automatically; never to the
-  objective's, and nothing moves it there later.
+  of its own; never to the objective's, and nothing moves it there later. Automatic sessions
+  close when their work ends. Never reuse a closed session for a new run.
 - The session grants nothing. Each pipeline run is still the exact request the user approves,
   and an agent session is still bounded by its own policy, gates, expiry, and pause. Never
   present the session as permission, and never use it to skip an approval.
@@ -136,7 +136,8 @@ not the objective itself.
   the one with the user before starting runs in it).
 - Report progress with `qdash_get_calibration_session`. Statuses belong to each run and agent
   session; judge the results themselves before saying the objective is met. Closing a
-  calibration session is the user's decision in QDash, not yours.
+  manual objective session is the user's decision in QDash, not yours. QDash closes automatic
+  sessions itself; this does not mean the objective succeeded.
 - When saying how a run was started, use QDash's records: an execution with a linked
   `agent_session` was dispatched by that agent session; a pipeline run with a `reported_origin`
   was launched by the named tool, which reported it itself (QDash does not verify it, and it is

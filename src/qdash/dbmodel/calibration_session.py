@@ -23,6 +23,7 @@ from qdash.datamodel.calibration_session import (
     CalibrationChildReservation,
     CalibrationDecisionOutcome,
     CalibrationExperimentStage,
+    CalibrationSessionCloseOrigin,
     CalibrationSessionOrigin,
     CalibrationSessionStatus,
 )
@@ -33,8 +34,9 @@ class CalibrationSessionDocument(Document):
     """One calibration objective on one chip.
 
     Agent sessions name it in ``AgentSessionDocument.calibration_session_id``; runs name it
-    in ``RunDocument.calibration_session_id``. Neither is copied here, so the session record
-    changes only when it is closed.
+    in ``RunDocument.calibration_session_id``. Neither is copied here: the session record holds
+    only its admission control (the count and the reservations), its close, and, for an
+    automatic session, when QDash last checked whether its work ended.
     """
 
     calibration_session_id: str
@@ -63,6 +65,9 @@ class CalibrationSessionDocument(Document):
     updated_at: datetime = Field(default_factory=now)
     closed_at: datetime | None = None
     closed_by: str | None = None
+    # ``automatic`` when QDash closed it because its work ended; None for an open session and
+    # for one closed before this was recorded, which a person closed.
+    close_origin: CalibrationSessionCloseOrigin | None = None
     closing_note: str = ""
     # Runs whose dispatch outcome was unknown when the session was closed; the person who
     # closed it stated that they checked them.
@@ -71,6 +76,9 @@ class CalibrationSessionDocument(Document):
     # closed; the person who closed it acknowledged them. One recorded later stays ``pending``
     # admission, is rejected, and never operates.
     closed_with_unknown_starts: list[CalibrationChildReservation] = Field(default_factory=list)
+    # When QDash last checked whether an open automatic session's work has ended; the check
+    # visits the least recently checked sessions first. None until it was first checked.
+    lifecycle_checked_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -92,6 +100,14 @@ class CalibrationSessionDocument(Document):
                     ("project_id", ASCENDING),
                     ("created_by", ASCENDING),
                     ("created_at", DESCENDING),
+                ]
+            ),
+            # The automatic close visits open automatic sessions, least recently checked first.
+            IndexModel(
+                [
+                    ("status", ASCENDING),
+                    ("origin", ASCENDING),
+                    ("lifecycle_checked_at", ASCENDING),
                 ]
             ),
         ]

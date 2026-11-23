@@ -209,6 +209,21 @@ describe("CalibrationSessionPageContent", () => {
     expect(screen.getByText("Closed", { selector: ".badge" })).toBeTruthy();
   });
 
+  it("labels an automatic close as QDash's, not a person's", () => {
+    state.detail = {
+      ...DETAIL,
+      origin: "automatic",
+      status: "closed",
+      closed_by: "system:auto-close",
+      close_origin: "automatic",
+      closing_note: "Closed automatically: everything started in this session ended.",
+    };
+    renderPage();
+    expect(screen.getByText(/Automatically, when its work ended/)).toBeTruthy();
+    expect(screen.queryByText(/system:auto-close/)).toBeNull();
+    expect(screen.queryByRole("button", { name: "Close session" })).toBeNull();
+  });
+
   it("says when the lists are cut, and counts every child", () => {
     state.detail = { ...DETAIL, pipeline_run_total: 140, agent_session_total: 1 };
     renderPage();
