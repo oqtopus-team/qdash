@@ -26,7 +26,7 @@ from qdash.api.schemas.calibration_session import (
 from qdash.api.services.audit_timeline import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE
 from qdash.api.services.calibration_session_audit import CalibrationSessionAuditService
 from qdash.api.services.calibration_session_service import CalibrationSessionService
-from qdash.datamodel.calibration_session import CalibrationSessionStatus
+from qdash.datamodel.calibration_session import CalibrationSessionOrigin, CalibrationSessionStatus
 
 router = APIRouter(prefix="/calibration-sessions")
 
@@ -45,7 +45,8 @@ def create_calibration_session(
 ) -> CalibrationSessionResponse:
     """Record one calibration objective on a chip.
 
-    Pipeline runs and agent sessions started with its ID are grouped under it. It grants no
+    Runs (saved workflows, pipelines, tasks) and agent sessions started with its ID are grouped
+    under it. A run started without one gets an automatic session instead. It grants no
     operation: each run is still approved, gated, and locked on its own.
     """
     return service.create(project_id=ctx.project_id, username=ctx.user.username, body=body)
@@ -65,6 +66,15 @@ def list_calibration_sessions(
         list[CalibrationSessionStatus] | None,
         Query(alias="status", description="Only sessions in these statuses"),
     ] = None,
+    origin: Annotated[
+        list[CalibrationSessionOrigin] | None,
+        Query(
+            description=(
+                "Only sessions of these origins: manual (created for an objective) or "
+                "automatic (created by QDash for a run started without a session ID)"
+            )
+        ),
+    ] = None,
     mine: Annotated[bool, Query(description="Only sessions the signed-in user created")] = False,
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
     skip: Annotated[int, Query(ge=0, le=10_000)] = 0,
@@ -75,6 +85,7 @@ def list_calibration_sessions(
         chip_id=chip_id,
         created_by=ctx.user.username if mine else None,
         statuses=status_filter,
+        origins=origin,
         limit=limit,
         skip=skip,
     )

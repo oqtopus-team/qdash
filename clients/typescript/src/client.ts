@@ -244,6 +244,13 @@ export interface CreateAgentSessionOptions {
   calibrationSessionId?: string;
 }
 
+export interface ExecuteFlowOptions {
+  /** Add the run to this calibration session (open, on the run's chip, created by the user). */
+  calibrationSessionId?: string;
+  /** A retry with the same key returns the recorded run instead of starting another. */
+  idempotencyKey?: string;
+}
+
 export interface SubmitAgentActionOptions {
   idempotencyKey: string;
   expectedStateVersion: number;
@@ -850,8 +857,32 @@ export class QDashClient {
     return this.post("/flows", request);
   }
 
-  async executeFlow(name: string, parameters: JsonObject = {}): Promise<ExecuteFlowResponse> {
-    return this.post(`/flows/${pathPart(name)}/execute`, { parameters });
+  /**
+   * Run a saved flow; `parameters` override its saved defaults for this run only. The run is
+   * recorded in `calibrationSessionId` when given, otherwise in an automatic calibration
+   * session the server creates; a retry with the same `idempotencyKey` returns the recorded
+   * run instead of starting another, and without a key every call starts a new run.
+   */
+  async executeFlow(
+    name: string,
+    parameters: JsonObject = {},
+    options: ExecuteFlowOptions = {},
+  ): Promise<ExecuteFlowResponse> {
+    const { calibrationSessionId: id, idempotencyKey: key } = options;
+    if ((id != null && !id.trim()) || (key != null && !key.trim())) {
+      throw new TypeError("calibrationSessionId and idempotencyKey must be non-empty when given");
+    }
+    const result: ExecuteFlowResponse = await this.post(`/flows/${pathPart(name)}/execute`, {
+      parameters,
+      ...(id != null ? { calibration_session_id: id } : {}),
+      ...(key != null ? { idempotency_key: key } : {}),
+    });
+    // A server that predates run recording ignores both fields and starts the flow anyway.
+    if ((id != null || key != null) && (typeof result?.calibration_run_id !== "string" ||
+        (id != null && result.calibration_session_id !== id))) {
+      throw new Error("Workflow result unknown: the run may have started without its calibration session or key. Do not retry automatically; reconcile the execution first.");
+    }
+    return result;
   }
 
   /** Metric scripts visible to the caller (project-shared and their own), without source. */
@@ -1526,8 +1557,10 @@ export class QDashClient {
       executeCalibrationPipeline: async (request, options) => {
         const id = request.calibration_session_id;
         const key = request.idempotency_key;
-        if ((id != null) !== (key != null) || (key != null && !key.trim())) {
-          throw new TypeError("calibration_session_id and a non-empty idempotency_key must be given together");
+        // Either may come alone: without a session the server records the run in an
+        // automatic one, and without a key it uses a key of its own.
+        if (key != null && !key.trim()) {
+          throw new TypeError("idempotency_key must be non-empty");
         }
         const decision = request.decision_id;
         if (decision != null && (id == null || !decision.trim())) {
@@ -1535,8 +1568,10 @@ export class QDashClient {
         }
         if (id != null) await preflight(id, request.chip_id, options);
         const result = await api.executeCalibrationPipeline(request, options);
-        if (id != null && (!result || result.calibration_session_id !== id ||
-            typeof result.pipeline_run_id !== "string" || !result.pipeline_run_id.trim())) {
+        // A server that predates run recording ignores both fields and launches anyway.
+        const recorded = !!result && typeof result.pipeline_run_id === "string" &&
+          !!result.pipeline_run_id.trim() && typeof result.calibration_session_id === "string";
+        if ((id != null || key != null) && (!recorded || (id != null && result.calibration_session_id !== id))) {
           throw new Error("Pipeline result unknown: the execution may have started without its association. Do not retry automatically or use a new key; reconcile the execution first.");
         }
         // A server that drops the decision would record the run without its intent.

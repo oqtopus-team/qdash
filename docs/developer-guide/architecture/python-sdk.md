@@ -33,9 +33,15 @@ Every operation belongs to one phase, and no phase starts the next one implicitl
 | Run a registered workflow | `workflow.run(parameters=...)`, `qdash.workflows.run(name, parameters=...)`, then `run.wait()` | Dispatches the saved deployment | `POST /flows/{name}/execute`, `GET /executions/{id}` |
 | Author metric scripts and dashboards | `Script(...)`, `Dashboard(...)`, then `qdash.scripts.create`/`update`, `qdash.dashboards.create`/`update` | Saves a script revision or a dashboard | `/metric-scripts`, `/dashboards` |
 
-`Pipelines.execute` also takes `calibration_session_id` and `idempotency_key`, given together, to
-record the run in a calibration session before it is launched; a retry with the same key returns
-the recorded run. With them, an optional `decision_id` names the session's decision the run
+`Pipelines.execute` and `Workflows.run` (and `Workflow.run`) take optional
+`calibration_session_id` and `idempotency_key`. The server records the run in that calibration
+session, or in an automatic one it creates, before it is launched; a retry with the same key
+returns the recorded run, and without a key every call starts a new run. `WorkflowRun` exposes
+`calibration_session_id` and `calibration_run_id`. When either argument is given, a response
+that does not name the recorded run raises `RuntimeError`: an older server may have started the
+run without them, so reconcile it instead of retrying. For a workflow whose chip the server
+cannot tell before the launch (no `chip_id` parameter and no saved chip), the server refuses
+either argument with 400 and starts nothing; pass `chip_id` in `parameters`. With a session, an optional `decision_id` names the session's decision the run
 carries out; without `calibration_session_id` it raises `ValueError` before any request. A
 response that does not echo the `decision_id` raises `RuntimeError` instead of returning, since
 the run may have started without the link: reconcile it in the session audit, never retry with a

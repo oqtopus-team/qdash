@@ -128,7 +128,14 @@ An `agent_sessions` document created in a calibration session stores its
 `calibration_session_id`, its `calibration_admission` (`pending`, `admitted`, or `rejected`),
 and the `calibration_reservation_id` the admission rests on; older documents have none. A
 `calibration_sessions` document lists the reservations of admitted agent sessions in
-`admitted_reservation_ids`. A `calibration_pipeline_runs` document stores the caller's
+`admitted_reservation_ids`. A `calibration_sessions` document stores its `origin`: `automatic` when QDash created it for a
+run started without a session ID, `manual` (or no field, for older documents) otherwise. A
+`calibration_pipeline_runs` document is one run of any kind: `run_kind` (`pipeline`, `workflow`,
+`task`, or `agent_action`; older documents have none and are pipelines), `run_name`, `trigger`
+(`api`, `schedule`, or `worker`), and, for an agent action, `agent_session_id` and `action_id`.
+An `execution_history` document of a run's step stores `note.calibration_session_id` and
+`note.calibration_run_id`; older executions have neither. A `calibration_pipeline_runs` document
+also stores the caller's
 `reported_origin` when one was reported, the normalized `spec` it validated, and the
 `decision_id` of the decision it carries out when the request named one; older runs have
 neither. A `calibration_decisions` document is one append-only decision of a calibration

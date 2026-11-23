@@ -6,13 +6,19 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { CalibrationGroupPipelineRunDecisionId } from './calibrationGroupPipelineRunDecisionId';
+import type { CalibrationRunKind } from './calibrationRunKind';
+import type { CalibrationRunTrigger } from './calibrationRunTrigger';
 import type { ExecutionResponseSummary } from './executionResponseSummary';
 
 /**
- * One pipeline run of a calibration session row, with its step executions.
+ * One run of a calibration session row, whatever it launched, with its step executions.
  */
 export interface CalibrationGroupPipelineRun {
   run_id: string;
+  run_kind?: CalibrationRunKind;
+  /** The workflow, pipeline, or task it launched */
+  run_name?: string;
+  trigger?: CalibrationRunTrigger;
   pipeline_name?: string;
   dispatch_status: string;
   requested_by: string;

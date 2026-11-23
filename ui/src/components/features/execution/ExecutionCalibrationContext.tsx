@@ -60,7 +60,7 @@ export function CalibrationSessionBadge({ link }: { link: CalibrationSessionRef 
 
 function membershipText(link: ExecutionCalibrationSessionLink): string {
   if (link.via === "pipeline_run") {
-    return `A step of pipeline run ${link.pipeline_run_id ?? ""} recorded in this calibration session`;
+    return `A step of run ${link.pipeline_run_id ?? ""} recorded in this calibration session`;
   }
   return `Run by agent session ${link.agent_session_id ?? ""}, which was admitted to this calibration session`;
 }

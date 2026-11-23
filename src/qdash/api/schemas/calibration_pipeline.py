@@ -6,7 +6,11 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from qdash.api.schemas.flow import ExecuteFlowResponse
+from qdash.api.schemas.flow import (
+    CALIBRATION_SESSION_FIELD,
+    IDEMPOTENCY_KEY_FIELD,
+    ExecuteFlowResponse,
+)
 from qdash.datamodel.launch_origin import ReportedLaunchOrigin  # noqa: TC001 - pydantic field
 from qdash.datamodel.task import TaskDocumentation  # noqa: TC001 - pydantic field type
 from qdash.datamodel.task_call import TaskCall  # noqa: TC001 - pydantic field type
@@ -170,22 +174,10 @@ class ExecutePipelineRequest(ValidatePipelineRequest):
         default=None,
         min_length=1,
         max_length=200,
-        description=(
-            "Record the run in this calibration session, which must be open, on this chip, "
-            "and created by the signed-in user. It groups the run with the session's other "
-            "work and grants nothing: the run is the request approved here. Requires "
-            "idempotency_key."
-        ),
+        description=CALIBRATION_SESSION_FIELD,
     )
     idempotency_key: str | None = Field(
-        default=None,
-        min_length=1,
-        max_length=128,
-        description=(
-            "With calibration_session_id: a retry with the same key and request returns the "
-            "recorded run instead of starting another, and a run whose launch outcome is "
-            "unknown is never launched again with it."
-        ),
+        default=None, min_length=1, max_length=128, description=IDEMPOTENCY_KEY_FIELD
     )
 
     decision_id: str | None = Field(
@@ -210,11 +202,7 @@ class ExecutePipelineRequest(ValidatePipelineRequest):
 
     @model_validator(mode="after")
     def validate_calibration_session(self) -> ExecutePipelineRequest:
-        """An idempotency key only means something for a run recorded in a session."""
-        if (self.calibration_session_id is None) != (self.idempotency_key is None):
-            raise ValueError(
-                "calibration_session_id and idempotency_key are given together or not at all"
-            )
+        """A decision belongs to a session the request names."""
         if self.decision_id is not None and self.calibration_session_id is None:
             raise ValueError("decision_id needs calibration_session_id")
         return self
@@ -225,11 +213,8 @@ class ExecutePipelineResponse(ExecuteFlowResponse):
 
     steps: list[ResolvedPipelineStep] = Field(default_factory=list)
     targets: ResolvedPipelineTargets | None = None
-    calibration_session_id: str | None = Field(
-        default=None, description="The calibration session the run is recorded in, if any"
-    )
     pipeline_run_id: str | None = Field(
-        default=None, description="The run's record in that calibration session"
+        default=None, description="The run's record in its calibration session"
     )
     decision_id: str | None = Field(
         default=None,
@@ -237,10 +222,6 @@ class ExecutePipelineResponse(ExecuteFlowResponse):
             "The decision the recorded run carries out, as QDash linked it; null when the "
             "request named none. A client that sent a decision checks it is echoed here"
         ),
-    )
-    replayed: bool = Field(
-        default=False,
-        description="True when a retry returned the run an earlier request with its key started",
     )
 
 

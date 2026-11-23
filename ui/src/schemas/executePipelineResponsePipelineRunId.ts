@@ -7,6 +7,6 @@
  */
 
 /**
- * The run's record in that calibration session
+ * The run's record in its calibration session
  */
 export type ExecutePipelineResponsePipelineRunId = string | null;

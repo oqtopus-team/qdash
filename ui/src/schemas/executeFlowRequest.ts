@@ -5,6 +5,8 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { ExecuteFlowRequestCalibrationSessionId } from './executeFlowRequestCalibrationSessionId';
+import type { ExecuteFlowRequestIdempotencyKey } from './executeFlowRequestIdempotencyKey';
 import type { ExecuteFlowRequestParameters } from './executeFlowRequestParameters';
 import type { ExecuteFlowRequestTargetOverride } from './executeFlowRequestTargetOverride';
 
@@ -16,4 +18,8 @@ export interface ExecuteFlowRequest {
   target_override?: ExecuteFlowRequestTargetOverride;
   /** Execution parameters (overrides default_parameters) */
   parameters?: ExecuteFlowRequestParameters;
+  /** Add the run to this calibration session, which must be open, on the run's chip, and created by the signed-in user. It groups the run with the session's other work and grants nothing. Without it, QDash creates an automatic session for the run. */
+  calibration_session_id?: ExecuteFlowRequestCalibrationSessionId;
+  /** A retry with the same key and request returns the recorded run instead of starting another, and a run whose launch outcome is unknown is never launched again with it. Without a key, every request starts a new run. */
+  idempotency_key?: ExecuteFlowRequestIdempotencyKey;
 }

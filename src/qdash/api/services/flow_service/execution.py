@@ -106,6 +106,7 @@ class ExecutionCoordinator:
         tags: list[str] | None = None,
         workflow: bool = False,
         context: dict[str, Any] | None = None,
+        note: dict[str, Any] | None = None,
     ) -> DispatchResult:
         """Dispatch a run that owns the execution lock until the flow adopts it."""
         claimed_execution_id = self._claim(
@@ -135,6 +136,7 @@ class ExecutionCoordinator:
             flow_run_id=flow_run_id,
             execution_id=claimed_execution_id,
             tags=tags,
+            note=note,
         )
         if execution_id is None:
             self._release(project_id, claimed_execution_id)
@@ -237,6 +239,7 @@ class ExecutionCoordinator:
         flow_run_id: str,
         execution_id: str | None = None,
         tags: list[str] | None = None,
+        note: dict[str, Any] | None = None,
     ) -> str | None:
         """Pre-create a scheduled execution row for a freshly created flow run.
 
@@ -272,7 +275,8 @@ class ExecutionCoordinator:
                 name=name,
                 execution_id=execution_id,
                 calib_data_path=calib_data_path,
-                note={"flow_run_id": flow_run_id},
+                # ``note`` names the run's calibration session and run, as the worker will.
+                note={**(note or {}), "flow_run_id": flow_run_id},
                 status=ExecutionStatusModel.SCHEDULED,
                 tags=tags or [],
                 chip_id=chip_id,

@@ -7,6 +7,17 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from qdash.datamodel.flow_targets import FlowTargetOverride, TargetMode
 
+CALIBRATION_SESSION_FIELD = (
+    "Add the run to this calibration session, which must be open, on the run's chip, and "
+    "created by the signed-in user. It groups the run with the session's other work and grants "
+    "nothing. Without it, QDash creates an automatic session for the run."
+)
+IDEMPOTENCY_KEY_FIELD = (
+    "A retry with the same key and request returns the recorded run instead of starting "
+    "another, and a run whose launch outcome is unknown is never launched again with it. "
+    "Without a key, every request starts a new run."
+)
+
 
 class SaveFlowRequest(BaseModel):
     """Request to save a Flow."""
@@ -245,6 +256,15 @@ class ExecuteFlowRequest(BaseModel):
     parameters: dict[str, Any] = Field(
         default_factory=dict, description="Execution parameters (overrides default_parameters)"
     )
+    calibration_session_id: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=200,
+        description=CALIBRATION_SESSION_FIELD,
+    )
+    idempotency_key: str | None = Field(
+        default=None, min_length=1, max_length=128, description=IDEMPOTENCY_KEY_FIELD
+    )
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -267,6 +287,21 @@ class ExecuteFlowResponse(BaseModel):
     flow_run_url: str = Field(..., description="Prefect flow run URL")
     qdash_ui_url: str = Field(..., description="QDash UI URL for execution")
     message: str = Field(..., description="Success message")
+    calibration_session_id: str | None = Field(
+        default=None,
+        description=(
+            "The calibration session the run is recorded in: the one the request named, or the "
+            "automatic session QDash created for it"
+        ),
+    )
+    calibration_run_id: str | None = Field(
+        default=None,
+        description="The run's record in that session; every step execution carries it",
+    )
+    replayed: bool = Field(
+        default=False,
+        description="True when a retry returned the run an earlier request with its key started",
+    )
 
 
 class ScheduleFlowRequest(BaseModel):

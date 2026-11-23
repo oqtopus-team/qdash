@@ -139,7 +139,7 @@ def test_valid_association_and_unassociated_legacy_path(kind: str, reply: dict[s
     assert methods == ["GET", "POST", "POST"]
 
 
-@pytest.mark.parametrize(("session_id", "key"), [("", "key"), ("cs-1", ""), ("cs-1", None)])
+@pytest.mark.parametrize(("session_id", "key"), [("", "key"), ("cs-1", ""), (None, " ")])
 def test_invalid_pipeline_recording_fails_without_requests(
     session_id: str, key: str | None
 ) -> None:
@@ -149,3 +149,82 @@ def test_invalid_pipeline_recording_fails_without_requests(
             chip_id="chip-1", spec={}, calibration_session_id=session_id, idempotency_key=key
         )
     assert methods == []
+
+
+FLOW_RUN = {
+    "execution_id": "e1",
+    "flow_run_id": "f1",
+    "flow_run_url": "http://prefect/f1",
+    "qdash_ui_url": "http://qdash/e1",
+    "message": "started",
+    "calibration_session_id": "cs-auto-1",
+    "calibration_run_id": "cpr-1",
+}
+LEGACY_FLOW_RUN = {key: FLOW_RUN[key] for key in ("execution_id", "flow_run_id", "flow_run_url")}
+
+
+def _sent_bodies(reply: Any) -> tuple[QDashClient, list[dict[str, Any]]]:
+    bodies: list[dict[str, Any]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        import json
+
+        bodies.append(json.loads(request.content))
+        return httpx.Response(200, json=reply)
+
+    config = QDashConfig.model_validate({"base_url": "http://qdash.local", "api_token": "token"})
+    transport = httpx.Client(base_url=config.base_url, transport=httpx.MockTransport(handler))
+    return QDashClient(config, http_client=transport), bodies
+
+
+def test_a_keyed_workflow_run_returns_its_session_and_run() -> None:
+    client, bodies = _sent_bodies(FLOW_RUN)
+    with closing(client):
+        response = client.execute_flow("demo", idempotency_key="click-1")
+    assert bodies == [{"parameters": {}, "idempotency_key": "click-1"}]
+    assert (response.calibration_session_id, response.calibration_run_id) == (
+        "cs-auto-1",
+        "cpr-1",
+    )
+
+
+@pytest.mark.parametrize(("session_id", "key"), [(None, "click-1"), ("cs-1", None)])
+def test_a_server_that_ignores_run_recording_is_reported_not_retried(
+    session_id: str | None, key: str | None
+) -> None:
+    client, bodies = _sent_bodies({**LEGACY_FLOW_RUN, "qdash_ui_url": "u", "message": "m"})
+    with closing(client), pytest.raises(RuntimeError, match="Do not retry automatically"):
+        client.execute_flow("demo", calibration_session_id=session_id, idempotency_key=key)
+    assert len(bodies) == 1
+
+
+@pytest.mark.parametrize(("session_id", "key"), [(None, "click-1"), ("cs-1", None)])
+def test_a_chipless_flow_refused_before_launch_is_reported_once(
+    session_id: str | None, key: str | None
+) -> None:
+    from qdash.client import QDashApiError
+
+    detail = (
+        "chipless names no chip (no chip_id parameter and no chip saved with the flow), so "
+        "QDash cannot record it in a calibration session or replay it by idempotency key. "
+        "Nothing was started."
+    )
+    bodies: list[dict[str, Any]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        import json
+
+        bodies.append(json.loads(request.content))
+        return httpx.Response(400, json={"detail": detail})
+
+    config = QDashConfig.model_validate({"base_url": "http://qdash.local", "api_token": "token"})
+    transport = httpx.Client(base_url=config.base_url, transport=httpx.MockTransport(handler))
+    with (
+        closing(QDashClient(config, http_client=transport)) as client,
+        pytest.raises(QDashApiError, match="Nothing was started"),
+    ):
+        client.execute_flow("chipless", calibration_session_id=session_id, idempotency_key=key)
+    # One request, carrying the caller's options: never retried without them.
+    assert len(bodies) == 1
+    assert bodies[0].get("idempotency_key") == key
+    assert bodies[0].get("calibration_session_id") == session_id

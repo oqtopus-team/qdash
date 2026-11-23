@@ -428,6 +428,9 @@ class CalibSession:
             note = dict(self.note or {})
             if flow_run_id:
                 note["flow_run_id"] = flow_run_id
+            if not self.is_worker:
+                # Every owned step execution names its calibration session and run.
+                note.update(self._calibration_note(self.flow_name))
             if self._reserved_scope is not None:
                 note["hardware_reservation"] = {
                     "chip_id": self._reserved_scope.chip_id,
@@ -1386,6 +1389,17 @@ class CalibSession:
         self._disconnect_backend()
         self._initialized = False
 
+    def _calibration_note(self, run_name: str | None) -> dict[str, str]:
+        """The calibration session and run of this flow run, resolved once per flow run."""
+        from qdash.workflow.service._internal.run_identity import calibration_note
+
+        return calibration_note(
+            project_id=self.project_id,
+            chip_id=self.chip_id,
+            username=self.username,
+            run_name=run_name,
+        )
+
     def _start_next_step(self, settings: SessionSettings) -> None:
         """Forget the previous step's Execution while keeping the pipeline reservation."""
         self._initialized = False
@@ -1431,7 +1445,12 @@ class CalibSession:
                 step.preflight(self)
             calibration_plan = self.calibration_plan(list(pipeline))
             self.plan_digest = calibration_plan["digest"]
-            pipeline_note = {**(base_settings.note or {}), "calibration_plan": calibration_plan}
+            pipeline_note = {
+                **(base_settings.note or {}),
+                "calibration_plan": calibration_plan,
+                # Resolved before anything is reserved, named after the whole pipeline.
+                **self._calibration_note(pipeline_flow_name),
+            }
             self._acquire_resource_scope(
                 plan_pipeline_resources(self.chip_id, targets, steps, mux_mapping=mux_mapping)
             )

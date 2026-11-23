@@ -23,7 +23,13 @@ import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { QubitTile } from "@/components/ui/QubitTile";
 import { useAuth } from "@/contexts/AuthContext";
-import { calibrationSessionsHref, dispatchStatusStyle } from "@/lib/chatCalibrationSession";
+import {
+  calibrationSessionsHref,
+  dispatchStatusStyle,
+  runDisplayName,
+  runKindLabel,
+  runTriggerLabel,
+} from "@/lib/chatCalibrationSession";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
 import { formatDateTime } from "@/lib/utils/datetime";
 import type {
@@ -86,7 +92,7 @@ function ExecutionLinks({
   );
 }
 
-/** One pipeline run: its launch, then each planned step and the execution it ran in. */
+/** One run: its launch, then each planned step and the execution it ran in. */
 function PipelineRunItem({
   run,
   projectId,
@@ -97,10 +103,13 @@ function PipelineRunItem({
   const dispatch = dispatchStatusStyle(run.dispatch_status);
   const steps = run.pipeline?.steps ?? [];
   const executions = run.executions ?? [];
+  const trigger = runTriggerLabel(run.trigger);
   return (
     <li className="flex flex-col gap-2 py-3" data-testid="calibration-pipeline-run">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-sm font-medium">{run.pipeline_name || "Pipeline run"}</span>
+        <span className="text-sm font-medium">{runDisplayName(run)}</span>
+        <span className="badge badge-outline badge-sm">{runKindLabel(run.run_kind)}</span>
+        {trigger ? <span className="badge badge-ghost badge-sm">{trigger}</span> : null}
         <span className={`badge badge-soft badge-sm ${dispatch.badge}`}>{dispatch.label}</span>
         {run.pipeline ? <StatusBadge status={run.pipeline.status} /> : null}
         {run.reported_origin ? <ReportedOriginBadge origin={run.reported_origin} /> : null}
@@ -290,7 +299,19 @@ export function CalibrationSessionPageContent({
                 {isOpen ? "Open" : "Closed"}
               </span>
             </Field>
-            <Field label="Pipeline runs">{runTotal}</Field>
+            <Field label="Origin">
+              {data.origin === "automatic" ? (
+                <span
+                  className="badge badge-ghost badge-sm"
+                  title="QDash created this session for a run started without one"
+                >
+                  Automatic
+                </span>
+              ) : (
+                <span className="badge badge-ghost badge-sm">Created for an objective</span>
+              )}
+            </Field>
+            <Field label="Runs">{runTotal}</Field>
             <Field label="Agent sessions">{agentTotal}</Field>
             <Field label="Still running or waiting">{blockers.length}</Field>
             <Field label="Decisions">{data.decision_total ?? 0}</Field>
@@ -303,8 +324,11 @@ export function CalibrationSessionPageContent({
               </div>
             ) : null}
             <p className="text-xs text-base-content/60 sm:col-span-2 md:col-span-4">
-              Groups the work started for this objective. It grants nothing: each pipeline run is
-              approved on its own, and each agent session keeps its own policy and pause.
+              Groups the work started for this objective. It grants nothing: each run is approved on
+              its own, and each agent session keeps its own policy and pause.
+              {data.origin === "automatic"
+                ? " QDash created it for a run started without a session; start another run with its ID to add to it."
+                : ""}
             </p>
             {isOpen && projectId && username === data.created_by ? (
               <div className="sm:col-span-2 md:col-span-4">
@@ -328,14 +352,14 @@ export function CalibrationSessionPageContent({
           executionHref={(executionId) => executionHref(data.chip_id, executionId, projectId)}
         />
 
-        <section className="card card-border bg-base-100" aria-label="Pipeline runs">
+        <section className="card card-border bg-base-100" aria-label="Runs">
           <div className="card-body gap-1 p-4">
-            <h2 className="text-sm font-medium">Pipeline runs</h2>
-            <ListedOf shown={runs.length} total={runTotal} noun="pipeline runs" />
+            <h2 className="text-sm font-medium">Runs</h2>
+            <ListedOf shown={runs.length} total={runTotal} noun="runs" />
             {runs.length === 0 ? (
               <EmptyState
-                title="No pipeline runs"
-                description="Pipelines started with this session's ID appear here, each with all of its step executions"
+                title="No runs"
+                description="Workflows, pipelines, and tasks started with this session's ID appear here, each with all of its step executions"
                 emoji="empty"
               />
             ) : (

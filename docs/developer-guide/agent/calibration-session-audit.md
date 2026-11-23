@@ -99,11 +99,11 @@ builds the events on every read:
 
 | Event `kind` | Source record | What it adds |
 | --- | --- | --- |
-| `session_created`, `session_closed` | `calibration_sessions` | Objective and chip; the closing note and acknowledged unknown runs. Closing records no verdict |
+| `session_created`, `session_closed` | `calibration_sessions` | Objective, chip, and `origin`; an automatic session is attributed to the server, opened for the user's run. The closing note and acknowledged unknown runs. Closing records no verdict |
 | `decision` | `calibration_decisions` | The decision with its snapshot; `agent_reported` with a model, otherwise `client_reported` |
-| `pipeline_requested` | `calibration_pipeline_runs` | Requesting user, `requested_task_calls` from the stored spec, the decision it carries out, the reported origin |
+| `pipeline_requested` | `calibration_pipeline_runs` (every kind except `agent_action`, whose steps the agent session's events show) | `run_kind`, `run_name`, and `trigger`; the requesting user, or the server when the worker recorded a scheduled run; `requested_task_calls` from a pipeline's stored spec, the decision it carries out, the reported origin |
 | `pipeline_dispatch` | `calibration_pipeline_runs` | `dispatched`, `rejected`, `unknown`, or `dispatching`, with the flow run |
-| `measurement` | `execution_history`, `task_result_history` | Each step execution of the flow run and its tasks' executed run parameters and outputs |
+| `measurement` | `execution_history`, `task_result_history` | Each step execution stamped with the run (or, for an unstamped one, of its flow run) and its tasks' executed run parameters and outputs |
 | `agent_session_linked` | `agent_sessions` | An agent session created in the session and its admission |
 
 An admitted agent session's own events follow its `agent_session_linked` event with
@@ -115,7 +115,7 @@ the linked event.
 
 | Missing fact | When |
 | --- | --- |
-| `requested_spec` | A run recorded before the spec was stored |
+| `requested_spec` | A pipeline run recorded before the spec was stored; other kinds have no spec |
 | `host_approval` | A run whose origin an agent tool reported; the approval card or dialog is outside QDash |
 | `decision` | On `pipeline_requested`, an agent tool run that names no decision; on `pipeline_dispatch`, a finished run no decision cites |
 | `execution`, `task_result` | A dispatched run without executions, or a finished execution without task results |

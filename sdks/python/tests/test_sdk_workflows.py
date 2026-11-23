@@ -222,3 +222,27 @@ def test_workflows_share_the_session_client_and_its_lifecycle(
     qdash.close()
 
     assert transport.is_closed
+
+
+def test_a_run_names_its_calibration_session_and_run() -> None:
+    recorded = {
+        **execute_body(),
+        "calibration_session_id": "cs-1",
+        "calibration_run_id": "cpr-1",
+    }
+    server = Server(
+        {
+            **routes(),
+            ("POST", f"/flows/{NAME}/execute"): [httpx.Response(200, json=recorded)],
+        }
+    )
+    run = QDash(server.client()).workflows.run(
+        NAME, calibration_session_id="cs-1", idempotency_key="trial-1"
+    )
+
+    assert json.loads(server.requests[0].content) == {
+        "parameters": {},
+        "calibration_session_id": "cs-1",
+        "idempotency_key": "trial-1",
+    }
+    assert (run.calibration_session_id, run.calibration_run_id) == ("cs-1", "cpr-1")

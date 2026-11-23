@@ -64,11 +64,13 @@ class _RecordingCoordinator:
 
     async def dispatch_run(self, **kwargs: Any) -> DispatchResult:
         self.runs.append(kwargs)
+        # Each launch is its own flow run, as Prefect creates it: flow-run-1, flow-run-2, ...
+        index = len(self.runs)
         return DispatchResult(
-            flow_run_id="flow-run-1",
-            flow_run_url="http://localhost:4200/runs/flow-run/flow-run-1",
-            execution_id="exec-1",
-            qdash_ui_url="http://localhost:5714/execution/exec-1",
+            flow_run_id=f"flow-run-{index}",
+            flow_run_url=f"http://localhost:4200/runs/flow-run/flow-run-{index}",
+            execution_id=f"exec-{index}",
+            qdash_ui_url=f"http://localhost:5714/execution/exec-{index}",
         )
 
     async def delete_deployment(self, *_: Any) -> None:
@@ -280,7 +282,8 @@ def test_without_an_override_the_saved_pairs_are_grouped_automatically(
         test_client, coordinator, monkeypatch, {"parameters": {"coupling_pairs": pairs}}
     )
 
-    assert "context" not in run
+    # No target override; the context carries only the run QDash recorded for the launch.
+    assert set(run.get("context") or {}) == {"qdash_calibration_run"}
     # Only the listed pairs run; 0-1 and 4-5 share a group, 5-4 shares qubits with 4-5.
     assert _executed(executed_pairs) == ["0-1", "4-5", "5-4"]
     assert len(executed_pairs) == 2

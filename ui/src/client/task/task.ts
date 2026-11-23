@@ -170,6 +170,9 @@ export function useListTasks<TData = Awaited<ReturnType<typeof listTasks>>, TErr
 
 /**
  * Execute one task without requiring a previous execution snapshot.
+ *
+ * The run is recorded in ``calibration_session_id`` when given, otherwise in an automatic
+ * calibration session QDash creates for it, before it is launched.
  * @summary Execute a single task from the task catalog
  */
 export const quickRunTask = (

@@ -39,7 +39,8 @@ class WorkflowRun:
     """A dispatched workflow run, returned by :meth:`Workflow.run` and :meth:`Workflows.run`.
 
     ``execution_id`` is the QDash execution the server created for the run; ``response`` is
-    the dispatch response as the API returned it, including ``flow_run_id``.
+    the dispatch response as the API returned it, including ``flow_run_id``. Every step
+    execution of the run belongs to ``calibration_session_id`` and ``calibration_run_id``.
     """
 
     def __init__(self, client: QDashClient, name: str, response: ExecuteFlowResponse) -> None:
@@ -50,6 +51,16 @@ class WorkflowRun:
     @property
     def execution_id(self) -> str:
         return self.response.execution_id
+
+    @property
+    def calibration_session_id(self) -> str | None:
+        """The calibration session the run is recorded in: the one named, or an automatic one."""
+        return self.response.calibration_session_id
+
+    @property
+    def calibration_run_id(self) -> str | None:
+        """The run's record in that session; every step execution of the run carries it."""
+        return self.response.calibration_run_id
 
     def __repr__(self) -> str:
         return f"WorkflowRun(name={self.name!r}, execution_id={self.execution_id!r})"
@@ -111,9 +122,20 @@ class Workflow:
     def __repr__(self) -> str:
         return f"Workflow(name={self.name!r}, chip_id={self.chip_id!r})"
 
-    def run(self, *, parameters: Mapping[str, Any] | None = None) -> WorkflowRun:
-        """Run this workflow; the same as ``Workflows.run(self.name, parameters=...)``."""
-        return self._workflows.run(self.name, parameters=parameters)
+    def run(
+        self,
+        *,
+        parameters: Mapping[str, Any] | None = None,
+        calibration_session_id: str | None = None,
+        idempotency_key: str | None = None,
+    ) -> WorkflowRun:
+        """Run this workflow; the same as ``Workflows.run(self.name, ...)``."""
+        return self._workflows.run(
+            self.name,
+            parameters=parameters,
+            calibration_session_id=calibration_session_id,
+            idempotency_key=idempotency_key,
+        )
 
 
 class Workflows:
@@ -130,7 +152,14 @@ class Workflows:
         """The registered workflow ``name``; raises ``QDashNotFoundError`` when there is none."""
         return Workflow(self, self._client.get_flow(_checked_name(name)))
 
-    def run(self, name: str, *, parameters: Mapping[str, Any] | None = None) -> WorkflowRun:
+    def run(
+        self,
+        name: str,
+        *,
+        parameters: Mapping[str, Any] | None = None,
+        calibration_session_id: str | None = None,
+        idempotency_key: str | None = None,
+    ) -> WorkflowRun:
         """Dispatch the registered workflow ``name`` and return its run handle.
 
         The server starts from the workflow's saved ``default_parameters`` and overrides them
@@ -139,6 +168,11 @@ class Workflows:
         parameters carry a ``chip_id``; the SDK adds no chip of its own. Requires a configured
         project, so the run cannot fall back to the user's default project. Returns once the
         run is dispatched; call :meth:`WorkflowRun.wait` to follow it.
+
+        The server records the run, with every step execution, in ``calibration_session_id``
+        when given (open, on the run's chip, created by the signed-in user), otherwise in an
+        automatic session it creates. A retry with the same ``idempotency_key`` returns the
+        recorded run instead of starting another; without a key every call starts a new run.
         """
         checked = _checked_name(name)
         if not self._client.config.project_id:
@@ -147,6 +181,9 @@ class Workflows:
                 "project_id in the profile, or QDash(..., project_id=...)"
             )
         response = self._client.execute_flow(
-            checked, parameters=dict(parameters) if parameters is not None else {}
+            checked,
+            parameters=dict(parameters) if parameters is not None else {},
+            calibration_session_id=calibration_session_id,
+            idempotency_key=idempotency_key,
         )
         return WorkflowRun(self._client, checked, response)

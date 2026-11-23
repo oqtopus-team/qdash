@@ -120,6 +120,25 @@ beforeEach(() => {
 });
 
 describe("CalibrationSessionPageContent", () => {
+  it("names an automatic session and what each of its runs launched", () => {
+    const [first] = DETAIL.pipeline_runs;
+    state.detail = {
+      ...DETAIL,
+      origin: "automatic",
+      objective: "Workflow nightly_1q",
+      pipeline_runs: [
+        { ...first, run_kind: "workflow", run_name: "nightly_1q", trigger: "schedule" },
+      ],
+    };
+    render(<CalibrationSessionPageContent calibrationSessionId="cs-1" />);
+    expect(screen.getByText("Automatic")).toBeTruthy();
+    expect(screen.getByText(/QDash created it for a run started without a session/)).toBeTruthy();
+    const [run] = screen.getAllByTestId("calibration-pipeline-run");
+    expect(within(run).getByText("nightly_1q")).toBeTruthy();
+    expect(within(run).getByText("Workflow")).toBeTruthy();
+    expect(within(run).getByText("Scheduled")).toBeTruthy();
+  });
+
   it("shows one pipeline run with every step execution, and the agent session with its executions", () => {
     render(<CalibrationSessionPageContent calibrationSessionId="cs-1" />);
     expect(state.requests[0]).toEqual({
@@ -186,7 +205,7 @@ describe("CalibrationSessionPageContent", () => {
     render(<CalibrationSessionPageContent calibrationSessionId="cs-1" />);
     const [cut] = screen.getAllByTestId("calibration-list-cut");
     expect(cut.textContent).toBe(
-      "Showing the latest 2 of 140 pipeline runs. Close checks every one of them.",
+      "Showing the latest 2 of 140 runs. Close checks every one of them.",
     );
     expect(screen.getAllByTestId("calibration-list-cut")).toHaveLength(1);
     expect(screen.getByText("140")).toBeTruthy();
@@ -241,7 +260,7 @@ describe("CalibrationSessionPageContent", () => {
   it("names empty sections", () => {
     state.detail = { ...DETAIL, pipeline_runs: [], agent_sessions: [], close_blockers: [] };
     render(<CalibrationSessionPageContent calibrationSessionId="cs-1" />);
-    expect(screen.getByText("No pipeline runs")).toBeTruthy();
+    expect(screen.getByText("No runs")).toBeTruthy();
     expect(screen.getByText("No agent sessions")).toBeTruthy();
   });
 

@@ -12,7 +12,33 @@ from qdash.api.routers.task_result import re_execute_task_result
 from qdash.api.schemas.flow import ExecuteFlowResponse
 from qdash.api.schemas.task import QuickRunTaskRequest
 from qdash.api.schemas.task_file import ListTaskInfoResponse, TaskInfo
+from qdash.api.services.calibration_session_service import PipelineDispatch
+from qdash.datamodel.calibration_session import CalibrationRunIdentity
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
+
+PLACEHOLDER = ExecuteFlowResponse(
+    execution_id="flow-run-0",
+    flow_run_id="flow-run-0",
+    flow_run_url="http://prefect/runs/flow-run/flow-run-0",
+    qdash_ui_url="http://qdash/execution/flow-run-0",
+    message="started",
+)
+
+
+class _Sessions:
+    """Records nothing: validates, then dispatches with a fixed run identity."""
+
+    identity = CalibrationRunIdentity(calibration_session_id="cs-test", run_id="cpr-test")
+
+    async def launch(self, *, validate: Any, dispatch: Any, **_: Any) -> PipelineDispatch:
+        dispatched = await dispatch(validate(), self.identity)
+        response = dispatched if isinstance(dispatched, ExecuteFlowResponse) else PLACEHOLDER
+        return PipelineDispatch(
+            response=response.model_dump(mode="json"),
+            run_id=self.identity.run_id,
+            replayed=False,
+            calibration_session_id=self.identity.calibration_session_id,
+        )
 
 
 def _project_context() -> SimpleNamespace:
@@ -77,6 +103,7 @@ async def test_catalog_run_source_is_provenance_only(
         "flow_service": SimpleNamespace(execute_single_task_from_snapshot=execute),
         "task_service": SimpleNamespace(get_task_result=lookup),
         "task_file_service": _task_file_service(_task_info()),
+        "sessions": _Sessions(),
     }
     if source_error:
         with pytest.raises(HTTPException) as exc:
@@ -123,6 +150,7 @@ async def test_quick_run_passes_readout_duration_to_task_and_session(
         ),
         task_service=SimpleNamespace(),  # type: ignore[arg-type]
         task_file_service=_task_file_service(_task_info()),  # type: ignore[arg-type]
+        sessions=_Sessions(),  # type: ignore[arg-type]
     )
 
     sent = execute.await_args_list[0].kwargs
@@ -161,6 +189,7 @@ async def test_quick_run_passes_sweep_form_to_task(monkeypatch: pytest.MonkeyPat
         ),
         task_service=SimpleNamespace(),  # type: ignore[arg-type]
         task_file_service=_task_file_service(_task_info()),  # type: ignore[arg-type]
+        sessions=_Sessions(),  # type: ignore[arg-type]
     )
 
     sent = execute.await_args_list[0].kwargs
@@ -194,6 +223,7 @@ async def test_quick_run_task_rejects_disabled_task(monkeypatch: pytest.MonkeyPa
             flow_service=flow_service,  # type: ignore[arg-type]
             task_service=SimpleNamespace(),  # type: ignore[arg-type]
             task_file_service=_task_file_service(),  # type: ignore[arg-type]
+            sessions=_Sessions(),  # type: ignore[arg-type]
         )
 
     assert exc_info.value.status_code == 400
@@ -228,10 +258,15 @@ async def test_quick_run_task_resolves_and_validates_default_backend(
         flow_service=flow_service,  # type: ignore[arg-type]
         task_service=SimpleNamespace(),  # type: ignore[arg-type]
         task_file_service=_task_file_service(_task_info()),  # type: ignore[arg-type]
+        sessions=_Sessions(),  # type: ignore[arg-type]
     )
 
-    assert result == response
+    assert result == response.model_copy(
+        update={"calibration_session_id": "cs-test", "calibration_run_id": "cpr-test"}
+    )
     execute.assert_awaited_once()
+    # The worker stamps the recorded run on the execution.
+    assert execute.await_args_list[0].kwargs["calibration_run"] == _Sessions.identity
     assert execute.await_args_list[0].kwargs["backend_name"] == "fake"
 
 
@@ -346,6 +381,7 @@ async def test_quick_run_task_rejects_invalid_overrides(
             flow_service=flow_service,  # type: ignore[arg-type]
             task_service=SimpleNamespace(),  # type: ignore[arg-type]
             task_file_service=_task_file_service(_task_info()),  # type: ignore[arg-type]
+            sessions=_Sessions(),  # type: ignore[arg-type]
         )
 
     assert exc_info.value.status_code == 400
@@ -382,6 +418,7 @@ async def test_re_execute_passes_snapshot_or_override_duration_to_session(
             execute_single_task_from_snapshot=execute
         ),
         task_file_service=_task_file_service(_task_info()),  # type: ignore[arg-type]
+        sessions=_Sessions(),  # type: ignore[arg-type]
         parameter_overrides=parameter_overrides,
     )
 
@@ -435,6 +472,7 @@ async def test_re_execute_restores_legacy_snapshot_duration(
             execute_single_task_from_snapshot=execute
         ),
         task_file_service=_task_file_service(_task_info()),  # type: ignore[arg-type]
+        sessions=_Sessions(),  # type: ignore[arg-type]
     )
 
     assert execute.await_args_list[0].kwargs["default_run_parameters"] == {
@@ -475,6 +513,7 @@ async def test_re_execute_rejects_conflicting_legacy_two_qubit_durations(
                 execute_single_task_from_snapshot=execute
             ),
             task_file_service=_task_file_service(_task_info()),  # type: ignore[arg-type]
+            sessions=_Sessions(),  # type: ignore[arg-type]
         )
 
     assert exc_info.value.status_code == 400
@@ -628,6 +667,7 @@ async def test_re_execute_keeps_session_duration_out_of_undeclared_run_overrides
             execute_single_task_from_snapshot=execute
         ),
         task_file_service=_task_file_service(task),  # type: ignore[arg-type]
+        sessions=_Sessions(),  # type: ignore[arg-type]
         parameter_overrides={"run": {"readout_duration": 1024, "shots": 256}},
     )
 

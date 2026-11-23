@@ -10,7 +10,13 @@ import type {
   ExecutionResponseSummary,
 } from "@/schemas";
 
-import { calibrationSessionHref, dispatchStatusStyle } from "@/lib/chatCalibrationSession";
+import {
+  calibrationSessionHref,
+  dispatchStatusStyle,
+  runDisplayName,
+  runKindLabel,
+  runTriggerLabel,
+} from "@/lib/chatCalibrationSession";
 import { formatDateTime } from "@/lib/utils/datetime";
 
 import { pluralize } from "./agentSessionDisplay";
@@ -72,12 +78,13 @@ function PipelineRunGroup({
   const dispatch = dispatchStatusStyle(run.dispatch_status);
   const executions = run.executions ?? [];
   const omitted = (run.executions_total ?? 0) - executions.length;
+  const trigger = runTriggerLabel(run.trigger);
   return (
     <li className="flex flex-col gap-2" data-testid="calibration-row-run">
       <div className="flex flex-wrap items-center gap-2 text-xs text-base-content/60">
-        <span className="text-sm font-medium text-base-content">
-          {run.pipeline_name || "Pipeline run"}
-        </span>
+        <span className="text-sm font-medium text-base-content">{runDisplayName(run)}</span>
+        <span className="badge badge-outline badge-sm">{runKindLabel(run.run_kind)}</span>
+        {trigger ? <span className="badge badge-ghost badge-sm">{trigger}</span> : null}
         <span className={`badge badge-soft badge-sm ${dispatch.badge}`}>{dispatch.label}</span>
         {run.decision_id ? (
           <span className="badge badge-ghost badge-sm" title="The decision this run carries out">
@@ -124,8 +131,10 @@ function PipelineRunGroup({
 
 /**
  * One calibration session in the Execution list: the objective and what its records hold, and,
- * expanded, every pipeline run with its step executions and every admitted agent session with
- * the executions it dispatched. Membership comes from the server's records only.
+ * expanded, every run (a workflow, pipeline, or task launch) with its step executions and every
+ * admitted agent session with the executions it dispatched. A run started without a session is
+ * shown in the automatic session QDash created for it. Membership comes from the server's
+ * records only.
  */
 export function CalibrationSessionGroupRow({
   item,
@@ -150,6 +159,7 @@ export function CalibrationSessionGroupRow({
   const agents = item.nested_agent_sessions ?? [];
   const recommendation = summary.recommendation;
   const isOpen = summary.status === "open";
+  const isAutomatic = summary.origin === "automatic";
 
   return (
     <div
@@ -175,6 +185,14 @@ export function CalibrationSessionGroupRow({
               <span className={`badge badge-soft badge-sm ${isOpen ? "badge-info" : ""}`}>
                 {isOpen ? "Open" : "Closed"}
               </span>
+              {isAutomatic ? (
+                <span
+                  className="badge badge-ghost badge-sm"
+                  title="QDash created this session for a run started without one"
+                >
+                  Automatic
+                </span>
+              ) : null}
               {recommendation ? (
                 <span
                   className="badge badge-outline badge-sm"
@@ -196,7 +214,7 @@ export function CalibrationSessionGroupRow({
               )}
             </span>
             <span className="mt-1 block text-xs text-base-content/60">
-              {pluralize(counts.pipeline_runs, "pipeline run")}
+              {pluralize(counts.pipeline_runs, "run")}
               {counts.agent_sessions > 0
                 ? ` · ${pluralize(counts.agent_sessions, "agent session")}`
                 : ""}
@@ -230,12 +248,12 @@ export function CalibrationSessionGroupRow({
           ) : null}
           {(item.pipeline_runs_omitted ?? 0) > 0 ? (
             <p className="text-xs text-base-content/60">
-              {pluralize(item.pipeline_runs_omitted ?? 0, "earlier pipeline run")} not listed here;
-              the calibration session lists all of them
+              {pluralize(item.pipeline_runs_omitted ?? 0, "earlier run")} not listed here; the
+              calibration session lists all of them
             </p>
           ) : null}
           {runs.length > 0 ? (
-            <ul className="flex flex-col gap-3" aria-label="Pipeline runs">
+            <ul className="flex flex-col gap-3" aria-label="Runs">
               {runs.map((run) => (
                 <PipelineRunGroup
                   key={run.run_id}

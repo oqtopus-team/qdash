@@ -5,7 +5,11 @@ import Link from "next/link";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { parseAsBoolean, parseAsInteger, parseAsStringLiteral, useQueryState } from "nuqs";
 
-import type { CalibrationSessionStatus, ListCalibrationSessionsParams } from "@/schemas";
+import type {
+  CalibrationSessionOrigin,
+  CalibrationSessionStatus,
+  ListCalibrationSessionsParams,
+} from "@/schemas";
 
 import {
   getListCalibrationSessionsQueryKey,
@@ -29,12 +33,19 @@ const STATUS_LABELS: Record<(typeof STATUS_FILTERS)[number], string> = {
   open: "Open",
   closed: "Closed",
 };
+const ORIGIN_FILTERS = ["all", "manual", "automatic"] as const;
+const ORIGIN_LABELS: Record<(typeof ORIGIN_FILTERS)[number], string> = {
+  all: "All origins",
+  manual: "Created for an objective",
+  automatic: "Automatic",
+};
 
 /**
  * The project's calibration sessions, newest first: one row per objective, linked to its page.
  *
- * A calibration session is optional. Ordinary executions never need one, so this page only
- * lists the ones people or agents created; it starts nothing.
+ * Every run belongs to one. A run started without a session gets an automatic one, so the
+ * origin filter separates the sessions people or agents created for an objective from those
+ * QDash created for single runs. This page starts nothing.
  */
 export function CalibrationSessionListPageContent() {
   const linked = useLinkedProject();
@@ -42,6 +53,10 @@ export function CalibrationSessionListPageContent() {
   const [statusFilter, setStatusFilter] = useQueryState(
     "status",
     parseAsStringLiteral(STATUS_FILTERS).withDefault("all"),
+  );
+  const [originFilter, setOriginFilter] = useQueryState(
+    "origin",
+    parseAsStringLiteral(ORIGIN_FILTERS).withDefault("all"),
   );
   const [mine, setMine] = useQueryState("mine", parseAsBoolean.withDefault(false));
   const [chip, setChip] = useQueryState("chip");
@@ -52,6 +67,7 @@ export function CalibrationSessionListPageContent() {
     limit: PAGE_SIZE,
     skip: (currentPage - 1) * PAGE_SIZE,
     ...(statusFilter !== "all" ? { status: [statusFilter as CalibrationSessionStatus] } : {}),
+    ...(originFilter !== "all" ? { origin: [originFilter as CalibrationSessionOrigin] } : {}),
     ...(mine ? { mine: true } : {}),
     ...(chip ? { chip_id: chip } : {}),
   };
@@ -89,7 +105,7 @@ export function CalibrationSessionListPageContent() {
     <PageContainer maxWidth>
       <PageHeader
         title="Calibration sessions"
-        description="Objectives that group pipeline runs and agent sessions. Ordinary executions need none."
+        description="Objectives that group runs and agent sessions. A run started without one gets an automatic session."
       />
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <div role="tablist" aria-label="Status" className="tabs tabs-box tabs-sm w-fit">
@@ -109,6 +125,22 @@ export function CalibrationSessionListPageContent() {
             </button>
           ))}
         </div>
+        <select
+          className="select select-sm w-fit"
+          aria-label="Origin"
+          value={originFilter}
+          onChange={(event) => {
+            const value = event.target.value as (typeof ORIGIN_FILTERS)[number];
+            void setOriginFilter(value === "all" ? null : value);
+            resetPage();
+          }}
+        >
+          {ORIGIN_FILTERS.map((value) => (
+            <option key={value} value={value}>
+              {ORIGIN_LABELS[value]}
+            </option>
+          ))}
+        </select>
         <label className="choice-field gap-2 text-sm">
           <input
             type="checkbox"
@@ -155,7 +187,7 @@ export function CalibrationSessionListPageContent() {
           description={
             currentPage > 1
               ? "No more sessions match these filters"
-              : "A calibration session appears here when someone, or an agent on their behalf, starts work toward an objective with one"
+              : "A calibration session appears here when a run starts, or when someone, or an agent on their behalf, creates one for an objective"
           }
           emoji="empty"
         />
@@ -175,8 +207,18 @@ export function CalibrationSessionListPageContent() {
                 >
                   {session.objective}
                 </Link>
-                <div className="text-xs text-base-content/60">
-                  {session.chip_id} · @{session.created_by} · {formatDateTime(session.created_at)}
+                <div className="flex flex-wrap items-center gap-x-1 text-xs text-base-content/60">
+                  {session.origin === "automatic" ? (
+                    <span
+                      className="badge badge-ghost badge-xs"
+                      title="QDash created this session for a run started without one"
+                    >
+                      Automatic
+                    </span>
+                  ) : null}
+                  <span>
+                    {session.chip_id} · @{session.created_by} · {formatDateTime(session.created_at)}
+                  </span>
                 </div>
               </div>
             </li>

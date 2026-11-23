@@ -22,6 +22,13 @@ function checkedName(name: string): string {
 export interface WorkflowRunOptions {
   /** Override the saved `default_parameters` for this run only. */
   parameters?: Record<string, unknown>;
+  /**
+   * Add the run to this calibration session (open, on the run's chip, created by the
+   * signed-in user). Without it, the server records the run in an automatic session.
+   */
+  calibrationSessionId?: string;
+  /** A retry with the same key returns the recorded run instead of starting another. */
+  idempotencyKey?: string;
 }
 
 /** A dispatched workflow run. */
@@ -35,6 +42,16 @@ export class WorkflowRun {
 
   get executionId(): string {
     return this.response.execution_id;
+  }
+
+  /** The calibration session the run is recorded in: the one named, or an automatic one. */
+  get calibrationSessionId(): string | null {
+    return this.response.calibration_session_id ?? null;
+  }
+
+  /** The run's record in that session; every step execution of the run carries it. */
+  get calibrationRunId(): string | null {
+    return this.response.calibration_run_id ?? null;
   }
 
   /** The run's current state; `QDashNotFoundError` before it exists. */
@@ -101,7 +118,10 @@ export class Workflows {
    */
   async run(name: string, options: WorkflowRunOptions = {}): Promise<WorkflowRun> {
     const checked = checkedName(name);
-    const response = await this.client.executeFlow(checked, { ...(options.parameters ?? {}) });
+    const response = await this.client.executeFlow(checked, { ...(options.parameters ?? {}) }, {
+      ...(options.calibrationSessionId !== undefined ? { calibrationSessionId: options.calibrationSessionId } : {}),
+      ...(options.idempotencyKey !== undefined ? { idempotencyKey: options.idempotencyKey } : {}),
+    });
     return new WorkflowRun(this.client, checked, response);
   }
 }

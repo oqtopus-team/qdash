@@ -88,7 +88,11 @@ from qdash.datamodel.agent_session import (
     AgentSessionStopRecord,
     model_label,
 )
-from qdash.datamodel.calibration_session import CalibrationAdmission, CalibrationChildKind
+from qdash.datamodel.calibration_session import (
+    CalibrationAdmission,
+    CalibrationChildKind,
+    CalibrationRunKind,
+)
 from qdash.dbmodel.agent_parameter_state import (
     StoredParameter,
     acquire_backend_apply_lock,
@@ -107,6 +111,10 @@ from qdash.dbmodel.evaluation import EvaluationDocument
 from qdash.dbmodel.execution_history import ExecutionHistoryDocument
 from qdash.dbmodel.qubit import QubitDocument
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
+from qdash.repository.calibration_run import (
+    automatic_objective,
+    insert_or_load_automatic_session,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -345,19 +353,31 @@ class AgentSessionService:
         )
         session_id = str(uuid4())
         calibration = CalibrationSessionService()
-        calibration_session_id = body.calibration_session_id or ""
-        reservation = None
-        if body.calibration_session_id is not None:
-            # Checked and reserved in the calibration session before the session exists; the
-            # relation grants nothing, so the policy above stays the only authority.
-            reservation = calibration.reserve_child(
+        calibration_session_id = body.calibration_session_id
+        if calibration_session_id is None:
+            # A session started without a calibration session gets an automatic one, so the
+            # runs its actions launch are recorded with a purpose like every other run. It is
+            # created after the checks above, and the start is reserved and admitted in it
+            # exactly as in a named one; the relation grants nothing.
+            calibration_session_id = insert_or_load_automatic_session(
+                calibration_session_id=f"cs-auto-{uuid4().hex}",
                 project_id=project_id,
-                calibration_session_id=calibration_session_id,
                 chip_id=body.chip_id,
                 username=username,
-                kind=CalibrationChildKind.AGENT_SESSION,
-                child_id=session_id,
-            )
+                objective=automatic_objective(
+                    CalibrationRunKind.AGENT_ACTION, body.skill_name or ""
+                ),
+            ).calibration_session_id
+        # Checked and reserved in the calibration session before the session exists; the
+        # relation grants nothing, so the policy above stays the only authority.
+        reservation = calibration.reserve_child(
+            project_id=project_id,
+            calibration_session_id=calibration_session_id,
+            chip_id=body.chip_id,
+            username=username,
+            kind=CalibrationChildKind.AGENT_SESSION,
+            child_id=session_id,
+        )
         try:
             timestamp = now()
             doc = AgentSessionDocument(
@@ -375,59 +395,52 @@ class AgentSessionService:
                 updated_at=timestamp,
                 # Stored with the session, so the start message survives a crash after insert.
                 start_notification=initial_start_notification(self.notifications.enabled),
-                calibration_session_id=body.calibration_session_id,
+                calibration_session_id=calibration_session_id,
                 # Written unadmitted: no operation passes until the reservation is finalized.
-                calibration_admission=(
-                    CalibrationAdmission.PENDING if reservation is not None else None
-                ),
-                calibration_reservation_id=(
-                    reservation.reservation_id if reservation is not None else None
-                ),
+                calibration_admission=CalibrationAdmission.PENDING,
+                calibration_reservation_id=reservation.reservation_id,
             )
         except BaseException:
-            if reservation is not None:
-                calibration.release_child(
-                    project_id=project_id,
-                    calibration_session_id=calibration_session_id,
-                    reservation_id=reservation.reservation_id,
-                )
+            calibration.release_child(
+                project_id=project_id,
+                calibration_session_id=calibration_session_id,
+                reservation_id=reservation.reservation_id,
+            )
             raise
         try:
             doc.insert()
         except DuplicateKeyError:
             # Not written: nothing can run in it.
-            if reservation is not None:
-                calibration.release_child(
-                    project_id=project_id,
-                    calibration_session_id=calibration_session_id,
-                    reservation_id=reservation.reservation_id,
-                )
+            calibration.release_child(
+                project_id=project_id,
+                calibration_session_id=calibration_session_id,
+                reservation_id=reservation.reservation_id,
+            )
             raise
         # Any other insert failure leaves the reservation pending: whether the session was
         # written is unknown, and a close reports it until it is found or acknowledged. A
         # session written meanwhile stays unadmitted until a load decides it.
-        if reservation is not None:
-            finalized = calibration.finalize_child(
-                project_id=project_id,
-                calibration_session_id=calibration_session_id,
-                reservation_id=reservation.reservation_id,
-                admit=True,
+        finalized = calibration.finalize_child(
+            project_id=project_id,
+            calibration_session_id=calibration_session_id,
+            reservation_id=reservation.reservation_id,
+            admit=True,
+        )
+        # A crash here leaves the session pending; its next load reads the finalized
+        # reservation from the calibration session and admits it, or rejects it.
+        if not finalized:
+            # The calibration session was closed before the start was finalized. The
+            # session was never admitted, so nothing ran in it; reject and cancel it.
+            reject_calibration_child(doc, actor=username)
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    f"Calibration session {calibration_session_id} was closed before "
+                    f"agent session {session_id} was admitted; it was rejected and "
+                    "cancelled before it could operate. Start a new calibration session."
+                ),
             )
-            # A crash here leaves the session pending; its next load reads the finalized
-            # reservation from the calibration session and admits it, or rejects it.
-            if not finalized:
-                # The calibration session was closed before the start was finalized. The
-                # session was never admitted, so nothing ran in it; reject and cancel it.
-                reject_calibration_child(doc, actor=username)
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail=(
-                        f"Calibration session {body.calibration_session_id} was closed before "
-                        f"agent session {session_id} was admitted; it was rejected and "
-                        "cancelled before it could operate. Start a new calibration session."
-                    ),
-                )
-            admit_calibration_child(doc)
+        admit_calibration_child(doc)
         return self._session_response(doc)
 
     def get_session(self, *, project_id: str, session_id: str) -> AgentSessionResponse:
@@ -2043,7 +2056,24 @@ class AgentSessionService:
                 detail="The dispatch reservation was released as abandoned; retry the action",
             )
 
+        run_claim = None
         try:
+            identity = None
+            if (
+                session.calibration_session_id
+                and session.calibration_admission == CalibrationAdmission.ADMITTED
+            ):
+                # The run of this dispatch, in the calibration session the agent session was
+                # admitted to, recorded before the launch so the worker stamps it.
+                run_claim, identity = CalibrationSessionService.begin_agent_action_run(
+                    project_id=project_id,
+                    calibration_session_id=session.calibration_session_id,
+                    chip_id=session.chip_id,
+                    agent_session_id=session_id,
+                    action_id=action_id,
+                    requested_by=session.created_by,
+                    run_name=f"{action.task_name} on {action.qids[0]}",
+                )
             operation = await run_catalog_task(
                 flow_service=flow_service,
                 task=task,
@@ -2059,8 +2089,14 @@ class AgentSessionService:
                 reconfigure=body.reconfigure,
                 execution_name=f"agent:{action.task_name}",
                 tags=[f"agent-session:{session_id}"],
+                calibration_run=identity,
+                # A session started before automatic sessions existed keeps its executions to
+                # itself: its runs are not recorded in a session it never had.
+                ungrouped=identity is None,
             )
         except Exception as exc:
+            if run_claim is not None:
+                CalibrationSessionService.settle_agent_action_run(run_claim, error=exc)
             actions.update_one(
                 reservation,
                 {
@@ -2072,6 +2108,8 @@ class AgentSessionService:
             )
             raise
 
+        if run_claim is not None:
+            CalibrationSessionService.settle_agent_action_run(run_claim, dispatched=operation)
         queued: dict[str, Any] = {
             "execution_status": "queued",
             "operation_id": operation.flow_run_id,

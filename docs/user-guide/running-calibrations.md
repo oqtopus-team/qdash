@@ -113,14 +113,23 @@ in the same details panel as any other run; select **Open session graph** to see
 count above the list gives runs and rows separately, because one row can hold several runs. With
 a day selected, a row appears when it was created or started a run that day, and it still lists
 all of its runs. A run belongs to a row only when it was started for that objective or by that
-agent session; runs started any other way stay their own rows. Turn the switch off for the plain
-list of runs. See [Agent Calibration](./agent-calibration.md#follow-a-session-on-the-execution-page).
+agent session; a run recorded before this grouping existed stays its own row. Turn the switch
+off for the plain list of runs. See [Agent Calibration](./agent-calibration.md#follow-a-session-on-the-execution-page).
 
-A run started for a calibration objective shows the objective as a badge on its card: each step
-of a pipeline run recorded in a calibration session, and each run of an agent session started in
-one. The details panel and the run's page say why it belongs there and offer **Open calibration
-session**; an agent session row offers the same link beside **Open session graph**. A run
-without an objective looks as before, and nothing asks you to create one.
+Every workflow, pipeline, or task you start belongs to a calibration session, and so does every
+step it runs. When you start one without choosing an objective, QDash creates a session for that
+run alone, marked **Automatic**. A saved workflow with several steps is therefore one row on the
+grouped list, with each step listed under the run, and running it again adds another session
+with its own run. Scheduled workflow runs are grouped the same way, one session per scheduled
+run. Each run is labeled **Workflow**, **Pipeline**, or **Task**, and a scheduled one is marked
+**Scheduled**. To collect several runs toward one goal, such as an agent's optimization trials,
+start them in the same calibration session; the assistant does this for you. Runs recorded
+before this grouping existed are not moved into a session.
+
+A run shows its objective as a badge on its card. The details panel and the run's page say why
+it belongs there and offer **Open calibration session**; an agent session row offers the same
+link beside **Open session graph**. After you start a workflow in **Workflow**, the confirmation
+offers **Open calibration session**.
 
 The card names the user whose sign-in started the run. **Agent** marks a run an agent session
 dispatched. **Agent tool, reported** marks a pipeline the assistant's tool started with your
@@ -128,8 +137,9 @@ approval: the tool reports this itself and QDash does not verify it, so the run 
 Belonging to an objective does not make a run an agent run.
 
 Select **Calibration sessions** at the top of the **Execution** page to list the objectives on
-the selected chip, newest first. Filter them by **Open** or **Closed** or with **Only mine**,
-and remove the chip filter to see every chip. Selecting an objective opens its page.
+the selected chip, newest first. Filter them by **Open** or **Closed**, by origin
+(**Created for an objective** or **Automatic**), or with **Only mine**, and remove the chip
+filter to see every chip. Selecting an objective opens its page.
 
 An objective's page shows **Search progression** when the assistant recorded experiments for it,
 such as a ZX90 gate search: the stages reached (**Baseline**, **Screening**, **Confirmation**), a

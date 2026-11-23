@@ -336,10 +336,10 @@ assistant then starts for the goal is still approved on its own card. Each card 
 calibration session the run is recorded in.
 
 1. Approve the **Calibration session** card. A card above the message box shows the goal, how
-   many pipeline runs and agent sessions it holds, and how many still run or wait.
-2. Approve the runs the assistant proposes. A pipeline run is listed once with all of its steps,
+   many runs and agent sessions it holds, and how many still run or wait.
+2. Approve the runs the assistant proposes. A pipeline or workflow run is listed once with all of its steps,
    and an agent session is listed with the measurements it ran.
-3. Select **Open** on the card to see the calibration session page: each pipeline run with its
+3. Select **Open** on the card to see the calibration session page: each run with its
    steps and their executions, and each agent session with its state and executions. Select an
    execution to open it on the **Execution** page. A pipeline the assistant started is marked
    **Agent tool, reported**; one you started yourself has no mark.

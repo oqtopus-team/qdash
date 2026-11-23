@@ -123,7 +123,7 @@ describe("calibration session and reported origin on executions", () => {
     );
     const note = screen.getByRole("note");
     expect(note.textContent).toContain("Bring up qubits 0 and 1");
-    expect(note.textContent).toContain("A step of pipeline run cpr-1");
+    expect(note.textContent).toContain("A step of run cpr-1");
     expect(note.textContent).toContain("pi-qdash reported that the agent tool qdash_run_pipeline");
     expect(note.textContent).toContain("QDash does not verify this");
     expect(

@@ -22,7 +22,7 @@ function registeredTools(saveFlow, chipId = "64Qv3", executeFlow = async () => {
         // null stands for a profile without a project.
         config: { projectId: projectId ?? undefined },
         async saveFlow(request) { calls.push(request); return saveFlow(request); },
-        async executeFlow(name, parameters) { calls.push({ execute: name, parameters }); return executeFlow(name, parameters); },
+        async executeFlow(name, parameters, options) { calls.push({ execute: name, parameters, ...options }); return executeFlow(name, parameters, options); },
         // The pause guard: the user's agent sessions waiting for an expert.
         async listAgentSessions(options) { sessionQueries.push(options); return typeof pausedSessions === "function" ? pausedSessions() : pausedSessions; },
         // A tool that starts a run must not follow it.
@@ -82,7 +82,8 @@ test("running a saved flow is confirmation-gated and reports the execution", asy
   await assert.rejects(run.execute("t", { name: "my_check" }, undefined, undefined, uiContext(false)), /requires explicit confirmation/);
   assert.equal(calls.length, 0);
   const result = await run.execute("t", { name: "my_check", parameters: { qids: ["0"] } }, undefined, undefined, approved("t"));
-  assert.deepEqual(calls, [{ execute: "my_check", parameters: { qids: ["0"] } }]);
+  // Recorded under the call's key: a replayed call returns the run it started.
+  assert.deepEqual(calls, [{ execute: "my_check", parameters: { qids: ["0"] }, idempotencyKey: "qdash_execute_flow:t" }]);
   assert.equal(result.details.executionId, "20261022-001");
   assert.equal(result.details.started, true);
   assert.equal(result.content[0].text, formatFlowExecution(started, "my_check"));
@@ -90,7 +91,25 @@ test("running a saved flow is confirmation-gated and reports the execution", asy
 
   // Without parameters the saved defaults run: an empty object is sent, as before.
   await run.execute("t", { name: "my_check" }, undefined, undefined, approved("t"));
-  assert.deepEqual(calls.at(-1), { execute: "my_check", parameters: {} });
+  assert.deepEqual(calls.at(-1), { execute: "my_check", parameters: {}, idempotencyKey: "qdash_execute_flow:t" });
+});
+
+test("a flow run names the calibration session and run it is recorded in", async () => {
+  const started = { execution_id: "20261022-003", flow_run_id: "fr-3", flow_run_url: "", qdash_ui_url: "", message: "started", calibration_session_id: "cs-1", calibration_run_id: "cpr-1" };
+  const { run, calls } = registeredTools(async () => ({}), "64Qv3", async () => started);
+  const result = await run.execute("c9", { name: "my_check", calibrationSessionId: "cs-1" }, undefined, undefined, approved("c9"));
+  assert.deepEqual(calls, [{ execute: "my_check", parameters: {}, idempotencyKey: "qdash_execute_flow:c9", calibrationSessionId: "cs-1" }]);
+  assert.equal(result.details.calibrationSessionId, "cs-1");
+  assert.equal(result.details.calibrationRunId, "cpr-1");
+  assert.match(result.content[0].text, /Recorded in calibration session cs-1 as run cpr-1/);
+});
+
+test("a chipless flow QDash refuses before launch is reported once, never retried without the key", async () => {
+  const refusal = new Error("my_check names no chip (no chip_id parameter and no chip saved with the flow), so QDash cannot record it in a calibration session or replay it by idempotency key. Nothing was started.");
+  const { run, calls } = registeredTools(async () => ({}), "64Qv3", async () => { throw refusal; });
+  await assert.rejects(run.execute("c10", { name: "my_check" }, undefined, undefined, approved("c10")), /Nothing was started/);
+  // One launch request, with the call's key; no keyless retry follows the refusal.
+  assert.deepEqual(calls, [{ execute: "my_check", parameters: {}, idempotencyKey: "qdash_execute_flow:c10" }]);
 });
 
 test("running a flow without a project keeps the server's default and the confirmation gate", async () => {
@@ -106,7 +125,8 @@ test("running a flow without a project keeps the server's default and the confir
   assert.equal(calls.length, 0);
   const viaHost = await run.execute("t", { name: "my_check" }, undefined, undefined, approved("t"));
   const viaUi = await run.execute("t", { name: "my_check" }, undefined, undefined, uiContext(true));
-  assert.deepEqual(calls, [{ execute: "my_check", parameters: {} }, { execute: "my_check", parameters: {} }]);
+  const sent = { execute: "my_check", parameters: {}, idempotencyKey: "qdash_execute_flow:t" };
+  assert.deepEqual(calls, [sent, sent]);
   for (const result of [viaHost, viaUi]) {
     assert.equal(result.details.started, true);
     assert.equal(result.details.executionId, "20261022-002");

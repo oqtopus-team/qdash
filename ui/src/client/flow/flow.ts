@@ -1163,7 +1163,12 @@ export function useGetFlowExecutionPlan<TData = Awaited<ReturnType<typeof getFlo
 
 
 /**
- * Execute a Flow via Prefect deployment.
+ * Execute a Flow via Prefect deployment, as one run of a calibration session.
+ *
+ * The run is recorded before it is launched: in ``calibration_session_id`` when given,
+ * otherwise in an automatic session QDash creates for it. Every step execution of the run
+ * carries the session and run IDs. ``idempotency_key`` makes a retry return the recorded
+ * run instead of starting another.
  * @summary Execute a flow
  */
 export const executeFlow = (

@@ -1,7 +1,7 @@
 """Record loading for a calibration session's audit.
 
-Loads the session and every record its audit reads (pipeline runs, decisions, agent sessions,
-the executions of each run's flow run, and their task results) in batched queries, and turns
+Loads the session and every record its audit reads (calibration runs, decisions, agent
+sessions, the step executions of each run, and their task results) in batched queries, and turns
 stored run specs and task results into the plain facts the audit shows. Nothing here
 validates, writes, or projects events.
 """
@@ -16,6 +16,7 @@ from bunnet import SortDirection
 from fastapi import HTTPException, status
 
 from qdash.api.services.audit_timeline import scalar, scalar_parameters, utc
+from qdash.datamodel.calibration_session import CalibrationRunKind
 from qdash.dbmodel.agent_session import AgentSessionDocument
 from qdash.dbmodel.calibration_session import (
     CalibrationDecisionDocument,
@@ -139,10 +140,11 @@ class CalibrationAuditRecords:
         project_id, chip_id = session.project_id, session.chip_id
         scope = {"project_id": project_id, "calibration_session_id": session.calibration_session_id}
         self.session = session
+        # An agent action's run is audited through its agent session.
         self.runs = cast(
             "list[CalibrationPipelineRunDocument]",
             CalibrationPipelineRunDocument.find(
-                scope,
+                {**scope, "run_kind": {"$ne": CalibrationRunKind.AGENT_ACTION.value}},
                 sort=[
                     ("requested_at", SortDirection.ASCENDING),
                     ("run_id", SortDirection.ASCENDING),
@@ -169,15 +171,24 @@ class CalibrationAuditRecords:
                 ],
             ).run(),
         )
-        flow_run_ids = sorted({run.flow_run_id for run in self.runs if run.flow_run_id})
+        # Step executions of each run: those the worker stamped with the run, or, for a run
+        # recorded before the stamp existed, those of its flow run.
+        by_id = {run.run_id: run for run in self.runs}
+        by_flow = {run.flow_run_id: run for run in self.runs if run.flow_run_id}
         self.flows: dict[str, list[dict[str, Any]]] = defaultdict(list)
-        if flow_run_ids:
+        if by_id:
+            run_clauses: list[dict[str, Any]] = [
+                {"note.calibration_run_id": {"$in": sorted(by_id)}}
+            ]
+            if by_flow:
+                run_clauses.append(
+                    {
+                        "note.flow_run_id": {"$in": sorted(by_flow)},
+                        "note.calibration_run_id": {"$exists": False},
+                    }
+                )
             for doc in ExecutionHistoryDocument.get_motor_collection().find(
-                {
-                    "project_id": project_id,
-                    "chip_id": chip_id,
-                    "note.flow_run_id": {"$in": flow_run_ids},
-                },
+                {"project_id": project_id, "chip_id": chip_id, "$or": run_clauses},
                 {
                     "_id": 0,
                     "execution_id": 1,
@@ -185,10 +196,20 @@ class CalibrationAuditRecords:
                     "start_at": 1,
                     "end_at": 1,
                     "note.flow_run_id": 1,
+                    "note.calibration_run_id": 1,
                     "note.step_index": 1,
                 },
             ):
-                self.flows[str(doc["note"]["flow_run_id"])].append(doc)
+                note = doc.get("note") or {}
+                # The stamp names the run; only an execution without one is found by its flow run.
+                stamp = note.get("calibration_run_id")
+                run = (
+                    by_id.get(str(stamp))
+                    if stamp
+                    else by_flow.get(str(note.get("flow_run_id") or ""))
+                )
+                if run is not None:
+                    self.flows[run.run_id].append(doc)
         for docs in self.flows.values():
             docs.sort(key=lambda doc: (utc(doc.get("start_at")) or EPOCH, doc["execution_id"]))
         execution_ids = sorted(
@@ -212,8 +233,8 @@ class CalibrationAuditRecords:
                 self.tasks_by_execution[str(task.get("execution_id"))].append(task)
 
     def executions_of(self, run: CalibrationPipelineRunDocument) -> list[dict[str, Any]]:
-        """The executions of the run's flow run, by start time."""
-        return list(self.flows.get(run.flow_run_id, [])) if run.flow_run_id else []
+        """The run's step executions, by start time."""
+        return list(self.flows.get(run.run_id, []))
 
     def run_tasks(self, run: CalibrationPipelineRunDocument) -> list[dict[str, Any]]:
         """The task results of the run's executions, execution by execution."""

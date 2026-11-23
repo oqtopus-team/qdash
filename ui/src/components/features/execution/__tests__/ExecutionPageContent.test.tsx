@@ -821,7 +821,7 @@ describe("ExecutionPageContent calibration session groups", () => {
       screen.getByText("4 executions, 3 of them in 1 calibration session; 2 rows"),
     ).toBeTruthy();
     expect(
-      screen.getByText(/2 pipeline runs · 1 agent session · 3 executions · 1 failed · 5 decisions/),
+      screen.getByText(/2 runs · 1 agent session · 3 executions · 1 failed · 5 decisions/),
     ).toBeTruthy();
     expect(screen.getByText("Targets 0, 1, 0-1")).toBeTruthy();
     // Closed says nothing about the objective; no recommendation was recorded, so none is shown.
@@ -847,6 +847,104 @@ describe("ExecutionPageContent calibration session groups", () => {
     const panel = screen.getByRole("complementary", { name: "Execution details" });
     // Browsing covers the run's step, the agent session's two children, and the manual run.
     expect(within(panel).getByText("1 of 4 on this page")).toBeTruthy();
+  });
+});
+
+const AUTOMATIC_ROW = {
+  kind: "calibration_session",
+  sort_at: "2026-06-06T00:00:00Z",
+  calibration_session: {
+    ...CALIBRATION_ROW.calibration_session,
+    calibration_session_id: "cs-auto-1",
+    objective: "Workflow nightly_1q",
+    status: "open",
+    origin: "automatic",
+    closed_at: null,
+    targets: [],
+    counts: {
+      pipeline_runs: 1,
+      agent_sessions: 0,
+      executions: 2,
+      executions_in_filter: 2,
+      running: 0,
+      failed: 0,
+      unknown_dispatch: 0,
+      decisions: 0,
+    },
+  },
+  pipeline_runs: [
+    {
+      run_id: "cpr-flow-1",
+      run_kind: "workflow",
+      run_name: "nightly_1q",
+      trigger: "schedule",
+      pipeline_name: "",
+      dispatch_status: "dispatched",
+      requested_by: "alice",
+      requested_at: "2026-06-06T00:00:00Z",
+      decision_id: null,
+      targets: [],
+      executions: [
+        {
+          execution_id: "flow-step-1",
+          name: "nightly_1q_bringup",
+          status: "completed",
+          start_at: "2026-06-06T00:00:00Z",
+          tags: [],
+          note: {},
+        },
+        {
+          execution_id: "flow-step-2",
+          name: "nightly_1q_rabi",
+          status: "completed",
+          start_at: "2026-06-06T00:05:00Z",
+          tags: [],
+          note: {},
+        },
+      ],
+      executions_total: 2,
+      executions_in_filter: 2,
+    },
+  ],
+  pipeline_runs_omitted: 0,
+  nested_agent_sessions: [],
+  nested_agent_sessions_omitted: 0,
+  children: [],
+};
+
+describe("ExecutionPageContent automatic calibration sessions", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    loadingNextPage = false;
+    executionDetail = DEFAULT_DETAIL;
+    currentProjectId = "project-1";
+    groupedError = false;
+    groupedItems = [AUTOMATIC_ROW, MANUAL_ROW];
+    groupedSummary = {
+      total: 2,
+      total_executions: 3,
+      grouped_executions: 2,
+      agent_sessions: 0,
+      calibration_sessions: 1,
+    };
+  });
+
+  afterEach(() => {
+    cleanup();
+    groupedItems = null;
+  });
+
+  it("shows a scheduled workflow run as one row with every step execution", () => {
+    render(<ExecutionPageContent />);
+    expect(screen.getByText("Automatic")).toBeTruthy();
+    expect(screen.getByText(/1 run · 2 executions/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { expanded: false, name: /Workflow nightly_1q/ }));
+    const runs = screen.getByRole("list", { name: "Runs" });
+    expect(within(runs).getByText("nightly_1q")).toBeTruthy();
+    expect(within(runs).getByText("Workflow")).toBeTruthy();
+    expect(within(runs).getByText("Scheduled")).toBeTruthy();
+    expect(within(runs).getByText("nightly_1q_bringup")).toBeTruthy();
+    expect(within(runs).getByText("nightly_1q_rabi")).toBeTruthy();
   });
 });
 

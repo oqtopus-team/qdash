@@ -112,6 +112,26 @@ describe("CalibrationSessionListPageContent", () => {
     expect(lastParams()).not.toHaveProperty("chip_id");
   });
 
+  it("filters by origin and marks the sessions QDash created for single runs", () => {
+    state.response = {
+      items: [{ ...SESSION, calibration_session_id: "cs-auto-1", origin: "automatic" }],
+      total: 1,
+      skip: 0,
+      has_more: false,
+    };
+    renderPage();
+    const row = screen.getByRole("link", { name: "Bring up qubits 0 and 1" }).closest("li");
+    expect(within(row as HTMLElement).getByText("Automatic")).toBeTruthy();
+    fireEvent.change(screen.getByRole("combobox", { name: "Origin" }), {
+      target: { value: "automatic" },
+    });
+    expect(lastParams()).toMatchObject({ origin: ["automatic"] });
+    fireEvent.change(screen.getByRole("combobox", { name: "Origin" }), {
+      target: { value: "all" },
+    });
+    expect(lastParams()).not.toHaveProperty("origin");
+  });
+
   it("pages with the server's has_more", () => {
     state.response = { items: [SESSION], total: 1, skip: 0, has_more: true };
     renderPage();

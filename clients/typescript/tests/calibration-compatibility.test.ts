@@ -85,11 +85,48 @@ describe("associated writes against older APIs", () => {
     }
     expect(calls).toHaveLength(0);
   });
-  it("rejects incomplete or empty recording arguments without network access", async () => {
+  it("rejects empty recording arguments without network access", async () => {
     const { client, calls } = setup();
-    for (const request of [{ ...pipeline, idempotency_key: undefined }, { ...pipeline, idempotency_key: " " }, { ...pipeline, calibration_session_id: "" }]) {
+    for (const request of [{ ...pipeline, idempotency_key: " " }, { ...pipeline, calibration_session_id: "" }]) {
       await expect(client.api.executeCalibrationPipeline(request)).rejects.toThrow(TypeError);
     }
     expect(calls).toHaveLength(0);
+  });
+  it("treats a keyed pipeline an older API ran without recording as unknown", async () => {
+    const { client, calls } = setup(undefined, { legacy: true });
+    await expect(
+      client.api.executeCalibrationPipeline({ chip_id: "chip-1", spec: {}, idempotency_key: "key-1" }),
+    ).rejects.toThrow(/result unknown.*Do not retry automatically/);
+    expect(calls.map((r) => r.method)).toEqual(["POST"]);
+  });
+  it("returns a keyed pipeline recorded in an automatic session", async () => {
+    const result = { calibration_session_id: "cs-auto-1", pipeline_run_id: "r1" };
+    const { client } = setup(undefined, result);
+    await expect(
+      client.api.executeCalibrationPipeline({ chip_id: "chip-1", spec: {}, idempotency_key: "key-1" }),
+    ).resolves.toEqual(result);
+  });
+  it("sends a workflow run's session and key, and refuses an older API's unrecorded run", async () => {
+    const recorded = { execution_id: "e1", calibration_session_id: "cs-1", calibration_run_id: "r1" };
+    const { client, calls } = setup(undefined, recorded);
+    await expect(client.executeFlow("demo", {}, { calibrationSessionId: "cs-1", idempotencyKey: "k" })).resolves.toEqual(recorded);
+    expect(JSON.parse(await calls[0]!.text())).toEqual({ parameters: {}, calibration_session_id: "cs-1", idempotency_key: "k" });
+    const legacy = setup(undefined, { execution_id: "e1" });
+    await expect(legacy.client.executeFlow("demo", {}, { idempotencyKey: "k" })).rejects.toThrow(/Workflow result unknown/);
+    await expect(legacy.client.executeFlow("demo", {}, { idempotencyKey: " " })).rejects.toThrow(TypeError);
+  });
+  it("reports a chipless workflow the server refused before launch once, never retrying without its key", async () => {
+    const detail = "chipless names no chip (no chip_id parameter and no chip saved with the flow). Nothing was started.";
+    const calls: Request[] = [];
+    const client = new QDashClient(new QDashConfig({ baseUrl: "http://qdash.test", apiToken: "token", projectId: "p1" }), {
+      fetch: async (input, init) => {
+        const request = new Request(input, init);
+        calls.push(request);
+        return new Response(JSON.stringify({ detail }), { status: 400, headers: { "Content-Type": "application/json" } });
+      },
+    });
+    await expect(client.executeFlow("chipless", {}, { idempotencyKey: "k" })).rejects.toThrow(/Nothing was started/);
+    expect(calls).toHaveLength(1);
+    expect(JSON.parse(await calls[0]!.text())).toEqual({ parameters: {}, idempotency_key: "k" });
   });
 });

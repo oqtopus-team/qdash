@@ -44,6 +44,7 @@ from qdash.dbmodel.qubit import QubitDocument
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 from qdash.repository.execution_history import MongoExecutionHistoryRepository
 from qdash.repository.execution_lock import MongoExecutionLockRepository
+from tests.qdash.api._legacy_records import make_standalone_agent_session
 
 if TYPE_CHECKING:
     from qdash.api.schemas.execution_group import (
@@ -91,7 +92,8 @@ def groups() -> ExecutionGroupService:
 
 
 def _session(sessions: AgentSessionService, *, project_id: str = PROJECT, chip_id: str = CHIP):
-    return sessions.create_session(
+    """A standalone agent session, as recorded before automatic calibration sessions."""
+    created = sessions.create_session(
         project_id=project_id,
         username=OWNER,
         body=CreateAgentSessionRequest(
@@ -105,6 +107,8 @@ def _session(sessions: AgentSessionService, *, project_id: str = PROJECT, chip_i
             ),
         ),
     )
+    make_standalone_agent_session(project_id, created.session_id)
+    return sessions.get_session(project_id=project_id, session_id=created.session_id)
 
 
 def _set_created(session_id: str, at: datetime) -> None:
@@ -644,6 +648,7 @@ def test_rows_and_graph_show_each_records_reported_model(
             model=created,
         ),
     )
+    make_standalone_agent_session(PROJECT, session.session_id)
     action = sessions.submit_action(
         project_id=PROJECT,
         session_id=session.session_id,

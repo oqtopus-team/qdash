@@ -17,7 +17,7 @@ The events, each from a record that already exists:
   QDash validated, the decision it carries out (named by the request, never inferred), and
   the launch origin the client reported.
 - ``pipeline_dispatch``: the run's dispatch state, including refused and unknown outcomes.
-- ``measurement``: each step execution of the run's flow run, with the target task results'
+- ``measurement``: each step execution of the run, with the target task results'
   executed run parameters and outputs.
 - ``agent_session_linked``: each agent session created in the session; the events of an
   admitted one follow with ``agent_session_id`` set, exactly as its own audit shows them.
@@ -86,6 +86,7 @@ from qdash.api.services.calibration_audit_search import (
     search_view,
 )
 from qdash.common.utils.datetime import now
+from qdash.datamodel.calibration_session import CalibrationRunKind
 from qdash.dbmodel.agent_session import AgentSessionDocument
 from qdash.dbmodel.calibration_session import (
     CalibrationDecisionDocument,
@@ -209,7 +210,9 @@ class CalibrationSessionAuditService:
             created_by=session.created_by,
             created_at=cast("datetime", utc(session.created_at)),
             status=session.status,
-            pipeline_run_total=CalibrationPipelineRunDocument.find(scope).count(),
+            pipeline_run_total=CalibrationPipelineRunDocument.find(
+                {**scope, "run_kind": {"$ne": CalibrationRunKind.AGENT_ACTION.value}}
+            ).count(),
             agent_session_total=AgentSessionDocument.find(scope).count(),
             decision_total=CalibrationDecisionDocument.find(scope).count(),
         )

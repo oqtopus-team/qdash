@@ -5,6 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { CalibrationSessionOrigin } from './calibrationSessionOrigin';
 import type { CalibrationSessionStatus } from './calibrationSessionStatus';
 
 export type ListCalibrationSessionsParams = {
@@ -13,6 +14,10 @@ chip_id?: string | null;
  * Only sessions in these statuses
  */
 status?: CalibrationSessionStatus[] | null;
+/**
+ * Only sessions of these origins: manual (created for an objective) or automatic (created by QDash for a run started without a session ID)
+ */
+origin?: CalibrationSessionOrigin[] | null;
 /**
  * Only sessions the signed-in user created
  */

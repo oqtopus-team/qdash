@@ -19,6 +19,7 @@ from qdash.dbmodel.agent_session import AgentSessionDocument
 from qdash.dbmodel.calibration_session import CalibrationPipelineRunDocument
 from qdash.dbmodel.execution_history import ExecutionHistoryDocument
 from qdash.dbmodel.pipeline_launch import PipelineLaunchDocument
+from tests.qdash.api._legacy_records import make_standalone_agent_session
 from tests.qdash.api.routers.test_calibration_pipeline import good_spec
 from tests.qdash.api.routers.test_calibration_sessions import (
     CHIP,
@@ -118,13 +119,17 @@ class TestOrdinaryExecutions:
         assert item["kind"] == "execution"
         assert item["execution"]["calibration_session"] is None
 
-    def test_a_pipeline_without_session_or_report_stays_unattributed(self, test_client):
+    def test_a_pipeline_without_session_belongs_to_its_automatic_session(self, test_client):
         with prefect(["flow-plain"]):
             response = _execute(test_client)
         assert response.status_code == 202, response.text
+        automatic = response.json()["calibration_session_id"]
+        assert automatic.startswith("cs-auto-")
         _step_execution(response.json()["execution_id"], "flow-plain", 1, "completed")
         row = _list(test_client)[response.json()["execution_id"]]
-        assert row["calibration_session"] is None
+        assert row["calibration_session"]["calibration_session_id"] == automatic
+        assert row["calibration_session"]["pipeline_run_id"] == response.json()["pipeline_run_id"]
+        # Grouping reports no origin: nothing was reported.
         assert row["reported_origin"] is None
         assert PipelineLaunchDocument.find_all().count() == 0
 
@@ -221,7 +226,11 @@ class TestReportedOrigin:
             # A report is not an agent session link, and the user stays the recorded one.
             assert rows[row_id]["agent_session"] is None
             assert rows[row_id]["username"] == "owner"
-            assert rows[row_id]["calibration_session"] is None
+            # The run's automatic session holds it; the report changes nothing about that.
+            assert (
+                rows[row_id]["calibration_session"]["calibration_session_id"]
+                == response.json()["calibration_session_id"]
+            )
         assert _detail(test_client, "step-3")["reported_origin"] == AGENT_TOOL
 
     def test_agent_tool_pipeline_in_a_session_keeps_both(self, test_client):
@@ -327,8 +336,21 @@ class TestAgentSessionMembership:
             "/agent-sessions", headers=_headers(), json={"chip_id": CHIP, "policy": POLICY}
         )
         assert alone.status_code == 201, alone.text
+        # A standalone session recorded before automatic sessions existed relates nothing.
+        make_standalone_agent_session("lab-a", alone.json()["session_id"])
         self._measured(alone.json()["session_id"], "alone-exec")
         assert _list(test_client)["alone-exec"]["calibration_session"] is None
+
+    def test_an_agent_session_created_alone_relates_its_automatic_session(self, test_client):
+        alone = test_client.post(
+            "/agent-sessions", headers=_headers(), json={"chip_id": CHIP, "policy": POLICY}
+        )
+        assert alone.status_code == 201, alone.text
+        automatic = alone.json()["calibration_session_id"]
+        self._measured(alone.json()["session_id"], "alone-exec")
+        row = _list(test_client)["alone-exec"]
+        assert row["calibration_session"]["calibration_session_id"] == automatic
+        assert row["calibration_session"]["via"] == "agent_session"
 
     def test_a_tag_alone_relates_nothing(self, test_client):
         session_id = _create_session(test_client)

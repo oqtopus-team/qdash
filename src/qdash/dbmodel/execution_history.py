@@ -85,6 +85,11 @@ class ExecutionHistoryDocument(Document):
                 [("project_id", ASCENDING), ("chip_id", ASCENDING), ("start_at", DESCENDING)]
             ),
             IndexModel([("project_id", ASCENDING), ("chip_id", ASCENDING)]),
+            # The step executions of a calibration run, which the worker stamps in the note.
+            IndexModel(
+                [("project_id", ASCENDING), ("note.calibration_run_id", ASCENDING)],
+                sparse=True,
+            ),
             IndexModel(
                 [("project_id", ASCENDING), ("username", ASCENDING), ("start_at", DESCENDING)]
             ),

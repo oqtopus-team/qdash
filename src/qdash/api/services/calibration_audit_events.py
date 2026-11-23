@@ -29,6 +29,9 @@ from qdash.api.services.calibration_audit_records import (
 from qdash.datamodel.calibration_session import (
     CalibrationAdmission,
     CalibrationPipelineRunStatus,
+    CalibrationRunKind,
+    CalibrationRunTrigger,
+    CalibrationSessionOrigin,
     CalibrationSessionStatus,
 )
 
@@ -69,16 +72,27 @@ def session_timeline(session: CalibrationSessionDocument) -> list[AgentAuditEven
         fields.setdefault("state_version", 0)
         events.append(AgentAuditEvent(sequence=0, **fields))
 
+    automatic = session.origin == CalibrationSessionOrigin.AUTOMATIC
     add(
         event_id=f"session_created:{session.calibration_session_id}",
         at=session.created_at,
         kind="session_created",
-        summary=f"{session.created_by} opened '{bounded_text(session.objective, 200)}' on "
-        f"{session.chip_id}",
+        summary=(
+            f"QDash opened an automatic session for {session.created_by}'s run "
+            f"'{bounded_text(session.objective, 200)}' on {session.chip_id}"
+            if automatic
+            else f"{session.created_by} opened '{bounded_text(session.objective, 200)}' on "
+            f"{session.chip_id}"
+        ),
         actor=session.created_by,
-        actor_kind="human",
+        # An automatic session was created by QDash for the run, not stated by a person.
+        actor_kind="server" if automatic else "human",
         provenance="server_record",
-        data={"objective": session.objective, "chip_id": session.chip_id},
+        data={
+            "objective": session.objective,
+            "chip_id": session.chip_id,
+            "origin": session.origin.value,
+        },
     )
 
     for decision in records.decisions:
@@ -208,32 +222,50 @@ def session_timeline(session: CalibrationSessionDocument) -> list[AgentAuditEven
 def _run_events(
     records: CalibrationAuditRecords, run: CalibrationPipelineRunDocument, cited: bool, add: Any
 ) -> None:
-    """A run's request, its dispatch, and a measurement per execution of its flow run."""
+    """A run's request, its dispatch, and a measurement per step execution of the run."""
     origin = run.reported_origin
     agent_tool = origin is not None and origin.source == "agent_tool"
     missing: list[str] = []
-    if run.spec is None:
+    kind = run.run_kind
+    # Only a pipeline run is requested with a spec; other kinds have none to record.
+    if run.spec is None and kind == CalibrationRunKind.PIPELINE:
         missing.append("requested_spec")
     if agent_tool:
         missing.append("host_approval")
         if run.decision_id is None:
             missing.append("decision")
+    run_label = run.run_name or run.pipeline_name or run.run_id
+    trigger_text = "a scheduled" if run.trigger == CalibrationRunTrigger.SCHEDULE else "an"
     add(
         event_id=f"pipeline_requested:{run.run_id}",
         at=run.requested_at,
         kind="pipeline_requested",
         summary=(
-            f"{run.requested_by} requested pipeline '{run.pipeline_name or run.run_id}'"
+            (
+                f"{run.requested_by} requested {kind.value.replace('_', ' ')} '{run_label}'"
+                if run.trigger == CalibrationRunTrigger.API
+                else f"The worker recorded {trigger_text} {kind.value.replace('_', ' ')} "
+                f"'{run_label}' for {run.requested_by}"
+            )
             + (f" for decision {run.decision_id}" if run.decision_id else "")
             + (f" (reported: {origin.tool})" if origin else "")
         ),
         actor=run.requested_by,
-        actor_kind="agent" if agent_tool else "unknown",
+        actor_kind=(
+            "agent"
+            if agent_tool
+            else "unknown"
+            if run.trigger == CalibrationRunTrigger.API
+            else "server"
+        ),
         provenance="server_record",
         pipeline_run_id=run.run_id,
         decision_id=run.decision_id,
         missing=missing,
         data={
+            "run_kind": kind.value,
+            "run_name": run.run_name or run.pipeline_name,
+            "trigger": run.trigger.value,
             "idempotency_key": run.idempotency_key,
             "pipeline_name": run.pipeline_name,
             "backend_name": run.backend_name,
@@ -268,7 +300,7 @@ def _run_events(
         event_id=f"pipeline_dispatch:{run.run_id}",
         at=run.updated_at,
         kind="pipeline_dispatch",
-        summary=f"Dispatch of {run.pipeline_name or run.run_id}: {dispatch.value}",
+        summary=f"Dispatch of {run_label}: {dispatch.value}",
         actor=None,
         actor_kind="server",
         provenance="server_record",

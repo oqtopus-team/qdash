@@ -1,4 +1,4 @@
-"""Persistence models for calibration sessions and the pipeline runs requested in them."""
+"""Persistence models for calibration sessions and the runs requested in them."""
 
 from __future__ import annotations
 
@@ -20,6 +20,9 @@ from qdash.datamodel.calibration_session import (
     CalibrationDecisionOutcome,
     CalibrationExperimentStage,
     CalibrationPipelineRunStatus,
+    CalibrationRunKind,
+    CalibrationRunTrigger,
+    CalibrationSessionOrigin,
     CalibrationSessionStatus,
 )
 from qdash.datamodel.launch_origin import ReportedLaunchOrigin  # noqa: TC001 - Bunnet field
@@ -28,9 +31,9 @@ from qdash.datamodel.launch_origin import ReportedLaunchOrigin  # noqa: TC001 - 
 class CalibrationSessionDocument(Document):
     """One calibration objective on one chip.
 
-    Agent sessions name it in ``AgentSessionDocument.calibration_session_id``; pipeline runs
-    are ``CalibrationPipelineRunDocument`` records. Neither is copied here, so the session
-    record changes only when it is closed.
+    Agent sessions name it in ``AgentSessionDocument.calibration_session_id``; runs are
+    ``CalibrationPipelineRunDocument`` records. Neither is copied here, so the session record
+    changes only when it is closed.
     """
 
     calibration_session_id: str
@@ -40,6 +43,9 @@ class CalibrationSessionDocument(Document):
     # The signed-in user who created it, from the request's authentication.
     created_by: str
     status: CalibrationSessionStatus = CalibrationSessionStatus.OPEN
+    # ``automatic`` when QDash created it for a run started without a session ID. Every
+    # session recorded before this field existed was created by a person: ``manual``.
+    origin: CalibrationSessionOrigin = CalibrationSessionOrigin.MANUAL
     # Raised, on the condition that the session is open, before every run or agent session is
     # started in it. Closing compares it with the value its check of the children read, so a
     # child started meanwhile makes the close fail instead of being hidden by it.
@@ -91,19 +97,33 @@ class CalibrationSessionDocument(Document):
 
 
 class CalibrationPipelineRunDocument(Document):
-    """One pipeline run requested in a calibration session, recorded before it is launched.
+    """One run requested in a calibration session, recorded before it is launched.
 
-    The record is inserted against its unique ``(project_id, calibration_session_id,
-    idempotency_key)`` before the flow run is created, so a retry finds it instead of
-    launching again. ``dispatch_token`` names the attempt that holds the launch; only that
-    attempt settles it. Once dispatched, the pipeline's step executions are the executions of
-    the project and chip whose ``note.flow_run_id`` is ``flow_run_id``.
+    The collection keeps its original name; ``run_kind`` says what the run launched (a
+    record without one is a pipeline run, the only kind that existed then). The record is
+    inserted against its unique ``(project_id, calibration_session_id, idempotency_key)``
+    before the flow run is created, so a retry finds it instead of launching again.
+    ``dispatch_token`` names the attempt that holds the launch; only that attempt settles it.
+    Once dispatched, the run's step executions are the executions of the project and chip
+    whose ``note.calibration_run_id`` is ``run_id``, or, for runs recorded before that note
+    existed, whose ``note.flow_run_id`` is ``flow_run_id``.
+
+    A run the worker found unrecorded (a scheduled flow run) is inserted by the worker when
+    the flow starts, already ``dispatched``, with IDs derived from its flow run, so a Prefect
+    retry of the same flow run finds it instead of adding another.
     """
 
     run_id: str
     project_id: str
     calibration_session_id: str
     chip_id: str
+    run_kind: CalibrationRunKind = CalibrationRunKind.PIPELINE
+    trigger: CalibrationRunTrigger = CalibrationRunTrigger.API
+    # What the run launched: the workflow name, the pipeline name, or the task and target.
+    run_name: str = ""
+    # For an agent action's run: the agent session and the action that dispatched it.
+    agent_session_id: str | None = None
+    action_id: str | None = None
     idempotency_key: str
     request_hash: str
     requested_by: str
@@ -117,6 +137,7 @@ class CalibrationPipelineRunDocument(Document):
     # whose reservation is pending or was cleared by a close was never launched.
     reservation_id: str | None = None
     attempts: int = 1
+    # Only for ``run_kind`` ``pipeline``; ``run_name`` names every kind.
     pipeline_name: str = ""
     backend_name: str = ""
     flow_run_id: str | None = None
@@ -160,6 +181,10 @@ class CalibrationPipelineRunDocument(Document):
             ),
             # The Execution list finds the run a step execution belongs to by its flow run.
             IndexModel([("project_id", ASCENDING), ("flow_run_id", ASCENDING)]),
+            IndexModel(
+                [("project_id", ASCENDING), ("agent_session_id", ASCENDING)],
+                sparse=True,
+            ),
         ]
 
 

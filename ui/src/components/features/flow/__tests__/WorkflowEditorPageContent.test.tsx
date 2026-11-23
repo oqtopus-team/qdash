@@ -261,6 +261,8 @@ describe("WorkflowEditorPageContent run callbacks", () => {
       "first_calibration",
       expect.objectContaining({
         parameters: expect.objectContaining({ chip_id: "chip-a" }),
+        // A run on a known chip is recorded under a key, so a resent request replays it.
+        idempotency_key: expect.any(String),
       }),
     );
     expect(storedJourney("project-1").executionId).toBe("20261105-001");
@@ -268,6 +270,24 @@ describe("WorkflowEditorPageContent run callbacks", () => {
     // The guide's run opens on its execution page, once, without a banner click.
     expect(mocks.push).toHaveBeenCalledTimes(1);
     expect(mocks.push).toHaveBeenCalledWith("/execution/chip-a/20261105-001");
+  });
+
+  it("sends no key for a run without a chip, which QDash cannot record before launch", async () => {
+    FLOW_CHIPS.first_calibration = "";
+    try {
+      mocks.executeFlow.mockResolvedValue({
+        data: { execution_id: "20261105-009", flow_run_id: "run-9" },
+      });
+      renderEditor();
+
+      await confirmExecute();
+
+      await waitFor(() => expect(mocks.executeFlow).toHaveBeenCalledTimes(1));
+      const [, body] = mocks.executeFlow.mock.calls[0];
+      expect(body).not.toHaveProperty("idempotency_key");
+    } finally {
+      FLOW_CHIPS.first_calibration = "chip-a";
+    }
   });
 
   it("marks Execute ready for the guide only while it can start a run", async () => {

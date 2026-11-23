@@ -5,6 +5,8 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { ExecuteFlowResponseCalibrationRunId } from './executeFlowResponseCalibrationRunId';
+import type { ExecuteFlowResponseCalibrationSessionId } from './executeFlowResponseCalibrationSessionId';
 
 /**
  * Response after executing a flow.
@@ -20,4 +22,10 @@ export interface ExecuteFlowResponse {
   qdash_ui_url: string;
   /** Success message */
   message: string;
+  /** The calibration session the run is recorded in: the one the request named, or the automatic session QDash created for it */
+  calibration_session_id?: ExecuteFlowResponseCalibrationSessionId;
+  /** The run's record in that session; every step execution carries it */
+  calibration_run_id?: ExecuteFlowResponseCalibrationRunId;
+  /** True when a retry returned the run an earlier request with its key started */
+  replayed?: boolean;
 }
