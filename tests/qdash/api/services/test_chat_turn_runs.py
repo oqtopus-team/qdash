@@ -19,7 +19,8 @@ from qdash.api.schemas.copilot_chat_session import (
     UpdateCopilotChatSessionRequest,
 )
 from qdash.api.services import chat_turn_runs
-from qdash.api.services.chat_transcript import transcript_digest
+from qdash.api.services import copilot_chat_session_service as sessions
+from qdash.api.services.chat_transcript import TurnTranscript, transcript_digest
 from qdash.api.services.copilot_chat_session_service import (
     CopilotChatSessionService,
     request_turn_stop,
@@ -527,3 +528,115 @@ async def test_rating_an_earlier_turn_keeps_its_recorded_answer(init_db) -> None
         payload = json.loads(_stored().messages[3].content)
         base = json.loads(recorded[3].content)
         assert payload == (base if expected is None else {**base, "feedback": None})
+
+
+@pytest.mark.asyncio
+async def test_a_turn_that_replaces_an_orphaned_one_marks_its_progress_interrupted(
+    init_db,
+) -> None:
+    # r1's API process restarted mid-turn: its progress stays saved as running.
+    _session()
+    first = _request()
+    own = chat_turn_runs.user_message_of(first, "r1")
+    assert first.turn_start is not None
+    claimed = sessions.claim_turn(
+        USER,
+        SESSION,
+        request_id="r1",
+        project_id="p1",
+        start_index=first.turn_start.index,
+        digest=first.turn_start.digest,
+        user_message=own,
+    )
+    assert claimed == "claimed"
+    fold = TurnTranscript("r1", own)
+    fold.apply("tool_start", {"id": "c1", "tool": "qdash_wait_execution", "label": "Wait"})
+    fold.apply("tool_draft", {"id": "c2", "tool": "qdash_get", "index": 0})
+    sessions.write_turn(USER, SESSION, "r1", fold.messages())
+    progress = [m.model_dump(mode="json") for m in _stored().messages]
+    assert json.loads(progress[3]["content"])["in_progress"] is True
+
+    # The next turn is sent from the chat as saved; nothing runs r1 any more.
+    async def nothing_runs() -> bool:
+        return False
+
+    runtime = Runtime()
+    second = chat_turn_runs.stream_turn(
+        _request("And T2?", "r2", history=progress),
+        username=USER,
+        project_id="p1",
+        source=runtime.source,
+        turn_running=nothing_runs,
+    )
+    runtime.send("result", _answer("T2 is 30 us."))
+    runtime.end()
+    await _collect(second)
+    await _settle("r2")
+
+    stored = _stored()
+    assert [m.turn_request_id for m in stored.messages] == [None, None, "r1", "r1", "r2", "r2"]
+    kept = json.loads(stored.messages[3].content)
+    # r1's answer so far stays, as interrupted, with no step claiming to still run.
+    assert "in_progress" not in kept
+    assert kept["interrupted"] is True
+    assert [s["status"] for s in kept["trace"]["steps"]] == ["done", "cancelled"]
+
+
+@pytest.mark.asyncio
+async def test_a_runtime_that_cannot_say_whether_a_turn_runs_never_replaces_it(
+    init_db,
+) -> None:
+    # r1 is recorded as running, and its progress is saved, when this API asks again.
+    _session()
+    first = _request()
+    own = chat_turn_runs.user_message_of(first, "r1")
+    assert first.turn_start is not None
+    assert (
+        sessions.claim_turn(
+            USER,
+            SESSION,
+            request_id="r1",
+            project_id="p1",
+            start_index=first.turn_start.index,
+            digest=first.turn_start.digest,
+            user_message=own,
+        )
+        == "claimed"
+    )
+    fold = TurnTranscript("r1", own)
+    fold.apply("tool_start", {"id": "c1", "tool": "qdash_wait_execution", "label": "Wait"})
+    sessions.write_turn(USER, SESSION, "r1", fold.messages())
+    before = _stored()
+    progress = [m.model_dump(mode="json") for m in before.messages]
+
+    asked: list[int] = []
+
+    async def outage() -> bool | None:
+        # The runtime is down or answered something malformed: it cannot say.
+        asked.append(1)
+        return None
+
+    runtime = Runtime()
+    second = await _collect(
+        chat_turn_runs.stream_turn(
+            _request("And T2?", "r2", history=progress),
+            username=USER,
+            project_id="p1",
+            source=runtime.source,
+            turn_running=outage,
+        )
+    )
+
+    # The new turn is refused as busy, and nothing was sent to the runtime...
+    events = _events(second)
+    assert [name for name, _ in events] == ["error"]
+    assert events[0][1]["code"] == chat_turn_runs.TURN_RUNNING
+    assert asked
+    assert runtime.opened == []
+    # ...and r1, its record and what it saved stay exactly as they were.
+    after = _stored()
+    assert after.turn is not None
+    assert after.turn.request_id == "r1"
+    assert after.turn.status == "running"
+    assert [m.model_dump(mode="json") for m in after.messages] == progress
+    assert json.loads(after.messages[-1].content)["in_progress"] is True

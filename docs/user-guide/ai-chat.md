@@ -76,11 +76,17 @@ answer is marked **Answer in progress, saved by the server**. Reopening it after
 shows the whole answer. A reload or another browser shows the same saved conversation. If QDash
 cannot save an answer, the chat says so and the window you sent it from keeps its own copy.
 If QDash itself restarts while an answer runs, the answer keeps running in the assistant, and
-reopening the chat reconnects to it and saves it.
+reopening the chat reconnects to it and saves it, or saves how it ended if it ended meanwhile.
+An answer that no longer runs anywhere is marked **Interrupted before it ended** once you send the
+next message.
+If the chat cannot reach the assistant to check on an answer, it keeps showing **Reconnecting**
+and checks again instead of saying the answer is lost. A message sent while QDash cannot check
+whether an earlier answer still runs is not sent, and the chat asks you to send it again shortly.
 
 The same chat open in another window or browser tab of yours, in the same project, shows the
-answer in progress too, from its start, once that window is in front or within about 15 seconds
-while it is shown. Nothing is sent again, and **Stop** works from either window. Only the window
+answer in progress too, from its start, and then each step as it happens. A window of the same
+browser picks it up at once; another browser or device does once that window is in front or
+within about 15 seconds while it is shown. Nothing is sent again, and **Stop** works from either window. Only the window
 where you sent the message shows its notifications. An answer that started and ended while the
 other window was not checking appears there at its next check. A message sent from a window that
 shows an older copy of the chat, such as one opened before another window's answer ended, is not
@@ -90,7 +96,7 @@ send the message again.
 The chat's header says what its answer is doing: what the assistant runs, **Waiting for the
 expert's answer**, **Reconnecting**, **Answer in progress** for a saved answer the chat does not
 follow now, or, once the answer ended, **Answered**, **Waiting for your approval**, **Waiting for
-your answer**, **Stopped**, or **Failed**. While the sidebar is closed,
+your answer**, **Stopped**, **Interrupted**, or **Failed**. While the sidebar is closed,
 a dot on **Ask Agent** shows that an answer is running, and **Ask Agent** opens that chat rather
 than a new one.
 

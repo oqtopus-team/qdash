@@ -117,3 +117,110 @@ export function observedTurnPlacement(
     userAt: continuing ? -1 : start.index,
   };
 }
+
+/** The latest turn the server records for a chat (the session's `turn`). */
+export interface RecordedTurn {
+  requestId: string;
+  projectId: string | null;
+  /** `running` while the turn runs; otherwise how it ended. */
+  status: "running" | "completed" | "failed" | "stopped" | "noop";
+  /** How many messages preceded the turn when it was claimed. */
+  startIndex: number;
+  continuing: boolean;
+  /** When the turn was claimed (ms since the epoch), or null when unknown. */
+  startedAt: number | null;
+}
+
+const TURN_STATUSES = new Set(["running", "completed", "failed", "stopped", "noop"]);
+
+/** The session's recorded turn as received from the API, or null when absent or malformed. */
+export function parseRecordedTurn(raw: unknown): RecordedTurn | null {
+  if (!raw || typeof raw !== "object") return null;
+  const v = raw as Record<string, unknown>;
+  if (typeof v.request_id !== "string" || !v.request_id) return null;
+  if (typeof v.status !== "string" || !TURN_STATUSES.has(v.status)) return null;
+  const start = v.start_index;
+  if (typeof start !== "number" || !Number.isInteger(start) || start < 0) return null;
+  return {
+    requestId: v.request_id,
+    projectId: typeof v.project_id === "string" ? v.project_id : null,
+    status: v.status as RecordedTurn["status"],
+    startIndex: start,
+    continuing: v.continuing === true,
+    startedAt: typeof v.started_at === "string" ? toMillis(v.started_at) : null,
+  };
+}
+
+function toMillis(iso: string): number | null {
+  // The API writes naive UTC timestamps; read them as UTC.
+  const withZone = /[zZ]|[+-]\d\d:?\d\d$/.test(iso) ? iso : `${iso}Z`;
+  const ms = Date.parse(withZone);
+  return Number.isFinite(ms) ? ms : null;
+}
+
+/** Whether `message` is progress the server saved while its turn ran. */
+function isInProgressAnswer(message: ChatMessage | undefined): boolean {
+  if (!message || message.role !== "assistant" || !message.content.startsWith("{")) return false;
+  try {
+    const payload = JSON.parse(message.content) as { in_progress?: unknown };
+    return payload?.in_progress === true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Where turn `requestId` is in the saved `messages`, found by its identity, not by
+ * a position a window remembered: every message the server records for a turn
+ * carries the turn's request ID (`turnRequestId`), and `recorded`, the session's
+ * latest recorded turn, says whether it still runs.
+ *
+ * - `running`: the turn still runs. `history` is what precedes its first message,
+ *   `shown` adds its own message (none for a continue); what the turn saved after
+ *   that (steers it placed, its answer so far) is left out, since reattaching
+ *   replays the turn from its start and places it again.
+ * - `ended`: the saved chat holds the turn's end, or a later turn replaced it;
+ *   nothing is replayed.
+ * - null: the saved chat holds nothing of the turn.
+ */
+export function recordedTurnPlacement(
+  messages: ChatMessage[],
+  requestId: string,
+  continuing: boolean,
+  recorded: RecordedTurn | null,
+): ({ state: "running"; continuing: boolean } & ObservedTurnPlacement) | { state: "ended" } | null {
+  const tagged: number[] = [];
+  messages.forEach((m, i) => {
+    if (m.turnRequestId === requestId) tagged.push(i);
+  });
+  const ours = recorded?.requestId === requestId ? recorded : null;
+  // The server's record says whether the turn is a continue; a window's memory may be older.
+  const cont = ours ? ours.continuing : continuing;
+  if (tagged.length === 0) {
+    // A continue that has saved nothing yet starts where the server recorded it.
+    if (!ours || !cont) return null;
+    if (ours.status !== "running") return { state: "ended" };
+    const history = messages.slice(0, Math.min(ours.startIndex, messages.length));
+    return { state: "running", continuing: true, history, shown: history, userAt: -1 };
+  }
+  const lastAt = tagged[tagged.length - 1];
+  const ended = ours
+    ? ours.status !== "running"
+    : // A later turn is recorded, or something follows the turn: it is over.
+      recorded !== null ||
+      lastAt < messages.length - 1 ||
+      (messages[lastAt].role === "assistant" && !isInProgressAnswer(messages[lastAt]));
+  if (ended) return { state: "ended" };
+  const first = tagged[0];
+  const history = messages.slice(0, first);
+  if (cont) return { state: "running", continuing: true, history, shown: history, userAt: -1 };
+  const own = tagged.find((i) => messages[i].role === "user" && !messages[i].steer);
+  if (own === undefined) return null;
+  return {
+    state: "running",
+    continuing: false,
+    history,
+    shown: [...history, messages[own]],
+    userAt: history.length,
+  };
+}

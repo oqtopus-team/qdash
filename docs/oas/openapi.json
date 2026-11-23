@@ -5671,7 +5671,7 @@
           "copilot"
         ],
         "summary": "Get a chat session with messages",
-        "description": "Return one chat session including the full message list.",
+        "description": "Return one chat session including the full message list.\n\nThe session's ``turn`` is named only in the project it was sent from, like\n``/chat/active``: the project the request names (``X-Project-Id``, else the\nuser's default), and only one the user may read. Elsewhere it is null. As the\nreply depends on that project, no cache keeps it for a request from another.",
         "operationId": "getCopilotChatSession",
         "security": [
           {
@@ -5686,6 +5686,22 @@
             "schema": {
               "type": "string",
               "title": "Session Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
             }
           }
         ],
@@ -25650,6 +25666,17 @@
               }
             ]
           },
+          "turn": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CopilotChatTurnSchema"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The latest turn the server records for the chat"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -25766,6 +25793,70 @@
         ],
         "title": "CopilotChatSteerSchema",
         "description": "Where a user message sent while an answer was written landed in the conversation."
+      },
+      "CopilotChatTurnSchema": {
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "title": "Request Id",
+            "description": "The turn's request ID"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id",
+            "description": "The project it was sent from"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "running",
+              "completed",
+              "failed",
+              "stopped",
+              "noop"
+            ],
+            "title": "Status",
+            "description": "Whether the turn still runs, or how it ended"
+          },
+          "start_index": {
+            "type": "integer",
+            "title": "Start Index",
+            "description": "How many messages precede the turn"
+          },
+          "continuing": {
+            "type": "boolean",
+            "title": "Continuing",
+            "description": "A continue: no user message",
+            "default": false
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "request_id",
+          "status",
+          "start_index"
+        ],
+        "title": "CopilotChatTurnSchema",
+        "description": "The latest turn the server records for a chat, as a reloaded page needs it.\n\nA page that reattaches to a turn, or follows one another window started, finds\nthe turn's messages by ``request_id`` (each carries it as ``turn_request_id``)\nand uses ``status`` to tell a running turn from one whose end is saved."
       },
       "CopilotPreferences": {
         "properties": {

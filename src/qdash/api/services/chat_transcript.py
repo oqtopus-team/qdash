@@ -115,6 +115,27 @@ def _close_open_steps(steps: list[Step], now: int) -> list[Step]:
     return closed
 
 
+def interrupted_content(content: str, now: int | None = None) -> str | None:
+    """``content`` of saved progress marked as interrupted, or None if it is no progress.
+
+    For progress of a turn that no process runs any more (its API process restarted and
+    a new turn replaced it): the answer so far is kept, marked ``interrupted`` instead of
+    ``in_progress``, and its open steps closed as a stopped turn's are.
+    """
+    try:
+        payload = json.loads(content)
+    except ValueError:
+        return None
+    if not isinstance(payload, dict) or payload.get("in_progress") is not True:
+        return None
+    payload.pop("in_progress")
+    payload["interrupted"] = True
+    trace = payload.get("trace")
+    if isinstance(trace, dict) and isinstance(trace.get("steps"), list):
+        trace["steps"] = _close_open_steps(trace["steps"], _now_ms() if now is None else now)
+    return to_json(payload)
+
+
 def _tool_evaluation(value: Any) -> dict[str, Any] | None:
     if not isinstance(value, dict):
         return None
@@ -354,9 +375,15 @@ class LiveTurn:
             *([{"type": "text", "content": partial, "chart": None}] if partial else []),
         ]
 
-    def trace(self, now: int) -> dict[str, Any] | None:
-        """The steps as stored with the answer (``toPersistedTrace``)."""
-        work = _close_open_steps(self.steps, now)[: _answer_start(self.steps)]
+    def trace(self, now: int, *, settle: bool = True) -> dict[str, Any] | None:
+        """The steps as stored with the answer (``toPersistedTrace``).
+
+        ``settle``: the turn ended, so a step still open is closed (a call still being
+        written was never made). Progress of a running turn keeps them open: a tool
+        that runs, or is being written, is not reported as done or as not run.
+        """
+        steps_now = _close_open_steps(self.steps, now) if settle else list(self.steps)
+        work = steps_now[: _answer_start(self.steps)]
         if not work:
             return None
         budget = MAX_PERSISTED_THINKING
@@ -557,7 +584,7 @@ class TurnTranscript:
                 return head
             return [*head, self._message("assistant", f"Error: {self.error}")]
         blocks = self.turn.stopped_blocks()
-        trace = self.turn.trace(now)
+        trace = self.turn.trace(now, settle=self.end == "stopped")
         if self.end == "stopped":
             payload: dict[str, Any] = {"blocks": blocks, "assessment": None, "stopped": True}
         elif blocks or trace:

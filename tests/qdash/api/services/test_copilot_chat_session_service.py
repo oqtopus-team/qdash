@@ -268,7 +268,10 @@ def test_a_branch_finishes_on_retry_after_the_runtime_forked_and_saving_failed(
     assert pending.branch is not None
     assert pending.branch.status == "pending"
     assert [s.session_id for s in service.list_sessions(username="alice").sessions] == ["s1"]
-    assert _status(lambda: service.get_session(username="alice", session_id="b1")) == 404
+    assert (
+        _status(lambda: service.get_session(username="alice", session_id="b1", project_id=None))
+        == 404
+    )
     with pytest.raises(ChatUnavailableError) as unavailable:
         resolve_runtime_target("alice", "b1")
     assert unavailable.value.status_code == 409
@@ -617,7 +620,10 @@ def test_a_failed_store_removal_keeps_the_deleted_chat_hidden_until_a_retry(init
     assert runtime.release_calls == [("s1", [("s1", RuntimeTarget("s1"))])]
     # Gone for the user, and not reopened or recreated under its ID, but kept for the retry.
     assert _visible_ids(service) == set()
-    assert _status(lambda: service.get_session(username="alice", session_id="s1")) == 404
+    assert (
+        _status(lambda: service.get_session(username="alice", session_id="s1", project_id=None))
+        == 404
+    )
     with pytest.raises(ChatUnavailableError):
         resolve_runtime_target("alice", "s1")
     assert (

@@ -164,8 +164,10 @@ class ChatActiveResponse(BaseModel):
     ``turn_request_id`` names the turn only in the project it was sent from; a
     window can reattach with it, which submits nothing, once its saved transcript
     holds ``turn_start`` (absent for a turn sent without one: not followed). ``other_project``: a turn
-    runs, sent from another project. ``running`` false: none runs, or the
-    runtime could not say.
+    runs, sent from another project. ``running`` false: none runs, as the
+    runtime answered; with ``unavailable`` the runtime could not be asked or
+    answered unexpectedly, so a turn may still run and must not be taken for
+    ended: ask again later.
     """
 
     running: bool
@@ -174,6 +176,7 @@ class ChatActiveResponse(BaseModel):
     started_at: int | None = None
     turn_start: ChatTurnStart | None = None
     other_project: bool = False
+    unavailable: bool = False
 
 
 class ChatSteerRequest(BaseModel):

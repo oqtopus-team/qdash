@@ -317,6 +317,7 @@ def test_the_running_turn_is_looked_up_for_the_current_user_and_project(monkeypa
             "started_at": 5,
             "turn_start": {"index": 1, "digest": "0123456789abcdef"},
             "other_project": False,
+            "unavailable": False,
         }
         # The user is the signed-in one, never one the request names.
         assert captured[0]["username"] == "alice"
@@ -334,7 +335,8 @@ def test_the_running_turn_is_looked_up_for_the_current_user_and_project(monkeypa
         assert client.post("/chat/active", json={}, headers=headers).status_code == 422
 
 
-def test_a_chat_that_cannot_run_reports_no_running_turn(monkeypatch):
+@pytest.mark.parametrize(("status_code", "may_run"), [(404, False), (409, True), (503, True)])
+def test_a_chat_that_cannot_run_reports_no_running_turn(monkeypatch, status_code, may_run):
     from qdash.api.services.copilot_chat_session_service import ChatUnavailableError
 
     user = UserInDB(
@@ -349,7 +351,7 @@ def test_a_chat_that_cannot_run_reports_no_running_turn(monkeypatch):
     )
 
     async def unavailable(_username, _session_id):
-        raise ChatUnavailableError(404, "gone")
+        raise ChatUnavailableError(status_code, "gone" if status_code == 404 else "busy")
 
     async def never(*_args, **_kwargs):
         raise AssertionError("an unavailable chat is not looked up in the runtime")
@@ -366,6 +368,41 @@ def test_a_chat_that_cannot_run_reports_no_running_turn(monkeypatch):
         )
     assert response.status_code == 200
     assert response.json()["running"] is False
+    # Only a chat that is gone runs nothing; one being created or cleaned up may run a turn.
+    assert response.json()["unavailable"] is may_run
+
+
+def test_an_unreachable_runtime_is_reported_unavailable_not_ended(monkeypatch):
+    user = UserInDB(
+        user_id="alice-id",
+        username="alice",
+        access_token="alice-token",
+        hashed_password="unused",
+        default_project_id="default-project",
+    )
+    monkeypatch.setattr(
+        auth, "get_user_by_token", lambda token: user if token == user.access_token else None
+    )
+
+    async def target(_username, session_id):
+        return RuntimeTarget(session_id)
+
+    async def outage(*_args, **_kwargs):
+        return dict(pi_chat_service.RUNTIME_TURN_UNKNOWN)
+
+    monkeypatch.setattr(pi_chat_service, "runtime_target", target)
+    monkeypatch.setattr(pi_chat_service, "active_runtime_turn", outage)
+    app = FastAPI()
+    app.include_router(copilot.router)
+    with TestClient(app) as client:
+        response = client.post(
+            "/chat/active",
+            json={"session_id": "s1"},
+            headers={"Authorization": "Bearer alice-token", "X-Project-Id": "p1"},
+        )
+    assert response.status_code == 200
+    assert response.json()["running"] is False
+    assert response.json()["unavailable"] is True
 
 
 def test_a_continue_does_not_rebuild_the_opening_context(monkeypatch):

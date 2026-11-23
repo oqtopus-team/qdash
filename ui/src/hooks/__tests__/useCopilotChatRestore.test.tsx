@@ -117,6 +117,7 @@ beforeEach(() => {
         if (body.messages) saved[match[1]] = body.messages as Message[];
         return Response.json({});
       }
+      if (url.endsWith("/copilot/chat/active")) return Response.json({ running: false });
       return Response.json({ stopped: true });
     }),
   );
@@ -340,14 +341,15 @@ describe("a running turn across surfaces and navigation", () => {
     expect(readStoredTurns("alice").s1).toBeUndefined();
   });
 
-  it("does not restore a turn whose message was never saved", async () => {
+  it("does not restore a turn the server has no record of and the runtime does not run", async () => {
     storeTurn("alice", {
       sessionId: "s1",
       requestId: "r-unsaved",
       projectId: "p1",
       start: 0,
       continuing: false,
-      startedAt: Date.now(),
+      // Sent long enough ago that its start is not still on its way to the server.
+      startedAt: Date.now() - 60_000,
     });
     const hook = await renderChat();
     await waitFor(() => expect(hook.result.current.chat.notice).toMatch(/cannot be shown here/));
