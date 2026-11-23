@@ -38,7 +38,7 @@ vi.mock("@/contexts/ChatDockContext", () => ({
     openSidebar: state.openSidebar,
   }),
 }));
-vi.mock("@yusufceng1z/ding-react", () => {
+vi.mock("sonner", () => {
   const show = (type: string) => (title: string, options: Record<string, unknown>) => {
     state.shown.push({ type, title, options });
     return options.id;
@@ -49,7 +49,7 @@ vi.mock("@yusufceng1z/ding-react", () => {
       error: show("error"),
       warning: show("warning"),
       info: show("info"),
-      close: (id: string) => state.closed.push(id),
+      dismiss: (id: string) => state.closed.push(id),
     },
   };
 });
@@ -89,9 +89,11 @@ describe("chat notifications", () => {
       ["success", "Answer ready", "chat:r1:answer"],
       ["warning", "Approval needed", "chat:r1:approval"],
     ]);
-    // Input needed stays until dismissed; a ready answer goes on its own.
-    expect(state.shown[1].options.duration).toBe(0);
+    // Input needed stays until dismissed (Sonner reads 0 as its default, so it must be
+    // Infinity); a ready answer goes on its own.
+    expect(state.shown[1].options.duration).toBe(Infinity);
     expect(state.shown[0].options.duration).toBeGreaterThan(0);
+    expect(Number.isFinite(state.shown[0].options.duration)).toBe(true);
     expect(chatToastId({ requestId: "r1", kind: "answer" })).toBe("chat:r1:answer");
   });
 
