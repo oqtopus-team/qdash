@@ -12,7 +12,7 @@ import asyncio
 import contextlib
 import gc
 import json
-from collections.abc import AsyncGenerator, Awaitable, Callable, MutableMapping
+from collections.abc import AsyncGenerator, Awaitable, Callable, Iterator, MutableMapping
 from types import SimpleNamespace
 from typing import Any
 
@@ -184,16 +184,18 @@ class Stream:
     async def disconnect(self) -> None:
         self.gone.set()
 
-    async def closed(self) -> None:
-        """Wait for the app to finish the response, and drop it as a server does.
+    def cancel(self) -> None:
+        """The server cancels the request's task, as on its shutdown."""
+        self.task.cancel()
 
-        An ASGI 2.4 app ends with ``ClientDisconnect``; the server logs and drops
-        it, which lets the response's generator be finalized.
+    async def closed(self) -> None:
+        """Wait for the app to finish the response.
+
+        An ASGI 2.4 app ends with ``ClientDisconnect``, a cancelled one with
+        ``CancelledError``; the server logs and drops either.
         """
-        with contextlib.suppress(Exception):
+        with contextlib.suppress(Exception, asyncio.CancelledError):
             await asyncio.wait_for(self.task, 5)
-        del self.task
-        gc.collect()
 
 
 def _turn_body(request_id: str, text: str, history: list[dict[str, Any]]) -> dict[str, Any]:
@@ -222,10 +224,25 @@ async def _until(check: Callable[[], Awaitable[bool]]) -> None:
     raise AssertionError("the condition was never met")
 
 
+@pytest.fixture
+def no_gc() -> Iterator[None]:
+    """No garbage collection: what the app leaves to a finalizer stays in place."""
+    enabled = gc.isenabled()
+    gc.disable()
+    try:
+        yield
+    finally:
+        if enabled:
+            gc.enable()
+
+
 @pytest.mark.asyncio
-@pytest.mark.parametrize("spec_version", ["2.3", "2.4"])
+@pytest.mark.parametrize(
+    ("spec_version", "ending"),
+    [("2.3", "disconnect"), ("2.4", "disconnect"), ("2.3", "cancel"), ("2.4", "cancel")],
+)
 async def test_a_turn_whose_stream_disconnects_is_saved_complete_for_the_owner(
-    init_db: Any, app: FastAPI, runtime: Runtime, spec_version: str
+    init_db: Any, app: FastAPI, runtime: Runtime, no_gc: None, spec_version: str, ending: str
 ) -> None:
     _projects()
     client = httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test")
@@ -242,19 +259,22 @@ async def test_a_turn_whose_stream_disconnects_is_saved_complete_for_the_owner(
         runtime.send("r1", "delta", {"text": "T1 is "})
         assert await stream.next_event() == ("delta", {"text": "T1 is "})
 
-        # The browser tab closes: the server reports the disconnect to the app.
-        await stream.disconnect()
-        runtime.send("r1", "delta", {"text": "40 "})
-        await stream.closed()
         run = chat_turn_runs.running("alice", "s1", "r1")
         assert run is not None and run.task is not None
+        assert len(run.subscribers) == 1
+        if ending == "disconnect":
+            # The browser tab closes: the server reports the disconnect to the app
+            # (ASGI 2.4 servers on the next send).
+            await stream.disconnect()
+            runtime.send("r1", "delta", {"text": "40 "})
+        else:
+            stream.cancel()
+            runtime.send("r1", "delta", {"text": "40 "})
+        await stream.closed()
 
-        async def unsubscribed() -> bool:
-            # ASGI 2.4 servers report the disconnect on the next send; the closed
-            # response's generator is finalized after the app returns.
-            return not run.subscribers
-
-        await _until(unsubscribed)
+        # The response unsubscribed as it ended, not when a finalizer ran later;
+        # the turn runs on.
+        assert not run.subscribers
         assert not run.task.done()
 
         # The turn goes on with nobody listening: its progress is saved...

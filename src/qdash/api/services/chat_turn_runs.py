@@ -486,8 +486,9 @@ async def stream_turn(
     turn that runs here from another project is refused, as the runtime would.
     """
     if not request.session_id or not request.request_id:
-        async for chunk in source(request):
-            yield chunk
+        async with contextlib.aclosing(source(request)) as stream:
+            async for chunk in stream:
+                yield chunk
         return
     key: RunKey = (username, request.session_id, request.request_id)
     run = _runs.get(key)

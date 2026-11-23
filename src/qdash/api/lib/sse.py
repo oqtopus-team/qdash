@@ -4,7 +4,12 @@ from __future__ import annotations
 
 import json
 import math
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+from starlette.responses import StreamingResponse
+
+if TYPE_CHECKING:
+    from starlette.types import Receive, Scope, Send
 
 
 def _sanitize_for_json(obj: Any) -> Any:
@@ -45,3 +50,21 @@ def sse_event(event: str, data: dict[str, Any]) -> str:
 
     """
     return f"event: {event}\ndata: {json.dumps(_sanitize_for_json(data), default=str, ensure_ascii=False)}\n\n"
+
+
+class ClosingStreamingResponse(StreamingResponse):
+    """A streaming response that closes its body iterator as soon as it ends.
+
+    Starlette leaves the iterator suspended when a send fails with ``OSError``
+    (how an ASGI 2.4 server reports a closed connection), so its ``finally``
+    blocks wait for garbage collection. Closing it here runs them when the
+    response ends, however it ends.
+    """
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        try:
+            await super().__call__(scope, receive, send)
+        finally:
+            aclose = getattr(self.body_iterator, "aclose", None)
+            if aclose is not None:
+                await aclose()

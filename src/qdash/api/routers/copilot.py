@@ -29,7 +29,7 @@ from qdash.api.lib.project import (
     get_project_context,
     get_project_id_from_header,
 )
-from qdash.api.lib.sse import sse_event
+from qdash.api.lib.sse import ClosingStreamingResponse, sse_event
 from qdash.api.schemas.auth import User
 from qdash.api.schemas.copilot_chat_session import (
     CopilotChatSessionResponse,
@@ -471,8 +471,9 @@ async def chat_stream(
         return active.get("running") is True
 
     # The turn's stream runs in the API apart from this response: closing it, or every
-    # window, never ends the turn or what the server records of it.
-    return StreamingResponse(
+    # window, never ends the turn or what the server records of it; it only ends the
+    # response's subscription, at once.
+    return ClosingStreamingResponse(
         chat_turn_runs.stream_turn(
             request,
             username=current_user.username,
