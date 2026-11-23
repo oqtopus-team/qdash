@@ -10,7 +10,7 @@
  * the configured chat model in a pi CLI process (RPC mode) with the production
  * pi-qdash tools and skills. It answers pi's approval dialogs as the user, answers the
  * intervention as the expert, and judges each scenario from QDash's records. See
- * docs/developer-guide/copilot/agent-validation.md.
+ * docs/developer-guide/agent/agent-validation.md.
  *
  * Exit status: 0 every scenario passed, 1 a scenario failed, 2 blocked or not run.
  */

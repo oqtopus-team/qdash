@@ -5,8 +5,8 @@ import { usePathname } from "next/navigation";
 import { toast } from "@yusufceng1z/ding-react";
 
 import { useChatDock } from "@/contexts/ChatDockContext";
-import { useCopilotChatSessionContext } from "@/contexts/CopilotChatSessionContext";
-import type { ChatEventKind, ChatTurnEvent } from "@/types/copilotChat";
+import { useAgentChatSessionContext } from "@/contexts/AgentChatSessionContext";
+import type { ChatEventKind, ChatTurnEvent } from "@/types/agentChat";
 
 const CHAT_PAGE = "/chat";
 
@@ -45,7 +45,7 @@ export function ChatNotifier({
   project: string | null | undefined;
 }) {
   const { subscribeChatEvents, activeSessionId, switchSession, hasSession } =
-    useCopilotChatSessionContext();
+    useAgentChatSessionContext();
   const { isOpen, miniChat, openSidebar } = useChatDock();
   const pathname = usePathname();
 

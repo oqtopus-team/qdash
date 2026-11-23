@@ -3,18 +3,15 @@ import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ChatDockProvider, useChatDock } from "../ChatDockContext";
-import {
-  CopilotChatSessionProvider,
-  useCopilotChatSessionContext,
-} from "../CopilotChatSessionContext";
-import type { InvestigationTarget } from "@/types/copilotChat";
+import { AgentChatSessionProvider, useAgentChatSessionContext } from "../AgentChatSessionContext";
+import type { InvestigationTarget } from "@/types/agentChat";
 
 vi.mock("next/navigation", () => ({ usePathname: () => "/execution" }));
 
 const wrapper = ({ children }: { children: ReactNode }) => (
-  <CopilotChatSessionProvider>
+  <AgentChatSessionProvider>
     <ChatDockProvider>{children}</ChatDockProvider>
-  </CopilotChatSessionProvider>
+  </AgentChatSessionProvider>
 );
 
 const EXECUTION_ONLY: InvestigationTarget = {
@@ -46,7 +43,7 @@ beforeEach(() => {
         status: 200,
       });
     }
-    if (url.endsWith("/copilot/chat/sessions") && !init?.method) {
+    if (url.endsWith("/agent/chat/sessions") && !init?.method) {
       return Response.json({ sessions: storedSessions });
     }
     const id = decodeURIComponent(String(url).split("/").pop() ?? "");
@@ -65,7 +62,7 @@ afterEach(() => {
 });
 
 function useDockAndStore() {
-  return { dock: useChatDock(), store: useCopilotChatSessionContext() };
+  return { dock: useChatDock(), store: useAgentChatSessionContext() };
 }
 
 async function renderDock() {
@@ -118,7 +115,7 @@ describe("ChatDock investigations", () => {
       title: expect.any(String),
     });
 
-    const [, createInit] = calls("/copilot/chat/sessions", "POST")[0];
+    const [, createInit] = calls("/agent/chat/sessions", "POST")[0];
     const created = JSON.parse(String(createInit.body));
     expect(created.title).toBe("Investigate execution exec-1");
     expect(created.context).toEqual({ investigation: EXECUTION_ONLY });
@@ -142,7 +139,7 @@ describe("ChatDock investigations", () => {
     const first = result.current.store.activeSessionId;
     act(() => result.current.dock.investigate(TASK, "mini"));
 
-    expect(calls("/copilot/chat/sessions", "POST")).toHaveLength(1);
+    expect(calls("/agent/chat/sessions", "POST")).toHaveLength(1);
     expect(result.current.store.activeSessionId).toBe(first);
     expect(result.current.dock.miniChat.isOpen).toBe(true);
     expect(result.current.dock.isOpen).toBe(false);
@@ -223,7 +220,7 @@ describe("ChatDock investigations", () => {
     expect(result.current.store.activeSessionId).toBe("saved");
     await waitFor(() => expect(result.current.store.activeSession?.messages).toHaveLength(2));
     expect(streamBodies()).toHaveLength(0);
-    expect(calls("/copilot/chat/sessions", "POST")).toHaveLength(0);
+    expect(calls("/agent/chat/sessions", "POST")).toHaveLength(0);
   });
 
   it("starts a fresh investigation after New chat, keeping the old one", async () => {
@@ -267,7 +264,7 @@ describe("ChatDock investigations", () => {
     });
     await waitFor(() => expect(streamBodies()).toHaveLength(2));
     expect(
-      calls("/copilot/chat/sessions", "POST").filter(([, init]) =>
+      calls("/agent/chat/sessions", "POST").filter(([, init]) =>
         String(init.body).includes("investigation"),
       ),
     ).toHaveLength(2);
@@ -446,7 +443,7 @@ describe("ChatDock investigations", () => {
       execution_id: "exec-1",
       chip_id: "64Q",
     });
-    expect(calls("/copilot/chat/sessions", "POST")).toHaveLength(0);
+    expect(calls("/agent/chat/sessions", "POST")).toHaveLength(0);
     await waitFor(() => expect(result.current.store.activeSession?.messages).toHaveLength(2));
 
     act(() => result.current.dock.investigate(EXECUTION_ONLY));
@@ -483,7 +480,7 @@ describe("ChatDock investigations", () => {
       if (url.endsWith("/stream")) {
         return new Response(new ReadableStream({ start() {} }), { status: 200 });
       }
-      if (url.endsWith("/copilot/chat/sessions") && !init?.method) {
+      if (url.endsWith("/agent/chat/sessions") && !init?.method) {
         return Response.json({ sessions: [] });
       }
       return Response.json({ session_id: "x", title: "", context: null, messages: [] });

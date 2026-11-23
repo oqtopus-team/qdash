@@ -5,17 +5,17 @@ import { parse } from "yaml";
 
 import { compactionBudget, type CompactionBudget } from "./budget.ts";
 import {
-  readCopilotModelYaml,
-  type CopilotModelFiles,
-  type CopilotModelYaml,
-} from "./copilot-profile.ts";
+  readAgentModelYaml,
+  type AgentModelFiles,
+  type AgentModelYaml,
+} from "./agent-profile.ts";
 
 /**
  * Build pi's models.json from QDash's chat.yaml and evaluation.yaml.
  *
  * Those two files are the single place model wiring is declared; this module is
  * the only translation into pi's schema. chat.yaml's `chat_models` back the
- * Copilot chat; evaluation.yaml's `evaluation_models` back the figure evaluation
+ * Agent chat; evaluation.yaml's `evaluation_models` back the figure evaluation
  * sidebar. See adr/0004 of the chat session.
  */
 
@@ -382,15 +382,15 @@ function isQwenModel(name: string): boolean {
 /**
  * Generate models.json next to the agent dir and return its path.
  *
- * `files` is the selection of copilot-profile.ts; a named profile's files are
+ * `files` is the selection of agent-profile.ts; a named profile's files are
  * validated, the default files are read as they always were.
  */
 export function writeModelsConfig(
-  files: CopilotModelFiles,
+  files: AgentModelFiles,
   outPath: string,
   env: NodeJS.ProcessEnv = process.env,
-): { path: string; yaml: CopilotModelYaml } {
-  const yaml = readCopilotModelYaml(files);
+): { path: string; yaml: AgentModelYaml } {
+  const yaml = readAgentModelYaml(files);
   const config = buildModelsConfig(yaml.chatYaml, yaml.evaluationYaml, env);
   writeFileSync(outPath, `${JSON.stringify(config, null, 2)}\n`);
   return { path: outPath, yaml };

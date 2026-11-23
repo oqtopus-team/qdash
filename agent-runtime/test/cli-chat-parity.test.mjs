@@ -43,7 +43,7 @@ import { Harness, MemoryStorage, ToolResultEntry } from "@earendil-works/pi-dura
 import { NESTED_READ_TOOL_NAMES } from "@oqtopus-team/pi-qdash/extensions/lib/tool-policy.ts";
 
 import { ALLOWLISTED_PACKAGES } from "../src/allowed-tools.ts";
-import { buildChatRegistry, buildCopilotExtension } from "../src/chat-registry.ts";
+import { buildChatRegistry, buildAgentExtension } from "../src/chat-registry.ts";
 import { buildSystemPrompt } from "../src/prompt.ts";
 import { buildSkillTool } from "../src/skill-tool.ts";
 import { bundledExtensions, createBundledResourceLoader, trustedBundleRoots } from "../src/bundled-extensions.ts";
@@ -306,7 +306,7 @@ async function openCli(steps, { capture, before = [] } = {}) {
 }
 
 /** The production chat registry on a durable harness, with the same packages. */
-async function openChat(steps, { capture, systemPrompt = "QDash parity test prompt", copilotTools = [] } = {}) {
+async function openChat(steps, { capture, systemPrompt = "QDash parity test prompt", agentTools = [] } = {}) {
   const { faux, offered } = scriptedModel(steps);
   const loader = createBundledResourceLoader({ cwd: workDir, agentDir: join(workDir, "runtime-agent"), bundled: bundledExtensions(packagesDir) });
   await loader.reload();
@@ -344,7 +344,7 @@ async function openChat(steps, { capture, systemPrompt = "QDash parity test prom
       modelRuntime,
       workDir,
       extensionPaths: trustedBundleRoots(bundledExtensions(packagesDir), ALLOWLISTED_PACKAGES),
-      copilot: buildCopilotExtension(systemPrompt, copilotTools),
+      agent: buildAgentExtension(systemPrompt, agentTools),
       internalCalls: {},
       codingTools: false,
     },
@@ -633,7 +633,7 @@ test("a plain-language request reaches the experiment skills and the shared requ
     ["chat", () => openChat([record("chat"), fauxAssistantMessage([fauxText("done")])], {
       // As runtime.ts builds them from the same loader.
       systemPrompt: buildSystemPrompt("auto", "en", skills),
-      copilotTools: [buildSkillTool(skills)],
+      agentTools: [buildSkillTool(skills)],
     })],
   ];
   for (const [host, open] of hosts) {

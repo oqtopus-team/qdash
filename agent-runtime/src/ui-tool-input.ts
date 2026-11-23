@@ -1,7 +1,7 @@
 import { Type, type Static, type TSchema } from "typebox";
 
 // See ui-tool.ts for why this path resolves in the image too.
-import { UI_COMPONENT_TYPES, type UiSpec } from "../../ui/src/lib/copilotUiSpec.ts";
+import { UI_COMPONENT_TYPES, type UiSpec } from "../../ui/src/lib/agentUiSpec.ts";
 
 /**
  * The arguments `render_ui` declares to the model, and their mapping to and

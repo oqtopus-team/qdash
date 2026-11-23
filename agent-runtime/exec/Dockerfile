@@ -1,4 +1,4 @@
-# The Copilot workspace: the container behind the chat's bash/read/write/edit
+# The Agent workspace: the container behind the chat's bash/read/write/edit
 # tools. It holds no QDash credentials and joins no QDash network; the Agent
 # Runtime reaches it only through exec/server.ts, which starts one pi-env
 # daemon per conversation as that user's own uid.

@@ -13,6 +13,7 @@ if TYPE_CHECKING:
 from qdash.api.lib.auth import get_current_active_user
 from qdash.api.routers import (
     admin,
+    agent,
     agent_session,
     auth,
     backend,
@@ -23,7 +24,6 @@ from qdash.api.routers import (
     config,
     cooldown,
     cooldown_wiring_event,
-    copilot,
     cryostat,
     dashboard,
     device_topology,
@@ -65,9 +65,9 @@ PUBLIC_ROUTERS: tuple[RouterRegistration, ...] = (
     RouterRegistration(execution.router, tags=("execution",), requires_auth=False),
     RouterRegistration(file.router, tags=("file",)),
     RouterRegistration(
-        copilot.public_router,
-        prefix="/copilot",
-        tags=("copilot",),
+        agent.public_router,
+        prefix="/agent",
+        tags=("agent",),
         requires_auth=False,
     ),
     RouterRegistration(forum.public_router, tags=("forum",), requires_auth=False),
@@ -78,7 +78,7 @@ PROTECTED_ROUTERS: tuple[RouterRegistration, ...] = (
     RouterRegistration(calibration.router, tags=("calibration",)),
     RouterRegistration(calibration_pipeline.router, tags=("calibration-pipeline",)),
     RouterRegistration(calibration_session.router, tags=("calibration-session",)),
-    RouterRegistration(copilot.router, prefix="/copilot", tags=("copilot",)),
+    RouterRegistration(agent.router, prefix="/agent", tags=("agent",)),
     RouterRegistration(settings.router, tags=("settings",)),
     RouterRegistration(chip.router, tags=("chip",)),
     RouterRegistration(task.router, tags=("task",)),

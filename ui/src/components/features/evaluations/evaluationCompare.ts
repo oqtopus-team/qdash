@@ -203,7 +203,7 @@ export function runSettings(a: RunSide, b: RunSide): SettingDiff[] {
     ["mode", "Mode", ({ run }) => modeLabel(run.mode)],
     [
       "planner",
-      "Copilot model",
+      "Agent model",
       ({ run }) => (run.mode === "planner" ? run.planner_model || "-" : "-"),
     ],
     [

@@ -1,11 +1,11 @@
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ChatDockProvider, SIDEBAR_COVERS_PAGE_QUERY, useChatDock } from "../ChatDockContext";
-import type { EditProposal, PageContext } from "@/types/copilotChat";
+import type { EditProposal, PageContext } from "@/types/agentChat";
 
 vi.mock("next/navigation", () => ({ usePathname: () => "/workflow/t1" }));
-vi.mock("../CopilotChatSessionContext", () => ({
-  useCopilotChatSessionContext: () => ({ activeSession: null }),
+vi.mock("../AgentChatSessionContext", () => ({
+  useAgentChatSessionContext: () => ({ activeSession: null }),
 }));
 afterEach(cleanup);
 

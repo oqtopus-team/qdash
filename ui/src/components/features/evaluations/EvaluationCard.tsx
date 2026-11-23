@@ -309,7 +309,7 @@ export function EvaluationCard({
             {output?.fallback && (
               <span className="badge badge-sm badge-warning badge-outline">fallback model</span>
             )}
-            {item.planner && <span className="badge badge-sm badge-outline">via Copilot</span>}
+            {item.planner && <span className="badge badge-sm badge-outline">via Agent</span>}
             <span className="ml-auto flex items-center gap-1">
               {showRunLink && (
                 <Link href={`/evaluations/${item.run_id}`} className="btn btn-ghost btn-xs">
@@ -448,9 +448,7 @@ export function EvaluationCard({
 
           {item.planner && (
             <details className="text-sm">
-              <summary className="cursor-pointer font-medium text-primary">
-                What Copilot did
-              </summary>
+              <summary className="cursor-pointer font-medium text-primary">What Agent did</summary>
               <div className="mt-2 space-y-2 rounded-lg border border-base-300 bg-base-200/40 p-3">
                 <div className="flex flex-wrap gap-1 text-xs">
                   <span className="font-mono text-base-content/60">{item.planner.model}</span>

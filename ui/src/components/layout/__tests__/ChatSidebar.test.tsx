@@ -19,8 +19,8 @@ vi.mock("@/contexts/ChatDockContext", () => ({
     closeSidebar: vi.fn(),
   }),
 }));
-vi.mock("@/contexts/CopilotChatSessionContext", () => ({
-  useCopilotChatSessionContext: () => ({ runs: mocks.runs, detachedTurns: mocks.detachedTurns }),
+vi.mock("@/contexts/AgentChatSessionContext", () => ({
+  useAgentChatSessionContext: () => ({ runs: mocks.runs, detachedTurns: mocks.detachedTurns }),
 }));
 vi.mock("@/components/features/chat/DockedChatPanel", () => ({
   DockedChatPanel: () => <div data-testid="docked-chat" />,

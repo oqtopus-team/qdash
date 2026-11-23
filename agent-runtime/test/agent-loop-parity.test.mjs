@@ -34,7 +34,7 @@ import { Harness, MemoryStorage, ToolResultEntry } from "@earendil-works/pi-dura
 
 import { startFakeAgentQDash } from "../../packages/pi-qdash/tests/helpers/fake-agent-qdash.mjs";
 import { ALLOWLISTED_PACKAGES } from "../src/allowed-tools.ts";
-import { buildChatRegistry, buildCopilotExtension } from "../src/chat-registry.ts";
+import { buildChatRegistry, buildAgentExtension } from "../src/chat-registry.ts";
 import { bundledExtensions, createBundledResourceLoader, trustedBundleRoots } from "../src/bundled-extensions.ts";
 
 const context = BACKGROUND_CONTEXT;
@@ -157,7 +157,7 @@ async function openChat(steps) {
       modelRuntime,
       workDir,
       extensionPaths: trustedBundleRoots(bundledExtensions(packagesDir), ALLOWLISTED_PACKAGES),
-      copilot: buildCopilotExtension("QDash agent loop test prompt", []),
+      agent: buildAgentExtension("QDash agent loop test prompt", []),
       internalCalls: {},
       codingTools: false,
     },

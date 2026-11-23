@@ -1,7 +1,7 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import type { TraceStep, TurnConnection } from "@/types/copilotChat";
+import type { TraceStep, TurnConnection } from "@/types/agentChat";
 
 import { QUIET_AFTER_MS, TurnActivity, connectionNote, currentActivity } from "../ChatTrace";
 

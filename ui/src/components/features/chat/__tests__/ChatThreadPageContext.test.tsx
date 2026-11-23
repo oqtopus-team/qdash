@@ -2,22 +2,22 @@ import { Profiler, useEffect, useRef, useState } from "react";
 import { act, cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ChatDockProvider, useChatDock } from "@/contexts/ChatDockContext";
-import type { PageContext } from "@/types/copilotChat";
+import type { PageContext } from "@/types/agentChat";
 import { ChatThread } from "../ChatThread";
 
 // The real dock and thread; only the route, the sessions, and the network are stubbed.
 const { nav } = vi.hoisted(() => ({ nav: { pathname: "/workflow/flow_a" } }));
 
 vi.mock("next/navigation", () => ({ usePathname: () => nav.pathname }));
-vi.mock("@/contexts/CopilotChatSessionContext", () => ({
-  useCopilotChatSessionContext: () => ({ activeSession: null }),
+vi.mock("@/contexts/AgentChatSessionContext", () => ({
+  useAgentChatSessionContext: () => ({ activeSession: null }),
 }));
-vi.mock("@/client/copilot/copilot", () => ({
-  useGetCopilotPreferences: () => ({ data: undefined }),
-  useListCopilotSkills: () => ({ data: undefined }),
+vi.mock("@/client/agent/agent", () => ({
+  useGetAgentPreferences: () => ({ data: undefined }),
+  useListAgentSkills: () => ({ data: undefined }),
 }));
-vi.mock("@/hooks/useCopilotChat", () => ({
-  useCopilotChat: () => ({
+vi.mock("@/hooks/useAgentChat", () => ({
+  useAgentChat: () => ({
     session: null,
     messages: [],
     isLoadingMessages: false,

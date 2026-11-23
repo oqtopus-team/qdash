@@ -33,7 +33,7 @@ import {
   type InteractionState,
 } from "@/components/features/chat/ChatInteractionCards";
 import { useOptionalChatDock } from "@/contexts/ChatDockContext";
-import { editTargetCode } from "@/lib/copilotEditTarget";
+import { editTargetCode } from "@/lib/agentEditTarget";
 import { ImagePreviewDialog } from "@/components/ui/ImagePreviewDialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import { useToast } from "@/components/ui/Toast";
@@ -47,27 +47,27 @@ import {
   writtenFiles,
   type WrittenFile,
 } from "@/lib/chatDownloads";
-import { answerStartIndex } from "@/lib/copilotChatStream";
-import { answerFeedback } from "@/hooks/useCopilotChat";
+import { answerStartIndex } from "@/lib/agentChatStream";
+import { answerFeedback } from "@/hooks/useAgentChat";
 import type {
   AnswerFeedback,
   BlocksResult,
-  ChatMessage as CopilotMessage,
-  CopilotBlocksResult,
+  ChatMessage as AgentMessage,
+  AgentBlocksResult,
   LiveTurn,
   TurnConnection,
-} from "@/types/copilotChat";
+} from "@/types/agentChat";
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function parseBlocksContent(content: string): CopilotBlocksResult | null {
+function parseBlocksContent(content: string): AgentBlocksResult | null {
   if (!content.startsWith("{")) return null;
   try {
     const data = JSON.parse(content);
     if (data.blocks && Array.isArray(data.blocks)) {
-      return data as CopilotBlocksResult;
+      return data as AgentBlocksResult;
     }
   } catch {
     // Not JSON
@@ -89,7 +89,7 @@ export function messageText(content: string): string {
     .join("\n\n");
 }
 
-function isErrorMessage(message: CopilotMessage): boolean {
+function isErrorMessage(message: AgentMessage): boolean {
   return message.role === "assistant" && message.content.startsWith("Error: ");
 }
 
@@ -238,7 +238,7 @@ function ImageSentBadge({ imagesSent }: { imagesSent: BlocksResult["images_sent"
     ...expected_images.map((img) => ({
       key: `expected-${img.index}`,
       alt: img.alt_text,
-      src: `${baseURL}/copilot/expected-image?task_name=${encodeURIComponent(task_name)}&index=${img.index}`,
+      src: `${baseURL}/agent/expected-image?task_name=${encodeURIComponent(task_name)}&index=${img.index}`,
     })),
   ];
 
@@ -304,7 +304,7 @@ function BlocksContent({
   blocks,
   interaction,
 }: {
-  blocks: CopilotBlocksResult;
+  blocks: AgentBlocksResult;
   interaction: InteractionState;
 }) {
   const figures = blocks.trace ? figuresInSteps(blocks.trace.steps) : [];
@@ -391,7 +391,7 @@ export const UserMessage = memo(function UserMessage({
   canEdit,
   onEdit,
 }: {
-  message: CopilotMessage;
+  message: AgentMessage;
   /** Nothing is streaming, so the message can be edited and resent. */
   canEdit: boolean;
   onEdit: (text: string) => void;
@@ -581,7 +581,7 @@ export const AssistantMessage = memo(function AssistantMessage({
   branching = false,
   onBranch,
 }: {
-  message: CopilotMessage;
+  message: AgentMessage;
   isLast: boolean;
   canRetry: boolean;
   onRetry: () => void;

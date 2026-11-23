@@ -257,7 +257,7 @@ function DiagnosisDiff({ row }: { row: CompareRow }) {
 /**
  * The two prompts of one entity as a diff, A as the old side and B as the new,
  * so what changed between the runs (an edited reference, examples, a question,
- * what Copilot wrote as context) stands out. The diff is built only when opened.
+ * what Agent wrote as context) stands out. The diff is built only when opened.
  */
 function PromptDiff({ row }: { row: CompareRow }) {
   const [open, setOpen] = useState(false);

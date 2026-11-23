@@ -14,7 +14,7 @@ QDash separates the Next.js UI, FastAPI API, and Prefect calibration runtime.
 
 The UI is the frontend for users, developed with Next.js and React. It provides pages for
 dashboarding, chip/task inspection, workflow editing and execution, metrics, provenance, issue
-tracking, file management, and Copilot-assisted analysis.
+tracking, file management, and Agent-assisted analysis.
 
 The UI client and standalone TypeScript client are generated with Orval from the API's OpenAPI
 schema, and the Python client's Pydantic models with `datamodel-code-generator`. API contract
@@ -138,7 +138,7 @@ browser session reaches Prefect with a cookie; Prefect's Python client fetches C
 itself.
 
 Next.js has no rewrites or route handlers under `/api`. The Prefect access check and the
-Copilot chat stream therefore pass through Caddy in development as in production. Caddy flushes
+Agent chat stream therefore pass through Caddy in development as in production. Caddy flushes
 each `text/event-stream` chunk as it arrives and closes the API's connection when the browser
 closes its own, so the API sees a stopped chat as a disconnect. It also proxies the Next.js HMR websocket at
 `/_next/hmr` with the browser's `Host` header. Next.js accepts it for `localhost`; list any

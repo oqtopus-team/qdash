@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import { FlaskConical, History, MessageSquare } from "lucide-react";
-import { useCopilotChatSessionContext } from "@/contexts/CopilotChatSessionContext";
+import { useAgentChatSessionContext } from "@/contexts/AgentChatSessionContext";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -48,7 +48,7 @@ export function SurfaceButton({
  * how it ended); its context shows above the composer.
  */
 export function SurfaceTitle() {
-  const { activeSession } = useCopilotChatSessionContext();
+  const { activeSession } = useAgentChatSessionContext();
   const status = useChatStatus();
   const hasMessages = Boolean(activeSession?.messages.length);
   return (
@@ -64,7 +64,7 @@ export function SurfaceTitle() {
 /** Jump back to a recent chat without leaving the page. Full history lives on /chat. */
 export function RecentChatsMenu({ onOpenAll }: { onOpenAll: () => void }) {
   const { sessions, activeSessionId, runs, detachedTurns, switchSession } =
-    useCopilotChatSessionContext();
+    useAgentChatSessionContext();
   const recent = [...sessions].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, RECENT_LIMIT);
 
   return (

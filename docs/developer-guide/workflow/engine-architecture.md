@@ -226,7 +226,7 @@ declaration, run `task generate-task-catalog` to refresh
 
 The catalog publishes the declaration as `documentation` on each task in `GET /task-files/tasks`
 and, for the backend's enabled tasks, as `task_documentation` in
-[`GET /calibration-pipelines/catalog`](./calibration-pipeline.md#endpoints). The Copilot reads it
+[`GET /calibration-pipelines/catalog`](./calibration-pipeline.md#endpoints). The Agent reads it
 through `qdash_get_pipeline_catalog` ([pi-qdash tools](../../reference/pi-qdash.md#pipeline-and-flow-operations)).
 `tests/qdash/api/services/test_task_file_service.py` covers static parsing.
 `tests/scripts/test_generate_task_catalog.py` checks that the catalog matches each class's runtime
@@ -265,7 +265,7 @@ run only when the worker runs with `QDASH_FAKE_FAULT_INJECTION=1` and
 `<chip>/validation/fake-fault.json` in the Qubex configuration tree names that chip, qubit, and
 task with an `expires_at` at most one hour ahead; any invalid file disables it. The failure
 message names the fault id and says it was injected. The
-[agent loop validation](../copilot/agent-validation.md) harness writes and removes the file;
+[agent loop validation](../agent/agent-validation.md) harness writes and removes the file;
 `tests/qdash/workflow/engine/backend/test_fake_faults.py` covers the rules.
 
 ### Add persistence behavior

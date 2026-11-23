@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { ImageIcon } from "lucide-react";
 import { ImagePreviewDialog } from "@/components/ui/ImagePreviewDialog";
-import type { TraceStep } from "@/types/copilotChat";
+import type { TraceStep } from "@/types/agentChat";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
 

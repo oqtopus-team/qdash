@@ -61,7 +61,7 @@ Socket mode (deployments):
   cannot widen the scope, and the worker reads data only through the relayed broker.
 - The runner (``agent-runtime/metric-runner/runner.ts``) is the only process of the
   ``metric-runner`` container: no network, read-only root, no credentials, and nothing
-  shared with the Copilot workspace. It admits jobs into a few global slots, starts each
+  shared with the Agent workspace. It admits jobs into a few global slots, starts each
   worker as the slot's own job uid with no capabilities and ``no_new_privs``, in a fresh
   private job directory, with an environment that holds only ``PATH``, ``PYTHONPATH``,
   ``HOME``/``TMPDIR``, locale and BLAS thread variables. On completion, timeout or

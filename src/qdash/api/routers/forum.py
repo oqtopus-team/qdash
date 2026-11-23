@@ -401,11 +401,11 @@ async def forum_ai_reply_stream(
 
     async def event_generator() -> AsyncGenerator[str, None]:
         """Yield SSE-formatted events as the AI reply is generated."""
-        from qdash.copilot.config import load_copilot_config
+        from qdash.agent.config import load_agent_config
 
-        config = load_copilot_config()
+        config = load_agent_config()
         if not config.enabled:
-            yield sse_event("error", {"step": "init", "detail": "Copilot is not enabled"})
+            yield sse_event("error", {"step": "init", "detail": "Agent is not enabled"})
             return
 
         yield sse_event("status", {"step": "load_forum", "message": "Forumを読み込み中..."})

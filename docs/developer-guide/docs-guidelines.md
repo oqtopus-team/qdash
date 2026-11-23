@@ -24,7 +24,7 @@ mechanism explanation, write one page in each guide and link them inline.
 | `docs/reference/` | Database collections, OpenAPI, and client APIs |
 
 Each guide's index gives its reading order. Group component-specific development pages under
-`api/`, `ui/`, `workflow/`, or `copilot/`; cross-component designs belong under `architecture/`.
+`api/`, `ui/`, `workflow/`, or `agent/`; cross-component designs belong under `architecture/`.
 
 Name files by topic (`reviewing-results.md`), not by audience or form (`user-...`,
 `...-overview`). Every page is linked from the sidebar in `docs/.vitepress/config.mts`; a page
@@ -36,7 +36,7 @@ A user page answers "how do I ...?" for one job: run a calibration, review resul
 cryostat. Start each section with when to use it, then give the steps.
 
 - **Name what the person sees.** Page and button names in bold, as the application shows them:
-  **Chip page → Evaluate**, **Settings → Copilot**. Describe what happens as a result, not how
+  **Chip page → Evaluate**, **Settings → Agent**. Describe what happens as a result, not how
   it is implemented.
 - **Steps are numbered** when order matters; otherwise a short paragraph. One action per step.
 - **Settings go in a table**: name, meaning, default. Environment variables and commands appear
@@ -45,7 +45,7 @@ cryostat. Start each section with when to use it, then give the steps.
   section.
 - **No internals.** No file paths, collection names, library or model names, JSON keys, HTTP
   routes, or component names. A reader who wants the mechanism gets one line: "How this works:
-  [Copilot architecture](./copilot/architecture.md)."
+  [Agent architecture](./agent/architecture.md)."
 - **Code the user writes is not an internal.** Workflow source edited in **Workflow**, client
   scripts, and `qdash-agent` commands are part of the job: show them as runnable examples with
   the names the user types (`TaskCall`, `mux_ids`), and leave out how QDash implements them.
@@ -178,7 +178,7 @@ comes first. When a page moves, add its old path to
 ## Exceptions
 
 **task-knowledge files** in the knowledge repository have a fixed template consumed by the
-copilot system prompt. Don't restructure these.
+agent system prompt. Don't restructure these.
 
 **Community files** (`CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`) follow GitHub's
 conventions, not these.

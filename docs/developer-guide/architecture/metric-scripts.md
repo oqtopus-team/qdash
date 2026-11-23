@@ -17,7 +17,7 @@ HTTP errors. The API side of the runtime package (`src/qdash/api/metric_runtime/
 executor, a client of the metric runner, and the data broker. The metric runner
 (`agent-runtime/metric-runner/runner.ts`) owns admission, job identity, supervision and cleanup,
 and is the only process of the `metric-runner` container: it shares no container, socket or
-resource limit with the [Copilot workspace](../copilot/workspace.md) in `agent-exec`. The
+resource limit with the [Agent workspace](../agent/workspace.md) in `agent-exec`. The
 runtime knows nothing about documents or users; the broker knows nothing about script code; the
 runner knows nothing about users, projects or data.
 

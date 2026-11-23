@@ -33,21 +33,21 @@ internal authentication; no AI Compose profile or UI enable flag is needed.
    and the other models still work; QDash never switches models by itself. Planner-mode
    evaluations also use the default chat model.
 
-2. Select the models in `config/copilot/chat.yaml` and `config/copilot/evaluation.yaml`, or
+2. Select the models in `config/agent/chat.yaml` and `config/agent/evaluation.yaml`, or
    [select a deployment profile](#select-a-deployment-profile). The supplied files reference the
    variables above. Further endpoints, provider names, and
    gateway compatibility keys are described in
-   [Copilot Model Configuration](../../developer-guide/copilot/model-configuration.md).
+   [Agent Model Configuration](../../developer-guide/agent/model-configuration.md).
 3. [Apply the changes](#apply-ai-changes).
 
-Copilot write operations require your approval and project permissions. No extra enable setting
+Agent write operations require your approval and project permissions. No extra enable setting
 is needed; the retired `AGENT_RUNTIME_ENABLE_WRITE_TOOLS` variable has no effect and can be removed.
 
 ## Select a Deployment Profile
 
 A deployment profile gives one deployment its own chat and evaluation models while the default
 files stay unchanged for other deployments. Each profile is a directory under
-`config/copilot/profiles/`. The supplied `oqtopus` profile is a sample that names
+`config/agent/profiles/`. The supplied `oqtopus` profile is a sample that names
 `Qwen/Qwen3.8-27B` for chat and evaluation; it has not been tested against any serving API.
 
 1. Confirm that the deployment serving the profile's models meets what the profile assumes, and
@@ -58,11 +58,11 @@ files stay unchanged for other deployments. Each profile is a directory under
 2. Set the profile name in `.env`:
 
    ```dotenv
-   QDASH_COPILOT_PROFILE=oqtopus
+   QDASH_AGENT_PROFILE=oqtopus
    ```
 
-   Leave the value unset or empty to use `config/copilot/chat.yaml` and
-   `config/copilot/evaluation.yaml`.
+   Leave the value unset or empty to use `config/agent/chat.yaml` and
+   `config/agent/evaluation.yaml`.
 3. Set the endpoint variables of [Connect Model Endpoints](#connect-model-endpoints) for the
    endpoints the profile serves. The `oqtopus` profile uses the `CHAT` and `EVALUATION` pairs.
 4. Recreate the API and the AI runtime. A restart keeps the environment a container was created
@@ -76,15 +76,15 @@ files stay unchanged for other deployments. Each profile is a directory under
    runtime with
    `docker compose -f compose.yaml -f compose.dev-local.yaml up -d --no-deps --force-recreate agent-runtime`.
 5. Check the runtime log with `docker compose logs agent-runtime`. It reports
-   `copilot models: profile oqtopus` and the two files it read.
+   `agent models: profile oqtopus` and the two files it read.
 
 QDash does not fall back to the default models when a profile is misconfigured. If the name is
 invalid, the profile directory or one of its files is missing, or a model setting is missing,
-unknown, or has a value of the wrong type or range, the AI runtime stops at startup, Copilot
+unknown, or has a value of the wrong type or range, the AI runtime stops at startup, Agent
 requests fail, and the logs of both services name the file, the model entry, and the setting.
 Fix the profile or the variable and recreate both services again. To add a profile for another
 deployment, see
-[Deployment Profiles](../../developer-guide/copilot/model-configuration.md#deployment-profiles).
+[Deployment Profiles](../../developer-guide/agent/model-configuration.md#deployment-profiles).
 
 ## Add a Classifier
 
@@ -110,9 +110,9 @@ chooses layouts and makes these judgments itself.
    `classify: classifier system-one-classifier/ZefanCai/Open-Jev-2B`, or why they are not
    offered, such as an unset variable.
 
-The model is declared in `config/copilot/classifier.yaml`. To turn the classifier off, leave the
+The model is declared in `config/agent/classifier.yaml`. To turn the classifier off, leave the
 variables unset or remove the model from that file. How this works:
-[Presentation Classifier](../../developer-guide/copilot/model-configuration.md#presentation-classifier).
+[Presentation Classifier](../../developer-guide/agent/model-configuration.md#presentation-classifier).
 
 ## Authenticate AI Endpoints with Cloudflare Access
 

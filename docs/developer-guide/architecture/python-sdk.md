@@ -35,7 +35,7 @@ Every operation belongs to one phase, and no phase starts the next one implicitl
 
 `Pipelines.execute` also takes `calibration_session_id` and `idempotency_key`, given together, to
 record the run in a calibration session before it is launched; a retry with the same key returns
-the recorded run. See [Calibration Sessions](../copilot/calibration-sessions.md).
+the recorded run. See [Calibration Sessions](../agent/calibration-sessions.md).
 
 `Chip` is a front door over `Pipelines`, not a second implementation:
 `validate_calibration` and `calibrate` build a `Pipeline` from `targets`, `steps` and the
@@ -253,7 +253,7 @@ member manifests also copies `sdks/python/hatch_build.py`.
 
 `.github/workflows/publish-qdash-client.yml` builds both packages from one release record,
 publishes `qdash-client`, and then publishes `qdash-sdk`; the release pipeline is described in
-[Pi Packages](../copilot/packages.md#distribution). The workflow keeps its filename because
+[Pi Packages](../agent/packages.md#distribution). The workflow keeps its filename because
 the existing `qdash-client` PyPI Trusted Publisher names it.
 
 Python flows written against `qdash.workflow` remain the way to express loops, conditions on

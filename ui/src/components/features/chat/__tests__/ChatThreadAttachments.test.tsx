@@ -8,12 +8,12 @@ const { send, steer, chat } = vi.hoisted(() => ({
   steer: vi.fn(),
   chat: { isStreaming: false, steers: [] as unknown[], notice: null as string | null },
 }));
-vi.mock("@/client/copilot/copilot", () => ({
-  useGetCopilotPreferences: () => ({ data: undefined }),
-  useListCopilotSkills: () => ({ data: undefined }),
+vi.mock("@/client/agent/agent", () => ({
+  useGetAgentPreferences: () => ({ data: undefined }),
+  useListAgentSkills: () => ({ data: undefined }),
 }));
-vi.mock("@/hooks/useCopilotChat", () => ({
-  useCopilotChat: () => ({
+vi.mock("@/hooks/useAgentChat", () => ({
+  useAgentChat: () => ({
     session: { id: "s1", context: null },
     messages: [],
     isLoadingMessages: false,

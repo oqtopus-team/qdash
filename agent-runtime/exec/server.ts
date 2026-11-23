@@ -8,7 +8,7 @@
  * cannot read another user's files. The container holds no QDash credentials
  * and reaches no QDash service. A Unix socket writable only by the runtime's
  * group prevents workspace users from choosing another owner. See
- * docs/developer-guide/copilot/workspace.md.
+ * docs/developer-guide/agent/workspace.md.
  */
 import { spawn, type ChildProcess } from "node:child_process";
 import { chmodSync, chownSync, lstatSync, mkdirSync, readdirSync, unlinkSync } from "node:fs";

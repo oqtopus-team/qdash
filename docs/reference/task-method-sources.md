@@ -3,7 +3,7 @@
 This table lists the published sources used as background reading when the task explanations
 (`description`, `when_to_use`, and `prerequisites` in each task's `TaskDocumentation`) were
 written, grouped by measurement method. It is documentation only: QDash does not store or
-publish these sources with task metadata, and the API and Copilot do not return them.
+publish these sources with task metadata, and the API and Agent do not return them.
 
 The sources describe the original general method, not the QDash implementation. The task
 source and the Qubex functions it calls define what a task actually does, including sweeps,

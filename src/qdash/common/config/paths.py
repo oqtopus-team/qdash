@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 CONFIG_DIR: Path = Path("/app/config")
-"""Base directory for configuration files grouped under app/, domain/, and copilot/."""
+"""Base directory for configuration files grouped under app/, domain/, and agent/."""
 
 CALIB_DATA_BASE: Path = Path("/app/calib_data")
 """Base directory for calibration data storage."""

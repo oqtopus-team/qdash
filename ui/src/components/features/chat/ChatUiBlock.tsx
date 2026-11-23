@@ -21,7 +21,7 @@ import type { Spec } from "@json-render/core";
 import { AlertTriangle, CheckCircle2, Info, XCircle } from "lucide-react";
 import { ChatMarkdown, ChatLink } from "@/components/features/chat/ChatMarkdown";
 import { ChatPlotlyChart } from "@/components/features/chat/ChatPlotlyChart";
-import { parseUiBlock, safeInternalHref, uiCatalog } from "@/lib/copilotUiSpec";
+import { parseUiBlock, safeInternalHref, uiCatalog } from "@/lib/agentUiSpec";
 
 type Tone = "neutral" | "info" | "success" | "warning" | "error";
 

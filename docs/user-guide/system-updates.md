@@ -18,7 +18,16 @@ After deploying QDash v1.10.0, follow [Upgrade MongoDB](./mongodb-upgrade.md) to
 through the required intermediate versions and FCV steps. These are one-time upgrade actions. Follow the
 v1.10.0 release notes for calibration-data migration, saved workflow changes, and AI configuration.
 If a Pi runtime upgrade migrates existing conversations, back up the stopped `agent-runtime-state`
-volume first; see [durable conversations](../developer-guide/copilot/architecture.md#durable-conversations).
+volume first; see [durable conversations](../developer-guide/agent/architecture.md#durable-conversations).
+
+The release that renames Copilot to Agent moves the AI settings from `config/copilot/` to
+`config/agent/` and renames `QDASH_COPILOT_PROFILE` to `QDASH_AGENT_PROFILE`. Move any profile or
+file you added under `config/copilot/` into `config/agent/`, and rename the variable in `.env`.
+The earlier variable still works for now; see
+[Rename Copilot Settings](../developer-guide/agent/model-configuration.md#rename-copilot-settings).
+The API routes move from `/copilot/` to `/agent/` without aliases, so update scripts and
+pi-qdash installations that call the old routes together with QDash. Chats and saved
+instructions stay as they are.
 
 ## Select a Version
 
@@ -56,7 +65,7 @@ Run the command that matches your existing deployment:
 | Docker Compose without the bundled Cloudflare Tunnel | `task deploy-local` |
 | Docker Compose with the bundled Cloudflare Tunnel configured | `task deploy` |
 
-Both commands update the configured Copilot knowledge repository and rebuild and start the
+Both commands update the configured Agent knowledge repository and rebuild and start the
 Compose stack. `task deploy` also enables the `tunnel` profile and restarts the API after startup.
 You do not need to stop and remove the stack first for a routine update.
 

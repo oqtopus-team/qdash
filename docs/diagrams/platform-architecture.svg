@@ -40,7 +40,7 @@
 
     <rect x="845" y="210" width="170" height="56" rx="8" class="qd-ext"/>
     <text x="930" y="234" class="qd-title">Agent runtime</text>
-    <text x="930" y="252" class="qd-sub">optional · Copilot</text>
+    <text x="930" y="252" class="qd-sub">optional · Agent</text>
 
     <!-- Row 4: Prefect server, MongoDB, calib_data -->
     <rect x="225" y="340" width="170" height="56" rx="8" class="qd-wf"/>

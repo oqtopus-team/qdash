@@ -1,5 +1,5 @@
 /**
- * The registry one chat session runs with: QDash's tools, the copilot's own
+ * The registry one chat session runs with: QDash's tools, the agent's own
  * tools and prompt, the user's preferences, the open page, the workspace
  * tools, and Code Mode with the tool policy. SharedRuntime builds the parts
  * that are the same for every chat once; this assembles them per session, so
@@ -26,15 +26,15 @@ import { buildUserInstructionsSection } from "./prompt.ts";
 export const USER_PREFERENCES_SECTION = "user-preferences";
 
 /**
- * The copilot's own tools with QDash's system prompt. They render in the chat
+ * The agent's own tools with QDash's system prompt. They render in the chat
  * or end the turn, so they are model-only, except an internal tool that
  * already names its callers (present_results' classifier).
  */
-export function buildCopilotExtension(systemPrompt: string, tools: readonly ToolRegistration[]): Extension {
+export function buildAgentExtension(systemPrompt: string, tools: readonly ToolRegistration[]): Extension {
   return modelOnlyTools(
     defineExtension({
-      name: "qdash-copilot",
-      sections: [section("qdash-copilot", () => systemPrompt, { tag: false })],
+      name: "qdash-agent",
+      sections: [section("qdash-agent", () => systemPrompt, { tag: false })],
       tools: [...tools],
     }),
   );
@@ -47,9 +47,9 @@ export interface ChatRegistryParts {
   workDir: string;
   /** Bundled roots trusted as a whole, as `buildQDashExtension` takes them. */
   extensionPaths: readonly string[];
-  /** From `buildCopilotExtension`. */
-  copilot: Extension;
-  /** Internal tools of `copilot` with the tools that may call them. */
+  /** From `buildAgentExtension`. */
+  agent: Extension;
+  /** Internal tools of `agent` with the tools that may call them. */
   internalCalls: InternalCalls;
   /** The workspace's read/write/edit/bash, when there is a workspace. */
   codingTools: boolean;
@@ -80,7 +80,7 @@ export function buildChatRegistry(
     parts.extensionPaths,
   );
   registry.install(qdash.extension);
-  registry.install(parts.copilot);
+  registry.install(parts.agent);
   if (parts.compaction) registry.install(parts.compaction);
   // After QDash's own rules, so they come first and the user's preferences
   // read as adjustments to them.

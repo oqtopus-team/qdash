@@ -34,7 +34,7 @@ import { chartTool } from "./chart-tool.ts";
 import { buildCompactionExtension } from "./compaction.ts";
 import {
   buildChatRegistry as buildChatRegistryFor,
-  buildCopilotExtension,
+  buildAgentExtension,
   USER_PREFERENCES_SECTION,
   type ChatRegistry,
   type ChatRegistryParts,
@@ -96,7 +96,7 @@ import { formatSettledDetail } from "./events.ts";
 import { logDurableReport } from "./durable-report.ts";
 import { examplesOf, fetchKnowledgeDraft, fetchTaskKnowledgeResponse, renderReference } from "./knowledge-context.ts";
 import type { TaskKnowledgeLike } from "./knowledge-context.ts";
-import { resolveCopilotModelFiles } from "./copilot-profile.ts";
+import { resolveAgentConfigPaths, resolveAgentModelFiles } from "./agent-profile.ts";
 import { chatCompactionOverrides, missingCredentialMessage, NATIVE_API_KEY_ENV, PROVIDER_ALIASES, supportedThinkingLevel, writeModelsConfig } from "./models-config.ts";
 import type { PageContext } from "./page-context.ts";
 import { buildSystemPrompt, buildUserInstructionsSection } from "./prompt.ts";
@@ -112,16 +112,16 @@ import { extractToolGuide, TOOL_GUIDE_SKILL, toolGuideNames } from "./tool-guide
 const AGENT_DIR = process.env.PI_CODING_AGENT_DIR ?? "/app/.pi-agent";
 const WORK_DIR = process.env.AGENT_WORK_DIR ?? "/app/workspace";
 const STATE_DIR = process.env.AGENT_STATE_DIR ?? "/app/state";
-const COPILOT_CONFIG_PATH = process.env.COPILOT_CONFIG_PATH ?? "/app/config/copilot/config.yaml";
-// chat.yaml and evaluation.yaml, or those of QDASH_COPILOT_PROFILE, resolved
-// once per process in SharedRuntime.create (see copilot-profile.ts).
-// Optional: the classifier models QDash features may use; present_results and
-// classify are offered when one of them is usable.
-const CLASSIFIER_CONFIG_PATH =
-  process.env.CLASSIFIER_CONFIG_PATH ?? "/app/config/copilot/classifier.yaml";
+// config.yaml (AGENT_CONFIG_PATH) and the optional classifier.yaml
+// (CLASSIFIER_CONFIG_PATH) default to /app/config/agent; chat.yaml and
+// evaluation.yaml, or those of QDASH_AGENT_PROFILE, sit next to config.yaml.
+// All are resolved once per process in SharedRuntime.create (see
+// agent-profile.ts). The classifier models back present_results and classify
+// when one of them is usable.
+const CONFIG_ROOT = "/app/config";
 // One model request; a whole turn is bounded by the server's own timers.
 const MODEL_STREAM_TIMEOUT_MS = Number(process.env.MODEL_STREAM_TIMEOUT_MS ?? 180_000);
-// The Copilot workspace (agent-exec container); without it the chat has no
+// The Agent workspace (agent-exec container); without it the chat has no
 // shell or files, only QDash tools.
 const EXEC_CONFIG = execConfigFromEnv();
 // The pi packages built into this image are the only extensions and skills
@@ -289,16 +289,19 @@ export class SharedRuntime {
       console.warn("[agent-runtime] workspace tools disabled: AGENT_EXEC_SOCKET is not set");
     }
 
-    const { responseLanguage, thinkingLanguage } = loadLanguageConfig(COPILOT_CONFIG_PATH);
+    const configPaths = resolveAgentConfigPaths(process.env, CONFIG_ROOT, (message) =>
+      console.warn(`[agent-runtime] ${message}`),
+    );
+    const { responseLanguage, thinkingLanguage } = loadLanguageConfig(configPaths.configPath);
     const loader = createBundledResourceLoader({ cwd: WORK_DIR, agentDir: AGENT_DIR, bundled: BUNDLED });
     await loader.reload();
     for (const { path, error } of loader.getExtensions().errors) {
       console.error(`[agent-runtime] extension ${path}: ${error}`);
     }
 
-    const modelFiles = resolveCopilotModelFiles(process.env, COPILOT_CONFIG_PATH);
+    const modelFiles = resolveAgentModelFiles(process.env, configPaths.configPath);
     console.log(
-      `[agent-runtime] copilot models: ${modelFiles.profile === undefined ? "default" : `profile ${modelFiles.profile}`} (${modelFiles.chatPath}, ${modelFiles.evaluationPath})`,
+      `[agent-runtime] agent models: ${modelFiles.profile === undefined ? "default" : `profile ${modelFiles.profile}`} (${modelFiles.chatPath}, ${modelFiles.evaluationPath})`,
     );
     const { path: modelsPath, yaml: modelYaml } = writeModelsConfig(
       modelFiles,
@@ -351,7 +354,7 @@ export class SharedRuntime {
     const localToolGuide = buildLocalToolGuide(extensions, EXTENSION_PATHS, new Set(localTools));
 
     const classifiers = configureClassifierModels(
-      readClassifierConfig(CLASSIFIER_CONFIG_PATH),
+      readClassifierConfig(configPaths.classifierPath),
       modelRuntime,
       process.env,
       console,
@@ -376,7 +379,7 @@ export class SharedRuntime {
         deferredTools: deferredToolsGuideline(deferredToolNames, toolGuideNames(toolGuide)),
       },
     );
-    const copilotExtension = buildCopilotExtension(systemPrompt, [
+    const agentExtension = buildAgentExtension(systemPrompt, [
       chartTool,
       uiTool,
       ...presentationTools,
@@ -389,7 +392,7 @@ export class SharedRuntime {
       modelRuntime,
       workDir: WORK_DIR,
       extensionPaths: EXTENSION_PATHS,
-      copilot: copilotExtension,
+      agent: agentExtension,
       internalCalls: presentation ? PRESENTATION_INTERNAL_CALLS : {},
       codingTools: EXEC_CONFIG !== undefined,
       compaction: buildCompactionExtension({ timeoutMs: MODEL_STREAM_TIMEOUT_MS }),

@@ -20,7 +20,7 @@ import { TaskResultEvaluations } from "@/components/features/evaluations/TaskRes
 import { TaskResultThreads } from "@/components/features/forum/TaskResultThreads";
 import { TaskResultMemo } from "./TaskResultMemo";
 import { TaskResultExcludeButton } from "./TaskResultExcludeButton";
-import type { TaskChatContext } from "@/types/copilotChat";
+import type { TaskChatContext } from "@/types/agentChat";
 import type { MetricHistoryItem } from "./MetricHistoryView";
 import { useChatDock } from "@/contexts/ChatDockContext";
 

@@ -391,7 +391,7 @@ describe("GlobalCommandPalette", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  it.each(["agent", "chat", "copilot", "チャット", "エージェント"])(
+  it.each(["agent", "chat", "ai", "チャット", "エージェント"])(
     "finds the agent chat action by %s",
     async (query) => {
       render(<GlobalCommandPalette />);
@@ -411,7 +411,7 @@ describe("GlobalCommandPalette", () => {
     render(<GlobalCommandPalette />);
     fireEvent.keyDown(window, { key: "k", metaKey: true });
     const input = screen.getByRole("combobox");
-    fireEvent.change(input, { target: { value: "copilot" } });
+    fireEvent.change(input, { target: { value: "agent" } });
 
     await waitFor(() =>
       expect(

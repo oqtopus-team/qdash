@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ChatCalibrationSessions } from "@/components/features/chat/ChatCalibrationSessions";
 import { linkedCalibrationSessions } from "@/lib/chatCalibrationSession";
-import type { ChatMessage } from "@/types/copilotChat";
+import type { ChatMessage } from "@/types/agentChat";
 
 const state = vi.hoisted(() => ({
   sessions: {} as Record<string, Record<string, unknown>>,

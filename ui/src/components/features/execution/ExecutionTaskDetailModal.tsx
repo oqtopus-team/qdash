@@ -22,7 +22,7 @@ import { InvestigateWithAiButton } from "@/components/features/chat/InvestigateW
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 import { TaskMessagePanel } from "@/components/ui/TaskMessagePanel";
 import { useChatDock } from "@/contexts/ChatDockContext";
-import type { InvestigationTarget, TaskChatContext } from "@/types/copilotChat";
+import type { InvestigationTarget, TaskChatContext } from "@/types/agentChat";
 import { firstPublishedParameter, inExecution } from "@/lib/provenanceTarget";
 import { formatDateTime, formatDateTimeCompact } from "@/lib/utils/datetime";
 

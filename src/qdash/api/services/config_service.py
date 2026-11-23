@@ -20,17 +20,17 @@ class ConfigService:
     def get_all_config(self) -> dict[str, Any]:
         """Get all application configuration.
 
-        Loads settings, metrics, and copilot configuration from YAML files.
+        Loads settings, metrics, and agent configuration from YAML files.
 
         Returns
         -------
         dict[str, Any]
-            Dictionary with ui, metrics, and copilot configuration.
+            Dictionary with ui, metrics, and agent configuration.
 
         """
         settings = ConfigLoader.load_settings()
         metrics = ConfigLoader.load_metrics()
-        copilot = ConfigLoader.load_copilot()
+        agent = ConfigLoader.load_agent()
 
         ui_config = settings.get("ui", {})
         task_files = ui_config.get("task_files", {})
@@ -44,5 +44,5 @@ class ConfigService:
                 },
             },
             "metrics": metrics,
-            "copilot": copilot,
+            "agent": agent,
         }

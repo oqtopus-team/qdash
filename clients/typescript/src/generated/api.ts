@@ -11,11 +11,16 @@ import type {
   AgentActionResponse,
   AgentCandidateCommitResponse,
   AgentCandidateSetCommitResponse,
+  AgentChatSessionResponse,
   AgentDecisionResponse,
   AgentInterventionResponse,
+  AgentPreferences,
+  AgentPreferencesUpdate,
   AgentSessionAuditResponse,
   AgentSessionGraphResponse,
   AgentSessionResponse,
+  AgentSkillList,
+  AgentSystemPrompt,
   AllConfigResponse,
   ApplyAgentCandidateRequest,
   ArtifactPreviewResponse,
@@ -52,19 +57,14 @@ import type {
   CooldownUpdateRequest,
   CooldownWiringCheckpointRequest,
   CooldownWiringEventResponse,
-  CopilotChatSessionResponse,
-  CopilotPreferences,
-  CopilotPreferencesUpdate,
-  CopilotSkillList,
-  CopilotSystemPrompt,
   CouplingResponse,
+  CreateAgentChatBranchRequest,
+  CreateAgentChatSessionRequest,
   CreateAgentInterventionRequest,
   CreateAgentSessionRequest,
   CreateCalibrationSessionRequest,
   CreateChipRequest,
   CreateChipResponse,
-  CreateCopilotChatBranchRequest,
-  CreateCopilotChatSessionRequest,
   CreateCouplingNoteCommentParams,
   CreateEvaluationRunRequest,
   CreateEvaluationRunResponse,
@@ -77,9 +77,9 @@ import type {
   DashboardTemplatePreviewResponse,
   DashboardUpdateRequest,
   DegradationTrendsResponse,
+  DeleteAgentChatSession200,
   DeleteChipNoteParams,
   DeleteChipParams,
-  DeleteCopilotChatSession200,
   DeleteCouplingMetricNoteParams,
   DeleteCouplingNoteCommentParams,
   DeleteCouplingNoteParams,
@@ -129,13 +129,13 @@ import type {
   ForumPostCreate,
   ForumPostResponse,
   ForumPostUpdate,
+  GetAgentConfig200,
   GetAgentSessionAuditParams,
+  GetAgentSourceFileParams,
   GetCalibrationPipelineCatalogParams,
   GetChipMetricsParams,
   GetChipNoteParams,
   GetChipNotesSummaryParams,
-  GetCopilotConfig200,
-  GetCopilotSourceFileParams,
   GetCouplingMetricHistoryParams,
   GetCouplingTaskHistoryParams,
   GetDegradationTrendsParams,
@@ -174,6 +174,7 @@ import type {
   LineageResponse,
   ListAgentActionsResponse,
   ListAgentCandidatesResponse,
+  ListAgentChatSessionsResponse,
   ListAgentDecisionsResponse,
   ListAgentInterventionsResponse,
   ListAgentSessionsParams,
@@ -193,7 +194,6 @@ import type {
   ListCooldownWiringEventsResponse,
   ListCooldownsParams,
   ListCooldownsResponse,
-  ListCopilotChatSessionsResponse,
   ListCouplingsResponse,
   ListCryostatsResponse,
   ListDashboardTemplatesResponse,
@@ -298,7 +298,7 @@ import type {
   SaveFlowResponse,
   ScheduleFlowRequest,
   ScheduleFlowResponse,
-  SearchCopilotSourceParams,
+  SearchAgentSourceParams,
   SearchNoteEventsParams,
   SearchSourceResponse,
   SeedImportRequest,
@@ -320,8 +320,8 @@ import type {
   TimeSeriesData,
   TokenResponse,
   UnreadNotificationCountResponse,
+  UpdateAgentChatSessionRequest,
   UpdateChipRequest,
-  UpdateCopilotChatSessionRequest,
   UpdateCouplingNoteCommentParams,
   UpdateQubitNoteCommentParams,
   UpdateScheduleRequest,
@@ -2032,24 +2032,24 @@ const closeCalibrationSession = (
     }
 
 /**
- * Get Copilot configuration for the metrics assistant.
+ * Get Agent configuration for the metrics assistant.
  *
- * Retrieves the Copilot configuration from YAML, including:
- * - enabled: Whether Copilot is enabled
+ * Retrieves the Agent configuration from YAML, including:
+ * - enabled: Whether Agent is enabled
  * - chat_models: The planner models the UI offers
  * - evaluation_models: The calibration evaluation model
  *
  * Returns
  * -------
  * dict[str, Any]
- *     Copilot configuration dictionary
- * @summary Get Copilot configuration
+ *     Agent configuration dictionary
+ * @summary Get Agent configuration
  */
-const getCopilotConfig = (
+const getAgentConfig = (
 
- options?: SecondParameter<typeof qdashRequest<GetCopilotConfig200>>,) => {
-      return qdashRequest<GetCopilotConfig200>(
-      {url: `/copilot/config`, method: 'GET'
+ options?: SecondParameter<typeof qdashRequest<GetAgentConfig200>>,) => {
+      return qdashRequest<GetAgentConfig200>(
+      {url: `/agent/config`, method: 'GET'
     },
       options);
     }
@@ -2062,11 +2062,11 @@ const getCopilotConfig = (
  * the runtime could not remove yet.
  * @summary List the current user's chat sessions
  */
-const listCopilotChatSessions = (
+const listAgentChatSessions = (
 
- options?: SecondParameter<typeof qdashRequest<ListCopilotChatSessionsResponse>>,) => {
-      return qdashRequest<ListCopilotChatSessionsResponse>(
-      {url: `/copilot/chat/sessions`, method: 'GET'
+ options?: SecondParameter<typeof qdashRequest<ListAgentChatSessionsResponse>>,) => {
+      return qdashRequest<ListAgentChatSessionsResponse>(
+      {url: `/agent/chat/sessions`, method: 'GET'
     },
       options);
     }
@@ -2075,13 +2075,13 @@ const listCopilotChatSessions = (
  * Create a new chat session owned by the current user.
  * @summary Create a new chat session
  */
-const createCopilotChatSession = (
-    createCopilotChatSessionRequest: CreateCopilotChatSessionRequest,
- options?: SecondParameter<typeof qdashRequest<CopilotChatSessionResponse>>,) => {
-      return qdashRequest<CopilotChatSessionResponse>(
-      {url: `/copilot/chat/sessions`, method: 'POST',
+const createAgentChatSession = (
+    createAgentChatSessionRequest: CreateAgentChatSessionRequest,
+ options?: SecondParameter<typeof qdashRequest<AgentChatSessionResponse>>,) => {
+      return qdashRequest<AgentChatSessionResponse>(
+      {url: `/agent/chat/sessions`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
-      data: createCopilotChatSessionRequest
+      data: createAgentChatSessionRequest
     },
       options);
     }
@@ -2095,11 +2095,11 @@ const createCopilotChatSession = (
  * reply depends on that project, no cache keeps it for a request from another.
  * @summary Get a chat session with messages
  */
-const getCopilotChatSession = (
+const getAgentChatSession = (
     sessionId: string,
- options?: SecondParameter<typeof qdashRequest<CopilotChatSessionResponse>>,) => {
-      return qdashRequest<CopilotChatSessionResponse>(
-      {url: `/copilot/chat/sessions/${sessionId}`, method: 'GET'
+ options?: SecondParameter<typeof qdashRequest<AgentChatSessionResponse>>,) => {
+      return qdashRequest<AgentChatSessionResponse>(
+      {url: `/agent/chat/sessions/${sessionId}`, method: 'GET'
     },
       options);
     }
@@ -2108,14 +2108,14 @@ const getCopilotChatSession = (
  * Update title, context, or messages of an existing chat session.
  * @summary Update a chat session
  */
-const updateCopilotChatSession = (
+const updateAgentChatSession = (
     sessionId: string,
-    updateCopilotChatSessionRequest: UpdateCopilotChatSessionRequest,
- options?: SecondParameter<typeof qdashRequest<CopilotChatSessionResponse>>,) => {
-      return qdashRequest<CopilotChatSessionResponse>(
-      {url: `/copilot/chat/sessions/${sessionId}`, method: 'PATCH',
+    updateAgentChatSessionRequest: UpdateAgentChatSessionRequest,
+ options?: SecondParameter<typeof qdashRequest<AgentChatSessionResponse>>,) => {
+      return qdashRequest<AgentChatSessionResponse>(
+      {url: `/agent/chat/sessions/${sessionId}`, method: 'PATCH',
       headers: {'Content-Type': 'application/json', },
-      data: updateCopilotChatSessionRequest
+      data: updateAgentChatSessionRequest
     },
       options);
     }
@@ -2131,11 +2131,11 @@ const updateCopilotChatSession = (
  * listing of the user's chats.
  * @summary Delete a chat session
  */
-const deleteCopilotChatSession = (
+const deleteAgentChatSession = (
     sessionId: string,
- options?: SecondParameter<typeof qdashRequest<DeleteCopilotChatSession200>>,) => {
-      return qdashRequest<DeleteCopilotChatSession200>(
-      {url: `/copilot/chat/sessions/${sessionId}`, method: 'DELETE'
+ options?: SecondParameter<typeof qdashRequest<DeleteAgentChatSession200>>,) => {
+      return qdashRequest<DeleteAgentChatSession200>(
+      {url: `/agent/chat/sessions/${sessionId}`, method: 'DELETE'
     },
       options);
     }
@@ -2150,40 +2150,40 @@ const deleteCopilotChatSession = (
  * the chat or its branches. The same request again returns the same session.
  * @summary Branch a chat session from one of its answers
  */
-const branchCopilotChatSession = (
+const branchAgentChatSession = (
     sessionId: string,
-    createCopilotChatBranchRequest: CreateCopilotChatBranchRequest,
- options?: SecondParameter<typeof qdashRequest<CopilotChatSessionResponse>>,) => {
-      return qdashRequest<CopilotChatSessionResponse>(
-      {url: `/copilot/chat/sessions/${sessionId}/branches`, method: 'POST',
+    createAgentChatBranchRequest: CreateAgentChatBranchRequest,
+ options?: SecondParameter<typeof qdashRequest<AgentChatSessionResponse>>,) => {
+      return qdashRequest<AgentChatSessionResponse>(
+      {url: `/agent/chat/sessions/${sessionId}/branches`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
-      data: createCopilotChatBranchRequest
+      data: createAgentChatBranchRequest
     },
       options);
     }
 
 /**
  * QDash and allowlisted dependency source served read-only, with known revisions.
- * @summary List the source trees the Copilot can read
+ * @summary List the source trees the Agent can read
  */
-const listCopilotSourceRoots = (
+const listAgentSourceRoots = (
 
  options?: SecondParameter<typeof qdashRequest<ListSourceRootsResponse>>,) => {
       return qdashRequest<ListSourceRootsResponse>(
-      {url: `/copilot/source/roots`, method: 'GET'
+      {url: `/agent/source/roots`, method: 'GET'
     },
       options);
     }
 
 /**
  * Literal search in file contents or file paths; read-only and size-limited.
- * @summary Search the source the Copilot can read
+ * @summary Search the source the Agent can read
  */
-const searchCopilotSource = (
-    params: SearchCopilotSourceParams,
+const searchAgentSource = (
+    params: SearchAgentSourceParams,
  options?: SecondParameter<typeof qdashRequest<SearchSourceResponse>>,) => {
       return qdashRequest<SearchSourceResponse>(
-      {url: `/copilot/source/search`, method: 'GET',
+      {url: `/agent/source/search`, method: 'GET',
         params
     },
       options);
@@ -2193,11 +2193,11 @@ const searchCopilotSource = (
  * Read up to 400 numbered lines; without ``root`` the path is matched as a traceback prints it.
  * @summary Read a line range of a source file
  */
-const getCopilotSourceFile = (
-    params: GetCopilotSourceFileParams,
+const getAgentSourceFile = (
+    params: GetAgentSourceFileParams,
  options?: SecondParameter<typeof qdashRequest<SourceFileResponse>>,) => {
       return qdashRequest<SourceFileResponse>(
-      {url: `/copilot/source/file`, method: 'GET',
+      {url: `/agent/source/file`, method: 'GET',
         params
     },
       options);
@@ -2205,28 +2205,28 @@ const getCopilotSourceFile = (
 
 /**
  * The instructions this user added to their chats.
- * @summary Get the current user's Copilot preferences
+ * @summary Get the current user's Agent preferences
  */
-const getCopilotPreferences = (
+const getAgentPreferences = (
 
- options?: SecondParameter<typeof qdashRequest<CopilotPreferences>>,) => {
-      return qdashRequest<CopilotPreferences>(
-      {url: `/copilot/preferences`, method: 'GET'
+ options?: SecondParameter<typeof qdashRequest<AgentPreferences>>,) => {
+      return qdashRequest<AgentPreferences>(
+      {url: `/agent/preferences`, method: 'GET'
     },
       options);
     }
 
 /**
  * Replace this user's chat instructions; an empty text clears them.
- * @summary Update the current user's Copilot preferences
+ * @summary Update the current user's Agent preferences
  */
-const updateCopilotPreferences = (
-    copilotPreferencesUpdate: CopilotPreferencesUpdate,
- options?: SecondParameter<typeof qdashRequest<CopilotPreferences>>,) => {
-      return qdashRequest<CopilotPreferences>(
-      {url: `/copilot/preferences`, method: 'PUT',
+const updateAgentPreferences = (
+    agentPreferencesUpdate: AgentPreferencesUpdate,
+ options?: SecondParameter<typeof qdashRequest<AgentPreferences>>,) => {
+      return qdashRequest<AgentPreferences>(
+      {url: `/agent/preferences`, method: 'PUT',
       headers: {'Content-Type': 'application/json', },
-      data: copilotPreferencesUpdate
+      data: agentPreferencesUpdate
     },
       options);
     }
@@ -2235,24 +2235,24 @@ const updateCopilotPreferences = (
  * QDash's chat system prompt and this user's instructions as appended to it (read-only).
  * @summary Show what QDash tells the chat model
  */
-const getCopilotSystemPrompt = (
+const getAgentSystemPrompt = (
 
- options?: SecondParameter<typeof qdashRequest<CopilotSystemPrompt>>,) => {
-      return qdashRequest<CopilotSystemPrompt>(
-      {url: `/copilot/system-prompt`, method: 'GET'
+ options?: SecondParameter<typeof qdashRequest<AgentSystemPrompt>>,) => {
+      return qdashRequest<AgentSystemPrompt>(
+      {url: `/agent/system-prompt`, method: 'GET'
     },
       options);
     }
 
 /**
- * Skills loaded by the Copilot runtime; a message starting ``/skill:<name>`` runs one.
+ * Skills loaded by the Agent runtime; a message starting ``/skill:<name>`` runs one.
  * @summary List the skills a chat message can invoke
  */
-const listCopilotSkills = (
+const listAgentSkills = (
 
- options?: SecondParameter<typeof qdashRequest<CopilotSkillList>>,) => {
-      return qdashRequest<CopilotSkillList>(
-      {url: `/copilot/skills`, method: 'GET'
+ options?: SecondParameter<typeof qdashRequest<AgentSkillList>>,) => {
+      return qdashRequest<AgentSkillList>(
+      {url: `/agent/skills`, method: 'GET'
     },
       options);
     }
@@ -5648,7 +5648,7 @@ const listUserAvatars = (
       options);
     }
 
-return {login,registerUser,getCurrentUser,updateCurrentUserProfile,logout,changePassword,resetPassword,reloadConfigCaches,listAllUsers,getUserDetails,updateUserSettings,deleteUser,bulkImportUsers,listAllProjects,adminDeleteProject,listProjectMembersAdmin,addProjectMemberAdmin,removeProjectMemberAdmin,createProjectForUser,listProjects,createProject,getProject,updateProject,deleteProject,listProjectMembers,inviteProjectMember,updateProjectMember,removeProjectMember,transferProjectOwnership,getFigureByPath,downloadArtifactByPath,downloadArtifactsAsArchive,previewArtifactByPath,getExecutionLockStatus,checkExecutionAvailability,listExecutions,listExecutionGroups,getAgentSessionGraph,getExecutionActivity,getExecution,cancelExecution,downloadFile,downloadZipFile,getFileTree,getFileContent,saveFileContent,getFileImage,validateFileContent,getGitStatus,gitPullConfig,gitPushConfig,createAgentSession,listAgentSessions,getAgentSession,evaluateAgentCandidateGate,submitAgentAction,listAgentActions,stopAgentSession,listAgentActionCandidates,commitAgentActionCandidate,commitAgentCandidateSet,getAgentCandidateSetCommit,getAgentCandidateCommit,applyAgentCandidateCommit,getAgentAction,executeAgentAction,createAgentIntervention,listAgentInterventions,getAgentIntervention,respondAgentIntervention,claimAgentInterventionResume,recordAgentResumeOutcome,retryAgentInterventionNotification,recordAgentDecision,listAgentDecisions,getAgentSessionAudit,exportAgentSessionAudit,retryCalibrationGitHubSync,getCalibrationNote,importSeedParameters,getAvailableSeedParameters,compareSeedValues,updateCalibrationParameters,deleteCalibrationParameter,getManualEdits,getCalibrationPipelineCatalog,validateCalibrationPipeline,executeCalibrationPipeline,createCalibrationSession,listCalibrationSessions,getCalibrationSession,closeCalibrationSession,getCopilotConfig,listCopilotChatSessions,createCopilotChatSession,getCopilotChatSession,updateCopilotChatSession,deleteCopilotChatSession,branchCopilotChatSession,listCopilotSourceRoots,searchCopilotSource,getCopilotSourceFile,getCopilotPreferences,updateCopilotPreferences,getCopilotSystemPrompt,listCopilotSkills,getSettings,listChips,createChip,listChipConfigSources,updateChip,deleteChip,getChip,getChipDeletionImpact,getChipDates,getChipMux,listChipMuxes,getChipNote,upsertChipNote,deleteChipNote,listChipQubits,getChipQubit,reanalyzeResonatorSpectroscopy,reanalyzeQubitSpectroscopy,listChipCouplings,getChipCoupling,getChipMetricsSummary,getChipMetricHeatmap,listTasks,quickRunTask,getTaskResult,listTaskKnowledge,getTaskKnowledgeMarkdown,downloadTaskKnowledgeArchive,getTaskEvaluationPrompts,getTaskKnowledge,getTaskFileSettings,listTaskFileBackends,getBackendConfig,listTaskInfo,listTaskResults,getLatestQubitTaskResults,getHistoricalQubitTaskResults,getQubitTaskHistory,getLatestCouplingTaskResults,getHistoricalCouplingTaskResults,getCouplingTaskHistory,getTimeseriesTaskResults,reExecuteTaskResult,setTaskResultExcluded,downloadFiguresAsZip,createEvaluationRun,listEvaluationRuns,getEvaluationRun,retryEvaluationRun,cancelEvaluationRun,listEvaluations,setEvaluationVerdict,getEvaluationFigure,createKnowledgeDraft,getKnowledgeDraft,getKnowledgeDraftKnowledge,downloadKnowledgeDraftArchive,listForumCategories,createForumCategory,updateForumCategory,deleteForumCategory,listForumLabels,createForumLabel,updateForumLabel,deleteForumLabel,listForumPosts,createForumPost,getForumPost,updateForumPost,deleteForumPost,getForumPostReplies,uploadForumImage,closeForumPost,reopenForumPost,listTags,getDeviceTopology,getDeviceTopologyPlot,listBackends,saveFlow,listFlows,formatFlowSource,listFlowTemplates,getFlowTemplate,listFlowHelperFiles,getFlowHelperFile,listAllFlowSchedules,deleteFlowSchedule,updateFlowSchedule,getFlow,deleteFlow,getFlowExecutionPlan,executeFlow,moveFlow,scheduleFlow,listFlowSchedules,getMetricsConfig,getChipMetrics,getQubitMetricHistory,getCouplingMetricHistory,downloadMetricsPdf,upsertQubitNote,deleteQubitNote,createQubitNoteComment,updateQubitNoteComment,deleteQubitNoteComment,upsertQubitMetricNote,deleteQubitMetricNote,upsertCouplingNote,deleteCouplingNote,createCouplingNoteComment,updateCouplingNoteComment,deleteCouplingNoteComment,upsertCouplingMetricNote,deleteCouplingMetricNote,getTaskNote,upsertTaskNote,deleteTaskNote,getChipNotesSummary,listChipNoteEvents,listTargetNoteEvents,searchNoteEvents,listNotifications,getUnreadNotificationCount,markNotificationRead,markAllNotificationsRead,listCryostats,createCryostat,getCryostat,updateCryostat,deleteCryostat,listCooldowns,createCooldown,getCooldown,updateCooldown,deleteCooldown,assignChipToCooldown,unassignChipFromCooldown,createCooldownWiringCheckpoint,listCooldownWiringEvents,listDashboards,createDashboard,listDashboardTemplates,previewDashboardTemplate,getDashboard,updateDashboard,deleteDashboard,duplicateDashboard,listMetricScripts,createMetricScript,listMetricScriptTemplates,getMetricScriptCatalog,validateMetricScript,formatMetricScriptSource,evaluateMetricScriptDraft,getMetricScript,updateMetricScript,deleteMetricScript,copyMetricScript,evaluateMetricScript,listTopologies,getTopologyById,getConfigAll,getProvenanceEntity,getProvenanceLineage,getProvenanceImpact,compareExecutions,getParameterHistory,getProvenanceStats,getRecentExecutions,getRecentChanges,getDegradationTrends,getRecalibrationRecommendations,getCurrentUserAvatar,updateCurrentUserAvatar,listUserAvatars}};
+return {login,registerUser,getCurrentUser,updateCurrentUserProfile,logout,changePassword,resetPassword,reloadConfigCaches,listAllUsers,getUserDetails,updateUserSettings,deleteUser,bulkImportUsers,listAllProjects,adminDeleteProject,listProjectMembersAdmin,addProjectMemberAdmin,removeProjectMemberAdmin,createProjectForUser,listProjects,createProject,getProject,updateProject,deleteProject,listProjectMembers,inviteProjectMember,updateProjectMember,removeProjectMember,transferProjectOwnership,getFigureByPath,downloadArtifactByPath,downloadArtifactsAsArchive,previewArtifactByPath,getExecutionLockStatus,checkExecutionAvailability,listExecutions,listExecutionGroups,getAgentSessionGraph,getExecutionActivity,getExecution,cancelExecution,downloadFile,downloadZipFile,getFileTree,getFileContent,saveFileContent,getFileImage,validateFileContent,getGitStatus,gitPullConfig,gitPushConfig,createAgentSession,listAgentSessions,getAgentSession,evaluateAgentCandidateGate,submitAgentAction,listAgentActions,stopAgentSession,listAgentActionCandidates,commitAgentActionCandidate,commitAgentCandidateSet,getAgentCandidateSetCommit,getAgentCandidateCommit,applyAgentCandidateCommit,getAgentAction,executeAgentAction,createAgentIntervention,listAgentInterventions,getAgentIntervention,respondAgentIntervention,claimAgentInterventionResume,recordAgentResumeOutcome,retryAgentInterventionNotification,recordAgentDecision,listAgentDecisions,getAgentSessionAudit,exportAgentSessionAudit,retryCalibrationGitHubSync,getCalibrationNote,importSeedParameters,getAvailableSeedParameters,compareSeedValues,updateCalibrationParameters,deleteCalibrationParameter,getManualEdits,getCalibrationPipelineCatalog,validateCalibrationPipeline,executeCalibrationPipeline,createCalibrationSession,listCalibrationSessions,getCalibrationSession,closeCalibrationSession,getAgentConfig,listAgentChatSessions,createAgentChatSession,getAgentChatSession,updateAgentChatSession,deleteAgentChatSession,branchAgentChatSession,listAgentSourceRoots,searchAgentSource,getAgentSourceFile,getAgentPreferences,updateAgentPreferences,getAgentSystemPrompt,listAgentSkills,getSettings,listChips,createChip,listChipConfigSources,updateChip,deleteChip,getChip,getChipDeletionImpact,getChipDates,getChipMux,listChipMuxes,getChipNote,upsertChipNote,deleteChipNote,listChipQubits,getChipQubit,reanalyzeResonatorSpectroscopy,reanalyzeQubitSpectroscopy,listChipCouplings,getChipCoupling,getChipMetricsSummary,getChipMetricHeatmap,listTasks,quickRunTask,getTaskResult,listTaskKnowledge,getTaskKnowledgeMarkdown,downloadTaskKnowledgeArchive,getTaskEvaluationPrompts,getTaskKnowledge,getTaskFileSettings,listTaskFileBackends,getBackendConfig,listTaskInfo,listTaskResults,getLatestQubitTaskResults,getHistoricalQubitTaskResults,getQubitTaskHistory,getLatestCouplingTaskResults,getHistoricalCouplingTaskResults,getCouplingTaskHistory,getTimeseriesTaskResults,reExecuteTaskResult,setTaskResultExcluded,downloadFiguresAsZip,createEvaluationRun,listEvaluationRuns,getEvaluationRun,retryEvaluationRun,cancelEvaluationRun,listEvaluations,setEvaluationVerdict,getEvaluationFigure,createKnowledgeDraft,getKnowledgeDraft,getKnowledgeDraftKnowledge,downloadKnowledgeDraftArchive,listForumCategories,createForumCategory,updateForumCategory,deleteForumCategory,listForumLabels,createForumLabel,updateForumLabel,deleteForumLabel,listForumPosts,createForumPost,getForumPost,updateForumPost,deleteForumPost,getForumPostReplies,uploadForumImage,closeForumPost,reopenForumPost,listTags,getDeviceTopology,getDeviceTopologyPlot,listBackends,saveFlow,listFlows,formatFlowSource,listFlowTemplates,getFlowTemplate,listFlowHelperFiles,getFlowHelperFile,listAllFlowSchedules,deleteFlowSchedule,updateFlowSchedule,getFlow,deleteFlow,getFlowExecutionPlan,executeFlow,moveFlow,scheduleFlow,listFlowSchedules,getMetricsConfig,getChipMetrics,getQubitMetricHistory,getCouplingMetricHistory,downloadMetricsPdf,upsertQubitNote,deleteQubitNote,createQubitNoteComment,updateQubitNoteComment,deleteQubitNoteComment,upsertQubitMetricNote,deleteQubitMetricNote,upsertCouplingNote,deleteCouplingNote,createCouplingNoteComment,updateCouplingNoteComment,deleteCouplingNoteComment,upsertCouplingMetricNote,deleteCouplingMetricNote,getTaskNote,upsertTaskNote,deleteTaskNote,getChipNotesSummary,listChipNoteEvents,listTargetNoteEvents,searchNoteEvents,listNotifications,getUnreadNotificationCount,markNotificationRead,markAllNotificationsRead,listCryostats,createCryostat,getCryostat,updateCryostat,deleteCryostat,listCooldowns,createCooldown,getCooldown,updateCooldown,deleteCooldown,assignChipToCooldown,unassignChipFromCooldown,createCooldownWiringCheckpoint,listCooldownWiringEvents,listDashboards,createDashboard,listDashboardTemplates,previewDashboardTemplate,getDashboard,updateDashboard,deleteDashboard,duplicateDashboard,listMetricScripts,createMetricScript,listMetricScriptTemplates,getMetricScriptCatalog,validateMetricScript,formatMetricScriptSource,evaluateMetricScriptDraft,getMetricScript,updateMetricScript,deleteMetricScript,copyMetricScript,evaluateMetricScript,listTopologies,getTopologyById,getConfigAll,getProvenanceEntity,getProvenanceLineage,getProvenanceImpact,compareExecutions,getParameterHistory,getProvenanceStats,getRecentExecutions,getRecentChanges,getDegradationTrends,getRecalibrationRecommendations,getCurrentUserAvatar,updateCurrentUserAvatar,listUserAvatars}};
 export type LoginResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['login']>>>
 export type RegisterUserResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['registerUser']>>>
 export type GetCurrentUserResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getCurrentUser']>>>
@@ -5741,20 +5741,20 @@ export type CreateCalibrationSessionResult = NonNullable<Awaited<ReturnType<Retu
 export type ListCalibrationSessionsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listCalibrationSessions']>>>
 export type GetCalibrationSessionResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getCalibrationSession']>>>
 export type CloseCalibrationSessionResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['closeCalibrationSession']>>>
-export type GetCopilotConfigResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getCopilotConfig']>>>
-export type ListCopilotChatSessionsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listCopilotChatSessions']>>>
-export type CreateCopilotChatSessionResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['createCopilotChatSession']>>>
-export type GetCopilotChatSessionResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getCopilotChatSession']>>>
-export type UpdateCopilotChatSessionResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['updateCopilotChatSession']>>>
-export type DeleteCopilotChatSessionResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['deleteCopilotChatSession']>>>
-export type BranchCopilotChatSessionResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['branchCopilotChatSession']>>>
-export type ListCopilotSourceRootsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listCopilotSourceRoots']>>>
-export type SearchCopilotSourceResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['searchCopilotSource']>>>
-export type GetCopilotSourceFileResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getCopilotSourceFile']>>>
-export type GetCopilotPreferencesResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getCopilotPreferences']>>>
-export type UpdateCopilotPreferencesResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['updateCopilotPreferences']>>>
-export type GetCopilotSystemPromptResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getCopilotSystemPrompt']>>>
-export type ListCopilotSkillsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listCopilotSkills']>>>
+export type GetAgentConfigResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getAgentConfig']>>>
+export type ListAgentChatSessionsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listAgentChatSessions']>>>
+export type CreateAgentChatSessionResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['createAgentChatSession']>>>
+export type GetAgentChatSessionResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getAgentChatSession']>>>
+export type UpdateAgentChatSessionResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['updateAgentChatSession']>>>
+export type DeleteAgentChatSessionResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['deleteAgentChatSession']>>>
+export type BranchAgentChatSessionResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['branchAgentChatSession']>>>
+export type ListAgentSourceRootsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listAgentSourceRoots']>>>
+export type SearchAgentSourceResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['searchAgentSource']>>>
+export type GetAgentSourceFileResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getAgentSourceFile']>>>
+export type GetAgentPreferencesResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getAgentPreferences']>>>
+export type UpdateAgentPreferencesResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['updateAgentPreferences']>>>
+export type GetAgentSystemPromptResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getAgentSystemPrompt']>>>
+export type ListAgentSkillsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listAgentSkills']>>>
 export type GetSettingsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getSettings']>>>
 export type ListChipsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listChips']>>>
 export type CreateChipResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['createChip']>>>

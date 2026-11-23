@@ -32,7 +32,7 @@ task ci-agent-runtime
 ```
 
 Install workspace dependencies from the repository root. See
-[Pi Packages](./copilot/packages.md) for setup and local pi CLI checks.
+[Pi Packages](./agent/packages.md) for setup and local pi CLI checks.
 Before every push, run the full `task check` as required by the
 [development flow](./development-flow.md#before-pushing).
 

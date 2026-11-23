@@ -45,7 +45,7 @@ import {
   type ChatThinkingLevel,
 } from "@/lib/chatThinking";
 import { matchSkills, skillInvocation, skillQuery, type ChatSkill } from "@/lib/chatSkills";
-import type { ModelOption } from "@/lib/copilotModels";
+import type { ModelOption } from "@/lib/agentModels";
 import type { ChatModelListStatus } from "@/hooks/useChatModelSelection";
 
 const MAX_HEIGHT_PX = 240;
@@ -519,7 +519,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
             <Tooltip>
               <TooltipTrigger asChild>
                 <Link
-                  href="/settings?tab=copilot"
+                  href="/settings?tab=agent"
                   className="btn btn-ghost btn-sm shrink-0 gap-1 font-normal text-base-content/60"
                   aria-label="Your instructions apply"
                 >

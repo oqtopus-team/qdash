@@ -11,7 +11,7 @@ import type {
   ToolEvaluation,
   TraceStep,
   TurnConnection,
-} from "@/types/copilotChat";
+} from "@/types/agentChat";
 import { ChatMarkdown } from "@/components/features/chat/ChatMarkdown";
 import { FigureStrip, figuresInSteps } from "@/components/features/chat/ChatFigures";
 import {
