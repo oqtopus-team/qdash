@@ -1,5 +1,6 @@
 export {
   EXECUTIONS_MAX_PAGE_SIZE,
+  executionListProblems,
   QDashClient,
   TASK_RESULTS_MAX_COLLECT,
   TASK_RESULTS_MAX_PAGE_SIZE,
@@ -8,6 +9,7 @@ export type {
   AgentSessionAuditPageOptions,
   CollectedTaskResults,
   CollectTaskResultsOptions,
+  CouplingTaskHistoryOptions,
   CreateAgentSessionOptions,
   DegradationTrendsOptions,
   DownloadedFile,
@@ -17,6 +19,7 @@ export type {
   PaginationOptions,
   PollOptions,
   QDashClientOptions,
+  QubitTaskHistoryOptions,
   RecentChangesOptions,
   RecordAgentDecisionOptions,
   RecalibrationRecommendationsOptions,

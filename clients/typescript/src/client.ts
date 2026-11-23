@@ -87,6 +87,7 @@ import type {
   TaskKnowledgeResponse,
   TaskResultListItem,
   TaskResultListResponse,
+  TaskHistoryResponse,
   TaskResultResponse,
   TimeSeriesData,
   User,
@@ -188,6 +189,24 @@ export interface ListExecutionsOptions {
 
 /** Most executions `GET /executions` returns per request. */
 export const EXECUTIONS_MAX_PAGE_SIZE = 100;
+
+/** Options of `getQubitTaskHistory`: every result of one task for one qubit. */
+export interface QubitTaskHistoryOptions {
+  chipId: string;
+  /** Qubit ID as QDash stores it (`"6"`). */
+  qid: string;
+  /** Task name, such as `"CheckT1"`. */
+  task: string;
+}
+
+/** Options of `getCouplingTaskHistory`: every result of one task for one coupling. */
+export interface CouplingTaskHistoryOptions {
+  chipId: string;
+  /** Coupling ID as QDash stores it (`"6-7"`). */
+  couplingId: string;
+  /** Task name, such as `"CrossResonance"`. */
+  task: string;
+}
 
 /** Rows `collectTaskResults` read, newest first. */
 export interface CollectedTaskResults {
@@ -376,6 +395,92 @@ function checkInteger(
     `${name} must be an integer ${range} (got ${String(value)})${hint ? `. ${hint}.` : "."}`,
     { payload: { field: name, value } },
   );
+}
+
+const EXECUTION_LIST_OPTIONS = new Set(["chipId", "skip", "limit", "date", "timezone"]);
+
+function isIntegerIn(value: unknown, minimum: number, maximum?: number): boolean {
+  return Number.isInteger(value) && (value as number) >= minimum && (maximum === undefined || (value as number) <= maximum);
+}
+
+/**
+ * Why `listExecutions` options other than `chipId` cannot be sent, one message
+ * per problem; empty when they can. `GET /executions` lists one chip's
+ * executions by page (`skip`, `limit`) and start day (`date`, `timezone`)
+ * only, so a supplied `flowName`, `status` or other option is a problem rather
+ * than silently dropped. An option set to `undefined` counts as omitted. Callers
+ * that resolve the chip later, such as a host that picks a default chip, can
+ * check the rest first and send no request on a problem.
+ */
+export function executionListProblems(options: Readonly<Record<string, unknown>>): string[] {
+  const problems: string[] = [];
+  const supplied = (key: string) => options[key] !== undefined;
+  const unsupported = ["flowName", "status"].filter(supplied);
+  if (unsupported.length > 0) {
+    problems.push(
+      `${unsupported.join(" and ")} cannot filter executions: QDash lists a chip's executions only by page (skip, limit) and day (date, timezone); filter the returned rows by flow_name or status instead`,
+    );
+  }
+  const unknown = Object.keys(options).filter(
+    (key) => supplied(key) && key !== "flowName" && key !== "status" && !EXECUTION_LIST_OPTIONS.has(key),
+  );
+  if (unknown.length > 0) problems.push(`${unknown.join(", ")} ${unknown.length === 1 ? "is not an option" : "are not options"} of listExecutions`);
+  if (supplied("limit") && !isIntegerIn(options.limit, 1, EXECUTIONS_MAX_PAGE_SIZE)) {
+    problems.push(`limit must be an integer from 1 to ${EXECUTIONS_MAX_PAGE_SIZE} (got ${JSON.stringify(options.limit)})`);
+  }
+  if (supplied("skip") && !isIntegerIn(options.skip, 0)) {
+    problems.push(`skip must be an integer of 0 or more (got ${JSON.stringify(options.skip)})`);
+  }
+  if (supplied("date") && !(typeof options.date === "string" && /^\d{8}$/.test(options.date))) {
+    problems.push(`date must be YYYYMMDD (got ${JSON.stringify(options.date)})`);
+  }
+  if (supplied("timezone") && !(typeof options.timezone === "string" && options.timezone.trim() !== "")) {
+    problems.push(`timezone must be a non-empty IANA time zone name (got ${JSON.stringify(options.timezone)})`);
+  }
+  return problems;
+}
+
+/** Throw `QDashValidationError` naming `field` when `value` is not a non-empty string. */
+function requireText(field: string, value: unknown, purpose: string): string {
+  if (typeof value === "string" && value.trim() !== "") return value;
+  throw new QDashValidationError(`${field} is required to ${purpose}.`, { payload: { field, value } });
+}
+
+/** Throw before any request when a task-history call is given an option the route does not take. */
+function checkTaskHistoryOptions(
+  options: Readonly<Record<string, unknown>>,
+  target: "qid" | "couplingId",
+): void {
+  const supplied = Object.keys(options).filter((key) => options[key] !== undefined);
+  const problems: string[] = [];
+  if (supplied.includes("date")) {
+    problems.push(
+      `date cannot filter a task history: it returns every result of the task for one target, newest first. Omit date, or use listTaskResults({ chipId, ${target === "qid" ? "qid" : "qid: couplingId"}, taskName, startFrom, startTo }) for one period`,
+    );
+  }
+  const unknown = supplied.filter((key) => key !== "date" && !["chipId", "task", target].includes(key));
+  if (unknown.length > 0) problems.push(`${unknown.join(", ")} ${unknown.length === 1 ? "is not an option" : "are not options"} of a task history`);
+  if (problems.length > 0) {
+    throw new QDashValidationError(`${problems.join("; ")}.`, { payload: { problems } });
+  }
+}
+
+/** The history, or an error naming what is wrong; never an empty history in place of a malformed one. */
+function checkTaskHistory(payload: unknown, route: string): TaskHistoryResponse {
+  const body = payload as Partial<TaskHistoryResponse> | null;
+  const problems: string[] = [];
+  if (!body || typeof body !== "object" || Array.isArray(body)) problems.push("the body is not an object");
+  else {
+    if (typeof body.name !== "string") problems.push("name is not a string");
+    if (!body.data || typeof body.data !== "object" || Array.isArray(body.data)) problems.push("data is not an object");
+    else if (Object.values(body.data).some((entry) => !entry || typeof entry !== "object" || Array.isArray(entry))) {
+      problems.push("a data entry is not an object");
+    }
+  }
+  if (problems.length > 0) {
+    throw new QDashApiError(`Unexpected GET ${route} response: ${problems.join("; ")}`, { payload });
+  }
+  return body as TaskHistoryResponse;
 }
 
 function taskResultQuery(options: ListTaskResultsOptions): Query {
@@ -607,6 +712,37 @@ export class QDashClient {
     };
   }
 
+  /**
+   * Every result of `task` for one qubit, newest first, keyed by task ID
+   * (`GET /task-results/qubits/{qid}/history`). The route has no date or paging
+   * filter: a missing `chipId`, `qid` or `task`, or a supplied `date` or other
+   * option, throws `QDashValidationError` before any request; use
+   * `listTaskResults` with `startFrom` and `startTo` for one period. A body
+   * without `name` and a `data` object throws `QDashApiError`.
+   */
+  async getQubitTaskHistory(options: QubitTaskHistoryOptions): Promise<TaskHistoryResponse> {
+    const chipId = requireText("chipId", options?.chipId, "read a task history");
+    const qid = requireText("qid", options.qid, "read a qubit task history");
+    const task = requireText("task", options.task, "read a task history");
+    checkTaskHistoryOptions(options as unknown as Record<string, unknown>, "qid");
+    const route = `/task-results/qubits/${pathPart(qid)}/history`;
+    return checkTaskHistory(await this.get<unknown>(route, { chip_id: chipId, task }), route);
+  }
+
+  /**
+   * Every result of `task` for one coupling, newest first, keyed by task ID
+   * (`GET /task-results/couplings/{coupling_id}/history`), with the same checks
+   * as `getQubitTaskHistory`.
+   */
+  async getCouplingTaskHistory(options: CouplingTaskHistoryOptions): Promise<TaskHistoryResponse> {
+    const chipId = requireText("chipId", options?.chipId, "read a task history");
+    const couplingId = requireText("couplingId", options.couplingId, "read a coupling task history");
+    const task = requireText("task", options.task, "read a task history");
+    checkTaskHistoryOptions(options as unknown as Record<string, unknown>, "couplingId");
+    const route = `/task-results/couplings/${pathPart(couplingId)}/history`;
+    return checkTaskHistory(await this.get<unknown>(route, { chip_id: chipId, task }), route);
+  }
+
   async getTaskResult(taskId: string): Promise<TaskResultResponse> {
     return this.get(`/tasks/${pathPart(taskId)}/result`);
   }
@@ -817,22 +953,17 @@ export class QDashClient {
   }
 
   /**
-   * One page of a chip's executions. A missing `chipId`, an out-of-range
-   * `limit` or `skip`, or a malformed `date` throws `QDashValidationError`
-   * before any request.
+   * One page of a chip's executions, newest first. A missing `chipId`, or any
+   * problem `executionListProblems` reports (an unsupported filter such as
+   * `flowName` or `status`, an out-of-range `limit` or `skip`, a malformed
+   * `date`), throws `QDashValidationError` before any request.
    */
   async listExecutions(options: ListExecutionsOptions): Promise<ListExecutionsResponse> {
-    if (typeof options?.chipId !== "string" || options.chipId.trim() === "") {
-      throw new QDashValidationError("chipId is required to list executions.", {
-        payload: { field: "chipId", value: options?.chipId },
-      });
-    }
-    checkInteger("limit", options.limit, 1, EXECUTIONS_MAX_PAGE_SIZE);
-    checkInteger("skip", options.skip, 0, undefined);
-    if (options.date !== undefined && !/^\d{8}$/.test(options.date)) {
-      throw new QDashValidationError(`date must be YYYYMMDD (got ${JSON.stringify(options.date)}).`, {
-        payload: { field: "date", value: options.date },
-      });
+    requireText("chipId", options?.chipId, "list executions");
+    const { chipId: _chipId, ...rest } = options;
+    const problems = executionListProblems(rest);
+    if (problems.length > 0) {
+      throw new QDashValidationError(`${problems.join("; ")}.`, { payload: { problems } });
     }
     return this.get(
       "/executions",

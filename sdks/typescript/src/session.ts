@@ -7,6 +7,7 @@ import {
 
 import { Dashboards, Scripts } from "./dashboards.js";
 import { Chip, Pipelines } from "./pipelines.js";
+import { TaskResults } from "./results.js";
 import { Workflows } from "./workflows.js";
 
 export interface QDashSessionOptions {
@@ -43,6 +44,8 @@ export class QDash {
   readonly workflows: Workflows;
   readonly scripts: Scripts;
   readonly dashboards: Dashboards;
+  /** Compound task-result reads, such as `compareLatest`. */
+  readonly taskResults: TaskResults;
 
   constructor(client: QDashClient, options: QDashSessionOptions = {}) {
     const projectId = checkedProject(options.projectId);
@@ -51,6 +54,7 @@ export class QDash {
     this.workflows = new Workflows(this.client);
     this.scripts = new Scripts(this.client);
     this.dashboards = new Dashboards(this.client);
+    this.taskResults = new TaskResults(this.client);
   }
 
   /** A session configured from `QDASH_*` environment variables. */

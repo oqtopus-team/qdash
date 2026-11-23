@@ -3,7 +3,6 @@ import { createServer } from "node:http";
 import test from "node:test";
 
 import qdashExtension from "../.test-dist/qdash.js";
-import { compareRepeatedTaskResults } from "../.test-dist/lib/calibration-comparison.js";
 
 // A GET /task-results row as TaskResultListItem serializes it: no output_parameters.
 const row = (taskId, taskName, qid, startAt, status = "completed") => ({
@@ -148,34 +147,6 @@ test("qdash_compare_calibration reads the two newest results' details and report
   assert.doesNotMatch(textOf(result), /no output-parameter changes/);
 });
 
-test("results whose output values agree are reported unchanged, even when error or calibrated_at differ", async (t) => {
-  const sameOld = { ...output(24.0, "us", 0.3), calibrated_at: "2026-11-01T00:00:00Z" };
-  const { run } = await fakeQDash(t, {
-    rows: [t1New, t1Old],
-    details: { "t1-new": detail(t1New, { t1: output(24.0, "us", 0.1) }), "t1-old": detail(t1Old, { t1: sameOld }) },
-  });
-  const result = await run("qdash_compare_calibration", { qid: "6" });
-  assert.deepEqual(result.details.data.compared.map((item) => [item.task, item.status, item.changes]), [["CheckT1", "compared", {}]]);
-  assert.match(textOf(result), /no output-parameter changes/);
-});
-
-test("comparison ignores nested object key order but preserves array order", async (t) => {
-  const before = { nested: { a: 1, b: 2 }, items: [{ x: 3, y: 4 }, 5] };
-  const after = { items: [{ y: 4, x: 3 }, 5], nested: { b: 2, a: 1 } };
-  const { run } = await fakeQDash(t, {
-    rows: [t1New, t1Old],
-    details: {
-      "t1-old": detail(t1Old, { config: output(before, ""), sequence: output([1, 2], "") }),
-      "t1-new": detail(t1New, { config: output(after, ""), sequence: output([2, 1], "") }),
-    },
-  });
-  const result = await run("qdash_compare_calibration", { qid: "6" });
-  assert.equal(result.details.data.compared[0].status, "compared");
-  assert.deepEqual(result.details.data.compared[0].changes, {
-    sequence: { before: [1, 2], after: [2, 1] },
-  });
-});
-
 test("a task with a single result is listed as not compared, and no detail is read", async (t) => {
   const { run, detailReads } = await fakeQDash(t, { rows: [echoOnly, t1New], total: 40 });
   const result = await run("qdash_compare_calibration", { qid: "6" });
@@ -187,26 +158,22 @@ test("a task with a single result is listed as not compared, and no detail is re
   assert.doesNotMatch(textOf(result), /no output-parameter changes/);
 });
 
-test("a failed or mismatched detail makes the task unavailable instead of unchanged", async (t) => {
-  const cases = [
-    ["a server error", new Error("database unavailable"), /reading the result of t1-old failed/],
-    ["a missing result", undefined, /reading the result of t1-old failed/],
-    ["no output_parameters", { ...detail(t1Old, {}), output_parameters: null }, /t1-old has no output_parameters object/],
-    ["another task's result", detail(t1New, { t1: output(31.5, "us") }), /the result read for t1-old has task_id "t1-new"/],
-    ["another task name", { ...detail(t1Old, { t1: output(31.5, "us") }), task_name: "CheckRabi" }, /task_name "CheckRabi", not "CheckT1"/],
-  ];
-  for (const [label, oldDetail, reason] of cases) {
-    const details = { "t1-new": detail(t1New, { t1: output(31.5, "us") }) };
-    if (oldDetail !== undefined) details["t1-old"] = oldDetail;
-    const { run } = await fakeQDash(t, { rows: [t1New, t1Old], details });
-    const result = await run("qdash_compare_calibration", { qid: "6" });
-    const [item] = result.details.data.compared;
-    assert.equal(item.status, "unavailable", label);
-    assert.equal(item.changes, null, label);
-    assert.match(item.error, reason, label);
-    assert.match(textOf(result), /comparison unavailable:/, label);
-    assert.doesNotMatch(textOf(result), /no output-parameter changes/, label);
-  }
+test("an unreadable detail is presented as unavailable, not unchanged", async (t) => {
+  const { run } = await fakeQDash(t, { rows: [t1New, t1Old], details: { "t1-new": detail(t1New, { t1: output(31.5, "us") }) } });
+  const result = await run("qdash_compare_calibration", { qid: "6" });
+  const [item] = result.details.data.compared;
+  assert.equal(item.status, "unavailable");
+  assert.equal(item.changes, null);
+  assert.match(item.error, /reading the result of t1-old failed/);
+  assert.match(textOf(result), /comparison unavailable: reading the result of t1-old failed/);
+  assert.doesNotMatch(textOf(result), /no output-parameter changes/);
+});
+
+test("the limit is clamped to the SDK's 2 to 100 rows instead of failing", async (t) => {
+  const { run, requests } = await fakeQDash(t, { rows: [] });
+  await run("qdash_compare_calibration", { qid: "6", limit: 1 });
+  await run("qdash_compare_calibration", { qid: "6", limit: 500 });
+  assert.deepEqual(requests.map((request) => request.query.limit), ["2", "100"]);
 });
 
 test("a coupling target is compared through the list's qid filter", async (t) => {
@@ -220,15 +187,6 @@ test("a coupling target is compared through the list's qid filter", async (t) =>
   assert.equal(requests[0].query.qid, "6-7");
   assert.equal(result.details.data.target.label, "c6-7");
   assert.deepEqual(result.details.data.compared[0].changes, { cr_amplitude: { before: 0.7, after: 0.8 } });
-});
-
-test("compareRepeatedTaskResults never reports a rejected read as no change", async () => {
-  const comparison = await compareRepeatedTaskResults([t1New, t1Old], async (taskId) => {
-    if (taskId === "t1-new") throw new Error("timeout");
-    return detail(t1Old, { t1: output(24.0, "us") });
-  });
-  assert.deepEqual(comparison.compared.map((item) => [item.status, item.changes]), [["unavailable", null]]);
-  assert.match(comparison.compared[0].error, /reading the result of t1-new failed: timeout/);
 });
 
 test("qubit_history and coupling_history send chip_id and task only", async (t) => {

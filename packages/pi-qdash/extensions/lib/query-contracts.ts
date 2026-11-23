@@ -135,47 +135,13 @@ export function checkQueryResponse(action: ContractedAction, data: unknown): unk
   );
 }
 
-/** Most rows one execution-list request returns. */
-export const EXECUTIONS_PAGE_LIMIT = 100;
-
-/**
- * Why an `executions` query cannot be sent, or null when it can. `GET
- * /executions` lists one chip's executions by page and optional day; it has no
- * flow or status filter, so those are refused rather than silently dropped.
- * Checked before any request.
- */
-export function executionListProblem(params: {
-  flowName?: unknown;
-  status?: unknown;
-  limit?: unknown;
-  skip?: unknown;
-  date?: unknown;
-}): string | null {
-  const problems: string[] = [];
-  const { flowName, status, limit, skip, date } = params;
-  const unsupported = [flowName !== undefined ? "flowName" : undefined, status !== undefined ? "status" : undefined].filter(Boolean);
-  if (unsupported.length > 0) {
-    problems.push(`${unsupported.join(" and ")} cannot filter executions: QDash lists a chip's executions only by page (skip, limit) and day (date, timezone); filter the returned rows by flow_name or status instead`);
-  }
-  if (limit !== undefined && !(Number.isInteger(limit) && (limit as number) >= 1 && (limit as number) <= EXECUTIONS_PAGE_LIMIT)) {
-    problems.push(`limit must be an integer from 1 to ${EXECUTIONS_PAGE_LIMIT} (got ${JSON.stringify(limit)})`);
-  }
-  if (skip !== undefined && !(Number.isInteger(skip) && (skip as number) >= 0)) {
-    problems.push(`skip must be an integer of 0 or more (got ${JSON.stringify(skip)})`);
-  }
-  if (date !== undefined && !(typeof date === "string" && /^\d{8}$/.test(date))) {
-    problems.push(`date must be YYYYMMDD (got ${JSON.stringify(date)})`);
-  }
-  if (problems.length === 0) return null;
-  return `${problems.join("; ")}. No request was sent.`;
-}
-
 /**
  * Why a `qubit_history` or `coupling_history` query cannot be sent, or null
- * when it can. `GET /task-results/qubits/{qid}/history` and
- * `GET /task-results/couplings/{coupling_id}/history` take only `chip_id` and
- * `task` and return the target's whole history, so a `date` is refused rather
- * than silently dropped. Checked before any request.
+ * when it can. The history routes take no date, and the client's
+ * `getQubitTaskHistory` and `getCouplingTaskHistory` refuse one for every
+ * caller. `qdash_query` shares one `date` argument across actions, so this host
+ * check refuses it first, before the default chip is resolved, with advice in
+ * tool terms.
  */
 export function targetHistoryProblem(params: { action: "qubit_history" | "coupling_history"; date?: unknown }): string | null {
   if (params.date === undefined) return null;

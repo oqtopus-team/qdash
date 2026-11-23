@@ -1,6 +1,10 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  executionListProblems,
+  QDashApiError,
   QDashClient,
   QDashConfig,
   QDashNotFoundError,
@@ -675,22 +679,34 @@ describe("SDK-facing client helpers", () => {
   });
 });
 
-describe("execution lists", () => {
-  function executionClient() {
-    const requests: URL[] = [];
-    const fetch = vi.fn(async (input: RequestInfo | URL) => {
-      requests.push(new URL(new Request(input).url));
-      return jsonResponse({ executions: [], total: 0 });
-    });
-    const client = new QDashClient(
-      new QDashConfig({ baseUrl: "https://qdash.example/api", apiToken: "token", retry: { maxAttempts: 1 } }),
-      { fetch },
-    );
-    return { client, requests, fetch };
-  }
+// The published contract: query and path parameters of each route, from docs/oas/openapi.json.
+const openapi = JSON.parse(readFileSync(new URL("../../../docs/oas/openapi.json", import.meta.url), "utf8")) as {
+  paths: Record<string, Record<string, { parameters?: { name: string; in: string; required?: boolean }[] }>>;
+};
+function routeParameters(path: string, where: "query" | "path") {
+  const parameters = (openapi.paths[path]!.get!.parameters ?? []).filter((parameter) => parameter.in === where);
+  return {
+    all: parameters.map((parameter) => parameter.name).sort(),
+    required: parameters.filter((parameter) => parameter.required).map((parameter) => parameter.name).sort(),
+  };
+}
 
-  it("sends the chip and only the filters GET /executions supports", async () => {
-    const { client, requests } = executionClient();
+function recordingClient(body: unknown = { executions: [], total: 0 }) {
+  const requests: URL[] = [];
+  const fetch = vi.fn(async (input: RequestInfo | URL) => {
+    requests.push(new URL(new Request(input).url));
+    return jsonResponse(body);
+  });
+  const client = new QDashClient(
+    new QDashConfig({ baseUrl: "https://qdash.example/api", apiToken: "token", retry: { maxAttempts: 1 } }),
+    { fetch },
+  );
+  return { client, requests, fetch };
+}
+
+describe("execution lists", () => {
+  it("sends the chip and only the query parameters GET /executions declares", async () => {
+    const { client, requests } = recordingClient();
     await client.listExecutions({ chipId: "C", skip: 20, limit: 100, date: "20261123", timezone: "Asia/Tokyo" });
     expect(requests[0]!.pathname).toBe("/api/executions");
     expect(Object.fromEntries(requests[0]!.searchParams)).toEqual({
@@ -700,8 +716,9 @@ describe("execution lists", () => {
       date: "20261123",
       timezone: "Asia/Tokyo",
     });
+    expect([...requests[0]!.searchParams.keys()].sort()).toEqual(routeParameters("/executions", "query").all);
     await client.listExecutions({ chipId: "C" });
-    expect(Object.fromEntries(requests[1]!.searchParams)).toEqual({ chip_id: "C" });
+    expect([...requests[1]!.searchParams.keys()]).toEqual(routeParameters("/executions", "query").required);
   });
 
   it.each([
@@ -710,14 +727,83 @@ describe("execution lists", () => {
     [{ chipId: "  " }, /chipId is required/],
     [{ chipId: "C", limit: 200 }, /limit must be an integer from 1 to 100 \(got 200\)/],
     [{ chipId: "C", limit: 0 }, /limit must be an integer from 1 to 100/],
-    [{ chipId: "C", skip: -1 }, /skip must be an integer 0 or more/],
+    [{ chipId: "C", limit: 2.5 }, /limit must be an integer from 1 to 100 \(got 2\.5\)/],
+    [{ chipId: "C", skip: -1 }, /skip must be an integer of 0 or more \(got -1\)/],
     [{ chipId: "C", date: "2026-11-23" }, /date must be YYYYMMDD/],
+    [{ chipId: "C", timezone: "" }, /timezone must be a non-empty IANA time zone name/],
+    [{ chipId: "C", flowName: "one_qubit" }, /flowName cannot filter executions/],
+    [{ chipId: "C", status: "running" }, /status cannot filter executions/],
+    [{ chipId: "C", flowName: "f", status: "running" }, /flowName and status cannot filter executions.*filter the returned rows/],
+    [{ chipId: "C", flow_name: "f" }, /flow_name is not an option of listExecutions/],
   ])("rejects %o before any request", async (options, message) => {
-    const { client, fetch } = executionClient();
+    const { client, fetch } = recordingClient();
     const call = () => client.listExecutions(options as Parameters<QDashClient["listExecutions"]>[0]);
     await expect(call()).rejects.toThrow(QDashValidationError);
     await expect(call()).rejects.toThrow(message);
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("reports every problem at once, and treats an undefined option as omitted", () => {
+    expect(executionListProblems({ status: "running", limit: 0, skip: undefined, date: "x" })).toEqual([
+      expect.stringMatching(/^status cannot filter executions/),
+      "limit must be an integer from 1 to 100 (got 0)",
+      'date must be YYYYMMDD (got "x")',
+    ]);
+    expect(executionListProblems({ flowName: undefined, status: undefined, skip: 0, limit: 1 })).toEqual([]);
+  });
+});
+
+describe("task histories", () => {
+  const history = { name: "CheckT1", data: { "t-2": { task_id: "t-2", name: "CheckT1", qid: "6" } } };
+
+  it("sends chip_id and task, the only query parameters the history routes declare", async () => {
+    const { client, requests } = recordingClient(history);
+    await expect(client.getQubitTaskHistory({ chipId: "C", qid: "6", task: "CheckT1" })).resolves.toEqual(history);
+    await client.getCouplingTaskHistory({ chipId: "C", couplingId: "6-7", task: "CheckCrossResonance" });
+    expect(requests.map((url) => [url.pathname, Object.fromEntries(url.searchParams)])).toEqual([
+      ["/api/task-results/qubits/6/history", { chip_id: "C", task: "CheckT1" }],
+      ["/api/task-results/couplings/6-7/history", { chip_id: "C", task: "CheckCrossResonance" }],
+    ]);
+    for (const path of ["/task-results/qubits/{qid}/history", "/task-results/couplings/{coupling_id}/history"]) {
+      expect(routeParameters(path, "query")).toEqual({ all: ["chip_id", "task"], required: ["chip_id", "task"] });
+    }
+  });
+
+  it("encodes the target as one path segment", async () => {
+    const { client, requests } = recordingClient(history);
+    await client.getQubitTaskHistory({ chipId: "C", qid: "a/b", task: "CheckT1" });
+    expect(requests[0]!.pathname).toBe("/api/task-results/qubits/a%2Fb/history");
+  });
+
+  it.each([
+    ["qubit", { qid: "6", task: "CheckT1" }, /chipId is required/],
+    ["qubit", { chipId: "C", task: "CheckT1" }, /qid is required/],
+    ["qubit", { chipId: "C", qid: "6" }, /task is required/],
+    ["coupling", { chipId: "C", task: "CheckCrossResonance" }, /couplingId is required/],
+    ["qubit", { chipId: "C", qid: "6", task: "CheckT1", date: "20261120" }, /date cannot filter a task history.*listTaskResults\(\{ chipId, qid, taskName, startFrom, startTo \}\)/],
+    ["coupling", { chipId: "C", couplingId: "6-7", task: "X", date: "20261120" }, /date cannot filter a task history.*qid: couplingId/],
+    ["qubit", { chipId: "C", qid: "6", task: "CheckT1", limit: 5 }, /limit is not an option of a task history/],
+  ])("rejects a %s history call %o before any request", async (kind, options, message) => {
+    const { client, fetch } = recordingClient(history);
+    const call = () =>
+      kind === "qubit"
+        ? client.getQubitTaskHistory(options as Parameters<QDashClient["getQubitTaskHistory"]>[0])
+        : client.getCouplingTaskHistory(options as Parameters<QDashClient["getCouplingTaskHistory"]>[0]);
+    await expect(call()).rejects.toThrow(QDashValidationError);
+    await expect(call()).rejects.toThrow(message);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [[], /the body is not an object/],
+    [{ data: {} }, /name is not a string/],
+    [{ name: "CheckT1", data: [] }, /data is not an object/],
+    [{ name: "CheckT1", data: { "t-1": null } }, /a data entry is not an object/],
+  ])("rejects a malformed history body %o instead of returning it", async (body, message) => {
+    const { client } = recordingClient(body);
+    const call = () => client.getQubitTaskHistory({ chipId: "C", qid: "6", task: "CheckT1" });
+    await expect(call()).rejects.toThrow(QDashApiError);
+    await expect(call()).rejects.toThrow(message);
   });
 });
 

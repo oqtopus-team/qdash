@@ -4,14 +4,17 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 
 import type { ExtensionAPI, Theme } from "@earendil-works/pi-coding-agent";
 import {
+  EXECUTIONS_MAX_PAGE_SIZE,
   QDashClient,
   defaultConfigPath,
+  executionListProblems,
   type CooldownResponse,
   type DownloadedFile,
   type TaskResultFigureOptions,
 } from "@oqtopus-team/qdash-client";
 import { Text, truncateToWidth } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
+import { QDash, type TaskResultComparison } from "@oqtopus-team/qdash-sdk";
 
 import { analyzePlotlyFigure, figureAnalysisText } from "./lib/figure-analysis.js";
 import { fetchFigureDetails, figureComponent, figureResultText, mediaTypeForPath, type FigureDetails } from "./lib/figures.js";
@@ -45,8 +48,7 @@ import { installQDashToolPolicy } from "./lib/script-policy.js";
 import { installQcalHydration } from "./lib/qcal-hydration-hook.js";
 import type { TaskKnowledgeLike } from "./lib/qcal-hydration.js";
 import { registerTimeseriesComparisonTool } from "./tools/timeseries.js";
-import { checkQueryResponse, EXECUTIONS_PAGE_LIMIT, executionListProblem, isContractedAction, QUERY_CONTRACTS, TASK_RESULTS_PAGE_LIMIT, targetHistoryProblem, taskResultPageProblem } from "./lib/query-contracts.js";
-import { compareRepeatedTaskResults, type RepeatedTaskComparison } from "./lib/calibration-comparison.js";
+import { checkQueryResponse, isContractedAction, QUERY_CONTRACTS, TASK_RESULTS_PAGE_LIMIT, targetHistoryProblem, taskResultPageProblem } from "./lib/query-contracts.js";
 import { analyzeWiringMarkdown, wiringInsightLines, type WiringInsights } from "./lib/wiring-analysis.js";
 
 type QDashQueryParams = {
@@ -513,10 +515,6 @@ function cleanQuery(values: Record<string, unknown> = {}): Record<string, unknow
   return Object.fromEntries(Object.entries(values).filter(([, value]) => value !== undefined && value !== null));
 }
 
-function pathPart(value: string): string {
-  return encodeURIComponent(value);
-}
-
 function requireValue(value: string | undefined, name: string): string {
   if (!value) throw new Error(`${name} is required for this QDash action`);
   return value;
@@ -826,7 +824,7 @@ type CalibrationComparison = {
   target: { kind: "qubit" | "coupling"; id: string; label: string };
   /** List rows read, and how many matched in total. */
   rows: { read: number; total: number };
-} & RepeatedTaskComparison;
+} & Pick<TaskResultComparison, "compared" | "insufficient">;
 
 async function buildCalibrationComparison(params: { profile?: string; configPath?: string; useEnv?: boolean; chipId?: string; qid?: string; couplingId?: string; limit?: number; withinHours?: number }): Promise<CalibrationComparison> {
   params = applyQDashContext(params);
@@ -838,15 +836,14 @@ async function buildCalibrationComparison(params: { profile?: string; configPath
   const kind = qid ? "qubit" : "coupling";
   const id = (qid ?? couplingId) as string;
   const limit = Math.max(2, Math.min(TASK_RESULTS_PAGE_LIMIT, Math.trunc(params.limit ?? 20)));
-  const page = await client.listTaskResults({ chipId, qid: id, limit });
-  const rows = page.items as unknown as Record<string, unknown>[];
-  // List rows carry no output parameters; read each compared result's detail.
-  const comparison = await compareRepeatedTaskResults(rows, (taskId) => client.getTaskResult(taskId));
+  // The SDK selects, reads and compares the results; this tool adapts arguments and presents them.
+  const { rows, compared, insufficient } = await new QDash(client).taskResults.compareLatest({ chipId, qid: id, limit });
   return {
     context: { profile: params.profile ?? currentContext.profile, chipId, webBaseUrl: qdashWebBaseUrl(client) },
     target: { kind, id, label: kind === "qubit" ? `q${id}` : `c${id}` },
-    rows: { read: rows.length, total: page.total },
-    ...comparison,
+    rows,
+    compared,
+    insufficient,
   };
 }
 
@@ -857,9 +854,7 @@ function calibrationComparisonLines(comparison: CalibrationComparison, color = f
   if (comparison.compared.length === 0) lines.push(muted(`Not enough repeated task results to compare among the ${comparison.rows.read} newest of ${comparison.rows.total}.`));
   for (const item of comparison.compared) {
     lines.push(accent(item.task));
-    const beforeId = firstString(item.before, ["task_id", "id"]) ?? "before";
-    const afterId = firstString(item.after, ["task_id", "id"]) ?? "after";
-    lines.push(`  before ${shortId(beforeId, 18)}  after ${shortId(afterId, 18)}`);
+    lines.push(`  before ${shortId(item.before.task_id, 18)}  after ${shortId(item.after.task_id, 18)}`);
     if (item.status !== "compared" || !item.changes) {
       lines.push(`  comparison unavailable: ${item.error ?? "the results could not be read"}`);
       continue;
@@ -1486,8 +1481,10 @@ async function executeQuery(params: QDashQueryParams) {
     if (problem) throw new Error(`task_results: ${problem}`);
   }
   if (params.action === "executions") {
-    const problem = executionListProblem(params);
-    if (problem) throw new Error(`executions: ${problem}`);
+    // The client's own check, run before the default chip is resolved so a bad call sends nothing.
+    const { flowName, status, skip, limit, date, timezone } = params;
+    const problems = executionListProblems({ flowName, status, skip, limit, date, timezone });
+    if (problems.length > 0) throw new Error(`executions: ${problems.join("; ")}. No request was sent.`);
   }
   if (params.action === "qubit_history" || params.action === "coupling_history") {
     const problem = targetHistoryProblem({ action: params.action, date: params.date });
@@ -1520,9 +1517,9 @@ async function dispatchQuery(params: QDashQueryParams) {
     case "task_result": return client.getTaskResult(requireValue(params.taskId, "taskId"));
     case "task_note": return client.api.getTaskNote(requireValue(params.taskId, "taskId"));
     case "qubit_latest": return client.api.getLatestQubitTaskResults({ chip_id: await defaultChipId(client, params.chipId), task: requireValue(params.task ?? params.taskName, "task") });
-    case "qubit_history": return client.api.getQubitTaskHistory(pathPart(requireValue(params.qid, "qid")), { chip_id: await defaultChipId(client, params.chipId), task: requireValue(params.task ?? params.taskName, "task") });
+    case "qubit_history": return client.getQubitTaskHistory({ chipId: await defaultChipId(client, params.chipId), qid: requireValue(params.qid, "qid"), task: requireValue(params.task ?? params.taskName, "task") });
     case "coupling_latest": return client.api.getLatestCouplingTaskResults({ chip_id: await defaultChipId(client, params.chipId), task: requireValue(params.task ?? params.taskName, "task") });
-    case "coupling_history": return client.api.getCouplingTaskHistory(pathPart(requireValue(params.couplingId, "couplingId")), { chip_id: await defaultChipId(client, params.chipId), task: requireValue(params.task ?? params.taskName, "task") });
+    case "coupling_history": return client.getCouplingTaskHistory({ chipId: await defaultChipId(client, params.chipId), couplingId: requireValue(params.couplingId, "couplingId"), task: requireValue(params.task ?? params.taskName, "task") });
     case "tasks": return client.listTasks(params.backend);
     case "task_knowledge": return params.taskName ? client.getTaskKnowledge(params.taskName) : client.listTaskKnowledge();
     case "task_knowledge_markdown": return client.getTaskKnowledgeMarkdown(requireValue(params.taskName, "taskName"));
@@ -1920,7 +1917,7 @@ export default function qdashExtension(host: ExtensionAPI) {
     parameters: Type.Object({
       ...connectionParams,
       ...chipScopedParams,
-      limit: Type.Optional(Type.Integer({ minimum: 1, maximum: EXECUTIONS_PAGE_LIMIT, description: `Rows to return, from 1 to ${EXECUTIONS_PAGE_LIMIT}. Defaults to 20.` })),
+      limit: Type.Optional(Type.Integer({ minimum: 1, maximum: EXECUTIONS_MAX_PAGE_SIZE, description: `Rows to return, from 1 to ${EXECUTIONS_MAX_PAGE_SIZE}. Defaults to 20.` })),
       skip: Type.Optional(Type.Integer({ minimum: 0, description: "Rows to skip before this page." })),
       date: Type.Optional(Type.String({ pattern: "^\\d{8}$", description: "Only executions started on this day, YYYYMMDD." })),
       timezone: Type.Optional(Type.String({ description: "IANA time zone that defines the day for date. Defaults to UTC." })),

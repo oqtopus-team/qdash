@@ -9,9 +9,10 @@
  * (`calibrate`) a calibration; `qdash.workflows` lists, reads and runs the
  * project's registered workflows; `qdash.pipelines` works with whole specs.
  * `qdash.scripts` and `qdash.dashboards` save metric scripts and custom
- * dashboards defined with `Script` and `Dashboard`. `qdash.client` reads
- * QDash data, such as `collectTaskResults({ maxItems })` for task results in
- * bounded pages.
+ * dashboards defined with `Script` and `Dashboard`. `qdash.taskResults`
+ * combines task-result reads, such as `compareLatest` for a target's two
+ * newest results per task. `qdash.client` reads other QDash data, such as
+ * `collectTaskResults({ maxItems })` for task results in bounded pages.
  */
 export { QDash } from "./session.js";
 export type { QDashFactoryOptions, QDashSessionOptions } from "./session.js";
@@ -38,11 +39,20 @@ export type {
   ScriptOptions,
   Visibility,
 } from "./dashboards.js";
+export { COMPARE_LATEST_DEFAULT_ROWS, COMPARE_LATEST_MAX_ROWS, TaskResults } from "./results.js";
+export type {
+  CompareLatestOptions,
+  ComparedTaskResults,
+  OutputParameterChange,
+  TaskResultComparison,
+} from "./results.js";
 export { runStatus } from "./runs.js";
 export type { RunResult, WaitOptions } from "./runs.js";
 export { calibrationSpec, customOneQubit, muxTargets, qubitTargets, sweep } from "./definitions.js";
 export type { CalibrationOptions, SweepDeclaration } from "./definitions.js";
 export {
+  EXECUTIONS_MAX_PAGE_SIZE,
+  executionListProblems,
   QDashApiError,
   QDashAuthError,
   QDashConfigError,
@@ -54,8 +64,10 @@ export {
 export type {
   CollectedTaskResults,
   CollectTaskResultsOptions,
+  CouplingTaskHistoryOptions,
   ListExecutionsOptions,
   ListTaskResultsOptions,
+  QubitTaskHistoryOptions,
 } from "@oqtopus-team/qdash-client";
 export type {
   CalibrationPipelineSpec,
@@ -81,7 +93,9 @@ export type {
   PipelineTargets,
   TaskCall,
   TaskResultListItem,
+  TaskHistoryResponse,
   TaskResultListResponse,
+  TaskResultResponse,
   TimeSeriesData,
   ValidatePipelineResponse,
 } from "@oqtopus-team/qdash-client/models";
