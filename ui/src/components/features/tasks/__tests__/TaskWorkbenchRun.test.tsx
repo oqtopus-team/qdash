@@ -131,6 +131,34 @@ describe("TaskWorkbench run availability", () => {
     expect(screen.getByRole("textbox", { name: "normalization_reference" })).toBeTruthy();
   });
 
+  it("reveals and names an invalid value inside a collapsed input group", async () => {
+    renderWorkbench(
+      {
+        input_parameters: {
+          qubit_frequency: { value_type: "float" },
+          normalization_reference: {
+            value_type: "float",
+            ui_group: "Normalization context",
+            ui_group_collapsed: true,
+          },
+        },
+      },
+      "?chip=chip-1&target=0",
+    );
+    const field = screen.getByRole("textbox", { name: "normalization_reference" });
+    fireEvent.change(field, { target: { value: "abc" } });
+    fireEvent.click(screen.getByRole("button", { name: "Run task" }));
+
+    await waitFor(() =>
+      expect(mocks.toast.error).toHaveBeenCalledWith("Fix normalization_reference before running"),
+    );
+    expect(screen.getByText("Normalization context").closest("details")).toHaveAttribute("open");
+    expect(field).toHaveAttribute("aria-invalid", "true");
+    expect(field).toHaveFocus();
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+    expect(mocks.post).not.toHaveBeenCalled();
+  });
+
   it("prefills the current form and submits all entered values through the catalog API", async () => {
     renderWorkbench(
       {
@@ -307,7 +335,10 @@ describe("TaskWorkbench run availability", () => {
     );
     expect(field).toHaveClass("input-error");
     expect(screen.queryByText("Enter numbers that produce a sweep.")).toBeNull();
-    expect(mocks.toast.error).not.toHaveBeenCalled();
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Enter numbers that produce a range sweep for time_range",
+    );
+    expect(mocks.toast.error).toHaveBeenCalledWith("Fix time_range before running");
     expect(mocks.post).not.toHaveBeenCalled();
 
     fireEvent.change(field, { target: { value: "8" } });
@@ -423,7 +454,8 @@ describe("TaskWorkbench run availability", () => {
     expect(document.getElementById(field.getAttribute("aria-describedby")!)).toHaveTextContent(
       'Expected an integer, got "1.5"',
     );
-    expect(mocks.toast.error).not.toHaveBeenCalled();
+    expect(field).toHaveFocus();
+    expect(mocks.toast.error).toHaveBeenCalledWith("Fix shots before running");
     expect(mocks.post).not.toHaveBeenCalled();
   });
 

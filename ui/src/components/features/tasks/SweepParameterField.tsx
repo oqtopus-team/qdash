@@ -112,7 +112,7 @@ export function SweepParameterField({
         </div>
       )}
       {error && (
-        <span id={errorId} className="mt-1 block break-words text-xs text-error">
+        <span id={errorId} role="alert" className="mt-1 block break-words text-xs text-error">
           {error}
         </span>
       )}

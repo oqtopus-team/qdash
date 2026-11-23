@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
+import { type FieldErrors, useForm } from "react-hook-form";
 import { type FormEvent, useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { useQueryClient } from "@tanstack/react-query";
@@ -88,6 +88,7 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
   const schema = useMemo(() => buildTaskRunSchema(task), [task]);
   const {
     register,
+    getValues,
     handleSubmit,
     reset,
     setValue,
@@ -97,6 +98,7 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
   } = useForm<TaskRunInput, unknown, TaskRunOutput>({
     resolver: zodResolver(schema),
     defaultValues: buildTaskRunDefaults(task, prefill),
+    shouldFocusError: false,
   });
   const isSubmitLocked = useRef(false);
   const runs = watch("runs");
@@ -241,14 +243,41 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
     }
   };
 
+  /** Names the first invalid parameter and reveals it, even inside a collapsed group. */
+  const handleInvalid = (form: HTMLFormElement, formErrors: FieldErrors<TaskRunInput>) => {
+    const values = getValues();
+    const inputIndex = values.inputs.findIndex((_, index) => formErrors.inputs?.[index]?.value);
+    const runIndex = values.runs.findIndex((_, index) => formErrors.runs?.[index]?.value);
+    const [fieldKey, name] =
+      inputIndex >= 0
+        ? [`input-${inputIndex}`, values.inputs[inputIndex]?.name]
+        : runIndex >= 0
+          ? [`run-${runIndex}`, values.runs[runIndex]?.name]
+          : [null, undefined];
+    toast.error(
+      name ? `Fix ${name} before running` : "Fix the highlighted parameters before running",
+    );
+    if (!fieldKey) return;
+    const field = form.querySelector<HTMLElement>(`[data-task-run-field="${fieldKey}"]`);
+    const group = field?.closest("details");
+    if (group) group.open = true;
+    const control =
+      field?.querySelector<HTMLElement>("input:not([disabled])") ??
+      field?.querySelector<HTMLElement>("select:not([disabled])");
+    control?.focus();
+  };
+
   /** Submits the run form once at a time while Run is enabled. */
   const handleFormSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (runDisabledReason || isSubmitLocked.current) return;
     isSubmitLocked.current = true;
-    void handleSubmit(handleRun)(event).finally(() => {
-      isSubmitLocked.current = false;
-    });
+    const form = event.currentTarget;
+    void handleSubmit(handleRun, (formErrors) => handleInvalid(form, formErrors))(event).finally(
+      () => {
+        isSubmitLocked.current = false;
+      },
+    );
   };
 
   /** Revalidates a sweep after its type or arguments change. */
@@ -377,7 +406,7 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
     const error = errors.inputs?.[index]?.value?.message;
     const errorId = `${runDisabledReasonId}-input-${index}-error`;
     return (
-      <label key={name} className="form-control min-w-0">
+      <label key={name} className="form-control min-w-0" data-task-run-field={`input-${index}`}>
         <span className="label-text mb-1 flex min-w-0 items-start justify-between gap-2">
           <span className="min-w-0 break-words">{name}</span>
           <span className="max-w-[45%] shrink-0 break-all text-right text-base-content/40">
@@ -393,7 +422,7 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
           placeholder="Use current value"
         />
         {error && (
-          <span id={errorId} className="mt-1 break-words text-xs text-error">
+          <span id={errorId} role="alert" className="mt-1 break-words text-xs text-error">
             {error}
           </span>
         )}
@@ -548,28 +577,35 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
                   <div className="grid max-h-80 gap-3 overflow-y-auto rounded-lg border border-base-300 p-3">
                     {Object.entries(task.run_parameters ?? {}).map(([name, parameter], index) =>
                       isSweepValueType(parameter.value_type) ? (
-                        <SweepParameterField
-                          key={name}
-                          name={name}
-                          unit={String(parameter.unit ?? "")}
-                          description={String(parameter.description ?? "")}
-                          declaredType={parameter.value_type}
-                          type={runs[index]?.type ?? parameter.value_type}
-                          parts={runs[index]?.parts ?? ["", "", ""]}
-                          listValue={runs[index]?.value ?? ""}
-                          error={errors.runs?.[index]?.value?.message}
-                          errorId={`${runDisabledReasonId}-run-${index}-error`}
-                          onTypeChange={(type) => handleSweepTypeChange(index, type)}
-                          onPartChange={(partIndex, value) => {
-                            setValue(`runs.${index}.parts.${partIndex}`, value);
-                            revalidateSweep(index);
-                          }}
-                          onListChange={(value) =>
-                            setValue(`runs.${index}.value`, value, { shouldValidate: isSubmitted })
-                          }
-                        />
+                        <div key={name} className="min-w-0" data-task-run-field={`run-${index}`}>
+                          <SweepParameterField
+                            name={name}
+                            unit={String(parameter.unit ?? "")}
+                            description={String(parameter.description ?? "")}
+                            declaredType={parameter.value_type}
+                            type={runs[index]?.type ?? parameter.value_type}
+                            parts={runs[index]?.parts ?? ["", "", ""]}
+                            listValue={runs[index]?.value ?? ""}
+                            error={errors.runs?.[index]?.value?.message}
+                            errorId={`${runDisabledReasonId}-run-${index}-error`}
+                            onTypeChange={(type) => handleSweepTypeChange(index, type)}
+                            onPartChange={(partIndex, value) => {
+                              setValue(`runs.${index}.parts.${partIndex}`, value);
+                              revalidateSweep(index);
+                            }}
+                            onListChange={(value) =>
+                              setValue(`runs.${index}.value`, value, {
+                                shouldValidate: isSubmitted,
+                              })
+                            }
+                          />
+                        </div>
                       ) : (
-                        <label key={name} className="form-control min-w-0">
+                        <label
+                          key={name}
+                          className="form-control min-w-0"
+                          data-task-run-field={`run-${index}`}
+                        >
                           <span className="label-text mb-1 flex min-w-0 items-start justify-between gap-2">
                             <span className="min-w-0 break-words">{name}</span>
                             <span className="max-w-[45%] shrink-0 break-all text-right text-base-content/40">
@@ -589,6 +625,7 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
                           {errors.runs?.[index]?.value?.message && (
                             <span
                               id={`${runDisabledReasonId}-run-${index}-error`}
+                              role="alert"
                               className="mt-1 break-words text-xs text-error"
                             >
                               {errors.runs[index]?.value?.message}
