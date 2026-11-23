@@ -52,7 +52,7 @@ QDash creates the [virtual chip configuration](./setup/fake-backend.md#create-a-
 1. Next to the code editor, read **What this flow runs**: the tasks in run order and the MUX
    targets that the code declares. A first run can use the template unchanged.
 
-   ![The Review the calibration callout next to What this flow runs, which lists the tasks in order and the targets MUX 0-15 of demo-64q](/images/guides/first-calibration-review-flow.gif)
+   ![The Review the calibration callout next to What this flow runs, which lists the tasks in order and the targets MUX 0-3 of demo-64q](/images/guides/first-calibration-review-flow.gif)
 
 2. Keep the suggested flow name, or enter another with letters, digits, and underscores.
 
@@ -66,11 +66,15 @@ QDash creates the [virtual chip configuration](./setup/fake-backend.md#create-a-
 4. Select **Execute** once it is highlighted, check the chip ID in the confirmation, and select
    **Execute** to start the run.
 
+   ![Selecting Execute at the Run the calibration callout; the Execute Flow dialog shows chip demo-64q and the targets MUX 0-3, and selecting Execute opens the run on Execution with the Calibration running callout](/images/guides/first-calibration-execute.gif)
+
 A failed save or a run that does not start leaves you in the editor with your changes.
 
 ### Follow Progress
 
 The run opens on **Execution**. The callout shows the completed task count while you wait.
+
+![A running first calibration on Execution: FakeBringUp nodes turn from running to completed and the next tasks start, while the Calibration running callout counts the completed tasks](/images/guides/first-calibration-follow-progress.gif)
 
 When the run fails or is cancelled, the guide stays on this step and offers **Open the run** and
 **Run again**. Open the run, or filter **Task Results** by status as described in
@@ -81,14 +85,29 @@ services themselves stop responding, see [Operations](./operations.md#resolve-co
 
 When the run finishes, the callout points at a completed result, such as the **CheckT1** node of
 the execution flow. Select it to open its preview, or open a result from the guide or from **Task
-Results**. The callouts then explain the result's graph and its **Output Parameters**. Close the
-preview to continue.
+Results**.
+
+![Selecting the CheckT1 node of qubit 8 at the Open a result callout; the result preview opens with its graph](/images/guides/first-calibration-open-result.gif)
+
+The callouts then explain the result's graph and its **Output Parameters**.
+
+![The Read the graph callout on the CheckT1 graph, then the Check the fitted values callout on Output Parameters, which lists t1](/images/guides/first-calibration-read-result.gif)
+
+Close the preview to continue.
+
+![Closing the result preview at the Close the preview callout; the See the whole chip callout points at Open the chip overview](/images/guides/first-calibration-close-preview.gif)
 
 ### Open the Chip Overview
 
 Open the chip on **Chip**. Each tile shows the latest result of the selected task for one qubit;
-choose another task to compare. Opening the overview finishes the guide, and Home shows **First
-calibration complete** with links to the result and the overview.
+choose another task to compare.
+
+![Selecting Open the chip overview; Chip opens demo-64q, and the Calibrated values on the chip callout explains the tiles until Done is selected](/images/guides/first-calibration-chip-overview.gif)
+
+Opening the overview finishes the guide, and Home shows **First calibration complete** with links
+to the result and the overview.
+
+![Opening Home from Chip after the guide is complete; Home shows First calibration complete with Open CheckT1 result and Chip overview](/images/guides/first-calibration-complete.gif)
 
 ## On a Qubex Deployment
 
