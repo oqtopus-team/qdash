@@ -125,7 +125,7 @@ function postTargetContext(post: ForumPostResponse): ForumTargetContext | null {
 
 function dashboardTargetHref(context: ForumTargetContext): string {
   if (context.targetType === "qubit") return `/chip/${context.chipId}/qubit/${context.targetId}`;
-  return `/dashboard?chip=${encodeURIComponent(context.chipId)}&type=coupling`;
+  return `/overview?chip=${encodeURIComponent(context.chipId)}&type=coupling`;
 }
 
 function isEdited(createdAt: string, updatedAt: string): boolean {

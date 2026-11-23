@@ -262,7 +262,9 @@ def test_run_plan_parses_plan_and_prints_audit_outcome(
 
 
 def _auto_session(autonomy: str):
-    from qdash.client.services.models import AgentSessionResponse
+    from qdash.client.services.client_models import (
+        AgentSessionResponse,
+    )
 
     return AgentSessionResponse.model_validate(
         {
@@ -279,7 +281,7 @@ def _auto_session(autonomy: str):
                 "autonomy": autonomy,
                 "max_rounds_per_target": 2,
             },
-            "skill_name": "qdash-calibration-agent",
+            "skill_name": "pi-qdash",
             "skill_version": "1",
             "skill_hash": "sha256:test",
             "model_name": "local-model",

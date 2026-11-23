@@ -4,6 +4,33 @@ The bundled pi extensions own tool execution and skills; the QDash runtime owns
 session orchestration, tool exposure, and host context. See
 [Pi Packages](./packages.md) for workspace setup and release procedures.
 
+## Supported hosts
+
+pi-qdash is the agent capability shared by two supported hosts: pi CLI, and the QDash
+web application's **Agent** through the agent runtime. The hosts share capability, not
+presentation, and their features differ; document a difference where the feature is
+described instead of implying parity.
+
+| Concern | Owner |
+| --- | --- |
+| QDash tools, skills, investigation policy, tool routing guide, and tool policy lists | pi-qdash, for both hosts |
+| Presentation, sessions, the context a turn carries, orchestration, and which tools are exposed | Each host |
+
+- **Permissions.** Both hosts apply the same rule: reads run directly, and a reviewed write
+  runs only after the user approves that call. Each host keeps its own gate. pi CLI asks in
+  its UI, or requires `confirmWrite: true` without one (`extensions/lib/write-gate.ts`); the
+  runtime shows an approval card and runs the approved call with the arguments the user saw
+  (`QDashWriteTools.runApproved` in `agent-runtime/src/durable-tools.ts`).
+- **Results.** A tool returns readable text in `content` and reusable structured data in
+  `details` (`extensions/lib/results.ts`), so a host without a renderer for a result still
+  shows its text.
+- **Host context.** Context such as the open page or a task result comes from the host,
+  not from pi-qdash; see [Page context and editor edits](./architecture.md#page-context-and-editor-edits)
+  for the web application.
+- **Verification.** A change to shared behavior is checked in both hosts, as described in
+  [Verify a change](#verify-a-change). A feature or limit specific to one host, such as pi
+  CLI slash commands or the web application's approval cards, is stated as such.
+
 ## pi-qdash
 
 `packages/pi-qdash/extensions/qdash.ts` registers QDash tools, slash commands, and
@@ -20,11 +47,29 @@ rather than appended on later runs. The QDash runtime does not run this hook; it
 same policy and guide with its own chat rules in `agent-runtime/src/prompt.ts`. Keep display,
 approval, and orchestration rules for one host out of `qdash-guidance.ts`.
 
+`extensions/tools/metric-scripts.ts` adds the metric script and dashboard tools: the
+`qdash_query` actions for scripts, templates, the data catalog and dashboards, the direct tools
+`qdash_validate_metric_script` and `qdash_preview_metric_script` (they execute code on the QDash
+server, so they are not script-callable reads), and the reviewed writes
+`qdash_save_metric_script` and `qdash_save_dashboard`. All four direct tools are deferred.
+The tools only reach the API and format its answers; the `qdash_metrics` API and the authoring
+workflow live in `skills/qdash-metric-scripts/`. When the web application's metric script
+editor is open, the runtime adds the editor's text to the prompt and offers
+`propose_code_edit` for it, as it does for the Workflow editor and for a dashboard the
+user may edit, where the proposal is the dashboard's draft as JSON; see
+[Page context and editor edits](./architecture.md#page-context-and-editor-edits).
+
 Keep API access through `@oqtopus-team/qdash-client`, redaction, rendering, and
 mechanical evidence extraction in extensions. Keep calibration interpretation,
 diagnosis recipes, thresholds, and runbooks in `packages/pi-qdash/skills/`.
 For example, `extensions/lib/figure-analysis.ts` summarizes Plotly JSON;
-`skills/qdash-two-qubit-calibration-diagnosis/` interprets calibration evidence.
+`skills/qdash-two-qubit-calibration/` decides from that evidence which two-qubit step to rerun.
+The experiment-flow skills (`qdash-chip-bringup`, `qdash-one-qubit-calibration`,
+`qdash-two-qubit-calibration`, and `qdash-characterization`) compose the flow templates toward a
+goal and leave task physics to task knowledge. The runtime's `read_skill` returns only a skill's
+`SKILL.md`, so these skills keep their instructions in that file and retrieve templates and task
+documentation through tools; `agent-runtime/test/bundled-extensions.test.mjs` checks that they
+load and name only tools the runtime offers.
 
 New tools are read-only by default. Writes and operational calls must use the
 existing approval gates, including explicit `confirmWrite: true` in non-interactive
@@ -62,6 +107,15 @@ Pipeline execution is separate from agent candidate approval. A valid
 `qdash_plan_pipeline` result precedes confirmation-gated `qdash_run_pipeline`;
 the latter persists completed task parameters directly. Do not use it to retry
 a failed agent action because that would bypass the candidate gate.
+
+The pipeline tools and `qdash_execute_flow` reach QDash through the
+[TypeScript SDK](../architecture/typescript-sdk.md) package `@oqtopus-team/qdash-sdk`
+(`qdash.pipelines` and `qdash.workflows.run`), which builds the requests; other
+tools use `@oqtopus-team/qdash-client` directly. A profile without a project keeps
+running on the server's default project. Confirmation, input checks, the 422 and
+503 handling and the structured results stay in the tools. A run tool returns the execution ID as soon as QDash
+accepts the run and never calls the SDK's `wait()`; `qdash_wait_execution` follows
+the run when asked.
 
 When adding a tool or command, update the [pi-qdash reference](../../reference/pi-qdash.md)
 and add focused tests under `packages/pi-qdash/tests/`. Keep pure extraction helpers

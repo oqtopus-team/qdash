@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -11,6 +11,11 @@ import {
 } from "@/components/features/first-calibration/__tests__/journeyTestUtils";
 import { WorkflowEditorPageContent } from "@/components/features/flow/WorkflowEditorPageContent";
 import { deleteFlow, saveFlow } from "@/client/flow/flow";
+import {
+  createFakeEditor,
+  createFakeMonaco,
+  deferred as deferredValue,
+} from "@/lib/__tests__/fakeMonaco";
 
 const mocks = vi.hoisted(() => ({
   monaco: {
@@ -20,9 +25,14 @@ const mocks = vi.hoisted(() => ({
   },
   // Commands the mounted editor registered, such as Cmd/Ctrl+S, by keybinding.
   editorCommands: new Map<number, () => void>(),
+  // Format tests: extra editor members (a model and Format Document) and Monaco's languages.
+  editorExtras: null as null | ((onChange?: (value?: string) => void) => object),
+  monacoLanguages: undefined as unknown,
+  formatSource: vi.fn(),
   executeFlow: vi.fn(),
   toastSuccess: vi.fn(),
   toastError: vi.fn(),
+  toastWarning: vi.fn(),
   projectId: "project-1",
   push: vi.fn(),
   disabledReason: null as string | null,
@@ -53,6 +63,11 @@ vi.mock("next/dynamic", () => ({
       onMount?: (editor: unknown, monaco: unknown) => void;
       options?: { readOnly?: boolean };
     }) {
+      // The fake editor's edits reach the pane's latest onChange, as Monaco's do.
+      const changeRef = useRef(onChange);
+      useEffect(() => {
+        changeRef.current = onChange;
+      });
       useEffect(() => {
         onMount?.(
           {
@@ -62,8 +77,10 @@ vi.mock("next/dynamic", () => ({
             updateOptions: () => undefined,
             addCommand: (keybinding: number, handler: () => void) =>
               mocks.editorCommands.set(keybinding, handler),
+            focus: () => undefined,
+            ...mocks.editorExtras?.((text) => changeRef.current?.(text)),
           },
-          mocks.monaco,
+          { ...mocks.monaco, languages: mocks.monacoLanguages },
         );
       }, [onMount]);
       return (
@@ -114,11 +131,15 @@ vi.mock("@/contexts/ProjectContext", () => ({
 }));
 
 vi.mock("@/contexts/ChatDockContext", () => ({
-  useChatDock: () => ({ registerPage: () => () => undefined }),
+  useChatDock: () => ({ registerPage: () => () => undefined, refreshPage: () => undefined }),
 }));
 
 vi.mock("@/components/ui/Toast", () => ({
-  useToast: () => ({ success: mocks.toastSuccess, error: mocks.toastError }),
+  useToast: () => ({
+    success: mocks.toastSuccess,
+    error: mocks.toastError,
+    warning: mocks.toastWarning,
+  }),
 }));
 
 vi.mock("@/hooks/useExecutionAvailability", () => ({
@@ -177,6 +198,8 @@ vi.mock("@/client/flow/flow", () => ({
   executeFlow: mocks.executeFlow,
   useListFlows: () => ({ data: { data: { flows: [] } } }),
   listFlowSchedules: () => Promise.resolve({ data: { schedules: [] } }),
+  formatFlowSource: (body: { source: string }) =>
+    Promise.resolve(mocks.formatSource(body)).then((data) => ({ data })),
 }));
 
 function renderEditor() {
@@ -797,5 +820,121 @@ describe("WorkflowEditorPageContent properties", () => {
       await screen.findByText("Failed to save first_calibration: disk full"),
     ).toBeInTheDocument();
     expect(screen.queryByText("Please enter a username")).toBeNull();
+  });
+});
+
+describe("WorkflowEditorPageContent formatting", () => {
+  const SAVED = "from prefect import flow\n";
+  let fakeEditor: ReturnType<typeof createFakeEditor> | null = null;
+
+  beforeEach(() => {
+    mocks.projectId = "project-1";
+    mocks.disabledReason = null;
+    mocks.editorCommands.clear();
+    window.localStorage.setItem(PROJECT_STORAGE_KEY, "project-1");
+    const fake = createFakeMonaco();
+    mocks.monacoLanguages = fake.monaco.languages;
+    mocks.editorExtras = (onChange) => {
+      fakeEditor = createFakeEditor(fake, SAVED, {
+        onChange: (text) => act(() => onChange?.(text)),
+      });
+      return fakeEditor;
+    };
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+    window.localStorage.clear();
+    mocks.editorExtras = null;
+    mocks.monacoLanguages = undefined;
+    fakeEditor = null;
+  });
+
+  it("formats the draft before saving and saves the text the editor shows", async () => {
+    const draft = "from prefect import flow\nx=1\n";
+    const formatted = "from prefect import flow\n\nx = 1\n";
+    mocks.formatSource.mockResolvedValue({ status: "formatted", source: formatted });
+    vi.mocked(saveFlow).mockResolvedValue({
+      data: { name: "first_calibration", file_path: "x.py", message: "ok", code: formatted },
+    } as Awaited<ReturnType<typeof saveFlow>>);
+    renderEditor();
+    await unlockEditor();
+    act(() => fakeEditor?.type(draft));
+
+    await pressSaveShortcut();
+
+    await waitFor(() =>
+      expect(saveFlow).toHaveBeenCalledWith(expect.objectContaining({ code: formatted })),
+    );
+    expect(mocks.formatSource).toHaveBeenCalledWith({ source: draft });
+    expect(screen.getByLabelText("Code")).toHaveValue(formatted);
+    await waitFor(() => expect(screen.queryByTitle("Unsaved changes")).toBeNull());
+  });
+
+  it("saves a draft that cannot be parsed as written, so the save reports the error", async () => {
+    const broken = "def broken(:\n";
+    mocks.formatSource.mockResolvedValue({ status: "syntax_error", source: broken });
+    vi.mocked(saveFlow).mockRejectedValue(new Error("Python syntax error in code"));
+    renderEditor();
+    await unlockEditor();
+    act(() => fakeEditor?.type(broken));
+
+    await pressSaveShortcut();
+
+    await waitFor(() =>
+      expect(saveFlow).toHaveBeenCalledWith(expect.objectContaining({ code: broken })),
+    );
+    expect(screen.getByLabelText("Code")).toHaveValue(broken);
+  });
+
+  it("does not save a draft edited while it was being formatted", async () => {
+    const answer = deferredValue<{ status: "formatted"; source: string }>();
+    mocks.formatSource.mockReturnValue(answer.promise);
+    renderEditor();
+    await unlockEditor();
+    act(() => fakeEditor?.type(`${SAVED}x=1\n`));
+
+    await pressSaveShortcut();
+    act(() => fakeEditor?.type(`${SAVED}x=2\n`));
+    await act(async () => {
+      answer.resolve({ status: "formatted", source: `${SAVED}x = 1\n` });
+    });
+
+    expect(saveFlow).not.toHaveBeenCalled();
+    expect(screen.getByLabelText("Code")).toHaveValue(`${SAVED}x=2\n`);
+    expect(screen.getByTitle("Unsaved changes")).toBeInTheDocument();
+    expect(mocks.toastWarning).toHaveBeenCalledWith(
+      "Not saved: the workflow changed while it was being formatted",
+      expect.anything(),
+    );
+  });
+
+  it("disables Format Document in the command palette while the editor is locked", async () => {
+    renderEditor();
+    await screen.findByTestId("editor");
+
+    fireEvent.keyDown(window, { key: "p", ctrlKey: true, shiftKey: true });
+
+    expect(await screen.findByRole("option", { name: /Format Document/ })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+  });
+
+  it("formats the draft from the command palette without saving it", async () => {
+    mocks.formatSource.mockResolvedValue({ status: "formatted", source: `${SAVED}\n# f\n` });
+    renderEditor();
+    await unlockEditor();
+
+    fireEvent.keyDown(window, { key: "p", ctrlKey: true, shiftKey: true });
+    const option = await screen.findByRole("option", { name: /Format Document/ });
+    await act(async () => {
+      fireEvent.click(option);
+    });
+
+    await waitFor(() => expect(screen.getByLabelText("Code")).toHaveValue(`${SAVED}\n# f\n`));
+    expect(mocks.formatSource).toHaveBeenCalledWith({ source: SAVED });
+    expect(saveFlow).not.toHaveBeenCalled();
   });
 });

@@ -213,7 +213,7 @@ async def test_save_flow_writes_the_source_and_registers_the_deployment(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Saving writes the file, registers the deployment and records metadata."""
-    monkeypatch.setattr(flow_service_module, "format_with_ruff", lambda _path: None)
+    monkeypatch.setattr(flow_service_module, "format_source_for_save", lambda code: code)
     repo = _FakeFlowRepository()
     deployment = _StubDeploymentClient()
     service = _service(tmp_path, repo=repo, deployment=deployment)
@@ -245,7 +245,7 @@ async def test_save_flow_keeps_the_stored_folder_when_the_request_omits_it(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """An omitted folder leaves the existing folder and replaces the deployment."""
-    monkeypatch.setattr(flow_service_module, "format_with_ruff", lambda _path: None)
+    monkeypatch.setattr(flow_service_module, "format_source_for_save", lambda code: code)
     file_path = tmp_path / "user_flows" / "project-1" / "my_flow.py"
     repo = _FakeFlowRepository(flow=_make_flow(file_path, folder="daily"))
     service = _service(tmp_path, repo=repo)
@@ -268,7 +268,7 @@ async def test_save_flow_removes_the_file_when_registration_fails(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A failed registration does not leave the new source behind."""
-    monkeypatch.setattr(flow_service_module, "format_with_ruff", lambda _path: None)
+    monkeypatch.setattr(flow_service_module, "format_source_for_save", lambda code: code)
     service = _service(
         tmp_path,
         deployment=_StubDeploymentClient(
@@ -294,7 +294,7 @@ async def test_save_flow_removes_the_file_when_metadata_cannot_be_saved(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A failed metadata write does not leave the new source behind."""
-    monkeypatch.setattr(flow_service_module, "format_with_ruff", lambda _path: None)
+    monkeypatch.setattr(flow_service_module, "format_source_for_save", lambda code: code)
     repo = _FakeFlowRepository()
     repo.create_failure = RuntimeError("mongo is down")
     service = _service(tmp_path, repo=repo)
@@ -869,7 +869,7 @@ async def test_save_flow_restores_old_source_when_update_metadata_fails(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """On update, a failed metadata write restores the previous source."""
-    monkeypatch.setattr(flow_service_module, "format_with_ruff", lambda _path: None)
+    monkeypatch.setattr(flow_service_module, "format_source_for_save", lambda code: code)
     file_path = tmp_path / "user_flows" / "project-1" / "my_flow.py"
     file_path.parent.mkdir(parents=True)
     file_path.write_text(FLOW_CODE, encoding="utf-8")
@@ -897,7 +897,7 @@ async def test_save_flow_restores_old_source_when_update_registration_fails(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """On update, a failed registration restores the previous source."""
-    monkeypatch.setattr(flow_service_module, "format_with_ruff", lambda _path: None)
+    monkeypatch.setattr(flow_service_module, "format_source_for_save", lambda code: code)
     file_path = tmp_path / "user_flows" / "project-1" / "my_flow.py"
     file_path.parent.mkdir(parents=True)
     file_path.write_text(FLOW_CODE, encoding="utf-8")
@@ -951,7 +951,7 @@ async def test_create_only_save_creates_a_new_flow(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A create-only save of a free name stores and registers the flow."""
-    monkeypatch.setattr(flow_service_module, "format_with_ruff", lambda _path: None)
+    monkeypatch.setattr(flow_service_module, "format_source_for_save", lambda code: code)
     repo = _FakeFlowRepository()
     service = _service(tmp_path, repo=repo)
 
@@ -973,7 +973,7 @@ async def test_create_only_save_rejects_an_existing_flow_without_changes(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A create-only save of a taken name returns 409 and leaves the flow as it was."""
-    monkeypatch.setattr(flow_service_module, "format_with_ruff", lambda _path: None)
+    monkeypatch.setattr(flow_service_module, "format_source_for_save", lambda code: code)
     file_path = tmp_path / "user_flows" / "project-1" / "my_flow.py"
     file_path.parent.mkdir(parents=True)
     file_path.write_text(FLOW_CODE, encoding="utf-8")
@@ -1004,7 +1004,7 @@ async def test_create_only_save_never_replaces_a_source_without_metadata(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A flow file left without metadata still blocks a create-only save of its name."""
-    monkeypatch.setattr(flow_service_module, "format_with_ruff", lambda _path: None)
+    monkeypatch.setattr(flow_service_module, "format_source_for_save", lambda code: code)
     file_path = tmp_path / "user_flows" / "project-1" / "my_flow.py"
     file_path.parent.mkdir(parents=True)
     file_path.write_text("# someone else's work\n", encoding="utf-8")
@@ -1031,7 +1031,7 @@ async def test_create_only_save_reports_a_concurrent_metadata_insert_as_conflict
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A unique-index violation on insert is a 409 and removes the file this save wrote."""
-    monkeypatch.setattr(flow_service_module, "format_with_ruff", lambda _path: None)
+    monkeypatch.setattr(flow_service_module, "format_source_for_save", lambda code: code)
     repo = _FakeFlowRepository()
     repo.create_failure = DuplicateKeyError("E11000 duplicate key")
     service = _service(tmp_path, repo=repo)
@@ -1053,7 +1053,7 @@ async def test_concurrent_create_only_saves_create_the_flow_once(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Of two concurrent create-only saves of one name, one wins and the other gets 409."""
-    monkeypatch.setattr(flow_service_module, "format_with_ruff", lambda _path: None)
+    monkeypatch.setattr(flow_service_module, "format_source_for_save", lambda code: code)
     repo = _StatefulFlowRepository()
     deployment = _SlowDeploymentClient()
     service = _service(tmp_path, repo=repo, deployment=deployment)
@@ -1091,7 +1091,7 @@ async def test_create_only_save_waits_for_a_save_in_another_process(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A save holding the lock in another process finishes first; the create-only save then 409s."""
-    monkeypatch.setattr(flow_service_module, "format_with_ruff", lambda _path: None)
+    monkeypatch.setattr(flow_service_module, "format_source_for_save", lambda code: code)
     project_dir = tmp_path / "user_flows" / "project-1"
     project_dir.mkdir(parents=True)
     file_path = project_dir / "my_flow.py"
@@ -1144,7 +1144,7 @@ async def test_save_without_create_only_still_overwrites_an_existing_flow(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """The default save keeps its overwrite behavior for the flow editor."""
-    monkeypatch.setattr(flow_service_module, "format_with_ruff", lambda _path: None)
+    monkeypatch.setattr(flow_service_module, "format_source_for_save", lambda code: code)
     file_path = tmp_path / "user_flows" / "project-1" / "my_flow.py"
     file_path.parent.mkdir(parents=True)
     file_path.write_text(FLOW_CODE, encoding="utf-8")

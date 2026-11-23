@@ -19,7 +19,7 @@ import { createCodingTools } from "@earendil-works/pi-durable/tools";
 import type { QDashConnection } from "./auth.ts";
 import { buildCodemodeExtensions, createCodemodeSandbox, modelOnlyTools, type InternalCalls } from "./codemode.ts";
 import { buildQDashExtension, type QDashWriteTools } from "./durable-tools.ts";
-import { buildPageContextSection, buildProposeCodeEditTool, PAGE_SECTION, type PageContext } from "./page-context.ts";
+import { buildPageContextSection, buildProposeCodeEditTool, editorOf, PAGE_SECTION, type PageContext } from "./page-context.ts";
 import { buildUserInstructionsSection } from "./prompt.ts";
 
 /** Section key of the user's preferences in the system prompt. */
@@ -54,6 +54,8 @@ export interface ChatRegistryParts {
   internalCalls: InternalCalls;
   /** The workspace's read/write/edit/bash, when there is a workspace. */
   codingTools: boolean;
+  /** From `buildCompactionExtension`: the summarizer chats compact with. */
+  compaction?: Extension;
 }
 
 export interface ChatRegistry {
@@ -81,6 +83,7 @@ export function buildChatRegistry(
   );
   registry.install(qdash.extension);
   registry.install(parts.copilot);
+  if (parts.compaction) registry.install(parts.compaction);
   // After QDash's own rules, so they come first and the user's preferences
   // read as adjustments to them.
   const preferences = buildUserInstructionsSection(userInstructions);
@@ -92,16 +95,18 @@ export function buildChatRegistry(
       }),
     );
   }
-  // The page the user has open, after their preferences; on the Workflow
-  // editor it brings the edit tool, which proposes and never saves.
+  // The page the user has open, after their preferences; on the Workflow editor,
+  // the metric script editor or an editable dashboard it brings the edit
+  // tool, which proposes and never saves.
   const pageSection = buildPageContextSection(pageContext);
+  const editor = editorOf(pageContext);
   if (pageSection) {
     registry.install(
       modelOnlyTools(
         defineExtension({
           name: PAGE_SECTION,
           sections: [section(PAGE_SECTION, () => pageSection)],
-          tools: pageContext?.flow ? [buildProposeCodeEditTool(pageContext.flow, pageContext.path)] : [],
+          tools: editor && pageContext ? [buildProposeCodeEditTool(editor, pageContext.path)] : [],
         }),
       ),
     );

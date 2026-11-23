@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { MobileTabBar } from "@/components/layout/MobileTabBar";
 
-const mockPathname = vi.hoisted(() => vi.fn(() => "/dashboard"));
+const mockPathname = vi.hoisted(() => vi.fn(() => "/overview"));
 const projectState = vi.hoisted(() => ({ canEdit: true }));
 
 vi.mock("next/navigation", () => ({
@@ -25,7 +25,7 @@ function getTabBar() {
 describe("MobileTabBar", () => {
   afterEach(() => {
     cleanup();
-    mockPathname.mockReturnValue("/dashboard");
+    mockPathname.mockReturnValue("/overview");
     projectState.canEdit = true;
   });
 
@@ -35,13 +35,13 @@ describe("MobileTabBar", () => {
     const links = within(getTabBar()).getAllByRole("link");
 
     expect(links.map((link) => link.textContent)).toEqual([
-      "Dashboard",
+      "Overview",
       "Workflow",
       "Execution",
-      "AI Chat",
+      "Agent",
     ]);
     expect(links.map((link) => link.getAttribute("href"))).toEqual([
-      "/dashboard",
+      "/overview",
       "/workflow",
       "/execution",
       "/chat",
@@ -87,13 +87,13 @@ describe("MobileTabBar", () => {
   });
 
   it.each([
-    ["/dashboard", "Dashboard"],
+    ["/overview", "Overview"],
     ["/workflow/new", "Workflow"],
     ["/workflow/calibrate-all", "Workflow"],
     ["/execution/chip-1/exec-1", "Execution"],
     ["/executions/exec-1", "Execution"],
-    ["/chat", "AI Chat"],
-    ["/chat/session-1", "AI Chat"],
+    ["/chat", "Agent"],
+    ["/chat/session-1", "Agent"],
   ])("marks only the owning tab current on %s", (pathname, label) => {
     mockPathname.mockReturnValue(pathname);
     render(<MobileTabBar />);
@@ -134,6 +134,6 @@ describe("MobileTabBar", () => {
       within(getTabBar())
         .getAllByRole("link")
         .map((link) => link.textContent),
-    ).toEqual(["Dashboard", "Execution", "AI Chat"]);
+    ).toEqual(["Overview", "Execution", "Agent"]);
   });
 });

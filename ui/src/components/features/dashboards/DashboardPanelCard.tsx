@@ -1,0 +1,264 @@
+"use client";
+
+import { type KeyboardEvent, memo, useId } from "react";
+
+import {
+  ArrowDown,
+  ArrowLeft,
+  ArrowRight,
+  ArrowUp,
+  Copy,
+  EllipsisVertical,
+  FoldHorizontal,
+  FoldVertical,
+  GripVertical,
+  Pencil,
+  Trash2,
+  UnfoldHorizontal,
+  UnfoldVertical,
+} from "lucide-react";
+
+import type { DashboardPanelResponse } from "@/schemas";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/DropdownMenu";
+
+import {
+  canApplyLayoutAction,
+  DRAG_GRIP_CLASS,
+  DRAG_HANDLE_CLASS,
+  type LayoutAction,
+} from "./layout";
+import { panelTypeMeta, readMarkdownContent, readMetricConfig } from "./panelConfig";
+import { MarkdownPanel } from "./panels/MarkdownPanel";
+import { CouplingMetricPanel, QubitMetricPanel } from "./panels/MetricPanels";
+import { MetricScriptPanel } from "./panels/MetricScriptPanel";
+
+/** `update-revision` moves a metric script panel's pin to the script's active revision. */
+export type PanelCommand = LayoutAction | "edit" | "duplicate" | "remove" | "update-revision";
+
+const LAYOUT_ITEMS: ReadonlyArray<{
+  action: LayoutAction;
+  label: string;
+  icon: typeof ArrowLeft;
+}> = [
+  { action: "left", label: "Move left", icon: ArrowLeft },
+  { action: "right", label: "Move right", icon: ArrowRight },
+  { action: "up", label: "Move up", icon: ArrowUp },
+  { action: "down", label: "Move down", icon: ArrowDown },
+  { action: "wider", label: "Wider", icon: UnfoldHorizontal },
+  { action: "narrower", label: "Narrower", icon: FoldHorizontal },
+  { action: "taller", label: "Taller", icon: UnfoldVertical },
+  { action: "shorter", label: "Shorter", icon: FoldVertical },
+];
+
+/** Arrow keys on the grip move a panel one cell; with Shift they resize it. */
+const GRIP_KEYS: Record<string, { move: LayoutAction; resize: LayoutAction }> = {
+  ArrowLeft: { move: "left", resize: "narrower" },
+  ArrowRight: { move: "right", resize: "wider" },
+  ArrowUp: { move: "up", resize: "shorter" },
+  ArrowDown: { move: "down", resize: "taller" },
+};
+
+function PanelBody({
+  panel,
+  chipId,
+  topologyId,
+  editing,
+  onCommand,
+  starterScript,
+}: {
+  panel: DashboardPanelResponse;
+  chipId: string;
+  topologyId: string;
+  editing: boolean;
+  onCommand: (panelId: string, command: PanelCommand) => void;
+  starterScript?: { name: string; source: string };
+}) {
+  switch (panel.type) {
+    case "qubit_metric": {
+      const config = readMetricConfig(panel);
+      return (
+        <QubitMetricPanel
+          chipId={chipId}
+          topologyId={topologyId}
+          metricKey={config.metric}
+          selectionMode={config.selection_mode}
+        />
+      );
+    }
+    case "coupling_metric": {
+      const config = readMetricConfig(panel);
+      return (
+        <CouplingMetricPanel
+          chipId={chipId}
+          topologyId={topologyId}
+          metricKey={config.metric}
+          selectionMode={config.selection_mode}
+        />
+      );
+    }
+    case "metric_script":
+      return (
+        <MetricScriptPanel
+          panel={panel}
+          chipId={chipId}
+          topologyId={topologyId}
+          editing={editing}
+          onUpdateRevision={() => onCommand(panel.panel_id, "update-revision")}
+          starterScript={starterScript}
+        />
+      );
+    case "markdown":
+      return <MarkdownPanel content={readMarkdownContent(panel)} />;
+  }
+}
+
+interface DashboardPanelCardProps {
+  /** The panel, with the script annotations the API adds to `metric_script` panels. */
+  panel: DashboardPanelResponse;
+  chipId: string;
+  topologyId: string;
+  editing: boolean;
+  /** Whether the header drags the panel; only in edit mode on the full grid. */
+  dragEnabled?: boolean;
+  onCommand: (panelId: string, command: PanelCommand) => void;
+  /** A template preview's starter script for a `metric_script` panel; see MetricScriptPanel. */
+  starterScript?: { name: string; source: string };
+}
+
+/**
+ * One panel, filling the grid cell that `DashboardGrid` sizes and positions. In edit mode
+ * the header holds the panel menu and, on the full grid, a grip: the header drags the panel,
+ * and the grip moves it with the arrow keys and resizes it with Shift and the arrow keys.
+ */
+export const DashboardPanelCard = memo(function DashboardPanelCard({
+  panel,
+  chipId,
+  topologyId,
+  editing,
+  dragEnabled = false,
+  onCommand,
+  starterScript,
+}: DashboardPanelCardProps) {
+  const { x, y, w, h } = panel.layout;
+  const meta = panelTypeMeta(panel.type);
+  const Icon = meta.icon;
+  const title = panel.title || meta.label;
+  const hintId = useId();
+
+  const handleGripKey = (event: KeyboardEvent<HTMLButtonElement>) => {
+    const step = GRIP_KEYS[event.key];
+    if (!step || event.altKey || event.ctrlKey || event.metaKey) return;
+    event.preventDefault();
+    const action = event.shiftKey ? step.resize : step.move;
+    if (canApplyLayoutAction(panel.layout, action)) onCommand(panel.panel_id, action);
+  };
+
+  return (
+    <section
+      aria-label={title}
+      data-panel-id={panel.panel_id}
+      className={`card card-border card-sm h-full min-w-0 bg-base-100 ${
+        editing ? "border-primary/30" : ""
+      }`}
+    >
+      <div className="card-body min-h-0 gap-2 p-3">
+        <header
+          className={`flex min-h-8 items-center gap-2 ${
+            dragEnabled ? `${DRAG_HANDLE_CLASS} cursor-grab select-none` : ""
+          }`}
+        >
+          {dragEnabled ? (
+            <button
+              type="button"
+              className={`${DRAG_GRIP_CLASS} btn btn-ghost btn-xs btn-square -ml-1 cursor-grab text-base-content/60`}
+              aria-label={`Move ${title}`}
+              aria-describedby={hintId}
+              onKeyDown={handleGripKey}
+            >
+              <GripVertical className="h-4 w-4" aria-hidden="true" />
+              <span id={hintId} className="sr-only">
+                Drag the header to move the panel and a bottom corner to resize it. Arrow keys move
+                it one cell; Shift with the arrow keys resizes it.
+              </span>
+            </button>
+          ) : (
+            <Icon className="h-4 w-4 shrink-0 text-base-content/60" aria-hidden="true" />
+          )}
+          <h2 className="card-title min-w-0 flex-1 truncate text-sm">{title}</h2>
+          {editing && (
+            <>
+              <span className="shrink-0 font-mono text-xs text-base-content/50">
+                {w}×{h} at {x},{y}
+              </span>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm btn-square"
+                    aria-label={`Panel actions for ${title}`}
+                  >
+                    <EllipsisVertical className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onSelect={() => onCommand(panel.panel_id, "edit")}>
+                    <Pencil className="h-4 w-4" aria-hidden="true" />
+                    Edit panel
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => onCommand(panel.panel_id, "duplicate")}>
+                    <Copy className="h-4 w-4" aria-hidden="true" />
+                    Duplicate panel
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel>Layout</DropdownMenuLabel>
+                  {LAYOUT_ITEMS.map((item) => {
+                    const ItemIcon = item.icon;
+                    return (
+                      <DropdownMenuItem
+                        key={item.action}
+                        disabled={!canApplyLayoutAction(panel.layout, item.action)}
+                        // Keep the menu open so several steps can be applied in a row.
+                        onSelect={(event) => {
+                          event.preventDefault();
+                          onCommand(panel.panel_id, item.action);
+                        }}
+                      >
+                        <ItemIcon className="h-4 w-4" aria-hidden="true" />
+                        {item.label}
+                      </DropdownMenuItem>
+                    );
+                  })}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="text-error data-[highlighted]:text-error"
+                    onSelect={() => onCommand(panel.panel_id, "remove")}
+                  >
+                    <Trash2 className="h-4 w-4" aria-hidden="true" />
+                    Remove panel
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </>
+          )}
+        </header>
+        <div className="min-h-0 flex-1">
+          <PanelBody
+            panel={panel}
+            chipId={chipId}
+            topologyId={topologyId}
+            editing={editing}
+            onCommand={onCommand}
+            starterScript={starterScript}
+          />
+        </div>
+      </div>
+    </section>
+  );
+});

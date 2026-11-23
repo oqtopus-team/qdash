@@ -11,6 +11,19 @@ if TYPE_CHECKING:
     from qdash.client.rest.configuration import Configuration
 
 
+# Failures raised while acquiring or opening a connection, before any request bytes are written.
+_PRE_SEND_ERRORS: tuple[type[httpx.HTTPError], ...] = (
+    httpx.ConnectError,
+    httpx.ConnectTimeout,
+    httpx.PoolTimeout,
+)
+
+
+def request_may_have_been_sent(exc: httpx.HTTPError) -> bool:
+    """Return whether the server may have received the request that raised ``exc``."""
+    return not isinstance(exc, _PRE_SEND_ERRORS)
+
+
 class ApiClient:
     """Small synchronous REST client used by service layer."""
 
@@ -48,7 +61,9 @@ class ApiClient:
                 json=json,
             )
         except httpx.HTTPError as exc:
-            raise ApiException(None, str(exc)) from exc
+            raise ApiException(
+                None, str(exc), request_sent=request_may_have_been_sent(exc)
+            ) from exc
 
         try:
             payload = response.json()

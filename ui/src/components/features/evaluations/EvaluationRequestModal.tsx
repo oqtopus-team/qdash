@@ -80,7 +80,7 @@ interface EvaluationRequestModalProps {
   scopeLabel: string;
   /**
    * Opens a chat about the result instead of an evaluation. When given, the
-   * modal is the one "Ask AI" entry for a single result: a recorded evaluation
+   * modal is the one "Ask Agent" entry for a single result: a recorded evaluation
    * (model only or via Copilot) or a conversation, chosen the same way.
    */
   onChat?: () => void;
@@ -124,7 +124,7 @@ const MODE_OPTIONS: ReadonlyArray<Option<EvaluationMode>> = [
     value: "planner",
     title: "Via Copilot",
     description:
-      "Copilot (the chat planner) summarises the result and calls the evaluation itself, as AI Chat does. Slower; what Copilot did and answered is recorded too.",
+      "Copilot (the chat planner) summarises the result and calls the evaluation itself, as Agent does. Slower; what Copilot did and answered is recorded too.",
   },
 ];
 
@@ -420,7 +420,7 @@ export function EvaluationRequestModal({
           <div className="flex items-center gap-2">
             <Bot className="h-5 w-5 text-primary" />
             <DialogTitle className="font-medium">
-              {onChat ? "Ask AI" : "Request AI evaluation"}
+              {onChat ? "Ask Agent" : "Request AI evaluation"}
             </DialogTitle>
           </div>
           <button

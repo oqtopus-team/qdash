@@ -9,13 +9,20 @@
  * misconfigured deployment can name the wrong host, and the preview and
  * "Open page" link resolve the record on this one. Links that match no record
  * route keep their origin: same-origin ones are internal, others external.
+ *
+ * This host leniency is for chat answers only. Links elsewhere in the app are
+ * described by `describeLink` in `linkPreview.ts`, which treats a record route
+ * on another host as an external link.
  */
 
-export type ChatLink =
+export type RecordLink =
   | { kind: "task-result"; taskId: string; href: string }
   | { kind: "execution"; executionId: string; chipId: string | null; href: string }
   | { kind: "forum-post"; postId: string; href: string }
-  | { kind: "figure"; path: string; href: string }
+  | { kind: "figure"; path: string; href: string };
+
+export type ChatLink =
+  | RecordLink
   | { kind: "internal"; href: string }
   | { kind: "external"; href: string };
 
@@ -29,16 +36,8 @@ function segment(value: string | undefined): string | null {
   }
 }
 
-/** Classify `href` relative to the page at `origin` (defaults to the current one). */
-export function classifyChatLink(href: string, origin?: string): ChatLink {
-  const base =
-    origin ?? (typeof window !== "undefined" ? window.location.origin : "http://localhost");
-  let url: URL;
-  try {
-    url = new URL(href, base);
-  } catch {
-    return { kind: "external", href };
-  }
+/** The QDash record a URL's path names, whatever its origin; `href` is kept as written. */
+export function matchRecordRoute(url: URL, href: string): RecordLink | null {
   const parts = url.pathname.split("/").filter(Boolean);
   const [first, second, third] = parts;
 
@@ -67,6 +66,25 @@ export function classifyChatLink(href: string, origin?: string): ChatLink {
     const path = url.searchParams.get("path");
     if (path) return { kind: "figure", path, href };
   }
+  return null;
+}
+
+/** The origin links resolve against: the current page, or a placeholder outside a browser. */
+function currentOrigin(): string {
+  return typeof window !== "undefined" ? window.location.origin : "http://localhost";
+}
+
+/** Classify `href` relative to the page at `origin` (defaults to the current one). */
+export function classifyChatLink(href: string, origin?: string): ChatLink {
+  const base = origin ?? currentOrigin();
+  let url: URL;
+  try {
+    url = new URL(href, base);
+  } catch {
+    return { kind: "external", href };
+  }
+  const record = matchRecordRoute(url, href);
+  if (record) return record;
   if (url.origin !== new URL(base).origin) return { kind: "external", href };
   return { kind: "internal", href };
 }

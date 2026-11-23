@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  firstSentence,
   formatPipelineCatalog,
   formatPipelinePlan,
   problemsFromError,
@@ -48,10 +49,18 @@ const VALID = {
   task_run_count: 12,
 };
 
-function registeredTools(api, chipId = "64Qv3") {
+function registeredTools(api, chipId = "64Qv3", projectId = "project-1") {
   const tools = new Map();
+  const client = {
+    api,
+    // null stands for a profile without a project.
+    config: { projectId: projectId ?? undefined },
+    // A tool that starts a run must not follow it.
+    async getExecution() { throw new Error("must not wait"); },
+    async waitForExecution() { throw new Error("must not wait"); },
+  };
   registerCalibrationPipelineTools({ registerTool(tool) { tools.set(tool.name, tool); } }, {
-    async makeClient() { return { api }; },
+    async makeClient() { return client; },
     async resolveChipId(_client, explicit) { return explicit ?? chipId; },
   });
   return tools;
@@ -169,6 +178,32 @@ test("run requires confirmation, then reports the execution", async () => {
 
   const viaUi = await run.execute("t", { chipId: "64Qv3", spec: SPEC }, undefined, undefined, uiContext(true));
   assert.equal(viaUi.details.started, true);
+  assert.equal(viaUi.details.data.execution_id, "20261006-012");
+  assert.deepEqual(result.details.data, execution);
+});
+
+test("without a project every tool keeps the server's default: the run is still confirmation-gated, then dispatched", async () => {
+  const calls = [];
+  const execution = { execution_id: "20261006-013", flow_run_id: "fr", flow_run_url: "", qdash_ui_url: "", message: "started", steps: STEPS, targets: VALID.targets };
+  const tools = registeredTools({
+    async executeCalibrationPipeline(request) { calls.push(request); return execution; },
+    async validateCalibrationPipeline(request) { calls.push(request); return VALID; },
+    async getCalibrationPipelineCatalog(params) { calls.push(params); return { backend_name: "fake", step_types: [], one_qubit_execution_modes: [], tasks: {}, spec_schema: {} }; },
+  }, "64Qv3", null);
+  const run = tools.get("qdash_run_pipeline");
+  await assert.rejects(run.execute("t", { chipId: "64Qv3", spec: SPEC }, undefined, undefined, { hasUI: false }), /requires explicit confirmation/);
+  await assert.rejects(run.execute("t", { chipId: "64Qv3", spec: SPEC }, undefined, undefined, uiContext(false)), /requires explicit confirmation/);
+  assert.equal(calls.length, 0);
+
+  const viaFlag = await run.execute("t", { chipId: "64Qv3", spec: SPEC, confirmWrite: true }, undefined, undefined, { hasUI: false });
+  const viaUi = await run.execute("t", { chipId: "64Qv3", spec: SPEC }, undefined, undefined, uiContext(true));
+  for (const result of [viaFlag, viaUi]) {
+    assert.equal(result.details.started, true);
+    assert.equal(result.details.executionId, "20261006-013");
+  }
+  await tools.get("qdash_plan_pipeline").execute("t", { spec: SPEC });
+  await tools.get("qdash_get_pipeline_catalog").execute("t", {});
+  assert.deepEqual(calls, [{ chip_id: "64Qv3", spec: SPEC }, { chip_id: "64Qv3", spec: SPEC }, { chip_id: "64Qv3", spec: SPEC }, undefined]);
 });
 
 test("run turns a 422 with problems into a readable rejection and nothing else into an error", async () => {
@@ -232,6 +267,40 @@ test("catalog lists step types and tasks by type and keeps the schema in details
   assert.match(text, /"manual" requires rounds and runs them exactly as written/);
   assert.doesNotMatch(text, /CalibrationPipelineSpec/);
   assert.equal(result.details.data.spec_schema.title, "CalibrationPipelineSpec");
+});
+
+test("catalog shows declared task documentation and expands the requested tasks", async () => {
+  const catalog = {
+    backend_name: "qubex",
+    step_types: [],
+    one_qubit_execution_modes: [],
+    tasks: { qubit: ["CheckRabi", "CheckT1", "CheckT2Echo"] },
+    task_documentation: {
+      CheckT1: {
+        description: "Measures the energy relaxation time T1. It writes t1 in microseconds.",
+        when_to_use: "Run it to track T1 once a half-pi pulse is calibrated.",
+        prerequisites: ["Rabi parameters stored by CheckRabi."],
+      },
+      CheckRabi: { description: "Measures a Rabi oscillation.", when_to_use: "Run it first.", prerequisites: [] },
+    },
+    spec_schema: {},
+  };
+  const tools = registeredTools({ async getCalibrationPipelineCatalog() { return catalog; } });
+
+  const brief = (await tools.get("qdash_get_pipeline_catalog").execute("t", {})).content[0].text;
+  assert.match(brief, /Task documentation \(2 documented; pass taskNames/);
+  assert.match(brief, /- CheckRabi: Measures a Rabi oscillation\.\n- CheckT1: Measures the energy relaxation time T1\./);
+  assert.doesNotMatch(brief, /When to use:|Prerequisites|It writes t1/);
+
+  const expanded = (await tools.get("qdash_get_pipeline_catalog").execute("t", { taskNames: ["CheckT1", "CheckT2Echo"] })).content[0].text;
+  assert.match(expanded, /- CheckT1: Measures the energy relaxation time T1\. It writes t1 in microseconds\.\n  When to use: Run it to track T1 once a half-pi pulse is calibrated\.\n  Prerequisites \(explanatory; validation reports what is actually missing\):\n  - Rabi parameters stored by CheckRabi\./);
+  assert.doesNotMatch(expanded, /References|https:/);
+  assert.doesNotMatch(expanded, /When to use: Run it first\./);
+  assert.match(expanded, /No declared documentation for: CheckT2Echo/);
+
+  assert.doesNotMatch(formatPipelineCatalog({ ...catalog, task_documentation: undefined }), /Task documentation/);
+  assert.equal(firstSentence("Sweeps 0.25 GHz. Then (maybe) more."), "Sweeps 0.25 GHz.");
+  assert.equal(firstSentence("No terminal period"), "No terminal period");
 });
 
 test("formatting helpers cover the edge cases", () => {

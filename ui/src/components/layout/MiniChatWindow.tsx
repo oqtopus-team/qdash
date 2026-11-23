@@ -96,7 +96,7 @@ const MARGIN = 16;
 // ---------------------------------------------------------------------------
 
 /**
- * Floating chat above modals, opened by "Ask AI" in result modals where the
+ * Floating chat above modals, opened by "Ask Agent" in result modals where the
  * docked sidebar would sit behind the overlay. Shows the same active chat as
  * the sidebar, so expanding it keeps a streaming answer going.
  */
@@ -213,7 +213,7 @@ export function MiniChatWindow() {
         height: minimized ? "auto" : size.height,
       }}
       role="dialog"
-      aria-label="AI chat"
+      aria-label="Agent"
     >
       {/* Draggable header */}
       <div
@@ -224,7 +224,7 @@ export function MiniChatWindow() {
         <GripHorizontal className="w-3.5 h-3.5 mt-1 text-base-content/30 flex-shrink-0" />
         {minimized ? (
           <span className="flex-1 min-w-0 truncate text-sm font-medium">
-            {activeSession?.title ?? "Ask AI"}
+            {activeSession?.title ?? "Agent"}
           </span>
         ) : (
           <SurfaceTitle />

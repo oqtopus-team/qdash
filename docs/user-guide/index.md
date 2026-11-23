@@ -38,7 +38,9 @@ Find pages and their guides in the [Application Tour](./application-tour.md).
 
 | Goal | Guide |
 | --- | --- |
-| Scan chip health | [Dashboard](./dashboard.md) |
+| Scan chip health | [Overview](./overview.md) |
+| Arrange and share your own maps, tables, and notes | [Dashboards](./dashboards.md) |
+| Compute your own per-qubit or per-coupling metric, such as a median over a period | [Metric Scripts](./metric-scripts.md) |
 | Investigate state, history, or provenance | [Calibration Data and Provenance](./data-and-provenance.md) |
 | Review, discuss, or hand off a result | [Reviewing and Sharing Results](./reviewing-results.md) |
 
@@ -54,7 +56,7 @@ passwords.
 
 | Goal | Guide |
 | --- | --- |
-| Ask questions about project data, or investigate a failure | [AI Chat](./ai-chat.md) |
+| Ask questions about project data, or investigate a failure | [Agent](./ai-chat.md) |
 | Judge task-result figures and compare evaluation settings | [AI Evaluations](./ai-evaluations.md) |
 | Let an agent you operate run bounded, gated single-qubit steps (experimental) | [Agent Calibration](./agent-calibration.md) |
 

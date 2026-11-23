@@ -10,6 +10,7 @@ from qdash.datamodel.task import (
     InputParameterSpec,
     OutputParameterSpec,
     RunParameterSpec,
+    TaskDocumentation,
 )
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -38,6 +39,26 @@ class CheckControlAmplitude(QubexTask):
 
     name: str = "CheckControlAmplitude"
     task_type: str = "qubit"
+    documentation: ClassVar[TaskDocumentation] = TaskDocumentation(
+        description=(
+            "Sweeps the drive frequency over ±150 MHz around control_frequency and fits the "
+            "phase response to a square-root Lorentzian whose width gives the Rabi rate. It "
+            "rescales the drive amplitude to the target Rabi rate (12.5 MHz by default) and "
+            "refines coarse_qubit_frequency and coarse_control_amplitude."
+        ),
+        when_to_use=(
+            "Run it after CheckQubitSpectroscopy to improve the amplitude and frequency seeds "
+            "for CheckAdaptiveChevron. The values remain coarse and are not calibrated "
+            "control_amplitude or qubit_frequency."
+        ),
+        prerequisites=(
+            (
+                "control_frequency (or coarse_qubit_frequency), readout_frequency (or "
+                "resonator_frequency), readout_amplitude, and coarse_control_amplitude are "
+                "stored, normally by CheckQubitSpectroscopy."
+            ),
+        ),
+    )
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
         # Coarse f01 from CheckQubitSpectroscopy (5 MHz grid). The sqrt-Lorentzian
         # fit refines this to sub-MHz precision. New workflows pass it through

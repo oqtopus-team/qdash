@@ -7,11 +7,7 @@ import { useCopilotChatSessionContext } from "@/contexts/CopilotChatSessionConte
 import { withViewTransition } from "@/lib/viewTransition";
 import { ChatSidebar, RenameInput, SessionMenu } from "@/components/features/chat/ChatSidebar";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import {
-  ChatThread,
-  ContextChip,
-  type ChatThreadHandle,
-} from "@/components/features/chat/ChatThread";
+import { ChatThread, type ChatThreadHandle } from "@/components/features/chat/ChatThread";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 
 const MOBILE_BREAKPOINT_PX = 768;
@@ -170,11 +166,6 @@ export function CopilotChatPage() {
                 <h2 className="text-sm font-medium truncate text-base-content/80">
                   {activeSession.title}
                 </h2>
-                {activeSession.context && (
-                  <span className="ml-1 min-w-0 shrink">
-                    <ContextChip context={activeSession.context} />
-                  </span>
-                )}
                 <SessionMenu
                   session={activeSession}
                   onRename={() => setRenaming(true)}
@@ -184,7 +175,7 @@ export function CopilotChatPage() {
               </div>
             )
           ) : (
-            <h2 className="ml-1 text-sm font-medium truncate text-base-content/80">AI Chat</h2>
+            <h2 className="ml-1 text-sm font-medium truncate text-base-content/80">Agent</h2>
           )}
         </header>
 

@@ -10,6 +10,7 @@ from qdash.datamodel.task import (
     InputParameterSpec,
     OutputParameterSpec,
     RunParameterSpec,
+    TaskDocumentation,
 )
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -41,6 +42,21 @@ class CheckQubitSpectroscopy(QubexTask):
 
     name: str = "CheckQubitSpectroscopy"
     task_type: str = "qubit"
+    documentation: ClassVar[TaskDocumentation] = TaskDocumentation(
+        description=(
+            "2D drive frequency and power spectroscopy read out dispersively. It estimates f01 "
+            "on a 5 MHz grid, published as coarse_qubit_frequency and control_frequency, and a "
+            "coarse_control_amplitude seed from the power at which the f01 line appears. An f12"
+            " estimate is reported only in logs and figures."
+        ),
+        when_to_use=(
+            "Run it after resonator spectroscopy when the qubit frequency is unknown. Its "
+            "outputs are seeds: CheckControlAmplitude and CheckAdaptiveChevron refine them."
+        ),
+        prerequisites=(
+            "readout_frequency (or resonator_frequency) and readout_amplitude are stored.",
+        ),
+    )
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
         "readout_frequency": InputParameterSpec.required_database(
             fallback_parameter_names=("resonator_frequency",)

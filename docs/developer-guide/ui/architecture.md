@@ -44,13 +44,16 @@ QueryClientProvider
       └─ AxiosProvider
          └─ ProjectProvider
             └─ ThemeProvider
-               ├─ route content
-               └─ ToastContainer
+               └─ TooltipProvider
+                  └─ LinkHoverCardProvider
+                     ├─ route content
+                     └─ ToastContainer
 ```
 
 Keep this order when adding a provider. `ProjectProvider` uses authenticated generated hooks and
 the shared query client, while feature components expect authentication, project, theme, and toast
-state to be available.
+state to be available. `LinkHoverCardProvider` sits inside `ProjectProvider` because a chat link
+card loads record summaries through project-scoped generated hooks.
 
 ## API Data Flow
 

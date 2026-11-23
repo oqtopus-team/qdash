@@ -1,33 +1,23 @@
 "use client";
 
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { ExternalLink, Loader2 } from "lucide-react";
 import { useGetExecution } from "@/client/execution/execution";
 import { useGetForumPost } from "@/client/forum/forum";
 import { useGetTaskResult } from "@/client/task/task";
-import { FigureStrip } from "@/components/features/chat/ChatFigures";
+import { FigureStrip, figureUrl } from "@/components/features/chat/ChatFigures";
 import { ExecutionProgress } from "@/components/features/chat/ExecutionProgress";
+import { LinkHoverCardProvider } from "@/components/features/link-preview/LinkHoverCardProvider";
+import { formatValue } from "@/components/features/link-preview/LinkPreviewCard";
+import { ChatLinkPreviewContext } from "@/components/features/chat/ChatPreviewLink";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 import { ImagePreviewDialog } from "@/components/ui/ImagePreviewDialog";
 import { chatLinkPagePath, classifyChatLink, type ChatLink } from "@/lib/chatLinks";
-import { figureUrl } from "@/components/features/chat/ChatFigures";
 
 type PreviewLink = Extract<
   ChatLink,
   { kind: "task-result" | "execution" | "forum-post" | "figure" }
 >;
-
-interface ChatLinkPreviewValue {
-  /** Open a preview for the link; false when the link is not previewable. */
-  preview: (href: string) => boolean;
-}
-
-const ChatLinkPreviewContext = createContext<ChatLinkPreviewValue | null>(null);
-
-/** The preview hook, or null outside a provider (links then behave normally). */
-export function useChatLinkPreview(): ChatLinkPreviewValue | null {
-  return useContext(ChatLinkPreviewContext);
-}
 
 /** Previewable links open in a dialog over the chat; the rest are left to the browser. */
 export function ChatLinkPreviewProvider({ children }: { children: ReactNode }) {
@@ -43,14 +33,16 @@ export function ChatLinkPreviewProvider({ children }: { children: ReactNode }) {
   const value = useMemo(() => ({ preview }), [preview]);
 
   return (
-    <ChatLinkPreviewContext.Provider value={value}>
-      {children}
-      {link?.kind === "figure" ? (
-        <ImagePreviewDialog src={figureUrl(link.path)} onClose={() => setLink(null)} />
-      ) : (
-        <ChatLinkPreviewDialog link={link} onClose={() => setLink(null)} />
-      )}
-    </ChatLinkPreviewContext.Provider>
+    <LinkHoverCardProvider scope="chat">
+      <ChatLinkPreviewContext.Provider value={value}>
+        {children}
+        {link?.kind === "figure" ? (
+          <ImagePreviewDialog src={figureUrl(link.path)} onClose={() => setLink(null)} />
+        ) : (
+          <ChatLinkPreviewDialog link={link} onClose={() => setLink(null)} />
+        )}
+      </ChatLinkPreviewContext.Provider>
+    </LinkHoverCardProvider>
   );
 }
 
@@ -69,21 +61,6 @@ function Loading({ what }: { what: string }) {
       <Loader2 className="w-4 h-4 animate-spin" /> Loading {what}…
     </div>
   );
-}
-
-function formatValue(value: unknown): string {
-  if (value === null || value === undefined) return "—";
-  if (typeof value === "number")
-    return Number.isInteger(value) ? String(value) : value.toPrecision(5);
-  if (typeof value === "object") {
-    const record = value as { value?: unknown; unit?: unknown };
-    if ("value" in record) {
-      const unit = typeof record.unit === "string" && record.unit ? ` ${record.unit}` : "";
-      return `${formatValue(record.value)}${unit}`;
-    }
-    return JSON.stringify(value);
-  }
-  return String(value);
 }
 
 const PARAMETER_LIMIT = 8;

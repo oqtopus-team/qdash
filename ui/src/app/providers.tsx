@@ -8,6 +8,7 @@ import { NuqsAdapter } from "nuqs/adapters/next/app";
 import { AxiosProvider } from "@/contexts/AxiosContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 
+import { LinkHoverCardProvider } from "@/components/features/link-preview/LinkHoverCardProvider";
 import { ToastContainer } from "@/components/ui/Toast";
 import { TooltipProvider } from "@/components/ui/Tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
@@ -24,8 +25,11 @@ export default function Providers({ children }: { children: React.ReactNode }) {
             <ProjectProvider>
               <ThemeProvider>
                 <TooltipProvider>
-                  {children}
-                  <ToastContainer />
+                  {/* Hover cards preview links in chat answers only; page navigation has none. */}
+                  <LinkHoverCardProvider scope="chat">
+                    {children}
+                    <ToastContainer />
+                  </LinkHoverCardProvider>
                 </TooltipProvider>
               </ThemeProvider>
             </ProjectProvider>

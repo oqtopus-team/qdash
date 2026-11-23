@@ -16,16 +16,18 @@ from qdash.client.services.agent_runner import (
     AgentSkillTransition,
     AgentStepOutcome,
 )
-from qdash.client.services.errors import (
-    QDashTransportError,
-    QDashValidationError,
-)
-from qdash.client.services.models import (
+from qdash.client.services.client_models import (
     AgentActionResponse,
     AgentCandidateCommitResponse,
     AgentCandidateResponse,
     AgentCandidateSetCommitResponse,
     AgentSessionResponse,
+)
+from qdash.client.services.errors import (
+    QDashTransportError,
+    QDashValidationError,
+)
+from qdash.client.services.models import (
     ExecutionResponseDetail,
 )
 

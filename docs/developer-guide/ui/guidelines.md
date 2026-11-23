@@ -73,13 +73,36 @@ menus, tooltips, page framing, tables, loading and empty states, errors, confirm
 feedback.
 
 Use DaisyUI for buttons, cards, inputs, badges, tables, alerts, and other visual components. Reuse
-the shared Radix-based `Dialog`, `DropdownMenu`, and `Tooltip` wrappers when focus management,
-keyboard navigation, portals, dismissal, or collision handling requires them. Feature code does
-not import another headless primitive to replace an established wrapper. The app root mounts one
-`TooltipProvider`, so moving between neighbouring tooltips skips the open delay; feature code
-does not add its own provider. An inline autocomplete, such as the mention list in
+the shared Radix-based `Dialog`, `DropdownMenu`, `Popover`, and `Tooltip` wrappers when focus
+management, keyboard navigation, portals, dismissal, or collision handling requires them. Feature
+code does not import another headless primitive to replace an established wrapper. The app root
+mounts one `TooltipProvider`, so moving between neighbouring tooltips skips the open delay; feature
+code does not add its own provider. An inline autocomplete, such as the mention list in
 `MarkdownEditor`, keeps focus in its text field, which `DropdownMenu` would move into the menu; it
 renders a `listbox` and marks the field as a `combobox` with `aria-activedescendant` instead.
+
+Links that navigate to a page show no hover popup: no `Tooltip`, no hover card, and no native
+`title` that only repeats the destination. A visible label names the link; an icon-only link or
+navigation button carries an `aria-label` instead. The collapsed sidebar follows the same rule:
+its rows keep their labels mounted, faded and clipped, so each row keeps its accessible name, and
+only the expand/collapse toggle keeps a tooltip. A tooltip or `title` stays where it adds
+information the visible text lacks, such as a chart day's counts, a truncated identifier, or the
+reason an action is disabled.
+
+Links in chat answers are the exception: they get a hover card from the root
+`LinkHoverCardProvider` in `ui/src/components/features/link-preview/`, mounted with
+`scope="chat"` so it reacts only to links inside a `data-link-preview="chat"` subtree. The
+provider finds those `<a href>` elements, including ones rendered by Next.js `Link`, through event
+delegation on the document, so a click keeps its normal navigation. A pointer opens the card after
+400 ms and keyboard focus opens it at once; touch and focus that follows a pointer press open
+nothing. `describeLink` in `ui/src/lib/linkPreview.ts` names the destination from the URL alone. A
+task result, execution, forum post, or figure route on the current origin loads a short summary
+when the card opens. Other links show their page, host, file, or address and are never requested.
+An empty `href`, a bare `#`, a `javascript:` URL, and `aria-disabled="true"` get no card, and
+buttons are never treated as links. In a chat answer, a record route on any host is still read as
+a QDash record, matching the click preview in `ChatLinkPreviewProvider`, because older answers may
+name a misconfigured host. Mark a subtree with `data-link-preview="off"` when its links must not
+show a card, as the card's own content does.
 
 How these boundaries connect: [UI Architecture](./architecture.md).
 

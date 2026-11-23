@@ -7,6 +7,7 @@ from qdash.datamodel.task import (
     InputParameterSpec,
     OutputParameterSpec,
     RunParameterSpec,
+    TaskDocumentation,
 )
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -25,6 +26,27 @@ class RandomizedBenchmarking(QubexTask):
 
     name: str = "RandomizedBenchmarking"
     task_type: str = "qubit"
+    documentation: ClassVar[TaskDocumentation] = TaskDocumentation(
+        description=(
+            "Runs single-qubit Clifford randomized benchmarking built from the DRAG half-pi "
+            "pulse and writes the average_gate_fidelity and depolarizing_rate from the Qubex "
+            "decay fit."
+        ),
+        when_to_use=(
+            "Run it after fine calibration to benchmark single-qubit gates as a whole; use "
+            "X90InterleavedRandomizedBenchmarking for the X90 gate alone."
+        ),
+        prerequisites=(
+            (
+                "drag_hpi_amplitude, drag_hpi_duration, and drag_hpi_beta stored by "
+                "CreateDRAGHPIPulse."
+            ),
+            (
+                "control_frequency (or qubit_frequency), readout_frequency (or "
+                "resonator_frequency), and readout_amplitude are stored for the qubit."
+            ),
+        ),
+    )
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
         # RabiParam normalizes measured IQ values; its readout duration is validated.
         **required_rabi_normalization_inputs(),

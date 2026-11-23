@@ -83,13 +83,25 @@ export interface ApprovalRequest {
   args: Record<string, unknown>;
 }
 
-/** A change the assistant proposes to the code open in the Workflow editor; the user applies it there. */
+/**
+ * A change the assistant proposes to the code open in an editor (the Workflow editor, the
+ * metric script editor, or a dashboard's draft as JSON); the user applies it there.
+ */
 export interface EditProposal {
   summary: string;
   /** The complete new file. */
   code: string;
+  /** Which editor the change is for. Absent on proposals made for flows before scripts existed. */
+  target?: "flow" | "metric_script" | "dashboard";
+  /** The flow's name; for a metric script or a dashboard, set to its name. */
   flowName: string;
   chipId: string | null;
+  /** The metric script the change is for (target `metric_script`). */
+  scriptId?: string;
+  /** The metric script's name (target `metric_script`). */
+  scriptName?: string;
+  /** The dashboard the change is for (target `dashboard`); null for a new dashboard. */
+  dashboardId?: string | null;
   pagePath: string;
 }
 
@@ -102,11 +114,42 @@ interface FlowEditorContext {
   dirty: boolean;
 }
 
+/** The metric script open in its editor, read when a turn is sent. */
+export interface MetricScriptEditorContext {
+  scriptId: string;
+  name: string;
+  /** The editor's current text, unsaved changes included. */
+  code: string;
+  dirty?: boolean;
+}
+
+/**
+ * A dashboard the user may edit, read when a turn is sent. Its unsaved draft is the
+ * "code" of the dashboard: JSON with the panels, plus name, description, chip and template
+ * for a new dashboard that is not created yet.
+ */
+interface DashboardEditorContext {
+  /** Absent for a new dashboard that exists only as a draft. */
+  dashboardId?: string;
+  name: string;
+  description?: string;
+  visibility?: "private" | "project";
+  /** The chip the page shows now. */
+  chipId?: string | null;
+  /** The stored version the draft is based on. */
+  version?: number | null;
+  /** The draft as JSON (see `dashboardDraft.ts`), unsaved changes included. */
+  code: string;
+  dirty?: boolean;
+}
+
 /** What the user has open while chatting from the sidebar or floating window; sent with every turn. */
 export interface PageContext {
   path: string;
   title: string;
   flow?: FlowEditorContext;
+  metricScript?: MetricScriptEditorContext;
+  dashboard?: DashboardEditorContext;
 }
 
 export interface ContentBlock {

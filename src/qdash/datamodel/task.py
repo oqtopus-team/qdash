@@ -70,6 +70,38 @@ def compatible_value_type(declared: object, requested: object) -> bool:
     return requested not in SWEEP_OVERRIDE_VALUE_TYPES
 
 
+class TaskDocumentation(BaseModel):
+    """Human-readable guidance a task class declares about itself.
+
+    A task class sets ``documentation: ClassVar[TaskDocumentation]`` to a literal
+    ``TaskDocumentation(...)`` call. The task catalog reads that call statically,
+    so every field must be a string literal, or a list or tuple of string
+    literals for ``prerequisites``.
+
+    ``prerequisites`` explains to readers what the task expects; it is not
+    enforced. The task's ``input_spec`` remains the only declaration that decides
+    which calibration values must exist before the task runs.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    description: str = Field(
+        min_length=1,
+        description="What the task measures or produces, in one or two sentences.",
+    )
+    when_to_use: str = Field(
+        default="",
+        description="The situation in which an operator or agent should run the task.",
+    )
+    prerequisites: tuple[str, ...] = Field(
+        default=(),
+        description=(
+            "Calibration state the task expects, explained for readers. Not enforced; "
+            "input parameter metadata carries the enforced requirements."
+        ),
+    )
+
+
 class ParameterSpec(BaseModel):
     """Common metadata declared for a task parameter."""
 

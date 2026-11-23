@@ -10,6 +10,7 @@ const setTheme = vi.fn();
 const success = vi.fn();
 const error = vi.fn();
 const taskInfoRequests = vi.fn();
+const openGeneralChat = vi.fn();
 const mockPathname = vi.hoisted(() => vi.fn(() => "/inbox"));
 const mockCanEdit = vi.hoisted(() => vi.fn(() => false));
 
@@ -60,6 +61,10 @@ vi.mock("@/contexts/ProjectContext", () => ({
     ],
     switchProject,
   }),
+}));
+
+vi.mock("@/contexts/ChatDockContext", () => ({
+  useChatDock: () => ({ openGeneralChat }),
 }));
 
 vi.mock("@/contexts/ThemeContext", () => ({
@@ -187,9 +192,9 @@ describe("GlobalCommandPalette", () => {
     expect(screen.getByRole("dialog")).toBeTruthy();
     expect(screen.getByRole("combobox", { name: "QDash navigation" })).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("option", { name: "Dashboard" }));
+    fireEvent.click(screen.getByRole("option", { name: "Overview" }));
 
-    expect(push).toHaveBeenCalledWith("/dashboard");
+    expect(push).toHaveBeenCalledWith("/overview");
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
@@ -202,10 +207,10 @@ describe("GlobalCommandPalette", () => {
     expect(screen.getByRole("option", { name: "Settings" })).toBeTruthy();
   });
 
-  it("shows dashboard metrics and jumps to the selected metric", async () => {
-    mockPathname.mockReturnValue("/dashboard");
+  it("shows overview metrics and jumps to the selected metric", async () => {
+    mockPathname.mockReturnValue("/overview");
     const target = document.createElement("div");
-    target.id = "dashboard-coupling-metric-zx90_gate_fidelity";
+    target.id = "overview-coupling-metric-zx90_gate_fidelity";
     const scrollIntoView = vi.fn();
     Object.defineProperty(target, "scrollIntoView", { value: scrollIntoView });
     document.body.appendChild(target);
@@ -374,5 +379,58 @@ describe("GlobalCommandPalette", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     await waitFor(() => expect(document.activeElement).toBe(field));
     field.remove();
+  });
+
+  it("opens the agent chat through the chat dock and closes the palette", () => {
+    render(<GlobalCommandPalette />);
+    fireEvent.keyDown(window, { key: "k", metaKey: true });
+    fireEvent.click(screen.getByRole("option", { name: "Open agent chat" }));
+
+    expect(openGeneralChat).toHaveBeenCalledOnce();
+    expect(push).not.toHaveBeenCalled();
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it.each(["agent", "chat", "copilot", "チャット", "エージェント"])(
+    "finds the agent chat action by %s",
+    async (query) => {
+      render(<GlobalCommandPalette />);
+      fireEvent.keyDown(window, { key: "k", metaKey: true });
+      fireEvent.change(screen.getByRole("combobox"), { target: { value: query } });
+
+      await waitFor(() =>
+        expect(screen.queryByRole("option", { name: "Create new thread" })).toBeNull(),
+      );
+      fireEvent.click(screen.getByRole("option", { name: "Open agent chat" }));
+      expect(openGeneralChat).toHaveBeenCalledOnce();
+      expect(screen.queryByRole("dialog")).toBeNull();
+    },
+  );
+
+  it("runs the agent chat action with Enter when it is the top search result", async () => {
+    render(<GlobalCommandPalette />);
+    fireEvent.keyDown(window, { key: "k", metaKey: true });
+    const input = screen.getByRole("combobox");
+    fireEvent.change(input, { target: { value: "copilot" } });
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole("option", { name: "Open agent chat" }).getAttribute("aria-selected"),
+      ).toBe("true"),
+    );
+    fireEvent.keyDown(input, { key: "Enter", keyCode: 13 });
+    expect(openGeneralChat).toHaveBeenCalledOnce();
+    expect(push).not.toHaveBeenCalled();
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("omits the agent chat action on the chat page, where the chat sidebar is hidden", () => {
+    mockPathname.mockReturnValue("/chat");
+    render(<GlobalCommandPalette />);
+    fireEvent.keyDown(window, { key: "k", metaKey: true });
+
+    expect(screen.queryByRole("option", { name: "Open agent chat" })).toBeNull();
+    expect(screen.getByRole("option", { name: "Agent" })).toBeTruthy();
+    expect(openGeneralChat).not.toHaveBeenCalled();
   });
 });

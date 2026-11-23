@@ -29,6 +29,7 @@ from qdash.api.services.cooldown_wiring_event_service import CooldownWiringEvent
 from qdash.api.services.copilot_chat_session_service import CopilotChatSessionService
 from qdash.api.services.copilot_investigation_service import CopilotInvestigationService
 from qdash.api.services.cryostat_service import CryostatService
+from qdash.api.services.dashboard_service import DashboardService
 from qdash.api.services.device_topology_service import DeviceTopologyService
 from qdash.api.services.evaluation_service import EvaluationService
 from qdash.api.services.execution_service import ExecutionService
@@ -36,6 +37,7 @@ from qdash.api.services.file_service import FileService
 from qdash.api.services.forum_service import ForumService
 from qdash.api.services.knowledge_draft_service import KnowledgeDraftStore
 from qdash.api.services.manual_update_service import ManualUpdateService
+from qdash.api.services.metric_script_service import MetricScriptService
 from qdash.api.services.metrics_service import MetricsService
 from qdash.api.services.note_service import NoteService
 from qdash.api.services.notification_service import NotificationService
@@ -65,8 +67,10 @@ from qdash.repository.cooldown import MongoCooldownRepository
 from qdash.repository.cooldown_wiring_event import MongoCooldownWiringEventRepository
 from qdash.repository.coupling import MongoCouplingCalibrationRepository
 from qdash.repository.cryostat import MongoCryostatRepository
+from qdash.repository.dashboard import MongoDashboardRepository
 from qdash.repository.execution_history import MongoExecutionHistoryRepository
 from qdash.repository.execution_lock import MongoExecutionLockRepository
+from qdash.repository.metric_script import MongoMetricScriptRepository
 from qdash.repository.provenance import (
     MongoActivityRepository,
     MongoParameterVersionRepository,
@@ -452,6 +456,40 @@ def get_cryostat_repository() -> MongoCryostatRepository:
 def get_cryostat_service() -> CryostatService:
     """Get the cryostat service instance."""
     return CryostatService(cryostat_repository=get_cryostat_repository())
+
+
+@cached_dependency_provider
+def get_dashboard_repository() -> MongoDashboardRepository:
+    """Get the dashboard repository instance."""
+    return MongoDashboardRepository()
+
+
+@cached_dependency_provider
+def get_dashboard_service() -> DashboardService:
+    """Get the dashboard service instance."""
+    return DashboardService(
+        dashboard_repository=get_dashboard_repository(),
+        metric_script_repository=get_metric_script_repository(),
+        metric_script_service=get_metric_script_service(),
+    )
+
+
+@cached_dependency_provider
+def get_metric_script_repository() -> MongoMetricScriptRepository:
+    """Get the metric script repository instance."""
+    return MongoMetricScriptRepository()
+
+
+@cached_dependency_provider
+def get_metric_script_service() -> MetricScriptService:
+    """Get the metric script service instance."""
+    return MetricScriptService(
+        metric_script_repository=get_metric_script_repository(),
+        dashboard_repository=get_dashboard_repository(),
+        chip_repository=get_chip_repository(),
+        metrics_service=get_metrics_service(),
+        task_result_repository=get_task_result_repository(),
+    )
 
 
 @cached_dependency_provider

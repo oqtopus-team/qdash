@@ -12,7 +12,7 @@ from qdash.client.services.errors import QDashApiError, QDashTransportError
 
 if TYPE_CHECKING:
     from qdash.client.services.client import QDashClient
-    from qdash.client.services.models import (
+    from qdash.client.services.client_models import (
         AgentActionResponse,
         AgentCandidateCommitResponse,
         AgentCandidateResponse,

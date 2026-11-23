@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 import {
   QDashClient,
   QDashConfig,
+  QDashNotFoundError,
+  QDashTimeoutError,
   QDashValidationError,
   type AgentSessionPolicy,
 } from "../src/index.js";
@@ -167,6 +169,63 @@ describe("QDashClient", () => {
       skill_name: "pi-extension",
       expires_in_seconds: 21600,
     });
+  });
+
+  it("wraps the metric script and dashboard endpoints", async () => {
+    const requests: Request[] = [];
+    const fetch = vi.fn(async (input: RequestInfo | URL) => {
+      requests.push(new Request(input));
+      return jsonResponse({});
+    });
+    const client = new QDashClient(
+      new QDashConfig({ baseUrl: "https://qdash.example/api", apiToken: "token" }),
+      { fetch },
+    );
+
+    await client.listMetricScripts();
+    await client.getMetricScript("ms_0123456789ab");
+    await client.listMetricScriptTemplates();
+    await client.getMetricScriptCatalog();
+    await client.validateMetricScript("x = 1");
+    await client.evaluateMetricScriptDraft({
+      source: "x = 1",
+      metric_id: "m",
+      chip_id: "chip-1",
+      period: { kind: "relative", days: 14 },
+    });
+    await client.evaluateMetricScript("ms_1", { metric_id: "m", chip_id: "chip-1", revision: 2 });
+    await client.createMetricScript({ name: "Median", source: "x = 1" });
+    await client.updateMetricScript("ms_1", { source: "x = 2", expected_revision: 3 });
+    await client.copyMetricScript("ms_1");
+    await client.deleteMetricScript("ms_1");
+    await client.listDashboards();
+    await client.getDashboard("cd/1");
+    await client.listDashboardTemplates();
+    await client.previewDashboardTemplate("frequency-collision-map");
+    await client.createDashboard({ name: "Board" });
+    await client.updateDashboard("cd_1", { panels: [] });
+
+    expect(requests.map((request) => `${request.method} ${new URL(request.url).pathname}`)).toEqual([
+      "GET /api/metric-scripts",
+      "GET /api/metric-scripts/ms_0123456789ab",
+      "GET /api/metric-scripts/templates",
+      "GET /api/metric-scripts/catalog",
+      "POST /api/metric-scripts/validate",
+      "POST /api/metric-scripts/evaluate",
+      "POST /api/metric-scripts/ms_1/evaluate",
+      "POST /api/metric-scripts",
+      "PATCH /api/metric-scripts/ms_1",
+      "POST /api/metric-scripts/ms_1/copy",
+      "DELETE /api/metric-scripts/ms_1",
+      "GET /api/dashboards",
+      "GET /api/dashboards/cd%2F1",
+      "GET /api/dashboards/templates",
+      "GET /api/dashboards/templates/frequency-collision-map/preview",
+      "POST /api/dashboards",
+      "PATCH /api/dashboards/cd_1",
+    ]);
+    expect(await requests[8]?.json()).toEqual({ source: "x = 2", expected_revision: 3 });
+    expect(await requests[6]?.json()).toEqual({ metric_id: "m", chip_id: "chip-1", revision: 2 });
   });
 
   it("sends an agent action's source execution only as provenance", async () => {
@@ -372,5 +431,53 @@ describe("QDashClient", () => {
       "policy.qids: Field required; policy.allowed_tasks: Field required",
     );
     await expect(result).rejects.not.toThrow("[object Object]");
+  });
+});
+
+describe("SDK-facing client helpers", () => {
+  function recording(replies: Response[]) {
+    const projects: (string | null)[] = [];
+    const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      projects.push(new Request(input, init).headers.get("X-Project-Id"));
+      const reply = replies.shift();
+      if (!reply) throw new Error("unexpected request");
+      return reply;
+    });
+    return { fetch, projects };
+  }
+
+  it("waitForExecution still throws on 404 unless asked to treat it as pending", async () => {
+    const { fetch } = recording([
+      jsonResponse({ detail: "missing" }, 404),
+      jsonResponse({ detail: "missing" }, 404),
+    ]);
+    const base = new QDashClient(
+      new QDashConfig({ baseUrl: "https://qdash.example/api", apiToken: "token" }),
+      { fetch },
+    );
+    await expect(base.waitForExecution("exec-1", { pollIntervalSeconds: 0 })).rejects.toBeInstanceOf(
+      QDashNotFoundError,
+    );
+    const timeout = await base
+      .waitForExecution("exec-1", { timeoutSeconds: 0, notFoundAsPending: true })
+      .catch((caught: unknown) => caught);
+    expect(timeout).toBeInstanceOf(QDashTimeoutError);
+    expect(timeout).toBeInstanceOf(Error);
+    expect((timeout as Error).message).toBe(
+      "Execution 'exec-1' did not reach a terminal state within 0 seconds",
+    );
+  });
+
+  it("withProject returns a scoped copy and keeps transport options", async () => {
+    const { fetch, projects } = recording([jsonResponse({ chips: [] })]);
+    const base = new QDashClient(
+      new QDashConfig({ baseUrl: "https://qdash.example/api", apiToken: "token", projectId: "a" }),
+      { fetch },
+    );
+    const scoped = base.withProject("b");
+    expect(base.config.projectId).toBe("a");
+    expect(scoped.config).toMatchObject({ baseUrl: base.config.baseUrl, apiToken: "token", projectId: "b" });
+    await scoped.listChips();
+    expect(projects).toEqual(["b"]);
   });
 });

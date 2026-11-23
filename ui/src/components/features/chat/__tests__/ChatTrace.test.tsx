@@ -141,7 +141,8 @@ describe("ChatTrace", () => {
         }}
       />,
     );
-    fireEvent.click(screen.getByText("Used 1 tool"));
+    // A single call is its own row, with no group to open first.
+    expect(screen.queryByTestId("tool-group-summary")).toBeNull();
     expect(screen.getByText("Classified as readout_problem")).toBeTruthy();
     expect(screen.getByText("Classified")).toBeTruthy();
     expect(screen.getByText("system-one-classifier/Open-Jev")).toBeTruthy();
@@ -187,6 +188,7 @@ describe("ChatTrace", () => {
         ]}
       />,
     );
+    fireEvent.click(screen.getByRole("button", { name: /Used 2 tools/ }));
     expect(screen.getByText("Classification unclear")).toBeTruthy();
     expect(screen.getByText("Unclear")).toBeTruthy();
     expect(screen.getByText("drive_problem")).toBeTruthy();
@@ -277,7 +279,6 @@ describe("ChatTrace", () => {
         }}
       />,
     );
-    fireEvent.click(screen.getByRole("button", { name: /used 1 tool/i }));
     fireEvent.click(screen.getByRole("button", { name: /Ran a script/ }));
     expect(screen.getByText(/ok\s+qdash_list_chips \(12 ms\)/)).toBeTruthy();
     expect(screen.getByText("javascript")).toBeTruthy();
@@ -337,7 +338,6 @@ describe("ChatTrace", () => {
         }}
       />,
     );
-    fireEvent.click(screen.getByRole("button", { name: /used 1 tool/i }));
     expect(
       screen.getByText("T1 = 24.3 us").closest("[aria-hidden]")?.getAttribute("aria-hidden"),
     ).toBe("true");
@@ -368,5 +368,28 @@ describe("ChatTrace", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("puts a row's status and time beside its title, before the preview", () => {
+    render(
+      <LiveTrace
+        steps={[
+          {
+            kind: "tool",
+            id: "c1",
+            tool: "qdash_execute_flow",
+            label: "Execute flow",
+            status: "error",
+            startedAt: 0,
+            endedAt: 2000,
+            args: { name: "daily" },
+          },
+        ]}
+      />,
+    );
+    const meta = screen.getByTestId("tool-step-meta");
+    expect(meta.textContent).toBe("Failed2s");
+    expect(meta.className).not.toContain("ml-auto");
+    expect(meta.nextElementSibling?.textContent).toBe("flow daily");
   });
 });

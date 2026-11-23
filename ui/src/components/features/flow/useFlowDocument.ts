@@ -70,12 +70,19 @@ export interface FlowDocument {
   isDirty: boolean;
   /**
    * Validate the properties and save them with the draft under `name`. Invalid properties are
-   * not saved; `onInvalid` receives their errors. Does nothing while no workflow is ready.
+   * not saved; `onInvalid` receives their errors. Does nothing while no workflow is ready or a
+   * save is in progress.
+   *
+   * `prepare`, when given, runs after the properties validate and returns the source to save,
+   * such as the draft after formatting, or null to save nothing. A workflow reopened while it
+   * runs is not saved.
    */
   save: (
     context: JourneyContext,
     onInvalid?: (errors: FieldErrors<FlowPropertiesFormInput>) => void,
+    prepare?: (draft: string) => Promise<string | null>,
   ) => void;
+  /** A save is being prepared or is pending. */
   isSaving: boolean;
   saveError: unknown;
   resetSave: () => void;
@@ -125,6 +132,9 @@ export function useFlowDocument(name: string | null): FlowDocument {
   const openCountRef = useRef(0);
   const [code, setCode] = useState("");
   const [originalCode, setOriginalCode] = useState("");
+  // True from a save's start until its request is sent, so a second save waits for it.
+  const preparingRef = useRef(false);
+  const [isPreparing, setIsPreparing] = useState(false);
 
   const {
     control,
@@ -218,8 +228,10 @@ export function useFlowDocument(name: string | null): FlowDocument {
   const isReady = Boolean(name && flow && loadedName === name);
 
   // A save answers for the user and project it was submitted in; one that lands after a
-  // project switch is dropped. The submitted source becomes the baseline only while the pane
-  // still holds the draft it was submitted from, so edits made after submitting stay unsaved.
+  // project switch is dropped. The stored source becomes the baseline only while the pane
+  // still holds the workflow it was submitted from, so edits made after submitting stay
+  // unsaved. The server stores the source formatted; a draft still equal to the submitted
+  // source is replaced by the stored text, so the editor shows what was saved.
   const saveMutation = useMutation({
     mutationFn: ({
       request,
@@ -228,7 +240,7 @@ export function useFlowDocument(name: string | null): FlowDocument {
       context: JourneyContext;
       openCount: number;
     }) => saveFlow(request),
-    onSuccess: (_response, { request, context, openCount }) => {
+    onSuccess: (response, { request, context, openCount }) => {
       if (!context.isCurrent()) return;
       queryClient.invalidateQueries({ queryKey: ["flow", request.name] });
       // The Workflow page lists under ["flows"]; the editor's Explorer uses the generated key.
@@ -236,28 +248,48 @@ export function useFlowDocument(name: string | null): FlowDocument {
       queryClient.invalidateQueries({ queryKey: getListFlowsQueryKey() });
       queryClient.invalidateQueries({ queryKey: ["execution-availability"] });
       if (loadedNameRef.current === request.name && openCountRef.current === openCount) {
-        setOriginalCode(request.code);
+        const stored = response.data?.code ?? request.code;
+        setOriginalCode(stored);
+        if (stored !== request.code) {
+          setCode((current) => (current === request.code ? stored : current));
+        }
       }
       toast.success(`${request.name} saved successfully!`);
     },
   });
   const mutateSave = saveMutation.mutate;
 
+  const isMutating = saveMutation.isPending;
   const save = useCallback(
     (
       context: JourneyContext,
       onInvalid?: (errors: FieldErrors<FlowPropertiesFormInput>) => void,
+      prepare?: (draft: string) => Promise<string | null>,
     ) => {
-      if (!name || !isReady) return;
-      void handleSubmit((values) => {
-        mutateSave({
-          request: buildSaveRequest(name, code, values),
-          context,
-          openCount: openCountRef.current,
-        });
+      if (!name || !isReady || preparingRef.current || isMutating) return;
+      void handleSubmit(async (values) => {
+        if (preparingRef.current) return;
+        const openCount = openCountRef.current;
+        let source = code;
+        if (prepare) {
+          preparingRef.current = true;
+          setIsPreparing(true);
+          try {
+            const prepared = await prepare(code);
+            if (prepared === null) return;
+            source = prepared;
+          } finally {
+            preparingRef.current = false;
+            setIsPreparing(false);
+          }
+          // The pane opened another workflow, or reopened this one, while preparing.
+          if (loadedNameRef.current !== name || openCountRef.current !== openCount) return;
+          if (!context.isCurrent()) return;
+        }
+        mutateSave({ request: buildSaveRequest(name, source, values), context, openCount });
       }, onInvalid)();
     },
-    [name, isReady, code, handleSubmit, mutateSave],
+    [name, isReady, isMutating, code, handleSubmit, mutateSave],
   );
 
   return {
@@ -285,7 +317,7 @@ export function useFlowDocument(name: string | null): FlowDocument {
     propertyErrors,
     isDirty: isReady && code !== originalCode,
     save,
-    isSaving: saveMutation.isPending,
+    isSaving: isPreparing || saveMutation.isPending,
     saveError: saveMutation.error,
     resetSave: saveMutation.reset,
   };

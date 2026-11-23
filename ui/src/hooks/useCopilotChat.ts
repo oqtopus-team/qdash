@@ -310,6 +310,32 @@ export function canContinueMessages(messages: ChatMessage[]): boolean {
   }
 }
 
+/** Whether an assistant message shows nothing but a trace: no blocks, only work done. */
+function isTraceOnly(message: ChatMessage): boolean {
+  if (message.role !== "assistant" || !message.content.startsWith("{")) return false;
+  try {
+    const parsed = JSON.parse(message.content) as { blocks?: unknown };
+    return Array.isArray(parsed.blocks) && parsed.blocks.length === 0;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The user's reply to the answer at `index`, if one follows it. An approved write runs
+ * before the decision is placed, so its tool trace becomes an assistant message of its
+ * own between the approval card and the "Approved: ..." reply; such trace-only
+ * messages are passed over. Any other message in between means no reply.
+ */
+export function replyAfter(messages: ChatMessage[], index: number): string | undefined {
+  for (let i = index + 1; i < messages.length; i++) {
+    const message = messages[i];
+    if (message.role === "user") return message.content;
+    if (!isTraceOnly(message)) return undefined;
+  }
+  return undefined;
+}
+
 /** The stored rating of an assistant message, if any. */
 export function answerFeedback(message: ChatMessage | undefined): AnswerFeedback | null {
   if (!message || message.role !== "assistant" || !message.content.startsWith("{")) return null;

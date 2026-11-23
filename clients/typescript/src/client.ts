@@ -3,7 +3,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { getQDashAPI } from "./generated/api.js";
 
 import { QDashConfig } from "./config.js";
-import { QDashNotFoundError } from "./errors.js";
+import { QDashNotFoundError, QDashTimeoutError } from "./errors.js";
 import type {
   AgentActionResponse,
   AgentCandidateSetCommitResponse,
@@ -23,6 +23,23 @@ import type {
   ListAgentCandidatesResponse,
   ListCouplingsResponse,
   ListFlowsResponse,
+  DashboardCreateRequest,
+  DashboardResponse,
+  DashboardTemplatePreviewResponse,
+  DashboardUpdateRequest,
+  ListDashboardTemplatesResponse,
+  ListDashboardsResponse,
+  ListMetricScriptTemplatesResponse,
+  ListMetricScriptsResponse,
+  MetricScriptCatalogResponse,
+  MetricScriptCreateRequest,
+  MetricScriptDraftEvaluateRequest,
+  MetricScriptEvaluateRequest,
+  MetricScriptEvaluateResponse,
+  MetricScriptResponse,
+  MetricScriptUpdateRequest,
+  MetricScriptValidateResponse,
+  SuccessResponse,
   ListForumPostsResponse,
   ListQubitsResponse,
   ListSourceRootsResponse,
@@ -135,6 +152,12 @@ export interface PollOptions {
    * `pipeline.status` then carries the run's outcome.
    */
   wholePipeline?: boolean;
+  /**
+   * Poll again when the execution is not listed yet (404) instead of throwing
+   * `QDashNotFoundError` (default false). A dispatched run can briefly be unknown
+   * to `GET /executions/{id}`; the timeout still applies.
+   */
+  notFoundAsPending?: boolean;
 }
 
 export interface DownloadedFile {
@@ -193,9 +216,11 @@ export class QDashClient {
   readonly config: QDashConfig;
 
   private readonly transport: QDashTransport;
+  private readonly options: QDashClientOptions;
 
   constructor(config: QDashConfig, options: QDashClientOptions = {}) {
     this.config = config;
+    this.options = options;
     this.transport = new QDashTransport(config, options);
     this.api = this.bindGeneratedApi(getQDashAPI());
   }
@@ -216,6 +241,16 @@ export class QDashClient {
       ? await QDashConfig.fromFile(profile, path)
       : await QDashConfig.fromFile(profile);
     return new QDashClient(config, options);
+  }
+
+  /**
+   * A new client that sends `projectId` as `X-Project-Id`. It keeps this client's
+   * configuration and transport options (`fetch`, headers, environment); this
+   * client and its configuration are unchanged. A username/password login is not
+   * shared, so the new client logs in on its first request.
+   */
+  withProject(projectId: string): QDashClient {
+    return new QDashClient(new QDashConfig({ ...this.config, projectId }), this.options);
   }
 
   async listChips(): Promise<ListChipsResponse> {
@@ -406,6 +441,98 @@ export class QDashClient {
     return this.post(`/flows/${pathPart(name)}/execute`, { parameters });
   }
 
+  /** Metric scripts visible to the caller (project-shared and their own), without source. */
+  async listMetricScripts(): Promise<ListMetricScriptsResponse> {
+    return this.get("/metric-scripts");
+  }
+
+  /** A metric script with its latest source, active (last-good) source and revisions. */
+  async getMetricScript(scriptId: string): Promise<MetricScriptResponse> {
+    return this.get(`/metric-scripts/${pathPart(scriptId)}`);
+  }
+
+  /** Starter metric scripts, with their source. */
+  async listMetricScriptTemplates(): Promise<ListMetricScriptTemplatesResponse> {
+    return this.get("/metric-scripts/templates");
+  }
+
+  /** The qubit and coupling metrics a script can read through `ctx.data`. */
+  async getMetricScriptCatalog(): Promise<MetricScriptCatalogResponse> {
+    return this.get("/metric-scripts/catalog");
+  }
+
+  /** Compile metric script source in a worker; nothing is saved. */
+  async validateMetricScript(source: string): Promise<MetricScriptValidateResponse> {
+    return this.post("/metric-scripts/validate", { source });
+  }
+
+  /** Evaluate one metric of unsaved source on a chip; nothing is saved. */
+  async evaluateMetricScriptDraft(
+    request: MetricScriptDraftEvaluateRequest,
+  ): Promise<MetricScriptEvaluateResponse> {
+    return this.post("/metric-scripts/evaluate", request);
+  }
+
+  /** Evaluate one metric of a saved script's validated revision (the active one by default). */
+  async evaluateMetricScript(
+    scriptId: string,
+    request: MetricScriptEvaluateRequest,
+  ): Promise<MetricScriptEvaluateResponse> {
+    return this.post(`/metric-scripts/${pathPart(scriptId)}/evaluate`, request);
+  }
+
+  async createMetricScript(request: MetricScriptCreateRequest): Promise<MetricScriptResponse> {
+    return this.post("/metric-scripts", request);
+  }
+
+  /** Update settings or save new source; invalid source keeps the last good revision active. */
+  async updateMetricScript(
+    scriptId: string,
+    request: MetricScriptUpdateRequest,
+  ): Promise<MetricScriptResponse> {
+    return this.patch(`/metric-scripts/${pathPart(scriptId)}`, request);
+  }
+
+  /** Copy the active source of a visible script into a private script of the caller. */
+  async copyMetricScript(scriptId: string): Promise<MetricScriptResponse> {
+    return this.post(`/metric-scripts/${pathPart(scriptId)}/copy`);
+  }
+
+  async deleteMetricScript(scriptId: string): Promise<SuccessResponse> {
+    return this.delete(`/metric-scripts/${pathPart(scriptId)}`);
+  }
+
+  async listDashboards(): Promise<ListDashboardsResponse> {
+    return this.get("/dashboards");
+  }
+
+  async getDashboard(dashboardId: string): Promise<DashboardResponse> {
+    return this.get(`/dashboards/${pathPart(dashboardId)}`);
+  }
+
+  async listDashboardTemplates(): Promise<ListDashboardTemplatesResponse> {
+    return this.get("/dashboards/templates");
+  }
+
+  /** What a dashboard created from a template now would hold, including the shared scripts it adds. Writes nothing. */
+  async previewDashboardTemplate(templateId: string): Promise<DashboardTemplatePreviewResponse> {
+    return this.get(`/dashboards/templates/${pathPart(templateId)}/preview`);
+  }
+
+  async createDashboard(
+    request: DashboardCreateRequest,
+  ): Promise<DashboardResponse> {
+    return this.post("/dashboards", request);
+  }
+
+  /** Update a dashboard; a provided `panels` list replaces the previous one. */
+  async updateDashboard(
+    dashboardId: string,
+    request: DashboardUpdateRequest,
+  ): Promise<DashboardResponse> {
+    return this.patch(`/dashboards/${pathPart(dashboardId)}`, request);
+  }
+
   /** Count a chip's executions per calendar day over the trailing window. */
   async getExecutionActivity(options: {
     chipId: string;
@@ -501,13 +628,20 @@ export class QDashClient {
     const terminal = new Set(["completed", "failed", "cancelled", "canceled", "crashed"]);
     const wholePipeline = options.wholePipeline ?? true;
     while (true) {
-      const execution = await this.getExecution(executionId);
-      // A pipeline step's own execution completes long before the run does.
-      const status =
-        wholePipeline && execution.pipeline ? execution.pipeline.status : execution.status;
-      if (terminal.has(status.toLowerCase())) return execution;
+      let execution: ExecutionResponseDetail | undefined;
+      try {
+        execution = await this.getExecution(executionId);
+      } catch (error) {
+        if (!(options.notFoundAsPending && error instanceof QDashNotFoundError)) throw error;
+      }
+      if (execution) {
+        // A pipeline step's own execution completes long before the run does.
+        const status =
+          wholePipeline && execution.pipeline ? execution.pipeline.status : execution.status;
+        if (terminal.has(status.toLowerCase())) return execution;
+      }
       if (Date.now() >= deadline) {
-        throw new Error(
+        throw new QDashTimeoutError(
           `Execution '${executionId}' did not reach a terminal state within ${timeoutSeconds} seconds`,
         );
       }
@@ -851,6 +985,10 @@ export class QDashClient {
 
   private patch<T>(path: string, body?: unknown): Promise<T> {
     return this.transport.requestJson<T>("PATCH", path, { body });
+  }
+
+  private delete<T>(path: string): Promise<T> {
+    return this.transport.requestJson<T>("DELETE", path);
   }
 
   private async pollAgentAction(

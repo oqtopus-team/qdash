@@ -151,6 +151,47 @@ docker compose build ui
 docker compose up -d ui
 ```
 
+### Limit Metric Script Runs
+
+[Metric scripts](./metric-scripts.md) run in the `metric-runner` container, which does nothing
+else and has no network and no credentials; the API sends each validation and preview there and
+answers the script's data requests itself. Set these in `.env` to change their limits, then
+apply them with `docker compose up -d api metric-runner`.
+
+Deploy `api` and `metric-runner` from the same revision; incompatible versions refuse runs.
+
+| Variable | Meaning | Default |
+| --- | --- | --- |
+| `METRIC_SCRIPT_TIMEOUT_SECONDS` | Wall-clock limit of one run, in seconds | `60` |
+| `METRIC_SCRIPT_MEMORY_MB` | Memory a script may use on top of the Python baseline, in MiB | `1024` |
+| `METRIC_RUNNER_CONCURRENCY` | Runs at once across the whole deployment | `2` |
+| `METRIC_RUNNER_QUEUE_LIMIT` | Runs allowed to wait for a free slot; more are refused | `16` |
+| `METRIC_RUNNER_QUEUE_WAIT_SECONDS` | How long a run waits for a slot before it is refused | `5` |
+| `METRIC_RUNNER_MAX_TIMEOUT_SECONDS` | Highest time limit the runner accepts; a larger `METRIC_SCRIPT_TIMEOUT_SECONDS` is lowered to it | `300` |
+| `METRIC_RUNNER_MAX_MEMORY_MB` | Highest memory limit the runner accepts; a larger `METRIC_SCRIPT_MEMORY_MB` is lowered to it | `1024` |
+| `METRIC_RUNNER_MEMORY_LIMIT` | Memory of the `metric-runner` container, shared by all runs | `3g` |
+| `METRIC_RUNNER_CPU_LIMIT` | CPUs of the `metric-runner` container | `2` |
+| `METRIC_RUNNER_PIDS_LIMIT` | Processes of the `metric-runner` container | `256` |
+| `METRIC_RUNNER_TMPFS_SIZE` | Scratch space of the runs, counted against the memory limit | `256m` |
+
+Keep `METRIC_RUNNER_CONCURRENCY` × (`METRIC_RUNNER_MAX_MEMORY_MB` + 128) + 128 +
+`METRIC_RUNNER_TMPFS_SIZE` (in MiB) within `METRIC_RUNNER_MEMORY_LIMIT`; the defaults use 2688 MiB
+of 3 GiB. When you raise the concurrency or the memory cap, raise the memory limit with them. The
+container logs this budget when it starts (`docker compose logs metric-runner`) and warns when it
+does not fit. A memory shortage can stop a worker or the supervisor; a supervisor failure
+interrupts every in-flight run until the container restarts.
+
+A refused run shows that the queue is full; try again shortly. When the `metric-runner`
+container is not running, validation, saving a script and previews fail with a message that the
+metric script runner is not available (HTTP 503), and nothing is saved. Leave
+`METRIC_RUNNER_MODE` unset: its `local` value, used by the host-side development API, runs
+scripts inside the API without this isolation.
+
+Scripts are written by project editors and owners. Each run has its own user in
+`metric-runner`, but it shares that container's CPU and memory with the other runs; see
+[Metric Scripts architecture](../developer-guide/architecture/metric-scripts.md#isolation-and-threat-model)
+before opening editing to people you would not give shell access.
+
 ### Run Several Deployments on One Host
 
 Give each deployment its own checkout and `.env`, with a different `ENV` and `UI_PORT`. Leave the

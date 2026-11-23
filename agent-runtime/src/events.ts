@@ -65,7 +65,7 @@ export type NdjsonEvent =
   | { type: "done"; text: string; entry_id?: string }
   /** A continue found nothing to answer: no request was sent and nothing was added. */
   | { type: "noop"; reason: "nothing_to_answer" }
-  | { type: "error"; message: string }
+  | { type: "error"; message: string; code?: "compaction_failed" }
   /** Keepalive while a turn is quiet (long tool calls); carries no content. */
   | { type: "ping" };
 

@@ -51,7 +51,7 @@ vi.mock("@/contexts/ProjectContext", () => ({
 }));
 
 vi.mock("@/contexts/ChatDockContext", () => ({
-  useChatDock: () => ({ registerPage: () => () => undefined }),
+  useChatDock: () => ({ registerPage: () => () => undefined, refreshPage: () => undefined }),
 }));
 
 vi.mock("@/components/ui/Toast", () => ({

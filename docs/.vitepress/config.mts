@@ -18,6 +18,13 @@ export default withMermaid(
         target: "es2022",
       },
       optimizeDeps: {
+        // mermaid imports the CommonJS package fastdom, which
+        // vitepress-plugin-mermaid does not pre-bundle. Without these entries
+        // the dev server serves it as ESM and the page renders blank.
+        include: [
+          "mermaid > fastdom",
+          "mermaid > fastdom/extensions/fastdom-promised.js",
+        ],
         esbuildOptions: {
           // Keep dev pre-bundling aligned with the production target.
           target: "es2022",
@@ -142,7 +149,9 @@ export default withMermaid(
             {
               text: "Review Results",
               items: [
-                { text: "Dashboard", link: "/user-guide/dashboard" },
+                { text: "Overview", link: "/user-guide/overview" },
+                { text: "Dashboards", link: "/user-guide/dashboards" },
+                { text: "Metric Scripts", link: "/user-guide/metric-scripts" },
                 { text: "Data and Provenance", link: "/user-guide/data-and-provenance" },
                 { text: "Reviewing Results", link: "/user-guide/reviewing-results" },
               ],
@@ -163,7 +172,7 @@ export default withMermaid(
             {
               text: "Use AI Assistance",
               items: [
-                { text: "AI Chat", link: "/user-guide/ai-chat" },
+                { text: "Agent", link: "/user-guide/ai-chat" },
                 { text: "AI Evaluations", link: "/user-guide/ai-evaluations" },
                 { text: "Agent Calibration", link: "/user-guide/agent-calibration" },
               ],
@@ -251,7 +260,11 @@ export default withMermaid(
                 { text: "CR Scheduler", link: "/developer-guide/architecture/cr-scheduler" },
                 { text: "Square Lattice", link: "/developer-guide/architecture/square-lattice-topology" },
                 { text: "Notes", link: "/developer-guide/architecture/notes" },
+                { text: "Dashboards", link: "/developer-guide/architecture/dashboards" },
+                { text: "Metric Scripts", link: "/developer-guide/architecture/metric-scripts" },
                 { text: "Provenance", link: "/developer-guide/architecture/provenance" },
+                { text: "Python SDK", link: "/developer-guide/architecture/python-sdk" },
+                { text: "TypeScript SDK", link: "/developer-guide/architecture/typescript-sdk" },
               ],
             },
             {
@@ -265,6 +278,7 @@ export default withMermaid(
                 { text: "TypeScript Client", link: "/reference/clients/typescript" },
                 { text: "pi-qdash", link: "/reference/pi-qdash" },
                 { text: "pi-qcaleval", link: "/reference/pi-qcaleval" },
+                { text: "Task Method Sources", link: "/reference/task-method-sources" },
               ],
             },
             {

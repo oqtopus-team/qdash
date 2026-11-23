@@ -26,6 +26,7 @@ from qdash.datamodel.task import (
     InputParameterSpec,
     OutputParameterSpec,
     RunParameterSpec,
+    TaskDocumentation,
 )
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -60,6 +61,23 @@ class CheckResonatorSpectroscopy(QubexTask):
 
     name: str = "CheckResonatorSpectroscopy"
     task_type: str = "qubit"
+    documentation: ClassVar[TaskDocumentation] = TaskDocumentation(
+        description=(
+            "MUX-level 2D readout frequency and power sweep that locates each resonator of the "
+            "MUX and the power at which it shifts to its bare (punched-out) frequency. It "
+            "writes resonator_frequency (also published as readout_frequency) and a "
+            "readout_amplitude derived from an optimal power set a margin below that power "
+            "boundary."
+        ),
+        when_to_use=(
+            "Run it at the start of bring-up, after capture delay correction, to obtain the "
+            "first readout frequency and amplitude. Check resonator_assignment_order when the "
+            "MUX's resonator frequency order differs from the default."
+        ),
+        prerequisites=(
+            "None from calibration storage; the frequency range defaults by readout band.",
+        ),
+    )
     is_mux_level: bool = True
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {}
     run_spec: ClassVar[dict[str, RunParameterSpec]] = {

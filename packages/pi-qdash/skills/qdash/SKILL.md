@@ -1,6 +1,6 @@
 ---
 name: qdash
-description: Query a running QDash instance from pi via the pi-qdash extension and @oqtopus-team/qdash-client. Use when inspecting chips, metrics, task results, tasks, projects, files, flows, executions, forum posts, provenance, or QDash profile/configuration.
+description: Query a running QDash instance from pi via the pi-qdash extension and @oqtopus-team/qdash-client. Use when inspecting chips, metrics, task results, tasks, projects, files, flows, metric scripts, dashboards, executions, forum posts, provenance, or QDash profile/configuration.
 ---
 
 <!-- Confirmation gates are implemented by the host harness. Skills should state that a gate exists, not instruct how or when to ask for confirmation. -->
@@ -18,11 +18,12 @@ Prefer the dedicated tool that matches the question. Use `qdash_query` only as a
    - `qdash_get_chip_metrics`, `qdash_list_chip_qubits`, `qdash_list_chip_couplings` — inspect chip metrics and topology targets
    - `qdash_list_cryostats`, `qdash_list_cooldowns` — establish cryostat and cooldown context
    - `qdash_get_cooldown_wiring`, `qdash_wiring_insights`, `qdash_list_cooldown_wiring_events` — inspect current wiring, attenuation, and changes
-   - `qdash_get_timeseries`, `qdash_plot_timeseries` — inspect one target metric over time
+   - `qdash_get_timeseries` — inspect one target metric over time
    - `qdash_inspect_timeseries_csv`, `qdash_compare_timeseries` — validate and compare multiple QDash or CSV timeseries
    - `qdash_list_task_results`, `qdash_get_task_result` — find and inspect calibration results
    - `qdash_get_task_knowledge` — interpret a task's purpose, expected result, failure modes, and check questions
    - `qdash_list_flows`, `qdash_get_flow` — list or inspect calibration flows
+   - `qdash_validate_metric_script`, `qdash_preview_metric_script` — check and preview a metric script on a chip; they run the code on the server but save nothing (see the `qdash-metric-scripts` skill)
    - `qdash_get_pipeline_catalog`, `qdash_plan_pipeline` — compose and check a calibration pipeline spec before running it
    - `qdash_list_executions`, `qdash_get_execution`, `qdash_wait_execution`, `qdash_compare_executions` — inspect, await, or compare executions
    - `qdash_get_provenance_stats` — inspect provenance status
@@ -42,11 +43,42 @@ Prefer the dedicated tool that matches the question. Use `qdash_query` only as a
    - `qdash_create_forum_evidence_reply`, `qdash_create_forum_image_reply` — publish previously reviewed evidence replies
    - `qdash_run_pipeline` — run a validated pipeline spec as one execution
    - `qdash_save_flow`, `qdash_execute_flow` — save a Prefect flow you wrote as a QDash workflow, and run a saved flow (see Authoring a flow)
+   - `qdash_save_metric_script`, `qdash_save_dashboard` — save a metric script, and create or update a dashboard with its panels (see the `qdash-metric-scripts` skill)
 4. Agent workflow state tools:
    - `qdash_get_agent_session`, `qdash_get_agent_action`, `qdash_list_agent_actions`, `qdash_wait_agent_action` — inspect agent workflow state
    - `qdash_list_agent_action_candidates`, `qdash_get_agent_candidate_commit`, `qdash_wait_agent_candidate_apply` — inspect candidates and apply status
 5. `qdash_query` — fallback for read-only operations without a dedicated tool.
 6. `qdash_raw_get` — last-resort read-only GET for an uncovered endpoint.
+
+## Calibration flows and execution paths
+
+Task definitions describe single measurements; the experiment-flow skills compose them, starting
+from QDash's flow templates, toward a goal. Follow the matching skill when the user wants to
+calibrate or characterize hardware:
+
+- `qdash-chip-bringup` — capture delay, resonator and qubit spectroscopy for a new chip, cooldown, or MUX
+- `qdash-one-qubit-calibration` — coarse and fine single-qubit calibration and its recovery
+- `qdash-two-qubit-calibration` — CR and ZX90 calibration of couplings, and diagnosis of poor two-qubit quality
+- `qdash-characterization` — coherence checks, EF calibration, noise and coupling characterization, gate coherence limits
+
+Calibration runs take one of two paths, and they differ in how results reach QDash:
+
+- A saved flow (`qdash_execute_flow`) or a pipeline (`qdash_run_pipeline`) writes the calibrated
+  parameters of every completed task to QDash directly.
+- An agent calibration session (`qdash_create_agent_session`, then its actions) runs bounded
+  tasks on the qubits its policy names, within the allowed tasks, actions, override bounds, and
+  action budget. Task outputs are staged as candidates; they reach the calibration state only
+  through `qdash_commit_agent_candidate` or `qdash_commit_agent_candidate_set`, and the backend
+  only through `qdash_apply_agent_candidate_commit`. Commit candidates only from a successful task,
+  preferably after a downstream check confirms them. A session with `autonomy` `auto` carries out
+  the plan the user approved, choosing each next step from the evaluation of the last result;
+  when it stops for the user, report its recorded evaluations and execution links.
+
+Stay within the scope the user approved; an approved plan or sequence is not re-litigated step
+by step, but new targets, templates, wider ranges, or commits are new decisions for the user.
+When an agent session refuses, rejects, or stops on a task, report the reason and the result
+links. Do not run the same task through a flow or pipeline instead, because that path writes
+parameters without the session's candidate gate.
 
 ## Composing a calibration pipeline
 
@@ -56,7 +88,7 @@ A step's `tasks` are calls, not names: `{"name": "CheckRamsey", "call_id": "rams
 
 Workflow:
 
-1. `qdash_get_pipeline_catalog` — read the step types (with what each needs from an earlier step and its default task list), the one-qubit modes, and the task names by type. Use only names from this catalog.
+1. `qdash_get_pipeline_catalog` — read the step types (with what each needs from an earlier step and its default task list), the one-qubit modes, the task names by type, and a one-line description of each documented task. Use only names from this catalog. Before choosing a task for a custom step, call it again with `taskNames` to read when to use the task and its prerequisites; the prerequisites explain, and `qdash_plan_pipeline` reports what is actually missing.
 2. Turn the request into steps. Start from the catalog defaults and the flow templates (`qdash_query` with `flow_templates`, then `flow_template` for one template's task list): `OneQubitCheck` and `OneQubitFineTune` carry the standard one-qubit sequences, `TwoQubitCalibration` the two-qubit chain. Use `CustomOneQubit` / `CustomTwoQubit` only where the user wants a different task list, and keep the task order the templates use.
 3. `qdash_plan_pipeline` — validate. A result with problems is not an error: each problem carries a path into the spec (`steps[2].tasks[0]`, `targets.qids[1]`); fix it and plan again until it is valid. Warnings do not make a spec invalid but usually mean a filter reads a different step than intended. A result with `migrated_spec` means the spec used the version 1 shape; plan the migrated spec.
 4. Show the user the resolved steps, each call's `call_id` and effective settings from the plan, then `qdash_run_pipeline` with the same `chipId` and `spec`. The execution is confirmation-gated. Say that completed tasks write their calibrated parameters to QDash directly; there is no candidate gate, so inside an agent calibration session use the session's actions instead.
@@ -82,6 +114,19 @@ Workflow:
 2. Write the module. Name the `@flow` function like the flow unless the user wants otherwise. Task and parameter names must come from `qdash_get_pipeline_catalog` and the template; do not invent them. When a shell workspace is available, draft the file there and run `python -m py_compile` on it before showing it.
 3. Show the user the complete code and the chip it is for, then `qdash_save_flow`. QDash checks the `@flow` function, formats the file, registers a Prefect deployment, and replaces a flow of the same name. A rejection comes back as text with QDash's reason; fix the code and save again.
 4. Saving does not run anything. Run it only when the user asks: `qdash_execute_flow` with the flow's parameters (confirmation-gated, takes the project execution lock), then `qdash_wait_execution`.
+
+## Metric scripts and dashboards
+
+Dashboards show per-qubit and per-coupling values computed by metric scripts: Python
+modules written against the `qdash_metrics` API that QDash runs in a bounded worker. For any
+request to build a dashboard, a derived or aggregated metric (a median over a period, a ratio,
+a count per coupling), a dashboard chart of a daily or weekly trend for selected qubits or
+couplings, or a collision map, follow the `qdash-metric-scripts` skill. `qdash_get_timeseries`
+answers a trend question in chat; only a metric script puts the trend on a dashboard. Its reads
+are `qdash_query` actions: `metric_script_catalog`, `metric_script_templates`,
+`metric_script_template`, `metric_scripts`, `metric_script`, `dashboards`,
+`dashboard`, `dashboard_templates`, `dashboard_template`. `qdash_dashboard` is a status
+summary, not one of these dashboards.
 
 ## Session context
 

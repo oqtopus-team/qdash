@@ -217,6 +217,33 @@ class FlowEditorContext(BaseModel):
     dirty: bool = Field(default=False, description="The buffer differs from the saved flow")
 
 
+class MetricScriptEditorContext(BaseModel):
+    """The metric script open in the script editor, with the editor's current text."""
+
+    script_id: str = Field(max_length=64)
+    name: str = Field(max_length=200)
+    code: str = Field(
+        max_length=300_000, description="The editor's buffer, unsaved changes included"
+    )
+    dirty: bool = Field(default=False, description="The buffer differs from the saved script")
+
+
+class DashboardEditorContext(BaseModel):
+    """A dashboard the user may edit, with its unsaved draft as JSON.
+
+    ``dashboard_id`` is unset for a new dashboard that exists only as a draft in the browser.
+    """
+
+    dashboard_id: str | None = Field(default=None, max_length=64)
+    name: str = Field(default="", max_length=200)
+    description: str | None = Field(default=None, max_length=2000)
+    visibility: Literal["private", "project"] | None = None
+    chip_id: str | None = Field(default=None, max_length=100, description="The chip shown now")
+    version: int | None = Field(default=None, description="Stored version the draft is based on")
+    code: str = Field(max_length=300_000, description="The draft as JSON, unsaved changes included")
+    dirty: bool = Field(default=False, description="The draft differs from the saved dashboard")
+
+
 class PageContext(BaseModel):
     """What the user has open in QDash while chatting from the sidebar or floating window."""
 
@@ -224,6 +251,14 @@ class PageContext(BaseModel):
     title: str | None = Field(default=None, max_length=200)
     flow: FlowEditorContext | None = Field(
         default=None, description="Set on the Workflow editor: the flow and its current code"
+    )
+    metric_script: MetricScriptEditorContext | None = Field(
+        default=None,
+        description="Set on the metric script editor: the script and its current code",
+    )
+    dashboard: DashboardEditorContext | None = Field(
+        default=None,
+        description="Set on a dashboard the user may edit: the dashboard and its draft",
     )
 
 
@@ -235,8 +270,9 @@ class ChatRequest(ImageAttachmentsRequest):
         default=None,
         description=(
             "The page the user has open while chatting from the sidebar. The runtime "
-            "tells the model about it every turn; on the Workflow editor the model can "
-            "propose code edits the user applies in the editor."
+            "tells the model about it every turn; on the Workflow editor, the metric script "
+            "editor, or a dashboard the user may edit, the model can propose changes "
+            "the user applies on the page."
         ),
     )
     task: TaskChatTarget | None = Field(

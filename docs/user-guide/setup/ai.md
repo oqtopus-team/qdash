@@ -5,7 +5,7 @@ QDash runs calibrations without AI endpoints.
 
 | Setting | Needed for | Required |
 | --- | --- | --- |
-| [Chat endpoint](#connect-model-endpoints) | **AI Chat**, the **Ask AI** sidebar, and forum AI replies | For chat |
+| [Chat endpoint](#connect-model-endpoints) | **Agent**, the **Ask Agent** sidebar, and forum AI replies | For chat |
 | [Evaluation endpoint](#connect-model-endpoints) | **AI Evaluations** and **Evaluate** on **Chip** | For evaluations |
 | [Deployment profile](#select-a-deployment-profile) | Chat and evaluation models specific to this deployment | No |
 | [Classifier endpoint](#add-a-classifier) | Fixed result layouts and category judgments in chat | No |
@@ -142,4 +142,4 @@ docker compose up -d --build --force-recreate agent-runtime
 ```
 
 Recreating the runtime keeps saved conversations: they are stored in the `agent-runtime-state`
-volume. Continue with [AI Chat](../ai-chat.md) and [AI Evaluations](../ai-evaluations.md).
+volume. Continue with [Agent](../ai-chat.md) and [AI Evaluations](../ai-evaluations.md).

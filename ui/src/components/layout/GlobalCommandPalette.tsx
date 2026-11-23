@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Bot,
   Braces,
   Check,
   FolderKanban,
@@ -27,6 +28,7 @@ import {
   CommandList,
 } from "@/components/ui/Command";
 import { useAuth } from "@/contexts/AuthContext";
+import { useChatDock } from "@/contexts/ChatDockContext";
 import { useProject } from "@/contexts/ProjectContext";
 import { useMetricsConfig } from "@/hooks/useMetricsConfig";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -56,12 +58,15 @@ export function GlobalCommandPalette() {
   const { canEdit, projects, projectId, switchProject } = useProject();
   const { theme, setTheme } = useTheme();
   const toast = useToast();
+  const { openGeneralChat } = useChatDock();
   const [shortcut, setShortcut] = useState("Ctrl K");
   const [open, setOpen] = useState(false);
-  const isDashboard = pathname === "/dashboard";
+  const isOverview = pathname === "/overview";
   const isMetrics = pathname === "/metrics";
   const isTasks = pathname === "/tasks";
-  const hasMetricCommands = isDashboard || isMetrics;
+  // The /chat page is the chat itself and hides the chat sidebar, so opening it there shows nothing.
+  const isChatPage = pathname === "/chat";
+  const hasMetricCommands = isOverview || isMetrics;
   const { qubitMetrics, couplingMetrics } = useMetricsConfig(hasMetricCommands);
   const { data: taskFileSettings } = useGetTaskFileSettings({
     query: { enabled: isTasks, staleTime: 60_000 },
@@ -103,6 +108,12 @@ export function GlobalCommandPalette() {
     router.push(href);
   };
 
+  // Resumes the current general chat in the sidebar, or starts one, as the Ask Agent tab does.
+  const openAgentChat = () => {
+    setOpen(false);
+    openGeneralChat();
+  };
+
   const copyPageLink = async () => {
     try {
       await copyText(window.location.href);
@@ -135,7 +146,7 @@ export function GlobalCommandPalette() {
       selectMetricsPageMetric(metricType, metricKey);
       return;
     }
-    jumpToMetric(`dashboard-${metricType}-metric-${metricKey}`);
+    jumpToMetric(`overview-${metricType}-metric-${metricKey}`);
   };
 
   const selectTask = (taskName: string) => {
@@ -204,6 +215,25 @@ export function GlobalCommandPalette() {
               </CommandItem>
             </CommandGroup>
             <CommandGroup heading="Actions">
+              {!isChatPage && (
+                <CommandItem
+                  value="Open agent chat"
+                  keywords={[
+                    "agent",
+                    "chat",
+                    "copilot",
+                    "ai",
+                    "ask",
+                    "assistant",
+                    "チャット",
+                    "エージェント",
+                  ]}
+                  onSelect={openAgentChat}
+                >
+                  <Bot size={15} className="shrink-0 opacity-60" aria-hidden="true" />
+                  <span>Open agent chat</span>
+                </CommandItem>
+              )}
               <CommandItem
                 value="Open inbox"
                 keywords={["notifications", "inbox", "mentions", "通知", "受信箱"]}
@@ -242,12 +272,12 @@ export function GlobalCommandPalette() {
               </CommandGroup>
             )}
             {hasMetricCommands && (qubitMetrics.length > 0 || couplingMetrics.length > 0) && (
-              <CommandGroup heading={isMetrics ? "Switch metric" : "Dashboard metrics"}>
+              <CommandGroup heading={isMetrics ? "Switch metric" : "Overview metrics"}>
                 {qubitMetrics.map((metric) => (
                   <CommandItem
                     key={`qubit-${metric.key}`}
                     value={`${metric.title} qubit metric`}
-                    keywords={[metric.key, "dashboard", "qubit"]}
+                    keywords={[metric.key, "overview", "qubit"]}
                     onSelect={() => selectMetric("qubit", metric.key)}
                   >
                     <Gauge size={15} className="shrink-0 opacity-60" aria-hidden="true" />
@@ -259,7 +289,7 @@ export function GlobalCommandPalette() {
                   <CommandItem
                     key={`coupling-${metric.key}`}
                     value={`${metric.title} coupling metric`}
-                    keywords={[metric.key, "dashboard", "coupling"]}
+                    keywords={[metric.key, "overview", "coupling"]}
                     onSelect={() => selectMetric("coupling", metric.key)}
                   >
                     <Gauge size={15} className="shrink-0 opacity-60" aria-hidden="true" />

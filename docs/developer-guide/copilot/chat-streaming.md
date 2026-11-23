@@ -32,7 +32,7 @@ ui/src/hooks/useCopilotChat.ts
 | `chart` | Included in final `result` | Render a collected chart. |
 | `ask` | Included in final `result` | Render a question card. |
 | `approval` | Included in final `result` | Render an approval card. |
-| `edit` | Included in final `result` | Render a proposed change from `propose_code_edit`, with Apply and Discard. The proposal's `pagePath`, `flowName`, and `chipId` must match the open editor before applying. |
+| `edit` | Included in final `result` | Render a proposed change from `propose_code_edit`, with Apply and Discard. The proposal's `target` and `pagePath` must match the open editor before applying, with `flowName` and `chipId` for a flow, `scriptId` for a metric script, or `dashboardId` (null for a new dashboard) for a dashboard draft. |
 | `steer` (`applied`) | `steer` with `result` | A message sent during the answer landed in the transcript as `entry_id`. `result` holds the blocks streamed before it, with `answer`, the text it follows when it came after the run's last tool round; the API starts collecting blocks anew. The UI closes the answer so far, inserts the message, and goes on. `before_turn: true` marks a steer a recovered run placed before this turn's message (see below). |
 | `steer` (`withdrawn`) | `steer` | The run failed or was stopped before placing the message; the UI says it was not delivered. |
 | `turn_start` | `turn_start` with `result` | The turn's own message was placed. What streamed before it came from a run recovered after the runtime died, answering a steer of an earlier turn; `result` holds those blocks, with `answer`, the text that run ended with. `answer` holds only an answer committed after the stream started, so on an ordinary turn it is empty and the UI adds nothing. The UI keeps them with the earlier turn, before the new message. |
@@ -50,7 +50,10 @@ Closing the browser stream does not cancel work in the Agent Runtime. The Stop a
 separate cancellation path for the active turn. A stop reaches the turn as soon as it holds the
 store, also while its own message is still being admitted: `ActiveChat.stop` records it, and the
 turn aborts again once its submission is in, before it admits any steer. Request IDs let a retry
-recover an answer that the runtime already committed.
+recover an answer that the runtime already committed. A parked `qdash_wait_execution` or
+`qdash_wait_agent_action` call stays a running tool in the stream until it ends, and a stop ends it
+without stopping the execution in QDash (see
+[Copilot Architecture](./architecture.md#code-mode-and-deferred-tools)).
 
 One turn runs per user and store, so per conversation and across a chat's [branches](#branches); a second `/chat` request gets `409`. A message sent
 while the turn runs goes to `POST /copilot/chat/steer` instead, which the runtime's `/chat/steer`
@@ -194,7 +197,7 @@ preserve the connection without creating transcript entries.
 ## Branches
 
 A branch is a chat session that continues another one from one of its answers. It is a Pi fork
-(`Conversation.fork(at)`) in the source chat's SQLite store, not a copy of the store: Pi 1.5 has no
+(`Conversation.fork(at)`) in the source chat's SQLite store, not a copy of the store: Pi 1.6 has no
 per-conversation export, import, or delete, so the runtime never copies SQLite files or rebuilds a
 transcript. The fork starts with what Pi copies at `at`: the transcript, `pi.agent` as of that
 entry (model tools loaded through `tool_search` included), and the Code Mode store as of that

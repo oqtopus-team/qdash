@@ -227,9 +227,20 @@ test("the Python workflow publishes only from the TypeScript pipeline's release 
   assert.match(steps.slice(source), /ref: \$\{\{ github\.event\.workflow_run\.head_sha \|\| github\.sha \}\}/);
   assert.match(steps, /channel: \$\{\{ steps\.release\.outputs\.channel \}\}/);
   assert.match(steps, /SETUPTOOLS_SCM_PRETEND_VERSION: \$\{\{ steps\.release\.outputs\.version \|\| steps\.check\.outputs\.version \}\}/);
-  const publish = python.slice(python.indexOf("\n  publish:\n"));
-  assert.match(publish, /github\.event_name == 'workflow_run' &&/);
-  assert.match(publish, /pypa\/gh-action-pypi-publish@/);
+  const publish = python.slice(python.indexOf("\n  publish:\n"), python.indexOf("\n  publish-sdk:\n"));
+  const publishSdk = python.slice(python.indexOf("\n  publish-sdk:\n"));
+  for (const [job, dist] of [[publish, "qdash-client-dist"], [publishSdk, "qdash-sdk-dist"]]) {
+    assert.match(job, /github\.event_name == 'workflow_run' &&/);
+    assert.match(job, /pypa\/gh-action-pypi-publish@/);
+    // Each publisher uploads only its own package, and no repository code runs there.
+    assert.deepEqual([...job.matchAll(/^\s+name: (qdash-\S+-dist)$/gm)].map((m) => m[1]), [dist]);
+    assert.doesNotMatch(job, /actions\/checkout@|\n\s+run:/);
+  }
+  // The SDK pins qdash-client==<version>, so it publishes only after that client.
+  assert.match(publishSdk, /needs: \[build, publish\]/);
+  // Both packages of one run carry the record's version, and the build checks the pin.
+  assert.match(steps, /uv build --package qdash-client --out-dir dist\n\s+uv build --package qdash-sdk --out-dir dist/);
+  assert.match(steps, /grep -Fx "Requires-Dist: qdash-client==\$CLIENT_VERSION"/);
   // The npm client and the record come from one build output in one reusable workflow run.
   assert.match(client, /python: \$\{\{ steps\.version\.outputs\.python \}\}/);
   const upload = client.slice(client.indexOf("- name: Publish package"));
@@ -241,10 +252,10 @@ test("the Python workflow publishes only from the TypeScript pipeline's release 
   assert.match(pipeline, /uses: \.\/\.github\/workflows\/publish-qdash-typescript-client\.yml/);
   assert.doesNotMatch(triggers(client), /\n  (push|pull_request|workflow_dispatch):/);
 });
-test("the TypeScript pipeline runs for Python client changes so both betas publish together", () => {
+test("the TypeScript pipeline runs for Python client and SDK changes so all betas publish together", () => {
   const on = triggers(workflow("publish-typescript-packages.yml"));
   const push = on.slice(on.indexOf("  push:\n")).split(/\n  (?=\S)/)[0];
-  for (const path of ["clients/python/**", "clients/typescript/**", "docs/oas/openapi.json", "pyproject.toml", "uv.lock", ".github/workflows/publish-qdash-client.yml"]) {
+  for (const path of ["clients/python/**", "sdks/python/**", "clients/typescript/**", "docs/oas/openapi.json", "pyproject.toml", "uv.lock", ".github/workflows/publish-qdash-client.yml"]) {
     assert.ok(push.includes(`- "${path}"`), path);
   }
   assert.match(push, /- "v\[0-9\]\+\.\[0-9\]\+\.\[0-9\]\+"/);

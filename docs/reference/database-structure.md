@@ -80,11 +80,17 @@ runtime lifecycle, reservations, and terminal state handling.
 | `slack_forum_thread` | `SlackForumThreadDocument` | `slack_forum_thread.py` |
 | `notification` | `NotificationDocument` | `notification.py` |
 | `copilot_chat_session` | `CopilotChatSessionDocument` | `copilot_chat_session.py` |
+| `dashboard` | `DashboardDocument` | `dashboard.py` |
+| `metric_script` | `MetricScriptDocument` | `metric_script.py` |
 | `copilot_store_teardown` | None (raw collection, one lease per owner and store) | `api/services/copilot_chat_session_service.py` |
 | `copilot_store_generation` | None (raw collection, the current generation per owner and store) | `api/services/copilot_chat_session_service.py` |
 
 [Notes Architecture](../developer-guide/architecture/notes.md) explains current-state notes and
 their audit events.
+[Dashboards Architecture](../developer-guide/architecture/dashboards.md) explains
+dashboards, metric scripts, and their revisions. A `metric_script` document also stores the
+revisions each dashboard pins (`pins`, keyed by `dashboard_id`) and a `version` write counter;
+`dashboard` documents have a `version` too.
 
 ## Agent and Provenance
 

@@ -1,30 +1,47 @@
-# AI Chat
+# Agent
 
-Use AI chat to ask questions about a project's calibration data, investigate a failure, or have
+Use the Agent to ask questions about a project's calibration data, investigate a failure, or have
 the assistant draft a workflow change or a calibration run for you to approve. The assistant reads
 QDash records with your permissions; it does not replace operator judgment.
 
-AI chat needs a chat model endpoint; an administrator configures it as described in
+The Agent needs a chat model endpoint; an administrator configures it as described in
 [AI Setup](./setup/ai.md). Without one, the rest of QDash works unchanged.
 
 ## Choose an Entry Point
 
 | Entry point | Use it for |
 | --- | --- |
-| **AI Chat** in the sidebar | A project-wide conversation with cited QDash records |
-| **Ask AI** on the right edge of any page | The same chat beside the page you are on |
-| **Ask AI** on a task result | Discussing or evaluating one result |
+| **Agent** in the sidebar | A project-wide conversation with cited QDash records |
+| **Ask Agent** on the right edge of any page | The same chat beside the page you are on |
+| **Ask Agent** on a task result | Discussing or evaluating one result |
 | **Investigate with AI** in an **Error Log** | Finding the likely cause of a failed execution or task |
 | [Agent Calibration](./agent-calibration.md) | Running a separately authorized, bounded calibration plan through the client |
 
 ## Start a Conversation
 
-Open **AI Chat** for a project-wide conversation. Start a new session when the chip,
+Open **Agent** for a project-wide conversation. Start a new session when the chip,
 investigation, or goal changes substantially. QDash stores sessions so you can return to earlier
 analysis.
 
 The assistant can inspect chips, metrics, task results, forum threads, workflows, and provenance.
 Confirm the active project and chip, then check important conclusions against the cited records.
+
+### Check What the Agent Uses
+
+Above the message box, the chat lists what your next message carries besides its text. The list
+shows only what QDash knows and sends; a general chat on the **Agent** page shows none.
+
+| Item | Shown when | What it means |
+| --- | --- | --- |
+| **Result** | The chat is about one task result | The task, qubit, and chip saved with this chat; every message names them |
+| **Investigating** | The chat investigates a failure | The failed execution, with the task, qubit, and chip when known, saved with this chat |
+| **Page** | You chat from the **Ask Agent** sidebar or the floating window | The page you have open now; it follows you as you navigate, and adds **with editor code** on the **Workflow** editor and the metric script editor, and **with dashboard draft** on a dashboard you can edit |
+
+Hover over an item for its full details. The link icon on **Result** or **Investigating** opens
+the execution. The saved result or investigation cannot be removed from a chat; start a general
+chat with **New chat** on the **Agent** page instead. In the sidebar and the floating window,
+**New chat** keeps the result the current chat is about. The chat does not send a time range;
+name one in your message when it matters.
 
 ### Add to an Answer in Progress, or Continue One
 
@@ -96,10 +113,13 @@ remove them right away, QDash retries the next time it loads your chat list.
 If a branch fails because the assistant service could not be reached, select **Branch from
 here** again: QDash finishes the same branch rather than making a second one.
 
-### Ask AI Beside Any Page
+### Ask Agent Beside Any Page {#ask-ai-beside-any-page}
 
-**Ask AI** opens a sidebar with the current page as context. Drag its left edge to resize it, or
-double-click to restore the default width. Your browser remembers the width.
+**Ask Agent** opens a sidebar with the current page as context. Drag its left edge to resize it, or
+double-click to restore the default width. Your browser remembers the width. On a narrow screen
+the sidebar covers the page instead; when you apply a proposed change, it closes so you can
+review the change on the page, and **Ask Agent** on the right edge opens the chat again. A
+proposal the page refuses leaves the sidebar open.
 
 On the **Workflow** editor the assistant also sees the flow's code as it is in the editor,
 unsaved changes included. Ask for a change in plain terms, for example "add a T2 echo check after
@@ -107,6 +127,17 @@ T1". The answer shows a diff against the editor; **Apply to editor** puts the ne
 editor and unlocks it, **Discard** leaves it as it was. Nothing is saved until you select
 **Save**, which checks the flow the same way as a hand-written one.
 Apply is available only while the proposal's flow is open on the same chip.
+
+The metric script editor works the same way: the assistant sees the script as it is in the
+editor, checks its changes by validating and previewing the draft, and proposes them as a diff
+that **Apply to editor** puts into the editor of that script. See
+[Write a Script with the Agent](./metric-scripts.md#write-a-script-with-the-agent).
+
+On a dashboard you can edit, and on a new dashboard from **Create with Agent**, the assistant sees
+the unsaved draft and proposes a new one as a diff. **Apply to draft** puts it on the page;
+**Save** on the page stores it. The empty chat there suggests dashboard requests, and nothing is
+sent until you pick one or type your own. See
+[Create a Dashboard with the Agent](./dashboards.md#create-a-dashboard-with-the-agent).
 
 ### Calculations and Scripts
 
@@ -172,9 +203,9 @@ every task result is judged by the same gates as a saved workflow. The execution
 **Execution** page tagged `pipeline`. See
 [Calibration Pipeline Spec](../developer-guide/workflow/calibration-pipeline.md) for the spec format.
 
-## Ask AI About a Task Result
+## Ask Agent About a Task Result {#ask-ai-about-a-task-result}
 
-**Ask AI** appears on a task result and in a metric's history on **Metrics**. It offers two routes
+**Ask Agent** appears on a task result and in a metric's history on **Metrics**. It offers two routes
 before anything starts:
 
 - **Evaluate the figure** creates a recorded evaluation with the settings described in

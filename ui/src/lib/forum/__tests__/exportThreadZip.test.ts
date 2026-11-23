@@ -168,7 +168,7 @@ describe("buildForumThreadZip", () => {
     const { blob: couplingBlob } = await buildForumThreadZip(couplingPost, []);
     const couplingMd = strFromU8((await unzipBlob(couplingBlob))["forum-0003/thread.md"]);
     expect(couplingMd).toContain(
-      `resource: ${window.location.origin}/dashboard?chip=chip-64&type=coupling`,
+      `resource: ${window.location.origin}/overview?chip=chip-64&type=coupling`,
     );
     expect(couplingMd).toContain("title: 12-13 · chip-64");
   });

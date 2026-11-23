@@ -17,7 +17,7 @@ only in what they open with:
 
 | Entry point | Request | Opening context | Typical question |
 | --- | --- | --- | --- |
-| Chat about a task result (**Ask AI** in a metrics modal, task history, or execution detail) | `POST /copilot/chat/stream` with `task: {task_name, chip_id, qid, execution_id, task_id}` | `TaskContext` (knowledge, qubit and coupling parameters, results, history, neighbors) and figures in the opening message | "Is this T1 result normal?" |
+| Chat about a task result (**Ask Agent** in a metrics modal, task history, or execution detail) | `POST /copilot/chat/stream` with `task: {task_name, chip_id, qid, execution_id, task_id}` | `TaskContext` (knowledge, qubit and coupling parameters, results, history, neighbors) and figures in the opening message | "Is this T1 result normal?" |
 | Chat page (`/copilot`, `useCopilotChat`) | `POST /copilot/chat/stream` | Chip ID, optional qubit ID, scoring thresholds | "Compare T1 across all qubits" |
 | Failure investigation | `POST /copilot/chat/stream` with `investigation` | Error message, stack trace, and source roots; see [Failure Investigations and Source Access](#failure-investigations-and-source-access) | "Why did this run fail?" |
 | Forum AI reply | `thread_reply` / `complete_once` in `pi_chat_service.py` | The thread's history and its latest post | One planner turn per reply |
@@ -38,6 +38,7 @@ only in what they open with:
 | `agent-runtime/src/branch.ts` | Branching a chat at an answer: the Pi fork, its checks, and the `qdash.branches` receipts ([Branches](./chat-streaming.md#branches)) |
 | `src/qdash/api/services/copilot_chat_session_service.py` | Chat sessions, the store each one uses, branch creation, and store cleanup with the last session |
 | `agent-runtime/src/chat-registry.ts` | Per-session chat registry: QDash tools, copilot tools, preferences, page context, workspace tools, and Code Mode |
+| `agent-runtime/src/compaction.ts` | Compaction summaries sized to the chat's model, and the compaction failure message |
 | `agent-runtime/src/allowed-tools.ts` | Which pi-qdash tools the chat offers, which need approval, which scripts may call, and which are deferred |
 | `agent-runtime/src/exec-env.ts` | The workspace: one `agent-exec` connection per conversation behind `bash`, `read`, `write`, `edit` |
 | `src/qdash/copilot/contracts/models.py` | Pydantic models: `TaskContext`, `TaskContextBundle`, `ChatRequest` (with `task`); request schemas |
@@ -84,7 +85,8 @@ store; a branch is another conversation in the store of the chat it was branched
 [Branches](./chat-streaming.md#branches)). Pi 1.4 upgrades existing stores to schema version 2 on first open;
 Pi 1.3 cannot reopen an upgraded store. Pi 1.5 keeps that schema but stores the `pi.live`,
 `pi.tool`, and `pi.generation` documents at new versions when a conversation is next written; Pi 1.4
-cannot read such a conversation and leaves its tasks blocked. Back up the stopped volume before
+cannot read such a conversation and leaves its tasks blocked. Pi 1.6 stores `pi.tool` and
+`pi.generation` at newer versions again; Pi 1.5 blocks those tasks as too new. Back up the stopped volume before
 upgrading, and restore that backup before a rollback to the earlier Pi release. See
 [System Updates](../../user-guide/system-updates.md#deploy-the-release).
 
@@ -94,6 +96,29 @@ and `agent-runtime/src/budget.ts` calculates their thresholds. The runtime gives
 `modelOverrides` entry for each resolved model, so a resumed task uses the budget of the model it
 started with even if the next request selects another model. The selected request model also gets
 an entry when it is absent from the startup list.
+
+`buildCompactionExtension` in `agent-runtime/src/compaction.ts` writes the compaction summary through
+Pi's `beforeCompact` hook. Pi's built-in summarizer sends the chat's thinking level, so reasoning and
+the summary share the model's output limit; on the local qwen model with a 64k window and 8k output,
+the reasoning can use all of it, and the turn fails with `Compaction failed: Summarization hit the
+token limit`. The hook sends the request with thinking off and an output cap that never exceeds the
+model's stated `maxTokens`. It serializes the whole summarized range: user and assistant text,
+including an earlier summary, is never cut or left out, and only tool arguments and tool results
+are shortened per call. When the summary is cut off, the hook retries once with shorter tool
+output, which makes a second cut-off less likely but does not rule it out. Pi still chooses the
+range and places the summary whole; raw entries stay in the store, and the task's durable memo
+keeps a written summary across restarts.
+
+The hook sends no request when the model states no context window, when its output limit is
+below 512 tokens, or when the whole serialized range, with the system prompt and instructions,
+does not fit the window with room for the output. It logs the reason and sizes, never
+conversation text, and hands the compaction to the built-in summarizer instead of summarizing a
+partial transcript. A provider error or a second cut-off also hands it over once. When the
+built-in summarizer fails too, the runtime sends the error code `compaction_failed` with a message
+that points to **Continue**. Continue resumes the turn without sending the message again or
+rerunning tool calls that finished. The message also says that the stored chat is intact, and that
+after a summary the model sees the earlier part only in summarized form. The provider's error text
+goes to the runtime log only.
 
 Pi reports storage failures, faulted or interrupted tasks, migrations, and extension errors through
 `onReport`. `agent-runtime/src/durable-report.ts` logs the report kind as `type`, the task and
@@ -135,13 +160,58 @@ list here:
 The hook allows one other kind of nested call: an internal tool called by the tool that owns it.
 `present_results` calls its classifier, `qdash.presentation.classify` (`callers: ["tools"]`), as
 a nested call. `PRESENTATION_INTERNAL_CALLS` names `present_results` as the classifier's only
-caller. The policy wraps `present_results` to note its task while it executes, and allows a
-classifier call only when its parent is that task. A script's parent is the `codemode` call, so a
-script cannot reach the classifier even with Code Mode unfiltered. The note lives in the runtime
-process; a nested call whose parent it cannot match is blocked, and `present_results` then falls
-back to `render_ui` or text. Its `sources` must name a tool the model is offered, or a listed read
+caller. The hook reads which tool the parent task runs from the conversation's `pi.live` tool
+slots, which the Harness writes, and allows a classifier call only when that tool is
+`present_results`. A script's parent is the `codemode` call, so a script cannot reach the
+classifier even with Code Mode unfiltered. The slots are committed state, so the check does not
+depend on the caller's code running in this process: it also holds for a caller that parks (see
+below) or that started the call with `executeTool(..., { wait: false })`, and after a restart. A
+nested call whose parent has no slot is blocked, and `present_results` then falls back to
+`render_ui` or text. Its `sources` must name a tool the model is offered, or a listed read
 a script may call (in the agent's `callable` tools), so a script's deferred read counts before
 `tool_search` loads it.
+
+The `qdash` durable extension declares the code mode namespace `QDASH_TOOL_NAMESPACE` from
+pi-qdash's `extensions/lib/tool-policy.ts` (Pi 1.6 `Extension.namespace`). The prompt section
+lists the tools a script may call under `## qdash` with the namespace's one-line description. A
+script reads the longer instructions (the read-only rule, the data bound, deferred reads) with
+`describeNamespace("qdash")`, and `searchTools()` searches both. The namespace groups tools only;
+it does not widen what a script may call, and write tools in the same extension stay out of the
+listing, `describeNamespace()`, and `searchTools()`.
+
+Pi 1.6 also lets a durable tool's `execute()` park, returning `{ sleep }` or `{ wait }` instead of
+a result, and run again once a deadline, a signal, or its child tasks wake it. Other pi-qdash
+tools are pi CLI tools adapted by `adaptCodingAgentTool`, which runs the tool once and returns its
+result. Approval stays the card-and-next-message flow below rather than a parked call. The
+runtime's own layer passes a park through unchanged: `modelOnly` and the Code Mode wrapper keep the
+tool's `execute()` result and `cancel`, and the policy hook works for parked callers as described
+above.
+
+The pinned `qdash_wait_execution` and `qdash_wait_agent_action` park between polls instead of
+running the client's polling loop (`agent-runtime/src/durable-waits.ts`). pi-qdash's
+`extensions/lib/waits.ts` (`WAIT_SPECS`) splits each tool into one poll, `check`, and its result,
+`result`. `check` stops on the same value as the client's loop: the whole pipeline's terminal
+status for an execution, and the requested `operation_id` or `execution_id`, or a failed
+`execution_status`, for an action. The pi CLI keeps the client's loop and builds the same result
+with `result`. In chat, each run of the tool polls once with a client built from the chat's
+connection, then returns the result, throws the client's timeout error once the deadline passed,
+or parks with `{ sleep: { until } }` for one poll interval. The tool's inputs, defaults, results,
+and errors are those of the pi CLI tool. A parked wait differs from the loop in these ways:
+
+- It holds no process or open request. Its `pi.live` slot is `sleeping`, so the chat stream
+  still shows the call as running and the turn as busy, and Stop stays available.
+- Its deadline is fixed from the Harness clock when the call first runs, memoized, and carried in
+  every park's checkpoint. A wait recovered after a runtime restart polls once against that
+  original deadline, so it never outlives its timeout.
+- Stop ends a parked wait at once and drops a poll in flight. The tool has no `cancel`: waiting
+  only reads, so the execution or action keeps running in QDash. The model reads Pi's
+  `aborted` result.
+- A recovered poll uses the credentials of the request that reopened the chat; the checkpoint
+  holds only the deadline.
+
+Polls keep the requested interval, 0.5 seconds by default, so each poll also commits a park to
+the chat store. A trusted checkout that replaces either tool runs its own code. Both tools stay
+model-only, so a script cannot long-poll.
 
 Write tools therefore still run only after the user approves the model's own call on the
 approval card, never from a script. In a script, a listed read resolves to its redacted response
@@ -160,8 +230,8 @@ until that call returns. Scripts cannot start model calls (`models: false`). Eac
 has its own sandbox, which `openSession` closes after the harness.
 
 Pi offers a tool with `deferred: true` to the model only after it is loaded. The pi-qdash tools in
-`DEFERRED_TOOL_NAMES` (cryostat and wiring context, forum, pipelines, agent workflow state, source
-code, and similar narrower workflows) are deferred. The tool guide in the system prompt marks
+`DEFERRED_TOOL_NAMES` (cryostat and wiring context, forum, pipelines, agent workflow state, metric
+scripts and dashboards, source code, and similar narrower workflows) are deferred. The tool guide in the system prompt marks
 them with `*`, and the prompt lists the deferred tools the guide does not name. The
 model loads one with `tool_search`, which records it in the conversation's `modelTools`. The tool
 stays offered on that conversation branch, also after compaction or a runtime restart. A model
@@ -184,26 +254,72 @@ deferred loading, including recovery of a direct call and persistence across a r
 `agent-runtime/test/chat-registry.test.mjs` runs the production `buildChatRegistry` assembly:
 `present_results` reaches its classifier, scripts reach only the listed reads, the policy hook
 blocks the classifier for any other parent, and a script past the worker limit is refused.
+`agent-runtime/test/tool-park.test.mjs` parks tools through the policy on a real Harness: a
+caller that sleeps on a signal and calls its internal tool after the wake, a caller that parks on
+an internal call it started without waiting, a non-caller that stays blocked after a wake, and an
+abort that runs the parked tool's `cancel`. `agent-runtime/test/durable-waits.test.mjs` runs the real pi-qdash
+waiting tools on a Harness against a QDash fixture: park and wake, the chat stream while parked,
+timeout, a failed request, Stop while parked and during a poll, and recovery after a restart
+against the original deadline, each compared with the pi CLI's result or error.
+`packages/pi-qdash/tests/waits.test.mjs` compares `WAIT_SPECS` with the client's polling loops.
 
 ## Page context and editor edits
 
 A chat from the sidebar or the floating window tells the assistant what the user has open.
-Every turn carries `ChatRequest.page` (`PageContext`: route, title, and on the Workflow editor
-the flow's name, chip, and the editor's current text, unsaved changes included); the runtime
+Every turn carries `ChatRequest.page` (`PageContext`: route, title, and on an editor the
+editor's current text, unsaved changes included: `flow` with the flow's name and chip on the
+Workflow editor, `metric_script` with the script's ID and name on the metric script editor at
+`/dashboards/scripts/<id>`); the runtime
 rebuilds a system prompt section from it each turn (`agent-runtime/src/page-context.ts`,
-`buildPageContextSection`). The chat page itself sends none.
+`buildPageContextSection`). The chat page itself sends none. Above the message box, every chat
+surface lists the page with the session's saved task result or investigation
+(`ui/src/components/features/chat/ChatContextBar.tsx`).
 
 Pages register what they show with the chat dock (`ChatDockContext.registerPage`): the
-registration reads the page's state when a turn is sent, so an editor's buffer is current, and
-may accept code back (`applyCode`). Without a registration the dock sends the route and the
-document title.
+registration reads the page's state when a turn is sent (`currentPage`), so an editor's buffer is
+current, and may accept code back (`applyCode`). Without a registration the dock sends the route
+and the document title. `ChatThread` subscribes to a summary of the same page (route, title, and
+whether the editor's code is sent) through `useChatPageSummary`. The dock notifies subscribers
+when a page registers or unregisters, and a registered page calls `refreshPage` after each of its
+commits, so the list follows navigation, the editor finishing loading, and a pane switch. The
+summary holds no code, so a keystroke in the editor does not rerender the chat.
 
-On the Workflow editor the runtime also offers `propose_code_edit`: the model passes the
-complete new file and a one-line summary, the call ends the turn, and the chat renders an
-`edit` block (`EditProposalCard`) with a diff against what the editor holds now. **Apply to
-editor** replaces the buffer and unlocks the editor; saving stays with the user and goes through
-the editor's Save, so `POST /flows` validation and deployment registration are unchanged. The
-runtime never writes the flow; `qdash_save_flow` stays for flows written from the chat alone.
+On either editor the runtime also offers `propose_code_edit` (`buildProposeCodeEditTool`, for
+the editor `editorOf` finds on the page): the model passes the complete new file and a one-line
+summary, the call ends the turn, and the chat renders an `edit` block (`EditProposalCard`) with a
+diff against what the editor holds now. The proposal carries `target` (`flow`,
+`metric_script`, or `dashboard`, described below), `pagePath`, and the editor's identity: `flowName` and `chipId` for a flow,
+`scriptId` and `scriptName` for a script (`flowName` repeats the script name). **Apply to
+editor** replaces the buffer only when the open editor matches (`ui/src/lib/copilotEditTarget.ts`)
+and unlocks the editor; saving stays with the user and goes through the editor's Save, so
+`POST /flows` validation and deployment registration, and metric script revisions, are
+unchanged. The runtime never writes the flow or the script. For a metric script, the page
+section also tells the model the file is a `qdash_metrics` module, points it to the
+`qdash-metric-scripts` skill, and has it check the draft with `qdash_validate_metric_script` and
+`qdash_preview_metric_script`; `qdash_save_flow` and `qdash_save_metric_script` stay for code
+written from the chat alone or saved at the user's request.
+
+A dashboard is the third editor. `DashboardPageContent` registers
+`PageContext.dashboard` (`DashboardEditorContext` in `src/qdash/copilot/contracts/models.py`)
+only when the user may save the dashboard: their own, or a new one on `/dashboards/new`,
+which has no `dashboard_id`. Its "code" is the draft as JSON written by
+`serializeDashboardDraft` (`ui/src/components/features/dashboards/dashboardDraft.ts`):
+`{"panels": [...]}` for a stored dashboard, plus `name`, `description`, `chip_id` and
+`template_id` for a new one. `panels` is required in a proposal, and `[]` with a `template_id`
+lets the page preview the template; a missing list is refused instead of being read as "remove
+every panel". Visibility is never part of a draft, so sharing stays an explicit action. For this editor `propose_code_edit` takes the draft JSON in `code`; the runtime checks
+its shape with `parseDashboardDraft` (`agent-runtime/src/page-context.ts`), fails the call with
+the problems so the model can correct it, and otherwise sends the draft in the page's key order
+with `target: "dashboard"` and `dashboardId` (null for a new dashboard). **Apply to draft** calls
+the page's `applyCode`, which parses the draft again and returns false, with a toast, for one it
+refuses; the card then stays unapplied. When `applyCode` succeeds while the sidebar covers the
+page (below the `lg` breakpoint, `SIDEBAR_COVERS_PAGE_QUERY` in `ChatDockContext.tsx`), the dock
+closes the sidebar and calls the registration's optional `revealAppliedCode`; the dashboard page
+uses it to move focus to its edit toolbar. The chat session and the card are unchanged. Applying replaces the page's local draft (entering edit
+mode for a stored dashboard) and never writes: the page's **Save** sends `PATCH` with
+`expected_version`, or for a new dashboard `POST /dashboards` as private, so a 409 or 422
+keeps the draft. A registration may also offer `suggestions`, which the empty chat shows in
+place of the general starters; picking one sends it like any suggestion.
 
 ## Failure investigations and source access
 

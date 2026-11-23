@@ -1099,22 +1099,17 @@ html[data-theme="dark"],
    ======================================== */
 
 /*
- * First-message transition on the chat page (lib/viewTransition.ts): the mark
- * and the composer keep their names across the layout change, so the browser
- * morphs them from the centered greeting into the thread while the rest
- * cross-fades. Names are scoped to the page so the docked panel and floating
- * window, which can be open at the same time, never carry duplicates.
+ * First-message transition on the chat page (lib/viewTransition.ts): the
+ * composer keeps its name across the layout change, so the browser morphs it
+ * from the centered greeting into the thread while the rest, including the
+ * greeting's mark, cross-fades. The name is scoped to the page so the docked
+ * panel and floating window, which can be open at the same time, never carry
+ * duplicates.
  */
-.chat-page-thread .chat-avatar-hero,
-.chat-page-thread .chat-bot-mark {
-  view-transition-name: qdash-bot-mark;
-}
-
 .chat-page-thread .chat-composer {
   view-transition-name: chat-composer;
 }
 
-::view-transition-group(qdash-bot-mark),
 ::view-transition-group(chat-composer) {
   animation-duration: 420ms;
   animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -1317,22 +1312,6 @@ html[data-theme="dark"],
 /* Assistant answers sit flush left, full width, with no avatar (ChatGPT and Claude style). */
 .chat-assistant-row {
   min-width: 0;
-}
-
-/* Breathing ring on the bot mark while the answer is still being worked out. */
-.chat-avatar-active {
-  border-radius: 9999px;
-  animation: chatAvatarPulse 1.8s ease-in-out infinite;
-}
-
-@keyframes chatAvatarPulse {
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 color-mix(in oklch, var(--color-primary) 35%, transparent);
-  }
-  50% {
-    box-shadow: 0 0 0 5px color-mix(in oklch, var(--color-primary) 0%, transparent);
-  }
 }
 
 /* Inline editor for a sent user message. */
@@ -1761,9 +1740,10 @@ html[data-theme="dark"],
   box-shadow: 0 1px 2px rgb(0 0 0 / 0.04);
 }
 
+/* Approval cards stay neutral; their sections set their own padding so the
+   decision footer's rule runs edge to edge. */
 .chat-approval-card {
-  border-color: color-mix(in oklch, var(--color-warning) 40%, transparent);
-  background: color-mix(in oklch, var(--color-warning) 4%, var(--color-base-100));
+  padding: 0;
 }
 
 .chat-option {
@@ -2019,4 +1999,88 @@ html[data-theme="dark"],
   .driver-fade .driver-popover {
     animation: none;
   }
+}
+
+/* ----------------------------------------
+   Dashboard grid (react-grid-layout)
+   The library's own stylesheet is not imported: it paints a red placeholder and image
+   resize handles. These rules cover only what DashboardGrid renders.
+   ---------------------------------------- */
+.dashboard-grid-layout {
+  position: relative;
+}
+
+/* Panels follow the content width at once; only edit-mode moves animate their position. */
+.dashboard-grid-layout > .react-grid-item[data-editable] {
+  transition: transform 150ms ease;
+}
+
+.dashboard-grid-layout > .react-grid-item.react-draggable-dragging,
+.dashboard-grid-layout > .react-grid-item.resizing {
+  z-index: 3;
+  transition: none;
+}
+
+/* The cell a panel lands in when the pointer is released. */
+.dashboard-grid-layout > .react-grid-placeholder {
+  z-index: 2;
+  border: 1px dashed color-mix(in oklch, var(--color-primary) 60%, transparent);
+  border-radius: var(--radius-box);
+  background: color-mix(in oklch, var(--color-primary) 8%, transparent);
+  transition: transform 100ms ease;
+  user-select: none;
+}
+
+.dashboard-grid-layout > .react-grid-placeholder.placeholder-resizing {
+  transition: none;
+}
+
+/* Bottom-corner resize handles: a small L that strengthens on hover. */
+.dashboard-grid-layout .react-resizable-handle {
+  position: absolute;
+  bottom: 0;
+  z-index: 1;
+  width: 20px;
+  height: 20px;
+  touch-action: none;
+}
+
+.dashboard-grid-layout .react-resizable-handle-se {
+  right: 0;
+  cursor: se-resize;
+}
+
+.dashboard-grid-layout .react-resizable-handle-sw {
+  left: 0;
+  cursor: sw-resize;
+}
+
+.dashboard-grid-layout .react-resizable-handle::after {
+  position: absolute;
+  bottom: 5px;
+  width: 7px;
+  height: 7px;
+  border-bottom: 2px solid color-mix(in oklch, var(--color-base-content) 30%, transparent);
+  content: "";
+  transition: border-color 150ms ease;
+}
+
+.dashboard-grid-layout .react-resizable-handle-se::after {
+  right: 5px;
+  border-right: 2px solid color-mix(in oklch, var(--color-base-content) 30%, transparent);
+}
+
+.dashboard-grid-layout .react-resizable-handle-sw::after {
+  left: 5px;
+  border-left: 2px solid color-mix(in oklch, var(--color-base-content) 30%, transparent);
+}
+
+.dashboard-grid-layout .react-grid-item:hover > .react-resizable-handle::after,
+.dashboard-grid-layout .react-grid-item.resizing > .react-resizable-handle::after {
+  border-color: var(--color-primary);
+}
+
+.dashboard-grid-layout .react-draggable-dragging .dashboard-drag-handle,
+.dashboard-grid-layout .react-draggable-dragging .dashboard-drag-grip {
+  cursor: grabbing;
 }

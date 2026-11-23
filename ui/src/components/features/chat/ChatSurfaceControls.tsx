@@ -3,7 +3,6 @@
 import type { ReactNode } from "react";
 import { FlaskConical, History, MessageSquare } from "lucide-react";
 import { useCopilotChatSessionContext } from "@/contexts/CopilotChatSessionContext";
-import { ContextChip } from "@/components/features/chat/ChatThread";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -43,20 +42,15 @@ export function SurfaceButton({
   );
 }
 
-/** Title of the active chat, with its result badge when it has one. */
+/** Title of the active chat; its context shows above the composer. */
 export function SurfaceTitle() {
   const { activeSession } = useCopilotChatSessionContext();
   const hasMessages = Boolean(activeSession?.messages.length);
   return (
     <div className="min-w-0 flex-1">
       <div className="text-sm font-medium truncate">
-        {activeSession && hasMessages ? activeSession.title : "Ask AI"}
+        {activeSession && hasMessages ? activeSession.title : "Agent"}
       </div>
-      {activeSession?.context && hasMessages && (
-        <div className="mt-0.5">
-          <ContextChip context={activeSession.context} />
-        </div>
-      )}
     </div>
   );
 }
@@ -106,7 +100,7 @@ export function RecentChatsMenu({ onOpenAll }: { onOpenAll: () => void }) {
         ))}
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={onOpenAll}>
-          <span className="text-xs text-base-content/70">View all in AI Chat</span>
+          <span className="text-xs text-base-content/70">View all in Agent</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

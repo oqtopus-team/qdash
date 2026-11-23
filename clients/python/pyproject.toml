@@ -46,5 +46,7 @@ exclude = [
     "**/*.pyc",
 ]
 
+# qdash-sdk ships qdash/sdk; neither wheel owns the qdash namespace.
 [tool.hatch.build.targets.wheel]
-packages = ["src/qdash"]
+only-include = ["src/qdash/client"]
+sources = ["src"]

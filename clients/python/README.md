@@ -20,6 +20,11 @@ The package has two layers:
 | `src/qdash/client/services/` | High-level models, configuration, retries, validation, and agent runners |
 | `src/qdash/client/rest/` | Generated low-level HTTP transport |
 
+`src/qdash/client/services/models.py` is generated from `docs/oas/openapi.json`; regenerate it
+with `task generate` (or `task generate-python-schema` for the models alone) and never edit it by
+hand. Keep client-side models that the OpenAPI document does not describe, or that the client
+validates more leniently, in `src/qdash/client/services/client_models.py`.
+
 Add application-facing operations to `QDashClient`. Keep raw request and generated transport
 details inside the REST layer. Export public classes and response models from
 `src/qdash/client/__init__.py`, then cover the behavior in `clients/python/tests/`.
@@ -28,7 +33,8 @@ details inside the REST layer. Export public classes and response models from
 
 PyPI Trusted Publishing publishes `qdash-client` from this repository. The package version is
 derived from the repository's `v<version>` release tag; do not edit a version in
-`clients/python/pyproject.toml`.
+`clients/python/pyproject.toml`. The same workflow then publishes
+[`qdash-sdk`](../../sdks/python/README.md) with the same version.
 
 Creating the tag also publishes the TypeScript client and creates the GitHub release:
 

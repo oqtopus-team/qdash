@@ -6,7 +6,12 @@ from typing import ClassVar
 from qubex.experiment.experiment_constants import CALIBRATION_SHOTS, PI_DURATION
 from qubex.measurement.measurement_defaults import DEFAULT_INTERVAL
 
-from qdash.datamodel.task import InputParameterSpec, OutputParameterSpec, RunParameterSpec
+from qdash.datamodel.task import (
+    InputParameterSpec,
+    OutputParameterSpec,
+    RunParameterSpec,
+    TaskDocumentation,
+)
 from qdash.workflow.calibtasks.base import PostProcessResult, RunResult
 from qdash.workflow.calibtasks.qubex.base import QubexTask, readout_duration_run_parameter
 from qdash.workflow.calibtasks.qubex.validation import (
@@ -23,6 +28,28 @@ class CreateEFPIPulse(QubexTask):
 
     name: str = "CreateEFPIPulse"
     task_type: str = "qubit"
+    documentation: ClassVar[TaskDocumentation] = TaskDocumentation(
+        description=(
+            "Calibrates the amplitude of a flat-top pi pulse on the e-to-f transition and "
+            "writes ef_pi_amplitude and ef_pi_duration."
+        ),
+        when_to_use=(
+            "Run it after CheckEFRabi. CheckThermalExcitation, CheckGEFRelaxation, "
+            "CheckReadoutMIST, and CheckAdaptiveFHChevron require the EF pi pulse."
+        ),
+        prerequisites=(
+            (
+                "GE and EF drive targets configured in the current session: run ConfigureEF, or"
+                " start with ConfigureAll, using configuration_mode ge-ef-cr or ge-ef-fh."
+            ),
+            "EF Rabi parameters (ef_rabi_*) stored by CheckEFRabi.",
+            "control_frequency_ef (or ef_frequency) stored by CheckAdaptiveEFChevron.",
+            (
+                "control_frequency, control_amplitude, readout_frequency, and readout_amplitude"
+                " are stored; hpi_amplitude and hpi_duration stored by CreateHPIPulse."
+            ),
+        ),
+    )
     r2_threshold: float = DEFAULT_RABI_R2_THRESHOLD
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
         "control_frequency": InputParameterSpec.required_database(

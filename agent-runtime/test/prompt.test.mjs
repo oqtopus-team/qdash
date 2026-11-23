@@ -25,10 +25,10 @@ test("choices go through ask_user", () => {
 
 test("listed skills point the model at read_skill", () => {
   const prompt = buildSystemPrompt("auto", "en", [
-    { name: "qdash-calibration-agent", description: "Run agent calibration sessions." },
+    { name: "qdash-one-qubit-calibration", description: "Calibrate single qubits." },
   ]);
   assert.match(prompt, /call `read_skill`/);
-  assert.match(prompt, /- qdash-calibration-agent: Run agent calibration sessions\./);
+  assert.match(prompt, /- qdash-one-qubit-calibration: Calibrate single qubits\./);
   assert.doesNotMatch(buildSystemPrompt("auto", "en"), /read_skill/);
 });
 
