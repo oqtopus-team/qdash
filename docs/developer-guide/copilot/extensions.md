@@ -172,8 +172,11 @@ is not blocked.
 
 The pipeline tools and `qdash_execute_flow` reach QDash through the
 [TypeScript SDK](../architecture/typescript-sdk.md) package `@oqtopus-team/qdash-sdk`
-(`qdash.pipelines` and `qdash.workflows.run`), which builds the requests; other
-tools use `@oqtopus-team/qdash-client` directly. A profile without a project keeps
+(`qdash.pipelines` and `qdash.workflows.run`), which builds the requests, and
+`qdash_compare_calibration` compares results with `qdash.taskResults.compareLatest`; other
+tools use `@oqtopus-team/qdash-client` directly. A tool resolves the default chip and target
+from its context and adapts its arguments; the SDK or client owns the comparison and the input
+checks other callers also need. A profile without a project keeps
 running on the server's default project. Confirmation, input checks, the 422 and
 503 handling and the structured results stay in the tools. A run tool returns the execution ID as soon as QDash
 accepts the run and never calls the SDK's `wait()`; `qdash_wait_execution` follows
