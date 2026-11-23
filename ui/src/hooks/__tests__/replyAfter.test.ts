@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { ChatMessage } from "@/types/copilotChat";
-import { replyAfter } from "../useCopilotChat";
+import type { ChatMessage } from "@/types/agentChat";
+import { replyAfter } from "../useAgentChat";
 
 const approvalCard: ChatMessage = {
   role: "assistant",

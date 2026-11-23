@@ -10,7 +10,7 @@ experimental single-qubit path inspired by
 You ask for it in plain words, in the QDash web **Agent** or in pi with the pi-qdash
 extension; both offer the same tools and the same approvals. A fixed plan can also be run
 from the command line; see [Run a fixed plan from the command line](#run-a-fixed-plan-from-the-command-line).
-How this works: [Agentic Calibration](../developer-guide/copilot/agentic-calibration.md).
+How this works: [Agentic Calibration](../developer-guide/agent/agentic-calibration.md).
 
 ## Before you start
 
@@ -112,7 +112,7 @@ the session can only be stopped. The page also shows whether the Slack message w
 **Retry Slack** posts an unsent message again. A post that timed out after Slack accepted it
 cannot be told apart from a lost one, so a retry can occasionally post a second message. Slack
 messages cannot be answered or acted on from Slack. How this works:
-[Human interventions](../developer-guide/copilot/agentic-calibration.md#human-interventions).
+[Human interventions](../developer-guide/agent/agentic-calibration.md#human-interventions).
 
 ## Continue after the expert answers
 
@@ -184,7 +184,7 @@ raw data stay with each result: follow **Result and figures** to open them. Any 
 can read and export the audit; only the session's creator, through the agent, adds decisions.
 
 The audit is kept for review. Nothing turns it into skill or task-knowledge changes by itself.
-How this works: [Experiment audit](../developer-guide/copilot/agentic-calibration.md#experiment-audit).
+How this works: [Experiment audit](../developer-guide/agent/agentic-calibration.md#experiment-audit).
 
 ## Follow a session on the Execution page
 
@@ -225,7 +225,7 @@ people who approve changes remain separate actors in the session audit.
 A run tagged with a session that no step of the session started, such as one from an older
 version, stays in the list as its own run without the **Agent** label; its page says it is only
 tagged.
-How this works: [Execution grouping](../developer-guide/copilot/agentic-calibration.md#execution-grouping).
+How this works: [Execution grouping](../developer-guide/agent/agentic-calibration.md#execution-grouping).
 
 ## Run a fixed plan from the command line
 
@@ -406,7 +406,7 @@ and planner decision, and the final set of carried parameters.
 #### Autonomous plan
 
 With `--planner evaluation`, each result's AI evaluation selects the next node through the
-task knowledge's `next_actions` table; see [Knowledge Layout](../developer-guide/copilot/knowledge-layout.md).
+task knowledge's `next_actions` table; see [Knowledge Layout](../developer-guide/agent/knowledge-layout.md).
 The planner can only choose nodes already in the approved plan:
 
 | Action | Effect |
@@ -455,7 +455,7 @@ retrace the run and record a verdict on each evaluation.
 Any other planner, backed by a model, is injected through the
 [Python API](../reference/clients/python.md#agent-calibration); without `--planner` the command
 runs the plan as written. How this works:
-[Agentic Calibration](../developer-guide/copilot/agentic-calibration.md).
+[Agentic Calibration](../developer-guide/agent/agentic-calibration.md).
 
 ### Resume a stopped plan
 

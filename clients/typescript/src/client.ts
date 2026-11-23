@@ -769,15 +769,15 @@ export class QDashClient {
     return this.get(`/tasks/${pathPart(taskName)}/knowledge/markdown`);
   }
 
-  /** Source trees the Copilot may read, with the revision of each when it is known. */
+  /** Source trees the Agent may read, with the revision of each when it is known. */
   async listSourceRoots(): Promise<ListSourceRootsResponse> {
-    return this.get("/copilot/source/roots");
+    return this.get("/agent/source/roots");
   }
 
   /** Literal search in source contents (`content`) or file paths (`path`). */
   async searchSource(options: SearchSourceOptions): Promise<SearchSourceResponse> {
     return this.get(
-      "/copilot/source/search",
+      "/agent/source/search",
       query({
         query: options.query,
         root: options.root,
@@ -792,7 +792,7 @@ export class QDashClient {
   /** A numbered line range of one source file; without `root`, a traceback path is mapped. */
   async getSourceFile(options: GetSourceFileOptions): Promise<SourceFileResponse> {
     return this.get(
-      "/copilot/source/file",
+      "/agent/source/file",
       query({
         path: options.path,
         root: options.root,

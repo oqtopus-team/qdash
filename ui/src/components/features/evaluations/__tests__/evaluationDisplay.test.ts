@@ -132,7 +132,7 @@ describe("evaluationDisplay", () => {
 
   it("names the two axes of a run in the user's terms", () => {
     expect(modeLabel("direct")).toBe("Fixed prompt");
-    expect(modeLabel("planner")).toBe("Via Copilot");
+    expect(modeLabel("planner")).toBe("Via Agent");
     expect(examplesLabel(false)).toBe("Zero-shot");
     expect(examplesLabel(true)).toBe("In-context");
   });

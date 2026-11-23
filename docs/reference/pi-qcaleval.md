@@ -1,7 +1,7 @@
 # pi-qcaleval
 
 `@oqtopus-team/pi-qcaleval` evaluates calibration figures independently of QDash.
-For the QDash host integration, see [Calibration Evaluation](../developer-guide/copilot/evaluation.md).
+For the QDash host integration, see [Calibration Evaluation](../developer-guide/agent/evaluation.md).
 
 ## Tool
 
@@ -67,4 +67,4 @@ Without task-specific `criteria`, the status choices are `SUCCESS`, `SUBOPTIMAL`
 | --- | --- |
 | Output tokens | Model's `maxTokens`, capped at 4096 per answer. |
 | Temperature | Set to 0 for reproducible answers. |
-| Provider | Declare the model, base URL, and credential in pi's `models.json`. See [Pi Extension Design](../developer-guide/copilot/extensions.md#pi-qcaleval). |
+| Provider | Declare the model, base URL, and credential in pi's `models.json`. See [Pi Extension Design](../developer-guide/agent/extensions.md#pi-qcaleval). |

@@ -39,7 +39,7 @@ the recorded run. With them, an optional `decision_id` names the session's decis
 carries out; without `calibration_session_id` it raises `ValueError` before any request. A
 response that does not echo the `decision_id` raises `RuntimeError` instead of returning, since
 the run may have started without the link: reconcile it in the session audit, never retry with a
-new key. See [Calibration Sessions](../copilot/calibration-sessions.md).
+new key. See [Calibration Sessions](../agent/calibration-sessions.md).
 
 `Chip` is a front door over `Pipelines`, not a second implementation:
 `validate_calibration` and `calibrate` build a `Pipeline` from `targets`, `steps` and the
@@ -257,7 +257,7 @@ member manifests also copies `sdks/python/hatch_build.py`.
 
 `.github/workflows/publish-qdash-client.yml` builds both packages from one release record,
 publishes `qdash-client`, and then publishes `qdash-sdk`; the release pipeline is described in
-[Pi Packages](../copilot/packages.md#distribution). The workflow keeps its filename because
+[Pi Packages](../agent/packages.md#distribution). The workflow keeps its filename because
 the existing `qdash-client` PyPI Trusted Publisher names it.
 
 Python flows written against `qdash.workflow` remain the way to express loops, conditions on

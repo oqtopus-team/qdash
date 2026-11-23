@@ -9,7 +9,7 @@ import {
 import { CodeBlock } from "@/components/features/chat/CodeBlock";
 import { PipelinePreview, isPipelineSpec } from "@/components/features/chat/PipelinePreview";
 import { PierreDiffViewer } from "@/components/ui/PierreDiffViewer";
-import type { ApprovalRequest, AskRequest, EditProposal } from "@/types/copilotChat";
+import type { ApprovalRequest, AskRequest, EditProposal } from "@/types/agentChat";
 
 /** How a card behaves: open for an answer, or showing the answer it got. */
 export interface InteractionState {

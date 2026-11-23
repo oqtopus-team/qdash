@@ -1,5 +1,5 @@
 /**
- * Downloads for what Copilot generates: an answer as Markdown, a code block,
+ * Downloads for what Agent generates: an answer as Markdown, a code block,
  * and the content the agent's `write` calls sent to its workspace. Everything
  * is built in the browser from what the chat already holds; no server path is
  * fetched, and a written file is offered as the content that call wrote, not
@@ -8,7 +8,7 @@
 
 import { saveBlob } from "@/lib/utils/download";
 
-import type { CopilotBlocksResult, TraceStep } from "@/types/copilotChat";
+import type { AgentBlocksResult, TraceStep } from "@/types/agentChat";
 
 /** Longest file name offered, extension included. */
 const MAX_FILE_NAME = 120;
@@ -106,11 +106,11 @@ function fence(code: string, language = ""): string {
   return `${marker}${language}\n${code}\n${marker}`;
 }
 
-function parseBlocks(content: string): CopilotBlocksResult | null {
+function parseBlocks(content: string): AgentBlocksResult | null {
   if (!content.startsWith("{")) return null;
   try {
     const data = JSON.parse(content);
-    return data && Array.isArray(data.blocks) ? (data as CopilotBlocksResult) : null;
+    return data && Array.isArray(data.blocks) ? (data as AgentBlocksResult) : null;
   } catch {
     return null;
   }

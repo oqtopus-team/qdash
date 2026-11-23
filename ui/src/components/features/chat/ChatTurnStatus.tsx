@@ -1,8 +1,8 @@
 "use client";
 
 import { twMerge } from "tailwind-merge";
-import type { SessionRun } from "@/contexts/CopilotChatSessionContext";
-import { useCopilotChatSessionContext } from "@/contexts/CopilotChatSessionContext";
+import type { SessionRun } from "@/contexts/AgentChatSessionContext";
+import { useAgentChatSessionContext } from "@/contexts/AgentChatSessionContext";
 import {
   currentActivity,
   formatDuration,
@@ -12,11 +12,11 @@ import {
 import { stepTitle } from "@/components/features/chat/ToolStepDetails";
 import type {
   ChatMessage,
-  CopilotBlocksResult,
+  AgentBlocksResult,
   DetachedTurn,
   TraceStep,
   TurnActivitySnapshot,
-} from "@/types/copilotChat";
+} from "@/types/agentChat";
 
 /** What a chat's turn is doing, as the chat knows it from the turn's own events. */
 export interface ChatStatus {
@@ -80,9 +80,9 @@ function settledStatus(messages: ChatMessage[]): ChatStatus | null {
   const last = lastAnswer(messages);
   if (!last || last.role !== "assistant") return null;
   if (last.content.startsWith("Error: ")) return { kind: "failed", label: "Failed", tone: "error" };
-  let payload: CopilotBlocksResult | null = null;
+  let payload: AgentBlocksResult | null = null;
   try {
-    payload = JSON.parse(last.content) as CopilotBlocksResult;
+    payload = JSON.parse(last.content) as AgentBlocksResult;
   } catch {
     payload = null;
   }
@@ -225,7 +225,7 @@ export function ChatStatusLine({
 
 /** The status of one chat (the active one by default), from the chat sessions. */
 export function useChatStatus(sessionId?: string | null): ChatStatus | null {
-  const { activeSession, sessions, runs, detachedTurns } = useCopilotChatSessionContext();
+  const { activeSession, sessions, runs, detachedTurns } = useAgentChatSessionContext();
   const session =
     sessionId === undefined ? activeSession : (sessions.find((s) => s.id === sessionId) ?? null);
   if (!session) return null;

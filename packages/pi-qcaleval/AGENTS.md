@@ -3,8 +3,8 @@
 This package supplies calibration-evaluation tools and skills to pi CLI and the
 QDash Agent Runtime. Follow the repository-root `AGENTS.md` for shared policies,
 branches, checks, commits, and documentation. See the
-[pi extension design guide](../../docs/developer-guide/copilot/extensions.md)
-for architecture and the [package guide](../../docs/developer-guide/copilot/packages.md)
+[pi extension design guide](../../docs/developer-guide/agent/extensions.md)
+for architecture and the [package guide](../../docs/developer-guide/agent/packages.md)
 for development and releases.
 
 - Keep model selection, question templates, request construction, and answer parsing

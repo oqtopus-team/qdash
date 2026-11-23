@@ -63,7 +63,7 @@ describe("evaluationPrompt", () => {
     expect(profile.question).toBeNull();
   });
 
-  it("flags ingredients that varied, as they can when Copilot is in the loop", () => {
+  it("flags ingredients that varied, as they can when Agent is in the loop", () => {
     const profile = promptProfile([
       item({
         system_prompt: "S1",

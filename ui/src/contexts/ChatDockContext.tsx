@@ -11,20 +11,20 @@ import React, {
   useSyncExternalStore,
 } from "react";
 import { usePathname } from "next/navigation";
-import { useCopilotChatSessionContext } from "@/contexts/CopilotChatSessionContext";
+import { useAgentChatSessionContext } from "@/contexts/AgentChatSessionContext";
 import type {
   EditProposal,
   InvestigationTarget,
   PageContext,
   TaskChatContext,
-} from "@/types/copilotChat";
-import { matchesEditTarget } from "@/lib/copilotEditTarget";
+} from "@/types/agentChat";
+import { matchesEditTarget } from "@/lib/agentEditTarget";
 import {
   sameInvestigation,
   investigationKey,
   investigationPrompt,
   investigationTitle,
-} from "@/lib/copilotInvestigation";
+} from "@/lib/agentInvestigation";
 
 /**
  * What a page tells the chat about itself. A page registers one while it is
@@ -94,7 +94,7 @@ function sameSummary(a: PageContextSummary | null, b: PageContextSummary | null)
 /**
  * Where the in-app chat is shown outside the /chat page: the docked sidebar or
  * the floating window that sits above modals. Both render the active session
- * of CopilotChatSessionProvider, so a chat moves between them mid-stream.
+ * of AgentChatSessionProvider, so a chat moves between them mid-stream.
  */
 /** Where an investigation opens: the docked sidebar on a page, the floating window above a modal. */
 export type InvestigationSurface = "sidebar" | "mini";
@@ -171,7 +171,7 @@ export function ChatDockProvider({ children }: { children: React.ReactNode }) {
     createNewSession,
     hasSession,
     sendMessage,
-  } = useCopilotChatSessionContext();
+  } = useAgentChatSessionContext();
   const [isOpen, setIsOpen] = useState(false);
   // Read by applyCode, which keeps one identity across renders.
   const isOpenRef = useRef(isOpen);

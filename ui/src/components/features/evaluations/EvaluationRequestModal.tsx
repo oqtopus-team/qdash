@@ -10,10 +10,10 @@ import {
   getListEvaluationsQueryKey,
   useCreateEvaluationRun,
 } from "@/client/evaluation/evaluation";
-import { useGetCopilotConfig } from "@/client/copilot/copilot";
+import { useGetAgentConfig } from "@/client/agent/agent";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 import { useToast } from "@/components/ui/Toast";
-import { buildEvaluationModelOptions, type ModelOverride } from "@/lib/copilotModels";
+import { buildEvaluationModelOptions, type ModelOverride } from "@/lib/agentModels";
 import type { CreateEvaluationRunRequest, KnowledgeDraftResponse, Task } from "@/schemas";
 
 import { examplesLabel, modeLabel } from "./evaluationDisplay";
@@ -81,7 +81,7 @@ interface EvaluationRequestModalProps {
   /**
    * Opens a chat about the result instead of an evaluation. When given, the
    * modal is the one "Ask Agent" entry for a single result: a recorded evaluation
-   * (model only or via Copilot) or a conversation, chosen the same way.
+   * (model only or via Agent) or a conversation, chosen the same way.
    */
   onChat?: () => void;
   /** Called once an evaluation run has been created, before the modal closes. */
@@ -106,13 +106,13 @@ const ACTION_OPTIONS: ReadonlyArray<Option<AskAction>> = [
   },
   {
     value: "chat",
-    title: "Chat with Copilot",
+    title: "Chat with Agent",
     description:
-      "Open a conversation about this result with Copilot, its context and figures loaded. Nothing is recorded unless Copilot evaluates the figure on its own.",
+      "Open a conversation about this result with Agent, its context and figures loaded. Nothing is recorded unless Agent evaluates the figure on its own.",
   },
 ];
 
-/** Who prepares the prompt: QDash the same way every time, or Copilot. */
+/** Who prepares the prompt: QDash the same way every time, or Agent. */
 const MODE_OPTIONS: ReadonlyArray<Option<EvaluationMode>> = [
   {
     value: "direct",
@@ -122,9 +122,9 @@ const MODE_OPTIONS: ReadonlyArray<Option<EvaluationMode>> = [
   },
   {
     value: "planner",
-    title: "Via Copilot",
+    title: "Via Agent",
     description:
-      "Copilot (the chat planner) summarises the result and calls the evaluation itself, as Agent does. Slower; what Copilot did and answered is recorded too.",
+      "Agent (the chat planner) summarises the result and calls the evaluation itself, as it does in a chat. Slower; what Agent did and answered is recorded too.",
   },
 ];
 
@@ -342,10 +342,10 @@ export function EvaluationRequestModal({
   // Targets the person unticked; empty means the whole chip view, as before.
   const [excluded, setExcluded] = useState<Set<string>>(new Set());
   const create = useCreateEvaluationRun();
-  const { data: copilotConfigResponse, isLoading: modelsLoading } = useGetCopilotConfig();
+  const { data: agentConfigResponse, isLoading: modelsLoading } = useGetAgentConfig();
   const evaluationModelOptions = useMemo(
-    () => buildEvaluationModelOptions(copilotConfigResponse?.data ?? null),
-    [copilotConfigResponse?.data],
+    () => buildEvaluationModelOptions(agentConfigResponse?.data ?? null),
+    [agentConfigResponse?.data],
   );
   const evaluationModel =
     evaluationModelOptions.find((option) => option.key === evaluationModelKey) ??
@@ -470,7 +470,7 @@ export function EvaluationRequestModal({
 
           {chatting ? (
             <p className="text-xs text-base-content/60">
-              You will type your question in the chat. Copilot can call the evaluation model from
+              You will type your question in the chat. Agent can call the evaluation model from
               there; such a judgement is recorded too.
             </p>
           ) : (
@@ -489,7 +489,7 @@ export function EvaluationRequestModal({
                 draft={draft}
                 onChange={(next) => {
                   setDraft(next);
-                  // Copilot's evaluation call reads the shared knowledge.
+                  // Agent's evaluation call reads the shared knowledge.
                   if (next) setMode("direct");
                 }}
                 disabled={isSubmitting}

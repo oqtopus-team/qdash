@@ -36,7 +36,7 @@ Choose the evaluation settings before confirming:
 | --- | --- | --- |
 | **Evaluation model** | Any configured model | Choose which model judges every selected figure. The first configured model is selected initially. |
 | **Who prepares the prompt** | **Fixed prompt** | You need a fast, reproducible prompt built directly by QDash. |
-| | **Via Copilot** | You want Copilot to summarize the result and call the evaluation model. |
+| | **Via Agent** | You want Agent to summarize the result and call the evaluation model. |
 | **Examples** | **Zero-shot** | The task reference is enough. |
 | | **In-context** | Expert-labeled examples should be shown before the result. |
 
@@ -62,7 +62,7 @@ draft is read only by the run you start with it; **Knowledge** stays the same fo
 3. Drop the zip on **Knowledge**, or select that area to choose the file. The dialog shows the
    draft's statuses, parameters and example count, and lists any format warnings. A zip for a
    different task is refused.
-4. Confirm. **Who prepares the prompt** is fixed to **Fixed prompt**, because Copilot reads the
+4. Confirm. **Who prepares the prompt** is fixed to **Fixed prompt**, because Agent reads the
    shared knowledge.
 5. Compare the run with one that used the shared knowledge. The **Knowledge** row shows which
    run used the draft.
@@ -137,4 +137,4 @@ Use a comparison to measure the effect of a prompt, model, example, or result ch
 A row marked as different results means the two runs judged different task results for that
 target. Treat it as a result change, not only as a model disagreement.
 
-How this works: [Calibration Evaluation](../developer-guide/copilot/evaluation.md).
+How this works: [Calibration Evaluation](../developer-guide/agent/evaluation.md).

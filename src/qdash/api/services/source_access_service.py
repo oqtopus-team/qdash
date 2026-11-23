@@ -1,6 +1,6 @@
-"""Read-only access to QDash and dependency source code for Copilot investigations.
+"""Read-only access to QDash and dependency source code for Agent investigations.
 
-The Copilot investigates a failed execution by reading the code that raised the
+The Agent investigates a failed execution by reading the code that raised the
 error. This service exposes a fixed set of source roots (the QDash package and
 allowlisted dependencies installed in the API process) for searching and
 reading, and nothing else: paths are resolved inside a root, hidden files,
@@ -57,7 +57,7 @@ class SourceAccessError(Exception):
 
 @dataclass(frozen=True)
 class SourceRoot:
-    """One directory of source the Copilot may read."""
+    """One directory of source the Agent may read."""
 
     name: str
     path: Path

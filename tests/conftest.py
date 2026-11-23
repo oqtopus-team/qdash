@@ -74,8 +74,8 @@ os.environ.setdefault("CALIB_DATA_PATH", "/tmp/calib")
 os.environ.setdefault("QPU_DATA_PATH", "/tmp/qpu")
 os.environ["SLACK_APP_TOKEN"] = "test-app-token"  # noqa: S105
 os.environ.setdefault("OPENAI_API_KEY", "test-openai-key")
-# Tests read the default Copilot model files unless they select a profile.
-os.environ.pop("QDASH_COPILOT_PROFILE", None)
+# Tests read the default Agent model files unless they select a profile.
+os.environ.pop("QDASH_AGENT_PROFILE", None)
 
 # Qubex fitting helpers call ``fig.show()`` by default. Where a browser is discoverable (a
 # desktop host or an inherited ``BROWSER``), Plotly's default renderer serves the figure from

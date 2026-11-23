@@ -2,8 +2,8 @@
 
 The server records every turn itself, whoever watches it, so the transcript a
 chat shows after a reload is the one the server saved. This is the server's
-copy of the fold the chat page does (``ui/src/lib/copilotChatStream.ts`` and
-``runTurn`` in ``CopilotChatSessionContext.tsx``): the same trace steps, the
+copy of the fold the chat page does (``ui/src/lib/agentChatStream.ts`` and
+``runTurn`` in ``AgentChatSessionContext.tsx``): the same trace steps, the
 same limits on what is stored, and the same message shapes, so the page renders
 a saved answer exactly like one it folded itself. Kept free of I/O.
 """
@@ -14,7 +14,7 @@ import json
 import time
 from typing import TYPE_CHECKING, Any, Literal
 
-from qdash.dbmodel.copilot_chat_session import CopilotChatMessage, CopilotChatSteer
+from qdash.dbmodel.agent_chat_session import AgentChatMessage, AgentChatSteer
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -43,7 +43,7 @@ def to_json(value: Any) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Transcript digest (``transcriptDigest`` in ui/src/lib/copilotObservedTurn.ts)
+# Transcript digest (``transcriptDigest`` in ui/src/lib/agentObservedTurn.ts)
 # ---------------------------------------------------------------------------
 
 
@@ -67,7 +67,7 @@ def hash64(text: str) -> str:
     return f"{h2:08x}{h1:08x}"
 
 
-def transcript_digest(messages: list[CopilotChatMessage]) -> str:
+def transcript_digest(messages: list[AgentChatMessage]) -> str:
     """Each message's role, text, and whether it is a steer, hashed as the page does.
 
     An answer of a recorded turn counts by its turn, not its text: the server and
@@ -481,7 +481,7 @@ class TurnTranscript:
     def __init__(
         self,
         request_id: str,
-        user_message: CopilotChatMessage | None,
+        user_message: AgentChatMessage | None,
         *,
         clock: Callable[[], int] = _now_ms,
     ) -> None:
@@ -492,20 +492,20 @@ class TurnTranscript:
 
     def restart(self) -> None:
         """Fold again from the turn's start: a reattached stream replays the turn."""
-        self._before: list[CopilotChatMessage] = []
-        self._after: list[CopilotChatMessage] = []
+        self._before: list[AgentChatMessage] = []
+        self._after: list[AgentChatMessage] = []
         self._placed: set[str] = set()
         self.turn = LiveTurn(self._clock(), self._clock)
         self.end: TurnEnd | None = None
         self.error: str | None = None
-        self._final: CopilotChatMessage | None = None
+        self._final: AgentChatMessage | None = None
 
-    def _message(self, role: str, content: str, **fields: Any) -> CopilotChatMessage:
-        return CopilotChatMessage(
+    def _message(self, role: str, content: str, **fields: Any) -> AgentChatMessage:
+        return AgentChatMessage(
             role=role, content=content, turn_request_id=self.request_id, **fields
         )
 
-    def _segment(self, payload: Any, now: int) -> CopilotChatMessage | None:
+    def _segment(self, payload: Any, now: int) -> AgentChatMessage | None:
         segment = (
             _result_blocks(payload)
             if isinstance(payload, dict)
@@ -584,7 +584,7 @@ class TurnTranscript:
                 self._message(
                     "user",
                     text,
-                    steer=CopilotChatSteer(
+                    steer=AgentChatSteer(
                         request_id=request_id,
                         entry_id=entry_id,
                         placement="approximate" if before_turn else "exact",
@@ -601,7 +601,7 @@ class TurnTranscript:
         self.end = "stopped"
         self.error = None
 
-    def messages(self) -> list[CopilotChatMessage]:
+    def messages(self) -> list[AgentChatMessage]:
         """The turn's run as it stands: in progress, or its end once it ended."""
         head = [*self._before, *([self.user_message] if self.user_message else []), *self._after]
         now = self._clock()

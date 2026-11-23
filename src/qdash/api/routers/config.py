@@ -36,7 +36,7 @@ class AllConfigResponse(BaseModel):
 
     ui: UISettings = Field(default_factory=UISettings)
     metrics: dict[str, Any] = Field(default_factory=dict)
-    copilot: dict[str, Any] = Field(default_factory=dict)
+    agent: dict[str, Any] = Field(default_factory=dict)
 
 
 @router.get(
@@ -52,7 +52,7 @@ def get_config_all(
     """Get all application configuration.
 
     This endpoint returns all configuration needed by the frontend in a single
-    request, including UI settings, metrics configuration, and copilot settings.
+    request, including UI settings, metrics configuration, and agent settings.
 
     Returns
     -------
@@ -73,5 +73,5 @@ def get_config_all(
             )
         ),
         metrics=config["metrics"],
-        copilot=config["copilot"],
+        agent=config["agent"],
     )

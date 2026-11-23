@@ -70,11 +70,11 @@ for the full tool and command list.
 
 The [tool, command, and skill reference](https://oqtopus-team.github.io/qdash/reference/pi-qdash)
 describes the extension's capabilities. The
-[pi extension design guide](https://oqtopus-team.github.io/qdash/developer-guide/copilot/extensions)
+[pi extension design guide](https://oqtopus-team.github.io/qdash/developer-guide/agent/extensions)
 explains where to add tools, safety gates, and domain reasoning.
 
 Development takes place in the [QDash monorepo](https://github.com/oqtopus-team/qdash/tree/develop/packages/pi-qdash).
-Follow the [package development and release guide](https://oqtopus-team.github.io/qdash/developer-guide/copilot/packages)
+Follow the [package development and release guide](https://oqtopus-team.github.io/qdash/developer-guide/agent/packages)
 for workspace setup, checks, local pi CLI testing, and npm releases, which share QDash's version.
 Open pull requests against QDash's `develop` branch and report bugs in
 [QDash issues](https://github.com/oqtopus-team/qdash/issues).

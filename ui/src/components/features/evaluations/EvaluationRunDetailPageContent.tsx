@@ -46,7 +46,7 @@ function Stat({ label, value }: { label: string; value: ReactNode }) {
 /**
  * What the evaluation model was given in this run, read off the records: the
  * system prompt, the reference (task knowledge), labeled examples, figures and
- * question, and whether they were the same for every evaluation. With Copilot
+ * question, and whether they were the same for every evaluation. With Agent
  * in the loop they can differ per evaluation, which this makes visible; the
  * exact prompt of each evaluation is under its own "Prompt sent to the model".
  */
@@ -77,7 +77,7 @@ function RunPromptPanel({
         <span className="text-xs text-base-content/60">
           {consistent
             ? `the same ingredients for all ${profile.recorded} evaluation${profile.recorded === 1 ? "" : "s"}`
-            : `varies across the ${profile.recorded} evaluations${run.mode === "planner" ? " (Copilot wrote the context and may pass its own reference)" : ""}`}
+            : `varies across the ${profile.recorded} evaluations${run.mode === "planner" ? " (Agent wrote the context and may pass its own reference)" : ""}`}
         </span>
       </div>
       <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
@@ -280,7 +280,7 @@ export function EvaluationRunDetailPageContent({ runId }: { runId: string }) {
             }
           />
           <Stat
-            label={run.mode === "planner" ? "Copilot model" : "Mode"}
+            label={run.mode === "planner" ? "Agent model" : "Mode"}
             value={run.mode === "planner" ? run.planner_model || "-" : modeLabel(run.mode)}
           />
         </div>

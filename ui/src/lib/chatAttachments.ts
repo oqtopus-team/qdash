@@ -1,13 +1,13 @@
 /**
  * Figures the user attaches to a chat message.
  *
- * The bytes go to the Copilot runtime with the turn; the browser keeps only a
+ * The bytes go to the Agent runtime with the turn; the browser keeps only a
  * preview for the thread. Large images are downscaled before upload: vision
  * models charge tokens per pixel patch, and a calibration plot stays legible
  * well below screen resolution.
  */
 
-import type { ChatImageAttachment, ChatMessage } from "@/types/copilotChat";
+import type { ChatImageAttachment, ChatMessage } from "@/types/agentChat";
 
 /** Attachments per message; the evaluation tool reads the newest figure. */
 export const MAX_ATTACHMENTS = 4;

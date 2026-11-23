@@ -13,7 +13,7 @@ import { TaskLineageSection } from "@/components/features/provenance/TaskLineage
 import { QubitTile } from "@/components/ui/QubitTile";
 import { TaskMessagePanel } from "@/components/ui/TaskMessagePanel";
 import { InvestigateWithAiButton } from "@/components/features/chat/InvestigateWithAiButton";
-import { failedTaskInvestigation } from "@/lib/copilotInvestigation";
+import { failedTaskInvestigation } from "@/lib/agentInvestigation";
 import { useEscapeLayer } from "@/hooks/useFullscreenPanel";
 import { formatDateTime } from "@/lib/utils/datetime";
 import { getTaskParameterUiGroup } from "@/lib/utils/task-parameters";

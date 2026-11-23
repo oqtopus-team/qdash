@@ -212,7 +212,7 @@ tasks:
         fi
         if [ -z "${AGENT_RUNTIME_TOKEN:-}" ]; then
           AGENT_RUNTIME_TOKEN="$(docker compose -f compose.yaml -f compose.dev-local.yaml exec -T agent-runtime cat /run/agent-runtime-auth/token 2>/dev/null)" \
-            || echo "Pi Agent Runtime is not running: Copilot chat fails until task dev-services starts it" >&2
+            || echo "Pi Agent Runtime is not running: Agent chat fails until task dev-services starts it" >&2
           export AGENT_RUNTIME_TOKEN
         fi
         exec uv run uvicorn src.qdash.api.main:app --reload --host "$bind" --port "${API_PORT:-5715}" --forwarded-allow-ips "*"
@@ -276,7 +276,7 @@ tasks:
       - bun run build:sdk
 
   pi-local:
-    desc: Run the pi CLI with pi-qdash and the Copilot chat models from .env (args after --)
+    desc: Run the pi CLI with pi-qdash and the Agent chat models from .env (args after --)
     deps: [build-client-ts]
     cmds:
       - bun agent-runtime/src/local-cli.ts {{range .CLI_ARGS_LIST}}{{shellQuote .}} {{end}}

@@ -68,7 +68,7 @@ live("a conversation gets its own directory and runs commands there through the 
   assert.ok(workspace.cwd.startsWith(root));
 
   let output = "";
-  const run = await env.exec("pwd && echo \"$HOME\" && env | grep -c ^COPILOT_ || true", {
+  const run = await env.exec("pwd && echo \"$HOME\" && env | grep -c ^AGENT_ || true", {
     onOutput: (text) => (output += text),
   }, BACKGROUND_CONTEXT);
   assert.ok(run.ok, JSON.stringify(run));

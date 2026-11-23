@@ -1,5 +1,5 @@
 /**
- * Shared SSE (Server-Sent Events) utilities used by copilot chat and forum AI replies.
+ * Shared SSE (Server-Sent Events) utilities used by agent chat and forum AI replies.
  */
 
 import { buildAuthHeaders } from "@/lib/auth/session";

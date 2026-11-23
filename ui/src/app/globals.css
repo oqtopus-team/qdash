@@ -1204,7 +1204,7 @@ html[data-theme="dark"],
   animation: fadeInUp 0.3s ease-out;
 }
 
-/* ---- Copilot chat page ---- */
+/* ---- Agent chat page ---- */
 
 .chat-bubble-user-soft {
   background: color-mix(in oklch, var(--color-base-content) 7%, var(--color-base-100));

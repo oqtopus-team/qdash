@@ -78,5 +78,5 @@ export function ownerUid(owner: string, used: ReadonlySet<number> = new Set()): 
     const uid = UID_BASE + ((start + offset) % UID_SPAN);
     if (!used.has(uid)) return uid;
   }
-  throw new Error("Copilot workspace uid range exhausted");
+  throw new Error("Agent workspace uid range exhausted");
 }

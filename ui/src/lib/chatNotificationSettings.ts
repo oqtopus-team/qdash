@@ -2,7 +2,7 @@ import { useSyncExternalStore } from "react";
 
 /**
  * How chat notifications sound on this device: off unless the user turns it on in
- * **Settings → Copilot**, at a volume from 0 to 1. Kept in local storage; it holds no
+ * **Settings → Agent**, at a volume from 0 to 1. Kept in local storage; it holds no
  * user data and applies to whoever signs in on this browser.
  */
 export interface ChatNotificationSettings {

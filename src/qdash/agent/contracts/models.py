@@ -1,0 +1,417 @@
+"""Models for the agent task analysis feature.
+
+Defines the structured context sent to the LLM and the expected response format.
+"""
+
+from __future__ import annotations
+
+import base64
+import binascii
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any, Literal
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+if TYPE_CHECKING:
+    from qdash.agent.config import ModelConfig
+
+
+@dataclass
+class TaskContextBundle:
+    """Everything a chat about one task result opens with: context text and figures."""
+
+    context: TaskContext
+    image_base64: str | None
+    expected_images: list[tuple[str, str]]
+    experiment_images: list[tuple[str, str]] = field(default_factory=list)
+    figure_paths: list[str] = field(default_factory=list)
+
+
+class TaskContext(BaseModel):
+    """Full context of one task result for a chat about it.
+
+    Built from DB data and TaskKnowledge when a chat opens on a task result;
+    rendered into the opening message of the chat.
+    """
+
+    # Task knowledge (pre-rendered prompt)
+    task_knowledge_prompt: str = Field(description="Markdown text from TaskKnowledge.to_prompt()")
+
+    # Qubit / coupling identity
+    chip_id: str
+    qid: str
+
+    # Current qubit parameters from QubitModel.data
+    qubit_params: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Current qubit parameters (frequency, T1, T2, etc.)",
+    )
+
+    # Experiment parameters
+    input_parameters: dict[str, Any] = Field(default_factory=dict)
+    output_parameters: dict[str, Any] = Field(default_factory=dict)
+    run_parameters: dict[str, Any] = Field(default_factory=dict)
+
+    # Result summary
+    metric_value: float | None = None
+    metric_unit: str = ""
+    r2_value: float | None = None
+
+    # Historical trend (most recent values for this metric)
+    recent_values: list[float] = Field(
+        default_factory=list,
+        description="Recent metric values for trend analysis",
+    )
+
+    # Dynamic context from TaskKnowledge.related_context
+    history_results: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description="Recent completed runs: [{output_parameters, start_at, execution_id}]",
+    )
+    neighbor_qubit_params: dict[str, dict[str, Any]] = Field(
+        default_factory=dict,
+        description="Neighbor qubit parameters: {qid: {param: value}}",
+    )
+    coupling_params: dict[str, dict[str, Any]] = Field(
+        default_factory=dict,
+        description="Coupling parameters: {coupling_id: {param: value}}",
+    )
+
+
+class ApprovalDecision(BaseModel):
+    """The user's decision on a write operation the assistant asked approval for."""
+
+    id: str = Field(description="Tool call id from the approval card")
+    approve: bool
+
+
+class ChatImageAttachment(BaseModel):
+    """One figure the user attached to a chat message."""
+
+    data: str = Field(
+        description="Base64 image bytes without a data: prefix",
+        min_length=1,
+        # 6 MB of base64: the UI downscales to 1600 px, so real plots are far smaller.
+        max_length=6 * 1024 * 1024,
+    )
+    mime_type: Literal["image/png", "image/jpeg"] = Field(alias="mimeType")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    @model_validator(mode="after")
+    def validate_image_data(self) -> ChatImageAttachment:
+        """Reject invalid base64 and bytes that do not match the declared image format."""
+        try:
+            decoded = base64.b64decode(self.data, validate=True)
+        except (ValueError, binascii.Error) as exc:
+            raise ValueError("Image data must be valid base64") from exc
+        signature = b"\x89PNG\r\n\x1a\n" if self.mime_type == "image/png" else b"\xff\xd8\xff"
+        if not decoded.startswith(signature):
+            raise ValueError("Image bytes do not match the declared PNG or JPEG format")
+        return self
+
+
+class ImageAttachmentsRequest(BaseModel):
+    """Shared attachment validation for chat and analysis turns."""
+
+    images: list[ChatImageAttachment] = Field(
+        default_factory=list,
+        max_length=4,
+        description="Figures attached to this turn (at most 12 MiB of base64 in total).",
+    )
+
+    @field_validator("images")
+    @classmethod
+    def validate_total_image_size(
+        cls, images: list[ChatImageAttachment]
+    ) -> list[ChatImageAttachment]:
+        """Leave room for context below the runtime's default 20 MiB body limit."""
+        if sum(len(image.data) for image in images) > 12 * 1024 * 1024:
+            raise ValueError("Attached images exceed 12 MiB in total; use fewer or smaller images")
+        return images
+
+
+class ChatStopRequest(BaseModel):
+    """Request body for POST /agent/chat/stop."""
+
+    session_id: str = Field(description="Chat session whose running turn should stop")
+    turn_request_id: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=200,
+        description=(
+            "Request ID of the turn to stop. When set, a newer turn of the chat is left "
+            "running: a stop that arrives late never stops another turn."
+        ),
+    )
+
+
+class ChatStopResponse(BaseModel):
+    """Whether a running turn was stopped."""
+
+    stopped: bool
+
+
+class ChatActiveRequest(BaseModel):
+    """Request body for POST /agent/chat/active: which turn runs a chat now."""
+
+    session_id: str = Field(min_length=1, description="Chat session to look up")
+
+
+class ChatActiveResponse(BaseModel):
+    """The turn running a chat now, so another window can follow it.
+
+    ``turn_request_id`` names the turn only in the project it was sent from; a
+    window can reattach with it, which submits nothing, once its saved transcript
+    holds ``turn_start`` (absent for a turn sent without one: not followed). ``other_project``: a turn
+    runs, sent from another project. ``running`` false: none runs, as the
+    runtime answered; with ``unavailable`` the runtime could not be asked or
+    answered unexpectedly, so a turn may still run and must not be taken for
+    ended: ask again later.
+    """
+
+    running: bool
+    turn_request_id: str | None = None
+    continuing: bool = False
+    started_at: int | None = None
+    turn_start: ChatTurnStart | None = None
+    other_project: bool = False
+    unavailable: bool = False
+
+
+class ChatSteerRequest(BaseModel):
+    """Request body for POST /agent/chat/steer: a message sent while an answer is written."""
+
+    session_id: str = Field(min_length=1, description="Chat session whose running turn to steer")
+    request_id: str = Field(
+        min_length=1,
+        max_length=200,
+        description="Idempotency key: a retry with the same key reports the same steer",
+    )
+    turn_request_id: str = Field(
+        min_length=1,
+        max_length=200,
+        description="Request ID of the chat turn it was sent to; only that turn admits it",
+    )
+    message: str = Field(min_length=1, max_length=100_000, description="What the user wrote")
+
+
+class ChatSteerStatusRequest(BaseModel):
+    """Request body for POST /agent/chat/steer/status: where a steer stands, without sending it."""
+
+    session_id: str = Field(min_length=1, description="Chat session the steer was sent to")
+    request_id: str = Field(min_length=1, max_length=200, description="The steer's request ID")
+
+
+class ChatSteerResponse(BaseModel):
+    """Where a steer stands.
+
+    ``queued``: admitted, placed after the current tool round. ``applied``: placed in
+    the transcript as ``entry_id``. ``withdrawn``: the run failed or was stopped
+    before it was placed. ``rejected``: nothing was running; send it as a new message.
+    ``not_found`` (status lookups only): never admitted, and no longer admitted later.
+    """
+
+    status: Literal["queued", "applied", "withdrawn", "rejected", "not_found"]
+    reason: str | None = None
+    entry_id: str | None = None
+
+
+class TaskChatTarget(BaseModel):
+    """The task result a chat is about; its first turn opens with the result's context."""
+
+    task_name: str = Field(description="Task class name (e.g. CheckT1)")
+    chip_id: str
+    qid: str
+    execution_id: str
+    task_id: str
+
+
+class InvestigationTarget(BaseModel):
+    """A failed execution, or one task of it, that a chat opens to investigate.
+
+    The API loads the logs itself, scoped to the user's project; the client only
+    names the target. ``task_id``, ``task_name`` and ``qid`` narrow it to one
+    task and are optional: an execution can fail before any task result exists.
+    """
+
+    execution_id: str = Field(min_length=1, max_length=200)
+    task_id: str | None = Field(default=None, max_length=200)
+    task_name: str | None = Field(default=None, max_length=200)
+    qid: str | None = Field(default=None, max_length=100)
+    chip_id: str | None = Field(default=None, max_length=200)
+
+
+class FlowEditorContext(BaseModel):
+    """The flow open in the Workflow editor, with the editor's current text."""
+
+    name: str = Field(max_length=200)
+    chip_id: str | None = Field(default=None, max_length=100)
+    code: str = Field(
+        max_length=200_000, description="The editor's buffer, unsaved changes included"
+    )
+    dirty: bool = Field(default=False, description="The buffer differs from the saved flow")
+
+
+class MetricScriptEditorContext(BaseModel):
+    """The metric script open in the script editor, with the editor's current text."""
+
+    script_id: str = Field(max_length=64)
+    name: str = Field(max_length=200)
+    code: str = Field(
+        max_length=300_000, description="The editor's buffer, unsaved changes included"
+    )
+    dirty: bool = Field(default=False, description="The buffer differs from the saved script")
+
+
+class DashboardEditorContext(BaseModel):
+    """A dashboard the user may edit, with its unsaved draft as JSON.
+
+    ``dashboard_id`` is unset for a new dashboard that exists only as a draft in the browser.
+    """
+
+    dashboard_id: str | None = Field(default=None, max_length=64)
+    name: str = Field(default="", max_length=200)
+    description: str | None = Field(default=None, max_length=2000)
+    visibility: Literal["private", "project"] | None = None
+    chip_id: str | None = Field(default=None, max_length=100, description="The chip shown now")
+    version: int | None = Field(default=None, description="Stored version the draft is based on")
+    code: str = Field(max_length=300_000, description="The draft as JSON, unsaved changes included")
+    dirty: bool = Field(default=False, description="The draft differs from the saved dashboard")
+
+
+class PageContext(BaseModel):
+    """What the user has open in QDash while chatting from the sidebar or floating window."""
+
+    path: str = Field(max_length=512, description="The route, such as /workflow/t1_check")
+    title: str | None = Field(default=None, max_length=200)
+    flow: FlowEditorContext | None = Field(
+        default=None, description="Set on the Workflow editor: the flow and its current code"
+    )
+    metric_script: MetricScriptEditorContext | None = Field(
+        default=None,
+        description="Set on the metric script editor: the script and its current code",
+    )
+    dashboard: DashboardEditorContext | None = Field(
+        default=None,
+        description="Set on a dashboard the user may edit: the dashboard and its draft",
+    )
+
+
+class ChatTurnStart(BaseModel):
+    """Where a chat turn starts in its saved transcript, as the window that sent it saw it.
+
+    Opaque to the API and the runtime: the runtime keeps it with the running turn and
+    reports it to another window of the same user, which follows the turn only once its
+    saved transcript holds exactly this start.
+    """
+
+    index: int = Field(ge=0, description="How many messages precede the turn")
+    digest: str = Field(
+        pattern=r"^[0-9a-f]{16}$",
+        description=(
+            "Fingerprint of the messages before the turn and, unless it is a continue, "
+            "the turn's own message"
+        ),
+    )
+
+
+class ChatRequest(ImageAttachmentsRequest):
+    """Request body for POST /agent/chat/stream."""
+
+    message: str = Field(description="User question / message")
+    page: PageContext | None = Field(
+        default=None,
+        description=(
+            "The page the user has open while chatting from the sidebar. The runtime "
+            "tells the model about it every turn; on the Workflow editor, the metric script "
+            "editor, or a dashboard the user may edit, the model can propose changes "
+            "the user applies on the page."
+        ),
+    )
+    task: TaskChatTarget | None = Field(
+        default=None,
+        description=(
+            "The task result this chat is about. When set, a new conversation opens "
+            "with the result's context and figures; later turns carry it for scoping."
+        ),
+    )
+    investigation: InvestigationTarget | None = Field(
+        default=None,
+        description=(
+            "A failed execution or task to investigate. When set on a new "
+            "conversation, its first turn opens with the failure's logs, identifiers "
+            "and the source the assistant can read."
+        ),
+    )
+    session_id: str | None = Field(
+        default=None,
+        description=(
+            "Chat session identifier. Required by the Pi chat backend, which "
+            "restores conversation state from the persisted session."
+        ),
+    )
+    request_id: str | None = Field(
+        default=None,
+        description="Idempotency key for recovering or retrying one Pi submission.",
+    )
+    chip_id: str | None = None
+    qid: str | None = None
+    conversation_history: list[dict[str, str]] = Field(
+        default_factory=list,
+        description="Previous conversation messages [{role, content}, ...]",
+    )
+    image_base64: str | None = None
+    chat_model_override: ModelConfig | None = Field(
+        default=None,
+        alias="model_override",
+        description=(
+            "Optional per-request model override for general chat. "
+            "When unset, the configured chat_models[0]/model selection is used."
+        ),
+    )
+    thinking_level: Literal["off", "minimal", "low", "medium", "high"] | None = Field(
+        default=None,
+        description=(
+            "How much the planner thinks before answering, for this turn. "
+            "Unset keeps the chat model's configured reasoning_effort."
+        ),
+    )
+    approval: ApprovalDecision | None = Field(
+        default=None,
+        description="Decision on the write operation the previous turn asked approval for.",
+    )
+    continue_run: bool = Field(
+        default=False,
+        description=(
+            "Continue the last run, which ended without an answer (stopped or a model "
+            "error), instead of sending ``message``: no user message is added. Refused "
+            "after an answer, while a run is going, or while a question, an approval or a "
+            "proposed edit waits for the user."
+        ),
+    )
+    turn_start: ChatTurnStart | None = Field(
+        default=None,
+        description=(
+            "Where this turn starts in the saved transcript, so another window can follow "
+            "it only from a transcript that holds that start. Ignored on a reattach."
+        ),
+    )
+    reattach: bool = Field(
+        default=False,
+        description=(
+            "Reattach to the turn ``request_id`` started after its stream dropped, instead "
+            "of sending ``message``: nothing is submitted. A running turn streams its events "
+            "again from its start; an ended one returns its answer from the store; a request "
+            "ID the runtime has never seen is reported as ``turn_not_found``."
+        ),
+    )
+
+
+def _rebuild_models() -> None:
+    from qdash.agent.config import ModelConfig as _RuntimeModelConfig
+
+    ChatRequest.model_rebuild(_types_namespace={"ModelConfig": _RuntimeModelConfig})
+
+
+_rebuild_models()

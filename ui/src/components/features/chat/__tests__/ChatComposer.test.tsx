@@ -176,7 +176,7 @@ describe("ChatComposer instructions indicator", () => {
     expect(screen.queryByRole("link", { name: "Your instructions apply" })).toBeNull();
     rerender(<ChatComposer {...props()} instructionsActive />);
     expect(screen.getByRole("link", { name: "Your instructions apply" }).getAttribute("href")).toBe(
-      "/settings?tab=copilot",
+      "/settings?tab=agent",
     );
   });
 });

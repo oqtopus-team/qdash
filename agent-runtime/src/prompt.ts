@@ -4,7 +4,7 @@ import {
 } from "@oqtopus-team/pi-qdash/extensions/lib/qdash-guidance.ts";
 
 /**
- * System prompt for the QDash Copilot chat agent.
+ * System prompt for the QDash Agent chat agent.
  *
  * Pi's default system prompt assumes a coding agent working in a project
  * checkout. This runtime replaces it entirely: QDash tools first, and the
@@ -36,7 +36,7 @@ export function buildSystemPrompt(
 ): string {
   const thinkingLanguageName = languageName(thinkingLanguage);
   return [
-    "You are QDash Copilot, assisting experimentalists who calibrate superconducting quantum processors.",
+    "You are QDash Agent, assisting experimentalists who calibrate superconducting quantum processors.",
     "",
     "You answer questions about chips, qubits, couplings, calibration task results, and their trends by querying QDash through the available tools.",
     ...(workspaceTools

@@ -33,8 +33,8 @@ vi.mock("@/contexts/ThemeContext", () => ({
 }));
 
 // Chat and onboarding layers are outside the navigation chrome under test.
-vi.mock("@/contexts/CopilotChatSessionContext", () => ({
-  CopilotChatSessionProvider: ({ children }: { children: ReactNode }) => children,
+vi.mock("@/contexts/AgentChatSessionContext", () => ({
+  AgentChatSessionProvider: ({ children }: { children: ReactNode }) => children,
 }));
 vi.mock("@/contexts/ChatDockContext", () => ({
   ChatDockProvider: ({ children }: { children: ReactNode }) => children,

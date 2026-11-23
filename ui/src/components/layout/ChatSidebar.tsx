@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { Bot } from "lucide-react";
 import { useChatDock } from "@/contexts/ChatDockContext";
-import { useCopilotChatSessionContext } from "@/contexts/CopilotChatSessionContext";
+import { useAgentChatSessionContext } from "@/contexts/AgentChatSessionContext";
 import { DockedChatPanel } from "@/components/features/chat/DockedChatPanel";
 import {
   clampSidebarWidth,
@@ -128,7 +128,7 @@ export function useAgentTabShown(): boolean {
  * stream is attaching again or a turn is being restored, `working` otherwise, null when none.
  */
 function useAgentActivity(): "working" | "reconnecting" | null {
-  const { runs, detachedTurns } = useCopilotChatSessionContext();
+  const { runs, detachedTurns } = useAgentChatSessionContext();
   const live = Object.values(runs ?? {});
   const detached = Object.values(detachedTurns ?? {});
   if (live.length === 0 && detached.length === 0) return null;

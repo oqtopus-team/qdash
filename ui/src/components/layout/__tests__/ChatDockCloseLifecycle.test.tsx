@@ -5,11 +5,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AppLayout } from "@/components/layout/AppLayout";
 import { useChatDock } from "@/contexts/ChatDockContext";
-import { useCopilotChatSessionContext } from "@/contexts/CopilotChatSessionContext";
+import { useAgentChatSessionContext } from "@/contexts/AgentChatSessionContext";
 
 /*
  * The production composition of the in-app chat: the real AppLayout with its real
- * CopilotChatSessionProvider, ChatDockProvider, ChatNotifier, ChatSidebar, MiniChatWindow,
+ * AgentChatSessionProvider, ChatDockProvider, ChatNotifier, ChatSidebar, MiniChatWindow,
  * DockedChatPanel, and ChatThread. Only the route, the signed-in user, the navigation chrome,
  * and the network are stubbed. Closing a surface with its X must hide it and nothing else.
  */
@@ -43,10 +43,10 @@ vi.mock("@/contexts/ProjectContext", () => ({
     switchProject: vi.fn(),
   }),
 }));
-vi.mock("@/client/copilot/copilot", () => ({
-  useGetCopilotConfig: () => ({ data: undefined }),
-  useGetCopilotPreferences: () => ({ data: undefined }),
-  useListCopilotSkills: () => ({ data: undefined }),
+vi.mock("@/client/agent/agent", () => ({
+  useGetAgentConfig: () => ({ data: undefined }),
+  useGetAgentPreferences: () => ({ data: undefined }),
+  useListAgentSkills: () => ({ data: undefined }),
 }));
 vi.mock("@/hooks/useChatSuggestions", () => ({ useChatSuggestions: () => [] }));
 vi.mock("@yusufceng1z/ding-react", () => {
@@ -129,7 +129,7 @@ beforeEach(() => {
       const body = init?.body ? JSON.parse(String(init.body)) : {};
       const method = init?.method ?? "GET";
       calls.push({ url, method, body });
-      if (url.endsWith("/copilot/chat/stream")) {
+      if (url.endsWith("/agent/chat/stream")) {
         const stream = controllableStream();
         streams.push(stream);
         init?.signal?.addEventListener("abort", () => {
@@ -138,13 +138,13 @@ beforeEach(() => {
         });
         return new Response(stream.body, { status: 200 });
       }
-      if (url.endsWith("/copilot/chat/sessions") && method === "GET") {
+      if (url.endsWith("/agent/chat/sessions") && method === "GET") {
         return Response.json({ sessions: [] });
       }
-      if (url.endsWith("/copilot/chat/sessions") && method === "POST") {
+      if (url.endsWith("/agent/chat/sessions") && method === "POST") {
         return Response.json({});
       }
-      const match = /\/copilot\/chat\/sessions\/([^/]+)$/.exec(url);
+      const match = /\/agent\/chat\/sessions\/([^/]+)$/.exec(url);
       if (match && method === "PATCH") {
         if (body.messages) saved[match[1]] = body.messages;
         return Response.json({});
@@ -172,12 +172,12 @@ afterEach(() => {
 });
 
 let dock: ReturnType<typeof useChatDock>;
-let store: ReturnType<typeof useCopilotChatSessionContext>;
+let store: ReturnType<typeof useAgentChatSessionContext>;
 
 /** Reads the real dock and session store from inside the real layout. */
 function Probe() {
   dock = useChatDock();
-  store = useCopilotChatSessionContext();
+  store = useAgentChatSessionContext();
   return null;
 }
 
@@ -197,8 +197,8 @@ function renderApp() {
   );
 }
 
-const streamCalls = () => calls.filter((c) => c.url.endsWith("/copilot/chat/stream"));
-const stopCalls = () => calls.filter((c) => c.url.endsWith("/copilot/chat/stop"));
+const streamCalls = () => calls.filter((c) => c.url.endsWith("/agent/chat/stream"));
+const stopCalls = () => calls.filter((c) => c.url.endsWith("/agent/chat/stop"));
 const freshPosts = () => streamCalls().filter((c) => c.body.reattach !== true);
 
 async function startTurnInSidebar() {

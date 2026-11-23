@@ -77,13 +77,13 @@ then records the run in that calibration session before it is launched, and a re
 key returns the recorded run (`replayed: true`) instead of starting another; the response adds
 `calibration_session_id` and `pipeline_run_id`. With them, an optional `decision_id` names the
 session's decision the run carries out, and the response echoes it (see
-[Calibration Session Audit](../copilot/calibration-session-audit.md#intent-before-execution)).
+[Calibration Session Audit](../agent/calibration-session-audit.md#intent-before-execution)).
 Without them the route behaves as before. The
 recording, retry, and unknown-outcome rules are in
-[Calibration Sessions](../copilot/calibration-sessions.md#dispatch-is-recorded-before-launch).
+[Calibration Sessions](../agent/calibration-sessions.md#dispatch-is-recorded-before-launch).
 An optional `reported_origin` records how the caller says it started the run; QDash stores it as
 client reported (see
-[Reported launch origin](../copilot/calibration-sessions.md#reported-launch-origin)).
+[Reported launch origin](../agent/calibration-sessions.md#reported-launch-origin)).
 
 ### Version 1 specs
 
@@ -193,4 +193,4 @@ Readers that want the whole run use that field rather than the first execution's
 
 ## Agent use
 
-The Copilot agent composes a spec from the catalog and the flow templates, validates it, and shows the resolved steps, with each call's id, in an approval card before `execute` runs. The spec is the only thing the agent writes; the procedure it encodes still comes from the templates and Step classes, and the deterministic gates in the engine judge every task result as they do for a saved flow.
+The agent composes a spec from the catalog and the flow templates, validates it, and shows the resolved steps, with each call's id, in an approval card before `execute` runs. The spec is the only thing the agent writes; the procedure it encodes still comes from the templates and Step classes, and the deterministic gates in the engine judge every task result as they do for a saved flow.

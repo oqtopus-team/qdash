@@ -22,7 +22,7 @@ test("durable failure logs task state without recording error payloads or user i
       reason: "restart_limit",
       restarts: 3,
       task: { id: 17, kind: "generation", conversationId: 1 },
-      extension: "qdash-copilot",
+      extension: "qdash-agent",
       error: new Error("secret prompt and bearer token"),
     }),
   );

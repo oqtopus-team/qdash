@@ -97,7 +97,7 @@ session before it is launched; a retry with the same key returns the recorded ru
 `TypeError` before any request. The client throws when the response does not echo the
 `decision_id` it sent, because the run may have started without the link. A fourth argument, `{ reportedOrigin }`, sends the caller's
 `reported_origin`; set it from the calling program, never from model or user input. See
-[Calibration Sessions](../copilot/calibration-sessions.md).
+[Calibration Sessions](../agent/calibration-sessions.md).
 
 ## Packaging and release
 
@@ -105,7 +105,7 @@ The package is ESM only, ships `dist/index.js` and `dist/index.d.ts`, and requir
 later. `tsup` builds it with `@oqtopus-team/qdash-client` marked external. In the workspace the
 dependency is `workspace:*`; the release pipeline packs the SDK at the client version of the
 same run and pins the client to exactly that version, then publishes it after the client and
-before pi-qdash. [Pi Packages](../copilot/packages.md#distribution) describes the pipeline.
+before pi-qdash. [Pi Packages](../agent/packages.md#distribution) describes the pipeline.
 
 ## Tests
 

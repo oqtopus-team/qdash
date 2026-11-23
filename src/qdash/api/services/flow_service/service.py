@@ -102,7 +102,7 @@ class FlowService:
         """
         validate_flow_name(request.name)
         # None keeps the stored folder, so a client that does not know about
-        # folders (the Copilot's save tool) does not move the flow to the root.
+        # folders (the Agent's save tool) does not move the flow to the root.
         folder = normalize_folder(request.folder) if request.folder is not None else None
 
         if request.flow_function_name is None:

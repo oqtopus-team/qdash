@@ -223,6 +223,119 @@ class AgentCandidateRejection(StrEnum):
     quality_gate = "quality_gate"
 
 
+class AgentChatBranchSchema(BaseModel):
+    """
+    Where a branched chat came from.
+    """
+
+    source_session_id: Annotated[str, Field(title="Source Session Id")]
+    """
+    The chat session it was branched from
+    """
+    source_entry_id: Annotated[str, Field(title="Source Entry Id")]
+    """
+    The answer it was branched at
+    """
+
+
+class EntryId(RootModel[str]):
+    root: Annotated[str, Field(pattern="^[0-9]{1,15}$", title="Entry Id")]
+    """
+    An assistant answer's entry in the runtime's transcript, from the chat stream's result; the chat can be branched from that answer
+    """
+
+
+class TurnRequestId(RootModel[str]):
+    root: Annotated[str, Field(max_length=200, title="Turn Request Id")]
+    """
+    The chat turn this message belongs to. The server records the latest turn's messages itself; a save cannot replace them.
+    """
+
+
+class AgentChatSessionSummary(BaseModel):
+    """
+    Lightweight session entry used in the session list.
+    """
+
+    session_id: Annotated[str, Field(title="Session Id")]
+    title: Annotated[str, Field(title="Title")]
+    context: Annotated[dict[str, Any] | None, Field(title="Context")] = None
+    message_count: Annotated[int, Field(title="Message Count")] = 0
+    branch: AgentChatBranchSchema | None = None
+    created_at: Annotated[AwareDatetime, Field(title="Created At")]
+    updated_at: Annotated[AwareDatetime, Field(title="Updated At")]
+
+
+class EntryId1(RootModel[str]):
+    root: Annotated[str, Field(max_length=64, title="Entry Id")]
+
+
+class Placement(StrEnum):
+    """
+    exact: the chat saw where it landed. approximate: it was confirmed after the answer it interrupted was saved as one message, and follows that message.
+    """
+
+    exact = "exact"
+    approximate = "approximate"
+
+
+class AgentChatSteerSchema(BaseModel):
+    """
+    Where a user message sent while an answer was written landed in the conversation.
+    """
+
+    request_id: Annotated[str, Field(max_length=200, min_length=1, title="Request Id")]
+    entry_id: Annotated[EntryId1 | None, Field(title="Entry Id")] = None
+    placement: Annotated[Placement, Field(title="Placement")] = Placement.exact
+    """
+    exact: the chat saw where it landed. approximate: it was confirmed after the answer it interrupted was saved as one message, and follows that message.
+    """
+
+
+class Status(StrEnum):
+    """
+    Whether the turn still runs, or how it ended
+    """
+
+    running = "running"
+    completed = "completed"
+    failed = "failed"
+    stopped = "stopped"
+    noop = "noop"
+
+
+class AgentChatTurnSchema(BaseModel):
+    """
+    The latest turn the server records for a chat, as a reloaded page needs it.
+
+    A page that reattaches to a turn, or follows one another window started, finds
+    the turn's messages by ``request_id`` (each carries it as ``turn_request_id``)
+    and uses ``status`` to tell a running turn from one whose end is saved.
+    """
+
+    request_id: Annotated[str, Field(title="Request Id")]
+    """
+    The turn's request ID
+    """
+    project_id: Annotated[str | None, Field(title="Project Id")] = None
+    """
+    The project it was sent from
+    """
+    status: Annotated[Status, Field(title="Status")]
+    """
+    Whether the turn still runs, or how it ended
+    """
+    start_index: Annotated[int, Field(title="Start Index")]
+    """
+    How many messages precede the turn
+    """
+    continuing: Annotated[bool, Field(title="Continuing")] = False
+    """
+    A continue: no user message
+    """
+    started_at: Annotated[AwareDatetime | None, Field(title="Started At")] = None
+
+
 class AgentCheckpointCandidate(BaseModel):
     """
     An accepted candidate the plan carries; the runner re-reads its value from QDash.
@@ -521,6 +634,29 @@ class AgentPlannerVerdictRecord(BaseModel):
     status: Annotated[str, Field(max_length=200, title="Status")]
     fit_reliability: Annotated[FitReliability | None, Field(title="Fit Reliability")] = None
     evaluation_id: Annotated[str, Field(max_length=200, title="Evaluation Id")] = ""
+
+
+class AgentPreferences(BaseModel):
+    """
+    The current user's Agent preferences.
+    """
+
+    instructions: Annotated[str, Field(max_length=2000, title="Instructions")] = ""
+    """
+    Instructions added to every chat of this user (style, language, formats). They apply to chat only, not to evaluations or forum replies, and cannot override the approval of write operations.
+    """
+    max_instructions_chars: Annotated[int, Field(title="Max Instructions Chars")] = 2000
+    """
+    Longest instructions accepted
+    """
+
+
+class AgentPreferencesUpdate(BaseModel):
+    """
+    Replace the current user's Agent instructions; empty clears them.
+    """
+
+    instructions: Annotated[str, Field(max_length=2000, title="Instructions")] = ""
 
 
 class AgentQualityGateScope(StrEnum):
@@ -846,6 +982,48 @@ class AgentSessionStopRecord(BaseModel):
     """
 
 
+class AgentSkill(BaseModel):
+    """
+    A skill the chat can run; the user invokes it with ``/skill:<name>``.
+    """
+
+    name: Annotated[str, Field(title="Name")]
+    """
+    Skill name, as typed after /skill:
+    """
+    description: Annotated[str, Field(title="Description")] = ""
+    """
+    What the skill is for
+    """
+
+
+class AgentSkillList(BaseModel):
+    """
+    The skills the Agent runtime has loaded, for the chat composer's / menu.
+    """
+
+    skills: Annotated[list[AgentSkill] | None, Field(title="Skills")] = None
+
+
+class AgentSystemPrompt(BaseModel):
+    """
+    What QDash tells the chat model, read-only: its system prompt and this user's part.
+    """
+
+    system_prompt: Annotated[str, Field(title="System Prompt")]
+    """
+    QDash's system prompt for chats, set by the application
+    """
+    user_preferences: Annotated[str | None, Field(title="User Preferences")] = None
+    """
+    This user's instructions as they are appended to it, or None when unset
+    """
+    tools: Annotated[list[str] | None, Field(title="Tools")] = None
+    """
+    Tools offered to the chat; their descriptions are sent with each request
+    """
+
+
 class ApplyAgentCandidateRequest(BaseModel):
     """
     Dispatch a committed candidate for worker-side backend application.
@@ -1041,7 +1219,7 @@ class CalibrationExperimentStage(StrEnum):
     confirmation = "confirmation"
 
 
-class Status(StrEnum):
+class Status1(StrEnum):
     disabled = "disabled"
     synced = "synced"
     failed = "failed"
@@ -1052,7 +1230,7 @@ class CalibrationGitHubSync(BaseModel):
     GitHub synchronization result, independent of the applied calibration values.
     """
 
-    status: Annotated[Status, Field(title="Status")] = Status.disabled
+    status: Annotated[Status1, Field(title="Status")] = Status1.disabled
     commit: Annotated[str | None, Field(title="Commit")] = None
     message: Annotated[str, Field(title="Message")] = ""
 
@@ -1315,7 +1493,7 @@ class ChipConfigOptions(BaseModel):
     """
 
 
-class Status1(StrEnum):
+class Status2(StrEnum):
     created = "created"
     existing = "existing"
     skipped = "skipped"
@@ -1326,7 +1504,7 @@ class ChipConfigResult(BaseModel):
     Outcome of creating the chip's configuration directory.
     """
 
-    status: Annotated[Status1, Field(title="Status")]
+    status: Annotated[Status2, Field(title="Status")]
     path: Annotated[str, Field(title="Path")]
     source_system_id: Annotated[str | None, Field(title="Source System Id")] = None
     backend: Annotated[str | None, Field(title="Backend")] = None
@@ -1559,190 +1737,29 @@ class CooldownWiringEventResponse(BaseModel):
     created_at: Annotated[AwareDatetime, Field(title="Created At")]
 
 
-class CopilotChatBranchSchema(BaseModel):
-    """
-    Where a branched chat came from.
-    """
-
-    source_session_id: Annotated[str, Field(title="Source Session Id")]
-    """
-    The chat session it was branched from
-    """
-    source_entry_id: Annotated[str, Field(title="Source Entry Id")]
-    """
-    The answer it was branched at
-    """
-
-
-class EntryId(RootModel[str]):
-    root: Annotated[str, Field(pattern="^[0-9]{1,15}$", title="Entry Id")]
-    """
-    An assistant answer's entry in the runtime's transcript, from the chat stream's result; the chat can be branched from that answer
-    """
-
-
-class TurnRequestId(RootModel[str]):
-    root: Annotated[str, Field(max_length=200, title="Turn Request Id")]
-    """
-    The chat turn this message belongs to. The server records the latest turn's messages itself; a save cannot replace them.
-    """
-
-
-class CopilotChatSessionSummary(BaseModel):
-    """
-    Lightweight session entry used in the session list.
-    """
-
-    session_id: Annotated[str, Field(title="Session Id")]
-    title: Annotated[str, Field(title="Title")]
-    context: Annotated[dict[str, Any] | None, Field(title="Context")] = None
-    message_count: Annotated[int, Field(title="Message Count")] = 0
-    branch: CopilotChatBranchSchema | None = None
-    created_at: Annotated[AwareDatetime, Field(title="Created At")]
-    updated_at: Annotated[AwareDatetime, Field(title="Updated At")]
-
-
-class EntryId1(RootModel[str]):
-    root: Annotated[str, Field(max_length=64, title="Entry Id")]
-
-
-class Placement(StrEnum):
-    """
-    exact: the chat saw where it landed. approximate: it was confirmed after the answer it interrupted was saved as one message, and follows that message.
-    """
-
-    exact = "exact"
-    approximate = "approximate"
-
-
-class CopilotChatSteerSchema(BaseModel):
-    """
-    Where a user message sent while an answer was written landed in the conversation.
-    """
-
-    request_id: Annotated[str, Field(max_length=200, min_length=1, title="Request Id")]
-    entry_id: Annotated[EntryId1 | None, Field(title="Entry Id")] = None
-    placement: Annotated[Placement, Field(title="Placement")] = Placement.exact
-    """
-    exact: the chat saw where it landed. approximate: it was confirmed after the answer it interrupted was saved as one message, and follows that message.
-    """
-
-
-class Status2(StrEnum):
-    """
-    Whether the turn still runs, or how it ended
-    """
-
-    running = "running"
-    completed = "completed"
-    failed = "failed"
-    stopped = "stopped"
-    noop = "noop"
-
-
-class CopilotChatTurnSchema(BaseModel):
-    """
-    The latest turn the server records for a chat, as a reloaded page needs it.
-
-    A page that reattaches to a turn, or follows one another window started, finds
-    the turn's messages by ``request_id`` (each carries it as ``turn_request_id``)
-    and uses ``status`` to tell a running turn from one whose end is saved.
-    """
-
-    request_id: Annotated[str, Field(title="Request Id")]
-    """
-    The turn's request ID
-    """
-    project_id: Annotated[str | None, Field(title="Project Id")] = None
-    """
-    The project it was sent from
-    """
-    status: Annotated[Status2, Field(title="Status")]
-    """
-    Whether the turn still runs, or how it ended
-    """
-    start_index: Annotated[int, Field(title="Start Index")]
-    """
-    How many messages precede the turn
-    """
-    continuing: Annotated[bool, Field(title="Continuing")] = False
-    """
-    A continue: no user message
-    """
-    started_at: Annotated[AwareDatetime | None, Field(title="Started At")] = None
-
-
-class CopilotPreferences(BaseModel):
-    """
-    The current user's Copilot preferences.
-    """
-
-    instructions: Annotated[str, Field(max_length=2000, title="Instructions")] = ""
-    """
-    Instructions added to every chat of this user (style, language, formats). They apply to chat only, not to evaluations or forum replies, and cannot override the approval of write operations.
-    """
-    max_instructions_chars: Annotated[int, Field(title="Max Instructions Chars")] = 2000
-    """
-    Longest instructions accepted
-    """
-
-
-class CopilotPreferencesUpdate(BaseModel):
-    """
-    Replace the current user's Copilot instructions; empty clears them.
-    """
-
-    instructions: Annotated[str, Field(max_length=2000, title="Instructions")] = ""
-
-
-class CopilotSkill(BaseModel):
-    """
-    A skill the chat can run; the user invokes it with ``/skill:<name>``.
-    """
-
-    name: Annotated[str, Field(title="Name")]
-    """
-    Skill name, as typed after /skill:
-    """
-    description: Annotated[str, Field(title="Description")] = ""
-    """
-    What the skill is for
-    """
-
-
-class CopilotSkillList(BaseModel):
-    """
-    The skills the Copilot runtime has loaded, for the chat composer's / menu.
-    """
-
-    skills: Annotated[list[CopilotSkill] | None, Field(title="Skills")] = None
-
-
-class CopilotSystemPrompt(BaseModel):
-    """
-    What QDash tells the chat model, read-only: its system prompt and this user's part.
-    """
-
-    system_prompt: Annotated[str, Field(title="System Prompt")]
-    """
-    QDash's system prompt for chats, set by the application
-    """
-    user_preferences: Annotated[str | None, Field(title="User Preferences")] = None
-    """
-    This user's instructions as they are appended to it, or None when unset
-    """
-    tools: Annotated[list[str] | None, Field(title="Tools")] = None
-    """
-    Tools offered to the chat; their descriptions are sent with each request
-    """
-
-
 class CouplingGateDuration(BaseModel):
     """
     Gate duration of the coupling.
     """
 
     rzx90: Annotated[int, Field(title="Rzx90")]
+
+
+class CreateAgentChatBranchRequest(BaseModel):
+    """
+    Body for POST /agent/chat/sessions/{session_id}/branches.
+    """
+
+    entry_id: Annotated[str, Field(pattern="^[0-9]{1,15}$", title="Entry Id")]
+    """
+    The saved answer to branch at: its runtime entry ID
+    """
+    target_session_id: Annotated[
+        str, Field(max_length=200, min_length=1, title="Target Session Id")
+    ]
+    """
+    Client-generated ID of the new chat session; sending the same request again returns the same branch
+    """
 
 
 class NodeId(RootModel[str]):
@@ -1796,23 +1813,6 @@ class CreateChipRequest(BaseModel):
     config: ChipConfigOptions | None = None
     """
     Qubex configuration directory to create; defaults to creating one
-    """
-
-
-class CreateCopilotChatBranchRequest(BaseModel):
-    """
-    Body for POST /copilot/chat/sessions/{session_id}/branches.
-    """
-
-    entry_id: Annotated[str, Field(pattern="^[0-9]{1,15}$", title="Entry Id")]
-    """
-    The saved answer to branch at: its runtime entry ID
-    """
-    target_session_id: Annotated[
-        str, Field(max_length=200, min_length=1, title="Target Session Id")
-    ]
-    """
-    Client-generated ID of the new chat session; sending the same request again returns the same branch
     """
 
 
@@ -3582,6 +3582,14 @@ class LineageEdgeResponse(BaseModel):
     target_id: Annotated[str, Field(title="Target Id")]
 
 
+class ListAgentChatSessionsResponse(BaseModel):
+    """
+    Response for GET /agent/chat/sessions.
+    """
+
+    sessions: Annotated[list[AgentChatSessionSummary], Field(title="Sessions")]
+
+
 class ListBackendsResponse(BaseModel):
     """
     Response model for listing all backends.
@@ -3614,14 +3622,6 @@ class ListConfigSourcesResponse(BaseModel):
 
 class ListCooldownWiringEventsResponse(BaseModel):
     events: Annotated[list[CooldownWiringEventResponse], Field(title="Events")]
-
-
-class ListCopilotChatSessionsResponse(BaseModel):
-    """
-    Response for GET /copilot/chat/sessions.
-    """
-
-    sessions: Annotated[list[CopilotChatSessionSummary], Field(title="Sessions")]
 
 
 class ListDashboardTemplatesResponse(BaseModel):
@@ -5674,7 +5674,7 @@ class SourceFileResponse(BaseModel):
 
 class SourceRootResponse(BaseModel):
     """
-    One source tree the Copilot can search and read.
+    One source tree the Agent can search and read.
     """
 
     name: Annotated[str, Field(title="Name")]
@@ -7458,6 +7458,53 @@ class AgentCandidateSetCommitResponse(BaseModel):
     committed_at: Annotated[AwareDatetime | None, Field(title="Committed At")] = None
 
 
+class AgentChatMessageSchema(BaseModel):
+    """
+    One message inside an agent chat session.
+    """
+
+    role: Annotated[str, Field(title="Role")]
+    """
+    "user" or "assistant"
+    """
+    content: Annotated[str, Field(title="Content")]
+    """
+    Message content
+    """
+    attached_image: Annotated[str | None, Field(title="Attached Image")] = None
+    steer: AgentChatSteerSchema | None = None
+    """
+    Set on a user message sent while an answer was written
+    """
+    entry_id: Annotated[EntryId | None, Field(title="Entry Id")] = None
+    """
+    An assistant answer's entry in the runtime's transcript, from the chat stream's result; the chat can be branched from that answer
+    """
+    turn_request_id: Annotated[TurnRequestId | None, Field(title="Turn Request Id")] = None
+    """
+    The chat turn this message belongs to. The server records the latest turn's messages itself; a save cannot replace them.
+    """
+    created_at: Annotated[AwareDatetime | None, Field(title="Created At")] = None
+
+
+class AgentChatSessionResponse(BaseModel):
+    """
+    Full session payload returned to the client.
+    """
+
+    session_id: Annotated[str, Field(title="Session Id")]
+    title: Annotated[str, Field(title="Title")]
+    context: Annotated[dict[str, Any] | None, Field(title="Context")] = None
+    messages: Annotated[list[AgentChatMessageSchema] | None, Field(title="Messages")] = None
+    branch: AgentChatBranchSchema | None = None
+    turn: AgentChatTurnSchema | None = None
+    """
+    The latest turn the server records for the chat
+    """
+    created_at: Annotated[AwareDatetime, Field(title="Created At")]
+    updated_at: Annotated[AwareDatetime, Field(title="Updated At")]
+
+
 class AgentDecisionResponse(BaseModel):
     """
     One recorded agent decision with QDash's frozen reading of its evidence.
@@ -8078,53 +8125,6 @@ class CooldownResponse(BaseModel):
     wiring_blocks: Annotated[list[dict[str, Any]] | None, Field(title="Wiring Blocks")] = None
 
 
-class CopilotChatMessageSchema(BaseModel):
-    """
-    One message inside a copilot chat session.
-    """
-
-    role: Annotated[str, Field(title="Role")]
-    """
-    "user" or "assistant"
-    """
-    content: Annotated[str, Field(title="Content")]
-    """
-    Message content
-    """
-    attached_image: Annotated[str | None, Field(title="Attached Image")] = None
-    steer: CopilotChatSteerSchema | None = None
-    """
-    Set on a user message sent while an answer was written
-    """
-    entry_id: Annotated[EntryId | None, Field(title="Entry Id")] = None
-    """
-    An assistant answer's entry in the runtime's transcript, from the chat stream's result; the chat can be branched from that answer
-    """
-    turn_request_id: Annotated[TurnRequestId | None, Field(title="Turn Request Id")] = None
-    """
-    The chat turn this message belongs to. The server records the latest turn's messages itself; a save cannot replace them.
-    """
-    created_at: Annotated[AwareDatetime | None, Field(title="Created At")] = None
-
-
-class CopilotChatSessionResponse(BaseModel):
-    """
-    Full session payload returned to the client.
-    """
-
-    session_id: Annotated[str, Field(title="Session Id")]
-    title: Annotated[str, Field(title="Title")]
-    context: Annotated[dict[str, Any] | None, Field(title="Context")] = None
-    messages: Annotated[list[CopilotChatMessageSchema] | None, Field(title="Messages")] = None
-    branch: CopilotChatBranchSchema | None = None
-    turn: CopilotChatTurnSchema | None = None
-    """
-    The latest turn the server records for the chat
-    """
-    created_at: Annotated[AwareDatetime, Field(title="Created At")]
-    updated_at: Annotated[AwareDatetime, Field(title="Updated At")]
-
-
 class Coupling(BaseModel):
     """
     Coupling information.
@@ -8147,6 +8147,20 @@ class CouplingResponse(BaseModel):
     data: Annotated[dict[str, Any], Field(title="Data")] = {}
     note: NoteModel | None = None
     metric_notes: Annotated[dict[str, NoteModel] | None, Field(title="Metric Notes")] = None
+
+
+class CreateAgentChatSessionRequest(BaseModel):
+    """
+    Body for POST /agent/chat/sessions.
+    """
+
+    session_id: Annotated[str, Field(title="Session Id")]
+    """
+    Client-generated session identifier
+    """
+    title: Annotated[str, Field(title="Title")] = "New Chat"
+    context: Annotated[dict[str, Any] | None, Field(title="Context")] = None
+    messages: Annotated[list[AgentChatMessageSchema] | None, Field(title="Messages")] = None
 
 
 class CreateAgentInterventionRequest(BaseModel):
@@ -8225,20 +8239,6 @@ class CreateChipResponse(BaseModel):
     current_cooldown_id: Annotated[str | None, Field(title="Current Cooldown Id")] = None
     note: NoteModel | None = None
     config: ChipConfigResult | None = None
-
-
-class CreateCopilotChatSessionRequest(BaseModel):
-    """
-    Body for POST /copilot/chat/sessions.
-    """
-
-    session_id: Annotated[str, Field(title="Session Id")]
-    """
-    Client-generated session identifier
-    """
-    title: Annotated[str, Field(title="Title")] = "New Chat"
-    context: Annotated[dict[str, Any] | None, Field(title="Context")] = None
-    messages: Annotated[list[CopilotChatMessageSchema] | None, Field(title="Messages")] = None
 
 
 class CreateEvaluationRunRequest(BaseModel):
@@ -10030,14 +10030,14 @@ class UISettings(BaseModel):
     task_files: UITaskFilesSettings | None = None
 
 
-class UpdateCopilotChatSessionRequest(BaseModel):
+class UpdateAgentChatSessionRequest(BaseModel):
     """
-    Body for PATCH /copilot/chat/sessions/{session_id}.
+    Body for PATCH /agent/chat/sessions/{session_id}.
     """
 
     title: Annotated[str | None, Field(title="Title")] = None
     context: Annotated[dict[str, Any] | None, Field(title="Context")] = None
-    messages: Annotated[list[CopilotChatMessageSchema] | None, Field(title="Messages")] = None
+    messages: Annotated[list[AgentChatMessageSchema] | None, Field(title="Messages")] = None
 
 
 class ValidatePipelineResponse(BaseModel):
@@ -10366,7 +10366,7 @@ class AllConfigResponse(BaseModel):
 
     ui: UISettings | None = None
     metrics: Annotated[dict[str, Any] | None, Field(title="Metrics")] = None
-    copilot: Annotated[dict[str, Any] | None, Field(title="Copilot")] = None
+    agent: Annotated[dict[str, Any] | None, Field(title="Agent")] = None
 
 
 class BulkUserImportResponse(BaseModel):

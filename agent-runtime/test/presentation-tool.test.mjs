@@ -88,7 +88,7 @@ function allowedValues(args) {
 
 // --- config ---
 
-const repoFile = (name) => readFileSync(new URL(`../../config/copilot/${name}`, import.meta.url), "utf8");
+const repoFile = (name) => readFileSync(new URL(`../../config/agent/${name}`, import.meta.url), "utf8");
 
 function fakeRuntime({ providers = [], catalog = [], auth = [] } = {}) {
   const registered = [];

@@ -9,7 +9,7 @@ describe("next.config.js", () => {
   it("leaves /api and /prefect to Caddy", () => {
     // Caddy proxies /api and /prefect, with the Prefect access check, in production
     // and under `task dev-local`. A Next.js rewrite or route handler under /api would
-    // bypass that check or buffer the Copilot chat stream.
+    // bypass that check or buffer the Agent chat stream.
     expect("rewrites" in nextConfig).toBe(false);
     expect(existsSync(resolve(__dirname, "../../app/api"))).toBe(false);
   });

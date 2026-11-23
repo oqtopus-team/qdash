@@ -20,7 +20,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/DropdownMenu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
-import type { CopilotSession } from "@/hooks/useCopilotChat";
+import type { AgentSession } from "@/hooks/useAgentChat";
 
 const DAY_MS = 86_400_000;
 
@@ -33,9 +33,9 @@ function groupLabel(ts: number, now: Date): string {
   return "Older";
 }
 
-function groupSessions(sessions: CopilotSession[]): [string, CopilotSession[]][] {
+function groupSessions(sessions: AgentSession[]): [string, AgentSession[]][] {
   const now = new Date();
-  const groups = new Map<string, CopilotSession[]>();
+  const groups = new Map<string, AgentSession[]>();
   for (const session of [...sessions].sort((a, b) => b.updatedAt - a.updatedAt)) {
     const label = groupLabel(session.updatedAt, now);
     const list = groups.get(label);
@@ -106,7 +106,7 @@ export function SessionMenu({
   className,
   onOpenChange,
 }: {
-  session: CopilotSession;
+  session: AgentSession;
   onRename: () => void;
   onDelete: () => void;
   className?: string;
@@ -138,7 +138,7 @@ export function SessionMenu({
 }
 
 interface ChatSidebarProps {
-  sessions: CopilotSession[];
+  sessions: AgentSession[];
   activeSessionId: string | null;
   /** Sessions with an answer streaming right now. */
   runningSessionIds?: readonly string[];
@@ -162,7 +162,7 @@ export function ChatSidebar({
   onClose,
 }: ChatSidebarProps) {
   const [query, setQuery] = useState("");
-  const [pendingDelete, setPendingDelete] = useState<CopilotSession | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<AgentSession | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
 

@@ -165,7 +165,7 @@ requires: a `.env` copied from an example has `9.0.8`, and an older `.env` needs
 already wrote its `MONGO_DATA_PATH`, read as in
 [Prepare the Update](../user-guide/system-updates.md#prepare-the-update). Use this flow when editing backend or frontend code
 frequently. The `caddy` service of the Compose deployment serves the browser on `UI_PORT` with
-the same Caddyfile, so `/api`, `/prefect` with its sign-in check, and the Copilot chat stream
+the same Caddyfile, so `/api`, `/prefect` with its sign-in check, and the Agent chat stream
 behave as in production.
 
 The component tasks are:
