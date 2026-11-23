@@ -244,6 +244,9 @@ _SESSION_FIELDS = {
     "expires_at": 1,
     "created_by": 1,
     "model": 1,
+    # The calibration session an admitted session belongs to, for the grouped list.
+    "calibration_session_id": 1,
+    "calibration_admission": 1,
 }
 
 

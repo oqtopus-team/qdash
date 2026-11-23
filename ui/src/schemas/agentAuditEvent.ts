@@ -8,6 +8,7 @@
 import type { AgentAuditEventActionId } from './agentAuditEventActionId';
 import type { AgentAuditEventActor } from './agentAuditEventActor';
 import type { AgentAuditEventActorKind } from './agentAuditEventActorKind';
+import type { AgentAuditEventAgentSessionId } from './agentAuditEventAgentSessionId';
 import type { AgentAuditEventCommitId } from './agentAuditEventCommitId';
 import type { AgentAuditEventData } from './agentAuditEventData';
 import type { AgentAuditEventDecisionId } from './agentAuditEventDecisionId';
@@ -15,6 +16,7 @@ import type { AgentAuditEventEvaluationId } from './agentAuditEventEvaluationId'
 import type { AgentAuditEventExecutionId } from './agentAuditEventExecutionId';
 import type { AgentAuditEventInterventionId } from './agentAuditEventInterventionId';
 import type { AgentAuditEventModel } from './agentAuditEventModel';
+import type { AgentAuditEventPipelineRunId } from './agentAuditEventPipelineRunId';
 import type { AgentAuditEventProvenance } from './agentAuditEventProvenance';
 import type { AgentAuditEventQid } from './agentAuditEventQid';
 import type { AgentAuditEventStatus } from './agentAuditEventStatus';
@@ -33,14 +35,14 @@ export interface AgentAuditEvent {
   at: string;
   /** Session state version the event belongs to: recorded by its source record, or inherited from its action or commit. Orders events that share a timestamp. */
   state_version: number;
-  /** session_created, action_proposed, measurement, evaluation, decision, candidate_commit, candidate_set_commit, backend_apply, intervention_opened, intervention_response, intervention_resumed, resume_outcome, or session_stopped */
+  /** session_created, action_proposed, measurement, evaluation, decision, candidate_commit, candidate_set_commit, backend_apply, intervention_opened, intervention_response, intervention_resumed, resume_outcome, or session_stopped; a calibration session's audit adds pipeline_requested, pipeline_dispatch, agent_session_linked, and session_closed */
   kind: string;
   /** One readable line about the event */
   summary: string;
   /** Who acted, when a record names them */
   actor?: AgentAuditEventActor;
   actor_kind?: AgentAuditEventActorKind;
-  /** server_record: QDash recorded it; server_computed: derived at read time from immutable records; agent_reported, human_reported, evaluator_reported: text that party supplied, recorded as given */
+  /** server_record: QDash recorded it; server_computed: derived at read time from immutable records; agent_reported, human_reported, evaluator_reported: text that party supplied, recorded as given; client_reported: text a client sent without saying whether an agent or a person wrote it */
   provenance: AgentAuditEventProvenance;
   /** Status of the source record */
   status?: AgentAuditEventStatus;
@@ -55,6 +57,10 @@ export interface AgentAuditEvent {
   evaluation_id?: AgentAuditEventEvaluationId;
   intervention_id?: AgentAuditEventInterventionId;
   decision_id?: AgentAuditEventDecisionId;
+  /** The calibration session pipeline run the event belongs to, if any */
+  pipeline_run_id?: AgentAuditEventPipelineRunId;
+  /** In a calibration session's audit: the agent session an event comes from. Always null in an agent session's own audit */
+  agent_session_id?: AgentAuditEventAgentSessionId;
   /** The model the client host reported for the record behind an agent event: the session's creation, an action proposal, a decision, an agent's intervention request, or a commit made under session authority (the model of the decision it rests on). Client reported, not verified by QDash; null when none was reported, and then named in missing */
   model?: AgentAuditEventModel;
   /** Facts the records do not hold for this event; never filled in */

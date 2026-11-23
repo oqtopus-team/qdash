@@ -247,6 +247,10 @@ export default withMermaid(
                 { text: "Agent Platform", link: "/developer-guide/copilot/agent-platform" },
                 { text: "Agentic Calibration", link: "/developer-guide/copilot/agentic-calibration" },
                 { text: "Calibration Sessions", link: "/developer-guide/copilot/calibration-sessions" },
+                {
+                  text: "Calibration Session Audit",
+                  link: "/developer-guide/copilot/calibration-session-audit",
+                },
                 { text: "Agent Loop Validation", link: "/developer-guide/copilot/agent-validation" },
                 { text: "Knowledge Layout", link: "/developer-guide/copilot/knowledge-layout" },
                 { text: "Calibration Evaluation", link: "/developer-guide/copilot/evaluation" },

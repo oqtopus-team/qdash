@@ -10,19 +10,12 @@ Decisions are append-only; a correction is a new decision that supersedes an ear
 
 from __future__ import annotations
 
-import base64
-import binascii
-import hashlib
-import json
 import math
-from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, cast
-from uuid import uuid4
 
 from bunnet import SortDirection
 from fastapi import HTTPException, status
-from pymongo.errors import DuplicateKeyError
 
 from qdash.api.schemas.agent_session import (
     AgentAuditEvent,
@@ -35,11 +28,38 @@ from qdash.api.schemas.agent_session import (
 from qdash.api.services.agent_execution_links import resolve_chip_links, utc
 from qdash.api.services.agent_session_gate import load_agent_session
 from qdash.api.services.agent_session_service import AgentSessionService
+from qdash.api.services.audit_timeline import (
+    CURSOR_PREFIX,
+    DEFAULT_PAGE_SIZE,
+    MAX_EXPORT_EVENTS,
+    MAX_PAGE_SIZE,
+    MAX_PARAMETERS,
+    MAX_SLOT_ATTEMPTS,
+    MAX_TEXT,
+    SNAPSHOT_ATTEMPTS,
+    AuditSnapshot,
+    CursorPosition,
+    DecisionLedger,
+    decision_request_hash,
+    decode_cursor,
+    encode_cursor,
+    event_sort_key,
+    fingerprint,
+    json_safe,
+    number_events,
+    read_export,
+    read_page,
+    read_snapshot,
+)
+from qdash.api.services.audit_timeline import bounded_text as _text
+from qdash.api.services.audit_timeline import recorded_model as _recorded_model
+from qdash.api.services.audit_timeline import scalar as _scalar
+from qdash.api.services.audit_timeline import scalar_parameters as _parameters
+from qdash.api.services.audit_timeline import utc as _utc
 from qdash.common.utils.datetime import now
 from qdash.datamodel.agent_session import (
     AgentActionDecision,
     AgentActionType,
-    AgentModelIdentity,
     AgentSessionStatus,
     model_label,
 )
@@ -58,20 +78,20 @@ from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 AUDIT_SCHEMA_VERSION = "qdash.agent-session-audit.v1"
 # Decisions one session may record; far above any real loop, it bounds a runaway client.
 MAX_DECISIONS_PER_SESSION = 2000
-# Inserts one recording tries while concurrent recordings keep taking the slot it chose.
-MAX_SLOT_ATTEMPTS = 20
-DEFAULT_PAGE_SIZE = 100
-MAX_PAGE_SIZE = 500
-# An export larger than this is refused rather than cut short.
-MAX_EXPORT_EVENTS = 100_000
-# Per-record bounds of copied scalars; an event says when a bound dropped entries.
-MAX_PARAMETERS = 50
-MAX_TEXT = 500
-# Cursors name the snapshot they page through; v1 cursors (a sort key) are refused.
-CURSOR_PREFIX = "v2"
-# Reads of the whole record set one snapshot takes at most before it gives up (see
-# AgentSessionAuditService._read_snapshot).
-SNAPSHOT_ATTEMPTS = 3
+# Shared with the calibration session audit (audit_timeline): page sizes, export bound,
+# parameter and text bounds, cursor format, and snapshot attempts.
+__all__ = [
+    "CURSOR_PREFIX",
+    "DEFAULT_PAGE_SIZE",
+    "MAX_DECISIONS_PER_SESSION",
+    "MAX_EXPORT_EVENTS",
+    "MAX_PAGE_SIZE",
+    "MAX_PARAMETERS",
+    "MAX_SLOT_ATTEMPTS",
+    "MAX_TEXT",
+    "SNAPSHOT_ATTEMPTS",
+    "AgentSessionAuditService",
+]
 
 # Order of events that share a timestamp: cause before effect.
 KIND_RANK = {
@@ -113,64 +133,6 @@ AUDIT_NOTES = [
     "Records are append-only through the QDash API. This is an application audit, not a "
     "tamper-proof ledger: a database administrator can change stored records.",
 ]
-
-
-def _utc(value: datetime | None) -> datetime | None:
-    if value is None:
-        return None
-    return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
-
-
-def _text(value: Any, limit: int = MAX_TEXT) -> str:
-    text = str(value or "")
-    return text if len(text) <= limit else text[: limit - 1] + "…"
-
-
-def _scalar(value: Any) -> Any:
-    """A JSON scalar copy of a value, or None when it is not a finite scalar."""
-    if isinstance(value, bool) or value is None:
-        return value
-    if isinstance(value, (int, float)):
-        return value if math.isfinite(float(value)) else None
-    if isinstance(value, str):
-        return _text(value, 200)
-    return None
-
-
-def _parameters(raw: dict[str, Any] | None) -> tuple[dict[str, dict[str, Any]], int]:
-    """Scalar parameter values with their unit and error; arrays and objects are left out."""
-    items: dict[str, dict[str, Any]] = {}
-    dropped = 0
-    for name, entry in sorted((raw or {}).items()):
-        if isinstance(entry, dict):
-            value = _scalar(entry.get("value"))
-            row: dict[str, Any] = {"value": value}
-            if entry.get("unit"):
-                row["unit"] = _text(entry.get("unit"), 50)
-            error = _scalar(entry.get("error"))
-            if isinstance(error, (int, float)) and not isinstance(error, bool) and error:
-                row["error"] = error
-        else:
-            value = _scalar(entry)
-            row = {"value": value}
-        if value is None and not (isinstance(entry, dict) and entry.get("value") is None):
-            dropped += 1
-            continue
-        if len(items) >= MAX_PARAMETERS:
-            dropped += 1
-            continue
-        items[name] = row
-    return items, dropped
-
-
-def _recorded_model(value: Any) -> AgentModelIdentity | None:
-    """A model identity stored as a dict, or None when absent or not a valid identity."""
-    if not isinstance(value, dict):
-        return None
-    try:
-        return AgentModelIdentity.model_validate(value)
-    except ValueError:
-        return None
 
 
 def _snapshot_value(snapshot: dict[str, Any] | None) -> Any:
@@ -425,12 +387,7 @@ class AgentSessionAuditService:
 
     @staticmethod
     def _decision_hash(body: RecordAgentDecisionRequest) -> str:
-        # The reported model is provenance, not part of the decision: a retry keeps the first
-        # record's model.
-        payload = json.dumps(
-            body.model_dump(mode="json", exclude={"model"}), sort_keys=True, separators=(",", ":")
-        )
-        return hashlib.sha256(payload.encode()).hexdigest()
+        return decision_request_hash(body)
 
     def record_decision(
         self,
@@ -457,11 +414,9 @@ class AgentSessionAuditService:
             )
         request_hash = self._decision_hash(body)
         scope = {"project_id": project_id, "session_id": session_id}
-        existing = self._by_key(scope, body.idempotency_key)
+        existing = _LEDGER.precheck(scope, body.idempotency_key, request_hash)
         if existing is not None:
-            return self._replay(existing, request_hash)
-        if self._used_slots(scope) >= MAX_DECISIONS_PER_SESSION:
-            raise self._quota_full()
+            return self._decision_response(existing)
 
         records = _Records(session)
         actions = {action.action_id: action for action in records.actions}
@@ -539,29 +494,17 @@ class AgentSessionAuditService:
             "intervention_id": body.intervention_id,
             "supersedes_decision_id": body.supersedes_decision_id,
             "model": body.model,
-            "evidence_snapshot": json.loads(
-                json.dumps(
-                    {
-                        "actions": snapshot_actions,
-                        "evaluations": [
-                            _evaluation_facts(evaluations[evaluation_id])
-                            for evaluation_id in evaluation_ids
-                        ],
-                    },
-                    default=lambda value: (
-                        value.isoformat() if isinstance(value, datetime) else str(value)
-                    ),
-                )
+            "evidence_snapshot": json_safe(
+                {
+                    "actions": snapshot_actions,
+                    "evaluations": [
+                        _evaluation_facts(evaluations[evaluation_id])
+                        for evaluation_id in evaluation_ids
+                    ],
+                }
             ),
         }
-        return self._insert_in_free_slot(scope, fields, request_hash)
-
-    @staticmethod
-    def _by_key(scope: dict[str, str], key: str) -> AgentDecisionDocument | None:
-        return cast(
-            "AgentDecisionDocument | None",
-            AgentDecisionDocument.find_one({**scope, "idempotency_key": key}).run(),
-        )
+        return self._decision_response(_LEDGER.insert(scope, fields, request_hash))
 
     @staticmethod
     def _used_slots(scope: dict[str, str]) -> int:
@@ -570,69 +513,7 @@ class AgentSessionAuditService:
         Slots are taken in order, so this is also the number of decisions. A record removed
         outside the API leaves its slot unused rather than reused.
         """
-        last = cast(
-            "list[AgentDecisionDocument]",
-            AgentDecisionDocument.find(scope)
-            .sort([("quota_slot", SortDirection.DESCENDING)])
-            .limit(1)
-            .run(),
-        )
-        return last[0].quota_slot + 1 if last else 0
-
-    @staticmethod
-    def _quota_full() -> HTTPException:
-        return HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=(
-                f"The session's audit is full: it already holds {MAX_DECISIONS_PER_SESSION} "
-                "decisions, so no further decision is recorded"
-            ),
-        )
-
-    def _insert_in_free_slot(
-        self, scope: dict[str, str], fields: dict[str, Any], request_hash: str
-    ) -> AgentDecisionResponse:
-        """Insert the decision in the session's lowest free quota slot.
-
-        The quota check and the record are one insert: the unique (session, slot) and
-        (session, idempotency key) indexes make Mongo refuse a second record for a slot or a
-        key, without a transaction. A refused insert means a concurrent recording won; the
-        loop then replays that record when it carries the same key, or takes the next slot.
-        Nothing is reserved apart from the record itself, so a crash before the insert
-        leaves no slot held and a crash after it leaves a complete record that a retry with
-        the same key returns.
-        """
-        for _ in range(MAX_SLOT_ATTEMPTS):
-            slot = self._used_slots(scope)
-            if slot >= MAX_DECISIONS_PER_SESSION:
-                raced = self._by_key(scope, fields["idempotency_key"])
-                if raced is not None:
-                    return self._replay(raced, request_hash)
-                raise self._quota_full()
-            doc = AgentDecisionDocument(
-                decision_id=str(uuid4()), recorded_at=now(), quota_slot=slot, **fields
-            )
-            try:
-                doc.insert()
-            except DuplicateKeyError:
-                raced = self._by_key(scope, fields["idempotency_key"])
-                if raced is not None:
-                    return self._replay(raced, request_hash)
-                continue
-            return self._decision_response(doc)
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Other decisions of the session were being recorded at the same time; retry",
-            headers={"Retry-After": "1"},
-        )
-
-    def _replay(self, existing: AgentDecisionDocument, request_hash: str) -> AgentDecisionResponse:
-        if existing.request_hash != request_hash:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Idempotency key was already used for a different decision",
-            )
-        return self._decision_response(existing)
+        return _LEDGER.count_slots(scope)
 
     def list_decisions(self, *, project_id: str, session_id: str) -> ListAgentDecisionsResponse:
         """A session's decisions, oldest first."""
@@ -1126,9 +1007,7 @@ class AgentSessionAuditService:
                 },
             )
 
-        events.sort(key=_sort_key)
-        for index, event in enumerate(events):
-            event.sequence = index
+        number_events(events, KIND_RANK)
         return events
 
     # ------------------------------------------------------------------ reads
@@ -1138,35 +1017,11 @@ class AgentSessionAuditService:
         session = load_agent_session(project_id, session_id)
         header = self._header(session)
         events = self.timeline(session)
-        digest = hashlib.sha256()
-        digest.update(header.model_dump_json().encode())
-        for event in events:
-            digest.update(b"\n")
-            digest.update(event.model_dump_json().encode())
-        return _Snapshot(header=header, events=events, snapshot_id=digest.hexdigest()[:32])
+        return _Snapshot(header=header, events=events, snapshot_id=fingerprint(header, events))
 
     def _read_snapshot(self, project_id: str, session_id: str) -> _Snapshot:
-        """Return two matching projected reads, or 503 if observed changes persist.
-
-        Collections are read sequentially without a transaction. Matching fingerprints do
-        not establish an atomic point-in-time snapshot: a value can change and revert
-        between reads, for example when a dispatch reservation is released. The fingerprint
-        binds pagination to matching projected content, not to an immutable database view.
-        """
-        previous = self._read_once(project_id, session_id)
-        for _ in range(SNAPSHOT_ATTEMPTS - 1):
-            current = self._read_once(project_id, session_id)
-            if current.snapshot_id == previous.snapshot_id:
-                return current
-            previous = current
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=(
-                "The session's records kept changing while its audit was read, so no "
-                "consistent snapshot was taken; try again"
-            ),
-            headers={"Retry-After": "2"},
-        )
+        """Two matching projected reads, or 503 if observed changes persist (``read_snapshot``)."""
+        return read_snapshot(lambda: self._read_once(project_id, session_id), "session")
 
     def _response(
         self, snapshot: _Snapshot, events: list[AgentAuditEvent], next_cursor: str | None
@@ -1190,127 +1045,37 @@ class AgentSessionAuditService:
         cursor: str | None = None,
         limit: int = DEFAULT_PAGE_SIZE,
     ) -> AgentSessionAuditResponse:
-        """One page of a snapshot of the timeline, oldest first.
+        """One page of a snapshot of the timeline, oldest first (``read_page``).
 
-        The first page takes a snapshot (see ``_read_snapshot``); its cursor names the
-        snapshot and the position after the page. A later page reads the records again and
-        is served only when they still fingerprint as that snapshot, so every page of one
-        cursor chain comes from the same records. When they changed (a late task result, a
-        new decision, a status that moved), the read is refused with 409 and the client
-        starts again from the first page; it never receives a page of a different snapshot.
+        Every page of one cursor chain comes from the same records; when they changed, a later
+        page is refused with 409 and the client starts again from the first page.
         """
-        limit = max(1, min(limit, MAX_PAGE_SIZE))
-        if cursor is None:
-            snapshot = self._read_snapshot(project_id, session_id)
-            offset = 0
-        else:
-            position = _decode_cursor(cursor)
-            if position.project_id != project_id or position.session_id != session_id:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="The audit cursor belongs to another session; read from the first page",
-                )
-            snapshot = self._read_once(project_id, session_id)
-            if snapshot.snapshot_id != position.snapshot_id:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail=(
-                        "The session's audit changed after its first page was read; the pages "
-                        "already read belong to an older snapshot. Read it again from the first "
-                        "page"
-                    ),
-                )
-            if position.offset >= len(snapshot.events):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid audit cursor"
-                )
-            offset = position.offset
-        end = offset + limit
-        page = snapshot.events[offset:end]
-        next_cursor = (
-            _encode_cursor(_CursorPosition(project_id, session_id, snapshot.snapshot_id, end))
-            if end < len(snapshot.events)
-            else None
+        page = read_page(
+            project_id=project_id,
+            scope_id=session_id,
+            noun="session",
+            read_once=lambda: self._read_once(project_id, session_id),
+            cursor=cursor,
+            limit=limit,
         )
-        return self._response(snapshot, page, next_cursor)
+        return self._response(page.snapshot, page.events, page.next_cursor)
 
     def export_audit(self, *, project_id: str, session_id: str) -> AgentSessionAuditResponse:
         """The whole of one snapshot of the timeline; refused, never cut short, when it
         exceeds the export bound."""
-        snapshot = self._read_snapshot(project_id, session_id)
-        if len(snapshot.events) > MAX_EXPORT_EVENTS:
-            raise HTTPException(
-                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                detail=(
-                    f"The session's audit has {len(snapshot.events)} events, more than one "
-                    f"export holds ({MAX_EXPORT_EVENTS}); read it in pages with the audit "
-                    "endpoint"
-                ),
-            )
+        snapshot = read_export(lambda: self._read_once(project_id, session_id), "session")
         return self._response(snapshot, snapshot.events, None)
 
 
-@dataclass(frozen=True)
-class _Snapshot:
-    header: AgentAuditSessionHeader
-    events: list[AgentAuditEvent]
-    snapshot_id: str
-
-
-@dataclass(frozen=True)
-class _CursorPosition:
-    project_id: str
-    session_id: str
-    snapshot_id: str
-    offset: int
-
-
-SortKey = tuple[str, int, int, str]
-
-
-def _sort_key(event: AgentAuditEvent) -> SortKey:
-    """Time, then the session state version (stored times have millisecond precision, so
-    records of one millisecond share a time), then cause before effect, then the id."""
-    at = cast("datetime", _utc(event.at))
-    return (
-        at.isoformat(timespec="milliseconds"),
-        event.state_version,
-        KIND_RANK.get(event.kind, 99),
-        event.event_id,
-    )
-
-
-def _encode_cursor(position: _CursorPosition) -> str:
-    raw = json.dumps(
-        [
-            CURSOR_PREFIX,
-            position.project_id,
-            position.session_id,
-            position.snapshot_id,
-            position.offset,
-        ],
-        separators=(",", ":"),
-    )
-    return base64.urlsafe_b64encode(raw.encode()).decode().rstrip("=")
-
-
-def _decode_cursor(cursor: str) -> _CursorPosition:
-    try:
-        padded = cursor + "=" * (-len(cursor) % 4)
-        prefix, project_id, session_id, snapshot_id, offset = json.loads(
-            base64.urlsafe_b64decode(padded.encode())
-        )
-        if (
-            prefix != CURSOR_PREFIX
-            or not all(isinstance(item, str) for item in (project_id, session_id, snapshot_id))
-            or not isinstance(offset, int)
-            or isinstance(offset, bool)
-            or offset < 1
-        ):
-            raise ValueError("unknown cursor")
-        return _CursorPosition(project_id, session_id, snapshot_id, offset)
-    except (ValueError, TypeError, binascii.Error, json.JSONDecodeError) as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid audit cursor; read the audit again from the first page",
-        ) from exc
+_Snapshot = AuditSnapshot[AgentAuditSessionHeader]
+_CursorPosition = CursorPosition
+_encode_cursor = encode_cursor
+_decode_cursor = decode_cursor
+_sort_key = event_sort_key(KIND_RANK)
+# Decisions of agent sessions; the quota read goes through the service so it stays observable.
+_LEDGER: DecisionLedger[AgentDecisionDocument] = DecisionLedger(
+    AgentDecisionDocument,
+    limit=MAX_DECISIONS_PER_SESSION,
+    noun="session",
+    slots=lambda scope: AgentSessionAuditService._used_slots(dict(scope)),
+)

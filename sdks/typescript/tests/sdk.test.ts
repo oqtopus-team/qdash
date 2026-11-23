@@ -236,6 +236,22 @@ describe("Chip calibration", () => {
     ).rejects.toThrow(TypeError);
   });
 
+  it("names the decision a recorded run carries out", async () => {
+    const { fetch, requests } = server({
+      "GET /calibration-sessions/cs-1": [{ body: { calibration_session_id: "cs-1", chip_id: "64Qv3" } }],
+      "POST /calibration-pipelines/execute": [{ body: { ...dispatched, calibration_session_id: "cs-1", pipeline_run_id: "cpr-1", decision_id: "d-1", replayed: false } }],
+    });
+    const qdash = new QDash(client(fetch, "p1"));
+    await qdash.pipelines.execute(expectedSpec, { chipId: "64Qv3" }, { calibrationSessionId: "cs-1", idempotencyKey: "key-1", decisionId: "d-1" });
+    expect(requests[1]?.body).toEqual({
+      chip_id: "64Qv3",
+      spec: expectedSpec,
+      calibration_session_id: "cs-1",
+      idempotency_key: "key-1",
+      decision_id: "d-1",
+    });
+  });
+
   it("sends a reported origin only when the caller gives one", async () => {
     const { fetch, requests } = server({
       "POST /calibration-pipelines/execute": [{ body: dispatched }],

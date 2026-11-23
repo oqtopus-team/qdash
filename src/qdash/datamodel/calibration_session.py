@@ -90,3 +90,30 @@ class CalibrationChildReservation(BaseModel):
     child_id: str
     reserved_by: str
     reserved_at: datetime
+
+
+class CalibrationExperimentStage(StrEnum):
+    """Where one experiment stands in an optimization search.
+
+    ``baseline``: the incumbent's evidence the search starts from.
+    ``screening``: a candidate condition measured to decide whether it is worth confirming.
+    ``confirmation``: a whole-arm rerun of a candidate or the incumbent, used for the final
+    comparison. Only confirmation evidence may back a recommendation of a new candidate.
+    """
+
+    BASELINE = "baseline"
+    SCREENING = "screening"
+    CONFIRMATION = "confirmation"
+
+
+class CalibrationDecisionOutcome(StrEnum):
+    """What a final decision recommends; a statement of the person or agent recording it.
+
+    ``recommend_candidate``: a candidate other than the baseline, backed by its confirmation
+    experiments. ``keep_baseline``: the baseline candidate stays the recommendation.
+    ``inconclusive``: the evidence supports no recommendation.
+    """
+
+    RECOMMEND_CANDIDATE = "recommend_candidate"
+    KEEP_BASELINE = "keep_baseline"
+    INCONCLUSIVE = "inconclusive"

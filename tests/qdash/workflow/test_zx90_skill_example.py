@@ -84,9 +84,27 @@ LABEL = "Q00-Q01"
 CONTROL, TARGET = LABEL.split("-")
 
 
-def _example_specs() -> list[dict[str, Any]]:
+def _example_blocks() -> list[dict[str, Any]]:
     text = SKILL.read_text(encoding="utf-8")
     return [json.loads(block) for block in re.findall(r"```json\n(.*?)```", text, re.DOTALL)]
+
+
+def _example_specs() -> list[dict[str, Any]]:
+    # The other JSON block is the decision recorded before the run (pinned below).
+    return [block for block in _example_blocks() if "spec_version" in block]
+
+
+def test_example_decision_states_the_one_change_the_spec_makes() -> None:
+    [decision] = [block for block in _example_blocks() if "experiment" in block]
+    [spec] = _example_specs()
+    [change] = decision["experiment"]["requestedChanges"]
+    checkcr = next(
+        call for call in spec["steps"][0]["tasks"] if call["name"] == "CheckCrossResonance"
+    )
+    assert change["taskName"] == "CheckCrossResonance"
+    assert checkcr["run"] == {change["parameter"]: change["value"]}
+    assert decision["experiment"]["target"] == "-".join(spec["steps"][0]["rounds"][0][0])
+    assert decision["nextAction"] in {"adjust_and_retry", "repeat", "next_task"}
 
 
 def test_example_spec_validates_and_changes_one_search_key() -> None:

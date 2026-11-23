@@ -14,6 +14,12 @@ vi.mock("@/components/features/agent-session/useLinkedProject", () => ({
   projectRequest: (projectId: string) => ({ headers: { "X-Project-Id": projectId } }),
 }));
 vi.mock("@/contexts/AuthContext", () => ({ useAuth: () => ({ username: state.username }) }));
+// The audit timeline reads its own pages; it is tested on its own.
+vi.mock("@/components/features/calibration-session/CalibrationSessionAuditTimeline", () => ({
+  CalibrationSessionAuditTimeline: ({ projectId }: { projectId: string }) => (
+    <div data-testid="calibration-audit" data-project={projectId} />
+  ),
+}));
 vi.mock("@/client/calibration-session/calibration-session", () => ({
   getGetCalibrationSessionQueryKey: (id: string) => [`/calibration-sessions/${id}`],
   useGetCalibrationSession: (
@@ -237,5 +243,183 @@ describe("CalibrationSessionPageContent", () => {
     render(<CalibrationSessionPageContent calibrationSessionId="cs-1" />);
     expect(screen.getByText("No pipeline runs")).toBeTruthy();
     expect(screen.getByText("No agent sessions")).toBeTruthy();
+  });
+
+  it("shows the search progression from recorded decisions and the audit for the same project", () => {
+    const measured = (fields: Record<string, unknown>) => ({
+      evidence_status: "complete",
+      execution_ids: ["exec-9"],
+      tasks: [],
+      ...fields,
+    });
+    state.detail = {
+      ...DETAIL,
+      decision_total: 4,
+      experiments: [
+        {
+          sequence: 1,
+          decision_id: "cd-1",
+          stage: "baseline",
+          candidate_id: "incumbent",
+          target: "0-1",
+          requested_changes: [],
+          rationale: "Latest validated chain",
+          recorded_at: "2026-11-23T00:00:00Z",
+          pipeline_run_id: null,
+          parameter_checks: [],
+          measured: measured({
+            gate_time_ns: {
+              value: 256,
+              unit: "ns",
+              task_id: "t1",
+              task_name: "CreateZX90",
+              execution_id: "e",
+            },
+            gate_fidelity: {
+              value: 0.99,
+              error: 0.002,
+              unit: "",
+              task_id: "t2",
+              task_name: "IRB",
+              execution_id: "e",
+            },
+          }),
+        },
+        {
+          sequence: 2,
+          decision_id: "cd-2",
+          stage: "screening",
+          candidate_id: "c03",
+          target: "0-1",
+          requested_changes: [
+            {
+              task_name: "CheckCrossResonance",
+              parameter: "adiabatic_safe_factor",
+              value: 0.8,
+              previous: 0.75,
+            },
+          ],
+          rationale: "The factor binds",
+          recorded_at: "2026-11-23T00:10:00Z",
+          pipeline_run_id: "cpr-9",
+          parameter_checks: [
+            {
+              task_name: "CheckCrossResonance",
+              parameter: "adiabatic_safe_factor",
+              requested: 0.8,
+              in_spec: 0.8,
+              executed: 0.75,
+              consistent: false,
+              missing: [],
+            },
+          ],
+          measured: measured({
+            gate_time_ns: {
+              value: 208,
+              unit: "ns",
+              task_id: "t3",
+              task_name: "CreateZX90",
+              execution_id: "e",
+            },
+            execution_seconds: 600,
+          }),
+        },
+        {
+          sequence: 3,
+          decision_id: "cd-3",
+          stage: "screening",
+          candidate_id: "c04",
+          target: "0-1",
+          requested_changes: [],
+          rationale: "Declined by the user",
+          recorded_at: "2026-11-23T00:20:00Z",
+          pipeline_run_id: null,
+          parameter_checks: [],
+          measured: { evidence_status: "not_run" },
+        },
+      ],
+      recommendation: {
+        decision_id: "cd-4",
+        calibration_session_id: "cs-1",
+        final: true,
+        conclusion: { outcome: "keep_baseline", recommended_candidate_id: "incumbent" },
+        interpretation: "c03 was not confirmed.",
+        next_action: "complete",
+        recorded_by: "alice",
+        recorded_at: "2026-11-23T00:30:00Z",
+        model: { provider: "local", model_id: "qwen", host: "pi" },
+      },
+      latest_requested_run: {
+        pipeline_run_id: "cpr-9",
+        requested_at: "2026-11-23T00:10:00Z",
+        dispatch_status: "dispatched",
+        execution_outcome: "completed",
+        decision_id: "cd-3",
+        candidate_id: "c03",
+        execution_ids: ["exec-9"],
+        candidate_is_recommended: false,
+        missing: ["an authoritative record of what this run wrote to the hardware"],
+      },
+    };
+    render(<CalibrationSessionPageContent calibrationSessionId="cs-1" />);
+    const progress = screen.getByRole("region", { name: "Search progression" });
+    const stages = within(progress).getByRole("list", { name: "Stages reached" });
+    expect(within(stages).getByText("Baseline").className).toContain("step-primary");
+    expect(within(stages).getByText("Confirmation").className).not.toContain("step-primary");
+    const table = within(progress).getByRole("table", { name: "Candidate comparison" });
+    expect(within(table).getByText("256.0 ns")).toBeTruthy();
+    expect(within(table).getByText("0.9900 ± 0.0020")).toBeTruthy();
+    expect(within(table).getByText("adiabatic_safe_factor 0.75 → 0.8")).toBeTruthy();
+    // What the task executed differs from the request, and it says so.
+    expect(within(table).getByText(/Executed adiabatic_safe_factor 0.75/)).toBeTruthy();
+    expect(within(table).getByText("No run carried it out")).toBeTruthy();
+    expect(within(table).getByText("10.0 min")).toBeTruthy();
+    expect(within(progress).getByText("Keeps the baseline")).toBeTruthy();
+    expect(within(progress).getByText("Agent statement")).toBeTruthy();
+    const notice = within(progress).getByRole("status").textContent ?? "";
+    expect(notice).toMatch(/The latest requested run \(candidate c03/);
+    expect(notice).toMatch(/completed every execution/);
+    expect(notice).toMatch(/requested candidate is not the recommended candidate incumbent/);
+    // A completed run is never presented as the hardware state.
+    expect(notice).toMatch(/QDash records no authoritative hardware write/);
+    expect(notice).not.toMatch(/last state the session wrote|wrote its results/);
+    const link = within(table).getAllByRole("link", { name: "Execution" })[0];
+    expect(link.getAttribute("href")).toBe("/execution/64Qv3/exec-9?project=lab-a");
+    expect(screen.getByTestId("calibration-audit").getAttribute("data-project")).toBe("lab-a");
+  });
+
+  it("reports a refused latest request as never run, not as a write", () => {
+    state.detail = {
+      ...DETAIL,
+      experiments: [],
+      recommendation: null,
+      latest_requested_run: {
+        pipeline_run_id: "cpr-10",
+        requested_at: "2026-11-23T00:40:00Z",
+        dispatch_status: "rejected",
+        execution_outcome: "refused",
+        candidate_id: null,
+        execution_ids: [],
+        candidate_is_recommended: null,
+        missing: [],
+      },
+    };
+    render(<CalibrationSessionPageContent calibrationSessionId="cs-1" />);
+    const notice = screen.getByRole("status");
+    expect(notice.className).toContain("alert-warning");
+    expect(notice.textContent).toMatch(/names no decision.*QDash refused its launch/);
+  });
+
+  it("never shows a conclusion that was not recorded", () => {
+    state.detail = {
+      ...DETAIL,
+      status: "closed",
+      experiments: [],
+      recommendation: null,
+      latest_requested_run: null,
+    };
+    render(<CalibrationSessionPageContent calibrationSessionId="cs-1" />);
+    expect(screen.queryByRole("region", { name: "Search progression" })).toBeNull();
+    expect(screen.queryByText(/Recommends|Keeps the baseline/)).toBeNull();
   });
 });

@@ -155,3 +155,114 @@ test("listing passes only the filters asked for", async () => {
   assert.deepEqual(calls, [{ mine: true, status: ["open"], limit: 100 }]);
   assert.match(result.content[0].text, /cs-1 \[open\] chip 64Qv3, by alice: Bring up qubits 0 and 1/);
 });
+
+test("a decision is appended to the calibration session audit once per tool call, with the host's model", async () => {
+  const calls = [];
+  const tools = registeredTools({
+    async recordCalibrationDecision(id, body) {
+      calls.push({ id, body });
+      return {
+        decision_id: "cd-1",
+        calibration_session_id: id,
+        experiment: body.experiment ?? null,
+        conclusion: body.conclusion ?? null,
+        carried_out_by_run_ids: [],
+      };
+    },
+  });
+  const record = tools.get("qdash_record_calibration_decision");
+  const params = {
+    calibrationSessionId: "cs-1",
+    interpretation: "The factor binds; raise it within the approved range.",
+    nextAction: "adjust_and_retry",
+    evidenceRunIds: ["cpr-1"],
+    experiment: {
+      candidateId: "c03",
+      stage: "screening",
+      target: "0-1",
+      requestedChanges: [{ taskName: "CheckCrossResonance", parameter: "adiabatic_safe_factor", value: 0.8, previous: 0.75 }],
+    },
+    // A model argument is ignored: provenance comes from the host context only.
+    model: { provider: "evil", model_id: "x" },
+  };
+  const ctx = { hasUI: false, model: { provider: "local", id: "qwen" } };
+  // Session-granted: no approval is needed, and a replay of the same call uses the same key.
+  const first = await record.execute("call-9", params, undefined, undefined, ctx);
+  await record.execute("call-9", params, undefined, undefined, ctx);
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0].body.idempotency_key, calls[1].body.idempotency_key);
+  assert.match(calls[0].body.idempotency_key, /^pi-calibration-decision-[0-9a-f]{40}$/);
+  assert.deepEqual(calls[0].body.experiment, {
+    candidate_id: "c03",
+    stage: "screening",
+    target: "0-1",
+    requested_changes: [{ task_name: "CheckCrossResonance", parameter: "adiabatic_safe_factor", value: 0.8, previous: 0.75 }],
+  });
+  assert.equal(calls[0].body.model.provider, "local");
+  assert.equal(calls[0].body.model.model_id, "qwen");
+  assert.equal(first.details.decisionId, "cd-1");
+  assert.match(first.content[0].text, /Pass decisionId cd-1 with calibrationSessionId to qdash_run_pipeline/);
+});
+
+test("the audit reads as events marked server-recorded or stated, with unrecorded facts named", async () => {
+  const tools = registeredTools({
+    async getCalibrationSessionAudit(id, params) {
+      assert.equal(id, "cs-1");
+      assert.deepEqual(params, { limit: 50 });
+      return {
+        calibration_session: { calibration_session_id: "cs-1", status: "open", chip_id: "64Qv3", objective: "Shorten the 0-1 ZX90" },
+        events: [
+          { sequence: 0, at: "2026-11-23T00:00:00Z", kind: "decision", summary: "Proposed screening of c03 on 0-1", provenance: "agent_reported", missing: [] },
+          { sequence: 1, at: "2026-11-23T00:01:00Z", kind: "pipeline_requested", summary: "alice requested pipeline", provenance: "server_record", missing: ["host_approval"] },
+          { sequence: 2, at: "2026-11-23T00:02:00Z", kind: "measurement", summary: "e1: completed", provenance: "server_record", missing: [], agent_session_id: null },
+        ],
+        total_events: 3,
+        complete: true,
+        next_cursor: null,
+      };
+    },
+  });
+  const result = await tools.get("qdash_get_calibration_session_audit").execute("c", { calibrationSessionId: "cs-1", limit: 50 });
+  const text = result.content[0].text;
+  assert.match(text, /0\. .* decision: Proposed screening of c03 on 0-1 \[agent reported\]/);
+  assert.match(text, /pipeline_requested: .*\[server\] \(not recorded: host_approval\)/);
+});
+
+test("the session detail shows experiments, mismatched parameters, and a recommendation that differs from the latest requested run", () => {
+  const text = formatCalibrationSession({
+    ...SESSION,
+    pipeline_runs: [],
+    agent_sessions: [],
+    decision_total: 3,
+    experiments: [
+      {
+        sequence: 1,
+        decision_id: "cd-1",
+        stage: "screening",
+        candidate_id: "c03",
+        target: "0-1",
+        requested_changes: [{ task_name: "CheckCrossResonance", parameter: "adiabatic_safe_factor", value: 0.8 }],
+        rationale: "x",
+        recorded_at: "2026-11-23T00:00:00Z",
+        pipeline_run_id: "cpr-1",
+        parameter_checks: [{ task_name: "CheckCrossResonance", parameter: "adiabatic_safe_factor", requested: 0.8, in_spec: 0.8, executed: 0.75, consistent: false, missing: [] }],
+        measured: {
+          evidence_status: "complete",
+          gate_time_ns: { value: 192, unit: "ns", task_id: "t", task_name: "CreateZX90", execution_id: "e" },
+          gate_fidelity: { value: 0.991, error: 0.002, unit: "", task_id: "t2", task_name: "ZX90InterleavedRandomizedBenchmarking", execution_id: "e" },
+          execution_seconds: 600,
+        },
+      },
+    ],
+    recommendation: { decision_id: "cd-3", conclusion: { outcome: "keep_baseline", recommended_candidate_id: "incumbent" } },
+    latest_requested_run: { pipeline_run_id: "cpr-1", requested_at: "2026-01-01T00:00:00Z", dispatch_status: "dispatched", execution_outcome: "completed", candidate_id: "c03", candidate_is_recommended: false, execution_ids: [], missing: [] },
+  });
+  assert.match(text, /#1 screening c03 on 0-1 .*run cpr-1/);
+  assert.match(text, /gate time 192 ns, fidelity 0.991 ± 0.002/);
+  assert.match(text, /executed 0.75: NOT consistent/);
+  assert.match(text, /Recommendation .*keep_baseline incumbent/);
+  assert.match(text, /Latest requested run in this session \(by request time\): cpr-1 \(candidate c03\), dispatch dispatched, execution outcome completed: every execution completed\./);
+  assert.match(text, /requested candidate is not the recommended candidate \(a comparison of records, not of the hardware\)/);
+  assert.match(text, /not the current or last written hardware state/);
+  assert.doesNotMatch(text, /hardware write in this session/i);
+});

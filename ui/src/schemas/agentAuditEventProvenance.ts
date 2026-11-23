@@ -7,7 +7,7 @@
  */
 
 /**
- * server_record: QDash recorded it; server_computed: derived at read time from immutable records; agent_reported, human_reported, evaluator_reported: text that party supplied, recorded as given
+ * server_record: QDash recorded it; server_computed: derived at read time from immutable records; agent_reported, human_reported, evaluator_reported: text that party supplied, recorded as given; client_reported: text a client sent without saying whether an agent or a person wrote it
  */
 export type AgentAuditEventProvenance = typeof AgentAuditEventProvenance[keyof typeof AgentAuditEventProvenance];
 
@@ -18,4 +18,5 @@ export const AgentAuditEventProvenance = {
   agent_reported: 'agent_reported',
   human_reported: 'human_reported',
   evaluator_reported: 'evaluator_reported',
+  client_reported: 'client_reported',
 } as const;

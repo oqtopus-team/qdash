@@ -35,6 +35,11 @@ from qdash.api.schemas.execution_group import (
     AgentSessionGraphSessionAction,
     AgentSessionGroupCounts,
     AgentSessionGroupSummary,
+    CalibrationGroupAgentSession,
+    CalibrationGroupCounts,
+    CalibrationGroupPipelineRun,
+    CalibrationRecommendationRef,
+    CalibrationSessionGroupSummary,
     ExecutionGroupItem,
     ListExecutionGroupsResponse,
 )
@@ -50,6 +55,11 @@ from qdash.api.services.agent_execution_links import (
     summary_link,
     utc,
 )
+from qdash.api.services.calibration_session_groups import (
+    ChipCalibrationGroups,
+    RunExecution,
+    resolve_chip_calibration_groups,
+)
 from qdash.api.services.calibration_session_links import (
     NO_RELATIONS,
     agent_session_parents,
@@ -63,12 +73,14 @@ from qdash.datamodel.agent_session import (
     AgentInterventionStatus,
     model_label,
 )
+from qdash.datamodel.calibration_session import CalibrationSessionStatus
 from qdash.dbmodel.agent_session import (
     AgentActionDocument,
     AgentDecisionDocument,
     AgentInterventionDocument,
     AgentSessionDocument,
 )
+from qdash.dbmodel.calibration_session import CalibrationDecisionDocument
 from qdash.dbmodel.evaluation import EvaluationDocument
 from qdash.dbmodel.execution_history import ExecutionHistoryDocument
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
@@ -76,11 +88,14 @@ from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
-    from qdash.api.schemas.execution import CalibrationSessionRef
+    from qdash.api.schemas.execution import CalibrationSessionRef, ExecutionResponseSummary
     from qdash.repository.execution_history import MongoExecutionHistoryRepository
 
 # Executions one session row of the list carries; the graph lists every one.
 MAX_LIST_CHILDREN = 20
+# Pipeline runs and nested agent sessions one calibration session row carries.
+MAX_LIST_RUNS = 20
+MAX_LIST_AGENT_SESSIONS = 20
 # Nodes one graph response carries; the latest are kept and the audit holds the rest.
 MAX_SESSION_GRAPH_NODES = 1000
 MAX_TEXT = 500
@@ -102,6 +117,29 @@ SESSION_GRAPH_NOTES = [
     "Decision text and intervention summaries are agent statements; guidance is an expert "
     "statement. Neither grants scope beyond the session policy.",
 ]
+
+
+def run_target_qids(run: dict[str, Any]) -> list[str]:
+    """The qubits QDash resolved for a dispatched run, from its stored dispatch response."""
+    targets = (run.get("response") or {}).get("targets") or {}
+    qids = targets.get("qids") if isinstance(targets, dict) else None
+    return [str(qid) for qid in qids] if isinstance(qids, list) else []
+
+
+def _run_dispatch(run: dict[str, Any]) -> str:
+    """A run projection's dispatch status, stale dispatching read as unknown everywhere."""
+    from qdash.api.services.calibration_session_service import DISPATCH_STALE_AFTER
+
+    value = str(run.get("status") or "")
+    updated = utc(run.get("updated_at"))
+    if value == "dispatching" and updated is not None and now() - updated > DISPATCH_STALE_AFTER:
+        return "unknown"
+    return value
+
+
+def _target_key(target: str) -> tuple[tuple[int, int | str], ...]:
+    """Qubit 2 before 10, and a coupling after its control qubit."""
+    return tuple((0, int(part)) if part.isdigit() else (1, part) for part in target.split("-"))
 
 
 def _text(value: Any, limit: int = MAX_TEXT) -> str:
@@ -430,43 +468,65 @@ class ExecutionGroupService:
         date: str | None = None,
         timezone: str = "UTC",
     ) -> ListExecutionGroupsResponse:
-        """A page of rows, newest first: agent sessions and the executions outside them.
+        """A page of rows, newest first: calibration sessions, agent sessions, and executions.
 
         Rows are grouped before the page is cut, so a session is one row with all of its
-        executions. An execution row is ordered by its start, as in the ungrouped list. A
-        session row is ordered by its latest activity: its latest measurement start, or its
-        creation before the first. With ``date``, an execution row needs its start on that
-        day, and a session row needs its creation or a measurement start on that day; the row
-        is then ordered by its latest activity of that day, and still lists every execution.
+        executions. A calibration session row holds the step executions of its pipeline runs
+        and its admitted agent sessions (each nested with its own executions); an agent session
+        outside one is its own row; every other execution is its own row, ordered by its start
+        as in the ungrouped list. A session row is ordered by its latest activity: its latest
+        execution start, or its creation before the first. With ``date``, an execution row
+        needs its start on that day and a session row its creation or an execution start on
+        it; the row is then ordered by its latest activity of that day and still lists every
+        execution.
         """
         window = day_window(date, timezone) if date else None
         links = resolve_chip_links(project_id, chip_id)
+        calib = resolve_chip_calibration_groups(project_id, chip_id, links)
 
         def in_window(moment: datetime | None) -> bool:
             if window is None:
                 return True
             return moment is not None and window[0] <= moment < window[1]
 
-        session_rows: list[tuple[datetime, str]] = []
-        for session_id, created in links.session_created.items():
-            moments = [created] + [
+        def agent_moments(session_id: str) -> list[datetime]:
+            return [links.session_created[session_id]] + [
                 link.start_at
                 for link in links.by_session.get(session_id, [])
                 if link.start_at is not None
             ]
-            moments = [moment for moment in moments if in_window(moment)]
-            if moments:
-                session_rows.append((max(moments), session_id))
-        session_rows.sort(key=lambda row: (row[0], row[1]), reverse=True)
 
+        rows: list[tuple[datetime, str, str]] = []
+        for session_id in links.session_created:
+            if session_id in calib.agent_parent:
+                continue
+            moments = [m for m in agent_moments(session_id) if in_window(m)]
+            if moments:
+                rows.append((max(moments), "agent_session", session_id))
+        for cs_id, doc in calib.sessions.items():
+            moments = [utc(doc.get("created_at")) or _EPOCH]
+            for run in calib.runs.get(cs_id, []):
+                moments += [
+                    e.start_at
+                    for e in calib.run_executions.get(str(run["run_id"]), [])
+                    if e.start_at is not None
+                ]
+            for agent_id in calib.agents.get(cs_id, []):
+                moments += agent_moments(agent_id)
+            moments = [m for m in moments if in_window(m)]
+            if moments:
+                rows.append((max(moments), "calibration_session", cs_id))
+        rows.sort(key=lambda row: (row[0], row[2]), reverse=True)
+
+        grouped_ids = sorted(set(links.by_execution) | set(calib.execution_session))
         base = self._chip_query(project_id, chip_id, window)
-        total_executions = ExecutionHistoryDocument.get_motor_collection().count_documents(base)
-        ungrouped = {**base, "execution_id": {"$nin": sorted(links.by_execution)}}
-        ungrouped_total = ExecutionHistoryDocument.get_motor_collection().count_documents(ungrouped)
+        collection = ExecutionHistoryDocument.get_motor_collection()
+        total_executions = collection.count_documents(base)
+        ungrouped = {**base, "execution_id": {"$nin": grouped_ids}}
+        ungrouped_total = collection.count_documents(ungrouped)
         # The merged order needs at most skip + limit rows of each kind.
         heads = list(
-            ExecutionHistoryDocument.get_motor_collection()
-            .find(ungrouped, {"_id": 0, "execution_id": 1, "start_at": 1})
+            collection.find(ungrouped, {"_id": 0, "execution_id": 1, "start_at": 1})
             .sort(
                 [("start_at", SortDirection.DESCENDING), ("execution_id", SortDirection.DESCENDING)]
             )
@@ -475,27 +535,29 @@ class ExecutionGroupService:
 
         merged: list[tuple[str, str, datetime | None]] = []
         i = j = 0
-        while len(merged) < skip + limit and (i < len(session_rows) or j < len(heads)):
-            session_at = session_rows[i][0] if i < len(session_rows) else None
+        while len(merged) < skip + limit and (i < len(rows) or j < len(heads)):
+            row_at = rows[i][0] if i < len(rows) else None
             head_at = utc(heads[j].get("start_at")) if j < len(heads) else None
-            take_session = i < len(session_rows) and (
-                j >= len(heads) or head_at is None or (session_at or _EPOCH) >= head_at
+            take_row = i < len(rows) and (
+                j >= len(heads) or head_at is None or (row_at or _EPOCH) >= head_at
             )
-            if take_session:
-                merged.append(("agent_session", session_rows[i][1], session_at))
+            if take_row:
+                merged.append((rows[i][1], rows[i][2], row_at))
                 i += 1
             else:
                 merged.append(("execution", str(heads[j]["execution_id"]), head_at))
                 j += 1
         page = merged[skip : skip + limit]
 
-        items = self._page_items(project_id, page, links, in_window)
+        items = self._page_items(project_id, page, links, calib, in_window)
+        agent_rows = sum(1 for row in rows if row[1] == "agent_session")
         return ListExecutionGroupsResponse(
             items=items,
-            total=ungrouped_total + len(session_rows),
+            total=ungrouped_total + len(rows),
             total_executions=total_executions,
             grouped_executions=total_executions - ungrouped_total,
-            agent_sessions=len(session_rows),
+            agent_sessions=agent_rows,
+            calibration_sessions=len(rows) - agent_rows,
             skip=skip,
             limit=limit,
             children_limit=MAX_LIST_CHILDREN,
@@ -515,17 +577,34 @@ class ExecutionGroupService:
         project_id: str,
         page: list[tuple[str, str, datetime | None]],
         links: ChipLinks,
+        calib: ChipCalibrationGroups,
         in_window: Any,
     ) -> list[ExecutionGroupItem]:
         """Rows of one page, with batched reads for every session on it."""
-        session_ids = [key for kind, key, _ in page if kind == "agent_session"]
+        cs_ids = [key for kind, key, _ in page if kind == "calibration_session"]
+        shown_runs = {cs_id: calib.runs.get(cs_id, [])[-MAX_LIST_RUNS:] for cs_id in cs_ids}
+        shown_agents = {
+            cs_id: calib.agents.get(cs_id, [])[-MAX_LIST_AGENT_SESSIONS:] for cs_id in cs_ids
+        }
+        session_ids = [key for kind, key, _ in page if kind == "agent_session"] + [
+            agent_id for agents in shown_agents.values() for agent_id in agents
+        ]
         child_links = {
             session_id: links.by_session.get(session_id, [])[-MAX_LIST_CHILDREN:]
             for session_id in session_ids
         }
-        execution_ids = [key for kind, key, _ in page if kind == "execution"] + [
-            link.execution_id for shown in child_links.values() for link in shown
-        ]
+        run_children = {
+            str(run["run_id"]): calib.run_executions.get(str(run["run_id"]), [])[
+                -MAX_LIST_CHILDREN:
+            ]
+            for runs in shown_runs.values()
+            for run in runs
+        }
+        execution_ids = (
+            [key for kind, key, _ in page if kind == "execution"]
+            + [link.execution_id for shown in child_links.values() for link in shown]
+            + [e.execution_id for shown in run_children.values() for e in shown]
+        )
         executions = {
             doc.execution_id: doc
             for doc in cast(
@@ -561,6 +640,23 @@ class ExecutionGroupService:
                 scope, {"_id": 0, "session_id": 1}
             ):
                 decisions[str(doc["session_id"])] += 1
+        # Every agent session of every calibration session row, for the targets and counts.
+        all_nested = sorted(
+            {agent_id for cs_id in cs_ids for agent_id in calib.agents.get(cs_id, [])}
+            - set(sessions)
+        )
+        nested_qids: dict[str, list[str]] = {
+            s.session_id: list(s.policy.qids) for s in sessions.values()
+        }
+        if all_nested:
+            for doc in AgentSessionDocument.get_motor_collection().find(
+                {"project_id": project_id, "session_id": {"$in": all_nested}},
+                {"_id": 0, "session_id": 1, "policy.qids": 1},
+            ):
+                nested_qids[str(doc["session_id"])] = [
+                    str(q) for q in (doc.get("policy") or {}).get("qids") or []
+                ]
+        cs_decisions = self._calibration_decisions(project_id, cs_ids)
 
         # Calibration sessions and reported origins of every execution on the page, and the
         # calibration session of every agent session row, each in batched reads.
@@ -571,34 +667,28 @@ class ExecutionGroupService:
         )
         parents = agent_session_parents(project_id, sessions.values())
 
-        items: list[ExecutionGroupItem] = []
-        for kind, key, sort_at in page:
-            if kind == "execution":
-                doc = executions.get(key)
-                if doc is not None:
-                    items.append(
-                        ExecutionGroupItem(
-                            kind="execution",
-                            sort_at=sort_at,
-                            execution=execution_summary(
-                                doc,
-                                summary_link(links, key),
-                                relations.get(key, NO_RELATIONS),
-                            ),
-                        )
-                    )
-                continue
+        def summary_of(execution_id: str) -> ExecutionResponseSummary | None:
+            execution = executions.get(execution_id)
+            if execution is None:
+                return None
+            return execution_summary(
+                execution,
+                summary_link(links, execution_id),
+                relations.get(execution_id, NO_RELATIONS),
+            )
+
+        def agent_group(key: str) -> CalibrationGroupAgentSession | None:
             group_session = sessions.get(key)
             if group_session is None:
-                continue
+                return None
             session_actions = actions.get(key, [])
             all_links = links.by_session.get(key, [])
             numbers = _measurement_numbers(session_actions, links.unlinked)
             by_action = {a.action_id: a for a in session_actions}
             children: list[AgentSessionChildExecution] = []
             for link in child_links.get(key, []):
-                execution = executions.get(link.execution_id)
-                if execution is None:
+                summary = summary_of(link.execution_id)
+                if summary is None:
                     continue
                 child_action = by_action.get(link.action_id)
                 sequence, attempt = numbers.get(link.action_id, (0, 0))
@@ -614,33 +704,214 @@ class ExecutionGroupService:
                             else None
                         ),
                         in_filter=in_window(link.start_at),
-                        execution=execution_summary(
-                            execution,
-                            summary_link(links, link.execution_id),
-                            relations.get(link.execution_id, NO_RELATIONS),
-                        ),
+                        execution=summary,
                     )
                 )
+            return CalibrationGroupAgentSession(
+                agent_session=_session_summary(
+                    group_session,
+                    actions=session_actions,
+                    links=all_links,
+                    unlinked=links.unlinked,
+                    open_interventions=open_interventions[key],
+                    decisions=decisions[key],
+                    calibration_session=parents.get(key),
+                ),
+                children=children,
+                children_total=len(all_links),
+                children_in_filter=sum(1 for link in all_links if in_window(link.start_at)),
+                children_omitted=max(0, len(all_links) - len(child_links.get(key, []))),
+            )
+
+        items: list[ExecutionGroupItem] = []
+        for kind, key, sort_at in page:
+            if kind == "execution":
+                summary = summary_of(key)
+                if summary is not None:
+                    items.append(
+                        ExecutionGroupItem(kind="execution", sort_at=sort_at, execution=summary)
+                    )
+                continue
+            if kind == "agent_session":
+                group = agent_group(key)
+                if group is None:
+                    continue
+                items.append(
+                    ExecutionGroupItem(
+                        kind="agent_session",
+                        sort_at=sort_at,
+                        agent_session=group.agent_session,
+                        children=group.children,
+                        children_total=group.children_total,
+                        children_in_filter=group.children_in_filter,
+                        children_omitted=group.children_omitted,
+                    )
+                )
+                continue
             items.append(
-                ExecutionGroupItem(
-                    kind="agent_session",
-                    sort_at=sort_at,
-                    agent_session=_session_summary(
-                        group_session,
-                        actions=session_actions,
-                        links=all_links,
-                        unlinked=links.unlinked,
-                        open_interventions=open_interventions[key],
-                        decisions=decisions[key],
-                        calibration_session=parents.get(key),
-                    ),
-                    children=children,
-                    children_total=len(all_links),
-                    children_in_filter=sum(1 for link in all_links if in_window(link.start_at)),
-                    children_omitted=max(0, len(all_links) - len(child_links.get(key, []))),
+                self._calibration_item(
+                    key,
+                    sort_at,
+                    project_id=project_id,
+                    links=links,
+                    calib=calib,
+                    in_window=in_window,
+                    shown_runs=shown_runs[key],
+                    run_children=run_children,
+                    nested=[
+                        group
+                        for agent_id in shown_agents[key]
+                        if (group := agent_group(agent_id)) is not None
+                    ],
+                    nested_qids=nested_qids,
+                    decision_docs=cs_decisions.get(key, []),
+                    summary_of=summary_of,
                 )
             )
         return items
+
+    @staticmethod
+    def _calibration_decisions(
+        project_id: str, cs_ids: list[str]
+    ) -> dict[str, list[dict[str, Any]]]:
+        """Decisions of the page's calibration sessions, oldest first, in one query."""
+        found: dict[str, list[dict[str, Any]]] = {}
+        if not cs_ids:
+            return found
+        for doc in (
+            CalibrationDecisionDocument.get_motor_collection()
+            .find(
+                {"project_id": project_id, "calibration_session_id": {"$in": cs_ids}},
+                {
+                    "_id": 0,
+                    "decision_id": 1,
+                    "calibration_session_id": 1,
+                    "recorded_at": 1,
+                    "quota_slot": 1,
+                    "conclusion": 1,
+                    "supersedes_decision_id": 1,
+                    "experiment.target": 1,
+                },
+            )
+            .sort([("recorded_at", 1), ("quota_slot", 1)])
+        ):
+            found.setdefault(str(doc["calibration_session_id"]), []).append(doc)
+        return found
+
+    @staticmethod
+    def _calibration_item(
+        key: str,
+        sort_at: datetime | None,
+        *,
+        project_id: str,
+        links: ChipLinks,
+        calib: ChipCalibrationGroups,
+        in_window: Any,
+        shown_runs: list[dict[str, Any]],
+        run_children: dict[str, list[RunExecution]],
+        nested: list[CalibrationGroupAgentSession],
+        nested_qids: dict[str, list[str]],
+        decision_docs: list[dict[str, Any]],
+        summary_of: Any,
+    ) -> ExecutionGroupItem:
+        """A calibration session row: its summary, latest runs, and nested agent sessions."""
+        doc = calib.sessions[key]
+        runs = calib.runs.get(key, [])
+        agents = calib.agents.get(key, [])
+        statuses: list[str] = []
+        moments: list[datetime] = []
+        in_filter = 0
+        for run in runs:
+            for e in calib.run_executions.get(str(run["run_id"]), []):
+                statuses.append(e.status)
+                moments += [m for m in (e.start_at, e.end_at) if m is not None]
+                in_filter += 1 if in_window(e.start_at) else 0
+        for agent_id in agents:
+            moments.append(links.session_created[agent_id])
+            for link in links.by_session.get(agent_id, []):
+                statuses.append(link.status)
+                if link.start_at is not None:
+                    moments.append(link.start_at)
+                in_filter += 1 if in_window(link.start_at) else 0
+        created = utc(doc.get("created_at")) or _EPOCH
+        targets: set[str] = set()
+        for run in runs:
+            targets.update(run_target_qids(run))
+        for agent_id in agents:
+            targets.update(nested_qids.get(agent_id, []))
+        superseded = {d.get("supersedes_decision_id") for d in decision_docs}
+        for decision in decision_docs:
+            target = (decision.get("experiment") or {}).get("target")
+            if target:
+                targets.add(str(target))
+        concluded = [
+            d for d in decision_docs if d.get("conclusion") and d["decision_id"] not in superseded
+        ]
+        recommendation = None
+        if concluded:
+            latest = concluded[-1]
+            recommendation = CalibrationRecommendationRef(
+                decision_id=str(latest["decision_id"]),
+                outcome=str(latest["conclusion"].get("outcome")),
+                recommended_candidate_id=latest["conclusion"].get("recommended_candidate_id"),
+                recorded_at=cast("datetime", utc(latest.get("recorded_at"))),
+            )
+        status_value = str(doc.get("status") or "open")
+        summary = CalibrationSessionGroupSummary(
+            calibration_session_id=key,
+            project_id=project_id,
+            chip_id=str(doc["chip_id"]),
+            objective=str(doc.get("objective") or ""),
+            status=CalibrationSessionStatus(status_value),
+            created_by=str(doc.get("created_by") or ""),
+            created_at=created,
+            closed_at=utc(doc.get("closed_at")),
+            targets=sorted(targets, key=_target_key),
+            counts=CalibrationGroupCounts(
+                pipeline_runs=len(runs),
+                agent_sessions=len(agents),
+                executions=len(statuses),
+                executions_in_filter=in_filter,
+                running=sum(1 for value in statuses if value in OPEN_EXECUTION_STATUSES),
+                failed=sum(1 for value in statuses if value == "failed"),
+                unknown_dispatch=sum(1 for run in runs if _run_dispatch(run) == "unknown"),
+                decisions=len(decision_docs),
+            ),
+            first_activity_at=min([created, *moments]),
+            latest_activity_at=max([created, *moments]),
+            recommendation=recommendation,
+        )
+        pipeline_runs: list[CalibrationGroupPipelineRun] = []
+        for run in shown_runs:
+            run_id = str(run["run_id"])
+            all_executions = calib.run_executions.get(run_id, [])
+            pipeline_runs.append(
+                CalibrationGroupPipelineRun(
+                    run_id=run_id,
+                    pipeline_name=str(run.get("pipeline_name") or ""),
+                    dispatch_status=_run_dispatch(run),
+                    requested_by=str(run.get("requested_by") or ""),
+                    requested_at=cast("datetime", utc(run.get("requested_at"))),
+                    decision_id=run.get("decision_id"),
+                    targets=run_target_qids(run),
+                    executions=[
+                        step
+                        for e in run_children.get(run_id, [])
+                        if (step := summary_of(e.execution_id)) is not None
+                    ],
+                    executions_total=len(all_executions),
+                    executions_in_filter=sum(1 for e in all_executions if in_window(e.start_at)),
+                )
+            )
+        return ExecutionGroupItem(
+            kind="calibration_session",
+            sort_at=sort_at,
+            calibration_session=summary,
+            pipeline_runs=pipeline_runs,
+            pipeline_runs_omitted=max(0, len(runs) - len(shown_runs)),
+            nested_agent_sessions=nested,
+            nested_agent_sessions_omitted=max(0, len(agents) - len(nested)),
+        )
 
     # ------------------------------------------------------------------ graph
 

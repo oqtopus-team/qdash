@@ -1529,11 +1529,19 @@ export class QDashClient {
         if ((id != null) !== (key != null) || (key != null && !key.trim())) {
           throw new TypeError("calibration_session_id and a non-empty idempotency_key must be given together");
         }
+        const decision = request.decision_id;
+        if (decision != null && (id == null || !decision.trim())) {
+          throw new TypeError("decision_id must be non-empty and needs calibration_session_id");
+        }
         if (id != null) await preflight(id, request.chip_id, options);
         const result = await api.executeCalibrationPipeline(request, options);
         if (id != null && (!result || result.calibration_session_id !== id ||
             typeof result.pipeline_run_id !== "string" || !result.pipeline_run_id.trim())) {
           throw new Error("Pipeline result unknown: the execution may have started without its association. Do not retry automatically or use a new key; reconcile the execution first.");
+        }
+        // A server that drops the decision would record the run without its intent.
+        if (decision != null && result.decision_id !== decision) {
+          throw new Error(`Pipeline result unknown: the run may have been recorded without its decision ${decision}. Do not retry automatically or use a new key; reconcile the run in the calibration session audit first.`);
         }
         return result;
       },

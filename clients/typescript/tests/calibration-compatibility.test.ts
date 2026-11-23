@@ -64,6 +64,27 @@ describe("associated writes against older APIs", () => {
     await client.createAgentSession({ chipId: "chip-1", policy: agent.policy });
     expect(calls.map((r) => r.method)).toEqual(["POST", "POST"]);
   });
+  it("returns a run whose decision link the server echoed", async () => {
+    const result = { calibration_session_id: "cs-1", pipeline_run_id: "r1", decision_id: "d-1" };
+    const { client, calls } = setup(parent, result);
+    await expect(client.api.executeCalibrationPipeline({ ...pipeline, decision_id: "d-1" })).resolves.toEqual(result);
+    expect(JSON.parse(await calls[1]!.text()).decision_id).toBe("d-1");
+  });
+  for (const echoed of [undefined, null, "d-2"]) {
+    it(`treats a dropped decision link as unknown, never retries: ${String(echoed)}`, async () => {
+      const result = { calibration_session_id: "cs-1", pipeline_run_id: "r1", ...(echoed === undefined ? {} : { decision_id: echoed }) };
+      const { client, calls } = setup(parent, result);
+      await expect(client.api.executeCalibrationPipeline({ ...pipeline, decision_id: "d-1" })).rejects.toThrow(/without its decision d-1.*Do not retry automatically/);
+      expect(calls.map((r) => r.method)).toEqual(["GET", "POST"]);
+    });
+  }
+  it("rejects a decision without a calibration session or an empty decision without network access", async () => {
+    const { client, calls } = setup();
+    for (const request of [{ chip_id: "chip-1", spec: {}, decision_id: "d-1" }, { ...pipeline, decision_id: " " }]) {
+      await expect(client.api.executeCalibrationPipeline(request)).rejects.toThrow(TypeError);
+    }
+    expect(calls).toHaveLength(0);
+  });
   it("rejects incomplete or empty recording arguments without network access", async () => {
     const { client, calls } = setup();
     for (const request of [{ ...pipeline, idempotency_key: undefined }, { ...pipeline, idempotency_key: " " }, { ...pipeline, calibration_session_id: "" }]) {

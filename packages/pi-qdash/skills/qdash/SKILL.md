@@ -26,6 +26,7 @@ Prefer the dedicated tool that matches the question. Use `qdash_query` only as a
    - `qdash_validate_metric_script`, `qdash_preview_metric_script` — check and preview a metric script on a chip; they run the code on the server but save nothing (see the `qdash-metric-scripts` skill)
    - `qdash_get_pipeline_catalog`, `qdash_plan_pipeline` — compose and check a calibration pipeline spec before running it
    - `qdash_get_calibration_session`, `qdash_list_calibration_sessions` — read one calibration objective with every pipeline run and agent session started for it, or find one to continue (see Calibration sessions)
+   - `qdash_get_calibration_session_audit` — read a calibration session's audit: decisions, pipeline requests, dispatch outcomes, executions, and its agent sessions' events
    - `qdash_list_executions`, `qdash_get_execution`, `qdash_wait_execution`, `qdash_compare_executions` — inspect, await, or compare executions
    - `qdash_get_provenance_stats` — inspect provenance status
    - `qdash_list_forum_posts`, `qdash_get_forum_post`, `qdash_list_forum_replies` — inspect Forum context
@@ -51,6 +52,7 @@ Prefer the dedicated tool that matches the question. Use `qdash_query` only as a
    - `qdash_list_agent_sessions`, `qdash_get_agent_session_context` — find your sessions and read what one allows now, what ran, and the expert's answer, from QDash
    - `qdash_run_agent_session_step`, `qdash_request_agent_human` — run one measurement or ask an expert inside an approved `auto` session; they need no further approval and refuse anything outside the session
    - `qdash_record_agent_decision` — append your reading of a result and your next step to the audit of a session you created; it changes no session state and needs no approval
+   - `qdash_record_calibration_decision` — the same for a calibration session you created: an experiment before its run, a reading, or the conclusion; it needs no approval and starts nothing
    - `qdash_end_agent_session` — stop (`stopped`) or complete (`completed`) a session when the user asks; a write the user approves, the only tool that ends a session, and it reports the status QDash reads back and what still runs (a measurement already sent is not cancelled)
    - `qdash_commit_agent_session_update` — commit (and, when granted, apply) a candidate of a result you assess as pass, only in a session whose approval granted `parameter_updates` for it; it needs no further approval and QDash refuses anything outside the grant
    - `qdash_get_agent_session_audit` — read a session's chronological experiment audit (read-only)
@@ -139,6 +141,12 @@ not the objective itself.
   was launched by the named tool, which reported it itself (QDash does not verify it, and it is
   not an agent session); one with neither was started directly by its user. Membership in a
   calibration session says what a run was for, not who ran it.
+- When pipeline runs toward the goal are chosen adaptively, keep the history in the session's
+  audit as an agent session keeps its own: record each experiment with
+  `qdash_record_calibration_decision` before its run and pass the returned `decisionId` to
+  `qdash_run_pipeline`, record your reading of each result citing the run, and end with a
+  conclusion. Resume from `qdash_get_calibration_session` and
+  `qdash_get_calibration_session_audit`, not from memory.
 - When QDash says a pipeline run's launch outcome is unknown, do not start it again: check
   `qdash_list_executions` and tell the user. Such a run was admitted and may still start, even
   after the calibration session is closed.

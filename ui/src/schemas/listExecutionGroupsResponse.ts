@@ -8,15 +8,16 @@
 import type { ExecutionGroupItem } from './executionGroupItem';
 
 /**
- * A page of the Execution list with agent sessions grouped on the server.
+ * A page of the Execution list with calibration and agent sessions grouped on the server.
  *
  * Grouping happens before pagination, so a session is one row on one page with all its
- * executions, and no execution appears both in a group and as its own row. ``total`` counts
+ * executions, and no execution appears both in a group and as its own row. An agent session
+ * admitted to a calibration session is nested in that session's row. ``total`` counts
  * rows; ``total_executions`` counts real executions, the number the ungrouped list reports.
  */
 export interface ListExecutionGroupsResponse {
   items: ExecutionGroupItem[];
-  /** Rows: agent sessions plus executions outside a session */
+  /** Rows: calibration sessions, agent sessions outside one, and executions outside both */
   total: number;
   /** Real executions that match the filter, grouped or not */
   total_executions: number;
@@ -24,6 +25,8 @@ export interface ListExecutionGroupsResponse {
   grouped_executions: number;
   /** Agent session rows that match the filter */
   agent_sessions: number;
+  /** Calibration session rows that match the filter */
+  calibration_sessions?: number;
   skip: number;
   limit: number;
   /** Most executions one session row lists */

@@ -1,6 +1,6 @@
 ---
 name: qdash-zx90-optimization
-description: Search, within a user-approved hardware time budget and parameter bounds, for a shorter ZX90 gate with high fidelity on one directed coupling, choosing each small CheckCrossResonance condition change from the last result, reporting every experiment in the chat, and confirming the best candidate against the incumbent with ordinary QDash pipelines. Use when the user asks to shorten or optimize the ZX90 or CR gate of one pair ("make the Q0 to Q1 ZX90 shorter without losing fidelity", "tune the CR conditions of this pair adaptively"), or to design an agent-versus-fixed-procedure comparison of such searches. Not for calibrating pairs (qdash-two-qubit-calibration).
+description: Search, within a user-approved hardware time budget and parameter bounds, for a shorter ZX90 gate with high fidelity on one directed coupling, choosing each small CheckCrossResonance condition change from the last result, recording every experiment and decision in one QDash calibration session's audit, and confirming the best candidate against the incumbent with ordinary QDash pipelines. Use when the user asks to shorten or optimize the ZX90 or CR gate of one pair ("make the Q0 to Q1 ZX90 shorter without losing fidelity", "tune the CR conditions of this pair adaptively"), or to design an agent-versus-fixed-procedure comparison of such searches. Not for calibrating pairs (qdash-two-qubit-calibration).
 license: Apache-2.0
 ---
 
@@ -8,7 +8,9 @@ license: Apache-2.0
 
 You run an adaptive search on one directed pair while the chat is open: each experiment
 changes one `CheckCrossResonance` condition inside bounds the user approved, you read its
-evidence, report it, and choose the next experiment. QDash tasks own the measurements and the
+evidence, report it, and choose the next experiment. One QDash calibration session holds the
+whole search: every pipeline run is recorded in it, and each experiment, reading, and the final
+conclusion is a decision in its audit, so the search can be resumed and reviewed from QDash. QDash tasks own the measurements and the
 quality calculations (tomography fits, amplitude fit, benchmark fit, coherence limit); you own
 the interpretation and the next decision. A shorter gate is a screening criterion; benchmarked
 fidelity is the objective.
@@ -24,7 +26,8 @@ Load the `qdash` skill first for execution paths and approval scope, and use
 | `CheckCrossResonance` run keys `adiabatic_safe_factor`, `max_amplitude`, `max_time_range` as the search keys | qubex arguments QDash does not pass: CheckCR `cr_amplitude`, `time_range`, `n_iterations`, `tolerance`; CreateZX90 `initial_state`, `degree`, `n_repetitions`, `duration_unit` |
 | Other CR controls this search leaves unset: CheckCR `ramptime`; CreateZX90 `duration`, `ramptime`, `amplitude_range`, `adiabatic_safe_factor`, `max_amplitude`, `rotary_multiple`, `duration_buffer` | A search over those controls; it needs its own approved scope and design |
 | `qdash_wait_execution`, `qdash_get_execution`, `qdash_list_executions`, task results, figures, task knowledge | A tool that cancels an execution; restoring an earlier pair state; saving a candidate without making it the current calibration |
-| `ZX90InterleavedRandomizedBenchmarking` per arm | Paired multi-arm IRB and its paired statistics; agent calibration sessions on couplings (sessions target qubits) |
+| `ZX90InterleavedRandomizedBenchmarking` per arm | Paired multi-arm IRB and its paired statistics; agent sessions on couplings (agent sessions target qubits) |
+| A calibration session for the search: `qdash_create_calibration_session`, `qdash_list_calibration_sessions`, `qdash_get_calibration_session`, `qdash_record_calibration_decision`, `qdash_get_calibration_session_audit` | Any authority from it: it groups coupling pipelines and records history, and grants no run, bound, or budget |
 
 Stop and report the gap when the request needs an item in the right column. If a run is
 refused (an HTTP 409, a held execution lock, a paused agent session), report it; do not retry
@@ -54,6 +57,39 @@ with an approval card showing the exact spec; the runtime runs it only when the 
 and then starts your next turn with the outcome. The pi CLI shows a confirmation dialog. The
 approved scope does not replace that approval; it means you call the tool directly with the
 exact spec instead of asking again in prose. A declined approval is a stop.
+
+## History in one calibration session
+
+Keep the search's history in QDash, not only in the chat. A calibration session is a record of
+purpose; it never replaces the scope record or any approval.
+
+1. **One session.** Before the first run, reuse the open calibration session the user names, or
+   one `qdash_list_calibration_sessions` finds for this chip and objective once the user confirms
+   it; otherwise create one with `qdash_create_calibration_session` (a reviewed write) whose
+   objective names the directed pair, the cooldown, and the goal. Use that one session for the
+   whole search, including the final comparison; never start a second one for the same search.
+2. **Baseline.** Record the incumbent with `qdash_record_calibration_decision`: `nextAction`
+   `next_task`, an `experiment` with `candidateId` `incumbent`, `stage` `baseline`, `target`
+   the pair (`0-1`, control first), and `evidenceTaskIds` of the incumbent's latest validated
+   chain on this chip.
+3. **Intent before each run.** Record the experiment before dispatching it: `nextAction`
+   `adjust_and_retry` (or `repeat`), an `experiment` with the candidate index as `candidateId`,
+   the stage (`screening` or `confirmation`), the target, and `requestedChanges` naming each
+   CheckCrossResonance key with `value` and `previous`. Then call `qdash_run_pipeline` with
+   `calibrationSessionId` and the returned `decisionId`.
+4. **Reading after each run.** Record your reading citing `evidenceRunIds` (the run's
+   `pipelineRunId`), the next step, and `assessment` when you judged the result. QDash reads the
+   measured values from the task results; your interpretation is your statement.
+5. **Declined or refused.** When the user declines a run's approval or QDash refuses it, record
+   a decision that says so (`nextAction` `stop`, or the next step), so the proposed experiment
+   is not left unexplained.
+6. **Conclusion.** End with `nextAction` `complete` or `stop` and a `conclusion`:
+   `recommend_candidate` cites the candidate's confirmation runs, `keep_baseline` cites the
+   incumbent's evidence, `inconclusive` names no candidate. Closing the session records no
+   conclusion; never let a status stand in for one.
+
+`qdash_record_calibration_decision` runs without an approval card because it only appends to
+the audit of a session you created; it starts nothing and changes no calibration.
 
 ## Mechanics that decide the design (qubex 1.5.0rc2)
 
@@ -150,7 +186,8 @@ not a claim that QDash has no input overrides.
 2. **Announce, then dispatch.** Before each run, post: the experiment number, the key and its
    change (from, to), the evidence that motivates it, the candidate index, the expected
    hardware time, and the budget left after it. Run the scan check, validate with
-   `qdash_plan_pipeline`, then call `qdash_run_pipeline` (see the example).
+   `qdash_plan_pipeline`, record the experiment decision, then call `qdash_run_pipeline` with
+   `calibrationSessionId` and `decisionId` (see the example).
 3. **Wait with status.** A waiting tool blocks the chat until it returns, so wait in slices:
    `qdash_wait_execution` with `timeoutSeconds` equal to the status cadence and
    `pollIntervalSeconds` 15. It waits for the whole pipeline. A timeout means "not finished
@@ -162,8 +199,10 @@ not a claim that QDash has no input overrides.
    CreateZX90 read `cr_duration`, `zx90_gate_time`, and the amplitude fit. QDash has already
    failed a run with no root or a root above the cap; report that failure as the result.
    Reject a candidate whose `cr_duration` exceeds the formula's, which means a retry. Post the
-   measured evidence, the decision, the incumbent's values, and the pair's actual current
-   stored state, which is now this run's result, not the incumbent.
+   measured evidence, the decision, and the incumbent's values, and say that this run's
+   completed tasks may have overwritten the pair's stored calibration, so the incumbent is no
+   longer known to be in place. QDash records no authoritative write, so never state the
+   current stored state as known. Record the reading as a decision citing the run.
 5. **Decide** one of: a nearby allowed candidate; a repeat of an uncertain condition (within
    the cap); advance a candidate whose realized gate time is shorter than the incumbent's to
    `CheckZX90`, the Bell checks, `Check2QGateCoherenceLimit`, and the benchmark; revisit 1Q or
@@ -184,8 +223,12 @@ not a claim that QDash has no input overrides.
   until `qdash_get_execution` shows `cancelled`, then report the pair state as unverified
   until you read which tasks completed.
 - **Resuming.** Nothing runs between turns or after the runtime or CLI stops. On the next turn,
-  rebuild the state from the decision records: read each recorded execution ID
-  (`qdash_get_execution`, `qdash_list_executions`) and its task results. Wait for a
+  rebuild the state from QDash, not from memory: `qdash_get_calibration_session` lists the
+  experiments with their measured values, the recommendation, and the latest requested run with
+  its recorded execution outcome, and
+  `qdash_get_calibration_session_audit` lists every decision, request, dispatch outcome, and
+  execution. Read each execution (`qdash_get_execution`, `qdash_list_executions`) and its task
+  results. Wait for a
   non-terminal execution; never re-dispatch an experiment whose completion is uncertain.
   Recompute the budget used from execution times, failed and cancelled runs included.
 
@@ -213,11 +256,16 @@ its own approval and budget.
 
 Report per arm the mean and spread of `zx90_gate_fidelity` over the confirmation runs with each
 run's error, the realized CR duration and total gate time, and the hardware time used; the total
-budget used and left; and the actual last stored pair state with the execution that wrote it.
-If that run failed or its evidence is incomplete, report the state as unverified. Call a
+budget used and left; and the session's latest requested run (`latest_requested_run`) with its
+execution outcome and whether its requested candidate is the recommended one. QDash records no
+authoritative hardware write: request order and a completed execution do not prove which run
+wrote last, since a run requested earlier can finish later. Never report the current or last
+written pair state as known; say it is unverified and that applying the recommendation needs a
+run of it. Keep the recommendation (your conclusion) separate from this observed record. Call a
 candidate better only when its confirmation runs consistently exceed the incumbent's beyond
 their errors; otherwise keep the incumbent as the recommendation and report a shorter gate as
-unconfirmed. Repeated, uncorrected comparisons carry no significance claim.
+unconfirmed. Repeated, uncorrected comparisons carry no significance claim. Record the
+recommendation as the session's conclusion.
 
 ## Example step
 
@@ -246,23 +294,49 @@ CheckCR.
 }
 ```
 
+Before this run, the experiment is recorded in the search's calibration session, and the run
+names the returned decision:
+
+```json
+{
+  "calibrationSessionId": "cs-...",
+  "interpretation": "Realized cr_amplitude 0.31 is below max_amplitude 1.0, so the factor binds; raise it one step within the approved 0.70-0.80.",
+  "nextAction": "adjust_and_retry",
+  "evidenceRunIds": ["cpr-... (the previous screening run)"],
+  "experiment": {
+    "candidateId": "c03",
+    "stage": "screening",
+    "target": "0-1",
+    "requestedChanges": [
+      {"taskName": "CheckCrossResonance", "parameter": "adiabatic_safe_factor", "value": 0.8, "previous": 0.75}
+    ]
+  }
+}
+```
+
+Then call `qdash_run_pipeline` with the spec above, `calibrationSessionId`, and that
+`decisionId`.
+
 To advance a candidate, append `CheckZX90`, `CheckBellState`, `CheckBellStateTomography`,
 `Check2QGateCoherenceLimit`, and `ZX90InterleavedRandomizedBenchmarking` (with the stage's
 `shots` and `n_trials`) to the same step, keeping its CheckCR run values.
 
 ## Decision record
 
-Agent sessions do not cover couplings, so no QDash tool stores this record; keep it in the
-conversation and the final report, and post it as Forum evidence only when the user asks. One
-record per experiment:
+QDash stores the record in the calibration session's audit; the chat reports it. Each
+experiment has:
 
-- evidence read (task IDs, execution ID, cooldown) and the hypothesis;
-- proposed: the action, the requested run values, candidate index, order or seed;
-- executed: the run values the task results show and the realized `cr_amplitude`;
-- unchanged: every other key, stated as stored or default;
-- result: CheckCR stop reason and unwanted terms, predicted and realized CR duration,
-  `zx90_gate_time`, fidelity with error, or the failure;
-- hardware time of this run, budget used and left, the repeat count, and the next decision.
+- intent: the decision recorded before the run, with the candidate index, stage, target, the
+  requested run values with their previous values, and the evidence that motivates it;
+- executed: the run that names the decision, its exact requested spec, and the run values the
+  task results show, which QDash compares with the request;
+- result: the measured values QDash reads from the task results (CR duration, `zx90_gate_time`,
+  fidelity with error, durations) or the failure, plus your reading as a decision citing the run;
+- in the chat: CheckCR stop reason and unwanted terms, predicted CR duration, unchanged keys
+  stated as stored or default, hardware time of this run, budget used and left, the repeat
+  count, and the next decision.
+
+Post the record as Forum evidence only when the user asks.
 
 ## Comparing search strategies
 

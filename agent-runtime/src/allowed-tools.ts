@@ -21,6 +21,7 @@ export const ALLOWED_TOOL_NAMES = [
   "qdash_get_agent_session_audit",
   "qdash_get_agent_session_context",
   "qdash_get_calibration_session",
+  "qdash_get_calibration_session_audit",
   "qdash_get_chip_metrics",
   "qdash_get_cooldown_wiring",
   "qdash_get_default_chip",

@@ -226,6 +226,26 @@ test("a run in a calibration session is recorded under a key from its tool call"
   assert.match(again.content[0].text, /nothing new was started/);
 });
 
+test("a run names the decision it carries out only together with its calibration session", async () => {
+  const calls = [];
+  const tools = registeredTools({
+    async executeCalibrationPipeline(request) {
+      calls.push(request);
+      return { execution_id: "e", flow_run_id: "fr", flow_run_url: "", qdash_ui_url: "", message: "started", steps: STEPS, targets: VALID.targets, calibration_session_id: "cs-1", pipeline_run_id: "cpr-2", replayed: false };
+    },
+  });
+  const run = tools.get("qdash_run_pipeline");
+  await assert.rejects(
+    run.execute("c0", { chipId: "64Qv3", spec: SPEC, decisionId: "cd-1" }, undefined, undefined, approved("c0")),
+    /decisionId needs calibrationSessionId/,
+  );
+  assert.equal(calls.length, 0);
+  const result = await run.execute("c1", { chipId: "64Qv3", spec: SPEC, calibrationSessionId: "cs-1", decisionId: "cd-1" }, undefined, undefined, approved("c1"));
+  assert.equal(calls[0].decision_id, "cd-1");
+  assert.equal(calls[0].idempotency_key, "qdash_run_pipeline:c1");
+  assert.equal(result.details.decisionId, "cd-1");
+});
+
 test("a run whose launch outcome is unknown is reported, never retried", async () => {
   const error = Object.assign(new Error("conflict"), { statusCode: 409, payload: { detail: "The dispatch outcome of pipeline run cpr-1 is unknown; it may be running." } });
   const tools = registeredTools({ async executeCalibrationPipeline() { throw error; } });

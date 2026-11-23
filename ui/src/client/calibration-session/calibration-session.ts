@@ -25,13 +25,18 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  CalibrationDecisionResponse,
+  CalibrationSessionAuditResponse,
   CalibrationSessionDetailResponse,
   CalibrationSessionResponse,
   CloseCalibrationSessionRequest,
   CreateCalibrationSessionRequest,
+  GetCalibrationSessionAuditParams,
   HTTPValidationError,
+  ListCalibrationDecisionsResponse,
   ListCalibrationSessionsParams,
-  ListCalibrationSessionsResponse
+  ListCalibrationSessionsResponse,
+  RecordCalibrationDecisionRequest
 } from '../../schemas';
 
 import { customInstance } from '../../lib/api/custom-instance';
@@ -381,3 +386,358 @@ export const useCloseCalibrationSession = <TError = HTTPValidationError,
       > => {
       return useMutation(getCloseCalibrationSessionMutationOptions(options), queryClient);
     }
+    /**
+ * Append a decision, as an agent session decision is appended to its audit.
+ *
+ * Only the session's creator records, in any status. Every cited pipeline run and decision
+ * must belong to the session and every cited task result must be on its chip (409 otherwise);
+ * QDash freezes what its records say about them. ``experiment`` proposes a run, which is then
+ * started with this decision's ID; ``conclusion`` states a recommendation that must rest on
+ * the cited evidence of its candidate (422 otherwise). A decision changes no calibration and
+ * starts nothing. A retry with the same key and request returns the same record.
+ * @summary Record a decision in a calibration session's audit
+ */
+export const recordCalibrationDecision = (
+    calibrationSessionId: string,
+    recordCalibrationDecisionRequest: RecordCalibrationDecisionRequest,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<CalibrationDecisionResponse>(
+      {url: `/calibration-sessions/${calibrationSessionId}/decisions`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: recordCalibrationDecisionRequest, signal
+    },
+      options);
+    }
+
+
+
+
+export const getRecordCalibrationDecisionMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof recordCalibrationDecision>>, TError,{calibrationSessionId: string;data: RecordCalibrationDecisionRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof recordCalibrationDecision>>, TError,{calibrationSessionId: string;data: RecordCalibrationDecisionRequest}, TContext> => {
+
+const mutationKey = ['recordCalibrationDecision'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof recordCalibrationDecision>>, {calibrationSessionId: string;data: RecordCalibrationDecisionRequest}> = (props) => {
+          const {calibrationSessionId,data} = props ?? {};
+
+          return  recordCalibrationDecision(calibrationSessionId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RecordCalibrationDecisionMutationResult = NonNullable<Awaited<ReturnType<typeof recordCalibrationDecision>>>
+    export type RecordCalibrationDecisionMutationBody = RecordCalibrationDecisionRequest
+    export type RecordCalibrationDecisionMutationError = HTTPValidationError
+
+    /**
+ * @summary Record a decision in a calibration session's audit
+ */
+export const useRecordCalibrationDecision = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof recordCalibrationDecision>>, TError,{calibrationSessionId: string;data: RecordCalibrationDecisionRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof recordCalibrationDecision>>,
+        TError,
+        {calibrationSessionId: string;data: RecordCalibrationDecisionRequest},
+        TContext
+      > => {
+      return useMutation(getRecordCalibrationDecisionMutationOptions(options), queryClient);
+    }
+    /**
+ * The session's decisions, oldest first, with the runs that carried each out.
+ * @summary List a calibration session's decisions
+ */
+export const listCalibrationDecisions = (
+    calibrationSessionId: string,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<ListCalibrationDecisionsResponse>(
+      {url: `/calibration-sessions/${calibrationSessionId}/decisions`, method: 'GET', signal
+    },
+      options);
+    }
+
+
+
+
+export const getListCalibrationDecisionsQueryKey = (calibrationSessionId: string,) => {
+    return [
+    `/calibration-sessions/${calibrationSessionId}/decisions`
+    ] as const;
+    }
+
+
+export const getListCalibrationDecisionsQueryOptions = <TData = Awaited<ReturnType<typeof listCalibrationDecisions>>, TError = HTTPValidationError>(calibrationSessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCalibrationDecisions>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListCalibrationDecisionsQueryKey(calibrationSessionId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listCalibrationDecisions>>> = ({ signal }) => listCalibrationDecisions(calibrationSessionId, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: calibrationSessionId !== null && calibrationSessionId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listCalibrationDecisions>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListCalibrationDecisionsQueryResult = NonNullable<Awaited<ReturnType<typeof listCalibrationDecisions>>>
+export type ListCalibrationDecisionsQueryError = HTTPValidationError
+
+
+export function useListCalibrationDecisions<TData = Awaited<ReturnType<typeof listCalibrationDecisions>>, TError = HTTPValidationError>(
+ calibrationSessionId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCalibrationDecisions>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listCalibrationDecisions>>,
+          TError,
+          Awaited<ReturnType<typeof listCalibrationDecisions>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListCalibrationDecisions<TData = Awaited<ReturnType<typeof listCalibrationDecisions>>, TError = HTTPValidationError>(
+ calibrationSessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCalibrationDecisions>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listCalibrationDecisions>>,
+          TError,
+          Awaited<ReturnType<typeof listCalibrationDecisions>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListCalibrationDecisions<TData = Awaited<ReturnType<typeof listCalibrationDecisions>>, TError = HTTPValidationError>(
+ calibrationSessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCalibrationDecisions>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List a calibration session's decisions
+ */
+
+export function useListCalibrationDecisions<TData = Awaited<ReturnType<typeof listCalibrationDecisions>>, TError = HTTPValidationError>(
+ calibrationSessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCalibrationDecisions>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListCalibrationDecisionsQueryOptions(calibrationSessionId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
+ * The session's chronological audit, a page at a time, with the agent session audit's
+ * event schema; an admitted agent session's events are included.
+ * @summary Read a calibration session's audit timeline
+ */
+export const getCalibrationSessionAudit = (
+    calibrationSessionId: string,
+    params?: GetCalibrationSessionAuditParams,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<CalibrationSessionAuditResponse>(
+      {url: `/calibration-sessions/${calibrationSessionId}/audit`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+
+
+
+
+export const getGetCalibrationSessionAuditQueryKey = (calibrationSessionId: string,
+    params?: GetCalibrationSessionAuditParams,) => {
+    return [
+    `/calibration-sessions/${calibrationSessionId}/audit`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetCalibrationSessionAuditQueryOptions = <TData = Awaited<ReturnType<typeof getCalibrationSessionAudit>>, TError = HTTPValidationError>(calibrationSessionId: string,
+    params?: GetCalibrationSessionAuditParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCalibrationSessionAudit>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCalibrationSessionAuditQueryKey(calibrationSessionId,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCalibrationSessionAudit>>> = ({ signal }) => getCalibrationSessionAudit(calibrationSessionId,params, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: calibrationSessionId !== null && calibrationSessionId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCalibrationSessionAudit>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetCalibrationSessionAuditQueryResult = NonNullable<Awaited<ReturnType<typeof getCalibrationSessionAudit>>>
+export type GetCalibrationSessionAuditQueryError = HTTPValidationError
+
+
+export function useGetCalibrationSessionAudit<TData = Awaited<ReturnType<typeof getCalibrationSessionAudit>>, TError = HTTPValidationError>(
+ calibrationSessionId: string,
+    params: undefined |  GetCalibrationSessionAuditParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCalibrationSessionAudit>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getCalibrationSessionAudit>>,
+          TError,
+          Awaited<ReturnType<typeof getCalibrationSessionAudit>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetCalibrationSessionAudit<TData = Awaited<ReturnType<typeof getCalibrationSessionAudit>>, TError = HTTPValidationError>(
+ calibrationSessionId: string,
+    params?: GetCalibrationSessionAuditParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCalibrationSessionAudit>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getCalibrationSessionAudit>>,
+          TError,
+          Awaited<ReturnType<typeof getCalibrationSessionAudit>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetCalibrationSessionAudit<TData = Awaited<ReturnType<typeof getCalibrationSessionAudit>>, TError = HTTPValidationError>(
+ calibrationSessionId: string,
+    params?: GetCalibrationSessionAuditParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCalibrationSessionAudit>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Read a calibration session's audit timeline
+ */
+
+export function useGetCalibrationSessionAudit<TData = Awaited<ReturnType<typeof getCalibrationSessionAudit>>, TError = HTTPValidationError>(
+ calibrationSessionId: string,
+    params?: GetCalibrationSessionAuditParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCalibrationSessionAudit>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetCalibrationSessionAuditQueryOptions(calibrationSessionId,params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
+ * The whole audit as versioned JSON; refused rather than cut short when too long.
+ * @summary Export a calibration session's audit timeline
+ */
+export const exportCalibrationSessionAudit = (
+    calibrationSessionId: string,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<CalibrationSessionAuditResponse>(
+      {url: `/calibration-sessions/${calibrationSessionId}/audit/export`, method: 'GET', signal
+    },
+      options);
+    }
+
+
+
+
+export const getExportCalibrationSessionAuditQueryKey = (calibrationSessionId: string,) => {
+    return [
+    `/calibration-sessions/${calibrationSessionId}/audit/export`
+    ] as const;
+    }
+
+
+export const getExportCalibrationSessionAuditQueryOptions = <TData = Awaited<ReturnType<typeof exportCalibrationSessionAudit>>, TError = HTTPValidationError>(calibrationSessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof exportCalibrationSessionAudit>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getExportCalibrationSessionAuditQueryKey(calibrationSessionId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof exportCalibrationSessionAudit>>> = ({ signal }) => exportCalibrationSessionAudit(calibrationSessionId, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: calibrationSessionId !== null && calibrationSessionId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof exportCalibrationSessionAudit>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ExportCalibrationSessionAuditQueryResult = NonNullable<Awaited<ReturnType<typeof exportCalibrationSessionAudit>>>
+export type ExportCalibrationSessionAuditQueryError = HTTPValidationError
+
+
+export function useExportCalibrationSessionAudit<TData = Awaited<ReturnType<typeof exportCalibrationSessionAudit>>, TError = HTTPValidationError>(
+ calibrationSessionId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof exportCalibrationSessionAudit>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof exportCalibrationSessionAudit>>,
+          TError,
+          Awaited<ReturnType<typeof exportCalibrationSessionAudit>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useExportCalibrationSessionAudit<TData = Awaited<ReturnType<typeof exportCalibrationSessionAudit>>, TError = HTTPValidationError>(
+ calibrationSessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof exportCalibrationSessionAudit>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof exportCalibrationSessionAudit>>,
+          TError,
+          Awaited<ReturnType<typeof exportCalibrationSessionAudit>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useExportCalibrationSessionAudit<TData = Awaited<ReturnType<typeof exportCalibrationSessionAudit>>, TError = HTTPValidationError>(
+ calibrationSessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof exportCalibrationSessionAudit>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Export a calibration session's audit timeline
+ */
+
+export function useExportCalibrationSessionAudit<TData = Awaited<ReturnType<typeof exportCalibrationSessionAudit>>, TError = HTTPValidationError>(
+ calibrationSessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof exportCalibrationSessionAudit>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getExportCalibrationSessionAuditQueryOptions(calibrationSessionId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}

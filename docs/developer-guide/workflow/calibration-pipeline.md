@@ -75,7 +75,10 @@ when the worker deployment is not registered.
 `execute` also accepts `calibration_session_id` with an `idempotency_key`, given together. QDash
 then records the run in that calibration session before it is launched, and a retry with the same
 key returns the recorded run (`replayed: true`) instead of starting another; the response adds
-`calibration_session_id` and `pipeline_run_id`. Without them the route behaves as before. The
+`calibration_session_id` and `pipeline_run_id`. With them, an optional `decision_id` names the
+session's decision the run carries out, and the response echoes it (see
+[Calibration Session Audit](../copilot/calibration-session-audit.md#intent-before-execution)).
+Without them the route behaves as before. The
 recording, retry, and unknown-outcome rules are in
 [Calibration Sessions](../copilot/calibration-sessions.md#dispatch-is-recorded-before-launch).
 An optional `reported_origin` records how the caller says it started the run; QDash stores it as

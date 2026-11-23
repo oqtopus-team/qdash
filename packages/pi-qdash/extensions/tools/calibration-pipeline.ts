@@ -436,6 +436,7 @@ export function registerCalibrationPipelineTools(pi: Pick<ExtensionAPI, "registe
     promptGuidelines: [
       "Use qdash_run_pipeline only for a spec that qdash_plan_pipeline reported valid.",
       "When the run serves a calibration objective, pass that objective's calibrationSessionId (from qdash_create_calibration_session or the user) so QDash records the run, with all its step executions, in it. It grants nothing: the user still approves this exact run.",
+      "When the run carries out an experiment you recorded with qdash_record_calibration_decision, pass that decision's decisionId too, so the session's audit links your intent to this run. Record the decision first; never pass a decision of another session.",
       "If QDash reports that a run's launch outcome is unknown, do not start it again: check qdash_list_executions and tell the user.",
       "Tell the user before running that completed tasks update calibrated parameters in QDash directly.",
       "Do not use qdash_run_pipeline to run a task an agent session action failed to run; that skips the session's candidate gate. Report the failure instead.",
@@ -447,9 +448,15 @@ export function registerCalibrationPipelineTools(pi: Pick<ExtensionAPI, "registe
       spec: specParam,
       backendName: Type.Optional(Type.String({ description: "Defaults to the configured backend." })),
       calibrationSessionId: Type.Optional(Type.String({ description: "Record the run in this calibration session (open, on this chip, created by the user). Grants nothing." })),
+      decisionId: Type.Optional(Type.String({ description: "With calibrationSessionId: the decision of that session (qdash_record_calibration_decision with an experiment) this run carries out." })),
     }),
-    async execute(toolCallId, params: ConnectionParams & { chipId: string; spec: Record<string, unknown>; backendName?: string; calibrationSessionId?: string }, _signal, _onUpdate, ctx) {
-      const recordedIn = params.calibrationSessionId ? ` It is recorded in calibration session ${params.calibrationSessionId}, which groups it and grants nothing.` : "";
+    async execute(toolCallId, params: ConnectionParams & { chipId: string; spec: Record<string, unknown>; backendName?: string; calibrationSessionId?: string; decisionId?: string }, _signal, _onUpdate, ctx) {
+      if (params.decisionId && !params.calibrationSessionId) {
+        throw new Error("decisionId needs calibrationSessionId: a decision belongs to one calibration session.");
+      }
+      const recordedIn = params.calibrationSessionId
+        ? ` It is recorded in calibration session ${params.calibrationSessionId}${params.decisionId ? ` as carrying out decision ${params.decisionId}` : ""}, which groups it and grants nothing.`
+        : "";
       await requireWriteApproval("qdash_run_pipeline", toolCallId, params, ctx, { title: "Run QDash calibration pipeline?", message: `This starts a calibration execution on chip ${params.chipId}. Completed tasks update calibrated parameters in QDash directly.${recordedIn}` });
       const client = await deps.makeClient(params);
       // A paused agent session's targets must not be measured around its pause.
@@ -460,7 +467,9 @@ export function registerCalibrationPipelineTools(pi: Pick<ExtensionAPI, "registe
       const qdash = new QDash(client);
       try {
         // Dispatch only: the run handle's wait() is deliberately not called here.
-        const recording = params.calibrationSessionId ? { calibrationSessionId: params.calibrationSessionId, idempotencyKey: pipelineRunKey(toolCallId) } : undefined;
+        const recording = params.calibrationSessionId
+          ? { calibrationSessionId: params.calibrationSessionId, idempotencyKey: pipelineRunKey(toolCallId), ...(params.decisionId ? { decisionId: params.decisionId } : {}) }
+          : undefined;
         // The origin is this tool's own constant, never the model's arguments: QDash shows it as
         // reported, so a run started here is told apart from one the user started directly.
         const run = await qdash.pipelines.execute(params.spec, { chipId: params.chipId, backendName: params.backendName }, recording, { reportedOrigin: PIPELINE_TOOL_ORIGIN });
@@ -471,6 +480,7 @@ export function registerCalibrationPipelineTools(pi: Pick<ExtensionAPI, "registe
           executionId: result.execution_id,
           started: true,
           ...(result.calibration_session_id ? { calibrationSessionId: result.calibration_session_id, pipelineRunId: result.pipeline_run_id ?? undefined } : {}),
+          ...(params.decisionId ? { decisionId: params.decisionId } : {}),
           ...(result.replayed ? { replayed: true } : {}),
         });
       } catch (error) {

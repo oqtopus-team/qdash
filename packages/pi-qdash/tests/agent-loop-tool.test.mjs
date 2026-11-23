@@ -54,7 +54,7 @@ function autoSession(policy = {}) {
 }
 
 test("the loop tools are session-granted writes or audited reads, never script-callable writes", () => {
-  assert.deepEqual([...SESSION_GRANTED_WRITE_TOOL_NAMES].sort(), ["qdash_commit_agent_session_update", "qdash_record_agent_decision", "qdash_request_agent_human", "qdash_run_agent_session_step"]);
+  assert.deepEqual([...SESSION_GRANTED_WRITE_TOOL_NAMES].sort(), ["qdash_commit_agent_session_update", "qdash_record_agent_decision", "qdash_record_calibration_decision", "qdash_request_agent_human", "qdash_run_agent_session_step"]);
   for (const name of SESSION_GRANTED_WRITE_TOOL_NAMES) {
     assert.ok(!REVIEWED_WRITE_TOOL_NAMES.includes(name), name);
     assert.ok(!NESTED_READ_TOOL_NAMES.includes(name), `${name} must not run from a script`);

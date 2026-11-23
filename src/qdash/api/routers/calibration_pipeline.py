@@ -155,12 +155,15 @@ async def execute_pipeline(
         dispatch=dispatch,
         response=response,
         reported_origin=request.reported_origin,
+        decision_id=request.decision_id,
     )
     return ExecutePipelineResponse.model_validate(
         {
             **recorded.response,
             "calibration_session_id": request.calibration_session_id,
             "pipeline_run_id": recorded.run_id,
+            # The request hash includes the decision, so a replay carries the same link.
+            "decision_id": request.decision_id,
             "replayed": recorded.replayed,
         }
     )

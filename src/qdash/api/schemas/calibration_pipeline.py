@@ -188,6 +188,17 @@ class ExecutePipelineRequest(ValidatePipelineRequest):
         ),
     )
 
+    decision_id: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=200,
+        description=(
+            "With calibration_session_id: the decision of that session this run carries out, "
+            "recorded before dispatch with an experiment. QDash checks it belongs to the "
+            "session and records the link on the run; it grants nothing."
+        ),
+    )
+
     reported_origin: ReportedLaunchOrigin | None = Field(
         default=None,
         description=(
@@ -204,6 +215,8 @@ class ExecutePipelineRequest(ValidatePipelineRequest):
             raise ValueError(
                 "calibration_session_id and idempotency_key are given together or not at all"
             )
+        if self.decision_id is not None and self.calibration_session_id is None:
+            raise ValueError("decision_id needs calibration_session_id")
         return self
 
 
@@ -217,6 +230,13 @@ class ExecutePipelineResponse(ExecuteFlowResponse):
     )
     pipeline_run_id: str | None = Field(
         default=None, description="The run's record in that calibration session"
+    )
+    decision_id: str | None = Field(
+        default=None,
+        description=(
+            "The decision the recorded run carries out, as QDash linked it; null when the "
+            "request named none. A client that sent a decision checks it is echoed here"
+        ),
     )
     replayed: bool = Field(
         default=False,

@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { ExecutePipelineResponseCalibrationSessionId } from './executePipelineResponseCalibrationSessionId';
+import type { ExecutePipelineResponseDecisionId } from './executePipelineResponseDecisionId';
 import type { ExecutePipelineResponsePipelineRunId } from './executePipelineResponsePipelineRunId';
 import type { ExecutePipelineResponseTargets } from './executePipelineResponseTargets';
 import type { ResolvedPipelineStep } from './resolvedPipelineStep';
@@ -30,6 +31,8 @@ export interface ExecutePipelineResponse {
   calibration_session_id?: ExecutePipelineResponseCalibrationSessionId;
   /** The run's record in that calibration session */
   pipeline_run_id?: ExecutePipelineResponsePipelineRunId;
+  /** The decision the recorded run carries out, as QDash linked it; null when the request named none. A client that sent a decision checks it is echoed here */
+  decision_id?: ExecutePipelineResponseDecisionId;
   /** True when a retry returned the run an earlier request with its key started */
   replayed?: boolean;
 }
