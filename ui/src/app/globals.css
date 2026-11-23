@@ -2084,18 +2084,3 @@ html[data-theme="dark"],
 .dashboard-grid-layout .react-draggable-dragging .dashboard-drag-grip {
   cursor: grabbing;
 }
-
-/*
- * Chat notifications (Ding, ChatToaster): the DaisyUI theme's surface, text, and status
- * colors and its box radius. `body` outranks the `.tst-viewport` rule Ding injects at runtime.
- */
-body .tst-viewport {
-  --tst-bg: var(--color-base-100);
-  --tst-fg: var(--color-base-content);
-  --tst-ring: color-mix(in oklab, var(--color-base-content) 10%, transparent);
-  --tst-success: var(--color-success);
-  --tst-error: var(--color-error);
-  --tst-warning: var(--color-warning);
-  --tst-info: var(--color-info);
-  --tst-radius: var(--radius-box);
-}
