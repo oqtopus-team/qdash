@@ -54,6 +54,10 @@ console.log(metrics.qubit_metrics);
 
 The client provides polling helpers for QDash executions, agent action dispatch, execution linkage, and candidate application.
 
+### List a Chip's Executions
+
+`listExecutions({ chipId, skip, limit, date, timezone })` returns one page of a chip's executions as `{ executions, total }`. `chipId` is required; `limit` is an integer from 1 to 100 and `skip` an integer of 0 or more; `date` is one start day as `YYYYMMDD` in `timezone` (default UTC). A missing or blank `chipId`, an invalid `limit` or `skip`, or a malformed `date` throws `QDashValidationError` before any request. `timezone` is passed to the API without local validation. The API has no flow or status filter, so filter the returned rows instead.
+
 ### Read Task Results in Pages
 
 `listTaskResults` returns one page, newest first, as `{ items, total, skip, limit, status_counts }`. `limit` is an integer from 1 to 100 and `skip` an integer of 0 or more; other values throw `QDashValidationError` before any request instead of returning a smaller page. Filters use the API's names: `startFrom` and `startTo` bound the task start time, and `qid` matches one stored qubit or coupling ID exactly (`"6"`, `"6-7"`).

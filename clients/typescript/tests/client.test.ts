@@ -675,6 +675,52 @@ describe("SDK-facing client helpers", () => {
   });
 });
 
+describe("execution lists", () => {
+  function executionClient() {
+    const requests: URL[] = [];
+    const fetch = vi.fn(async (input: RequestInfo | URL) => {
+      requests.push(new URL(new Request(input).url));
+      return jsonResponse({ executions: [], total: 0 });
+    });
+    const client = new QDashClient(
+      new QDashConfig({ baseUrl: "https://qdash.example/api", apiToken: "token", retry: { maxAttempts: 1 } }),
+      { fetch },
+    );
+    return { client, requests, fetch };
+  }
+
+  it("sends the chip and only the filters GET /executions supports", async () => {
+    const { client, requests } = executionClient();
+    await client.listExecutions({ chipId: "C", skip: 20, limit: 100, date: "20261123", timezone: "Asia/Tokyo" });
+    expect(requests[0]!.pathname).toBe("/api/executions");
+    expect(Object.fromEntries(requests[0]!.searchParams)).toEqual({
+      chip_id: "C",
+      skip: "20",
+      limit: "100",
+      date: "20261123",
+      timezone: "Asia/Tokyo",
+    });
+    await client.listExecutions({ chipId: "C" });
+    expect(Object.fromEntries(requests[1]!.searchParams)).toEqual({ chip_id: "C" });
+  });
+
+  it.each([
+    [{}, /chipId is required/],
+    [{ chipId: "" }, /chipId is required/],
+    [{ chipId: "  " }, /chipId is required/],
+    [{ chipId: "C", limit: 200 }, /limit must be an integer from 1 to 100 \(got 200\)/],
+    [{ chipId: "C", limit: 0 }, /limit must be an integer from 1 to 100/],
+    [{ chipId: "C", skip: -1 }, /skip must be an integer 0 or more/],
+    [{ chipId: "C", date: "2026-11-23" }, /date must be YYYYMMDD/],
+  ])("rejects %o before any request", async (options, message) => {
+    const { client, fetch } = executionClient();
+    const call = () => client.listExecutions(options as Parameters<QDashClient["listExecutions"]>[0]);
+    await expect(call()).rejects.toThrow(QDashValidationError);
+    await expect(call()).rejects.toThrow(message);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+});
+
 describe("task result pages", () => {
   const row = (index: number) => ({
     task_id: `t-${index}`,

@@ -51,7 +51,12 @@ export {
   QDashTransportError,
   QDashValidationError,
 } from "@oqtopus-team/qdash-client";
-export type { CollectedTaskResults, CollectTaskResultsOptions, ListTaskResultsOptions } from "@oqtopus-team/qdash-client";
+export type {
+  CollectedTaskResults,
+  CollectTaskResultsOptions,
+  ListExecutionsOptions,
+  ListTaskResultsOptions,
+} from "@oqtopus-team/qdash-client";
 export type {
   CalibrationPipelineSpec,
   CalibrationPipelineSpecStepsItem,

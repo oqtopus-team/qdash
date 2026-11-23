@@ -25,6 +25,7 @@ async function fakeQDash(t) {
     };
     if (url.pathname === "/task-results") return send(200, page([row("t-1", url.searchParams.get("qid") ?? "6")]));
     if (url.pathname === "/executions") return send(200, { executions: [], total: 0 });
+    if (url.pathname === "/chips") return send(200, { chips: [{ chip_id: "OLD", activity_status: "inactive" }, { chip_id: "D", activity_status: "active" }] });
     if (url.pathname === "/chips/C/couplings/6-7") return send(200, { coupling_id: "6-7", chip_id: "C" });
     if (url.pathname === "/forum/posts") return send(200, { posts: [], total: 0 });
     return send(404, { detail: `no ${url.pathname}` });
@@ -85,9 +86,49 @@ test("task_results paging is checked before any request, with advice to page", a
     }
   }
   assert.deepEqual(requests, []);
-  // Other actions keep their own limits: executions is not held to the task-result maximum.
-  await run("qdash_query", { action: "executions", chipId: "C", limit: 200 });
-  assert.deepEqual(requests.map((request) => [request.path, request.query.limit]), [["/executions", "200"]]);
+  // Other actions keep their own checks: forum_posts is not held to the task-result maximum.
+  await run("qdash_query", { action: "forum_posts", chipId: "C", limit: 200 });
+  assert.deepEqual(requests.map((request) => [request.path, request.query.limit]), [["/forum/posts", "200"]]);
+});
+
+test("executions are listed for the given chip, or the default chip when chipId is omitted", async (t) => {
+  const { run, requests } = await fakeQDash(t);
+  // The reported call: no chipId. The default chip is resolved first, so /executions always gets chip_id.
+  for (const call of [() => run("qdash_list_executions", { limit: 5 }), () => run("qdash_query", { action: "executions", limit: 5 })]) {
+    requests.length = 0;
+    const result = await call();
+    assert.deepEqual(requests.map((request) => request.path), ["/chips", "/executions"]);
+    assert.deepEqual(requests[1].query, { chip_id: "D", limit: "5" });
+    assert.deepEqual(result.details.data.executions, []);
+  }
+  requests.length = 0;
+  await run("qdash_list_executions", { chipId: "C", skip: 20, limit: 100, date: "20261123", timezone: "Asia/Tokyo" });
+  assert.deepEqual(requests.map((request) => [request.path, request.query]), [
+    ["/executions", { chip_id: "C", skip: "20", limit: "100", date: "20261123", timezone: "Asia/Tokyo" }],
+  ]);
+});
+
+test("executions refuse unsupported filters and invalid paging before any request", async (t) => {
+  const { run, requests, tools } = await fakeQDash(t);
+  const properties = tools.get("qdash_list_executions").parameters.properties;
+  // The schema offers only what GET /executions supports.
+  assert.deepEqual(Object.keys(properties).filter((key) => !["profile", "configPath", "useEnv"].includes(key)).sort(), ["chipId", "date", "limit", "skip", "timezone"]);
+  assert.deepEqual({ type: properties.limit.type, minimum: properties.limit.minimum, maximum: properties.limit.maximum }, { type: "integer", minimum: 1, maximum: 100 });
+  assert.doesNotMatch(tools.get("qdash_list_executions").description, /optional chip, flow, status/);
+  for (const [params, message] of [
+    [{ flowName: "one_qubit" }, /flowName cannot filter executions/],
+    [{ status: "running" }, /status cannot filter executions/],
+    [{ flowName: "f", status: "running" }, /flowName and status cannot filter executions/],
+    [{ limit: 200 }, /limit must be an integer from 1 to 100 \(got 200\)/],
+    [{ limit: 0 }, /limit must be an integer from 1 to 100/],
+    [{ skip: -1 }, /skip must be an integer of 0 or more/],
+    [{ date: "2026-11-23" }, /date must be YYYYMMDD/],
+  ]) {
+    for (const call of [() => run("qdash_query", { action: "executions", chipId: "C", ...params }), () => run("qdash_list_executions", { chipId: "C", ...params })]) {
+      await assert.rejects(call(), (error) => message.test(error.message) && /No request was sent/.test(error.message));
+    }
+  }
+  assert.deepEqual(requests, []);
 });
 
 test("couplingId filters task results through the API's exact qid filter", async (t) => {

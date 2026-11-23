@@ -169,6 +169,26 @@ export interface CollectTaskResultsOptions extends Omit<ListTaskResultsOptions, 
   pageSize?: number;
 }
 
+/**
+ * Options of `listExecutions`. `GET /executions` lists one chip's executions;
+ * it has no flow or status filter, so none is offered here.
+ */
+export interface ListExecutionsOptions {
+  /** The chip whose executions to list. Required by the API. */
+  chipId: string;
+  /** Rows to skip, an integer of 0 or more. */
+  skip?: number;
+  /** Rows to return, an integer from 1 to 100 (the API default is 20). */
+  limit?: number;
+  /** Only executions started on this calendar day, YYYYMMDD. */
+  date?: string;
+  /** IANA time zone that defines the day for `date` (the API default is UTC). */
+  timezone?: string;
+}
+
+/** Most executions `GET /executions` returns per request. */
+export const EXECUTIONS_MAX_PAGE_SIZE = 100;
+
 /** Rows `collectTaskResults` read, newest first. */
 export interface CollectedTaskResults {
   items: TaskResultListItem[];
@@ -796,21 +816,28 @@ export class QDashClient {
     );
   }
 
-  async listExecutions(options: {
-    flowName?: string;
-    status?: string;
-    skip?: number;
-    limit?: number;
-    /** Only executions started on this calendar day, YYYYMMDD. */
-    date?: string;
-    /** IANA time zone that defines the day for `date`. */
-    timezone?: string;
-  } = {}): Promise<ListExecutionsResponse> {
+  /**
+   * One page of a chip's executions. A missing `chipId`, an out-of-range
+   * `limit` or `skip`, or a malformed `date` throws `QDashValidationError`
+   * before any request.
+   */
+  async listExecutions(options: ListExecutionsOptions): Promise<ListExecutionsResponse> {
+    if (typeof options?.chipId !== "string" || options.chipId.trim() === "") {
+      throw new QDashValidationError("chipId is required to list executions.", {
+        payload: { field: "chipId", value: options?.chipId },
+      });
+    }
+    checkInteger("limit", options.limit, 1, EXECUTIONS_MAX_PAGE_SIZE);
+    checkInteger("skip", options.skip, 0, undefined);
+    if (options.date !== undefined && !/^\d{8}$/.test(options.date)) {
+      throw new QDashValidationError(`date must be YYYYMMDD (got ${JSON.stringify(options.date)}).`, {
+        payload: { field: "date", value: options.date },
+      });
+    }
     return this.get(
       "/executions",
       query({
-        flow_name: options.flowName,
-        status: options.status,
+        chip_id: options.chipId,
         skip: options.skip,
         limit: options.limit,
         date: options.date,
