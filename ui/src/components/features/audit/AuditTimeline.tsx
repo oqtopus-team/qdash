@@ -322,7 +322,9 @@ export interface AuditTimelineSource<P extends AuditPageLike> {
 /**
  * A chronological audit, read from QDash a page at a time, with a JSON export of the whole
  * timeline. Every entry says whose statement it is. Agent sessions and calibration sessions
- * share it: both audits use the same event schema and snapshot rules.
+ * share it: both audits use the same event schema and snapshot rules. Each session feature
+ * keeps a thin wrapper (`AgentSessionAuditTimeline`, `CalibrationSessionAuditTimeline`) that
+ * supplies its own API calls, query key, export file name, and header.
  *
  * Each read is one snapshot of QDash's records. The pages shown always come from the
  * snapshot of the first page: when the records change before the next page is read, QDash

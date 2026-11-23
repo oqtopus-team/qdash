@@ -5,13 +5,11 @@ import {
   getAgentSessionAudit,
   getGetAgentSessionAuditQueryKey,
 } from "@/client/agent-session/agent-session";
+import { AUDIT_PAGE_SIZE, AuditTimeline } from "@/components/features/audit/AuditTimeline";
 import { reportedModelLabel } from "@/components/features/execution/agentSessionDisplay";
 import type { AgentSessionAuditResponse } from "@/schemas";
 
-import { AUDIT_PAGE_SIZE, AuditTimeline } from "./AuditTimeline";
 import { projectRequest } from "./useLinkedProject";
-
-export { auditKindLabel, auditProvenanceLabel, gateOutcomeLabel } from "./AuditTimeline";
 
 /**
  * The agent session's chronological experiment audit (``AuditTimeline``), with the model the
