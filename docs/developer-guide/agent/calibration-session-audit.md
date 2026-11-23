@@ -198,7 +198,15 @@ results. No flow runs and no hardware is touched. The unchanged agent session au
 ## Implementation Files
 
 - `src/qdash/api/services/audit_timeline.py`: mechanisms both audits share
-- `src/qdash/api/services/calibration_session_audit.py`: decisions, timeline, and projections
+- `src/qdash/api/services/calibration_session_audit.py`: `CalibrationSessionAuditService`,
+  paged reads, and the export
+- `src/qdash/api/services/calibration_audit_records.py`: the records one audit read loads
+- `src/qdash/api/services/calibration_audit_evidence.py`: evidence checks and the decision
+  snapshot
+- `src/qdash/api/services/calibration_audit_decisions.py`: decision recording and listing
+- `src/qdash/api/services/calibration_audit_search.py`: experiments, the recommendation, and
+  the latest requested run
+- `src/qdash/api/services/calibration_audit_events.py`: the timeline's events
 - `src/qdash/api/services/calibration_session_groups.py`: the grouped list's membership
 - `src/qdash/dbmodel/calibration_session.py`: `CalibrationDecisionDocument`
 - `packages/pi-qdash/extensions/tools/calibration-session.ts`: decision and audit tools
