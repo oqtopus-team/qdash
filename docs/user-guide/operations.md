@@ -130,6 +130,10 @@ moved, regrouped, or deleted.
 | --- | --- | --- |
 | `CALIBRATION_SESSION_GROUPING` | `automatic`: a run started without a calibration session gets one of its own. `explicit`: it joins none; a run started in a calibration session is grouped as before. | `automatic` |
 
+Fresh installations need no additional environment setting or migration: startup creates only
+the new run-scope index. To use `explicit` on a fresh installation, go directly to step 4.
+Steps 2–3 apply only to databases with the legacy session-key index from an earlier release.
+
 1. Make sure every API and workflow worker already runs the same release; finish the
    [upgrade](#upgrade-calibration-session-support) first.
 2. Check the database. This command changes nothing; it reports whether an index used by
@@ -164,7 +168,7 @@ moved, regrouped, or deleted.
    docker compose up -d api user-flow-worker deployment-service
    ```
 
-If you skip step 3, a run started without a calibration session can be refused with "Nothing
+If the legacy index exists and you skip step 3, a run started without a calibration session can be refused with "Nothing
 was started" until an administrator runs it.
 
 To turn grouping back on, set the value to `automatic` (or remove the line) and recreate the

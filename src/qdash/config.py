@@ -40,7 +40,7 @@ class Settings(BaseSettings):
     # Whether a run or agent session started without a calibration session gets an automatic
     # one (``automatic``) or joins none (``explicit``). Set it to the same value for the API
     # and the workers; see ``qdash.datamodel.run.CalibrationSessionGrouping``. Before the
-    # first ``explicit`` deployment, run
+    # first ``explicit`` deployment on a database with the legacy session-key index, run
     # ``python -m qdash.dbmodel.migration prepare-run-scope --execute --writers-quiesced``.
     calibration_session_grouping: Literal["automatic", "explicit"] = "automatic"
 
