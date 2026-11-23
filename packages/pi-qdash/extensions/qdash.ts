@@ -34,6 +34,7 @@ import { qcalContextText, recordedParameters, sweepsOf, type RecordedParameter, 
 import { registerAgentLoopTools } from "./tools/agent-loop.js";
 import { registerAgentSessionEndTool } from "./tools/agent-session-end.js";
 import { registerCalibrationPipelineTools } from "./tools/calibration-pipeline.js";
+import { registerCalibrationSessionTools } from "./tools/calibration-session.js";
 import { registerCurrentTimeTool } from "./tools/current-time.js";
 import { registerFlowAuthoringTools } from "./tools/flow-authoring.js";
 import { isMetricScriptQueryAction, metricScriptQuery, registerMetricScriptTools, type MetricScriptQueryAction } from "./tools/metric-scripts.js";
@@ -1602,6 +1603,10 @@ export default function qdashExtension(host: ExtensionAPI) {
     makeClient,
     resolveChipId: (client, chipId) => defaultChipId(client as QDashClient, chipId),
   });
+  registerCalibrationSessionTools(pi, {
+    makeClient,
+    resolveChipId: (client, chipId) => defaultChipId(client as QDashClient, chipId),
+  });
   registerFlowAuthoringTools(pi, {
     makeClient,
     resolveChipId: (client, chipId) => defaultChipId(client as QDashClient, chipId),
@@ -1998,6 +2003,7 @@ export default function qdashExtension(host: ExtensionAPI) {
       "The policy takes no numeric bounds or quality gates (allowed_overrides, task_quality_gates, quality_gates): the tool refuses them, even ones the user stated, because QDash cannot verify who wrote a number. A granted output is accepted on its task's own completion checks, and a session created here overrides no task input.",
       "When the goal needs a measured value committed (a dependent step reads it), propose parameter_updates in the policy (autonomy auto) as one object {parameters: [...], tasks: [...], apply_backend: false}, never a list: only the parameters the goal commits, only the tasks that measure them, apply_backend only when the goal needs the backend files written. A granted output is accepted when its task completed with its own checks passing; another output of the same task that is not granted (such as CheckChevron's control_amplitude when only qubit_frequency is granted) is staged for reference only and never blocks the granted one. Never add an output to the grant only because the task also reports it. Find output names with qdash_get_pipeline_catalog taskNames. Show the user every field before asking: approving it lets passing results be committed without asking again.",
       "Never create a new session to get around a paused one; the tool refuses while one of your sessions on the chip is paused for these qubits.",
+      "When the session serves a calibration objective, pass its calibrationSessionId so QDash records the agent session in it. That grants nothing beyond the policy.",
     ],
     parameters: Type.Object({
       ...connectionParams,
@@ -2007,6 +2013,7 @@ export default function qdashExtension(host: ExtensionAPI) {
       skillName: Type.Optional(Type.String()),
       skillVersion: Type.Optional(Type.String()),
       skillHash: Type.Optional(Type.String()),
+      calibrationSessionId: Type.Optional(Type.String({ description: "Create the agent session in this calibration session (open, same chip, created by the user). Grants nothing beyond the policy." })),
     }),
     async execute(toolCallId, params: {
       profile?: string;
@@ -2018,6 +2025,7 @@ export default function qdashExtension(host: ExtensionAPI) {
       skillName?: string;
       skillVersion?: string;
       skillHash?: string;
+      calibrationSessionId?: string;
     }, _signal, _onUpdate, ctx) {
       // A malformed policy fails here, before any approval or QDash call.
       const problems = agentSessionPolicyProblems(params.policy);
@@ -2030,7 +2038,8 @@ export default function qdashExtension(host: ExtensionAPI) {
       const autonomous = (policy as { autonomy?: unknown }).autonomy === "auto";
       const conflict = autonomous ? await pausedSessionConflict(client, chipId, qids) : null;
       if (conflict) throw new Error(conflict.replace("Nothing was started", "No session was created").replace("A flow or pipeline", "A new session"));
-      await requireWriteApproval("qdash_create_agent_session", toolCallId, params, ctx, { title: "Create QDash agent session?", message: agentSessionApprovalText(chipId, params.policy, params.expiresInSeconds) });
+      const recordedIn = params.calibrationSessionId ? `\nRecorded in calibration session ${params.calibrationSessionId}, which groups it and grants nothing.` : "";
+      await requireWriteApproval("qdash_create_agent_session", toolCallId, params, ctx, { title: "Create QDash agent session?", message: `${agentSessionApprovalText(chipId, params.policy, params.expiresInSeconds)}${recordedIn}` });
       const data = await client.createAgentSession({
         chipId,
         policy: { ...params.policy, evaluation: params.policy.evaluation ?? "off" } as never,
@@ -2040,12 +2049,13 @@ export default function qdashExtension(host: ExtensionAPI) {
         skillHash: params.skillHash,
         // The host's model, from the extension context; no argument can set it.
         model: hostModelIdentity(ctx),
+        ...(params.calibrationSessionId ? { calibrationSessionId: params.calibrationSessionId } : {}),
       });
       const expectedEvaluation = params.policy.evaluation ?? "off";
       if ((data as { policy?: { evaluation?: string | null } }).policy?.evaluation !== expectedEvaluation) {
         throw new Error(`QDash created session ${(data as { session_id?: string }).session_id ?? "(unknown)"} without the approved evaluation mode (${expectedEvaluation}). Do not run steps in it: complete it, and upgrade QDash before creating another session.`);
       }
-      return toToolResult(data, { tool: "qdash_create_agent_session", chipId });
+      return toToolResult(data, { tool: "qdash_create_agent_session", chipId, ...(params.calibrationSessionId ? { calibrationSessionId: params.calibrationSessionId } : {}) });
     },
   });
 

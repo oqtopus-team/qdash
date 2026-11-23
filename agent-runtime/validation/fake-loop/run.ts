@@ -36,21 +36,34 @@ import { fileURLToPath } from "node:url";
 
 import { prepareLocalCli } from "../../src/local-cli.ts";
 import { decideApproval } from "./approval.ts";
-import { evaluateScenario, type FaultEvidence, type HumanResponseEvidence, type ScenarioEvidence } from "./evaluate.ts";
+import {
+  type BaselineEvidence,
+  type CalibrationEvidence,
+  evaluateScenario,
+  type FaultEvidence,
+  type HumanResponseEvidence,
+  type ScenarioEvidence,
+} from "./evaluate.ts";
 import { GUARD_ENV, MAX_TOOL_CALLS_ENV } from "./guard-extension.ts";
 import {
   ApiError,
+  calibrationCapabilities,
   CHIP_ID_PATTERN,
   collectSession,
   createFakeChip,
+  getCalibrationSession,
+  getExecution,
   getQubit,
   type Json,
   listChipExecutions,
+  listFlowRunExecutions,
+  listScenarioCalibrationSessions,
   listOpenSessions,
   listScenarioSessions,
   preflight,
   QDashApi,
   respondToIntervention,
+  runManualPipeline,
   runSetupTask,
   type SessionEvidence,
   waitForExecution,
@@ -342,6 +355,51 @@ async function gatherEvidence(api: QDashApi, options: Options, since: Date): Pro
   return { sessions, executions: await listChipExecutions(api, options.chipId, since) };
 }
 
+const OPEN_EXECUTION = new Set(["scheduled", "pending", "running", "cancelling"]);
+
+/**
+ * The calibration sessions the caller created on the chip during the scenario, with every
+ * step execution of their pipeline runs settled and read in detail, and every chip execution
+ * of the scenario read in detail too, so the list row and the detail can be compared.
+ */
+async function gatherCalibrationEvidence(api: QDashApi, options: Options, since: Date, chipExecutions: Json[], timeoutMs: number): Promise<Omit<CalibrationEvidence, "baseline">> {
+  const read = async () => Promise.all((await listScenarioCalibrationSessions(api, options.chipId, since)).map((session) => getCalibrationSession(api, String(session.calibration_session_id))));
+  let sessions = await read();
+  const pending = sessions.flatMap((session) => ((session.pipeline_runs ?? []) as Json[]).flatMap((run) => ((run.executions ?? []) as Json[]).filter((execution) => OPEN_EXECUTION.has(String(execution.status)))));
+  for (const execution of pending) await waitForExecution(api, String(execution.execution_id), timeoutMs);
+  if (pending.length > 0) sessions = await read();
+  const ids = new Set<string>(chipExecutions.map((execution) => String(execution.execution_id)));
+  for (const session of sessions) {
+    for (const run of (session.pipeline_runs ?? []) as Json[]) {
+      for (const execution of (run.executions ?? []) as Json[]) ids.add(String(execution.execution_id));
+      for (const step of (((run.pipeline ?? {}) as Json).steps ?? []) as Json[]) if (typeof step.execution_id === "string") ids.add(step.execution_id);
+    }
+  }
+  const executionDetails: Record<string, Json> = {};
+  for (const id of ids) {
+    try {
+      executionDetails[id] = await getExecution(api, id);
+    } catch (error) {
+      if (!(error instanceof ApiError && error.status === 404)) throw error;
+    }
+  }
+  return { sessions, executionDetails };
+}
+
+/** Run the scenario's manual baseline pipeline to its end, before the prompt. */
+async function runBaseline(api: QDashApi, options: Options, scenario: Scenario, timeoutMs: number): Promise<{ flowRunId: string; status: string }> {
+  const target: ScenarioTarget = { chipId: options.chipId, qid: options.qid };
+  const started = await runManualPipeline(api, options.chipId, scenario.baseline!.spec(target));
+  const status = await waitForExecution(api, started.executionId, timeoutMs);
+  return { flowRunId: started.flowRunId, status };
+}
+
+async function readBaseline(api: QDashApi, options: Options, run: { flowRunId: string; status: string }): Promise<BaselineEvidence> {
+  const listRows = await listFlowRunExecutions(api, options.chipId, run.flowRunId);
+  const details = await Promise.all(listRows.map((row) => getExecution(api, String(row.execution_id))));
+  return { flowRunId: run.flowRunId, status: run.status, listRows, details };
+}
+
 interface PiLaunch {
   command: string;
   args: string[];
@@ -377,16 +435,43 @@ async function runScenario(api: QDashApi, options: Options, launch: PiLaunch, sc
     report.fault_id = fault.faultId;
   }
 
+  let baselineRun: { flowRunId: string; status: string } | undefined;
+  if (scenario.expect.calibration) {
+    const capable = await calibrationCapabilities(api);
+    if (!capable.ok) return { ...report, status: "blocked", reason: `this QDash cannot record calibration sessions with reported origins: ${capable.detail}` };
+  }
+  if (scenario.baseline) {
+    try {
+      baselineRun = await runBaseline(api, options, scenario, options.setupTimeoutSeconds * 1000);
+    } catch (error) {
+      return { ...report, status: "blocked", reason: error instanceof ApiError ? `baseline pipeline: ${error.message}` : "the baseline pipeline could not run" };
+    }
+    if (baselineRun.status !== "completed") return { ...report, status: "blocked", reason: `the baseline pipeline ended ${baselineRun.status}` };
+  }
+
   // Read before the scenario starts, so the report shows what an earlier scenario left open.
   const openSessionsAtStart = await listOpenSessions(api, options.chipId).catch(() => undefined);
   const startedAt = new Date();
   report.started_at = startedAt.toISOString();
   const storedT1 = scenario.id === "stored-t1" ? qubitValue(await getQubit(api, options.chipId, options.qid), "t1") : undefined;
   const scenarioLaunch = launchFor(launch, scenario);
+  const approvedCounts: Record<string, number> = {};
   const onDialog = async (_request: unknown, call: { toolName: string; args: Record<string, unknown> } | undefined) => {
     if (!call) return { confirmed: false, reason: "unmatched dialog" };
     const sessions = await listScenarioSessions(api, options.chipId, startedAt).catch(() => []);
-    const decision = decideApproval(call, { target, plan: scenario.approvals, scenarioSessionIds: new Set(sessions.map((session) => String(session.session_id))) });
+    // Read only when the scenario plans calibration writes; a failed read approves nothing.
+    const calibrationSessions = scenario.approvals.createCalibrationSession || scenario.approvals.runPipeline
+      ? await listScenarioCalibrationSessions(api, options.chipId, startedAt).catch(() => undefined)
+      : [];
+    if (calibrationSessions === undefined) return { confirmed: false, reason: "the scenario's calibration sessions could not be read" };
+    const decision = decideApproval(call, {
+      target,
+      plan: scenario.approvals,
+      scenarioSessionIds: new Set(sessions.map((session) => String(session.session_id))),
+      scenarioCalibrationSessionIds: new Set(calibrationSessions.map((session) => String(session.calibration_session_id))),
+      approvedCounts,
+    });
+    if (decision.approve) approvedCounts[call.toolName] = (approvedCounts[call.toolName] ?? 0) + 1;
     return { confirmed: decision.approve, reason: decision.reason };
   };
   const run = (prompt: string) => {
@@ -436,8 +521,16 @@ async function runScenario(api: QDashApi, options: Options, launch: PiLaunch, sc
     }
   }
 
-  const { sessions, executions } = await gatherEvidence(api, options, startedAt);
-  const evidence: ScenarioEvidence = { scenario, target, username, startedAt: startedAt.toISOString(), initial, continuation, continuationStartedAt, sessions, chipExecutions: executions, openSessionsAtStart, storedT1, fault, human };
+  let { sessions, executions } = await gatherEvidence(api, options, startedAt);
+  let calibration: CalibrationEvidence | undefined;
+  if (scenario.expect.calibration) {
+    const records = await gatherCalibrationEvidence(api, options, startedAt, executions, options.setupTimeoutSeconds * 1000);
+    // Steps settled meanwhile: list the chip again so its rows show their final state.
+    executions = await listChipExecutions(api, options.chipId, startedAt);
+    calibration = { ...records, ...(baselineRun ? { baseline: await readBaseline(api, options, baselineRun) } : {}) };
+    report.calibration_session_ids = records.sessions.map((session) => String(session.calibration_session_id));
+  }
+  const evidence: ScenarioEvidence = { scenario, target, username, startedAt: startedAt.toISOString(), initial, continuation, continuationStartedAt, sessions, chipExecutions: executions, openSessionsAtStart, storedT1, fault, human, calibration };
   const verdict = evaluateScenario(evidence);
   report.status = verdict.status;
   report.checks = verdict.checks;

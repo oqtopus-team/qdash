@@ -12,6 +12,7 @@ import {
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { calibrationSessionHref } from "@/lib/chatCalibrationSession";
 import { QubitTile } from "@/components/ui/QubitTile";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
 import { formatDateTime } from "@/lib/utils/datetime";
@@ -139,6 +140,26 @@ export function AgentSessionPageContent({ sessionId }: { sessionId: string }) {
             <div className="sm:col-span-2 md:col-span-3">
               <Field label="Allowed tasks">{data.policy.allowed_tasks.join(", ")}</Field>
             </div>
+            {data.calibration_session_id ? (
+              <div className="sm:col-span-2 md:col-span-4">
+                <Field label="Calibration session">
+                  <Link
+                    href={calibrationSessionHref(data.calibration_session_id, projectId)}
+                    className="link link-hover font-mono text-xs"
+                  >
+                    {data.calibration_session_id}
+                  </Link>
+                  {data.calibration_admission === "pending" ? (
+                    <span className="ml-2 badge badge-soft badge-sm badge-warning">
+                      Not admitted yet
+                    </span>
+                  ) : null}
+                  {data.calibration_admission === "rejected" ? (
+                    <span className="ml-2 badge badge-soft badge-sm">Rejected</span>
+                  ) : null}
+                </Field>
+              </div>
+            ) : null}
             {data.stop ? (
               <div className="sm:col-span-2 md:col-span-4">
                 <Field label="Stopped">

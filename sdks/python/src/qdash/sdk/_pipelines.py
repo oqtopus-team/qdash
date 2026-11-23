@@ -94,6 +94,8 @@ class Pipelines:
         *,
         chip_id: str,
         backend_name: str | None = None,
+        calibration_session_id: str | None = None,
+        idempotency_key: str | None = None,
     ) -> PipelineRun:
         """Dispatch a pipeline as one execution and return its run handle.
 
@@ -101,13 +103,23 @@ class Pipelines:
         ``QDashValidationError``. Requires a configured project, so the run cannot fall back
         to the user's default project. Returns once the run is dispatched; call
         :meth:`PipelineRun.wait` to follow it.
+
+        ``calibration_session_id`` and ``idempotency_key``, given together, record the run in
+        that calibration session before it is launched; a retry with the same key returns the
+        recorded run instead of starting another. Grouping grants nothing.
         """
+        if (calibration_session_id is None) != (idempotency_key is None):
+            raise ValueError("calibration_session_id and idempotency_key are given together")
         if not self._client.config.project_id:
             raise QDashConfigError(
                 "running a calibration pipeline needs a project: set QDASH_PROJECT_ID, "
                 "project_id in the profile, or QDash(..., project_id=...)"
             )
         response = self._client.execute_calibration_pipeline(
-            chip_id=chip_id, spec=to_spec(pipeline), backend_name=backend_name
+            chip_id=chip_id,
+            spec=to_spec(pipeline),
+            backend_name=backend_name,
+            calibration_session_id=calibration_session_id,
+            idempotency_key=idempotency_key,
         )
         return PipelineRun(self._client, response)

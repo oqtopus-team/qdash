@@ -288,6 +288,42 @@ needs a new value), and asks an expert in QDash when it
 cannot tell what to do next. To continue after the expert answers, tell it to continue, in the
 same chat or a new one. See [Agent Calibration](./agent-calibration.md).
 
+## Follow a Calibration Objective
+
+When you ask for calibration work toward one goal, such as "bring up Q00 and Q01", the assistant
+first proposes a **Calibration session** for that goal on an approval card. The session only
+records the goal: it starts nothing, and every pipeline run and step-by-step agent session the
+assistant then starts for the goal is still approved on its own card. Each card names the
+calibration session the run is recorded in.
+
+1. Approve the **Calibration session** card. A card above the message box shows the goal, how
+   many pipeline runs and agent sessions it holds, and how many still run or wait.
+2. Approve the runs the assistant proposes. A pipeline run is listed once with all of its steps,
+   and an agent session is listed with the measurements it ran.
+3. Select **Open** on the card to see the calibration session page: each pipeline run with its
+   steps and their executions, and each agent session with its state and executions. Select an
+   execution to open it on the **Execution** page. A pipeline the assistant started is marked
+   **Agent tool, reported**; one you started yourself has no mark.
+
+One chat can follow several goals, each in its own calibration session. To continue a goal in a
+new chat, ask the assistant to continue it; it finds the session among yours. Deleting or
+branching a chat does not change a calibration session. Outside the chat, open
+**Execution** and select **Calibration sessions** to find every objective.
+
+When the work is done, the person who created the session can select **Close session** on its
+page. Closing stops and cancels nothing and does not record whether the goal was met; it only
+prevents new runs in the session. QDash refuses to close it while a run or agent session in it still runs,
+waits for an expert, or is being started, or while an ended agent session still has a
+measurement in progress. If QDash could not confirm whether a pipeline run started (**Start
+unknown**), check the **Execution** page and confirm that in the close dialog first. Such a run
+was already admitted: it may be running, or it may still start after you close the session.
+The dialog also asks you to confirm an agent session whose start was interrupted. That session
+was never admitted, so if it appears later it is rejected and cannot run anything. An agent
+session marked **Not admitted yet** cannot run anything until its start completes. When a
+session holds more than 100 pipeline runs or agent sessions, its page lists the latest 100
+and says how many there are; closing still checks all of them.
+How this works: [Calibration Sessions](../developer-guide/copilot/calibration-sessions.md).
+
 ## Ask Agent About a Task Result {#ask-ai-about-a-task-result}
 
 **Ask Agent** appears on a task result and in a metric's history on **Metrics**. It offers two routes

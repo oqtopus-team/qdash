@@ -88,6 +88,13 @@ do not match on this point.
 A workflow name other than letters, digits and underscores throws `TypeError` before any
 request, as in the Python SDK.
 
+`qdash.pipelines.execute(spec, target, recordIn)` takes an optional third argument,
+`{ calibrationSessionId, idempotencyKey }`, that records the run in a calibration session before
+it is launched; a retry with the same key returns the recorded run. Either field empty throws
+`TypeError` before any request. A fourth argument, `{ reportedOrigin }`, sends the caller's
+`reported_origin`; set it from the calling program, never from model or user input. See
+[Calibration Sessions](../copilot/calibration-sessions.md).
+
 ## Packaging and release
 
 The package is ESM only, ships `dist/index.js` and `dist/index.d.ts`, and requires Node.js 20 or

@@ -1,5 +1,5 @@
 /**
- * Which calibration (agent) session a chat works on, and what that session waits for.
+ * Which agent session a chat works on, and what that session waits for.
  *
  * The chat stores no link to an agent session. It is read from the chat's own tool calls:
  * a call of a session-scoped agent tool that QDash completed (or that still runs) names the
@@ -142,18 +142,18 @@ export function agentSessionStatus(
       return {
         ...base,
         phase: "completed",
-        label: "Calibration session completed",
+        label: "Agent session completed",
         nextActor: "none",
       };
     case "cancelled":
       return {
         ...base,
         phase: "cancelled",
-        label: "Calibration session cancelled",
+        label: "Agent session cancelled",
         nextActor: "none",
       };
     case "expired":
-      return { ...base, phase: "expired", label: "Calibration session expired", nextActor: "none" };
+      return { ...base, phase: "expired", label: "Agent session expired", nextActor: "none" };
     case "waiting_for_human":
       if (intervention?.status === "resume_authorized") {
         return {

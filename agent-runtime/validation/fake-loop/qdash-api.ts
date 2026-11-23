@@ -331,3 +331,51 @@ export async function respondToIntervention(
     { idempotency_key: idempotencyKey, expected_state_version: expectedStateVersion, decision: "resume", guidance },
   );
 }
+
+// ------------------------------------------------------------- calibration sessions
+
+/**
+ * Whether the deployment records calibration sessions and the origin a pipeline caller
+ * reports. A scenario that needs them is blocked on an older revision rather than failed.
+ */
+export async function calibrationCapabilities(api: QDashApi): Promise<{ ok: boolean; detail: string }> {
+  const openapi = await api.get<Json>("/openapi.json");
+  const paths = (openapi.paths ?? {}) as Json;
+  const needed = ["/calibration-sessions", "/calibration-sessions/{calibration_session_id}", "/calibration-pipelines/execute"];
+  const missing = needed.filter((path) => !(path in paths));
+  const schemas = (((openapi.components ?? {}) as Json).schemas ?? {}) as Json;
+  const request = ((schemas.ExecutePipelineRequest ?? {}) as Json).properties as Json | undefined;
+  const summary = ((schemas.ExecutionResponseSummary ?? {}) as Json).properties as Json | undefined;
+  if (!request || !("reported_origin" in request)) missing.push("ExecutePipelineRequest.reported_origin");
+  if (!summary || !("calibration_session" in summary) || !("reported_origin" in summary)) missing.push("ExecutionResponseSummary.calibration_session/reported_origin");
+  return missing.length === 0 ? { ok: true, detail: "calibration sessions and reported origins present" } : { ok: false, detail: `missing ${missing.join(", ")}` };
+}
+
+/** The caller's calibration sessions on the chip created at or after `since`. */
+export async function listScenarioCalibrationSessions(api: QDashApi, chipId: string, since: Date): Promise<Json[]> {
+  return sessionsCreatedSince(list(await api.get(`/calibration-sessions?mine=true&limit=100&chip_id=${encodeURIComponent(chipId)}`), "items"), since);
+}
+
+export async function getCalibrationSession(api: QDashApi, calibrationSessionId: string): Promise<Json> {
+  return api.get(`/calibration-sessions/${encodeURIComponent(calibrationSessionId)}`);
+}
+
+export async function getExecution(api: QDashApi, executionId: string): Promise<Json> {
+  return api.get(`/executions/${encodeURIComponent(executionId)}`);
+}
+
+/**
+ * Start a pipeline as a person would through the API: no calibration session and no reported
+ * origin. Used only for the unassociated baseline on the validation chip.
+ */
+export async function runManualPipeline(api: QDashApi, chipId: string, spec: Record<string, unknown>): Promise<{ executionId: string; flowRunId: string }> {
+  if (!CHIP_ID_PATTERN.test(chipId)) throw new Error("a manual pipeline runs only on an agentval-* chip");
+  const response = await api.post<Json>("/calibration-pipelines/execute", { chip_id: chipId, spec });
+  return { executionId: String(response.execution_id), flowRunId: String(response.flow_run_id) };
+}
+
+/** Every execution of a pipeline flow run on the chip, newest first, from the chip's list. */
+export async function listFlowRunExecutions(api: QDashApi, chipId: string, flowRunId: string): Promise<Json[]> {
+  const response = await api.get(`/executions?chip_id=${encodeURIComponent(chipId)}&limit=100`);
+  return list(response, "executions").filter((execution) => ((execution.note ?? {}) as Json).flow_run_id === flowRunId);
+}

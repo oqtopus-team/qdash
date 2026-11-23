@@ -213,6 +213,38 @@ describe("Chip calibration", () => {
     ]);
   });
 
+  it("records a run in a calibration session under its retry key", async () => {
+    const { fetch, requests } = server({
+      "POST /calibration-pipelines/execute": [{ body: { ...dispatched, calibration_session_id: "cs-1", pipeline_run_id: "cpr-1", replayed: false } }],
+    });
+    const qdash = new QDash(client(fetch, "p1"));
+    const run = await qdash.pipelines.execute(expectedSpec, { chipId: "64Qv3" }, { calibrationSessionId: "cs-1", idempotencyKey: "key-1" });
+
+    expect(run.response.pipeline_run_id).toBe("cpr-1");
+    expect(requests).toEqual([
+      {
+        method: "POST",
+        path: "/calibration-pipelines/execute",
+        body: { chip_id: "64Qv3", spec: expectedSpec, calibration_session_id: "cs-1", idempotency_key: "key-1" },
+        project: "p1",
+      },
+    ]);
+    await expect(
+      qdash.pipelines.execute(expectedSpec, { chipId: "64Qv3" }, { calibrationSessionId: "cs-1", idempotencyKey: "" }),
+    ).rejects.toThrow(TypeError);
+  });
+
+  it("sends a reported origin only when the caller gives one", async () => {
+    const { fetch, requests } = server({
+      "POST /calibration-pipelines/execute": [{ body: dispatched }],
+    });
+    const qdash = new QDash(client(fetch, "p1"));
+    const origin = { source: "agent_tool" as const, tool: "qdash_run_pipeline", client: "pi-qdash" };
+    await qdash.pipelines.execute(expectedSpec, { chipId: "64Qv3" }, undefined, { reportedOrigin: origin });
+
+    expect(requests[0]?.body).toEqual({ chip_id: "64Qv3", spec: expectedSpec, reported_origin: origin });
+  });
+
   it("propagates a 422 with its problems", async () => {
     const problems = [{ path: "steps[0].tasks[1]", message: "CheckT1 needs Rabi parameters" }];
     const { fetch } = server({

@@ -49,9 +49,10 @@ class MongoExecutionRepository:
         Parameters
         ----------
         host : str | None
-            MongoDB host (defaults to 'mongo' for Docker)
+            MongoDB host (defaults to MONGO_HOST env var or 'mongo' for Docker)
         port : int | None
-            MongoDB port (defaults to 27017)
+            MongoDB port (defaults to 27017 inside Docker, otherwise MONGO_PORT
+            env var or 27017)
         username : str | None
             MongoDB username (defaults to env var)
         password : str | None
@@ -60,8 +61,12 @@ class MongoExecutionRepository:
             Database name (defaults to MONGO_DB_NAME env var or 'qdash')
 
         """
-        self._host = host or "mongo"
-        self._port = port or 27017
+        self._host = host or os.getenv("MONGO_HOST", "mongo")
+        # MONGO_PORT is for host-side port mapping. Inside the Docker network,
+        # MongoDB always listens on 27017.
+        self._port = port or (
+            27017 if self._host == "mongo" else int(os.getenv("MONGO_PORT", "27017"))
+        )
         self._username = username or os.getenv("MONGO_INITDB_ROOT_USERNAME")
         self._password = password or os.getenv("MONGO_INITDB_ROOT_PASSWORD")
         self._database: str = database if database else os.getenv("MONGO_DB_NAME") or "qdash"

@@ -11,6 +11,10 @@ from qdash.dbmodel.agent_session import (
 )
 from qdash.dbmodel.backend import BackendDocument
 from qdash.dbmodel.calibration_note import CalibrationNoteDocument
+from qdash.dbmodel.calibration_session import (
+    CalibrationPipelineRunDocument,
+    CalibrationSessionDocument,
+)
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.chip_history import ChipHistoryDocument
 from qdash.dbmodel.chip_note import ChipNoteDocument
@@ -39,6 +43,7 @@ from qdash.dbmodel.metric_note import MetricNoteDocument
 from qdash.dbmodel.metric_script import MetricScriptDocument
 from qdash.dbmodel.note_event import NoteEventDocument
 from qdash.dbmodel.notification import NotificationDocument
+from qdash.dbmodel.pipeline_launch import PipelineLaunchDocument
 from qdash.dbmodel.project import ProjectDocument
 from qdash.dbmodel.project_execution_counter import ProjectExecutionCounterDocument
 from qdash.dbmodel.project_membership import ProjectMembershipDocument
@@ -68,6 +73,9 @@ def document_models() -> list[Any]:
         AgentCandidateSetCommitDocument,
         AgentDecisionDocument,
         AgentInterventionDocument,
+        CalibrationSessionDocument,
+        CalibrationPipelineRunDocument,
+        PipelineLaunchDocument,
         ExecutionHistoryDocument,
         TaskResultHistoryDocument,
         QubitDocument,

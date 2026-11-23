@@ -106,13 +106,25 @@ Set `QDASH_WEB_URL` when the web UI is not at the API base URL minus `/api`.
 | `qdash_query` | Read-only queries without a dedicated tool. `files_tree` and `file_content` cover only the calibration config directory. `files_tree` takes no `path`; supplying one returns source-tool guidance. `file_content` preserves successful config reads and returns guidance only for source-looking paths that produce HTTP 400 or 404. Other errors, including HTTP 403 and server errors, propagate. |
 | `qdash_raw_get` | Read-only GET endpoints through qdash-client. |
 
+## Calibration session tools
+
+A calibration session records one calibration objective on one chip and groups the pipeline runs and agent sessions started with its ID; it grants nothing. All three tools are deferred. See [Calibration Sessions](../developer-guide/copilot/calibration-sessions.md).
+
+| Tool | Result or limit |
+| --- | --- |
+| `qdash_create_calibration_session` (confirmation-gated) | Create a session for `objective` (at most 500 characters) on `chipId` or the default chip and return its ID. The confirmation says that it starts and grants nothing. |
+| `qdash_get_calibration_session` | One session: objective, status, each pipeline run with its dispatch status, who requested it and any reported launch origin, and every step execution, each agent session with its status and executions, and what still runs or waits. Read-only. |
+| `qdash_list_calibration_sessions` | Sessions of the current project, newest first; `chipId`, `mine`, `openOnly`, and `limit` (default 20, at most 100) narrow it. Read-only. |
+
+`qdash_run_pipeline` and `qdash_create_agent_session` take an optional `calibrationSessionId`; QDash accepts it only for an open session on the same chip that the signed-in user created.
+
 ## Pipeline and flow operations
 
 | Tool | Operation |
 | --- | --- |
 | `qdash_get_pipeline_catalog` | List supported pipeline steps, dependencies, default task calls, step metrics, backend tasks, the accepted spec version, and the first sentence of each documented task's description. `taskNames` adds the full description, when to use, and prerequisites for the named tasks, lists named tasks without declared documentation, and lists each named task's declared inputs and outputs with units from `GET /tasks`, or says why that list could not be read. |
 | `qdash_plan_pipeline` | Validate a version 2 pipeline spec and return problems with paths, warnings, and the calls each step will run with their call ids and effective settings; for a version 1 spec it points to the converted spec. Does not execute. |
-| `qdash_run_pipeline` (confirmation-gated) | Start a validated spec as one QDash execution and return its execution ID without waiting. A 422 with problems is returned as text. Completed tasks persist parameters directly, without an agent candidate gate. Nothing starts while one of your agent sessions on the chip waits for an expert and covers a target of the spec; MUX targets count as overlapping. Nothing starts either when QDash cannot list the sessions, including a release without `GET /agent-sessions` (404 or 405). |
+| `qdash_run_pipeline` (confirmation-gated) | Start a validated spec as one QDash execution and return its execution ID without waiting. A 422 with problems is returned as text. Completed tasks persist parameters directly, without an agent candidate gate. Nothing starts while one of your agent sessions on the chip waits for an expert and covers a target of the spec; MUX targets count as overlapping. Nothing starts either when QDash cannot list the sessions, including a release without `GET /agent-sessions` (404 or 405). With `calibrationSessionId`, QDash records the run in that calibration session under the idempotency key `qdash_run_pipeline:<tool call id>`, so a replayed call reports the run it started (`Already started`) instead of starting another; a run whose launch outcome QDash reports as unknown is reported with advice to check the executions, never retried. Every launch sends the tool's own `reported_origin` (`agent_tool`, `qdash_run_pipeline`, `pi-qdash`), which no argument sets; QDash shows it as reported, not verified. |
 | `qdash_save_flow` (confirmation-gated) | Validate, format, save, and register a Prefect `@flow` workflow. |
 | `qdash_execute_flow` (confirmation-gated) | Run a saved flow with parameters and return its execution ID without waiting. The name is letters, digits and underscores. Nothing starts while one of your agent sessions waits for an expert on the flow's `chip_id` and `qids` parameters; when they are absent, any such session blocks. Nothing starts either when QDash cannot list the sessions, including a release without `GET /agent-sessions` (404 or 405). |
 

@@ -52,6 +52,9 @@ from qdash.api.services.agent_parameter_update import (
     update_authority,
 )
 from qdash.api.services.agent_session_gate import (
+    ADMITTED_FILTER,
+    admission_refusal,
+    admit_calibration_child,
     autonomous_session_refusal,
     end_notification_update,
     expire_session_if_due,
@@ -61,13 +64,16 @@ from qdash.api.services.agent_session_gate import (
     materialize_pending_intervention,
     pass_execution_gate,
     raw_document,
+    reject_calibration_child,
     release_abandoned_reservations,
+    settle_calibration_admission,
     to_bson,
 )
 from qdash.api.services.agent_session_notifications import (
     AgentSessionNotificationService,
     initial_start_notification,
 )
+from qdash.api.services.calibration_session_service import CalibrationSessionService
 from qdash.api.services.catalog_task_run import resolve_catalog_task, run_catalog_task
 from qdash.common.agent_gate import evaluate_numeric_candidate
 from qdash.common.utils.datetime import now
@@ -82,6 +88,7 @@ from qdash.datamodel.agent_session import (
     AgentSessionStopRecord,
     model_label,
 )
+from qdash.datamodel.calibration_session import CalibrationAdmission, CalibrationChildKind
 from qdash.dbmodel.agent_parameter_state import (
     StoredParameter,
     acquire_backend_apply_lock,
@@ -336,24 +343,91 @@ class AgentSessionService:
                 "allowed_actions": list(dict.fromkeys(body.policy.allowed_actions)),
             }
         )
-        timestamp = now()
-        doc = AgentSessionDocument(
-            session_id=str(uuid4()),
-            project_id=project_id,
-            chip_id=body.chip_id,
-            created_by=username,
-            policy=policy,
-            skill_name=body.skill_name,
-            skill_version=body.skill_version,
-            skill_hash=body.skill_hash,
-            model=body.model,
-            expires_at=timestamp + timedelta(seconds=body.expires_in_seconds),
-            created_at=timestamp,
-            updated_at=timestamp,
-            # Stored with the session, so the start message survives a crash after insert.
-            start_notification=initial_start_notification(self.notifications.enabled),
-        )
-        doc.insert()
+        session_id = str(uuid4())
+        calibration = CalibrationSessionService()
+        calibration_session_id = body.calibration_session_id or ""
+        reservation = None
+        if body.calibration_session_id is not None:
+            # Checked and reserved in the calibration session before the session exists; the
+            # relation grants nothing, so the policy above stays the only authority.
+            reservation = calibration.reserve_child(
+                project_id=project_id,
+                calibration_session_id=calibration_session_id,
+                chip_id=body.chip_id,
+                username=username,
+                kind=CalibrationChildKind.AGENT_SESSION,
+                child_id=session_id,
+            )
+        try:
+            timestamp = now()
+            doc = AgentSessionDocument(
+                session_id=session_id,
+                project_id=project_id,
+                chip_id=body.chip_id,
+                created_by=username,
+                policy=policy,
+                skill_name=body.skill_name,
+                skill_version=body.skill_version,
+                skill_hash=body.skill_hash,
+                model=body.model,
+                expires_at=timestamp + timedelta(seconds=body.expires_in_seconds),
+                created_at=timestamp,
+                updated_at=timestamp,
+                # Stored with the session, so the start message survives a crash after insert.
+                start_notification=initial_start_notification(self.notifications.enabled),
+                calibration_session_id=body.calibration_session_id,
+                # Written unadmitted: no operation passes until the reservation is finalized.
+                calibration_admission=(
+                    CalibrationAdmission.PENDING if reservation is not None else None
+                ),
+                calibration_reservation_id=(
+                    reservation.reservation_id if reservation is not None else None
+                ),
+            )
+        except BaseException:
+            if reservation is not None:
+                calibration.release_child(
+                    project_id=project_id,
+                    calibration_session_id=calibration_session_id,
+                    reservation_id=reservation.reservation_id,
+                )
+            raise
+        try:
+            doc.insert()
+        except DuplicateKeyError:
+            # Not written: nothing can run in it.
+            if reservation is not None:
+                calibration.release_child(
+                    project_id=project_id,
+                    calibration_session_id=calibration_session_id,
+                    reservation_id=reservation.reservation_id,
+                )
+            raise
+        # Any other insert failure leaves the reservation pending: whether the session was
+        # written is unknown, and a close reports it until it is found or acknowledged. A
+        # session written meanwhile stays unadmitted until a load decides it.
+        if reservation is not None:
+            finalized = calibration.finalize_child(
+                project_id=project_id,
+                calibration_session_id=calibration_session_id,
+                reservation_id=reservation.reservation_id,
+                admit=True,
+            )
+            # A crash here leaves the session pending; its next load reads the finalized
+            # reservation from the calibration session and admits it, or rejects it.
+            if not finalized:
+                # The calibration session was closed before the start was finalized. The
+                # session was never admitted, so nothing ran in it; reject and cancel it.
+                reject_calibration_child(doc, actor=username)
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=(
+                        f"Calibration session {body.calibration_session_id} was closed before "
+                        f"agent session {session_id} was admitted; it was rejected and "
+                        "cancelled before it could operate. Start a new calibration session."
+                    ),
+                )
+            admit_calibration_child(doc)
         return self._session_response(doc)
 
     def get_session(self, *, project_id: str, session_id: str) -> AgentSessionResponse:
@@ -398,6 +472,7 @@ class AgentSessionService:
         )
         items: list[AgentSessionResponse] = []
         for doc in docs:
+            settle_calibration_admission(doc)
             materialize_pending_action(doc)
             materialize_pending_intervention(doc)
             expire_session_if_due(doc)
@@ -422,6 +497,7 @@ class AgentSessionService:
                 status_code=status.HTTP_409_CONFLICT,
                 detail=f"Agent session is not active: {session.status.value}",
             )
+        admission_refusal(session)
 
         bounds = session.policy.allowed_overrides.get(body.parameter_name)
         if bounds is None:
@@ -674,6 +750,7 @@ class AgentSessionService:
                 status_code=status.HTTP_409_CONFLICT,
                 detail=f"Agent session is not active: {session.status.value}",
             )
+        admission_refusal(session)
         if body.expected_state_version != session.state_version:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -770,6 +847,7 @@ class AgentSessionService:
                 "session_id": session_id,
                 "status": AgentSessionStatus.ACTIVE.value,
                 "state_version": session.state_version,
+                **ADMITTED_FILTER,
                 "pending_action": None,
             },
             {"$set": session_update, "$inc": increments},
@@ -1136,6 +1214,7 @@ class AgentSessionService:
                 "session_id": session.session_id,
                 "status": AgentSessionStatus.ACTIVE.value,
                 "state_version": session.state_version,
+                **ADMITTED_FILTER,
             },
             {"$set": {"updated_at": now()}, "$inc": {"state_version": 1}},
             return_document=ReturnDocument.AFTER,
@@ -1200,6 +1279,7 @@ class AgentSessionService:
                 status_code=status.HTTP_409_CONFLICT,
                 detail=f"Agent session is not active: {session.status.value}",
             )
+        admission_refusal(session)
         if body.expected_state_version != session.state_version:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -1390,6 +1470,7 @@ class AgentSessionService:
                 status_code=status.HTTP_409_CONFLICT,
                 detail=f"Agent session is not active: {session.status.value}",
             )
+        admission_refusal(session)
         if body.expected_state_version != session.state_version:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -1591,6 +1672,7 @@ class AgentSessionService:
                 status_code=status.HTTP_409_CONFLICT,
                 detail=f"Agent session is not active: {session.status.value}",
             )
+        admission_refusal(session)
         if body.expected_state_version != session.state_version:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -1870,6 +1952,7 @@ class AgentSessionService:
                 status_code=status.HTTP_409_CONFLICT,
                 detail=f"Agent session is not active: {session.status.value}",
             )
+        admission_refusal(session)
         if body.reconfigure and not session.policy.allow_reconfigure:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,

@@ -71,7 +71,7 @@ const action = (status: string) => ({
   execution_status: status,
 });
 
-describe("the calibration session a chat works on", () => {
+describe("the agent session a chat works on", () => {
   it("shows an expert's answer as waiting for the next decision, and offers only an explicit Continue", () => {
     api.session = {
       session_id: "as-1",

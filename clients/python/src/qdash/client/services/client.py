@@ -863,16 +863,26 @@ class QDashClient:
         chip_id: str,
         spec: Mapping[str, Any],
         backend_name: str | None = None,
+        calibration_session_id: str | None = None,
+        idempotency_key: str | None = None,
     ) -> ExecutePipelineResponse:
         """Validate a pipeline spec on the server and dispatch it as one execution.
 
         A spec with problems raises :class:`QDashValidationError` (422) whose ``payload`` holds
-        the server's problem list; nothing is dispatched.
+        the server's problem list; nothing is dispatched. With ``calibration_session_id`` and
+        ``idempotency_key`` (given together), the run is recorded in that calibration session
+        before it is launched, and a retry with the same key returns the recorded run.
         """
         response = self._request(
             "POST",
             "/calibration-pipelines/execute",
-            json=self._query_params(chip_id=chip_id, spec=dict(spec), backend_name=backend_name),
+            json=self._query_params(
+                chip_id=chip_id,
+                spec=dict(spec),
+                backend_name=backend_name,
+                calibration_session_id=calibration_session_id,
+                idempotency_key=idempotency_key,
+            ),
         )
         return self._validate_model_payload(ExecutePipelineResponse, response.data)
 

@@ -15,6 +15,8 @@ performs it, judges it, and records it. Two agent-side drivers use the same QDas
   compatible with existing scripts.
 
 The operator's procedure for both is in [Agent Calibration](../../user-guide/agent-calibration.md).
+An agent session can be created in a calibration session, which groups it with the pipeline runs
+for the same objective and grants nothing; see [Calibration Sessions](./calibration-sessions.md).
 
 ## The model-driven loop
 
@@ -683,7 +685,9 @@ applies one at a time. `src/qdash/api/services/agent_session_gate.py` holds it.
   unconfirmed token, or a commit in `reserving`), then pass a session update that matches only
   `status: active`, then confirm the reservation and start. If the pause wins the session
   first, the gate refuses with 409, the reservation is released, and nothing is sent; the
-  action stays authorised for a resumed session.
+  action stays authorised for a resumed session. A session created in a calibration session
+  also passes the gate only once it is admitted there (see
+  [Agent session admission](./calibration-sessions.md#agent-session-admission)).
 - **In flight.** An operation that passed the gate before the pause continues: a pause does not
   stop a measurement or apply already sent to the worker, nor a Qubit save already reserved.
   Its record shows it as in flight, and resume stays blocked until it settles. A resume reads

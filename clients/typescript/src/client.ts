@@ -197,6 +197,12 @@ export interface CreateAgentSessionOptions {
    * does not verify it; omit it when the host does not know it.
    */
   model?: AgentModelIdentity;
+  /**
+   * Create the session in this calibration session (open, on the same chip, created by the
+   * signed-in user). It groups the session with the objective's other work; the policy stays
+   * the only authority.
+   */
+  calibrationSessionId?: string;
 }
 
 export interface SubmitAgentActionOptions {
@@ -909,6 +915,7 @@ export class QDashClient {
       skill_version: options.skillVersion ?? "",
       skill_hash: options.skillHash ?? "",
       ...(options.model ? { model: options.model } : {}),
+      ...(options.calibrationSessionId ? { calibration_session_id: options.calibrationSessionId } : {}),
     });
   }
 

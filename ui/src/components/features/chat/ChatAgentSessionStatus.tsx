@@ -58,7 +58,7 @@ function nextStep(status: AgentSessionStatus, chatTurn: ChatTurnState): string |
 }
 
 /**
- * The state of the calibration session this chat's tools act on, read from QDash under
+ * The state of the agent session this chat's tools act on, read from QDash under
  * the project open now: what runs or waits, who acts next, the latest measurement, and
  * its candidate values. A session QDash does not find in this project shows nothing.
  * `onContinue` offers an explicit Continue, sent as an ordinary chat message.
@@ -146,7 +146,7 @@ export function ChatAgentSessionStatus({
   return (
     <section
       className="rounded-[var(--radius-box)] border border-base-300 bg-base-100 px-3 py-2.5 text-xs"
-      aria-label="Calibration session"
+      aria-label="Agent session"
       data-testid="chat-agent-session"
       data-phase={status.phase}
     >

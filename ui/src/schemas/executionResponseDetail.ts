@@ -6,10 +6,12 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { ExecutionResponseDetailAgentSession } from './executionResponseDetailAgentSession';
+import type { ExecutionResponseDetailCalibrationSession } from './executionResponseDetailCalibrationSession';
 import type { ExecutionResponseDetailElapsedTime } from './executionResponseDetailElapsedTime';
 import type { ExecutionResponseDetailEndAt } from './executionResponseDetailEndAt';
 import type { ExecutionResponseDetailNote } from './executionResponseDetailNote';
 import type { ExecutionResponseDetailPipeline } from './executionResponseDetailPipeline';
+import type { ExecutionResponseDetailReportedOrigin } from './executionResponseDetailReportedOrigin';
 import type { ExecutionResponseDetailStartAt } from './executionResponseDetailStartAt';
 import type { ExecutionResponseDetailUserId } from './executionResponseDetailUserId';
 import type { Task } from './task';
@@ -49,4 +51,8 @@ export interface ExecutionResponseDetail {
   pipeline?: ExecutionResponseDetailPipeline;
   /** The agent session whose action dispatched this execution, or the session only its tag names (linked false); null for an execution outside agent sessions */
   agent_session?: ExecutionResponseDetailAgentSession;
+  /** The calibration session this execution belongs to, from QDash's own records: a pipeline run recorded in it, or an action of an agent session admitted to it. Null when no record relates it, or when records disagree on the session */
+  calibration_session?: ExecutionResponseDetailCalibrationSession;
+  /** How the caller that launched this execution's pipeline said it was started, such as an agent tool. Client reported, not verified by QDash; null when nothing was reported. The recorded user is still the one whose sign-in started it */
+  reported_origin?: ExecutionResponseDetailReportedOrigin;
 }

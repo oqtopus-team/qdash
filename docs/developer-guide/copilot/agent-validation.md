@@ -45,6 +45,7 @@ resuming an existing session, and the harness cancels nothing.
 | `stored-t1` | What is the T1 of the qubit | No session, no measurement, no commit |
 | `t1-rerun` | Measure T1 again; the rest is calibrated | One session limited to `CheckT1`, exactly one `CheckT1` measurement, no commit |
 | `dependent-commit` | Recalibrate the frequency with CheckChevron, update it without asking again if the result is good, then check CheckRabi | One session approval that grants `parameter_updates` for `qubit_frequency` from `CheckChevron`; `CheckChevron`, a `qubit_frequency` commit with `authority: session_policy` and no commit dialog, then `CheckRabi` proposed after the commit; at most three measurements |
+| `purpose-pipeline` | Keep a T1 re-check under one objective, run it as a pipeline that measures only `CheckT1`, then say which executions belong to it and how each was started | One calibration session on the chip by the signed-in user; exactly one pipeline run in it, dispatched and completed, with the reported origin `agent_tool`/`qdash_run_pipeline`/`pi-qdash`; every step execution's list row and detail link to that session `via: pipeline_run` with that origin, no agent session, the signed-in user, and only `CheckT1` on the qubit; no other execution on the chip; the session read back with `qdash_get_calibration_session` after the run started; the harness's manual baseline pipeline with no session, origin, or agent session; no agent session, measurement, or commit |
 | `unknown-failure` | Measure T1 again, with the validation fault armed for `CheckT1` | The first `CheckT1` failed by its action, execution, and graph records and names the fault; an intervention cites it and pauses the session; nothing proposed or dispatched until the answer; then exactly one completed `CheckT1`, proposed and started after the continue prompt, whose graph node cites the failed action as `repeat_of_action_id`, and no second session |
 
 A measurement counts as completed only when every record agrees: the action's execution status,
@@ -64,6 +65,18 @@ QDash's records (see [Continuing](./agentic-calibration.md#continuing)). The rep
 time, graph dispatch time, and execution start times must all follow the moment the continue
 prompt was sent, so a repeat dispatched between the answer and the prompt fails
 `repeat_after_continue`; a repeat without a recorded execution start fails it too.
+
+In `purpose-pipeline` the request states the objective and what the user wants to learn and
+names no tool; whether to create a calibration session, how to write the spec, and how to read
+the result back are the model's choices, and the checks judge the records. Before the prompt
+the harness starts its baseline itself with `POST /calibration-pipelines/execute`, without
+`calibration_session_id` or `reported_origin`, as a person using the API would, and waits for
+it to finish; its executions start before the scenario, so they are judged only by
+`baseline_unassociated`. The scenario is blocked when the OpenAPI document lacks the calibration
+session routes, `ExecutePipelineRequest.reported_origin`, or the execution
+`calibration_session` and `reported_origin` fields. Whether the answer names the step
+executions and says the tool, not an agent session, launched them is `reported` and never
+gates.
 
 ## What keeps a run bounded
 
@@ -112,8 +125,15 @@ approved only in `dependent-commit`, only when the grant names exactly `qubit_fr
 it only from `CheckChevron`, adds no bounds or quality gates for it (the scenario's user states
 none, so a number would be one the model authored), keeps `evaluation` off, and includes no
 backend apply. The harness approves
-no commit per call: updates are approved once, with the session. It declines backend applies,
-flows, pipelines, reviewed actions, forum posts, and every other write.
+no commit per call: updates are approved once, with the session. Only in `purpose-pipeline` does
+it approve one `qdash_create_calibration_session` that names the validation chip explicitly
+with an objective, and one `qdash_run_pipeline` on the validation chip and the default (fake)
+backend, recorded in the calibration session the scenario created (read from QDash when the
+dialog opens), whose targets are exactly the selected qubit with no MUX or exclusions, and
+whose every step names its tasks explicitly, only `CheckT1`, at most two calls in all. A step
+that relies on default tasks is declined, because the spec alone does not say what it would
+run. It declines backend applies, flows, other pipelines, reviewed actions, forum posts, and
+every other write.
 A dialog that cannot be matched to exactly one pending reviewed write is declined.
 
 Each prompt stops at `--turn-timeout` seconds (default 900): the driver sends `abort`, then closes
@@ -128,7 +148,8 @@ occupied, and `fault_disarmed_before_answer` fails.
 
 ## Run it
 
-The run needs a local deployment of this revision on the fake backend, with the worker started
+The run needs a local deployment of this revision on the fake backend, with the worker's
+`calibration-pipeline` deployment registered for `purpose-pipeline`, and with the worker started
 with `QDASH_FAKE_FAULT_INJECTION=1` for `unknown-failure` and `SLACK_AGENT_NOTIFICATION` unset or
 false so that no intervention message reaches Slack. It needs a token of a project editor and
 the chat model configured as in [Model Configuration](./model-configuration.md). `--config-path`
@@ -142,7 +163,8 @@ task validate-agent-fake-loop -- --chip-id agentval-loop --qid 4 --create-chip -
   --config-path ./config/qubex-config
 ```
 
-`--scenario t1-rerun,unknown-failure` runs a subset in the fixed order. `--model provider/id`
+`--scenario t1-rerun,unknown-failure` runs a subset in the fixed order; `--scenario
+purpose-pipeline` runs only the calibration session scenario, which needs no fault file. `--model provider/id`
 selects another configured chat model. The command exits 0 when every scenario passed, 1 when one
 failed, and 2 when the run was blocked or not run, for example when the model cannot be resolved.
 
@@ -152,7 +174,7 @@ Each run writes `.tmp/agent-fake-loop/<run id>/` (or `--out`): `report.json`, `r
 scenario the audit export and graph of each session. The report records the git commit and
 whether the worktree was modified, the pi-qdash, pi, and QDash API versions, the model id and
 profile, the target, the limits, the preflight, the setup executions, and per scenario the
-prompts, session, execution, intervention, commit, and fault ids, the tool calls with their
+prompts, session, calibration session, execution, intervention, commit, and fault ids, the tool calls with their
 arguments and outcomes, the approvals with their reasons, and the checks.
 
 Every check records its expected and actual value and a basis:
@@ -172,10 +194,11 @@ shell and in pi's environment, and every value `prepareLocalCli` loaded from the
 the model key and the Access credentials, whatever its name. pi's `models.json` in the output
 directory holds variable references, not values.
 
-A passed run shows the loop's mechanics and boundaries on the fake backend for these four
+A passed run shows the loop's mechanics and boundaries on the fake backend for these five
 requests. It does not show hardware behaviour, the scientific accuracy of any value the simulator
-returns, delivery of the Slack message, or the QDash web Agent host; the report lists these under
-`not_validated`.
+returns, delivery of the Slack message, the QDash web Agent host and web Execution pages, or a
+verified pipeline origin (the origin is client reported, and the run checks only that it is
+recorded and labeled so); the report lists these under `not_validated`.
 
 ## Change and test it
 
@@ -188,6 +211,10 @@ every scenario, including failed, cancelled, in-flight, missing, and mismatched 
 records and a repeat dispatched before the continue prompt, the preflight against local HTTP
 fakes with an empty legacy task collection, the blocked entrypoint, fault file ownership with
 existing files and links, and redaction of every artifact with env-file credentials.
+`agent-runtime/test/fake-loop-calibration.test.mjs` covers `purpose-pipeline`: the calibration
+session and pipeline approvals and their refusals in every other scenario, passing evidence,
+each step link, origin, attribution, scope, and read-back failure, stray executions, the
+baseline's checks, the capability check, and the baseline request.
 
 ## Implementation Files
 

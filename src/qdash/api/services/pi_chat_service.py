@@ -12,6 +12,7 @@ import json
 import logging
 import math
 import os
+import re
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -935,6 +936,7 @@ async def translate(
                 call=call,
             )
             classification = _classification_for_chat(event.get("classification"))
+            calibration_session = _created_calibration_session_for_chat(event)
             yield sse_event(
                 "tool_end",
                 {
@@ -948,6 +950,9 @@ async def translate(
                     **({"evaluation": evaluation} if isinstance(evaluation, dict) else {}),
                     # What the classifier decided for a ``classify`` call.
                     **({"classification": classification} if classification else {}),
+                    # The calibration session a successful create call made, for the chat
+                    # to show without another call.
+                    **({"calibration_session": calibration_session} if calibration_session else {}),
                     # What a workspace tool (bash, read, write, edit) answered.
                     **(
                         {"output": event["output"]}
@@ -1124,6 +1129,33 @@ def _classification_for_chat(classification: Any) -> dict[str, Any] | None:
     reason = _short_text(classification.get("reason"))
     if reason is not None:
         shown["reason"] = reason
+    return shown
+
+
+_CREATE_CALIBRATION_SESSION_TOOL = "qdash_create_calibration_session"
+_CALIBRATION_SESSION_ID = re.compile(r"^[A-Za-z0-9_.:-]{1,200}$")
+
+
+def _created_calibration_session_for_chat(event: dict[str, Any]) -> dict[str, str] | None:
+    """The calibration session a ``qdash_create_calibration_session`` call created.
+
+    The runtime reads it from the tool's own result details, never from the model's
+    arguments or text. Only a successful call of that tool passes, with a well-formed ID and
+    chip; anything else is dropped. The chat reads the session from QDash under the project
+    open there, so an ID this lets through still shows nothing QDash does not find.
+    """
+    if event.get("name") != _CREATE_CALIBRATION_SESSION_TOOL or event.get("isError"):
+        return None
+    created = event.get("calibrationSession")
+    if not isinstance(created, dict):
+        return None
+    session_id = created.get("calibrationSessionId")
+    if not isinstance(session_id, str) or not _CALIBRATION_SESSION_ID.match(session_id):
+        return None
+    shown = {"calibration_session_id": session_id}
+    chip_id = created.get("chipId")
+    if isinstance(chip_id, str) and chip_id:
+        shown["chip_id"] = chip_id[:200]
     return shown
 
 

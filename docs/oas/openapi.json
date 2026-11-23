@@ -5505,7 +5505,7 @@
           "calibration-pipeline"
         ],
         "summary": "Validate and run a calibration pipeline spec",
-        "description": "Runs the spec as one execution through the worker's calibration-pipeline\ndeployment. A spec with problems is rejected with 422 and the same problem\nlist that /validate returns.",
+        "description": "Runs the spec as one execution through the worker's calibration-pipeline\ndeployment. A spec with problems is rejected with 422 and the same problem\nlist that /validate returns.\n\nWith ``calibration_session_id`` the run is recorded in that calibration\nsession before it is launched, and ``idempotency_key`` makes a retry return\nthe recorded run instead of starting another.",
         "operationId": "executeCalibrationPipeline",
         "security": [
           {
@@ -5547,6 +5547,336 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ExecutePipelineResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/calibration-sessions": {
+      "post": {
+        "tags": [
+          "calibration-session"
+        ],
+        "summary": "Create a calibration session",
+        "description": "Record one calibration objective on a chip.\n\nPipeline runs and agent sessions started with its ID are grouped under it. It grants no\noperation: each run is still approved, gated, and locked on its own.",
+        "operationId": "createCalibrationSession",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCalibrationSessionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalibrationSessionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "calibration-session"
+        ],
+        "summary": "List calibration sessions",
+        "description": "List the project's calibration sessions, newest first.",
+        "operationId": "listCalibrationSessions",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CalibrationSessionStatus"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only sessions in these statuses",
+              "title": "Status"
+            },
+            "description": "Only sessions in these statuses"
+          },
+          {
+            "name": "mine",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Only sessions the signed-in user created",
+              "default": false,
+              "title": "Mine"
+            },
+            "description": "Only sessions the signed-in user created"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 10000,
+              "minimum": 0,
+              "default": 0,
+              "title": "Skip"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListCalibrationSessionsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/calibration-sessions/{calibration_session_id}": {
+      "get": {
+        "tags": [
+          "calibration-session"
+        ],
+        "summary": "Get a calibration session with its runs",
+        "description": "The session, its pipeline runs with every step execution, and its agent sessions with\nthe executions their actions dispatched.",
+        "operationId": "getCalibrationSession",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "calibration_session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Calibration Session Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalibrationSessionDetailResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/calibration-sessions/{calibration_session_id}/close": {
+      "post": {
+        "tags": [
+          "calibration-session"
+        ],
+        "summary": "Close a calibration session",
+        "description": "End work on the objective; no new run can start in it.\n\nRefused (409) while a pipeline run or agent session in it still runs or waits. Closing\nstops nothing and records no verdict on the objective.",
+        "operationId": "closeCalibrationSession",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "calibration_session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Calibration Session Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CloseCalibrationSessionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalibrationSessionDetailResponse"
                 }
               }
             }
@@ -23402,6 +23732,17 @@
             "description": "provider/model_id of model; empty when none was reported",
             "default": ""
           },
+          "calibration_session": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalibrationSessionRef"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The calibration session the session was admitted to, when it was created in one; null for a session created alone, or one not admitted"
+          },
           "counts": {
             "$ref": "#/components/schemas/AgentSessionGroupCounts"
           },
@@ -23792,6 +24133,29 @@
               }
             ],
             "description": "Who stopped the session with a stop request, why, and when; null unless a stop request ended it (an expert's stop answer is recorded on its intervention)"
+          },
+          "calibration_session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Calibration Session Id",
+            "description": "The calibration session it was created in; null when it was created alone"
+          },
+          "calibration_admission": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalibrationAdmission"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Admission in its calibration session: pending (written, start not finalized; every operation is refused), admitted (operates under its policy), or rejected (the calibration session was closed first; cancelled, never operates). Null for a session created alone, which is never checked"
           }
         },
         "type": "object",
@@ -24293,6 +24657,155 @@
         "title": "BulkUserImportResult",
         "description": "Result for a single row in a bulk user import."
       },
+      "CalibrationAdmission": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "admitted",
+          "rejected"
+        ],
+        "title": "CalibrationAdmission",
+        "description": "Whether an agent session created in a calibration session may operate.\n\nAn agent session created with a calibration session ID is written ``pending`` and can do\nnothing (no action, measurement, commit, apply, or pause) until its reservation in the\ncalibration session is finalized. Finalizing removes the reservation and records its ID in\n``CalibrationSessionDocument.admitted_reservation_ids`` in one update, so the outcome is\ndurable proof in the parent:\n\n``admitted``: the reservation was finalized; the session operates under its own policy.\n``rejected``: the reservation was cleared without being finalized (the calibration session\nwas closed first). The session is cancelled and never operates.\n\nA session created alone, or before admission existed, has no admission and keeps the\nbehavior it always had."
+      },
+      "CalibrationAgentSessionChild": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AgentSessionStatus",
+            "description": "Its own status, with expiry applied"
+          },
+          "created_by": {
+            "type": "string",
+            "title": "Created By"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          },
+          "autonomy": {
+            "$ref": "#/components/schemas/AgentAutonomy"
+          },
+          "qids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Qids"
+          },
+          "allowed_tasks": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Allowed Tasks"
+          },
+          "action_count": {
+            "type": "integer",
+            "title": "Action Count"
+          },
+          "active_intervention_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active Intervention Id"
+          },
+          "model_name": {
+            "type": "string",
+            "title": "Model Name",
+            "default": ""
+          },
+          "calibration_admission": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalibrationAdmission"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "pending until its start is finalized, admitted after, rejected when the session was closed first; it operates only when admitted"
+          },
+          "executions": {
+            "items": {
+              "$ref": "#/components/schemas/ExecutionResponseSummary"
+            },
+            "type": "array",
+            "title": "Executions",
+            "description": "Executions its actions dispatched, as the agent session links them"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "status",
+          "created_by",
+          "created_at",
+          "expires_at",
+          "autonomy",
+          "qids",
+          "allowed_tasks",
+          "action_count"
+        ],
+        "title": "CalibrationAgentSessionChild",
+        "description": "An agent session created in a calibration session, with the executions it dispatched."
+      },
+      "CalibrationChildKind": {
+        "type": "string",
+        "enum": [
+          "pipeline_run",
+          "agent_session"
+        ],
+        "title": "CalibrationChildKind",
+        "description": "What a child of a calibration session is."
+      },
+      "CalibrationChildReservation": {
+        "properties": {
+          "reservation_id": {
+            "type": "string",
+            "title": "Reservation Id"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/CalibrationChildKind"
+          },
+          "child_id": {
+            "type": "string",
+            "title": "Child Id"
+          },
+          "reserved_by": {
+            "type": "string",
+            "title": "Reserved By"
+          },
+          "reserved_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Reserved At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reservation_id",
+          "kind",
+          "child_id",
+          "reserved_by",
+          "reserved_at"
+        ],
+        "title": "CalibrationChildReservation",
+        "description": "A child counted in a calibration session before its own record is written.\n\nThe reservation is pushed into the session by the same conditional update that checks the\nsession is open, with the ID the child will have. The request that made it removes it\n(``finalize``) once the child's record exists, and only then may a pipeline run be\nlaunched. Closing the session clears every reservation it accepts; a request whose\nreservation was cleared undoes its child instead of starting it."
+      },
       "CalibrationGitHubSync": {
         "properties": {
           "status": {
@@ -24396,6 +24909,420 @@
         ],
         "title": "CalibrationParameterDeleteResponse",
         "description": "Response from deleting one current calibration parameter value."
+      },
+      "CalibrationPipelineRunResponse": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "calibration_session_id": {
+            "type": "string",
+            "title": "Calibration Session Id"
+          },
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id"
+          },
+          "idempotency_key": {
+            "type": "string",
+            "title": "Idempotency Key"
+          },
+          "requested_by": {
+            "type": "string",
+            "title": "Requested By"
+          },
+          "reported_origin": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReportedLaunchOrigin"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How the caller said it started the run (client reported, not verified); null when nothing was reported, as for a run requested directly"
+          },
+          "dispatch_status": {
+            "$ref": "#/components/schemas/CalibrationPipelineRunStatus",
+            "description": "Whether QDash launched the run: dispatching, dispatched, rejected (nothing was started), or unknown (it may have started; check the Execution list)"
+          },
+          "attempts": {
+            "type": "integer",
+            "title": "Attempts"
+          },
+          "pipeline_name": {
+            "type": "string",
+            "title": "Pipeline Name"
+          },
+          "backend_name": {
+            "type": "string",
+            "title": "Backend Name"
+          },
+          "flow_run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Flow Run Id"
+          },
+          "execution_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Execution Id",
+            "description": "The first step's execution, as returned at dispatch"
+          },
+          "error": {
+            "type": "string",
+            "title": "Error",
+            "default": ""
+          },
+          "requested_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Requested At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "pipeline": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PipelineProgress"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The run as a whole, from its step executions; null until its first execution exists"
+          },
+          "executions": {
+            "items": {
+              "$ref": "#/components/schemas/ExecutionResponseSummary"
+            },
+            "type": "array",
+            "title": "Executions",
+            "description": "Every execution of the run's flow run on the chip, oldest first"
+          }
+        },
+        "type": "object",
+        "required": [
+          "run_id",
+          "calibration_session_id",
+          "chip_id",
+          "idempotency_key",
+          "requested_by",
+          "dispatch_status",
+          "attempts",
+          "pipeline_name",
+          "backend_name",
+          "requested_at",
+          "updated_at"
+        ],
+        "title": "CalibrationPipelineRunResponse",
+        "description": "One pipeline run requested in a calibration session, with its step executions."
+      },
+      "CalibrationPipelineRunStatus": {
+        "type": "string",
+        "enum": [
+          "dispatching",
+          "dispatched",
+          "rejected",
+          "unknown"
+        ],
+        "title": "CalibrationPipelineRunStatus",
+        "description": "Dispatch state of one pipeline run requested in a calibration session.\n\n``dispatching``: the request was recorded and its launch has not reported back.\n``dispatched``: QDash created the pipeline's flow run; its executions carry its\n``flow_run_id``.\n``rejected``: QDash refused the launch before any flow run was created (the hardware was\nbusy or the worker deployment was missing); a retry with the same key may launch it.\n``unknown``: the launch failed in a way that may have created a flow run anyway, or it\nstayed ``dispatching`` past the time a launch takes. A retry with the same key never\nlaunches it again."
+      },
+      "CalibrationSessionDetailResponse": {
+        "properties": {
+          "calibration_session_id": {
+            "type": "string",
+            "title": "Calibration Session Id"
+          },
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          },
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id"
+          },
+          "objective": {
+            "type": "string",
+            "title": "Objective"
+          },
+          "created_by": {
+            "type": "string",
+            "title": "Created By",
+            "description": "The signed-in user who created it"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CalibrationSessionStatus"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "closed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closed At"
+          },
+          "closed_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closed By"
+          },
+          "closing_note": {
+            "type": "string",
+            "title": "Closing Note",
+            "default": ""
+          },
+          "closed_with_unknown_runs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Closed With Unknown Runs",
+            "description": "Pipeline runs whose dispatch outcome was unknown when it was closed"
+          },
+          "closed_with_unknown_starts": {
+            "items": {
+              "$ref": "#/components/schemas/CalibrationChildReservation"
+            },
+            "type": "array",
+            "title": "Closed With Unknown Starts",
+            "description": "Agent session starts reserved long ago and never recorded when it was closed. One recorded later is rejected (calibration_admission: rejected) and never operates."
+          },
+          "pipeline_runs": {
+            "items": {
+              "$ref": "#/components/schemas/CalibrationPipelineRunResponse"
+            },
+            "type": "array",
+            "title": "Pipeline Runs",
+            "description": "The most recent pipeline runs (at most 100), oldest first"
+          },
+          "pipeline_run_total": {
+            "type": "integer",
+            "title": "Pipeline Run Total",
+            "description": "Every pipeline run requested in it; more than listed when the list is cut",
+            "default": 0
+          },
+          "agent_sessions": {
+            "items": {
+              "$ref": "#/components/schemas/CalibrationAgentSessionChild"
+            },
+            "type": "array",
+            "title": "Agent Sessions",
+            "description": "The most recent agent sessions (at most 100), oldest first"
+          },
+          "agent_session_total": {
+            "type": "integer",
+            "title": "Agent Session Total",
+            "description": "Every agent session created in it; more than listed when the list is cut",
+            "default": 0
+          },
+          "close_blockers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Close Blockers",
+            "description": "Why it cannot be closed now, read from every child (not only the listed ones): runs and agent sessions that still run or wait, operations an ended agent session has not settled, and children being started. Empty when closing is allowed."
+          },
+          "unknown_runs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unknown Runs",
+            "description": "Pipeline runs whose dispatch outcome is unknown. Each was admitted, so it may be running or may still start, even after the session is closed"
+          },
+          "unknown_starts": {
+            "items": {
+              "$ref": "#/components/schemas/CalibrationChildReservation"
+            },
+            "type": "array",
+            "title": "Unknown Starts",
+            "description": "Agent session starts reserved long ago whose session was never recorded; the request may have stopped or may still record it. One recorded after a close is rejected and never operates"
+          }
+        },
+        "type": "object",
+        "required": [
+          "calibration_session_id",
+          "project_id",
+          "chip_id",
+          "objective",
+          "created_by",
+          "status",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "CalibrationSessionDetailResponse",
+        "description": "A calibration session with every run started in it."
+      },
+      "CalibrationSessionRef": {
+        "properties": {
+          "calibration_session_id": {
+            "type": "string",
+            "title": "Calibration Session Id"
+          },
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id"
+          },
+          "objective": {
+            "type": "string",
+            "title": "Objective"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CalibrationSessionStatus"
+          }
+        },
+        "type": "object",
+        "required": [
+          "calibration_session_id",
+          "chip_id",
+          "objective",
+          "status"
+        ],
+        "title": "CalibrationSessionRef",
+        "description": "A calibration session another record belongs to, read in the request's project."
+      },
+      "CalibrationSessionResponse": {
+        "properties": {
+          "calibration_session_id": {
+            "type": "string",
+            "title": "Calibration Session Id"
+          },
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          },
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id"
+          },
+          "objective": {
+            "type": "string",
+            "title": "Objective"
+          },
+          "created_by": {
+            "type": "string",
+            "title": "Created By",
+            "description": "The signed-in user who created it"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CalibrationSessionStatus"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "closed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closed At"
+          },
+          "closed_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closed By"
+          },
+          "closing_note": {
+            "type": "string",
+            "title": "Closing Note",
+            "default": ""
+          },
+          "closed_with_unknown_runs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Closed With Unknown Runs",
+            "description": "Pipeline runs whose dispatch outcome was unknown when it was closed"
+          },
+          "closed_with_unknown_starts": {
+            "items": {
+              "$ref": "#/components/schemas/CalibrationChildReservation"
+            },
+            "type": "array",
+            "title": "Closed With Unknown Starts",
+            "description": "Agent session starts reserved long ago and never recorded when it was closed. One recorded later is rejected (calibration_admission: rejected) and never operates."
+          }
+        },
+        "type": "object",
+        "required": [
+          "calibration_session_id",
+          "project_id",
+          "chip_id",
+          "objective",
+          "created_by",
+          "status",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "CalibrationSessionResponse",
+        "description": "A calibration session record."
+      },
+      "CalibrationSessionStatus": {
+        "type": "string",
+        "enum": [
+          "open",
+          "closed"
+        ],
+        "title": "CalibrationSessionStatus",
+        "description": "Whether a calibration session accepts new runs.\n\n``closed`` is a person's statement that work on the objective has ended. It says nothing\nabout whether the objective was met and is refused while a child still runs or waits."
       },
       "CancelExecutionResponse": {
         "properties": {
@@ -25017,6 +25944,26 @@
         ],
         "title": "ClaimAgentResumeRequest",
         "description": "A runner claims an authorized resume; one claim key owns the resumed run."
+      },
+      "CloseCalibrationSessionRequest": {
+        "properties": {
+          "closing_note": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "Closing Note",
+            "description": "What the person closing it wants recorded; QDash does not judge the outcome",
+            "default": ""
+          },
+          "acknowledge_unknown_runs": {
+            "type": "boolean",
+            "title": "Acknowledge Unknown Runs",
+            "description": "Close although some pipeline runs have an unknown dispatch outcome, or some agent session starts were reserved long ago and never recorded, after checking the Execution list and the agent sessions for them. They are recorded with the closure. Such a pipeline run was admitted: it may be running or may still start after the close, which does not cancel it. Such an agent session was never admitted: if it is recorded later it is rejected and never operates.",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "CloseCalibrationSessionRequest",
+        "description": "End work on a calibration session's objective."
       },
       "CommitAgentCandidateRequest": {
         "properties": {
@@ -26102,6 +27049,20 @@
               }
             ],
             "description": "The provider and model the client host reports it ran the agent with, read from the host's own runtime, never from the agent's tool arguments. Recorded as reported; QDash does not verify it, and it changes no scope or approval. Omitted when the host does not know it."
+          },
+          "calibration_session_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Calibration Session Id",
+            "description": "Create the session in this calibration session, which must be open, on the same chip, and created by the signed-in user. It groups the session with the objective's other work and grants nothing beyond the policy."
           }
         },
         "type": "object",
@@ -26111,6 +27072,30 @@
         ],
         "title": "CreateAgentSessionRequest",
         "description": "Create a bounded authorization session for a local agent."
+      },
+      "CreateCalibrationSessionRequest": {
+        "properties": {
+          "chip_id": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Chip Id"
+          },
+          "objective": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Objective",
+            "description": "What the calibration is for, in a person's words; shown with every run"
+          }
+        },
+        "type": "object",
+        "required": [
+          "chip_id",
+          "objective"
+        ],
+        "title": "CreateCalibrationSessionRequest",
+        "description": "Start a calibration session for one objective on one chip."
       },
       "CreateChipRequest": {
         "properties": {
@@ -28692,6 +29677,45 @@
             ],
             "title": "Backend Name",
             "description": "Defaults to the configured backend."
+          },
+          "calibration_session_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Calibration Session Id",
+            "description": "Record the run in this calibration session, which must be open, on this chip, and created by the signed-in user. It groups the run with the session's other work and grants nothing: the run is the request approved here. Requires idempotency_key."
+          },
+          "idempotency_key": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idempotency Key",
+            "description": "With calibration_session_id: a retry with the same key and request returns the recorded run instead of starting another, and a run whose launch outcome is unknown is never launched again with it."
+          },
+          "reported_origin": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReportedLaunchOrigin"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How the caller says it started the run, such as an agent tool. QDash stores it as given and shows it as reported: it is not verified, does not link the run to an agent session, and grants nothing. The signed-in user stays responsible for the run."
           }
         },
         "type": "object",
@@ -28814,6 +29838,36 @@
                 "type": "null"
               }
             ]
+          },
+          "calibration_session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Calibration Session Id",
+            "description": "The calibration session the run is recorded in, if any"
+          },
+          "pipeline_run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pipeline Run Id",
+            "description": "The run's record in that calibration session"
+          },
+          "replayed": {
+            "type": "boolean",
+            "title": "Replayed",
+            "description": "True when a retry returned the run an earlier request with its key started",
+            "default": false
           }
         },
         "type": "object",
@@ -29066,6 +30120,67 @@
         ],
         "title": "ExecutionAvailabilityResponse",
         "description": "Current resource availability; execution admission still checks atomically."
+      },
+      "ExecutionCalibrationSessionLink": {
+        "properties": {
+          "calibration_session_id": {
+            "type": "string",
+            "title": "Calibration Session Id"
+          },
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id"
+          },
+          "objective": {
+            "type": "string",
+            "title": "Objective"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CalibrationSessionStatus"
+          },
+          "via": {
+            "type": "string",
+            "enum": [
+              "pipeline_run",
+              "agent_session"
+            ],
+            "title": "Via"
+          },
+          "pipeline_run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pipeline Run Id",
+            "description": "The pipeline run, when via is pipeline_run"
+          },
+          "agent_session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Session Id",
+            "description": "The agent session, when via is agent_session"
+          }
+        },
+        "type": "object",
+        "required": [
+          "calibration_session_id",
+          "chip_id",
+          "objective",
+          "status",
+          "via"
+        ],
+        "title": "ExecutionCalibrationSessionLink",
+        "description": "The calibration session an execution belongs to, and the server record that says so.\n\n``via`` names the record: ``pipeline_run`` when the execution is a step of a pipeline run\nrecorded in the session (matched by project, chip, and flow run), ``agent_session`` when an\naction of an admitted agent session of the session dispatched it. Membership says what the\nwork was for; it never says that an agent ran it."
       },
       "ExecutionComparisonResponse": {
         "properties": {
@@ -29587,6 +30702,28 @@
               }
             ],
             "description": "The agent session whose action dispatched this execution, or the session only its tag names (linked false); null for an execution outside agent sessions"
+          },
+          "calibration_session": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExecutionCalibrationSessionLink"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The calibration session this execution belongs to, from QDash's own records: a pipeline run recorded in it, or an action of an agent session admitted to it. Null when no record relates it, or when records disagree on the session"
+          },
+          "reported_origin": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReportedLaunchOrigin"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How the caller that launched this execution's pipeline said it was started, such as an agent tool. Client reported, not verified by QDash; null when nothing was reported. The recorded user is still the one whose sign-in started it"
           }
         },
         "type": "object",
@@ -29692,6 +30829,28 @@
               }
             ],
             "description": "Set only when an action of an agent session dispatched this execution; a tag alone never sets it"
+          },
+          "calibration_session": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExecutionCalibrationSessionLink"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The calibration session this execution belongs to, from QDash's own records: a pipeline run recorded in it, or an action of an agent session admitted to it. Null when no record relates it, or when records disagree on the session"
+          },
+          "reported_origin": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReportedLaunchOrigin"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How the caller that launched this execution's pipeline said it was started, such as an agent tool. Client reported, not verified by QDash; null when nothing was reported. The recorded user is still the one whose sign-in started it"
           }
         },
         "type": "object",
@@ -31672,6 +32831,14 @@
         "title": "LatestTaskResultResponse",
         "description": "Response model for fetching the latest tasks grouped by qid/coupling_id."
       },
+      "LaunchSource": {
+        "type": "string",
+        "enum": [
+          "agent_tool"
+        ],
+        "title": "LaunchSource",
+        "description": "What a caller reports started a run.\n\n``agent_tool``: a tool of an agent host, such as pi-qdash's ``qdash_run_pipeline``, made\nthe request with the user's sign-in after the user approved it."
+      },
       "LegendItem": {
         "properties": {
           "color": {
@@ -31950,6 +33117,41 @@
         ],
         "title": "ListBackendsResponse",
         "description": "Response model for listing all backends.\n\nWraps list of backends for API consistency and future extensibility."
+      },
+      "ListCalibrationSessionsResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CalibrationSessionResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Number of sessions returned, after filters and the limit"
+          },
+          "skip": {
+            "type": "integer",
+            "title": "Skip",
+            "description": "Sessions skipped before the first one returned",
+            "default": 0
+          },
+          "has_more": {
+            "type": "boolean",
+            "title": "Has More",
+            "description": "True when more sessions match after the ones returned",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "ListCalibrationSessionsResponse",
+        "description": "Calibration sessions of the current project, newest first."
       },
       "ListChipsResponse": {
         "properties": {
@@ -37801,6 +39003,37 @@
         "type": "object",
         "title": "RelativePeriod",
         "description": "The last ``days`` days, resolved to ``[now - days, now]`` at evaluation."
+      },
+      "ReportedLaunchOrigin": {
+        "properties": {
+          "source": {
+            "$ref": "#/components/schemas/LaunchSource"
+          },
+          "tool": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:-]+$",
+            "title": "Tool",
+            "description": "The tool that made the request, such as qdash_run_pipeline"
+          },
+          "client": {
+            "type": "string",
+            "maxLength": 100,
+            "pattern": "^[A-Za-z0-9_.:@/ -]*$",
+            "title": "Client",
+            "description": "The host or package that reports it, such as pi-qdash; empty when unnamed",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "source",
+          "tool"
+        ],
+        "title": "ReportedLaunchOrigin",
+        "description": "A caller's own account of how a run was started; client reported, not verified."
       },
       "ResolvedPipelineStep": {
         "properties": {

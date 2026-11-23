@@ -29,6 +29,7 @@ from qdash.datamodel.agent_session import (
     AgentSessionStatus,
     AgentSessionStopRecord,
 )
+from qdash.datamodel.calibration_session import CalibrationAdmission  # noqa: TC001
 
 
 class AgentSessionDocument(Document):
@@ -79,6 +80,16 @@ class AgentSessionDocument(Document):
     # Set by the update that stopped the session on a stop request; None otherwise (an
     # expert's stop answer is recorded on its intervention).
     stop: AgentSessionStopRecord | None = None
+    # The calibration session this session was created in, checked and stored by its
+    # creation and never changed; None for a session started on its own or before
+    # calibration sessions existed. It grants nothing: the policy above is the authority.
+    calibration_session_id: str | None = None
+    # Admission of a session created in a calibration session, and the reservation it rests
+    # on: written ``pending`` with the session, decided by the reservation's outcome in the
+    # calibration session (see ``CalibrationAdmission``). Every operational gate refuses
+    # ``pending`` and ``rejected``; None (a session created alone) is never checked.
+    calibration_admission: CalibrationAdmission | None = None
+    calibration_reservation_id: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -93,6 +104,13 @@ class AgentSessionDocument(Document):
                     ("project_id", ASCENDING),
                     ("chip_id", ASCENDING),
                     ("created_at", DESCENDING),
+                ]
+            ),
+            IndexModel(
+                [
+                    ("project_id", ASCENDING),
+                    ("calibration_session_id", ASCENDING),
+                    ("created_at", ASCENDING),
                 ]
             ),
         ]

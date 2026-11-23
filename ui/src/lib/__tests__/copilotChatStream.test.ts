@@ -82,6 +82,55 @@ describe("copilotChatStream", () => {
     expect(tool(stored!.steps, 0).classification).toEqual(classification);
   });
 
+  it("keeps the calibration session a create call made, and only that, through a reload", () => {
+    const create = "qdash_create_calibration_session";
+    const started = startTool([], { id: "s1", tool: create, label: "Create", args: {} });
+    const created = { calibration_session_id: "cs-new", chip_id: "64Qv3" };
+    const steps = endTool(started, { id: "s1", tool: create, calibration_session: created });
+    expect(tool(steps)).toMatchObject({
+      status: "done",
+      calibrationSession: { calibrationSessionId: "cs-new", chipId: "64Qv3" },
+    });
+    const trace = toPersistedTrace(
+      { steps: [...steps, { kind: "text", text: "ok" }], startedAt: 0 },
+      10,
+    );
+    const stored = JSON.parse(JSON.stringify(trace)) as typeof trace;
+    expect(tool(stored!.steps, 0).calibrationSession).toEqual({
+      calibrationSessionId: "cs-new",
+      chipId: "64Qv3",
+    });
+
+    // A failed call, another tool, a result for a call of another tool, or a malformed ID.
+    expect(
+      tool(
+        endTool(started, { id: "s1", tool: create, is_error: true, calibration_session: created }),
+      ),
+    ).not.toHaveProperty("calibrationSession");
+    const other = startTool([], { id: "g1", tool: "qdash_get_calibration_session", label: "Get" });
+    expect(
+      tool(
+        endTool(other, {
+          id: "g1",
+          tool: "qdash_get_calibration_session",
+          calibration_session: created,
+        }),
+      ),
+    ).not.toHaveProperty("calibrationSession");
+    expect(
+      tool(endTool(other, { id: "g1", tool: create, calibration_session: created })),
+    ).not.toHaveProperty("calibrationSession");
+    expect(
+      tool(
+        endTool(started, {
+          id: "s1",
+          tool: create,
+          calibration_session: { calibration_session_id: "../x" },
+        }),
+      ),
+    ).not.toHaveProperty("calibrationSession");
+  });
+
   it("keeps a failed classification as an error step and drops malformed ones", () => {
     const started = startTool([], { id: "k1", tool: "classify", label: "Classify" });
     const failed = endTool(started, {

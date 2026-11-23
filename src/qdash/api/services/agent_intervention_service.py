@@ -55,6 +55,8 @@ from qdash.api.schemas.agent_session import (
 from qdash.api.services.agent_execution_links import resolve_chip_links
 from qdash.api.services.agent_intervention_slack import AgentInterventionSlackNotifier
 from qdash.api.services.agent_session_gate import (
+    ADMITTED_FILTER,
+    admission_refusal,
     autonomous_session_refusal,
     end_notification_update,
     in_flight_blockers,
@@ -1140,6 +1142,9 @@ class AgentInterventionService:
                 raise _conflict(
                     f"Agent session already waits on intervention {session.active_intervention_id}"
                 )
+            # A session never admitted in its calibration session records nothing: it has no
+            # work to ask about, and a pause would lead to a resume.
+            admission_refusal(session)
             if session.status != AgentSessionStatus.ACTIVE:
                 return self._record_without_pause(
                     session=session, username=username, body=body, request_hash=request_hash
@@ -1164,6 +1169,7 @@ class AgentInterventionService:
                     "session_id": session_id,
                     "status": AgentSessionStatus.ACTIVE.value,
                     "state_version": session.state_version,
+                    **ADMITTED_FILTER,
                 },
                 {
                     "$set": {**self.pause_update(doc), **binding_update, "updated_at": now()},
@@ -1472,6 +1478,7 @@ class AgentInterventionService:
                 "status": AgentSessionStatus.WAITING_FOR_HUMAN.value,
                 "active_intervention_id": intervention_id,
                 "intervention_resolution_id": doc.response.response_id,
+                **ADMITTED_FILTER,
             },
             {
                 "$set": {
