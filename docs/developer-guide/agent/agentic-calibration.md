@@ -928,7 +928,12 @@ The Execution page presents a session as one experiment over its real executions
 making the session an execution. The session stays the authority for policy, budget, and
 pauses; each measurement stays an ordinary execution whose workflow and hardware lifecycle the
 session does not own. Nothing here dispatches, locks, cancels, or writes: the grouping and the
-graph are read-only projections in `src/qdash/api/services/execution_group_service.py`.
+graph are read-only projections. `ExecutionGroupService` in
+`src/qdash/api/services/execution_group_service.py` is the service the router calls.
+`execution_group_list.py` decides the rows, their order, and the page cut, and
+`execution_group_rows.py` assembles the rows of the cut page. `agent_session_graph.py` builds
+the graph, and `agent_session_group_summary.py` holds the session header and measurement
+numbering that the list and the graph share, so a measurement has the same number in both.
 
 **Link authority.** An execution belongs to a session only when an authorized `run_task` action
 of that session names it: the action's `operation_id` matches the execution's
@@ -1020,6 +1025,7 @@ detail and panel. The graph page pins its requests to the linked project with
 `useLinkedProject`, as the session pages do, and the list adds the project to its query key and
 request header; a project switch closes the panel and collapses the groups. Tests:
 `tests/qdash/api/services/test_execution_group_service.py`,
+`tests/qdash/api/services/test_execution_group_modules.py`,
 `tests/qdash/api/routers/test_execution_groups.py`, and the `__tests__` of those components.
 
 ## Statuses
@@ -1107,8 +1113,10 @@ planner may escalate after the value is already written; only `commit_on_success
   and `tests/qdash/api/routers/test_agent_session_audit.py`
 - `ui/src/components/features/agent-session/`: session and intervention pages
 - `src/qdash/api/services/agent_execution_links.py`,
-  `src/qdash/api/services/execution_group_service.py`: action-to-execution links, the grouped
-  Execution list, and the graph; see [Execution grouping](#execution-grouping)
+  `src/qdash/api/services/execution_group_service.py`, `execution_group_list.py`,
+  `execution_group_rows.py`, `agent_session_graph.py`, and `agent_session_group_summary.py`:
+  action-to-execution links, the grouped Execution list, and the graph; see
+  [Execution grouping](#execution-grouping)
 - `src/qdash/api/services/calibration_pipeline_preflight.py`: pipeline preflight
 - `clients/python/tests/test_agent_runner.py`, `clients/python/tests/test_evaluation_planner.py`,
   `tests/qdash/api/services/test_agent_session_service.py`,

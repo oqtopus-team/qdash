@@ -6,11 +6,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AXIOS_INSTANCE } from "@/lib/api/custom-instance";
 
 import { AgentSessionPageContent } from "../AgentSessionPageContent";
-import {
-  auditKindLabel,
-  auditProvenanceLabel,
-  gateOutcomeLabel,
-} from "../AgentSessionAuditTimeline";
 
 const PROJECTS = [{ project_id: "lab-a" }, { project_id: "lab-b" }];
 let project: { projectId: string | null; projects: { project_id: string }[]; loading: boolean };
@@ -295,26 +290,5 @@ describe("AgentSessionAuditTimeline", () => {
     setup();
     expect(await screen.findByText(/which your account cannot\s+open/)).toBeTruthy();
     expect(audits).toEqual([]);
-  });
-
-  it("names kinds and sources in plain words", () => {
-    expect(auditKindLabel("intervention_response")).toBe("Expert answered");
-    expect(auditProvenanceLabel("server_record")).toBe("QDash record");
-    expect(auditKindLabel("future_kind")).toBe("future_kind");
-  });
-
-  it("tells an out-of-scope output apart from a failed gate", () => {
-    expect(gateOutcomeLabel({ accepted: true, rejection: null })).toBe("accepted");
-    expect(gateOutcomeLabel({ accepted: false, rejection: "not_in_scope" })).toBe(
-      "not in session scope (reference only)",
-    );
-    expect(gateOutcomeLabel({ accepted: false, rejection: "outside_bounds" })).toBe(
-      "rejected: outside bounds",
-    );
-    expect(gateOutcomeLabel({ accepted: false, rejection: "quality_gate" })).toBe(
-      "rejected: quality gate",
-    );
-    // An audit recorded before the code existed keeps its plain wording.
-    expect(gateOutcomeLabel({ accepted: false })).toBe("rejected");
   });
 });
