@@ -38,7 +38,7 @@ CADDYFILE = REPO_ROOT / "config/caddy/Caddyfile"
 # The tunnel's public URL in .env; requests to its host come from browsers using HTTPS.
 PUBLIC_HTTPS_URL = "https://qdash.example.com"
 DEPLOYMENT_ID = "123e4567-e89b-12d3-a456-426614174000"
-CHAT_STREAM = "/api/copilot/chat/stream"
+CHAT_STREAM = "/api/agent/chat/stream"
 CREATE_RUN = f"/prefect/api/deployments/{DEPLOYMENT_ID}/create_flow_run"
 
 
@@ -133,7 +133,7 @@ class MockHandler(BaseHTTPRequestHandler):
         )
 
     def stream_events(self, seen: Seen) -> None:
-        """Answer like the Copilot chat stream: SSE events while the connection lasts."""
+        """Answer like the Agent chat stream: SSE events while the connection lasts."""
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream")
         self.send_header("Cache-Control", "no-cache")

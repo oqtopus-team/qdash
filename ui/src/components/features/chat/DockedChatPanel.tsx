@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { Maximize2, SquarePen, X } from "lucide-react";
 import { useOptionalChatDock } from "@/contexts/ChatDockContext";
-import { useCopilotChatSessionContext } from "@/contexts/CopilotChatSessionContext";
+import { useAgentChatSessionContext } from "@/contexts/AgentChatSessionContext";
 import { ChatThread } from "@/components/features/chat/ChatThread";
 import {
   RecentChatsMenu,
@@ -13,7 +13,7 @@ import {
 
 /** The active chat as a docked column: the app sidebar or a split view inside a modal. */
 export function DockedChatPanel({ onClose }: { onClose: () => void }) {
-  const { activeSession, createNewSession } = useCopilotChatSessionContext();
+  const { activeSession, createNewSession } = useAgentChatSessionContext();
   const dock = useOptionalChatDock();
   const router = useRouter();
 

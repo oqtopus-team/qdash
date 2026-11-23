@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ChatNotifier } from "@/components/features/chat/ChatNotifier";
 import { ToastContainer } from "@/components/ui/Toast";
-import type { ChatTurnEvent } from "@/types/copilotChat";
+import type { ChatTurnEvent } from "@/types/agentChat";
 
 // Unlike ChatNotifier.test.tsx, Sonner is real here: chat toasts must render, update, stay, and
 // close in the app's own toaster.
@@ -15,8 +15,8 @@ const state = vi.hoisted(() => ({
 
 vi.mock("next/navigation", () => ({ usePathname: () => "/execution" }));
 vi.mock("@/contexts/ThemeContext", () => ({ useTheme: () => ({ theme: "light" }) }));
-vi.mock("@/contexts/CopilotChatSessionContext", () => ({
-  useCopilotChatSessionContext: () => ({
+vi.mock("@/contexts/AgentChatSessionContext", () => ({
+  useAgentChatSessionContext: () => ({
     subscribeChatEvents: (listener: (event: ChatTurnEvent) => void) => {
       state.listeners.add(listener);
       return () => state.listeners.delete(listener);

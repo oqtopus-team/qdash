@@ -9,7 +9,7 @@ import type { User } from "@/schemas";
 import { useGetCurrentUser, useLogin, useLogout } from "@/client/auth/auth";
 import { startAvatarSpecSession } from "@/lib/avatar/avatarSpecs";
 import { getAccessToken } from "@/lib/auth/session";
-import { forgetChatTabState } from "@/lib/copilotTurnStore";
+import { forgetChatTabState } from "@/lib/agentTurnStore";
 
 interface AuthContextType {
   user: User | null;

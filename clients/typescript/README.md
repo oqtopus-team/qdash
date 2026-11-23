@@ -144,5 +144,5 @@ dependency in the pi-qdash tarball with that exact version. The source client
 manifest remains at `0.0.0`; it is never used as a published dependency.
 
 Stable client releases still follow QDash's `v<version>` tags. The
-[pi package release guide](../../docs/developer-guide/copilot/packages.md)
+[pi package release guide](../../docs/developer-guide/agent/packages.md)
 describes snapshot versions, publication ordering, and npm authentication.

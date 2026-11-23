@@ -12,7 +12,7 @@ import {
   uiSpecToText,
   validateUiSpec,
   type UiBlockPayload,
-} from "../../ui/src/lib/copilotUiSpec.ts";
+} from "../../ui/src/lib/agentUiSpec.ts";
 import {
   UI_INPUT_GROUPS,
   UI_TOOL_PARAMETERS,
@@ -26,7 +26,7 @@ export {
   UI_SPEC_LIMITS,
   validateUiSpec,
   type UiBlockPayload,
-} from "../../ui/src/lib/copilotUiSpec.ts";
+} from "../../ui/src/lib/agentUiSpec.ts";
 
 /** A `ui` block read back from tool details, re-validated so replayed entries are checked too. */
 export function uiBlockFromDetails(details: unknown): UiBlockPayload | undefined {

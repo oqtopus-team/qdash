@@ -3,7 +3,7 @@
 # job directory and relays its data requests to the API over a Unix socket.
 # The container holds no QDash credentials (no env_file) and has no network
 # (Compose sets network_mode: none); scripts read data only through the API's
-# broker. It shares nothing with the Copilot workspace (agent-exec).
+# broker. It shares nothing with the Agent workspace (agent-exec).
 #
 # Build context: repository root (see compose.yaml).
 

@@ -10,12 +10,12 @@ from typing import Any
 
 import pytest
 
-from qdash.api.services.copilot_chat_session_service import merge_saved_messages
-from qdash.dbmodel.copilot_chat_session import (
-    CopilotChatMessage,
-    CopilotChatServerTurn,
-    CopilotChatSessionDocument,
-    CopilotChatSteer,
+from qdash.api.services.agent_chat_session_service import merge_saved_messages
+from qdash.dbmodel.agent_chat_session import (
+    AgentChatMessage,
+    AgentChatServerTurn,
+    AgentChatSessionDocument,
+    AgentChatSteer,
     TurnStatus,
 )
 
@@ -25,18 +25,18 @@ pytestmark = pytest.mark.usefixtures("init_db")
 T0 = datetime(2026, 1, 1, tzinfo=timezone.utc)
 
 
-def _m(content: str, role: str = "user", rid: str | None = None) -> CopilotChatMessage:
-    return CopilotChatMessage(role=role, content=content, turn_request_id=rid, created_at=T0)
+def _m(content: str, role: str = "user", rid: str | None = None) -> AgentChatMessage:
+    return AgentChatMessage(role=role, content=content, turn_request_id=rid, created_at=T0)
 
 
 def _doc(
-    messages: list[CopilotChatMessage],
+    messages: list[AgentChatMessage],
     rid: str | None = None,
     status: TurnStatus = "completed",
     start: int = 0,
-) -> CopilotChatSessionDocument:
+) -> AgentChatSessionDocument:
     turn = (
-        CopilotChatServerTurn(
+        AgentChatServerTurn(
             request_id=rid,
             project_id="p1",
             start_index=start,
@@ -48,12 +48,10 @@ def _doc(
         if rid
         else None
     )
-    return CopilotChatSessionDocument(
-        username="alice", session_id="s1", messages=messages, turn=turn
-    )
+    return AgentChatSessionDocument(username="alice", session_id="s1", messages=messages, turn=turn)
 
 
-def _contents(messages: list[CopilotChatMessage]) -> list[str]:
+def _contents(messages: list[AgentChatMessage]) -> list[str]:
     return [m.content for m in messages]
 
 
@@ -69,8 +67,8 @@ def test_a_chat_without_recorded_turns_takes_the_client_copy() -> None:
 
 def test_a_steer_the_page_placed_between_turns_is_kept() -> None:
     doc = _doc([*A, *B], "b")
-    steer = CopilotChatMessage(
-        role="user", content="late", steer=CopilotChatSteer(request_id="s"), created_at=T0
+    steer = AgentChatMessage(
+        role="user", content="late", steer=AgentChatSteer(request_id="s"), created_at=T0
     )
     merged = merge_saved_messages(doc, [*A, steer, *B])
     assert _contents(merged) == ["qa", "answer a", "late", "qb", "answer b"]
@@ -117,9 +115,9 @@ def _json(value: Any) -> str:
     return json.dumps(value, separators=(",", ":"))
 
 
-def _answer(text: str, rid: str, entry: str | None = None, **extra: Any) -> CopilotChatMessage:
+def _answer(text: str, rid: str, entry: str | None = None, **extra: Any) -> AgentChatMessage:
     payload = {"blocks": [{"type": "text", "content": text, "chart": None}], "assessment": None}
-    return CopilotChatMessage(
+    return AgentChatMessage(
         role="assistant",
         content=_json({**payload, **extra}),
         turn_request_id=rid,
@@ -128,17 +126,17 @@ def _answer(text: str, rid: str, entry: str | None = None, **extra: Any) -> Copi
     )
 
 
-def _steer(text: str, request_id: str, rid: str | None = None) -> CopilotChatMessage:
-    return CopilotChatMessage(
+def _steer(text: str, request_id: str, rid: str | None = None) -> AgentChatMessage:
+    return AgentChatMessage(
         role="user",
         content=text,
-        steer=CopilotChatSteer(request_id=request_id),
+        steer=AgentChatSteer(request_id=request_id),
         turn_request_id=rid,
         created_at=T0,
     )
 
 
-def _rated(m: CopilotChatMessage, feedback: Any) -> CopilotChatMessage:
+def _rated(m: AgentChatMessage, feedback: Any) -> AgentChatMessage:
     payload = json.loads(m.content)
     if feedback is _UNRATED:
         payload.pop("feedback", None)
@@ -150,7 +148,7 @@ def _rated(m: CopilotChatMessage, feedback: Any) -> CopilotChatMessage:
 _UNRATED = object()
 
 
-def _feedback(m: CopilotChatMessage) -> Any:
+def _feedback(m: AgentChatMessage) -> Any:
     return json.loads(m.content).get("feedback", _UNRATED)
 
 
@@ -170,11 +168,11 @@ CHAT = [*LEGACY, *STEERED, BETWEEN, *CONTINUED, *LAST]
 DURABLE = [*STEERED, *CONTINUED, *LAST]
 
 
-def _durable(messages: list[CopilotChatMessage]) -> list[CopilotChatMessage]:
+def _durable(messages: list[AgentChatMessage]) -> list[AgentChatMessage]:
     return [m for m in messages if m.turn_request_id in {"t1", "t2", "t3"}]
 
 
-def _check(incoming: list[CopilotChatMessage]) -> list[CopilotChatMessage]:
+def _check(incoming: list[AgentChatMessage]) -> list[AgentChatMessage]:
     """Merge a copy of CHAT and check the invariants every save keeps."""
     merged = merge_saved_messages(_doc(CHAT, "t3"), incoming)
     assert _durable(merged) == DURABLE

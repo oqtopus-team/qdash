@@ -1,5 +1,5 @@
 /**
- * The Copilot workspace: a conversation's directory and shell in the
+ * The Agent workspace: a conversation's directory and shell in the
  * agent-exec container, offered to the model as pi-durable's `read`,
  * `write`, `edit` and `bash` tools.
  *

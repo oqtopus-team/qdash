@@ -162,15 +162,15 @@ test("defaultChatModel uses the first chat model and refuses an unresolved endpo
 
 function checkout() {
   const root = mkdtempSync(join(tmpdir(), "pi-local-"));
-  mkdirSync(join(root, "config/copilot/profiles/lab"), { recursive: true });
-  writeFileSync(join(root, "config/copilot/config.yaml"), "language: {}\n");
-  writeFileSync(join(root, "config/copilot/chat.yaml"), CHAT_YAML);
-  writeFileSync(join(root, "config/copilot/evaluation.yaml"), EVALUATION_YAML);
+  mkdirSync(join(root, "config/agent/profiles/lab"), { recursive: true });
+  writeFileSync(join(root, "config/agent/config.yaml"), "language: {}\n");
+  writeFileSync(join(root, "config/agent/chat.yaml"), CHAT_YAML);
+  writeFileSync(join(root, "config/agent/evaluation.yaml"), EVALUATION_YAML);
   writeFileSync(
-    join(root, "config/copilot/profiles/lab/chat.yaml"),
+    join(root, "config/agent/profiles/lab/chat.yaml"),
     CHAT_YAML.replace("qwen-test", "lab-model"),
   );
-  writeFileSync(join(root, "config/copilot/profiles/lab/evaluation.yaml"), EVALUATION_YAML);
+  writeFileSync(join(root, "config/agent/profiles/lab/evaluation.yaml"), EVALUATION_YAML);
   writeFileSync(
     join(root, ".env"),
     [
@@ -278,10 +278,22 @@ test("prepareLocalCli passes launcher-looking text after -- to pi", () => {
 
 test("prepareLocalCli selects a profile named in .env", () => {
   const root = checkout();
-  writeFileSync(join(root, ".env"), `${readFileSync(join(root, ".env"), "utf8")}\nQDASH_COPILOT_PROFILE=lab\n`);
+  writeFileSync(join(root, ".env"), `${readFileSync(join(root, ".env"), "utf8")}\nQDASH_AGENT_PROFILE=lab\n`);
   const plan = prepareLocalCli([], {}, root);
   assert.equal(plan.profile, "lab");
   assert.equal(plan.model, "openai-compatible-chat/lab-model");
+});
+
+test("prepareLocalCli accepts the legacy QDASH_COPILOT_PROFILE and refuses a conflicting pair", () => {
+  const root = checkout();
+  const base = readFileSync(join(root, ".env"), "utf8");
+  writeFileSync(join(root, ".env"), `${base}\nQDASH_COPILOT_PROFILE=lab\n`);
+  assert.equal(prepareLocalCli([], {}, root).profile, "lab");
+  // The shell's new name and the file's legacy name are compared, not layered.
+  assert.throws(
+    () => prepareLocalCli([], { QDASH_AGENT_PROFILE: "other" }, root),
+    /conflicts with the legacy QDASH_COPILOT_PROFILE/,
+  );
 });
 
 test("prepareLocalCli refuses the global pi agent dir", () => {

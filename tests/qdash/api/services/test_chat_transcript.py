@@ -4,7 +4,7 @@ import json
 from typing import Any
 
 from qdash.api.services.chat_transcript import TurnTranscript, transcript_digest
-from qdash.dbmodel.copilot_chat_session import CopilotChatMessage, CopilotChatSteer
+from qdash.dbmodel.agent_chat_session import AgentChatMessage, AgentChatSteer
 
 
 def _clock(start: int = 1_000):
@@ -12,31 +12,31 @@ def _clock(start: int = 1_000):
     return lambda: next(ticks)
 
 
-def _user(text: str = "What is T1?") -> CopilotChatMessage:
-    return CopilotChatMessage(role="user", content=text, turn_request_id="r1")
+def _user(text: str = "What is T1?") -> AgentChatMessage:
+    return AgentChatMessage(role="user", content=text, turn_request_id="r1")
 
 
-def _payload(message: CopilotChatMessage) -> dict[str, Any]:
+def _payload(message: AgentChatMessage) -> dict[str, Any]:
     payload: dict[str, Any] = json.loads(message.content)
     return payload
 
 
 def test_the_digest_matches_the_pages_digest() -> None:
-    # Values computed by transcriptDigest in ui/src/lib/copilotObservedTurn.ts.
+    # Values computed by transcriptDigest in ui/src/lib/agentObservedTurn.ts.
     messages = [
-        CopilotChatMessage(role="user", content='こんにちは "q" \n\t\x01 😀'),
-        CopilotChatMessage(
+        AgentChatMessage(role="user", content='こんにちは "q" \n\t\x01 😀'),
+        AgentChatMessage(
             role="assistant",
             content='{"blocks":[{"type":"text","content":"hi","chart":null}],"assessment":null}',
         ),
-        CopilotChatMessage(
-            role="user", content="steer", steer=CopilotChatSteer(request_id="s", entry_id=None)
+        AgentChatMessage(
+            role="user", content="steer", steer=AgentChatSteer(request_id="s", entry_id=None)
         ),
     ]
     assert transcript_digest(messages) == "0b3c0204ed516ffb"
     assert transcript_digest([]) == "d095202279b28c9e"
     # An answer of a recorded turn counts by its turn, whatever its text.
-    answer = CopilotChatMessage(role="assistant", content="ignored", turn_request_id="r9")
+    answer = AgentChatMessage(role="assistant", content="ignored", turn_request_id="r9")
     assert transcript_digest([*messages, answer]) == "8af3d0d15d3928a4"
     assert transcript_digest([*messages, answer.model_copy(update={"content": "rated"})]) == (
         "8af3d0d15d3928a4"

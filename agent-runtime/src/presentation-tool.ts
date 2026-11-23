@@ -13,7 +13,7 @@ import {
   uiSpecToText,
   validateUiSpec,
   type UiBlockPayload,
-} from "../../ui/src/lib/copilotUiSpec.ts";
+} from "../../ui/src/lib/agentUiSpec.ts";
 
 type JsonObject = ClassifierContext["state"];
 
@@ -193,7 +193,7 @@ export function classifierContext(state: JsonObject): ClassifierContext {
       category: {
         type: "choice",
         instructions:
-          "A QDash Copilot user asked `request`, and the assistant retrieved data with the shape described by the other fields. Choose how the chat should present it.",
+          "A QDash Agent user asked `request`, and the assistant retrieved data with the shape described by the other fields. Choose how the chat should present it.",
         criteria: { ...PRESENTATION_CATEGORIES },
       },
     },

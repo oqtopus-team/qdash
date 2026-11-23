@@ -27,10 +27,10 @@ import type { MemberResponse, ProjectRole } from "@/schemas";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
 import { copyText } from "@/lib/utils/clipboard";
 
-import { CopilotInstructionsSettings } from "./CopilotInstructionsSettings";
-import { CopilotSystemPromptView } from "./CopilotSystemPromptView";
+import { AgentInstructionsSettings } from "./AgentInstructionsSettings";
+import { AgentSystemPromptView } from "./AgentSystemPromptView";
 
-const TABS = ["appearance", "project", "copilot", "account", "api"] as const;
+const TABS = ["appearance", "project", "agent", "account", "api"] as const;
 type Tab = (typeof TABS)[number];
 
 const editableProjectRoles: ProjectRole[] = ["viewer", "editor"];
@@ -42,29 +42,29 @@ function roleBadgeClass(role: ProjectRole) {
   return "badge-ghost";
 }
 
-/** Copilot settings for the chat model, custom instructions and system prompt. */
-function CopilotSettingsPanel() {
+/** Agent settings for the chat model, custom instructions and system prompt. */
+function AgentSettingsPanel() {
   const { options, selected, select, status, unavailableModel } = useChatModelSelection();
   const effective = selected.resolvedModel;
   const canSwitch = status === "ready" && options.length > 1;
 
   return (
-    <div className="card bg-base-200 shadow-sm" key="copilot">
+    <div className="card bg-base-200 shadow-sm" key="agent">
       <div className="card-body">
-        <h2 className="card-title mb-4">Copilot Settings</h2>
+        <h2 className="card-title mb-4">Agent Settings</h2>
         <div className="flex flex-col gap-6">
           <div className="flex flex-col gap-3">
-            <label className="text-sm font-medium" htmlFor="copilot-chat-model">
+            <label className="text-sm font-medium" htmlFor="agent-chat-model">
               Default chat model
             </label>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <select
-                id="copilot-chat-model"
+                id="agent-chat-model"
                 className="select select-bordered w-full sm:max-w-md"
                 value={selected.key}
                 onChange={(event) => select(event.target.value)}
                 disabled={!canSwitch}
-                aria-describedby="copilot-chat-model-help"
+                aria-describedby="agent-chat-model-help"
               >
                 <SelectedLabel />
                 {options.map((option) => (
@@ -82,7 +82,7 @@ function CopilotSettingsPanel() {
                 </div>
               )}
             </div>
-            <p id="copilot-chat-model-help" className="text-sm text-base-content/60">
+            <p id="agent-chat-model-help" className="text-sm text-base-content/60">
               {status === "loading"
                 ? "Loading the configured chat models…"
                 : status === "error"
@@ -112,9 +112,9 @@ function CopilotSettingsPanel() {
 
           <div className="divider my-0" />
 
-          <CopilotInstructionsSettings />
+          <AgentInstructionsSettings />
 
-          <CopilotSystemPromptView />
+          <AgentSystemPromptView />
         </div>
       </div>
     </div>
@@ -455,7 +455,7 @@ export function SettingsPageContent() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>("appearance");
 
-  // `?tab=copilot` opens a tab directly (the chat links to its instructions).
+  // `?tab=agent` opens a tab directly (the chat links to its instructions).
   useEffect(() => {
     const requested = new URLSearchParams(window.location.search).get("tab");
     if (requested && (TABS as readonly string[]).includes(requested)) {
@@ -473,7 +473,7 @@ export function SettingsPageContent() {
     <PageContainer>
       <PageHeader
         title="Settings"
-        description="Appearance, project, Copilot, account and API tokens"
+        description="Appearance, project, Agent, account and API tokens"
       />
       <div className="w-full gap-8">
         <div className="tabs tabs-boxed mb-4 sm:mb-6 w-full sm:w-fit overflow-x-auto flex-nowrap">
@@ -490,10 +490,10 @@ export function SettingsPageContent() {
             Project
           </a>
           <a
-            className={`tab ${activeTab === "copilot" ? "tab-active" : ""}`}
-            onClick={() => setActiveTab("copilot")}
+            className={`tab ${activeTab === "agent" ? "tab-active" : ""}`}
+            onClick={() => setActiveTab("agent")}
           >
-            Copilot
+            Agent
           </a>
           <a
             className={`tab ${activeTab === "account" ? "tab-active" : ""}`}
@@ -513,8 +513,8 @@ export function SettingsPageContent() {
             <AppearanceSettingsPanel />
           ) : activeTab === "project" ? (
             <ProjectMembersPanel />
-          ) : activeTab === "copilot" ? (
-            <CopilotSettingsPanel />
+          ) : activeTab === "agent" ? (
+            <AgentSettingsPanel />
           ) : activeTab === "account" ? (
             <div className="space-y-4" key="account">
               {user?.must_change_password && (

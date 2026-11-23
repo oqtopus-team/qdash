@@ -242,7 +242,7 @@ deleted with it.
 ### Thinking and Your Own Instructions
 
 The model picker under the message box names the model your next message goes to; the default
-is marked **default**. Choose another model there or in **Settings → Copilot → Default chat
+is marked **default**. Choose another model there or in **Settings → Agent → Default chat
 model**; the two stay in step and your browser remembers the choice. The picker cannot be opened
 while an answer is streaming, or when the deployment offers only one chat model. The list of
 models comes from the deployment and is refreshed when you open a chat or **Settings**, or
@@ -255,14 +255,14 @@ applies from the next message and is remembered in your browser. A model that al
 such as Claude Opus 5.5, cannot turn it off: its menu omits **Off**. A previously saved
 **Off** choice displays and runs as **Low** for that model.
 
-**Settings → Copilot → Your instructions** holds instructions added to every chat you start, after
+**Settings → Agent → Your instructions** holds instructions added to every chat you start, after
 QDash's own rules: language, tone, and formats such as "answer in Japanese, conclusion first" or
 "put numbers in a table with units". They are stored with your account, so they follow you across
 devices. They do not apply to AI evaluations or forum replies, which stay the same for everyone,
 and they cannot skip the approval of write operations. A **Your instructions** link in the chat
 composer shows when they are on.
 
-**What Copilot is told** shows the current system prompt, your appended instructions, and
+**What Agent is told** shows the current system prompt, your appended instructions, and
 available tools. The application-owned text is read-only; change it in the deployment.
 
 ## Investigate a Failure
@@ -361,7 +361,7 @@ was never admitted, so if it appears later it is rejected and cannot run anythin
 session marked **Not admitted yet** cannot run anything until its start completes. When a
 session holds more than 100 pipeline runs or agent sessions, its page lists the latest 100
 and says how many there are; closing still checks all of them.
-How this works: [Calibration Sessions](../developer-guide/copilot/calibration-sessions.md).
+How this works: [Calibration Sessions](../developer-guide/agent/calibration-sessions.md).
 
 ## Ask Agent About a Task Result {#ask-ai-about-a-task-result}
 
@@ -370,7 +370,7 @@ before anything starts:
 
 - **Evaluate the figure** creates a recorded evaluation with the settings described in
   [AI Evaluations](./ai-evaluations.md).
-- **Chat with Copilot** opens a chat with that result and its figures as context.
+- **Chat with Agent** opens a chat with that result and its figures as context.
 
 Viewers without edit rights go straight to the chat. When the question depends on the chip,
 metric, target direction, or time range, state the intended comparison explicitly.

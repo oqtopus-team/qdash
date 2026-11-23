@@ -83,7 +83,7 @@ HTTP boundary; remove an override after the test.
 protected and assign their tag and optional prefix. Protected routers receive the active-user
 dependency automatically.
 
-A domain can expose separate public and protected `APIRouter` objects, as Copilot and Forum do.
+A domain can expose separate public and protected `APIRouter` objects, as Agent and Forum do.
 Register each object with the intended policy instead of making an entire domain public for one
 unauthenticated endpoint.
 

@@ -12,7 +12,7 @@ vi.mock("@/components/features/chat/ChatPlotlyChart", () => ({
   },
 }));
 
-vi.mock("@/hooks/useCopilotChat", () => ({ answerFeedback: () => null }));
+vi.mock("@/hooks/useAgentChat", () => ({ answerFeedback: () => null }));
 
 afterEach(cleanup);
 

@@ -12,7 +12,7 @@ import {
   Terminal,
   Wrench,
 } from "lucide-react";
-import type { TraceStep } from "@/types/copilotChat";
+import type { TraceStep } from "@/types/agentChat";
 import { CodeBlock } from "@/components/features/chat/CodeBlock";
 
 /**

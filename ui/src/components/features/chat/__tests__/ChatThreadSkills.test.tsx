@@ -3,9 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ChatThread } from "../ChatThread";
 
 const { send } = vi.hoisted(() => ({ send: vi.fn() }));
-vi.mock("@/client/copilot/copilot", () => ({
-  useGetCopilotPreferences: () => ({ data: undefined }),
-  useListCopilotSkills: () => ({
+vi.mock("@/client/agent/agent", () => ({
+  useGetAgentPreferences: () => ({ data: undefined }),
+  useListAgentSkills: () => ({
     data: {
       data: {
         skills: [
@@ -16,8 +16,8 @@ vi.mock("@/client/copilot/copilot", () => ({
     },
   }),
 }));
-vi.mock("@/hooks/useCopilotChat", () => ({
-  useCopilotChat: () => ({
+vi.mock("@/hooks/useAgentChat", () => ({
+  useAgentChat: () => ({
     session: { id: "s1", context: null },
     messages: [],
     isLoadingMessages: false,

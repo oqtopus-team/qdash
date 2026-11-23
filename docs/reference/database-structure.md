@@ -27,6 +27,9 @@ Related model layers serve different contracts:
 | `project` | `ProjectDocument` | `project.py` |
 | `project_membership` | `ProjectMembershipDocument` | `project_membership.py` |
 
+`UserDocument.agent_instructions`, a user's own Agent instructions, is stored in the
+`copilot_instructions` field, its name before the Copilot to Agent rename.
+
 ## Calibration and Hardware
 
 | Collection | Document | Module |
@@ -79,12 +82,16 @@ runtime lifecycle, reservations, and terminal state handling.
 | `forum_counter` | `ForumCounterDocument` | `forum.py` |
 | `slack_forum_thread` | `SlackForumThreadDocument` | `slack_forum_thread.py` |
 | `notification` | `NotificationDocument` | `notification.py` |
-| `copilot_chat_session` | `CopilotChatSessionDocument` | `copilot_chat_session.py` |
-| `copilot_chat_turn` | `CopilotChatTurnDocument` (insert-once, one per user, session, and request ID) | `copilot_chat_turn.py` |
+| `copilot_chat_session` | `AgentChatSessionDocument` | `agent_chat_session.py` |
+| `copilot_chat_turn` | `AgentChatTurnDocument` (insert-once, one per user, session, and request ID) | `agent_chat_turn.py` |
 | `dashboard` | `DashboardDocument` | `dashboard.py` |
 | `metric_script` | `MetricScriptDocument` | `metric_script.py` |
-| `copilot_store_teardown` | None (raw collection, one lease per owner and store) | `api/services/copilot_chat_session_service.py` |
-| `copilot_store_generation` | None (raw collection, the current generation per owner and store) | `api/services/copilot_chat_session_service.py` |
+| `copilot_store_teardown` | None (raw collection, one lease per owner and store) | `api/services/agent_chat_session_service.py` |
+| `copilot_store_generation` | None (raw collection, the current generation per owner and store) | `api/services/agent_chat_session_service.py` |
+
+The four `copilot_*` collections and the `copilot_chat_turn_unique_idx` index keep the names they
+had before the chat was renamed from Copilot to Agent, so existing chats, turn records, and store
+leases stay readable without a data migration.
 
 [Notes Architecture](../developer-guide/architecture/notes.md) explains current-state notes and
 their audit events.
@@ -124,7 +131,7 @@ and the `calibration_reservation_id` the admission rests on; older documents hav
 `reported_origin` when one was reported, and a `pipeline_launches` document keeps the same
 report for any dispatched pipeline, keyed by `(project_id, flow_run_id)`; both are client
 reported and never verified.
-[Calibration Sessions](../developer-guide/copilot/calibration-sessions.md) explains these
+[Calibration Sessions](../developer-guide/agent/calibration-sessions.md) explains these
 collections.
 
 [Provenance Architecture](../developer-guide/architecture/provenance.md) explains version,

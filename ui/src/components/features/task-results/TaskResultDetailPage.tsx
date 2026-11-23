@@ -24,7 +24,7 @@ import { ParametersTable } from "@/components/features/metrics/ParametersTable";
 import { TaskResultMemo } from "@/components/features/metrics/TaskResultMemo";
 import { TaskMessagePanel } from "@/components/ui/TaskMessagePanel";
 import { InvestigateWithAiButton } from "@/components/features/chat/InvestigateWithAiButton";
-import { failedTaskInvestigation } from "@/lib/copilotInvestigation";
+import { failedTaskInvestigation } from "@/lib/agentInvestigation";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { formatDateTime, formatRelativeTime } from "@/lib/utils/datetime";
 import { QubitTile } from "@/components/ui/QubitTile";

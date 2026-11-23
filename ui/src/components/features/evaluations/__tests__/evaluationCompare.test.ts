@@ -187,7 +187,7 @@ describe("evaluationCompare", () => {
       b: "In-context requested · 0/2 used",
       differs: true,
     });
-    expect(byKey.mode).toMatchObject({ a: "Fixed prompt", b: "Via Copilot", differs: true });
+    expect(byKey.mode).toMatchObject({ a: "Fixed prompt", b: "Via Agent", differs: true });
     expect(byKey.planner).toMatchObject({
       a: "-",
       b: "openai-compatible/qwen3.8-flash-next",

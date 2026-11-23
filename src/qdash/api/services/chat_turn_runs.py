@@ -4,7 +4,7 @@ A chat request starts the turn's stream in a background task (``TurnRun``) and
 the HTTP response only subscribes to it. Closing the response, or every window,
 ends the subscription, never the stream: the task reads the turn to its end,
 records its progress and its end in the chat session (``chat_transcript`` and
-``copilot_chat_session_service``), and then reports ``transcript``. A request
+``agent_chat_session_service``), and then reports ``transcript``. A request
 for the same turn (a retry, or a reattach) on the same API process subscribes
 to the running task instead of opening a second stream; on another process it
 opens its own, which records the same turn idempotently. A stream to the runtime
@@ -24,19 +24,19 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal
 
 from qdash.api.lib.sse import sse_event
-from qdash.api.services import copilot_chat_session_service as sessions
+from qdash.api.services import agent_chat_session_service as sessions
 from qdash.api.services.chat_transcript import TurnTranscript
 from qdash.api.services.pi_chat_service import (
     STREAM_LOST,
     TURN_BOUNDARY_UNKNOWN,
     parse_sse,
 )
-from qdash.dbmodel.copilot_chat_session import CopilotChatMessage
+from qdash.dbmodel.agent_chat_session import AgentChatMessage
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Awaitable, Callable
 
-    from qdash.copilot.contracts import ChatRequest
+    from qdash.agent.contracts import ChatRequest
 
 logger = logging.getLogger(__name__)
 
@@ -126,12 +126,12 @@ def note_stop(username: str, session_id: str, turn_request_id: str | None) -> No
             run.stop_requested = True
 
 
-def user_message_of(request: ChatRequest, request_id: str) -> CopilotChatMessage | None:
+def user_message_of(request: ChatRequest, request_id: str) -> AgentChatMessage | None:
     """The turn's own message as the chat stores it; None for a continue."""
     if request.continue_run:
         return None
     attached = bool(request.images) or request.task is not None or request.investigation is not None
-    return CopilotChatMessage(
+    return AgentChatMessage(
         role="user",
         content=request.message,
         attached_image="1" if attached else None,
@@ -139,7 +139,7 @@ def user_message_of(request: ChatRequest, request_id: str) -> CopilotChatMessage
     )
 
 
-def _message_json(message: CopilotChatMessage) -> dict[str, Any]:
+def _message_json(message: AgentChatMessage) -> dict[str, Any]:
     """A stored message as the session API returns it."""
     return {
         "role": message.role,
@@ -159,12 +159,12 @@ class _Recorder:
         self.username = username
         self.session_id = session_id
         self.request_id = request_id
-        self._pending: list[CopilotChatMessage] | None = None
+        self._pending: list[AgentChatMessage] | None = None
         self._writer: asyncio.Task[None] | None = None
         self._last = 0.0
         self.gone = False
 
-    async def _write(self, run: list[CopilotChatMessage], **end: Any) -> sessions.TurnWrite:
+    async def _write(self, run: list[AgentChatMessage], **end: Any) -> sessions.TurnWrite:
         return await asyncio.to_thread(
             sessions.write_turn, self.username, self.session_id, self.request_id, run, **end
         )
@@ -235,7 +235,7 @@ async def _claim(
     project_id: str | None,
     request_id: str,
     turn_running: Callable[[], Awaitable[bool | None]] | None,
-) -> tuple[sessions.ClaimOutcome | Literal["unknown"], CopilotChatMessage | None]:
+) -> tuple[sessions.ClaimOutcome | Literal["unknown"], AgentChatMessage | None]:
     """Record the turn's start, waiting briefly for a save of it still on its way.
 
     A recorded turn still marked running blocks the claim while it runs here or in

@@ -2,7 +2,7 @@
 
 import { useMemo, useSyncExternalStore } from "react";
 
-import { useGetCopilotConfig } from "@/client/copilot/copilot";
+import { useGetAgentConfig } from "@/client/agent/agent";
 import {
   levelOfEffort,
   thinkingChoiceStore,
@@ -15,7 +15,7 @@ import {
   chatModelIdentityOfKey,
   resolveChatModelOption,
   type ModelOption,
-} from "@/lib/copilotModels";
+} from "@/lib/agentModels";
 import type { StoredChoice } from "@/lib/storedChoice";
 
 export type ChatModelListStatus = "loading" | "error" | "ready";
@@ -51,7 +51,7 @@ function useStoredChoice<T extends string>(store: StoredChoice<T>): T {
  * back to the configured default instead of being sent.
  */
 export function useChatModelSelection(): ChatModelSelection {
-  const { data, isError } = useGetCopilotConfig({
+  const { data, isError } = useGetAgentConfig({
     query: {
       staleTime: 0,
       refetchOnMount: "always",

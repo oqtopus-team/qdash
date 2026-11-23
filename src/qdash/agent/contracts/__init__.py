@@ -1,0 +1,41 @@
+"""Shared request/response models for Agent APIs and workflows."""
+
+from qdash.agent.contracts.models import (
+    ChatActiveRequest,
+    ChatActiveResponse,
+    ChatRequest,
+    ChatSteerRequest,
+    ChatSteerResponse,
+    ChatSteerStatusRequest,
+    ChatStopRequest,
+    ChatStopResponse,
+    ChatTurnStart,
+    DashboardEditorContext,
+    FlowEditorContext,
+    InvestigationTarget,
+    MetricScriptEditorContext,
+    PageContext,
+    TaskChatTarget,
+    TaskContext,
+    TaskContextBundle,
+)
+
+__all__ = [
+    "ChatActiveRequest",
+    "ChatActiveResponse",
+    "ChatRequest",
+    "ChatSteerRequest",
+    "ChatSteerResponse",
+    "ChatSteerStatusRequest",
+    "ChatStopRequest",
+    "ChatStopResponse",
+    "ChatTurnStart",
+    "DashboardEditorContext",
+    "FlowEditorContext",
+    "InvestigationTarget",
+    "MetricScriptEditorContext",
+    "PageContext",
+    "TaskChatTarget",
+    "TaskContext",
+    "TaskContextBundle",
+]

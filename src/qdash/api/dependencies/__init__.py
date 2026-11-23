@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from qdash.api.services.flow_schedule_service import FlowScheduleService
     from qdash.api.services.flow_service import FlowService
 
+from qdash.agent.runtime import AgentRuntime
 from qdash.api.dependencies.cache import (
     cached_dependency_provider,
 )
@@ -20,7 +21,9 @@ from qdash.api.dependencies.cache import (
     clear_dependency_caches as _clear_dependency_caches,
 )
 from qdash.api.services.admin_service import AdminService
+from qdash.api.services.agent_chat_session_service import AgentChatSessionService
 from qdash.api.services.agent_intervention_service import AgentInterventionService
+from qdash.api.services.agent_investigation_service import AgentInvestigationService
 from qdash.api.services.agent_session_audit import AgentSessionAuditService
 from qdash.api.services.agent_session_service import AgentSessionService
 from qdash.api.services.auth_service import AuthService
@@ -29,8 +32,6 @@ from qdash.api.services.chip import ChipConfigScaffolder, ChipService
 from qdash.api.services.config_service import ConfigService
 from qdash.api.services.cooldown_service import CooldownService
 from qdash.api.services.cooldown_wiring_event_service import CooldownWiringEventService
-from qdash.api.services.copilot_chat_session_service import CopilotChatSessionService
-from qdash.api.services.copilot_investigation_service import CopilotInvestigationService
 from qdash.api.services.cryostat_service import CryostatService
 from qdash.api.services.dashboard_service import DashboardService
 from qdash.api.services.device_topology_service import DeviceTopologyService
@@ -55,7 +56,6 @@ from qdash.api.services.task_file_service import TaskFileService
 from qdash.api.services.task_result_service import TaskResultService
 from qdash.api.services.task_service import TaskService
 from qdash.api.services.user_avatar_service import UserAvatarService
-from qdash.copilot.runtime import CopilotRuntime
 from qdash.repository import (
     MongoChipRepository,
     MongoExecutionCounterRepository,
@@ -409,21 +409,21 @@ def get_slack_notification_service() -> SlackNotificationService:
 
 
 @cached_dependency_provider
-def get_copilot_runtime() -> CopilotRuntime:
-    """Get the copilot runtime instance."""
-    return CopilotRuntime()
+def get_agent_runtime() -> AgentRuntime:
+    """Get the agent runtime instance."""
+    return AgentRuntime()
 
 
 @cached_dependency_provider
 def get_source_access_service() -> SourceAccessService:
-    """Get the read-only source access service for Copilot investigations."""
+    """Get the read-only source access service for Agent investigations."""
     return SourceAccessService()
 
 
 @cached_dependency_provider
-def get_copilot_investigation_service() -> CopilotInvestigationService:
+def get_agent_investigation_service() -> AgentInvestigationService:
     """Get the service that opens a chat investigating a failed execution."""
-    return CopilotInvestigationService(
+    return AgentInvestigationService(
         execution_service=get_execution_service(),
         task_service=get_task_service(),
         source_service=get_source_access_service(),
@@ -463,9 +463,9 @@ def get_notification_service() -> NotificationService:
 
 
 @cached_dependency_provider
-def get_copilot_chat_session_service() -> CopilotChatSessionService:
-    """Get the copilot chat session service instance."""
-    return CopilotChatSessionService()
+def get_agent_chat_session_service() -> AgentChatSessionService:
+    """Get the agent chat session service instance."""
+    return AgentChatSessionService()
 
 
 @cached_dependency_provider

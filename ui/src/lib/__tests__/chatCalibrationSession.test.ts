@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { endTool, startTool, toPersistedTrace } from "@/lib/copilotChatStream";
+import { endTool, startTool, toPersistedTrace } from "@/lib/agentChatStream";
 import {
   calibrationSessionHref,
   dispatchStatusStyle,
   linkedCalibrationSessions,
 } from "@/lib/chatCalibrationSession";
-import type { ChatMessage, TraceStep } from "@/types/copilotChat";
+import type { ChatMessage, TraceStep } from "@/types/agentChat";
 
 const tool = (
   name: string,

@@ -2,7 +2,7 @@ import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ChatNotifier, chatToastId } from "@/components/features/chat/ChatNotifier";
-import type { ChatTurnEvent } from "@/types/copilotChat";
+import type { ChatTurnEvent } from "@/types/agentChat";
 
 const state = vi.hoisted(() => ({
   listeners: new Set<(event: ChatTurnEvent) => void>(),
@@ -19,8 +19,8 @@ const state = vi.hoisted(() => ({
 }));
 
 vi.mock("next/navigation", () => ({ usePathname: () => state.pathname }));
-vi.mock("@/contexts/CopilotChatSessionContext", () => ({
-  useCopilotChatSessionContext: () => ({
+vi.mock("@/contexts/AgentChatSessionContext", () => ({
+  useAgentChatSessionContext: () => ({
     subscribeChatEvents: (listener: (event: ChatTurnEvent) => void) => {
       state.listeners.add(listener);
       return () => state.listeners.delete(listener);

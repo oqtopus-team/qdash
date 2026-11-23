@@ -5,7 +5,7 @@ import {
   linkedAgentSessions,
   type AgentActionState,
 } from "@/lib/chatAgentSession";
-import type { ChatMessage, TraceStep } from "@/types/copilotChat";
+import type { ChatMessage, TraceStep } from "@/types/agentChat";
 
 const tool = (
   name: string,

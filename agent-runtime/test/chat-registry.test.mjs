@@ -10,7 +10,7 @@ import { Type } from "typebox";
 
 import { askUserTool } from "../src/ask-tool.ts";
 import { chartTool } from "../src/chart-tool.ts";
-import { buildChatRegistry, buildCopilotExtension } from "../src/chat-registry.ts";
+import { buildChatRegistry, buildAgentExtension } from "../src/chat-registry.ts";
 import {
   CODEMODE_TOOL_NAME,
   createCodemodeSandbox,
@@ -144,7 +144,7 @@ function productionRegistry(piExtensions) {
       modelRuntime,
       workDir: "/tmp/work",
       extensionPaths: [LOCAL],
-      copilot: buildCopilotExtension("QDash test prompt", [
+      agent: buildAgentExtension("QDash test prompt", [
         chartTool,
         uiTool,
         ...buildPresentationTools(presentationConfig),
@@ -258,7 +258,7 @@ test("the edit tool comes with an editor or an editable dashboard and is model-o
     modelRuntime,
     workDir: "/tmp/work",
     extensionPaths: [LOCAL],
-    copilot: buildCopilotExtension("QDash test prompt", []),
+    agent: buildAgentExtension("QDash test prompt", []),
     internalCalls: PRESENTATION_INTERNAL_CALLS,
   };
   const editTool = (page) => {
@@ -297,7 +297,7 @@ test("the policy hook blocks the classifier for any parent but a running present
   // Code Mode without QDash's script filter: only the hook stands between a script and the classifier.
   const sandbox = createCodemodeSandbox();
   const registry = createRegistry();
-  registry.install(defineExtension({ name: "copilot", tools: [present, classify, impostor] }));
+  registry.install(defineExtension({ name: "agent", tools: [present, classify, impostor] }));
   registry.install(createCodemodeExtension({ sandbox, models: false }));
   registry.install(toolPolicyExtension({ nestedTools: [], deferredTools: [], internalCalls: PRESENTATION_INTERNAL_CALLS }));
   const code = "try { await tools.qdash_presentation_classify({ state: {} }); text('ran'); } catch (e) { text('blocked: ' + e.message); }";

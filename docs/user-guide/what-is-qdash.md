@@ -40,7 +40,7 @@ explains this boundary.
 ## Ways to Work
 
 Use the web application for interactive operation and investigation. The generated Python and
-TypeScript clients provide the same API for scripts, notebooks, and integrations. Copilot can
+TypeScript clients provide the same API for scripts, notebooks, and integrations. Agent can
 help explore project data, but the operator remains responsible for checking evidence and making
 hardware decisions.
 
