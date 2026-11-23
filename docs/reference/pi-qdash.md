@@ -17,7 +17,7 @@ Start `pi`, then run `/qdash-setup <profile> <chip_id>` with your saved profile 
 QDash web Agent includes the extension already.
 
 `qdash_config_info` shows non-secret connection settings. Use
-[client profiles](./clients/python.md#connect-to-a-deployment) for credentials.
+[client profiles](./clients/typescript.md#connect-to-a-deployment) for credentials.
 Set `QDASH_WEB_URL` if the web UI is not the API base URL without `/api`.
 
 ## Read-only query tools

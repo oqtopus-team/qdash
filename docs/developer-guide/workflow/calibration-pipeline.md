@@ -62,8 +62,9 @@ Unavailable task catalogs or unsupported Qubex topology fail validation rather t
 | Two-qubit calibration | `TwoQubitCalibration`, `CustomTwoQubit` |
 
 Use the catalog for current default tasks and dependencies. Calibration steps need unique IDs;
-custom steps use `step_name`. `ConfigureAll.call` sets its task settings, while target-derived
-MUX IDs take priority. Top-level `task_parameters` remains accepted with a deprecation warning;
+custom steps use `step_name`. `ConfigureAll` uses step-level `mux_ids` when set, otherwise
+target-derived MUX IDs; either overrides `call.run.mux_ids`. Other task settings come from `call`.
+Top-level `task_parameters` remains accepted with a deprecation warning;
 [migrate settings to calls](./task-calls.md#migrate-per-task-defaults).
 
 ### Execution Modes

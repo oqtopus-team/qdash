@@ -35,7 +35,11 @@ Resolve conflicting local changes before deploying.
 | Compose without bundled tunnel | `task deploy-local` |
 | Compose with configured tunnel | `task deploy` |
 
-These also update configured knowledge. Without Go Task, use `docker compose up -d --build`,
+Both commands run `task knowledge-pull`, which resets local knowledge to `origin/main` and may
+delete and reclone the checkout on failure. Before deploying, merge knowledge changes upstream
+or copy them outside `config/task-knowledge`.
+
+Without Go Task, use `docker compose up -d --build`,
 retaining your deployment's Compose files and profiles; this does not update knowledge or
 add the tunnel profile.
 

@@ -18,7 +18,8 @@ Stable versions follow QDash releases. Use `pip install --pre qdash-sdk` for a p
 <a id="configuration"></a>
 
 1. Copy your token from **Settings → API Token**. The displayed curl example includes the project ID.
-2. Save a profile, keeping the `/api` suffix in the base URL:
+2. Save a profile. Replace `localhost:5714` with your deployment host and UI port, or its public
+   URL, keeping the `/api` suffix:
 
    ```python
    from getpass import getpass

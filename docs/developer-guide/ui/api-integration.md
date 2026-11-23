@@ -17,11 +17,12 @@ under `response.data`:
 import { useListChips } from "@/client/chip/chip";
 
 export function useChipList() {
-  const { data: response } = useListChips({ query: { staleTime: 30_000 } });
-  return response?.data.chips ?? [];
+  const query = useListChips({ query: { staleTime: 30_000 } });
+  return { ...query, chips: query.data?.data.chips ?? [] };
 }
 ```
 
+Check `isPending` and `isError` before displaying an empty chip list.
 Pass query options through `query`. Use `enabled` while required inputs are missing, rather than
 sending placeholder IDs.
 

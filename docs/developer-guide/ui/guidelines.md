@@ -82,7 +82,8 @@ Narrow `unknown` at external boundaries; avoid `any`, blanket assertions, and du
 
 ## Run the Development Loop
 
-Use Bun in `ui/`. Start with `task dev-local-setup` and `task dev-local` from the repository root.
+Complete [Developer Setup](../setup.md), including `.env` and the MongoDB version, before
+`task dev-local-setup` and `task dev-local`. Use Bun in `ui/`.
 Follow [UI Testing](./testing.md) for checks.
 
 ## Regenerate the API Client

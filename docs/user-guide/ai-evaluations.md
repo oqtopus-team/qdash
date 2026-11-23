@@ -28,7 +28,8 @@ or cancelled items without repeating completed ones, using the same model.
 ## Try a Knowledge Change Before Proposing It
 
 1. On **Knowledge**, select **Download zip** for the task.
-2. Edit `task.md` and `examples/`, preserving required headings and identity fields, then zip them.
+2. Edit `task.md` and `examples/`, preserving required headings and identity fields. Zip them at
+   the archive root, or inside one folder named after the task; preserve the downloaded layout.
 3. Start an evaluation and upload the zip under **Knowledge**.
 4. Review warnings and confirm. Drafts use **Fixed prompt**.
 5. Compare with a run using shared knowledge before proposing a repository change.

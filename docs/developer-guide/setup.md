@@ -13,6 +13,18 @@ cd qdash
 
 For a deployed system rather than a development environment, follow [Setup](../user-guide/setup.md).
 
+## Prepare the Environment
+
+Before starting a DevContainer or development services, follow only [Create the Environment File](../user-guide/setup.md#create-the-environment-file)
+and [Configure Shared Deployment Settings](../user-guide/setup.md#configure-shared-deployment-settings).
+Choose Fake for a first local start and set the administrator password. Skip the operator guide's
+clone and production-start commands; start the development stack below instead.
+For existing data, keep the MongoDB version that wrote it; follow
+[System Updates](../user-guide/system-updates.md) before changing it.
+
+Create `.env` on the host first so the DevContainer and services share the same `ENV` network.
+If you already started the container with a different `ENV`, recreate it after configuring `.env`.
+
 ## Nix Host Shell
 
 Install Nix with `nix-command` and `flakes` enabled, then enter the shell:
@@ -34,6 +46,9 @@ LOCAL_UID=$(id -u) LOCAL_GID=$(id -g) docker compose -f compose.devcontainer.yam
 docker compose -f compose.devcontainer.yaml exec --user vscode devcontainer zsh
 ```
 
+After manual startup, run `qdash-post-start` inside the container to fix volume ownership and
+create the host-workspace link. VS Code runs this automatically.
+
 Use `/workspace/qdash` for development. Its host parent is available at `/workspace/repos`.
 To share another directory, create it and export its absolute path as `QDASH_SHARED_REPOS_DIR`
 before starting the container. The preflight check requires it to exist and be writable.
@@ -42,8 +57,9 @@ The checkout is shared; Python dependencies, caches, and UI build output use sep
 volumes. Recreate the container after mount changes. Run development and Git commands as `vscode`;
 set Git identity and authenticate inside the container because host credentials are not copied.
 
-For direct Docker Compose commands inside the container, use the host checkout path in
-`QDASH_HOST_WORKSPACE`: the Docker daemon resolves bind mounts on the host.
+Inside the container, run `cd "$QDASH_HOST_WORKSPACE"` before Docker Compose commands or
+Compose-backed tasks such as `task dev-local`, `task dev-services`, and `task dev-local-down`.
+The Docker daemon resolves their bind mounts on the host.
 
 <a id="refresh-dependencies"></a>
 
@@ -67,12 +83,7 @@ For documentation work, also run `bun install --cwd docs --frozen-lockfile`, the
 
 ## Run the Development Stack
 
-In this checkout, follow only [Create the Environment File](../user-guide/setup.md#create-the-environment-file)
-and [Configure Shared Deployment Settings](../user-guide/setup.md#configure-shared-deployment-settings).
-Choose Fake for a first local start and set the administrator password. Skip the operator guide's
-clone and production-start commands; start the development stack below instead.
-For existing data, keep the MongoDB version that wrote it; follow
-[System Updates](../user-guide/system-updates.md) before changing it.
+From the host checkout, or `$QDASH_HOST_WORKSPACE` inside the DevContainer:
 
 ```bash
 task dev-local

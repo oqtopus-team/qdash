@@ -17,8 +17,18 @@ Stable versions follow QDash releases. Append `@beta` for a prerelease.
 
 <a id="configuration"></a>
 
-Use the [shared profile or environment settings](./python.md#connect-to-a-deployment), including
-`QDASH_BASE_URL` with `/api`, `QDASH_API_TOKEN`, and `QDASH_PROJECT_ID`.
+Copy your token and project ID from **Settings → API Token**. Set `QDASH_BASE_URL` to the
+deployment URL ending in `/api`, plus `QDASH_API_TOKEN` and `QDASH_PROJECT_ID` in your environment.
+Save a profile with the installed client (no Python required):
+
+```ts
+import { QDashConfig } from "@oqtopus-team/qdash-client";
+
+await QDashConfig.fromEnv().save("local");
+```
+
+Profiles use `$XDG_CONFIG_HOME/qdash/config.ini`, or `~/.config/qdash/config.ini`, shared with the
+Python client and pi-qdash. `save()` writes owner-only permissions. Connect with that profile:
 
 ```ts
 import { QDashClient } from "@oqtopus-team/qdash-client";
@@ -113,8 +123,8 @@ its **Flow Name**. Reuse the `qdash` session above and choose targets supported 
 
 ```ts
 const workflow = await qdash.workflows.get("coherence_check");
-const run = await workflow.run({ parameters: { qids: ["0", "1"] } });
-console.log((await run.wait()).status);
+const workflowRun = await workflow.run({ parameters: { qids: ["0", "1"] } });
+console.log((await workflowRun.wait()).status);
 ```
 
 `qdash.workflows.list()` lists saved workflows. Parameters override saved defaults for this run

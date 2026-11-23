@@ -51,8 +51,9 @@ To edit the generated files on **Config**:
 3. Check the saved changes before running hardware. When using a configuration repository,
    select **Create PR** and follow its link to review and merge the changes.
 
-**Save** changes the deployment's local files; it does not publish them. **Pull** updates from
-the repository and can overwrite unsaved edits, so save or discard those edits first.
+**Save** changes local files only. **Pull** resets them to the repository's `main` branch and removes
+untracked files, including saved local work. Before pulling, merge your **Create PR** changes or
+copy them outside the deployment's configuration directory.
 
 ## Check Parallel Execution on QuEL-3
 

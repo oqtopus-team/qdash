@@ -19,7 +19,8 @@ A measured output becomes a later task's input only when it is accepted and publ
 | Validated, measurement-only | Recorded | Unchanged | Unchanged by publication |
 | Rejected | Diagnostics retained, rejected outputs cleared | Unchanged | Unchanged by publication |
 
-`database_updated` describes the current MongoDB value, not history persistence or file export.
+`database_updated` records whether this output was written to MongoDB. A later result may replace
+it; the flag does not describe the current value, history persistence, or file export.
 Missing metadata on older results means the update status is unknown. MongoDB is written before
 Qubex synchronization; a synchronization failure does not roll it back.
 

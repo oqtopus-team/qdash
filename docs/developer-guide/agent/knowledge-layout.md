@@ -5,7 +5,7 @@ use the same calibration knowledge.
 
 | Content | Source |
 | --- | --- |
-| Task background and labeled examples | `config/task-knowledge`, a checkout of the task-knowledge repository |
+| Task background and labeled examples | `config/task-knowledge`, a checkout of the [task-knowledge repository](https://github.com/qiqb-osaka/qdash-task-knowledge) |
 | Tools, routing, and calibration procedures | `packages/pi-qdash/extensions/` and `packages/pi-qdash/skills/` |
 | Web chat behavior and host context | `agent-runtime/src/prompt.ts` |
 
@@ -21,9 +21,13 @@ use the same calibration knowledge.
 
 ## Change knowledge
 
-Propose task edits in the task-knowledge repository, then update the deployment with
-`task knowledge-pull`. Test a draft through [AI Evaluations](../../user-guide/ai-evaluations.md)
-before replacing shared knowledge.
+Test a draft through [AI Evaluations](../../user-guide/ai-evaluations.md), then propose and merge
+changes into the knowledge repository's `main` branch. Configure
+[repository access](../../user-guide/setup/ai.md#apply-ai-changes), then run `task knowledge-pull`.
+Without `KNOWLEDGE_REPO_URL`, the command skips the update.
+
+Before pulling, copy any local work outside `config/task-knowledge`. The command resets tracked
+files to `origin/main`, discarding local edits; a failed fetch or reset deletes and reclones the checkout.
 
 For tool procedures, edit the bundled skill, run `task ci-pi-packages` and
 `task ci-agent-runtime`, and rebuild the runtime. Sessions record skill name, version, and hash.

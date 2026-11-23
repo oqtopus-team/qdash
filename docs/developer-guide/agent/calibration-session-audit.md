@@ -12,8 +12,9 @@ Late evidence invalidates an old snapshot instead of silently disappearing from 
 ## Decisions
 
 Only the session creator, with editor rights, can append a decision. Decisions remain append-only
-even after the session closes and change no session state. Evidence must belong to the session;
-the record freezes what QDash knew when the decision was made.
+even after the session closes and change no session state. Referenced runs and decisions must
+belong to that session. Task results may come from another session in the same project and chip;
+when an experiment is specified, its target must also match. The record freezes the evidence.
 
 ## Intent before execution
 

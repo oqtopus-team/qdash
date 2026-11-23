@@ -1,7 +1,7 @@
 # Calibration Provenance
 
-Provenance records which accepted parameter versions a task used and produced. Task history
-keeps measurements; provenance versions values actually published to the calibration database.
+Provenance links tasks to published parameter versions. Task history keeps measurements and
+effective inputs; provenance versions values published to the calibration database.
 
 ## Model the Lineage Graph
 
@@ -13,7 +13,7 @@ keeps measurements; provenance versions values actually published to the calibra
 | `wasGeneratedBy` | Output version → activity |
 | `wasDerivedFrom` | Output version → input version |
 
-<Diagram name="provenance-lineage" caption="A task links its accepted outputs to the exact input versions it used." />
+<Diagram name="provenance-lineage" caption="A task links published outputs to recorded input entities." />
 
 Use the model's ID generators for entities and activities; all writers must share their format.
 
@@ -23,6 +23,9 @@ The task recorder saves history first, then records provenance when enabled. It 
 input entities, creates versions only for successfully written output destinations, and links
 them to the activity and inputs. New versions close the previous current version; a unique index
 protects version numbers.
+
+Input lookup uses parameter name and target without comparing the effective value. An override
+can therefore differ from the linked entity; use task history to inspect actual inputs.
 
 Measurement-only output creates no current provenance entity. Recording failures are logged
 without turning a successful measurement into a failure, so a missing edge is not proof that
@@ -36,9 +39,9 @@ inferred task-name relationships. See [OpenAPI](../../reference/openapi.md) for 
 
 ## Extend Provenance Recording
 
-Create an activity and versions only after calibration updates succeed. Add dependency edges only
-when the exact input entity is known. Preserve project, chip, target, execution, and task identity
-throughout the graph; never infer a version solely from its parameter name.
+Create an activity and versions only after calibration updates succeed. Preserve project, chip, target,
+execution, and task identity throughout the graph. Do not treat current input links as proof
+that the linked value was used; exact lineage would also require effective-value matching.
 
 ## Implementation Files
 

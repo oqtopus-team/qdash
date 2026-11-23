@@ -3,7 +3,9 @@
 Use `execution_mode="manual"` when you need exact target groups and order. Each target runs its
 whole task list; the next round waits for all targets in the current round.
 Start with [Creating Workflows](./creating-workflows.md) to open and save a flow, then replace
-its step with the example you need below. Use qubit IDs and couplings from your chip.
+its step and targets with the example you need below. Set `qids` to the qubits in the rounds
+and remove any MUX selection, or replace the target construction with `QubitTargets` as shown.
+Use qubit IDs and couplings from your chip.
 
 ## Write One-Qubit Rounds
 

@@ -18,10 +18,12 @@ Use `--help` on the CLI tools below for options.
 ## Plot a Schedule
 
 ```bash
-uv run python src/tools/cr_scheduler_visualizer.py --chip-id 64Qv3 --use-plugins
+uv run python src/tools/cr_scheduler_visualizer.py --chip-id 144Qv2 --use-plugins
 ```
 
-Results go to a timestamped directory under `.tmp/`.
+Results go to a timestamped directory under `.tmp/`. The visualizer uses a fixed 144-qubit layout;
+replace the chip ID with a matching deployment. Plugin mode uses a hard-coded candidate subset,
+even when `--candidate-qubits` is supplied, so its output does not cover the whole chip.
 
 ## Read Task Results
 

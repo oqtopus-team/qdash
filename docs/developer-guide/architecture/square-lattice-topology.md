@@ -24,8 +24,9 @@ member qubits; that order selects control-port slots in `wiring.yaml`. Use
 `src/qdash/common/mux_mapping.py` everywhere instead of repeating arithmetic.
 
 A known qubit absent from every MUX is standalone. An unknown qubit is invalid. A declared topology
-that cannot load raises `MuxMappingError`; do not schedule from a guessed layout. Only chips
-without topology retain the legacy MUX `qid // 4`, slot `qid % 4` mapping.
+that cannot load raises `MuxMappingError`; do not schedule from a guessed layout. Missing project
+context, an unknown chip, or a chip without topology uses the legacy MUX `qid // 4`, slot `qid % 4`
+mapping. This fallback is not verification of physical wiring.
 
 ### Legacy Templates
 
