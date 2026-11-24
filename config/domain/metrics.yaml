@@ -36,6 +36,14 @@ qubit_metrics:
     evaluation:
       mode: none
 
+  readout_amplitude:
+    title: Readout Amplitude
+    unit: a.u.
+    scale: 1
+    description: Readout pulse amplitude used for qubit state measurement
+    evaluation:
+      mode: none
+
   qubit_frequency:
     title: Qubit Frequency
     unit: GHz
