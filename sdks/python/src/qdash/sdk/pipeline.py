@@ -1,7 +1,8 @@
 """Calibration pipeline definitions that serialize to pipeline spec version 2.
 
-The classes here are the API's generated pipeline models (``qdash.client`` builds them from the
-OpenAPI document) with a few conveniences: :class:`Pipeline` fixes ``spec_version``,
+The classes here are strict pipeline models generated from the API's OpenAPI document into
+``qdash.sdk._generated._authoring`` (unknown fields, patterns, constants and defaults are
+enforced locally) with a few conveniences: :class:`Pipeline` fixes ``spec_version``,
 :class:`QubitTargets` and :class:`MuxTargets` select qubit IDs or MUXes, and
 :class:`CustomOneQubit` fills in the step ``type``. Building them checks only the structure
 the schema describes, such as required fields, ID patterns and literal values. Whether a
@@ -13,9 +14,8 @@ Defining a pipeline has no effects: no request is sent and nothing runs until
 ``QDash.pipelines.execute`` is called. :mod:`qdash.sdk.calibration` re-exports the definitions
 a calibration needs; this module adds :class:`Pipeline` for building a whole spec.
 
-Any other step type can be passed as its generated model from
-``qdash.client.services.models`` (for example ``OneQubitCheckStep(type="OneQubitCheck")``) or
-as a plain dictionary in the spec's JSON form.
+Any other step type can be passed as its generated model, re-exported here (for example
+``OneQubitCheckStep(type="OneQubitCheck")``), or as a plain dictionary in the spec's JSON form.
 """
 
 from __future__ import annotations
@@ -23,27 +23,50 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping, Sequence
 from typing import TYPE_CHECKING, Any, Literal
 
-from qdash.client.services import models
-from qdash.client.services.models import (
-    CalibrationPipelineSpec,
-    CustomOneQubitStep,
-    PipelineTargets,
-)
 from qdash.sdk import sweep
+from qdash.sdk._generated import _authoring as models
+from qdash.sdk._generated._authoring import (
+    BringUpStep,
+    CalibrationPipelineSpec,
+    ConfigureAllStep,
+    CustomOneQubitStep,
+    CustomTwoQubitStep,
+    FilterByMetricStep,
+    FilterByStatusStep,
+    GenerateCRScheduleStep,
+    OneQubitCheckStep,
+    OneQubitFineTuneStep,
+    PipelineTargets,
+    TaskSettings,
+    TwoQubitCalibrationStep,
+)
 
 if TYPE_CHECKING:
     from pydantic import BaseModel
 
 __all__ = [
+    "BringUpStep",
+    "CalibrationPipelineSpec",
+    "ConfigureAllStep",
     "CustomOneQubit",
+    "CustomOneQubitStep",
+    "CustomTwoQubitStep",
+    "FilterByMetricStep",
+    "FilterByStatusStep",
+    "GenerateCRScheduleStep",
     "MuxTargets",
     "OnFailure",
+    "OneQubitCheckStep",
     "OneQubitExecutionMode",
+    "OneQubitFineTuneStep",
     "Pipeline",
     "PipelineSpecInput",
+    "PipelineTargets",
     "QubitTargets",
     "Qubits",
     "TaskCall",
+    "TaskSettings",
+    "TwoQubitCalibrationStep",
     "sweep",
     "to_spec",
 ]

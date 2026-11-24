@@ -1,13 +1,19 @@
 [project]
 name = "qdash-sdk"
-description = "Python SDK for defining and running QDash calibrations"
+description = "Python SDK for the QDash API: generated resource clients and calibration helpers"
 authors = [
     {name = "OQTOPUS Team", email = "oqtopus-team@googlegroups.com"}
 ]
 readme = "README.md"
 requires-python = ">=3.11,<3.13"
-# hatch_build.py sets the dependencies: qdash-client pinned to this package's version.
-dynamic = ["version", "dependencies"]
+dynamic = ["version"]
+# The runtime of the Fern-generated client in qdash/sdk/_generated and of the helpers.
+# qdash-sdk does not depend on qdash-client; both can be installed side by side.
+dependencies = [
+    "httpx>=0.27.0",
+    "pydantic>=2.8.0",
+    "typing-extensions>=4.12.0",
+]
 
 [dependency-groups]
 dev = [
@@ -36,14 +42,18 @@ local_scheme = "no-local-version"
 [tool.hatch.version.raw-options.scm.git]
 describe_command = "git describe --dirty --tags --long --match v[0-9]*"
 
-[tool.hatch.metadata.hooks.custom]
-
 [tool.hatch.build]
 exclude = [
     "**/__pycache__",
     "**/*.pyc",
 ]
 
+# qdash-client ships qdash/client; neither wheel owns the qdash namespace.
 [tool.hatch.build.targets.wheel]
 only-include = ["src/qdash/sdk"]
 sources = ["src"]
+
+# The sdist carries the generation inputs next to the sources: the Fern configuration
+# reads docs/oas/openapi.json from the repository, so it is not part of the sdist.
+[tool.hatch.build.targets.sdist]
+only-include = ["src/qdash/sdk", "fern", "README.md", "pyproject.toml"]

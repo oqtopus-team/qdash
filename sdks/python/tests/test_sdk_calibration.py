@@ -84,7 +84,7 @@ def test_targets_serialize_like_the_workflow_targets() -> None:
 
 def test_chip_binds_the_session_without_requests() -> None:
     server = Server()
-    qdash = QDash(server.client())
+    qdash = server.session()
     chip = qdash.chip(CHIP)
     coherence_steps()
 
@@ -104,7 +104,7 @@ def test_validate_calibration_posts_the_spec_and_dispatches_nothing() -> None:
             ]
         }
     )
-    qdash = QDash(server.client())
+    qdash = server.session()
     chip = qdash.chip(CHIP)
 
     check = chip.validate_calibration(
@@ -130,7 +130,7 @@ def test_options_left_out_are_left_to_the_server() -> None:
     server = Server(
         {("POST", "/calibration-pipelines/validate"): [httpx.Response(200, json=validate_body())]}
     )
-    QDash(server.client()).chip(CHIP).validate_calibration(MuxTargets([0]), coherence_steps())
+    server.session().chip(CHIP).validate_calibration(MuxTargets([0]), coherence_steps())
 
     spec = json.loads(server.requests[0].content)["spec"]
     assert set(spec) == {"spec_version", "targets", "steps"}
@@ -148,7 +148,7 @@ def test_calibrate_dispatches_once_and_reports_the_whole_run_status() -> None:
             ],
         }
     )
-    qdash = QDash(server.client())
+    qdash = server.session()
     chip = qdash.chip(CHIP)
 
     run = calibrate(chip)
@@ -177,7 +177,7 @@ def test_get_reads_the_current_state_without_waiting() -> None:
             ],
         }
     )
-    run = calibrate(QDash(server.client()).chip(CHIP))
+    run = calibrate(server.session().chip(CHIP))
 
     assert run.get().status == "running"
     assert server.sleeps == []
@@ -193,7 +193,7 @@ def test_status_falls_back_to_the_execution_without_pipeline_progress() -> None:
             ],
         }
     )
-    result = calibrate(QDash(server.client()).chip(CHIP)).wait(poll_interval_seconds=1)
+    result = calibrate(server.session().chip(CHIP)).wait(poll_interval_seconds=1)
 
     assert result.status == "cancelled"
     assert result.detail.pipeline is None
@@ -206,7 +206,7 @@ def test_wait_times_out_without_cancelling() -> None:
             ("GET", "/executions/exec-1"): [httpx.Response(200, json=detail("running", "running"))],
         }
     )
-    run = calibrate(QDash(server.client()).chip(CHIP))
+    run = calibrate(server.session().chip(CHIP))
 
     with pytest.raises(TimeoutError):
         run.wait(timeout_seconds=0)
@@ -222,7 +222,7 @@ def test_calibrate_rejection_raises_with_the_problems() -> None:
         {("POST", "/calibration-pipelines/execute"): [httpx.Response(422, json=rejected)]}
     )
     with pytest.raises(QDashValidationError) as raised:
-        calibrate(QDash(server.client()).chip(CHIP))
+        calibrate(server.session().chip(CHIP))
 
     assert raised.value.payload == rejected
     assert len(server.requests) == 1
@@ -232,7 +232,7 @@ def test_calibrate_needs_a_project_but_validate_does_not() -> None:
     server = Server(
         {("POST", "/calibration-pipelines/validate"): [httpx.Response(200, json=validate_body())]}
     )
-    chip = QDash(server.client(project_id=None)).chip(CHIP)
+    chip = server.session(project_id=None).chip(CHIP)
 
     with pytest.raises(QDashConfigError):
         calibrate(chip)
@@ -245,13 +245,13 @@ def test_chips_share_the_session_client_and_project() -> None:
     server = Server(
         {("POST", "/calibration-pipelines/validate"): [httpx.Response(200, json=validate_body())]}
     )
-    client = server.client(project_id="project-a")
-    qdash = QDash(client, project_id="project-b")
+    owner = server.session(project_id="project-a")
+    qdash = owner.with_project("project-b")
 
     for chip_id in ("64Qv3", "144Qv1"):
         qdash.chip(chip_id).validate_calibration(QubitTargets(["0"]), coherence_steps())
     qdash.close()
-    client.validate_calibration_pipeline(chip_id=CHIP, spec=expected_spec())
+    owner.api.calibration_pipeline.validate_calibration_pipeline(chip_id=CHIP, spec=expected_spec())
 
     assert [request.headers["X-Project-Id"] for request in server.requests] == [
         "project-b",
@@ -259,7 +259,6 @@ def test_chips_share_the_session_client_and_project() -> None:
         "project-a",
     ]
     assert [json.loads(r.content)["chip_id"] for r in server.requests[:2]] == ["64Qv3", "144Qv1"]
-    client.close()
 
 
 def test_a_closed_owned_session_does_not_reopen(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -269,8 +268,8 @@ def test_a_closed_owned_session_does_not_reopen(monkeypatch: pytest.MonkeyPatch)
 
     qdash = QDash.from_env()
     chip = qdash.chip(CHIP)
-    transport = qdash.client._rest_client._client
-    assert chip._pipelines._client is qdash.client
+    http_client = qdash._http_client
+    assert chip._pipelines is qdash.pipelines
     qdash.close()
 
-    assert transport.is_closed
+    assert http_client.is_closed

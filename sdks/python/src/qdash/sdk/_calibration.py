@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from qdash.sdk._runs import RunResult
+from qdash.sdk._runs import Run
 from qdash.sdk.pipeline import Pipeline
 
 if TYPE_CHECKING:
@@ -17,55 +17,25 @@ if TYPE_CHECKING:
 
     from pydantic import BaseModel
 
-    from qdash.client.services.models import (
-        ExecutePipelineResponse,
-        PipelineTargets,
-        ValidatePipelineResponse,
-    )
-    from qdash.sdk._pipelines import PipelineRun, Pipelines
+    from qdash.sdk._generated.types.execute_pipeline_response import ExecutePipelineResponse
+    from qdash.sdk._generated.types.validate_pipeline_response import ValidatePipelineResponse
+    from qdash.sdk._pipelines import Pipelines
+    from qdash.sdk._runs import Executions
+    from qdash.sdk.pipeline import PipelineTargets
 
 
-class CalibrationRun:
+class CalibrationRun(Run):
     """A dispatched calibration, returned by :meth:`Chip.calibrate`.
 
     ``execution_id`` is the execution the server created for the first step; ``response`` is
-    the dispatch response as the API returned it.
+    the dispatch response as the API returned it. :meth:`get` and :meth:`wait` return a
+    :class:`~qdash.sdk.RunResult` for the whole calibration: a failed or cancelled one is
+    returned, not raised, and a timeout leaves it running.
     """
 
-    def __init__(self, run: PipelineRun) -> None:
-        self._run = run
-
-    @property
-    def execution_id(self) -> str:
-        return self._run.execution_id
-
-    @property
-    def response(self) -> ExecutePipelineResponse:
-        return self._run.response
-
-    def __repr__(self) -> str:
-        return f"CalibrationRun(execution_id={self.execution_id!r})"
-
-    def get(self) -> RunResult:
-        """The run's current state; raises ``QDashNotFoundError`` before it exists."""
-        return RunResult(self.execution_id, self._run.get())
-
-    def wait(
-        self,
-        *,
-        timeout_seconds: float = 3600.0,
-        poll_interval_seconds: float = 5.0,
-    ) -> RunResult:
-        """Poll until the whole calibration ends and return its result.
-
-        A failed or cancelled calibration is returned, not raised; check ``result.status``.
-        Raises ``TimeoutError`` when the run has not ended within ``timeout_seconds``; the
-        run itself keeps going. Same polling as :meth:`PipelineRun.wait`.
-        """
-        detail = self._run.wait(
-            timeout_seconds=timeout_seconds, poll_interval_seconds=poll_interval_seconds
-        )
-        return RunResult(self.execution_id, detail)
+    def __init__(self, executions: Executions, response: ExecutePipelineResponse) -> None:
+        super().__init__(executions, response.execution_id)
+        self.response = response
 
 
 class Chip:
@@ -74,10 +44,11 @@ class Chip:
     Holds the session's client, project and the chip ID; creating it sends no request.
     """
 
-    def __init__(self, pipelines: Pipelines, chip_id: str) -> None:
+    def __init__(self, pipelines: Pipelines, executions: Executions, chip_id: str) -> None:
         if not isinstance(chip_id, str) or not chip_id:
             raise ValueError("chip_id must be a non-empty string")
         self._pipelines = pipelines
+        self._executions = executions
         self._chip_id = chip_id
 
     @property
@@ -128,7 +99,7 @@ class Chip:
         """
         pipeline = _pipeline(targets, steps, name, default_run_parameters, tags)
         run = self._pipelines.execute(pipeline, chip_id=self._chip_id, backend_name=backend_name)
-        return CalibrationRun(run)
+        return CalibrationRun(self._executions, run.response)
 
 
 def _pipeline(

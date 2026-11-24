@@ -26,8 +26,6 @@ COPY clients/python/pyproject.toml clients/python/pyproject.toml
 COPY clients/python/README.md clients/python/README.md
 COPY sdks/python/pyproject.toml sdks/python/pyproject.toml
 COPY sdks/python/README.md sdks/python/README.md
-# qdash-sdk derives its dependencies at build time, so locking reads its build hook.
-COPY sdks/python/hatch_build.py sdks/python/hatch_build.py
 COPY src/qdash/workflow/pyproject.toml src/qdash/workflow/pyproject.toml
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --package qdash-api --no-dev

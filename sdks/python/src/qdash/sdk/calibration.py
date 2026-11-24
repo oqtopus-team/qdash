@@ -17,8 +17,8 @@ workflow runtime classes, so building them sends no request and needs no worker 
     run = chip.calibrate(targets, steps)
     print(run.wait().status)
 
-Other step types are passed as their generated models from ``qdash.client.services.models`` or
-as dictionaries in the spec's JSON form.
+Other step types are passed as their generated models from :mod:`qdash.sdk.pipeline` or as
+dictionaries in the spec's JSON form.
 """
 
 from qdash.sdk import sweep

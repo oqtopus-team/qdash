@@ -1,7 +1,8 @@
 # Python SDK
 
-`qdash.sdk` builds calibration, metric-script, and dashboard requests on top of `qdash.client`.
-The client owns transport and authentication; the API owns permissions and hardware validation.
+`qdash.sdk` contains a Fern-generated API client and handwritten calibration, workflow, and
+dashboard helpers. It has no dependency on `qdash-client`; that package remains available to
+existing applications. The server owns permissions and hardware validation.
 
 ## Define, check, run
 
@@ -20,12 +21,30 @@ validates again at execution.
 
 ## Session and client ownership
 
-`QDash.from_env()` and `from_profile()` own their client; `close()` or a `with` block closes it.
-`QDash(client)` borrows the caller's client and never closes it. Chips share the session's
-connection and project. The SDK keeps no separate run registry or catalog cache.
+Create one `QDash` session and reuse it across operations or notebook cells.
+`QDash(config)`, `from_env()`, and `from_profile()` own their HTTP connection; call `close()`
+when the session is no longer needed. A `with` block is an optional way to close it on exit. `QDash(config, http_client=...)` borrows an `httpx.Client` and never
+closes it. The supplied client's TLS and proxy settings apply. `with_project()` creates a
+session on the same connection without taking ownership. Close the owning session last.
+
+`qdash.api` exposes generated resources with the session's authentication and project header.
+Generated calls disable retries by default. Helper reads may retry transient failures according
+to `QDashConfig.read_attempts`; helper writes send once, including on 409, 5xx, and timeouts.
+Helpers translate HTTP errors to SDK errors; direct generated calls retain generated exceptions
+and httpx errors. Password authentication caches a token without refreshing on 401; create a
+new session after expiry, or use API tokens. Read helpers retry connection and remote protocol
+errors, but not read timeouts. Writes retain a single attempt. A session snapshots its
+configuration; `config` returns a copy, and `with_project()` explicitly changes scope.
+
+Profiles use `config.toml` with `[profiles.<name>]` tables. Explicit profile selection takes
+precedence over `default_profile`, then `"default"`. The SDK reads deprecated INI only when
+the default TOML file is absent or the caller explicitly supplies an INI path; it emits
+`QDashConfigDeprecationWarning`. TOML errors never trigger fallback. `api_token_env` resolves
+only the selected profile's token. See the [migration procedure](../../reference/clients/python.md#migrate-an-ini-profile).
 
 ## Following a run
 
+`qdash.run(execution_id)` creates a handle for an existing execution without dispatching work.
 Run handles wait for pipeline-wide status, retry an initial execution 404, return failed/cancelled
 outcomes, and raise `TimeoutError` on timeout. A timeout does not prove the operation stopped.
 
@@ -40,17 +59,31 @@ reconcile the possible launch rather than retrying with a new key. See
 `Script` and `Dashboard` are authoring objects; save them through the session. Script source is
 text written for the worker's `qdash_metrics` API, not code imported by the SDK. A saved script
 handle binds its revision, and dashboard panels pin that revision. Updates send expected revisions
-or versions so concurrent edits fail explicitly.
+or versions so concurrent edits fail with `QDashConflictError`.
 
 ## Shared models
 
-Pipeline definitions derive from server models through OpenAPI. To extend them, change
-`src/qdash/datamodel/calibration_pipeline.py`, run `task generate`, then update SDK helpers and
-tests. Never hand-edit generated clients or duplicate server-dependent checks locally.
+`docs/oas/openapi.json` is the source for both generated API resources and authoring models.
+Fern generates `_generated/`; `types.py` exposes response types. `_generated/_authoring.py`
+is generated with datamodel-code-generator from the request schemas used by the helpers.
+It preserves schema constraints that the pinned Fern generator omits, including pipeline
+patterns, constants, and defaults. Unknown fields are rejected only where the schema closes
+an object. Response models tolerate extra fields for compatibility with server additions.
+
+To extend the API, update the server schemas and run `task generate`. For SDK-only generation,
+run `task generate-python-sdk`. Both need Node.js (`npx`) and a running Docker daemon. The
+CLI and generator versions are pinned in `sdks/python/fern/`; local generation uses the legacy
+`generators.yml` format and needs no Fern login. Change generation settings there, never in the
+output files. Keep generated imports under `qdash.sdk._generated`.
+
+`scripts/generate_python_sdk.py` retains Python sources and excludes variable generation
+metadata. `task check-python-sdk-generated` regenerates and compares the output; it also runs
+in `ci-lint`. New endpoints become available through `qdash.api` without handwritten wrappers.
+Add helpers only for QDash-specific composition or behavior.
 
 ## Packaging and release
 
-`qdash-sdk` depends on the matching `qdash-client`. They share the implicit `qdash` namespace;
+`qdash-sdk` and `qdash-client` install independently and share the implicit `qdash` namespace;
 do not add `qdash/__init__.py`. [Pi Packages](../agent/packages.md#distribution) describes the
 common release pipeline. Usage examples live in the [Python client reference](../../reference/clients/python.md).
 
@@ -58,7 +91,11 @@ common release pipeline. Usage examples live in the [Python client reference](..
 
 | File | Responsibility |
 | --- | --- |
-| `sdks/python/src/qdash/sdk/_session.py` | Session and client ownership |
+| `sdks/python/src/qdash/sdk/_session.py` | Session and connection ownership |
+| `sdks/python/src/qdash/sdk/_config.py` | Environment and profile settings |
+| `sdks/python/src/qdash/sdk/_http.py` | Authentication, HTTP configuration, error translation |
+| `sdks/python/src/qdash/sdk/errors.py` | SDK exception types |
+| `sdks/python/src/qdash/sdk/_runs.py` | Execution lookup and whole-run polling |
 | `sdks/python/src/qdash/sdk/_calibration.py` | Chip front door |
 | `sdks/python/src/qdash/sdk/_pipelines.py` | Pipeline dispatch and handles |
 | `sdks/python/src/qdash/sdk/_workflows.py` | Registered workflows |
