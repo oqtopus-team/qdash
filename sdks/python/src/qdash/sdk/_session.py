@@ -6,11 +6,17 @@ import time
 from typing import TYPE_CHECKING
 
 from qdash.sdk._calibration import Chip
+from qdash.sdk._chips import Chips
 from qdash.sdk._config import QDashConfig, _load_config
 from qdash.sdk._dashboards import Dashboards, Scripts
+from qdash.sdk._device_topology import DeviceTopologies
+from qdash.sdk._history import ExecutionHistory, TaskResultHistory
 from qdash.sdk._http import build_api, owned_http_client
 from qdash.sdk._pipelines import Pipelines
+from qdash.sdk._qubex import Qubex
+from qdash.sdk._results import Execution
 from qdash.sdk._runs import Executions, Run
+from qdash.sdk._tasks import Tasks
 from qdash.sdk._workflows import Workflows
 
 if TYPE_CHECKING:
@@ -21,6 +27,7 @@ if TYPE_CHECKING:
     import httpx
 
     from qdash.sdk._generated.client import QDashApi
+    from qdash.sdk._results import TaskResult
 
 
 class QDash:
@@ -35,8 +42,10 @@ class QDash:
     ``project_id`` (else ``config.project_id``) is sent as ``X-Project-Id`` with every
     request of the session, including the generated resource calls on :attr:`api`.
 
-    The helpers (:attr:`pipelines`, :attr:`workflows`, :attr:`scripts`, :attr:`dashboards`,
-    :meth:`chip`, :meth:`run`) raise the SDK's errors and send every write once. :attr:`api`
+    The helpers (:attr:`chips`, :attr:`pipelines`, :attr:`workflows`, :attr:`tasks`,
+    :attr:`scripts`, :attr:`dashboards`, :attr:`executions`, :attr:`task_results`,
+    :attr:`device_topology`, :attr:`qubex`, :meth:`chip`, :meth:`run`, :meth:`execution`,
+    :meth:`task_result`) raise the SDK's errors and send every write, and every POST, once. :attr:`api`
     is the generated client of the whole API, for every route the helpers do not cover.
     """
 
@@ -65,8 +74,14 @@ class QDash:
         self._executions = Executions(self._api, config, sleep=sleep)
         self.pipelines = Pipelines(self._api, config, self._executions, config.project_id)
         self.workflows = Workflows(self._api, config, self._executions, config.project_id)
+        self.tasks = Tasks(self._api, config, self._executions, config.project_id)
+        self.chips = Chips(self._api, config)
         self.scripts = Scripts(self._api, config)
         self.dashboards = Dashboards(self._api, config)
+        self.executions = ExecutionHistory(self._api, config)
+        self.task_results = TaskResultHistory(self._api, config)
+        self.device_topology = DeviceTopologies(self._api, config)
+        self.qubex = Qubex(self._api, config)
 
     @classmethod
     def from_env(cls, *, project_id: str | None = None) -> QDash:
@@ -120,7 +135,10 @@ class QDash:
         return self._config.project_id
 
     def chip(self, chip_id: str) -> Chip:
-        """Calibration on ``chip_id`` through this session; sends no request."""
+        """Calibration on ``chip_id`` through this session; sends no request.
+
+        To read the chip's metadata, use ``chips.get(chip_id)``.
+        """
         return Chip(self.pipelines, self._executions, chip_id)
 
     def run(self, execution_id: str) -> Run:
@@ -128,6 +146,22 @@ class QDash:
         if not isinstance(execution_id, str) or not execution_id:
             raise ValueError("execution_id must be a non-empty string")
         return Run(self._executions, execution_id)
+
+    def execution(self, execution_id: str) -> Execution:
+        """A handle to read one execution by ID; sends no request.
+
+        Unlike :meth:`run`, which follows a whole pipeline run, its ``get()`` reports only this
+        execution's own status and tasks.
+        """
+        if not isinstance(execution_id, str) or not execution_id:
+            raise ValueError("execution_id must be a non-empty string")
+        return Execution(self._executions, execution_id)
+
+    def task_result(self, task_id: str) -> TaskResult:
+        """The full saved result of one task run, read by ``task_id``."""
+        if not isinstance(task_id, str) or not task_id:
+            raise ValueError("task_id must be a non-empty string")
+        return self._executions.task_result(task_id)
 
     def close(self) -> None:
         """Close the connection when the session created it; a borrowed one stays open."""

@@ -1,4 +1,4 @@
-"""Definitions for a calibration started with ``Chip.calibrate(targets, steps)``.
+"""Definitions for a calibration started with ``Chip.calibrate``.
 
 The names mirror ``qdash.workflow``: :class:`QubitTargets` or :class:`MuxTargets` select the
 targets, and :class:`CustomOneQubit` runs its :class:`TaskCall` list, in order, on each target
@@ -17,8 +17,9 @@ workflow runtime classes, so building them sends no request and needs no worker 
     run = chip.calibrate(targets, steps)
     print(run.wait().status)
 
-Other step types are passed as their generated models from :mod:`qdash.sdk.pipeline` or as
-dictionaries in the spec's JSON form.
+:class:`Pipeline` holds a whole calibration, including its name, default run parameters and
+tags, for ``Chip.calibrate(pipeline)``. Other step types are passed as their generated models
+from :mod:`qdash.sdk.pipeline` or as dictionaries in the spec's JSON form.
 """
 
 from qdash.sdk import sweep
@@ -27,6 +28,7 @@ from qdash.sdk.pipeline import (
     MuxTargets,
     OneQubitExecutionMode,
     OnFailure,
+    Pipeline,
     QubitTargets,
     TaskCall,
 )
@@ -36,6 +38,7 @@ __all__ = [
     "MuxTargets",
     "OnFailure",
     "OneQubitExecutionMode",
+    "Pipeline",
     "QubitTargets",
     "TaskCall",
     "sweep",

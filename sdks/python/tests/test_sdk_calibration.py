@@ -22,6 +22,7 @@ from qdash.sdk import (
 )
 from qdash.sdk.calibration import CustomOneQubit, MuxTargets, QubitTargets, TaskCall, sweep
 from qdash.sdk.pipeline import Pipeline
+from qdash.sdk.types import ExecutionResponseDetail
 
 TIME_RANGE = sweep.logspace(math.log10(300), math.log10(500_000), 51)
 RUN_PARAMETERS = {"readout_duration": 1024, "interval": 262_144}
@@ -273,3 +274,146 @@ def test_a_closed_owned_session_does_not_reopen(monkeypatch: pytest.MonkeyPatch)
     qdash.close()
 
     assert http_client.is_closed
+
+
+def whole_pipeline() -> Pipeline:
+    """A pipeline with every option set, including fields the targets form cannot set."""
+    return calibration.Pipeline(
+        name="coherence-t1-t2echo",
+        targets=QubitTargets(["0", "1"]),
+        steps=[
+            CustomOneQubit(
+                step_name="coherence",
+                execution_mode="parallel_by_mux",
+                tasks=[
+                    TaskCall(
+                        name="CheckT1",
+                        call_id="t1",
+                        run={"time_range": TIME_RANGE},
+                        update_calibration_parameters=False,
+                        on_failure="continue",
+                    )
+                ],
+            )
+        ],
+        default_run_parameters=RUN_PARAMETERS,
+        tags=["sdk", "notebook"],
+    )
+
+
+def test_calibration_exports_pipeline() -> None:
+    from qdash.sdk.calibration import Pipeline as CalibrationPipeline
+
+    assert CalibrationPipeline is Pipeline
+    assert "Pipeline" in calibration.__all__
+
+
+def test_validate_calibration_sends_a_whole_pipeline_unchanged() -> None:
+    server = Server(
+        {("POST", "/calibration-pipelines/validate"): [httpx.Response(200, json=validate_body())]}
+    )
+    spec = whole_pipeline()
+
+    server.session().chip(CHIP).validate_calibration(spec, backend_name="qubex")
+
+    assert server.paths() == [("POST", "/calibration-pipelines/validate")]
+    assert json.loads(server.requests[0].content) == {
+        "chip_id": CHIP,
+        "spec": spec.to_spec(),
+        "backend_name": "qubex",
+    }
+    sent = json.loads(server.requests[0].content)["spec"]
+    assert sent["tags"] == ["sdk", "notebook"]
+    assert sent["default_run_parameters"] == RUN_PARAMETERS
+    assert sent["steps"][0]["execution_mode"] == "parallel_by_mux"
+    assert sent["steps"][0]["tasks"][0]["on_failure"] == "continue"
+
+
+def test_calibrate_dispatches_a_whole_pipeline_once() -> None:
+    server = Server(
+        {("POST", "/calibration-pipelines/execute"): [httpx.Response(200, json=execute_body())]}
+    )
+    spec = whole_pipeline()
+
+    run = server.session().chip(CHIP).calibrate(spec)
+
+    assert run.execution_id == "exec-1"
+    assert server.paths() == [("POST", "/calibration-pipelines/execute")]
+    assert json.loads(server.requests[0].content) == {"chip_id": CHIP, "spec": spec.to_spec()}
+    assert server.requests[0].headers["X-Project-Id"] == "project-a"
+
+
+def test_targets_and_steps_still_work_by_keyword() -> None:
+    server = Server(
+        {("POST", "/calibration-pipelines/validate"): [httpx.Response(200, json=validate_body())]}
+    )
+    server.session().chip(CHIP).validate_calibration(
+        targets=QubitTargets(["0", "1"]),
+        steps=coherence_steps(),
+        name="coherence-t1-t2echo",
+        default_run_parameters=RUN_PARAMETERS,
+        tags=["sdk"],
+    )
+
+    assert json.loads(server.requests[0].content)["spec"] == expected_spec()
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        {"steps": []},
+        {"name": "other"},
+        {"default_run_parameters": {}},
+        {"tags": []},
+    ],
+)
+def test_a_pipeline_with_fields_beside_it_is_rejected_locally(extra: dict[str, Any]) -> None:
+    server = Server()
+    chip = server.session().chip(CHIP)
+
+    with pytest.raises(TypeError, match="already defines"):
+        chip.validate_calibration(whole_pipeline(), **extra)
+    with pytest.raises(TypeError, match="already defines"):
+        chip.calibrate(whole_pipeline(), **extra)
+    assert server.requests == []
+
+
+def test_targets_without_steps_are_rejected_locally() -> None:
+    server = Server()
+    chip = server.session().chip(CHIP)
+
+    with pytest.raises(TypeError, match="steps is required"):
+        chip.validate_calibration(QubitTargets(["0"]))
+    with pytest.raises(TypeError, match="steps is required"):
+        chip.calibrate(QubitTargets(["0"]))
+    assert server.requests == []
+
+
+@pytest.mark.parametrize(
+    ("status", "pipeline_status", "succeeded", "done"),
+    [
+        # The whole pipeline's status wins over the first step's completed execution.
+        ("completed", "running", False, False),
+        ("completed", "failed", False, True),
+        ("running", "completed", True, True),
+        ("completed", "COMPLETED", True, True),
+        ("completed", "cancelled", False, True),
+        ("completed", "Canceled", False, True),
+        ("completed", "crashed", False, True),
+        ("completed", "scheduled", False, False),
+        ("completed", "mystery", False, False),
+        # Without pipeline progress, the execution's own status applies.
+        ("completed", None, True, True),
+        ("Running", None, False, False),
+        ("FAILED", None, False, True),
+    ],
+)
+def test_run_result_flags_follow_the_whole_run_status(
+    status: str, pipeline_status: str | None, succeeded: bool, done: bool
+) -> None:
+    payload = detail(status, pipeline_status)
+    result = RunResult("exec-1", ExecutionResponseDetail.model_validate(payload))
+
+    assert (result.succeeded, result.done) == (succeeded, done)
+    assert result.status == (pipeline_status if pipeline_status is not None else status)
+    assert result.detail.status == status

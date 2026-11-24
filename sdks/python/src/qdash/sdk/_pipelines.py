@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from qdash.sdk._generated.types.execution_response_detail import ExecutionResponseDetail
     from qdash.sdk._generated.types.pipeline_catalog_response import PipelineCatalogResponse
     from qdash.sdk._generated.types.validate_pipeline_response import ValidatePipelineResponse
+    from qdash.sdk._results import ExecutionResult
     from qdash.sdk._runs import Executions
     from qdash.sdk.pipeline import PipelineSpecInput
 
@@ -45,6 +46,16 @@ class PipelineRun:
     def get(self) -> ExecutionResponseDetail:
         """The execution's current detail; raises ``QDashNotFoundError`` before it exists."""
         return self._executions.get(self.execution_id)
+
+    def executions(self) -> list[ExecutionResult]:
+        """Each execution of the run as it is now, in pipeline step order.
+
+        The same as :meth:`Run.executions <qdash.sdk.Run.executions>`: each result's
+        ``status`` is that execution's own, and pending steps and transforms are skipped.
+        """
+        from qdash.sdk._results import collect_executions
+
+        return collect_executions(self._executions, self.execution_id)
 
     def wait(
         self,

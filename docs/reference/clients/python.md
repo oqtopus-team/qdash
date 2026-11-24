@@ -68,7 +68,7 @@ To migrate, create `config.toml`, change `[local]` to `[profiles.local]`, and qu
 values as shown above. Rename `timeout_seconds` to `timeout_sec` and `retry_max_attempts` to
 `read_attempts`. Write booleans as `true` or `false` and numeric settings without quotes.
 Omit legacy client-only worker and backoff settings. Set `default_profile` if needed, then
-verify the connection with `qdash.api.chip.list_chips()`.
+verify the connection with `qdash.chips.list()`.
 
 Existing `qdash-client` applications continue reading `config.ini` without this deprecation.
 Keep that file if those applications still use it. Their `QDashConfig.save()` writes INI;
@@ -104,7 +104,10 @@ Legacy password authentication uses `QDASH_USERNAME` and the variable named by
 from qdash.sdk import QDash
 
 qdash = QDash.from_profile("local")
-print(qdash.api.chip.list_chips().total)
+chips = qdash.chips.list()
+print("Total:", len(chips))
+for chip in chips:
+    print(chip.chip_id, chip.qubit_count)
 ```
 
 Create one session and reuse `qdash` across notebook cells or script operations. Each example
@@ -112,6 +115,9 @@ below includes initialization so it can run on its own; skip that line when reus
 Call `qdash.close()` when you finish using the connection. For a short script that needs
 automatic cleanup, `with QDash.from_profile("local") as qdash:` is also supported.
 Closing the connection does not cancel work already dispatched to the server.
+
+`qdash.chips.list()` returns chip metadata as a list; `qdash.chips.get(chip_id)` reads one
+chip. `qdash.chip(chip_id)` creates a calibration handle without contacting the server.
 
 `qdash.api` exposes the generated resources, grouped by API tags. Response types are available
 from `qdash.sdk.types`. These calls use the session's authentication and project header,
@@ -171,7 +177,7 @@ settings appropriate for your hardware. Validation checks the spec, not physical
 ```python
 import math
 from qdash.sdk import QDash
-from qdash.sdk.calibration import CustomOneQubit, QubitTargets, TaskCall, sweep
+from qdash.sdk.calibration import CustomOneQubit, Pipeline, QubitTargets, TaskCall, sweep
 
 qdash = QDash.from_profile("local")
 chip = qdash.chip("64Qv3")
@@ -190,11 +196,17 @@ steps = [
 ]
 run_parameters = {"readout_duration": 1024, "interval": 262_144}
 
-check = chip.validate_calibration(targets, steps, default_run_parameters=run_parameters)
+pipeline = Pipeline(
+    name="coherence",
+    targets=targets,
+    steps=steps,
+    default_run_parameters=run_parameters,
+)
+check = chip.validate_calibration(pipeline)
 if not check.valid:
     raise SystemExit([f"{p.path}: {p.message}" for p in check.problems or []])
 
-run = chip.calibrate(targets, steps, default_run_parameters=run_parameters)  # measures
+run = chip.calibrate(pipeline)  # measures
 result = run.wait(timeout_seconds=3600)
 print(result.status)
 ```
@@ -202,6 +214,13 @@ print(result.status)
 `validate_calibration()` dispatches nothing. `calibrate()` dispatches and returns a run;
 `run.wait()` returns its whole-calibration status, including failure or cancellation.
 A timeout leaves the run active. Keep the session to inspect or follow the run later.
+`result.succeeded` is true only on completion; `result.done` also includes failure and
+cancellation. Both describe the whole run at the time it was read, without another request.
+
+The existing `chip.validate_calibration(targets, steps, ...)` and
+`chip.calibrate(targets, steps, ...)` forms remain supported. When passing a `Pipeline`,
+set its name, tags, and run parameters on the pipeline itself; passing those overrides or
+`steps` alongside it raises `TypeError`. You can still pass `backend_name`.
 
 ### Run a Whole Pipeline Spec
 
@@ -240,6 +259,133 @@ Replace the ID with one returned by an earlier launch. Creating the handle does 
 work. Waiting follows the whole pipeline, returns failed or cancelled outcomes, and raises
 `TimeoutError` without cancelling the run.
 
+## List Executions and Task Results
+
+```python
+executions = qdash.executions.list(chip_id="64Qv3", date="2026-11-24", timezone="Asia/Tokyo")
+results = qdash.task_results.list(chip_id="64Qv3", status="failed", task_name="CheckT1")
+print(len(results), results.total)
+records = results.to_records()
+next_results = results.next_page()
+```
+
+Execution filters are chip and calendar day. Task result filters also include `qid`,
+`execution_id`, `username`, `message_contains`, `step_id`, `call_id`, and the inclusive
+`start_from` / `start_to` bounds (timezone-aware datetimes). Both return newest-first pages;
+`skip` starts at 0 and `limit` accepts 1–100. Iteration and conversions use only the loaded
+page. `next_page()` retains filters and returns None at the end. New records can shift these
+offset-based pages. Execution `total` and `has_next` can be None when the server omits totals.
+`results.status_counts` covers all pages with the other filters applied, ignoring `status`.
+
+`to_dataframe()` needs pandas; `to_records()` needs no extra package. For an interactive
+notebook table, install `pandas`, `pyarrow`, and `perspective-python[jupyter]`, then use
+`PerspectiveWidget(results.to_dataframe())` from `perspective.widget`. Widget filters and
+aggregates cover only the loaded page, not all matching history. Read full details with
+`qdash.execution(row.execution_id).get()` or `qdash.task_result(row.task_id)`.
+
+## Inspect Execution Results
+
+`run.get()` and `run.wait()` report the whole run. `run.executions()` reads each started
+execution in step order; each returned `ExecutionResult.status` is that execution's own
+status. Pending steps without an execution ID are omitted.
+
+```python
+run = qdash.run("your-execution-id")
+for execution in run.executions():
+    print(execution.execution_id, execution.name, execution.status)
+    for task in execution.tasks:
+        print(task.task_id, task.name, task.qid, task.status, task.message)
+        print("run:", task.run_parameters)
+        for name, parameter in task.output_parameters.items():
+            if parameter is not None:
+                print(name, parameter.value, parameter.unit)
+```
+
+`task.input_parameters` and `task.output_parameters` retain parameter metadata, including
+units and reported errors. Use `task_id` or `invocation` to distinguish repeated calls.
+To read one execution, use `qdash.execution(execution_id).get()`. To read the full saved task
+result, including any `stack_trace`, use `qdash.task_result(task_id)` or `task.get()`.
+These are snapshots; fetch them again to see updates. `detail` retains the original response.
+
+In a notebook, display a task's figures explicitly:
+
+```python
+task = qdash.task_result("your-task-id")
+for figure in task.figures:
+    figure.show()
+# Save a selected figure to an explicit local filename:
+# task.figures[0].save("t1.png")
+```
+
+`show()` needs IPython. Figures, `task.json_figures`, and `task.raw_data` also provide
+`read()` for bytes and `save(path, overwrite=False)`. Each call fetches the file through the
+session; inspecting or printing a handle does not. Saving requires an existing parent directory
+and refuses an existing file unless `overwrite=True`. Missing server files raise
+`QDashNotFoundError`. Keep the session open while fetching results and files.
+
+## Run a Task from the Workbench
+
+`qdash.tasks` uses the Task Workbench's catalog and single-task execution route. Inspect a
+definition's `input_parameters`, `run_parameters`, and `output_parameters` before choosing
+settings; `qdash.tasks.list(enabled_only=True)` lists runnable definitions. Pass
+`backend_name` if the server has no configured default backend.
+
+```python
+from qdash.sdk import QDash
+from qdash.sdk.calibration import TaskCall, sweep
+
+qdash = QDash.from_profile("local")
+definition = qdash.tasks.get("CheckT1")
+print(definition.run_parameters)
+call = TaskCall(
+    name="CheckT1",
+    run={"time_range": sweep.linspace(300, 500_000, 51)},
+    update_calibration_parameters=False,
+)
+run = qdash.tasks.run(call, chip_id="64Qv3", qid="0")  # measures
+result = run.wait(timeout_seconds=600)
+print(result.status)
+for task in run.results():
+    print(task.task_id, task.status, task.output_parameters)
+```
+
+Use a chip, target, and measurement settings appropriate for your hardware. `TaskCall` is
+the same definition accepted by `CustomOneQubit(tasks=[call])`: `run` supplies measurement
+settings and `input` overrides calibration inputs. Single-task execution rejects `call_id`
+and `on_failure`, which apply within pipeline steps. Set call parameters on `TaskCall`, not
+as duplicate arguments to `tasks.run()`.
+
+To load current inputs and run defaults before building a call:
+
+```python
+params = qdash.tasks.load_parameters("CheckT1", chip_id="64Qv3", qid="0")
+print(params.input, params.run, params.missing)
+params.run["time_range"] = sweep.linspace(300, 500_000, 51)
+call = params.to_call()
+```
+
+Loading only reads data. `to_call()` rejects unknown names, missing required inputs, and
+edits to `params.forbidden` inputs; forbidden values remain visible but are omitted from
+the call. Fill missing editable inputs, or calibrate missing forbidden values first.
+`params.unresolved` lists inputs with resolution rules the SDK does not recognize; these
+are left to the worker. Values and bounds are still validated when the task runs.
+Loaded inputs are target-specific: use the same chip, qid, and backend when running the call.
+Reload to see newer calibration values. For a multi-target pipeline, define a `TaskCall`
+without these input overrides so each target resolves its own values.
+
+By default, a single-task run records history and artifacts without replacing current
+calibration values. Set `TaskCall(update_calibration_parameters=True, ...)` to replace them
+with validated outputs. `reconfigure` and `update_params` also default to false. This default
+is specific to single-task runs; pipeline calls with an unset update policy inherit it.
+`source_task_id` records provenance; it does not restore historical inputs. Execution uses
+current task definitions and calibration state.
+
+`run.results()` reads all matching task/target results, excluding setup tasks, and may be
+empty before results arrive. Use `run.executions()` to include all tasks. A timeout does not
+cancel execution; reattach with `qdash.run(run.execution_id)`. Writes send once; after an
+uncertain response, reconcile before repeating. Supply the same `idempotency_key` and request
+when retrying a launch; `calibration_session_id` groups it with an existing open session.
+
 ## Save Metric Scripts and Dashboards
 
 ```python
@@ -258,6 +404,9 @@ For your own calculation, see [metric scripts](../../user-guide/metric-scripts.m
 Panels pin the saved script revision. To edit a dashboard, get it, call `edit()`, then
 `qdash.dashboards.update(saved, edited)`. HTTP 409 means it changed; read it again before saving.
 Earlier successful saves remain if a later operation fails.
+
+For topology JSON/PNG and Qubex configuration downloads, follow
+[Export Device Gateway Files](../../user-guide/device-gateway-export.md).
 
 ## Agent Calibration
 
