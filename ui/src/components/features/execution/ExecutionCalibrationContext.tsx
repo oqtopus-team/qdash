@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 
-import { Target, Wrench } from "lucide-react";
+import { Wrench } from "lucide-react";
 
 import type {
   CalibrationSessionRef,
@@ -51,7 +51,6 @@ export function CalibrationSessionBadge({ link }: { link: CalibrationSessionRef 
       title={`Calibration session: ${link.objective}`}
       data-testid="calibration-session-badge"
     >
-      <Target className="h-3 w-3 shrink-0" aria-hidden="true" />
       <span className="sr-only">Calibration session: </span>
       <span className="truncate">{link.objective || link.calibration_session_id}</span>
     </span>
@@ -91,11 +90,7 @@ export function ExecutionCalibrationNotice({
       className={`alert alert-soft text-sm ${className}`}
       data-testid="execution-calibration-notice"
     >
-      {link ? (
-        <Target className="h-4 w-4" aria-hidden="true" />
-      ) : (
-        <Wrench className="h-4 w-4" aria-hidden="true" />
-      )}
+      {link ? null : <Wrench className="h-4 w-4" aria-hidden="true" />}
       <div className="flex min-w-0 flex-col gap-0.5">
         {link ? (
           <>

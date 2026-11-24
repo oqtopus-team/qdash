@@ -97,7 +97,11 @@ describe("CalibrationSessionListPageContent", () => {
     });
     const link = screen.getByRole("link", { name: "Bring up qubits 0 and 1" });
     expect(link.getAttribute("href")).toBe("/calibration-sessions/cs-1?project=lab-a");
-    expect(within(link.closest("li") as HTMLElement).getByText("Open")).toBeTruthy();
+    const row = within(link.closest("li") as HTMLElement);
+    expect(row.getByText("Open")).toBeTruthy();
+    // The row names its creator and chip the way execution cards name theirs.
+    expect(row.getByText("@alice")).toBeTruthy();
+    expect(row.getByText("Chip 64Qv3")).toBeTruthy();
     expect(screen.queryByRole("navigation", { name: "Pages" })).toBeNull();
   });
 

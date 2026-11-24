@@ -3,6 +3,7 @@ import { NuqsTestingAdapter } from "nuqs/adapters/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CalibrationSessionPageContent } from "@/components/features/calibration-session/CalibrationSessionPageContent";
+import { formatDateTime } from "@/lib/utils/datetime";
 
 const state = vi.hoisted(() => ({
   detail: null as null | Record<string, unknown>,
@@ -405,11 +406,11 @@ describe("CalibrationSessionPageContent", () => {
       },
     };
     renderPage();
-    const progress = screen.getByRole("region", { name: "Search progression" });
-    const stages = within(progress).getByRole("list", { name: "Stages reached" });
-    expect(within(stages).getByText("Baseline").className).toContain("step-primary");
-    expect(within(stages).getByText("Confirmation").className).not.toContain("step-primary");
+    const progress = screen.getByRole("region", { name: "Experiments" });
+    // The stage is a column of the comparison, not a separate stepper.
+    expect(within(progress).queryByRole("list", { name: "Stages reached" })).toBeNull();
     const table = within(progress).getByRole("table", { name: "Candidate comparison" });
+    expect(within(table).getAllByText("Screening")).toHaveLength(2);
     expect(within(table).getByText("256.0 ns")).toBeTruthy();
     expect(within(table).getByText("0.9900 ± 0.0020")).toBeTruthy();
     expect(within(table).getByText("adiabatic_safe_factor 0.75 → 0.8")).toBeTruthy();
@@ -417,15 +418,28 @@ describe("CalibrationSessionPageContent", () => {
     expect(within(table).getByText(/Executed adiabatic_safe_factor 0.75/)).toBeTruthy();
     expect(within(table).getByText("No run carried it out")).toBeTruthy();
     expect(within(table).getByText("10.0 min")).toBeTruthy();
-    expect(within(progress).getByText("Keeps the baseline")).toBeTruthy();
-    expect(within(progress).getByText("Agent statement")).toBeTruthy();
-    const notice = within(progress).getByRole("status").textContent ?? "";
-    expect(notice).toMatch(/The latest requested run \(candidate c03/);
-    expect(notice).toMatch(/completed every execution/);
-    expect(notice).toMatch(/requested candidate is not the recommended candidate incumbent/);
+    // The rationale is a statement in its own column, apart from the measured values.
+    const rationaleColumn = within(table)
+      .getAllByRole("columnheader")
+      .findIndex((header) => header.textContent === "Rationale");
+    const firstRow = within(table).getAllByRole("row")[1];
+    expect(within(firstRow).getAllByRole("cell")[rationaleColumn].textContent).toBe(
+      "Latest validated chain",
+    );
+    const conclusion = within(progress).getByRole("group", { name: "Conclusion" });
+    expect(within(conclusion).getByText("Keep baseline")).toBeTruthy();
+    expect(within(conclusion).getByText("Agent statement")).toBeTruthy();
+    expect(within(conclusion).getByText("c03 was not confirmed.")).toBeTruthy();
+    const latest = within(progress).getByRole("group", { name: "Latest requested run" });
+    expect(within(latest).getByText("Completed")).toBeTruthy();
+    expect(within(latest).getByText("c03")).toBeTruthy();
+    expect(within(latest).getByText("Not the recommended candidate incumbent")).toBeTruthy();
+    // Requested and finished are separate facts; a run without an end is not shown finished.
+    expect(within(latest).getByText("Requested")).toBeTruthy();
+    expect(within(latest).getByText("Finished").nextElementSibling?.textContent).toBe("—");
     // A completed run is never presented as the hardware state.
-    expect(notice).toMatch(/QDash records no authoritative hardware write/);
-    expect(notice).not.toMatch(/last state the session wrote|wrote its results/);
+    expect(within(latest).getByText("Hardware state is not tracked")).toBeTruthy();
+    expect(latest.textContent).not.toMatch(/last state the session wrote|wrote its results/);
     const link = within(table).getAllByRole("link", { name: "Execution" })[0];
     expect(link.getAttribute("href")).toBe("/execution/64Qv3/exec-9?project=lab-a");
     expect(screen.getByTestId("calibration-audit").getAttribute("data-project")).toBe("lab-a");
@@ -448,9 +462,66 @@ describe("CalibrationSessionPageContent", () => {
       },
     };
     renderPage();
-    const notice = screen.getByRole("status");
-    expect(notice.className).toContain("alert-warning");
-    expect(notice.textContent).toMatch(/names no decision.*QDash refused its launch/);
+    const latest = screen.getByRole("group", { name: "Latest requested run" });
+    expect(within(latest).getByText("Refused, never ran")).toBeTruthy();
+    expect(within(latest).getByText("No candidate")).toBeTruthy();
+    expect(within(latest).queryByText(/recommended candidate/)).toBeNull();
+  });
+
+  it("keeps the requested and finished times of the latest run apart", () => {
+    state.detail = {
+      ...DETAIL,
+      experiments: [],
+      recommendation: null,
+      latest_requested_run: {
+        pipeline_run_id: "cpr-11",
+        requested_at: "2026-11-23T00:40:00Z",
+        finished_at: "2026-11-23T02:15:00Z",
+        dispatch_status: "dispatched",
+        execution_outcome: "partial",
+        candidate_id: "c05",
+        execution_ids: ["exec-11"],
+        candidate_is_recommended: false,
+        missing: [],
+      },
+    };
+    renderPage();
+    const latest = screen.getByRole("group", { name: "Latest requested run" });
+    const requested = within(latest).getByText("Requested").nextElementSibling?.textContent;
+    const finished = within(latest).getByText("Finished").nextElementSibling?.textContent;
+    expect(requested).toBe(formatDateTime("2026-11-23T00:40:00Z"));
+    expect(finished).toBe(formatDateTime("2026-11-23T02:15:00Z"));
+    expect(requested).not.toBe(finished);
+    expect(within(latest).getByText("Partly completed")).toBeTruthy();
+    // No recommendation names the other candidate, so the mismatch stays generic.
+    expect(within(latest).getByText("Not the recommended candidate")).toBeTruthy();
+  });
+
+  it.each([
+    ["running", "Not finished"],
+    ["unknown", "Unknown"],
+  ])("shows the finish state for a %s latest run", (outcome, finishedLabel) => {
+    state.detail = {
+      ...DETAIL,
+      experiments: [],
+      recommendation: null,
+      latest_requested_run: {
+        pipeline_run_id: "cpr-12",
+        requested_at: "2026-11-23T00:40:00Z",
+        dispatch_status: outcome === "unknown" ? "unknown" : "dispatched",
+        execution_outcome: outcome,
+        candidate_id: "c06",
+        execution_ids: ["exec-12"],
+        candidate_is_recommended: true,
+        missing: [],
+      },
+    };
+    renderPage();
+    const latest = screen.getByRole("group", { name: "Latest requested run" });
+    expect(within(latest).getByText("Finished").nextElementSibling?.textContent).toBe(
+      finishedLabel,
+    );
+    expect(within(latest).queryByText(/recommended candidate/)).toBeNull();
   });
 
   it("never shows a conclusion that was not recorded", () => {
@@ -462,8 +533,8 @@ describe("CalibrationSessionPageContent", () => {
       latest_requested_run: null,
     };
     renderPage();
-    expect(screen.queryByRole("region", { name: "Search progression" })).toBeNull();
-    expect(screen.queryByText(/Recommends|Keeps the baseline/)).toBeNull();
+    expect(screen.queryByRole("region", { name: "Experiments" })).toBeNull();
+    expect(screen.queryByText(/Recommend|Keep baseline/)).toBeNull();
   });
 
   describe("place in the Execution area", () => {

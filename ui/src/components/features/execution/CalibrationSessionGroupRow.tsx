@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 
-import { ChevronRight, ExternalLink, Target } from "lucide-react";
+import { ChevronRight, ExternalLink } from "lucide-react";
 
 import type {
   CalibrationGroupPipelineRun,
@@ -16,11 +16,17 @@ import {
   runKindLabel,
   runTriggerLabel,
 } from "@/lib/chatCalibrationSession";
+import { QubitTile } from "@/components/ui/QubitTile";
 import { type SessionReturnContext, calibrationSessionDetailHref } from "@/lib/executionArea";
 import { formatDateTime } from "@/lib/utils/datetime";
 
 import { pluralize } from "./agentSessionDisplay";
 import { AgentSessionGroupRow } from "./AgentSessionGroupRow";
+import { ExecutionActor } from "./ExecutionAttribution";
+import {
+  CalibrationSessionStatusBadge,
+  calibrationSessionBorderStyle,
+} from "./CalibrationSessionStatus";
 import { ExecutionListCard } from "./ExecutionListCard";
 
 interface CalibrationSessionGroupRowProps {
@@ -161,13 +167,13 @@ export function CalibrationSessionGroupRow({
   const runs = item.pipeline_runs ?? [];
   const agents = item.nested_agent_sessions ?? [];
   const recommendation = summary.recommendation;
-  const isOpen = summary.status === "open";
+  const targets = summary.targets ?? [];
   const isAutomatic = summary.origin === "automatic";
 
   return (
     <div
       data-testid="calibration-session-card"
-      className="rounded-box border border-base-200 border-l-4 border-l-primary/60 bg-base-100 shadow-sm"
+      className={`rounded-box border border-base-200 bg-base-100 shadow-sm ${calibrationSessionBorderStyle(summary.status)}`}
     >
       <div className="flex flex-col gap-2 p-3 sm:flex-row sm:items-start sm:justify-between sm:p-4">
         <button
@@ -183,11 +189,8 @@ export function CalibrationSessionGroupRow({
           />
           <span className="min-w-0">
             <span className="flex flex-wrap items-center gap-2">
-              <Target className="h-4 w-4 shrink-0 text-base-content/60" aria-hidden="true" />
               <span className="text-sm font-medium wrap-anywhere">{summary.objective}</span>
-              <span className={`badge badge-soft badge-sm ${isOpen ? "badge-info" : ""}`}>
-                {isOpen ? "Open" : "Closed"}
-              </span>
+              <CalibrationSessionStatusBadge status={summary.status} />
               {isAutomatic ? (
                 <span
                   className="badge badge-ghost badge-sm"
@@ -209,9 +212,17 @@ export function CalibrationSessionGroupRow({
             </span>
             <span className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-sm text-base-content/60">
               <span>{timeRange(summary.first_activity_at, summary.latest_activity_at)}</span>
-              <span>{summary.created_by}</span>
-              {summary.targets && summary.targets.length > 0 ? (
-                <span>Targets {summary.targets.join(", ")}</span>
+              <ExecutionActor actor={{ username: summary.created_by }} />
+              {targets.length > 0 ? (
+                <span
+                  className="inline-flex flex-wrap items-center gap-1"
+                  data-testid="calibration-session-targets"
+                >
+                  <span>Targets</span>
+                  {targets.map((qid) => (
+                    <QubitTile key={qid} qid={qid} />
+                  ))}
+                </span>
               ) : (
                 <span>No target recorded</span>
               )}

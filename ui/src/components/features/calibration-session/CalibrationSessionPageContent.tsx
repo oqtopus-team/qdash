@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
-import { Info, Target } from "lucide-react";
+import { Info } from "lucide-react";
 import Link from "next/link";
 import { useQueryStates } from "nuqs";
 
@@ -20,6 +20,8 @@ import {
   sessionStatusBadgeClass,
 } from "@/components/features/execution/agentSessionDisplay";
 import { ExecutionBreadcrumbs } from "@/components/features/execution/ExecutionAreaNav";
+import { ExecutionActor } from "@/components/features/execution/ExecutionAttribution";
+import { CalibrationSessionStatusBadge } from "@/components/features/execution/CalibrationSessionStatus";
 import { ReportedOriginBadge } from "@/components/features/execution/ExecutionCalibrationContext";
 import { getStatusBadgeClass } from "@/components/features/execution/ExecutionListCard";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -366,14 +368,15 @@ export function CalibrationSessionPageContent({
     <PageContainer maxWidth>
       <header className="mb-4 flex min-w-0 flex-col gap-1 sm:mb-6">
         <ExecutionBreadcrumbs crumbs={crumbs} />
-        <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-base-content/60">
-          <Target className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+        <p className="mt-2 text-xs text-base-content/60">
           {isAutomatic ? "Automatic calibration session" : "Calibration session"}
         </p>
         {/* The objective names the session; for an automatic one it is the run's recorded name. */}
         <h1 className="line-clamp-3 text-xl font-medium wrap-anywhere">{data.objective}</h1>
-        <p className="text-sm text-base-content/70">
-          {data.chip_id} · created by {data.created_by} {formatDateTime(data.created_at)}
+        <p className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-base-content/60">
+          <span>Chip {data.chip_id}</span>
+          <ExecutionActor actor={{ username: data.created_by }} />
+          <span>Created {formatDateTime(data.created_at)}</span>
         </p>
       </header>
       <div className="flex flex-col gap-4">
@@ -387,11 +390,7 @@ export function CalibrationSessionPageContent({
               </div>
             ) : null}
             <Field label="Status">
-              <span
-                className={`badge badge-soft badge-sm ${isOpen ? "badge-info" : "badge-ghost"}`}
-              >
-                {isOpen ? "Open" : "Closed"}
-              </span>
+              <CalibrationSessionStatusBadge status={data.status} />
             </Field>
             <Field label="Origin">
               {isAutomatic ? (
@@ -422,10 +421,10 @@ export function CalibrationSessionPageContent({
               </div>
             ) : null}
             <p className="text-xs text-base-content/60 sm:col-span-2 md:col-span-4">
-              Groups the work started for this objective. It grants nothing: each run is approved on
-              its own, and each agent session keeps its own policy and pause.
+              It grants nothing: each run is approved on its own, and each agent session keeps its
+              own policy.
               {isAutomatic
-                ? " QDash created it for a run started without a session; start another run with its ID to add to it while it is open. QDash closes it once everything started in it has ended, whatever the outcome."
+                ? " QDash created it for a run started without a session. Runs started with its ID join it while it is open, and QDash closes it when everything in it has ended."
                 : ""}
             </p>
             {isOpen && projectId && username === data.created_by ? (
