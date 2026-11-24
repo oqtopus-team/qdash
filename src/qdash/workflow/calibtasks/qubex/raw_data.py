@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
+import tempfile
 from collections.abc import Mapping, Sequence
 from dataclasses import is_dataclass
+from pathlib import Path
 from typing import Any
 
 import numpy as np
 from qubex.core import DataModel
+from qubex.measurement.classifiers import StateClassifier
 
-from qdash.common.raw_data import PreFitRawData
+from qdash.common.raw_data import PreFitRawData, StateClassifierRawData
 
 _AXIS_NAMES = (
     "sweep_range",
@@ -72,3 +75,51 @@ def extract_qubex_raw_data(value: Any) -> list[DataModel]:
 
     visit(value)
     return artifacts
+
+
+def state_classifier_raw_data(target: str, classifier: StateClassifier) -> StateClassifierRawData:
+    """Snapshot a trained Qubex classifier with the serializer Qubex itself uses."""
+    # Serialize through StateClassifier.save so the stored bytes match the shared
+    # classifier file Qubex writes and reads, independent of later overwrites.
+    with tempfile.TemporaryDirectory() as directory:
+        path = Path(directory) / f"{target}.pkl"
+        classifier.save(path)
+        payload = path.read_bytes()
+
+    states = sorted(classifier.dataset)
+    training_shots = np.stack(
+        [
+            np.asarray(classifier.dataset[state])[:, 0]
+            + 1j * np.asarray(classifier.dataset[state])[:, 1]
+            for state in states
+        ]
+    )
+    centers = classifier.centers
+    return StateClassifierRawData(
+        target=target,
+        source_type=f"{type(classifier).__module__}.{type(classifier).__name__}",
+        n_states=len(states),
+        data=training_shots,
+        axes={"state": np.asarray(states, dtype=np.int64)},
+        label_map={str(key): int(value) for key, value in classifier.label_map.items()},
+        confusion_matrix=np.asarray(classifier.confusion_matrix),
+        centers=np.asarray([complex(centers[state]) for state in states]),
+        phase=float(classifier.phase),
+        scale=float(getattr(classifier, "scale", 1.0)),
+        created_at=str(classifier.created_at),
+        classifier_pickle=StateClassifierRawData.pack_bytes(payload),
+        classifier_pickle_size=len(payload),
+    )
+
+
+def extract_state_classifier_raw_data(value: Any) -> list[StateClassifierRawData]:
+    """Return snapshots of the classifiers in a Qubex ``build_classifier`` result."""
+    data = getattr(value, "data", value)
+    classifiers = data.get("classifiers") if isinstance(data, Mapping) else None
+    if not isinstance(classifiers, Mapping):
+        return []
+    return [
+        state_classifier_raw_data(str(target), classifier)
+        for target, classifier in classifiers.items()
+        if isinstance(classifier, StateClassifier)
+    ]

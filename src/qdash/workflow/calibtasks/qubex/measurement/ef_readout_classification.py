@@ -13,6 +13,7 @@ from qdash.datamodel.task import (
 )
 from qdash.workflow.calibtasks.base import PostProcessResult, RunResult
 from qdash.workflow.calibtasks.qubex.base import QubexTask, readout_duration_run_parameter
+from qdash.workflow.calibtasks.qubex.raw_data import extract_state_classifier_raw_data
 from qdash.workflow.calibtasks.qubex.validation import (
     finite_value_error,
     first_validation_error,
@@ -95,6 +96,13 @@ class EFReadoutClassification(QubexTask):
             unit="a.u.", description="Readout fidelity for prepared second-excited state"
         ),
     }
+
+    def extract_raw_data(self, run_result: RunResult) -> list[Any]:
+        """Persist a per-task snapshot of the trained classifier as a NetCDF artifact."""
+        return [
+            *super().extract_raw_data(run_result),
+            *extract_state_classifier_raw_data(run_result.raw_result),
+        ]
 
     def run(self, backend: QubexBackend, qid: str) -> RunResult:
         exp = self.get_experiment(backend)
