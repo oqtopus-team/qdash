@@ -115,18 +115,12 @@ describe("tool step transitions", () => {
     expect(expanded(/Wrote fit.py/)).toBe("false");
   });
 
-  it("draws no icon on a live row, one once it ends, and no spinner", () => {
-    const steps = [tool({ tool: "bash", label: "Bash", args: { command: "ls -la" } })];
-    const { container, rerender } = render(<LiveTrace steps={steps} />);
+  it("draws one icon per row and no spinner", () => {
+    const { container } = render(
+      <LiveTrace steps={[tool({ tool: "bash", label: "Bash", args: { command: "ls -la" } })]} />,
+    );
     const row = screen.getByRole("button", { name: /Running ls/ });
-    expect(row.querySelectorAll("svg:not(.lucide-chevron-right)")).toHaveLength(0);
-    expect(row.querySelector(".loader-text-shimmer")).toBeNull();
-    rerender(<LiveTrace steps={[{ ...steps[0], status: "done", endedAt: 1000 }]} />);
-    expect(
-      screen
-        .getByRole("button", { name: /Ran ls/ })
-        .querySelectorAll("svg:not(.lucide-chevron-right)"),
-    ).toHaveLength(1);
+    expect(row.querySelectorAll("svg:not(.lucide-chevron-right)")).toHaveLength(1);
     expect(container.querySelector(".animate-spin")).toBeNull();
     expect(container.querySelector(".chain-marker")).toBeNull();
   });
@@ -255,7 +249,7 @@ describe("currentActivity", () => {
     expect(currentActivity(finished, null)).toBeNull();
   });
 
-  it("always names the activity beside the mark, in one visible live region", () => {
+  it("draws the footer only when no trace row shows the activity, but always announces it", () => {
     const startedAt = Date.now() - 5000;
     const { rerender } = render(
       <TurnActivity
@@ -264,12 +258,13 @@ describe("currentActivity", () => {
         statusMessage={null}
       />,
     );
+    // A running row already says this; the footer is screen-reader only, without a timer.
     const footer = screen.getByTestId("turn-activity");
-    expect(screen.getAllByRole("status")).toHaveLength(1);
-    expect(screen.getByRole("status")).not.toHaveClass("sr-only");
+    expect(footer.className).toBe("sr-only");
     expect(screen.getByRole("status").textContent).toBe("Running Get figure");
-    expect(footer.textContent).toMatch(/^Running Get figure\d+s$/);
+    expect(footer.textContent).toBe("Running Get figure");
 
+    // Writing the answer has no row, so the footer is drawn with its timer.
     rerender(
       <TurnActivity
         steps={[tool({ status: "done", endedAt: 1 }), { kind: "text", text: "T1 is" }]}
@@ -277,10 +272,11 @@ describe("currentActivity", () => {
         statusMessage={null}
       />,
     );
-    // A named activity shows at once, in the same footer.
+    // The same live region stays mounted across the switch.
     expect(screen.getByTestId("turn-activity")).toBe(footer);
+    expect(footer.className).not.toContain("sr-only");
     expect(screen.getByRole("status").textContent).toBe("Writing the answer");
-    expect(footer.textContent).toMatch(/^Writing the answer\d+s$/);
+    expect(footer.textContent).toMatch(/Writing the answer\d+s/);
   });
 });
 

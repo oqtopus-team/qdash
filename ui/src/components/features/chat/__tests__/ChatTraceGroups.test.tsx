@@ -72,10 +72,8 @@ describe("live tool groups", () => {
     const group = summary();
     expect(group.getAttribute("aria-expanded")).toBe("false");
     expect(group.getAttribute("data-active")).toBe("true");
-    // Live, the summary only counts calls: the footer names what runs, with the one mark.
-    expect(group.textContent).toContain("2 tool calls");
-    expect(group.textContent).not.toContain("Running uv");
-    expect(group.querySelector(".lucide-wrench")).toBeNull();
+    expect(group.textContent).toContain("Running uv");
+    expect(group.textContent).toContain("2 tools");
     // The rows are folded away, not just covered.
     expect(screen.queryByRole("button", { name: /Ran ls/ })).toBeNull();
 
@@ -83,15 +81,14 @@ describe("live tool groups", () => {
     rerender(<LiveTrace steps={steps} />);
     // The same summary, now counting three.
     expect(summary()).toBe(group);
-    expect(group.textContent).toContain("3 tool calls");
+    expect(group.textContent).toContain("Running bun");
+    expect(group.textContent).toContain("3 tools");
 
     steps = endTool(steps, { id: "e3", tool: "bash", output: "ok" });
     rerender(<LiveTrace steps={steps} />);
     expect(summary()).toBe(group);
     expect(group.getAttribute("data-active")).toBe("false");
     expect(group.textContent).toContain("Used 3 tools");
-    // Settled, the summary takes its static wrench.
-    expect(group.querySelector(".lucide-wrench")).not.toBeNull();
     expect(group.getAttribute("aria-expanded")).toBe("false");
 
     // Opened, the individual calls are there to inspect.
@@ -121,7 +118,7 @@ describe("live tool groups", () => {
     expect(screen.getByRole("button", { name: /Running bun/ })).toBeTruthy();
   });
 
-  it("leaves a thought inside the run to the footer", () => {
+  it("names a thought inside the run as its live activity", () => {
     render(
       <LiveTrace
         steps={[
@@ -131,8 +128,8 @@ describe("live tool groups", () => {
         ]}
       />,
     );
-    expect(summary().textContent).not.toContain("Thinking");
-    expect(summary().textContent).toContain("2 tool calls");
+    expect(summary().textContent).toContain("Thinking");
+    expect(summary().textContent).toContain("2 tools");
   });
 
   it("keeps prose between calls outside every group", () => {
