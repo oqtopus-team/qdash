@@ -578,8 +578,11 @@ html[data-theme="light"],
   --color-neutral: #dddde3 !important;
   --color-neutral-content: #3c3c43 !important;
 
-  /* Status colors - quieter hues kept apart from each other and from primary */
-  --color-info: #1d6b85 !important;
+  /*
+   * Status colors - quieter hues kept apart from each other and from primary. Info is a
+   * saturated blue, not teal, so running never reads as success green.
+   */
+  --color-info: #1662b0 !important;
   --color-info-content: #ffffff !important;
   --color-success: #2b7350 !important;
   --color-success-content: #ffffff !important;
@@ -621,8 +624,11 @@ html[data-theme="dark"],
   --color-neutral: #515c67 !important;
   --color-neutral-content: rgba(255, 255, 255, 0.87) !important;
 
-  /* Status colors - quieter hues kept apart from each other and from primary */
-  --color-info: #6eaed0 !important;
+  /*
+   * Status colors - quieter hues kept apart from each other and from primary. Info is a
+   * saturated blue, not teal, so running never reads as success green.
+   */
+  --color-info: #5ba3ea !important;
   --color-info-content: #1b1b1f !important;
   --color-success: #62b88c !important;
   --color-success-content: #1b1b1f !important;
