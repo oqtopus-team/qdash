@@ -179,6 +179,7 @@ class RunLedger:
         backend_name: str | None = None,
         reported_origin: ReportedLaunchOrigin | None = None,
         decision_id: str | None = None,
+        preflight: Callable[[Any], None] | None = None,
     ) -> RunDispatch:
         """Launch one run at most once per idempotency key.
 
@@ -189,8 +190,10 @@ class RunLedger:
         anything is recorded or launched. Without one it joins an automatic session. Without a
         key, every request is a new run, as an unkeyed request always was a new launch.
 
-        The request is validated before an automatic session is created, so a refused request
-        leaves nothing behind.
+        The request is validated, and then given to ``preflight`` (which refuses, for example,
+        a run whose hardware is already in use), before an automatic session is created or the
+        run is recorded or reserved, so a refused request leaves nothing behind. A retry that
+        gets its recorded answer is neither validated nor checked again.
         """
         key = idempotency_key or f"srv-{uuid4()}"
         hashed = scoped_request_hash(request_hash, calibration_session_id)
@@ -199,7 +202,7 @@ class RunLedger:
             replay = self._replay(found.run, request_hash if found.legacy else hashed)
             if replay is not None:
                 return replay
-            validated = validate()
+            validated = self._validated(validate, preflight)
             self._check_decision(
                 project_id, found.run.calibration_session_id, decision_id, validated
             )
@@ -238,9 +241,9 @@ class RunLedger:
                     ),
                 )
             association = RunAssociation.EXPLICIT
-            validated = validate()
+            validated = self._validated(validate, preflight)
         else:
-            validated = validate()
+            validated = self._validated(validate, preflight)
             try:
                 session = insert_or_load_automatic_session(
                     calibration_session_id=automatic_session_id_for_key(project_id, username, key),
@@ -273,6 +276,14 @@ class RunLedger:
             reported_origin=reported_origin,
             decision_id=decision_id,
         )
+
+    @staticmethod
+    def _validated(validate: Callable[[], Any], preflight: Callable[[Any], None] | None) -> Any:
+        """The validated request, refused when its preflight check fails."""
+        validated = validate()
+        if preflight is not None:
+            preflight(validated)
+        return validated
 
     # -- Agent actions -------------------------------------------------------------------
 

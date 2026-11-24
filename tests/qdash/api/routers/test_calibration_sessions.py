@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from qdash.api.services.flow_service.execution import EXECUTION_IN_PROGRESS_DETAIL
 from qdash.common.utils.datetime import now
 from qdash.datamodel.agent_session import AgentSessionStatus
 from qdash.datamodel.calibration_session import (
@@ -404,27 +405,88 @@ class TestPipelineRuns:
         ][0]
         assert run["dispatch_status"] == "unknown"
 
-    def test_busy_hardware_is_a_refusal_the_same_key_can_retry(self, test_client, lab):
+    def test_busy_hardware_refuses_before_a_named_session_records_anything(self, test_client, lab):
         session_id = _create_session(test_client)
         with prefect(["flow-run-busy", "flow-run-a"]) as create:
             # An unrelated run holds the chip.
             assert _run(test_client, None, key=None).status_code == 202
+            executions = ExecutionHistoryDocument.find_all().count()
+            before = _session_doc(session_id)
             refused = _run(test_client, session_id)
             assert refused.status_code == 409
-            [record] = CalibrationPipelineRunDocument.find(
-                {"calibration_session_id": session_id}
-            ).to_list()
-            assert record.status == CalibrationPipelineRunStatus.REJECTED
+            assert refused.json()["detail"] == EXECUTION_IN_PROGRESS_DETAIL
+            # No run, reservation, admission count, or execution; nothing reached Prefect.
+            assert (
+                CalibrationPipelineRunDocument.find({"calibration_session_id": session_id}).count()
+                == 0
+            )
+            after = _session_doc(session_id)
+            assert after.child_count == before.child_count
+            assert after.pending_children == []
+            assert ExecutionHistoryDocument.find_all().count() == executions
+            assert create.await_count == 1
             _release_locks()
             retried = _run(test_client, session_id)
         assert retried.status_code == 202, retried.text
         assert retried.json()["flow_run_id"] == "flow-run-a"
+        assert retried.json()["replayed"] is False
         assert create.await_count == 2
         [record] = CalibrationPipelineRunDocument.find(
             {"calibration_session_id": session_id}
         ).to_list()
         assert record.status == CalibrationPipelineRunStatus.DISPATCHED
-        assert record.attempts == 2
+        assert record.attempts == 1
+
+    def test_busy_hardware_refuses_before_an_automatic_session_is_created(self, test_client, lab):
+        with prefect(["flow-run-busy"]) as create:
+            assert _run(test_client, None, key=None).status_code == 202
+            sessions = CalibrationSessionDocument.find_all().count()
+            executions = ExecutionHistoryDocument.find_all().count()
+            unkeyed = _run(test_client, None, key=None)
+            keyed = _run(test_client, None, key="k")
+        assert unkeyed.status_code == keyed.status_code == 409
+        assert create.await_count == 1
+        assert CalibrationSessionDocument.find_all().count() == sessions
+        assert CalibrationPipelineRunDocument.find_all().count() == 1
+        assert ExecutionHistoryDocument.find_all().count() == executions
+
+    def test_a_retry_replays_its_run_while_that_run_holds_the_chip(self, test_client, lab):
+        with prefect(["flow-run-a"]) as create:
+            first = _run(test_client, None, key="k")
+            # The lock is still held by the first run's own execution.
+            again = _run(test_client, None, key="k")
+        assert first.status_code == again.status_code == 202, again.text
+        assert again.json()["replayed"] is True
+        assert again.json()["flow_run_id"] == "flow-run-a"
+        assert again.json()["calibration_run_id"] == first.json()["calibration_run_id"]
+        assert create.await_count == 1
+
+    def test_a_claim_taken_after_the_preflight_still_refuses_the_launch(self, test_client, lab):
+        from qdash.api.services.flow_service.execution import ExecutionCoordinator
+
+        with prefect(["flow-run-busy", "flow-run-a"]) as create:
+            assert _run(test_client, None, key=None).status_code == 202
+            executions = ExecutionHistoryDocument.find_all().count()
+            # Another run claims the chip between the preflight check and the claim.
+            with patch.object(ExecutionCoordinator, "ensure_available", return_value=None):
+                late = _run(test_client, None, key="k")
+            assert late.status_code == 409
+            assert late.json()["detail"] == EXECUTION_IN_PROGRESS_DETAIL
+            assert create.await_count == 1
+            assert ExecutionHistoryDocument.find_all().count() == executions
+            # The late refusal is recorded as rejected, as before the preflight existed.
+            [rejected] = CalibrationPipelineRunDocument.find({"idempotency_key": "k"}).to_list()
+            assert rejected.status == CalibrationPipelineRunStatus.REJECTED
+            assert rejected.attempts == 1
+            # Its retry while the chip is still busy is refused before another attempt.
+            assert _run(test_client, None, key="k").status_code == 409
+            [still] = CalibrationPipelineRunDocument.find({"idempotency_key": "k"}).to_list()
+            assert still.attempts == 1
+            _release_locks()
+            retried = _run(test_client, None, key="k")
+        assert retried.status_code == 202, retried.text
+        assert retried.json()["calibration_run_id"] == rejected.run_id
+        assert create.await_count == 2
 
     def test_missing_deployment_is_a_refusal(self, test_client, lab):
         from qdash.api.services.flow_service.prefect_gateway import SystemDeploymentUnavailable

@@ -160,6 +160,13 @@ async def quick_run_task(
             task, body.input_parameter_overrides, body.run_parameter_overrides
         ),
         dispatch=dispatch,
+        # The single-task run claims only its qubit's hardware.
+        preflight=lambda _: flow_service.ensure_hardware_available(
+            project_id=ctx.project_id,
+            chip_id=body.chip_id,
+            parameters={"qid": body.qid},
+            workflow=False,
+        ),
     )
 
 

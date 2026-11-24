@@ -270,6 +270,12 @@ It sends one request and does not retry or wait. If the connection fails, check 
 state before requesting cancellation again. A run that already ended raises
 `QDashConflictError`. Other runs in the calibration session are not targeted.
 
+Workflow, pipeline, and Workbench launches check hardware availability before creating a
+session or run record. An existing conflicting lock returns `QDashConflictError` without
+starting work or adding history. A successful same-key replay returns its saved response
+without this check. If another request acquires the lock after the check, the final atomic
+lock acquisition still prevents launch, but a rejected run record can remain.
+
 ## Follow an Existing Run
 
 ```python

@@ -749,6 +749,13 @@ async def re_execute_task_result(
         idempotency_key=idempotency_key,
         validate=lambda: None,
         dispatch=dispatch,
+        # The single-task run claims only its qubit's hardware.
+        preflight=lambda _: flow_service.ensure_hardware_available(
+            project_id=ctx.project_id,
+            chip_id=doc.chip_id,
+            parameters={"qid": doc.qid},
+            workflow=False,
+        ),
     )
 
 

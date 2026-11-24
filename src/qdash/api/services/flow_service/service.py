@@ -783,6 +783,27 @@ class FlowService:
         )
         return ExecutionAvailabilityResponse(available=available, reason=reason)
 
+    def ensure_hardware_available(
+        self,
+        *,
+        project_id: str,
+        chip_id: str,
+        parameters: dict[str, Any],
+        workflow: bool,
+    ) -> None:
+        """Refuse with 409 a launch whose hardware a running execution already holds.
+
+        Checked before the launch records anything; the atomic claim at dispatch still
+        decides. ``parameters`` are the run's flow parameters (only its targets matter), and
+        ``workflow`` claims the whole chip, as saved flows and pipelines do.
+        """
+        self._coordinator.ensure_available(
+            project_id=project_id,
+            chip_id=chip_id,
+            parameters=parameters,
+            workflow=workflow,
+        )
+
     async def _system_deployment(
         self,
         deployment_name: str,
