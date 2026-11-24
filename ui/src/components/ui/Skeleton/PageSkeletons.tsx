@@ -53,7 +53,7 @@ export function MetricsPageSkeleton() {
         </div>
 
         {/* View switch */}
-        <div className="flex w-fit gap-1 mb-6 rounded-[calc(var(--radius-field)+var(--border))] border border-base-300 p-2">
+        <div className="flex w-fit gap-1 mb-6 rounded-field bg-base-200 p-1">
           <div className="skeleton h-10 w-20 rounded-field" />
           <div className="skeleton h-10 w-24 rounded-field" />
         </div>
@@ -93,7 +93,7 @@ export function ChipPageSkeleton() {
         </div>
 
         {/* View switch */}
-        <div className="flex w-fit gap-1 mb-6 rounded-[calc(var(--radius-field)+var(--border))] border border-base-300 p-2">
+        <div className="flex w-fit gap-1 mb-6 rounded-field bg-base-200 p-1">
           <div className="skeleton h-10 w-20 rounded-field" />
           <div className="skeleton h-10 w-24 rounded-field" />
           <div className="skeleton h-10 w-24 rounded-field" />
@@ -135,7 +135,7 @@ export function AnalysisPageSkeleton() {
         </div>
 
         {/* View switch */}
-        <div className="flex w-fit max-w-full gap-1 overflow-hidden rounded-[calc(var(--radius-field)+var(--border))] border border-base-300 p-2">
+        <div className="flex w-fit max-w-full gap-1 overflow-hidden rounded-field bg-base-200 p-1">
           <div className="skeleton h-10 w-24 shrink-0 rounded-field" />
           <div className="skeleton h-10 w-24 shrink-0 rounded-field" />
           <div className="skeleton h-10 w-16 shrink-0 rounded-field" />

@@ -45,6 +45,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { SearchInput } from "@/components/ui/SearchInput";
 import { SelectedLabel } from "@/components/ui/SelectedLabel";
 import { UserAvatar } from "@/components/ui/UserAvatar";
+import { ViewSwitch } from "@/components/ui/ViewSwitch";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProject } from "@/contexts/ProjectContext";
 import { useForumLabels } from "@/hooks/useForumLabels";
@@ -1052,37 +1053,25 @@ export function ForumPageContent() {
         }
       />
 
-      <div className="mb-4 overflow-x-auto">
-        <div
-          className="tabs tabs-boxed w-fit whitespace-nowrap"
-          role="tablist"
-          aria-label="Forum status"
-        >
-          {FORUM_STATUSES.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              role="tab"
-              aria-selected={status === item.id}
-              className={`tab tab-sm gap-1.5 ${status === item.id ? "tab-active" : ""}`}
-              onClick={() => setStatusFilter(item.id as StatusFilter)}
-            >
+      <ViewSwitch<StatusFilter>
+        ariaLabel="Forum status"
+        size="sm"
+        className="mb-4 overflow-x-auto"
+        value={status}
+        onValueChange={setStatusFilter}
+        items={[
+          ...FORUM_STATUSES.map((item) => ({ id: item.id as StatusFilter, label: item.label })),
+          { id: "all" as const, label: "All" },
+        ].map((item) => ({
+          value: item.id,
+          label: (
+            <>
               {item.label}
               {status === item.id && !isLoading && <span className="badge badge-sm">{total}</span>}
-            </button>
-          ))}
-          <button
-            type="button"
-            role="tab"
-            aria-selected={status === "all"}
-            className={`tab tab-sm gap-1.5 ${status === "all" ? "tab-active" : ""}`}
-            onClick={() => setStatusFilter("all")}
-          >
-            All
-            {status === "all" && !isLoading && <span className="badge badge-sm">{total}</span>}
-          </button>
-        </div>
-      </div>
+            </>
+          ),
+        }))}
+      />
 
       <PageFiltersBar className="mb-4 sm:mb-6">
         <PageFiltersBar.Group className="flex-1">
