@@ -41,6 +41,11 @@ A submitted PR should show the intended files and a recorded successful check co
 Every push requires a successful full `task check`, including docs-only changes and PR updates.
 Focused tests and CI do not replace this gate.
 
+`task check` completes auto-fixes before running independent checks in parallel, then runs
+the leak scan after those checks pass. Output is grouped by task, so long-running tests can
+remain silent until they finish. For focused troubleshooting, `task check-lanes` runs only
+the parallel checks; it does not replace the full pre-push check.
+
 1. Stage intended new files so the leak scan includes them.
 2. Fetch the PR target and run the checks from the repository root:
 
