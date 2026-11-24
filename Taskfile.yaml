@@ -293,6 +293,8 @@ tasks:
 
   build-client-ts:
     desc: Build the local TypeScript client and SDK for pi packages and the runtime
+    # Dependents running in parallel share one build instead of rewriting dist/ concurrently.
+    run: once
     cmds:
       - bun run build:client
       - bun run build:sdk
@@ -319,7 +321,13 @@ tasks:
     desc: Check the TypeScript SDK's generated client is fresh, then typecheck and test the SDK
     cmds:
       - task: check-typescript-sdk-generated
-      - cd sdks/typescript && bun run check
+      - task: check-sdk-ts-package
+
+  check-sdk-ts-package:
+    desc: Typecheck and test the TypeScript SDK package without the generation check
+    dir: sdks/typescript
+    cmds:
+      - bun run check
 
   test-workflow:
     desc: Run workflow engine tests
@@ -371,6 +379,9 @@ tasks:
 
   build-docs:
     dir: docs
+    # check-docs-links and check-docs-mermaid run in one invocation share one build
+    # instead of writing .vitepress/dist concurrently.
+    run: once
     cmds:
       - bun run docs:build
 
@@ -486,21 +497,51 @@ tasks:
     cmds:
       # Fail fast on the wrong scanner before the slower checks run.
       - task: check-betterleaks-version
+      # Auto-fixes write files, so they finish before any read-only check starts.
       - task: lint
-      - task: ci-lint
-      - task: ci-typecheck
-      - task: ci-test
-      - task: ci-ui
-      - task: test-client-ts
-      - task: test-sdk-ts
-      - task: ci-pi-packages
-      - task: ci-agent-runtime
+      # Checks run in parallel lanes. Grouped output keeps each task's log
+      # contiguous; the run continues after a failure and exits non-zero if any check fails.
+      - '"{{.TASK_EXE}}" --output group check-lanes'
+      # Scan the tree last so no check is still writing files while it is copied.
       - task: scan-leaks-local
 
   check-all:
     desc: Run the full local check suite
     cmds:
       - task: check
+
+  check-lanes:
+    desc: Run the checks of task check in parallel lanes (no auto-fix or leak scan)
+    deps: [check-lane-python, check-lane-typescript, ci-ui]
+
+  check-lane-python:
+    internal: true
+    cmds:
+      # ci-lint syncs the uv environment with --all-packages and runs the Python Fern check,
+      # so the later uv runs do not race on the sync and the two Fern runs never overlap.
+      - task: ci-lint
+      - task: check-lane-python-after-lint
+
+  check-lane-python-after-lint:
+    internal: true
+    deps: [ci-typecheck, check-test-python, check-typescript-sdk-generated]
+
+  check-test-python:
+    internal: true
+    cmds:
+      # Same tests and flags as ci-test, without coverage instrumentation or reports.
+      - uv run pytest tests/ clients/python/tests/ sdks/python/tests/ -v --tb=short
+
+  check-lane-typescript:
+    internal: true
+    cmds:
+      # Build the local client and SDK once before anything reads their dist/ output.
+      - task: build-client-ts
+      - task: check-lane-typescript-after-build
+
+  check-lane-typescript-after-build:
+    internal: true
+    deps: [test-client-ts, check-sdk-ts-package, ci-pi-packages, ci-agent-runtime]
 
   # =============================================================================
   # CI Checks (check-only, no auto-fix)
