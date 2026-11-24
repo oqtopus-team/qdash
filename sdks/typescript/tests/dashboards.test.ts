@@ -4,7 +4,6 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { QDashClient, QDashConfig } from "@oqtopus-team/qdash-client";
 import {
   Dashboard,
   MetricScriptError,
@@ -32,9 +31,7 @@ function server(routes: Record<string, Reply[]>) {
       headers: { "Content-Type": "application/json" },
     });
   };
-  const qdash = new QDash(
-    new QDashClient(new QDashConfig({ baseUrl: "https://qdash.example/api", apiToken: "token", projectId: "p" }), { fetch }),
-  );
+  const qdash = new QDash({ baseUrl: "https://qdash.example/api", apiToken: "token", projectId: "p" }, { fetch });
   return { qdash, requests };
 }
 

@@ -27,6 +27,18 @@ for one of these purposes; keep measurement preparation free of writes.
 `taskResults.evidence`: the SDK joins authorized reads; the tool bounds and redacts output and
 adds web links. Keep reusable joins in the SDK so scripts can use them without Pi.
 
+`extensions/lib/sdk-session.ts` maps resolved legacy client settings into the SDK. Production
+uses the built-in fetch and `process.env`; a custom host must pass its fetch and environment
+through `sdkSessionFactory({ fetch, env })` in the affected tool's `sdk` dependency. Private
+client transport settings are not copied. The client's retry backoff does not apply to SDK
+reads. Client and SDK password logins are independent; API-token authentication avoids this
+extra login. The hosted runtime still supplies a private INI profile, not TOML.
+
+`tests/sdk-adapter-integration.test.mjs` exercises the real adapter and SDK against a local
+HTTP server, including project headers, session preflight, single dispatch, and uncertain
+outcomes. The launch tools preserve `QDashResultUnknownError` reconciliation guidance rather
+than reporting a run as started.
+
 Reviewed writes require user approval. Session-granted tools are limited to the approved session
 and still pass server checks. A model-provided approval flag is never authority.
 

@@ -2,7 +2,6 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-import { QDashClient, QDashConfig } from "@oqtopus-team/qdash-client";
 import {
   COOLDOWN_NOT_ASSOCIATED,
   QDash,
@@ -97,11 +96,8 @@ function qdashWith(routes: Record<string, Body>) {
     if (body && typeof body === "object" && "__status" in body) return json({ detail: "unavailable" }, (body as { __status: number }).__status);
     return json(body);
   };
-  const client = new QDashClient(
-    new QDashConfig({ baseUrl: "https://qdash.example/api", apiToken: "token", projectId: "p-1", retry: { maxAttempts: 1 } }),
-    { fetch },
-  );
-  return { qdash: new QDash(client), requests, projects };
+  const qdash = new QDash({ baseUrl: "https://qdash.example/api", apiToken: "token", projectId: "p-1", readAttempts: 1 }, { fetch });
+  return { qdash, requests, projects };
 }
 
 describe("qdash.taskResults.evidence", () => {

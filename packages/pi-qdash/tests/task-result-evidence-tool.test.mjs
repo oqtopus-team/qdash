@@ -11,6 +11,7 @@ import {
   isReviewedWriteTool,
   isSessionGrantedWriteTool,
 } from "../.test-dist/lib/tool-policy.js";
+import { sdkOver } from "./helpers/sdk-session.mjs";
 
 const RESULT = {
   task_id: "t-1",
@@ -52,7 +53,7 @@ function toolWith(routes) {
     },
   });
   const tools = new Map();
-  registerTaskResultEvidenceTool({ registerTool: (tool) => tools.set(tool.name, tool) }, { makeClient: async () => client });
+  registerTaskResultEvidenceTool({ registerTool: (tool) => tools.set(tool.name, tool) }, { sdk: sdkOver, makeClient: async () => client });
   return { tool: tools.get(TASK_RESULT_EVIDENCE_TOOL), requests };
 }
 
@@ -120,7 +121,7 @@ test("the evidence tool is a deferred, script-callable read and never a write", 
   assert.ok(!isReviewedWriteTool(TASK_RESULT_EVIDENCE_TOOL));
   assert.ok(!isSessionGrantedWriteTool(TASK_RESULT_EVIDENCE_TOOL));
   const tools = new Map();
-  registerTaskResultEvidenceTool({ registerTool: (tool) => tools.set(tool.name, applyToolPolicy(tool)) }, { makeClient: async () => { throw new Error("unused"); } });
+  registerTaskResultEvidenceTool({ registerTool: (tool) => tools.set(tool.name, applyToolPolicy(tool)) }, { sdk: sdkOver, makeClient: async () => { throw new Error("unused"); } });
   const applied = tools.get(TASK_RESULT_EVIDENCE_TOOL);
   assert.equal(applied.exposure, "deferred");
   assert.equal(applied.annotations.readOnlyHint, true);

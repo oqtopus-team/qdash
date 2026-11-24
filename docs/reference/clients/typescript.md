@@ -1,14 +1,15 @@
-# TypeScript Client
+# TypeScript Client and SDK
 
-Use `@oqtopus-team/qdash-client` for API access and `@oqtopus-team/qdash-sdk` for calibrations.
-Both require Node.js 20 or later.
+Use `@oqtopus-team/qdash-sdk` for API access, calibrations, workflows, and dashboards.
+It includes its own Fern-generated client. Existing `@oqtopus-team/qdash-client` applications
+remain supported independently. Both require Node.js 20 or later.
 
 ## Installation
 
 ```bash
-npm install @oqtopus-team/qdash-client
-# Includes the matching client:
 npm install @oqtopus-team/qdash-sdk
+# For existing client applications:
+npm install @oqtopus-team/qdash-client
 ```
 
 Stable versions follow QDash releases. Append `@beta` for a prerelease.
@@ -17,28 +18,56 @@ Stable versions follow QDash releases. Append `@beta` for a prerelease.
 
 <a id="configuration"></a>
 
-Copy your token and project ID from **Settings → API Token**. Set `QDASH_BASE_URL` to the
-deployment URL ending in `/api`, plus `QDASH_API_TOKEN` and `QDASH_PROJECT_ID` in your environment.
-Save a profile with the installed client (no Python required):
+The SDK reads the same `config.toml` as Python, including `default_profile` and
+`[profiles.<name>]`. Follow the [profile setup](./python.md#connect-to-a-deployment) to create
+it and set the token environment variable in your Node.js or Bun process.
 
 ```ts
-import { QDashConfig } from "@oqtopus-team/qdash-client";
+import { QDash } from "@oqtopus-team/qdash-sdk";
 
-await QDashConfig.fromEnv().save("local");
+const qdash = await QDash.fromProfile("local");
+console.log((await qdash.api.chip.listChips()).chips);
 ```
 
-Profiles use `$XDG_CONFIG_HOME/qdash/config.ini`, or `~/.config/qdash/config.ini`, shared with the
-Python client and pi-qdash. `save()` writes owner-only permissions. Connect with that profile:
+Reuse `qdash` across operations; there is no connection to close. `QDash.fromProfile()` uses
+`default_profile`, then `"default"`. An explicit name takes precedence. For an explicit file,
+use `QDash.fromProfile("local", "/path/to/config.toml")`. The file uses snake_case keys;
+JavaScript configuration uses camelCase:
 
 ```ts
-import { QDashClient } from "@oqtopus-team/qdash-client";
-
-const client = await QDashClient.fromProfile("local"); // or QDashClient.fromEnv()
-console.log((await client.listChips()).chips);
+const qdash = new QDash({
+  baseUrl: "http://localhost:5714/api",
+  apiToken: process.env.QDASH_API_TOKEN,
+  projectId: "your-project-id",
+  timeoutSec: 30,
+});
 ```
 
-An empty array is a successful connection to a project with no chips. Before calibration examples,
-[create a chip and run its first calibration](../../user-guide/first-calibration.md).
+Alternatively, `QDash.fromEnv()` reads `QDASH_BASE_URL`, `QDASH_API_TOKEN`, and
+`QDASH_PROJECT_ID`, plus the [shared environment settings](./python.md#environment-variables).
+Legacy worker and retry-backoff settings do not apply to the SDK.
+
+INI profiles are deprecated in the SDK and emit `DeprecationWarning` with code
+`QDASH_SDK_INI_CONFIG`. The SDK reads INI only when the default TOML file is absent or an
+explicit `.ini` path is given. It never merges files or falls back after a TOML error.
+Use the [INI migration procedure](./python.md#migrate-an-ini-profile); both SDKs use the same
+TOML keys and profile selection rules. The SDK does not provide a profile-writing method.
+
+`qdash.withProject(projectId)` returns a new scoped session without changing the original.
+Configuration is a frozen snapshot. `proxy` or `verifyTls: false` requires a custom `fetch`
+passed as the second constructor argument, such as `new QDash(config, { fetch: customFetch })`.
+Construction fails if no custom fetch is supplied. The caller must ensure that the supplied
+fetch implements the requested proxy or TLS policy; the SDK cannot verify that behavior.
+
+An empty chip array indicates a successful connection to a project with no chips. Before
+calibration examples, [create a chip and run its first calibration](../../user-guide/first-calibration.md).
+
+### Existing Client Applications
+
+`@oqtopus-team/qdash-client` continues to use `config.ini` without this deprecation.
+Its `QDashConfig.fromEnv().save("local")` writes INI with owner-only permissions;
+`QDashClient.fromProfile("local")` reads it. Keep INI profiles for those applications.
+The high-level client methods below are unchanged.
 
 <a id="list-a-chip-s-executions"></a>
 <a id="read-a-target-s-task-history"></a>
@@ -81,7 +110,7 @@ session's project. Use a task ID from `listTaskResults`:
 import { QDash } from "@oqtopus-team/qdash-sdk";
 
 const qdash = await QDash.fromProfile("local");
-const page = await qdash.client.listTaskResults({ chipId: "64Qv3", qid: "6", limit: 1 });
+const page = await qdash.api.taskResult.listTaskResults({ chip_id: "64Qv3", qid: "6", limit: 1 });
 if (!page.items[0]) throw new Error("No saved results for this target");
 const evidence = await qdash.taskResults.evidence(page.items[0].task_id);
 console.log(evidence.result.output_parameters);
@@ -141,7 +170,10 @@ console.log(result.status);
 
 `validateCalibration()` dispatches nothing; `calibrate()` starts the run. `wait()` returns the
 whole run's status, including failure or cancellation. A timeout throws `QDashTimeoutError`
-and leaves the run active. `get()` reads current status without waiting.
+and leaves the run active. Sleeps are capped at the remaining budget; no subsequent read
+starts at or after the deadline. A read already in flight is not cancelled and remains subject
+to its request timeout and retries. A zero timeout makes one initial read.
+`get()` reads current status without waiting.
 
 For stored specs, use `qdash.pipelines.catalog()`, `validate(spec, { chipId })`, and
 `execute(spec, { chipId })`. The returned pipeline run's `wait()` returns raw execution detail.
@@ -183,11 +215,45 @@ See [metric scripts](../../user-guide/metric-scripts.md) for authoring.
 
 ## Generated API
 
-Use `client.api` for any [OpenAPI](../openapi.md) operation without a high-level helper:
+The SDK exposes every generated resource through `qdash.api`. Request and response fields
+retain the API's snake_case spelling:
 
 ```ts
-const chips = await client.api.listChips();
+const chips = await qdash.api.chip.listChips();
+const execution = await qdash.api.execution.getExecution({ execution_id: "your-execution-id" });
 ```
 
-It shares authentication, timeouts, retries, and error handling with the high-level client.
-Generated types are available from the package's `/models` and `/openapi` exports.
+These calls share the session's authentication and project header, disable retries by default,
+and throw generated `ApiError` or `ApiTimeoutError`. SDK helpers translate failures to
+`QDashApiError` subclasses: 409 becomes `QDashConflictError`, and 5xx responses remain
+`QDashApiError`. Helper GETs retry transient statuses, connection failures, and timeouts up to
+`readAttempts`; caller cancellation is not retried. Writes are sent once. Do not opt into
+retries for execution writes without reconciling their effects.
+
+With username/password authentication, a resource's 401 invalidates the login used by that
+request. The failed request is not replayed; the next call signs in again. Scoped sessions share
+this state, and a late 401 cannot invalidate a newer sign-in. Static API tokens are unchanged.
+
+With `calibrationSessionId`, pipeline execution first searches your sessions on the target
+chip without changing their state. It checks up to 10,100 sessions, including closed sessions
+for idempotent replay. If that check fails, `QDashPreflightError` means no launch request was
+sent; its `cause` preserves a failed API read. Check the session, credentials and API availability.
+
+`QDashResultUnknownError` means a dispatch response did not confirm the requested run
+recording, or a successful HTTP response could not be read as a JSON object. The latter also
+applies without recording options. It extends `QDashApiError` and exposes `executionId` when available. The operation
+may have started: inspect that execution before deciding what to do; do not launch again
+with a new key.
+
+Import generated types through the `QDashApi` namespace from `@oqtopus-team/qdash-sdk`. Existing client users can continue
+using `client.api.listChips()` and the client's `/models` and `/openapi` exports.
+
+## Follow an Existing Run
+
+```ts
+const result = await qdash.run("your-execution-id").wait({ timeoutSeconds: 600 });
+console.log(result.status);
+```
+
+Creating the handle dispatches no work. Waiting follows the whole pipeline; a timeout leaves
+it running on the server.

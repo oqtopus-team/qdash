@@ -16,9 +16,18 @@ Start `pi`, then run `/qdash-setup <profile> <chip_id>` with your saved profile 
 `/qdash-dashboard` should show that chip's current data; check `/qdash-config` if it cannot connect.
 QDash web Agent includes the extension already.
 
-`qdash_config_info` shows non-secret connection settings. Use
-[client profiles](./clients/typescript.md#connect-to-a-deployment) for credentials.
+`qdash_config_info` shows non-secret connection settings. pi-qdash still reads the legacy
+client's `config.ini` or `QDASH_*` environment variables, not the SDK's `config.toml`.
+Keep your INI file when migrating standalone SDK scripts to TOML. See
+[existing client configuration](./clients/typescript.md#existing-client-applications).
+API tokens avoid separate password logins by the client and SDK; with username/password,
+a tool using both can sign in twice.
 Set `QDASH_WEB_URL` if the web UI is not the API base URL without `/api`.
+
+If a launch reports an unknown outcome, do not repeat it. Use `qdash_get_execution` with
+the reported execution ID. If no ID is available, use `qdash_list_executions` with the
+launch's chip and check subsequent pages before reconciling its state. The pipeline and
+saved-workflow tools do not report such responses as successfully started.
 
 ## Read-only query tools
 

@@ -14,6 +14,7 @@ on:
       - "sdks/python/**"
       - "clients/typescript/**"
       - "sdks/typescript/**"
+      - "sdks/testdata/**"
       - "packages/**"
       - "docs/oas/openapi.json"
       - "ui/src/schemas/**"
@@ -36,6 +37,7 @@ on:
       - "sdks/python/**"
       - "clients/typescript/**"
       - "sdks/typescript/**"
+      - "sdks/testdata/**"
       - "packages/**"
       - "docs/oas/openapi.json"
       - "ui/src/schemas/**"
@@ -97,9 +99,12 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Build local TypeScript client
-        run: bun run build:client
+      # Regenerates src/_generated with the pinned Fern CLI (npx) and its generator image
+      # (Docker, preinstalled on the runner) and fails when the committed tree differs.
+      - name: Check generated API client
+        run: node sdks/typescript/scripts/generate.mjs --check
 
+      # The SDK is self-contained: it is checked without building the client.
       - name: Check and test SDK
         working-directory: sdks/typescript
         run: bun run check
@@ -107,7 +112,7 @@ jobs:
       - name: Test release versioning
         run: node --test .github/scripts/sdk-package-release.test.mjs
 
-      # The SDK takes the client's exact version and pins the client to it.
+      # The SDK takes the client's exact version; it does not depend on the client.
       - name: Set package version
         env:
           QDASH_CLIENT_VERSION: ${{ needs.client.outputs.version }}
@@ -119,22 +124,18 @@ jobs:
           bun run build
           npm pack --pack-destination dist --ignore-scripts
 
-      - name: Download matching client tarball
-        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
-        with:
-          name: qdash-typescript-client-dist
-          path: client-dist
-
       - name: Verify standalone tarball
         shell: bash
-        # This tests a fresh consumer install and typechecks it with Node's resolution.
+        # This tests a fresh consumer install of the SDK alone, without the client, and
+        # typechecks it with Node's resolution.
         # jactionlint ignore=adhoc-packages
         run: |
           consumer="$(mktemp -d)"
           npm install --prefix "$consumer" --ignore-scripts --no-audit --no-fund \
-            "$(realpath sdks/typescript/dist/oqtopus-team-qdash-sdk-*.tgz)" "$(realpath client-dist/*.tgz)" \
-            typescript@5.9.3 @types/node@24
+            "$(realpath sdks/typescript/dist/oqtopus-team-qdash-sdk-*.tgz)" \
+            typescript@5.9.3 @types/node@20
           node .github/scripts/sdk-package-smoke.mjs "$consumer"
+          bun .github/scripts/sdk-package-smoke.mjs "$consumer" --runtime-only
 
       - name: Upload package artifact
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
@@ -147,7 +148,7 @@ jobs:
     name: Publish TypeScript SDK
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    # The client job published the client first; the SDK pins that exact version.
+    # The client job published the client first; the SDK carries the same version.
     needs: [client, sdk]
     if: >-
       startsWith(github.ref, 'refs/tags/v') ||

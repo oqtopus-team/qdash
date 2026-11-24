@@ -150,9 +150,10 @@ not the objective itself.
   `qdash_run_pipeline`, record your reading of each result citing the run, and end with a
   conclusion. Resume from `qdash_get_calibration_session` and
   `qdash_get_calibration_session_audit`, not from memory.
-- When QDash says a pipeline run's launch outcome is unknown, do not start it again: check
-  `qdash_list_executions` and tell the user. Such a run was admitted and may still start, even
-  after the calibration session is closed.
+- When QDash says a pipeline run's launch outcome is unknown, do not start it again: check the
+  reported execution ID with `qdash_get_execution`, or without one page through
+  `qdash_list_executions` for the run's `chipId`, and tell the user. Such a run was admitted and
+  may still start, even after the calibration session is closed.
 - An agent session that QDash reports as not admitted refuses every operation; do not work
   around it. A rejected one never operates: start a new calibration session for further work.
 

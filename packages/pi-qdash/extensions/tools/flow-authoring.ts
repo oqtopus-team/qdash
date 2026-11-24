@@ -1,11 +1,11 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { QDashClient } from "@oqtopus-team/qdash-client";
-import { QDash } from "@oqtopus-team/qdash-sdk";
 import { Type } from "typebox";
 
 import { pausedSessionConflict } from "../lib/agent-loop.js";
 import { toTextToolResult } from "../lib/results.js";
 import { requireWriteApproval } from "../lib/write-approval.js";
+import { isResultUnknown, resultUnknownToolError, sdkSession, type SdkSessionFactory } from "../lib/sdk-session.js";
 
 /**
  * Flow authoring: saving a Prefect flow the agent wrote.
@@ -70,6 +70,8 @@ export type FlowAuthoringDependencies = {
   resolveChipId(client: FlowClient, chipId?: string): Promise<string>;
   /** The QDash web page of a flow, when the web URL is known. */
   flowPageUrl?(client: FlowClient, name: string): string | undefined;
+  /** The SDK session for a resolved client; defaults to one with the client's settings. */
+  sdk?: SdkSessionFactory;
 };
 
 const FLOW_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
@@ -237,13 +239,20 @@ export function registerFlowAuthoringTools(pi: Pick<ExtensionAPI, "registerTool"
       if (conflict) {
         return toTextToolResult(conflict, { blocked: true }, { tool: "qdash_execute_flow", flowName: params.name, started: false, blockedByPausedSession: true });
       }
-      const qdash = new QDash(client);
+      const qdash = (deps.sdk ?? sdkSession)(client);
       // Recorded under this call's key: a replayed call returns the run it started.
-      const run = await qdash.workflows.run(params.name, {
-        parameters: params.parameters,
-        idempotencyKey: flowRunKey(toolCallId),
-        ...(params.calibrationSessionId ? { calibrationSessionId: params.calibrationSessionId } : {}),
-      });
+      const run = await qdash.workflows
+        .run(params.name, {
+          parameters: params.parameters,
+          idempotencyKey: flowRunKey(toolCallId),
+          ...(params.calibrationSessionId ? { calibrationSessionId: params.calibrationSessionId } : {}),
+        })
+        .catch((error: unknown) => {
+          // Answered, but without the recording asked for: the run may be going.
+          throw isResultUnknown(error)
+            ? resultUnknownToolError(error, flowChip ? { chipId: flowChip } : { chipHint: `the chip_id that qdash_get_flow shows for flow ${params.name}` })
+            : error;
+        });
       const result = run.response as FlowExecution;
       return toTextToolResult(formatFlowExecution(result, params.name), result, {
         tool: "qdash_execute_flow",

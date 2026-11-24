@@ -6,7 +6,8 @@
  * the reason it is absent. A failed or missing part is never filled from other
  * data, and a cooldown is never inferred.
  */
-import { QDashApiError, QDashValidationError, type QDashClient } from "@oqtopus-team/qdash-client";
+import { read as readGet, type Context } from "./_http.js";
+import { QDashApiError, QDashValidationError } from "./errors.js";
 import type {
   CooldownResponse,
   CouplingResponse,
@@ -14,7 +15,7 @@ import type {
   QubitResponse,
   Task,
   TaskResultResponse,
-} from "@oqtopus-team/qdash-client/models";
+} from "./types.js";
 
 /**
  * A context part of the evidence.
@@ -119,7 +120,7 @@ function checkEvidenceArguments(taskId: unknown, options: unknown): void {
       problems.push(`${unknown.join(", ")} ${unknown.length === 1 ? "is not an option" : "are not options"} of evidence`);
     }
   }
-  if (problems.length > 0) throw new QDashValidationError(`${problems.join("; ")}.`, { payload: { problems } });
+  if (problems.length > 0) throw new QDashValidationError(`${problems.join("; ")}.`, { body: { problems } });
 }
 
 /** A failed read as a context part, keeping the error kind and HTTP status. */
@@ -161,7 +162,7 @@ export function targetKind(qid: string, task: Task | null): Pick<TargetContext, 
 
 function executionContext(execution: ExecutionResponseDetail, result: TaskResultResponse): ExecutionContext {
   if (!isRecord(execution)) {
-    throw new QDashApiError(`Unexpected GET /executions/${result.execution_id} response: not an object`, { payload: execution });
+    throw new QDashApiError(`Unexpected GET /executions/${result.execution_id} response: not an object`, { body: execution });
   }
   const tasks = Array.isArray(execution.task) ? execution.task : [];
   const task = tasks.find((entry) => isRecord(entry) && entry.task_id === result.task_id) ?? null;
@@ -175,7 +176,7 @@ function targetContext(
   kind: Pick<TargetContext, "kind" | "kindSource">,
   result: TaskResultResponse,
 ): TargetContext {
-  if (!isRecord(state)) throw new QDashApiError(`Unexpected ${kind.kind} response for ${result.qid}: not an object`, { payload: state });
+  if (!isRecord(state)) throw new QDashApiError(`Unexpected ${kind.kind} response for ${result.qid}: not an object`, { body: state });
   const data = isRecord(state.data) ? state.data : {};
   const outputs: Record<string, StoredOutput> = {};
   const outputsNotStored: string[] = [];
@@ -192,7 +193,7 @@ function targetContext(
 }
 
 function cooldownContext(cooldown: CooldownResponse, result: TaskResultResponse): CooldownContext {
-  if (!isRecord(cooldown)) throw new QDashApiError("Unexpected cooldown response: not an object", { payload: cooldown });
+  if (!isRecord(cooldown)) throw new QDashApiError("Unexpected cooldown response: not an object", { body: cooldown });
   const chip = text(result.chip_id);
   const chips = Array.isArray(cooldown.chip_ids) ? cooldown.chip_ids : null;
   const at = Date.parse(text(result.start_at) ?? "");
@@ -215,22 +216,23 @@ function cooldownContext(cooldown: CooldownResponse, result: TaskResultResponse)
  * qubit or coupling, and a named cooldown. See `TaskResults.evidence`.
  */
 export async function readTaskResultEvidence(
-  client: QDashClient,
+  context: Context,
   taskId: string,
   options: TaskResultEvidenceOptions = {},
 ): Promise<TaskResultEvidence> {
   checkEvidenceArguments(taskId, options);
   const id = taskId.trim();
-  const body: unknown = await client.getTaskResult(id);
-  if (!isRecord(body)) throw new QDashApiError(`Unexpected GET /tasks/${id}/result response: not an object`, { payload: body });
+  const { api, reads } = context;
+  const body: unknown = await readGet(reads, (requestOptions) => api.task.getTaskResult({ task_id: id }, requestOptions));
+  if (!isRecord(body)) throw new QDashApiError(`Unexpected GET /tasks/${id}/result response: not an object`, { body: body });
   if (body.task_id !== id) {
-    throw new QDashApiError(`The result read for ${id} has task_id ${JSON.stringify(body.task_id)}`, { payload: body });
+    throw new QDashApiError(`The result read for ${id} has task_id ${JSON.stringify(body.task_id)}`, { body: body });
   }
   const result = body as unknown as TaskResultResponse;
 
   const executionId = text(result.execution_id);
   const execution: TaskResultContext<ExecutionContext> = executionId
-    ? await read(async () => executionContext(await client.getExecution(executionId), result))
+    ? await read(async () => executionContext(await readGet(reads, (requestOptions) => api.execution.getExecution({ execution_id: executionId }, requestOptions)), result))
     : { status: "not_applicable", reason: "The task result names no execution." };
 
   const qid = text(result.qid);
@@ -242,7 +244,11 @@ export async function readTaskResultEvidence(
     const kind = targetKind(qid, execution.status === "ok" ? execution.value.task : null);
     target = await read(async () =>
       targetContext(
-        kind.kind === "coupling" ? await client.getChipCoupling(chipId, qid) : await client.getChipQubit(chipId, qid),
+        kind.kind === "coupling"
+          ? await readGet(reads, (requestOptions) =>
+              api.chip.getChipCoupling({ chip_id: chipId, coupling_id: qid }, requestOptions),
+            )
+          : await readGet(reads, (requestOptions) => api.chip.getChipQubit({ chip_id: chipId, qid }, requestOptions)),
         kind,
         result,
       ),
@@ -251,7 +257,7 @@ export async function readTaskResultEvidence(
 
   const cooldownId = options.cooldownId?.trim();
   const cooldown: TaskResultContext<CooldownContext> = cooldownId
-    ? await read(async () => cooldownContext(await client.api.getCooldown(encodeURIComponent(cooldownId)), result))
+    ? await read(async () => cooldownContext(await readGet(reads, (requestOptions) => api.cooldown.getCooldown({ cooldown_id: cooldownId }, requestOptions)), result))
     : { status: "not_associated", reason: COOLDOWN_NOT_ASSOCIATED };
 
   return { taskId: id, result, execution, target, cooldown };

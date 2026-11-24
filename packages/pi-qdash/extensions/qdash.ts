@@ -14,7 +14,7 @@ import {
 } from "@oqtopus-team/qdash-client";
 import { Text, truncateToWidth } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
-import { QDash, type TaskResultComparison } from "@oqtopus-team/qdash-sdk";
+import type { TaskResultComparison } from "@oqtopus-team/qdash-sdk";
 
 import { analyzePlotlyFigure, figureAnalysisText } from "./lib/figure-analysis.js";
 import { fetchFigureDetails, figureComponent, figureResultText, mediaTypeForPath, type FigureDetails } from "./lib/figures.js";
@@ -52,6 +52,7 @@ import type { TaskKnowledgeLike } from "./lib/qcal-hydration.js";
 import { registerTimeseriesComparisonTool } from "./tools/timeseries.js";
 import { checkQueryResponse, isContractedAction, QUERY_CONTRACTS, TASK_RESULTS_PAGE_LIMIT, targetHistoryProblem, taskResultPageProblem } from "./lib/query-contracts.js";
 import { analyzeWiringMarkdown, wiringInsightLines, type WiringInsights } from "./lib/wiring-analysis.js";
+import { sdkSession } from "./lib/sdk-session.js";
 
 type QDashQueryParams = {
   profile?: string;
@@ -839,7 +840,7 @@ async function buildCalibrationComparison(params: { profile?: string; configPath
   const id = (qid ?? couplingId) as string;
   const limit = Math.max(2, Math.min(TASK_RESULTS_PAGE_LIMIT, Math.trunc(params.limit ?? 20)));
   // The SDK selects, reads and compares the results; this tool adapts arguments and presents them.
-  const { rows, compared, insufficient } = await new QDash(client).taskResults.compareLatest({ chipId, qid: id, limit });
+  const { rows, compared, insufficient } = await sdkSession(client).taskResults.compareLatest({ chipId, qid: id, limit });
   return {
     context: { profile: params.profile ?? currentContext.profile, chipId, webBaseUrl: qdashWebBaseUrl(client) },
     target: { kind, id, label: kind === "qubit" ? `q${id}` : `c${id}` },

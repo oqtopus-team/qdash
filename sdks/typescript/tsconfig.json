@@ -6,11 +6,12 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "strict": true,
     "noUncheckedIndexedAccess": true,
-    "noImplicitOverride": true,
     "noFallthroughCasesInSwitch": true,
     "noUnusedLocals": true,
-    "noUnusedParameters": true,
     "skipLibCheck": true,
+    // src/_generated is Fern's output, type checked as generated: it does not mark overrides
+    // and keeps unused parameters, so noImplicitOverride and noUnusedParameters stay off.
+    // @types/node 20 matches the minimum Node version; newer ones conflict with its DOM types.
     "types": ["node", "vitest/globals"]
   },
   "include": ["src/**/*.ts", "tests/**/*.ts"]

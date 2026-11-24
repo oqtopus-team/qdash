@@ -13,7 +13,7 @@ import type {
   CalibrationPipelineSpecStepsItem,
   CustomOneQubitStep,
   PipelineTargets,
-} from "@oqtopus-team/qdash-client/models";
+} from "./types.js";
 
 /** Explicit target qubits by the IDs QDash lists: `{ qids: [...] }`. */
 export function qubitTargets(qids: readonly string[]): PipelineTargets {
