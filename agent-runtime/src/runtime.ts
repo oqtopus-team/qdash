@@ -97,7 +97,7 @@ import { logDurableReport } from "./durable-report.ts";
 import { examplesOf, fetchKnowledgeDraft, fetchTaskKnowledgeResponse, renderReference } from "./knowledge-context.ts";
 import type { TaskKnowledgeLike } from "./knowledge-context.ts";
 import { resolveAgentConfigPaths, resolveAgentModelFiles } from "./agent-profile.ts";
-import { chatCompactionOverrides, missingCredentialMessage, NATIVE_API_KEY_ENV, PROVIDER_ALIASES, supportedThinkingLevel, writeModelsConfig } from "./models-config.ts";
+import { chatCompactionOverrides, chatModelAvailability, missingCredentialMessage, NATIVE_API_KEY_ENV, PROVIDER_ALIASES, supportedThinkingLevel, writeModelsConfig, type ChatModelAvailability } from "./models-config.ts";
 import type { PageContext } from "./page-context.ts";
 import { buildSystemPrompt, buildUserInstructionsSection } from "./prompt.ts";
 import {
@@ -259,7 +259,18 @@ export class SharedRuntime {
     private readonly modelCompactionOverrides: Readonly<Record<string, CompactionBudget>> = {},
     /** The skills `read_skill` offers, which the user may also invoke as `/skill:name`. */
     private readonly skills: readonly SkillSummary[] = [],
+    /** The chat.yaml the models were built from, for the chat model menus. */
+    private readonly chatYaml: string = "",
   ) {}
+
+  /** chat.yaml's chat models in order, each marked by whether its credential is set. */
+  async chatModels(): Promise<ChatModelAvailability[]> {
+    const available = await this.modelRuntime.getAvailable();
+    return chatModelAvailability(
+      this.chatYaml,
+      new Set(available.map((model) => `${model.provider}/${model.id}`)),
+    );
+  }
 
   /** The skills the chat composer offers after `/`, with their descriptions. */
   chatSkills(): SkillCommand[] {
@@ -440,6 +451,7 @@ export class SharedRuntime {
       systemPrompt,
       modelCompactionOverrides,
       skills,
+      modelYaml.chatYaml,
     );
   }
 

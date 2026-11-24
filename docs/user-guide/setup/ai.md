@@ -11,12 +11,20 @@ Set the credentials needed by your models in `.env`. Endpoint base URLs end with
 | --- | --- |
 | `OPENAI_API_KEY` | OpenAI chat |
 | `ANTHROPIC_API_KEY` | Anthropic chat |
+| `OPENAI_COMPATIBLE_BASE_URL_DEEPSEEK`, `OPENAI_COMPATIBLE_API_KEY_DEEPSEEK` | DeepSeek chat |
 | `OPENAI_COMPATIBLE_BASE_URL_CHAT`, `OPENAI_COMPATIBLE_API_KEY_CHAT` | OpenAI-compatible chat |
 | `OPENAI_COMPATIBLE_BASE_URL_EVALUATION`, `OPENAI_COMPATIBLE_API_KEY_EVALUATION` | Figure evaluation |
 
 Models are configured in `config/agent/chat.yaml` and `config/agent/evaluation.yaml`.
-A missing key fails that model's request; QDash does not silently switch providers. Apply changes
-as below. Writes still need user approval and project permission.
+Chat menus hide models whose credentials are missing. The first available model in configuration
+order is the default. If none are available, configure a key before sending a message. An explicitly
+selected model that fails does not switch providers. Apply changes as below. Writes still need
+user approval and project permission.
+
+For the supplied DeepSeek preview model, set `OPENAI_COMPATIBLE_BASE_URL_DEEPSEEK` to
+`https://api.ai.sakura.ad.jp/v1` and `OPENAI_COMPATIBLE_API_KEY_DEEPSEEK` to your API token.
+After applying changes, select **preview/DeepSeek-V4.1-Flash-1017** in the chat model menu.
+Preview model availability can change; check the provider's model list if requests fail.
 
 ## Select a Deployment Profile
 

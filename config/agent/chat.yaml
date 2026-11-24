@@ -1,15 +1,16 @@
 # Agent Chat Configuration
 #
 # The planner models every chat can use, with or without a task result as its
-# context. The first entry is the default; the UI offers the rest in a dropdown.
+# context. Chat defaults to the first available entry; the UI hides models
+# without credentials and offers the rest in a dropdown.
 # The Pi Agent Runtime generates its models.json from this list at startup;
 # `temperature`/`top_p`/`top_k` do not reach Bedrock there.
 chat_models:
   # Default: OpenAI's GPT-6 Sol through OpenAI's own API (api.openai.com), from
   # pi's bundled model catalog, so it needs no base_url and no sampling settings.
   # It authenticates with OPENAI_API_KEY from .env, read by the agent runtime
-  # only; without it a chat on this model is refused with what to set, and the
-  # chat never switches to another model by itself. Its planner-mode evaluations
+  # only; without it this model is hidden from chat menus. Explicit requests
+  # never switch to another model on failure. Its planner-mode evaluations
   # use it too (the first entry is the planner); evaluation.yaml is unchanged.
   - provider: openai
     name: gpt-6-sol
@@ -76,13 +77,29 @@ chat_models:
   # Claude Opus 5.5 through Anthropic's own API (api.anthropic.com), from pi's
   # bundled model catalog, selectable in the chat's model menu. It authenticates
   # with ANTHROPIC_API_KEY from .env, read by the agent runtime only; without it
-  # a chat on this model is refused with what to set. Its thinking is adaptive
+  # this model is hidden from chat menus. Its thinking is adaptive
   # and always on, and it takes no temperature, top_p, or top_k, so none is set
   # here; the Thinking menu's Off and Minimal run at Low on it.
   - provider: anthropic
     name: claude-opus-5-5
     # Claude Opus 5.5's own default effort; "Auto" in the chat's Thinking menu.
     reasoning_effort: medium
+  # DeepSeek V4.1 Flash (preview) through an OpenAI Chat Completions API,
+  # selectable in the chat's model menu. Set OPENAI_COMPATIBLE_BASE_URL_DEEPSEEK
+  # to https://api.ai.sakura.ad.jp/v1 and OPENAI_COMPATIBLE_API_KEY_DEEPSEEK to
+  # its API key. The endpoint reads max_tokens (ignoring max_completion_tokens,
+  # top_p, and top_k) and streams thinking in delta.reasoning, which the runtime
+  # shows and sends back on tool rounds. It documents no thinking switch or
+  # effort, so no reasoning_effort is set and the Thinking menu does not change
+  # its requests.
+  - provider: openai-compatible-deepseek
+    name: preview/DeepSeek-V4.1-Flash-1017
+    api_style: completion
+    base_url: env:OPENAI_COMPATIBLE_BASE_URL_DEEPSEEK
+    api_key_env: OPENAI_COMPATIBLE_API_KEY_DEEPSEEK
+    num_ctx: 1048575
+    # The endpoint's max_tokens ceiling; thinking and the answer share it.
+    max_output_tokens: 32000
   # - provider: openai-compatible-ollama
   #   name: nvidia/Gemma-4-31B-IT-NVFP4
   #   api_style: completion
