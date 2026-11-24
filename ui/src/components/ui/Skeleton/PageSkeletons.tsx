@@ -52,10 +52,10 @@ export function MetricsPageSkeleton() {
           </div>
         </div>
 
-        {/* Tabs */}
-        <div className="flex gap-2 mb-6">
-          <div className="skeleton h-9 w-20 rounded-lg" />
-          <div className="skeleton h-9 w-20 rounded-lg" />
+        {/* View switch */}
+        <div className="flex w-fit gap-1 mb-6 rounded-[calc(var(--radius-field)+var(--border))] border border-base-300 p-2">
+          <div className="skeleton h-10 w-20 rounded-field" />
+          <div className="skeleton h-10 w-24 rounded-field" />
         </div>
 
         {/* Metric Cards Grid */}
@@ -92,11 +92,11 @@ export function ChipPageSkeleton() {
           </div>
         </div>
 
-        {/* View Mode Tabs */}
-        <div className="flex gap-2 mb-6">
-          <div className="skeleton h-9 w-14 rounded-lg" />
-          <div className="skeleton h-9 w-14 rounded-lg" />
-          <div className="skeleton h-9 w-20 rounded-lg" />
+        {/* View switch */}
+        <div className="flex w-fit gap-1 mb-6 rounded-[calc(var(--radius-field)+var(--border))] border border-base-300 p-2">
+          <div className="skeleton h-10 w-20 rounded-field" />
+          <div className="skeleton h-10 w-24 rounded-field" />
+          <div className="skeleton h-10 w-24 rounded-field" />
         </div>
 
         {/* Grid of cards */}
@@ -134,12 +134,12 @@ export function AnalysisPageSkeleton() {
           </div>
         </div>
 
-        {/* Tabs */}
-        <div className="flex gap-2">
-          <div className="skeleton h-10 w-24 rounded-lg" />
-          <div className="skeleton h-10 w-24 rounded-lg" />
-          <div className="skeleton h-10 w-20 rounded-lg" />
-          <div className="skeleton h-10 w-24 rounded-lg" />
+        {/* View switch */}
+        <div className="flex w-fit max-w-full gap-1 overflow-hidden rounded-[calc(var(--radius-field)+var(--border))] border border-base-300 p-2">
+          <div className="skeleton h-10 w-24 shrink-0 rounded-field" />
+          <div className="skeleton h-10 w-24 shrink-0 rounded-field" />
+          <div className="skeleton h-10 w-16 shrink-0 rounded-field" />
+          <div className="skeleton h-10 w-28 shrink-0 rounded-field" />
         </div>
 
         {/* Parameter Selection */}

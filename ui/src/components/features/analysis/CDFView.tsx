@@ -13,6 +13,7 @@ import { DataTable } from "@/components/ui/DataTable";
 import { ErrorCard } from "@/components/ui/ErrorCard";
 import { QuantumLoader } from "@/components/ui/QuantumLoader";
 import { TimeRangeSelector } from "@/components/ui/TimeRangeSelector";
+import { ViewSwitch } from "@/components/ui/ViewSwitch";
 import { useCSVExport } from "@/hooks/useCSVExport";
 import { useMetricsConfig, type MetricConfig } from "@/hooks/useMetricsConfig";
 import { useMetricsQueryParams } from "@/hooks/useMetricsQueryParams";
@@ -692,20 +693,16 @@ export function CDFView() {
           <div className="flex flex-col gap-3 sm:gap-4">
             {/* Row 1a: Type + Chip + Parameters */}
             <div className="flex flex-col sm:flex-row flex-wrap items-start gap-2 sm:gap-3">
-              <div className="tabs tabs-boxed tabs-sm">
-                <button
-                  className={`tab ${currentMetricType === "qubit" ? "tab-active" : ""}`}
-                  onClick={() => handleMetricTypeChange("qubit")}
-                >
-                  1Q
-                </button>
-                <button
-                  className={`tab ${currentMetricType === "coupling" ? "tab-active" : ""}`}
-                  onClick={() => handleMetricTypeChange("coupling")}
-                >
-                  2Q
-                </button>
-              </div>
+              <ViewSwitch
+                ariaLabel="Metric target"
+                size="sm"
+                value={currentMetricType}
+                onValueChange={handleMetricTypeChange}
+                items={[
+                  { value: "qubit", label: "1Q", title: "Qubit" },
+                  { value: "coupling", label: "2Q", title: "Coupling" },
+                ]}
+              />
 
               <div className="w-full sm:w-64">
                 <ChipSelector selectedChip={selectedChip} onChipSelect={setSelectedChip} />

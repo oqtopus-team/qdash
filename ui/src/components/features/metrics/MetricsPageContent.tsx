@@ -22,6 +22,7 @@ import { CooldownSelector } from "@/components/selectors/CooldownSelector";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { TimeRangeSelector } from "@/components/ui/TimeRangeSelector";
+import { ViewSwitch } from "@/components/ui/ViewSwitch";
 import { MetricsPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { useMetricsConfig } from "@/hooks/useMetricsConfig";
 import { useMetricsQueryParams } from "@/hooks/useMetricsQueryParams";
@@ -411,30 +412,15 @@ export function MetricsPageContent() {
             </div>
           </div>
 
-          <div
-            className="tabs tabs-boxed w-fit bg-base-200"
-            role="tablist"
-            aria-label="Metric target"
-          >
-            <button
-              type="button"
-              role="tab"
-              aria-selected={metricType === "qubit"}
-              className={`tab ${metricType === "qubit" ? "tab-active" : ""}`}
-              onClick={() => setMetricType("qubit")}
-            >
-              Qubit
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={metricType === "coupling"}
-              className={`tab ${metricType === "coupling" ? "tab-active" : ""}`}
-              onClick={() => setMetricType("coupling")}
-            >
-              Coupling
-            </button>
-          </div>
+          <ViewSwitch
+            ariaLabel="Metric target"
+            value={metricType}
+            onValueChange={setMetricType}
+            items={[
+              { value: "qubit", label: "Qubit" },
+              { value: "coupling", label: "Coupling" },
+            ]}
+          />
 
           <section
             aria-labelledby="metrics-data-scope"

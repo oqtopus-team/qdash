@@ -42,6 +42,7 @@ import { ExecutionDetailPageSkeleton } from "@/components/ui/Skeleton/PageSkelet
 import { TaskMessagePanel } from "@/components/ui/TaskMessagePanel";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import { useToast } from "@/components/ui/Toast";
+import { ViewSwitch } from "@/components/ui/ViewSwitch";
 import { useProject } from "@/contexts/ProjectContext";
 import { useFullscreenPanel } from "@/hooks/useFullscreenPanel";
 import { useSelectStyles } from "@/hooks/useSelectStyles";
@@ -427,28 +428,19 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
                 shown on the chip layout
               </p>
             </div>
-            <div className="tabs tabs-boxed bg-base-200 w-fit">
-              <button
-                type="button"
-                className={`tab ${topologyMode === "1q" ? "tab-active" : ""}`}
-                onClick={() => {
-                  setTopologyMode("1q");
-                  setFilterTaskName("");
-                }}
-              >
-                Qubit
-              </button>
-              <button
-                type="button"
-                className={`tab ${topologyMode === "2q" ? "tab-active" : ""}`}
-                onClick={() => {
-                  setTopologyMode("2q");
-                  setFilterTaskName("");
-                }}
-              >
-                Coupling
-              </button>
-            </div>
+            <ViewSwitch
+              ariaLabel="Topology target"
+              size="sm"
+              value={topologyMode}
+              onValueChange={(mode) => {
+                setTopologyMode(mode);
+                setFilterTaskName("");
+              }}
+              items={[
+                { value: "1q", label: "Qubit" },
+                { value: "2q", label: "Coupling" },
+              ]}
+            />
           </div>
 
           {/* Filter Controls */}

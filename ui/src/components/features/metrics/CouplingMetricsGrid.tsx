@@ -12,6 +12,7 @@ import { GridZoomControls } from "@/components/ui/GridZoomControls";
 import { RegionZoomToggle } from "@/components/ui/RegionZoomToggle";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
+import { ViewSwitch } from "@/components/ui/ViewSwitch";
 import { useFullscreenPanel } from "@/hooks/useFullscreenPanel";
 import { useGridLayout } from "@/hooks/useGridLayout";
 import { usePanClickGuard } from "@/hooks/usePanClickGuard";
@@ -564,33 +565,35 @@ export function CouplingMetricsGrid({
     >
       {/* View mode toggle */}
       <div className="flex items-center justify-between px-1 md:px-4 py-2">
-        <div className="tabs tabs-boxed bg-base-200/50 p-1">
-          <button
-            type="button"
-            className={`tab gap-2 ${viewMode === "pan-zoom" ? "tab-active" : ""}`}
-            onClick={() => {
-              setViewMode("pan-zoom");
+        <ViewSwitch
+          ariaLabel="Grid view"
+          size="sm"
+          value={viewMode}
+          onValueChange={(mode) => {
+            setViewMode(mode);
+            if (mode === "pan-zoom") {
               setZoomMode("full");
               setSelectedRegion(null);
               setRegionSelectionEnabled(false);
-            }}
-            title="Zoom"
-            aria-label="Zoom"
-          >
-            <ZoomIn className="h-4 w-4" />
-            <span className="hidden sm:inline">Zoom</span>
-          </button>
-          <button
-            type="button"
-            className={`tab gap-2 ${viewMode === "region" ? "tab-active" : ""}`}
-            onClick={() => setViewMode("region")}
-            title="Lock"
-            aria-label="Lock"
-          >
-            <Lock className="h-4 w-4" />
-            <span className="hidden sm:inline">Lock</span>
-          </button>
-        </div>
+            }
+          }}
+          items={[
+            {
+              value: "pan-zoom",
+              label: <span className="hidden sm:inline">Zoom</span>,
+              icon: <ZoomIn aria-hidden="true" />,
+              ariaLabel: "Zoom",
+              title: "Zoom",
+            },
+            {
+              value: "region",
+              label: <span className="hidden sm:inline">Lock</span>,
+              icon: <Lock aria-hidden="true" />,
+              ariaLabel: "Lock",
+              title: "Lock",
+            },
+          ]}
+        />
 
         <div className="flex items-center gap-2">
           <div

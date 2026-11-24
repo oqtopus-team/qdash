@@ -84,7 +84,7 @@ describe("CouplingGrid locked view", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Lock" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Lock" }));
 
     const scroller = container.querySelector<HTMLElement>(".overflow-auto.justify-center-safe");
     expect(scroller).not.toBeNull();
