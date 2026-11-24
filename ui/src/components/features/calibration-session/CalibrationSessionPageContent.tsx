@@ -412,7 +412,11 @@ export function CalibrationSessionPageContent({
             {!isOpen ? (
               <div className="sm:col-span-2 md:col-span-4">
                 <Field label="Closed">
-                  {data.closed_by} · {formatDateTime(data.closed_at ?? null)}
+                  {/* An automatic close is QDash's record that the work ended, not a person's. */}
+                  {data.close_origin === "automatic"
+                    ? "Automatically, when its work ended"
+                    : data.closed_by}{" "}
+                  · {formatDateTime(data.closed_at ?? null)}
                   {data.closing_note ? `: ${data.closing_note}` : ""}
                 </Field>
               </div>
@@ -421,7 +425,7 @@ export function CalibrationSessionPageContent({
               Groups the work started for this objective. It grants nothing: each run is approved on
               its own, and each agent session keeps its own policy and pause.
               {isAutomatic
-                ? " QDash created it for a run started without a session; start another run with its ID to add to it."
+                ? " QDash created it for a run started without a session; start another run with its ID to add to it while it is open. QDash closes it once everything started in it has ended, whatever the outcome."
                 : ""}
             </p>
             {isOpen && projectId && username === data.created_by ? (

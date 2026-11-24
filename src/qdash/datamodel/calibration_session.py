@@ -46,6 +46,7 @@ __all__ = [
     "CalibrationRunIdentity",
     "CalibrationRunKind",
     "CalibrationRunTrigger",
+    "CalibrationSessionCloseOrigin",
     "CalibrationSessionOrigin",
     "CalibrationSessionStatus",
 ]
@@ -54,8 +55,10 @@ __all__ = [
 class CalibrationSessionStatus(StrEnum):
     """Whether a calibration session accepts new runs.
 
-    ``closed`` is a person's statement that work on the objective has ended. It says nothing
-    about whether the objective was met and is refused while a child still runs or waits.
+    ``closed`` says that work on the objective has ended: a person's statement, or, for an
+    automatic session, QDash's record that everything started in it ended (see
+    ``CalibrationSessionCloseOrigin``). It says nothing about whether the objective was met or
+    how the runs ended, and is refused while a child still runs or waits.
     """
 
     OPEN = "open"
@@ -68,6 +71,19 @@ class CalibrationSessionOrigin(StrEnum):
     ``manual``: a person or agent created it for an objective (every session recorded before
     automatic sessions existed). ``automatic``: QDash created it for a run started without a
     session ID; it is an ordinary session that a later run may name to add to it.
+    """
+
+    MANUAL = "manual"
+    AUTOMATIC = "automatic"
+
+
+class CalibrationSessionCloseOrigin(StrEnum):
+    """Who closed a calibration session.
+
+    ``manual``: the person who created it closed it (every session closed before this was
+    recorded). ``automatic``: QDash closed an automatic session once every run and agent
+    session in it had ended and nothing was being started, dispatched, or settled in it. An
+    automatic close only stops new runs from joining; it cancels nothing and judges nothing.
     """
 
     MANUAL = "manual"

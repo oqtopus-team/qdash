@@ -218,7 +218,11 @@ export function formatCalibrationSession(detail: CalibrationSessionDetailRespons
   }
   lines.push(...searchLines(detail));
   if (detail.status === "closed") {
-    lines.push("", `Closed by ${detail.closed_by ?? "unknown"}${detail.closing_note ? `: ${detail.closing_note}` : ""}. Start a new calibration session for further work.`);
+    // An automatic close is QDash's record that the work ended; its closed_by names no person.
+    const closed = detail.close_origin === "automatic"
+      ? "Closed by QDash (automatic close, not a person)"
+      : `Closed by ${detail.closed_by ?? "unknown"}`;
+    lines.push("", `${closed}${detail.closing_note ? `: ${detail.closing_note}` : ""}. Start a new calibration session for further work.`);
   }
   return lines.join("\n");
 }

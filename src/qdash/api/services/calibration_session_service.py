@@ -80,6 +80,7 @@ from qdash.datamodel.calibration_session import (
     CalibrationChildReservation,
     CalibrationPipelineRunStatus,
     CalibrationRunKind,
+    CalibrationSessionCloseOrigin,
     CalibrationSessionOrigin,
     CalibrationSessionStatus,
 )
@@ -243,9 +244,21 @@ class CalibrationSessionService:
         """A calibration session with its most recent pipeline runs and agent sessions.
 
         ``close_blockers`` and the unknown lists are read from every child, not only the ones
-        listed; ``pipeline_run_total`` and ``agent_session_total`` count every child.
+        listed; ``pipeline_run_total`` and ``agent_session_total`` count every child. An open
+        automatic session is first checked, and closed if everything started in it ended
+        (``calibration_session_lifecycle``).
         """
-        doc = self._recover_pipeline_reservations(self._load(project_id, calibration_session_id))
+        doc = self._load(project_id, calibration_session_id)
+        if (
+            doc.origin == CalibrationSessionOrigin.AUTOMATIC
+            and doc.status == CalibrationSessionStatus.OPEN
+        ):
+            # Imported here: the lifecycle check builds on this service.
+            from qdash.api.services.calibration_session_lifecycle import check_automatic_session
+
+            check_automatic_session(doc)
+            doc = self._load(project_id, calibration_session_id)
+        doc = self._recover_pipeline_reservations(doc)
         return self._detail(doc, self._blockers(doc))
 
     def close(
@@ -324,6 +337,7 @@ class CalibrationSessionService:
                     "status": CalibrationSessionStatus.CLOSED.value,
                     "closed_at": timestamp,
                     "closed_by": username,
+                    "close_origin": CalibrationSessionCloseOrigin.MANUAL.value,
                     "closing_note": body.closing_note,
                     "closed_with_unknown_runs": blockers.unknown_runs,
                     "closed_with_unknown_starts": [
@@ -471,6 +485,13 @@ class CalibrationSessionService:
         ).run()
         if doc is not None:
             self._recover_pipeline_reservations(doc)
+
+    @staticmethod
+    def recover_stale_reservations(
+        doc: CalibrationSessionDocument,
+    ) -> CalibrationSessionDocument:
+        """Reject pipeline runs whose request stopped before launching them; the session after."""
+        return CalibrationSessionService._recover_pipeline_reservations(doc)
 
     @staticmethod
     def reject_unlaunched(reservation: CalibrationChildReservation) -> None:
@@ -670,6 +691,7 @@ class CalibrationSessionService:
             pipeline_name=run.pipeline_name,
             backend_name=run.backend_name,
             flow_run_id=run.flow_run_id,
+            flow_end_state=run.flow_end_state,
             execution_id=run.execution_id,
             error=run.error,
             requested_at=run.requested_at,

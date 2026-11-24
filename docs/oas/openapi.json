@@ -26823,6 +26823,17 @@
             ],
             "title": "Flow Run Id"
           },
+          "flow_end_state": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RunFlowEndState"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How the run's whole flow run ended, as Prefect reported it once it was terminal (completed, failed, cancelled, or crashed); null while it may still run or was not observed"
+          },
           "execution_id": {
             "anyOf": [
               {
@@ -27022,6 +27033,15 @@
         "title": "CalibrationSessionAuditResponse",
         "description": "A page of one snapshot of a calibration session's audit, or all of it.\n\nThe events have the same schema and semantics as an agent session's audit, and an admitted\nagent session's events appear inside it with ``agent_session_id`` set. A snapshot is two\nmatching projected reads, not an atomic database view."
       },
+      "CalibrationSessionCloseOrigin": {
+        "type": "string",
+        "enum": [
+          "manual",
+          "automatic"
+        ],
+        "title": "CalibrationSessionCloseOrigin",
+        "description": "Who closed a calibration session.\n\n``manual``: the person who created it closed it (every session closed before this was\nrecorded). ``automatic``: QDash closed an automatic session once every run and agent\nsession in it had ended and nothing was being started, dispatched, or settled in it. An\nautomatic close only stops new runs from joining; it cancels nothing and judges nothing."
+      },
       "CalibrationSessionDetailResponse": {
         "properties": {
           "calibration_session_id": {
@@ -27084,7 +27104,19 @@
                 "type": "null"
               }
             ],
-            "title": "Closed By"
+            "title": "Closed By",
+            "description": "The user who closed it, or system:auto-close when QDash closed it automatically"
+          },
+          "close_origin": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalibrationSessionCloseOrigin"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "manual when the creator closed it; automatic when QDash closed an automatic session because every run and agent session in it ended. Null while open, and for a session closed before this was recorded (closed by its creator). Closing says nothing about how the runs ended."
           },
           "closing_note": {
             "type": "string",
@@ -27414,7 +27446,19 @@
                 "type": "null"
               }
             ],
-            "title": "Closed By"
+            "title": "Closed By",
+            "description": "The user who closed it, or system:auto-close when QDash closed it automatically"
+          },
+          "close_origin": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalibrationSessionCloseOrigin"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "manual when the creator closed it; automatic when QDash closed an automatic session because every run and agent session in it ended. Null while open, and for a session closed before this was recorded (closed by its creator). Closing says nothing about how the runs ended."
           },
           "closing_note": {
             "type": "string",
@@ -27459,7 +27503,7 @@
           "closed"
         ],
         "title": "CalibrationSessionStatus",
-        "description": "Whether a calibration session accepts new runs.\n\n``closed`` is a person's statement that work on the objective has ended. It says nothing\nabout whether the objective was met and is refused while a child still runs or waits."
+        "description": "Whether a calibration session accepts new runs.\n\n``closed`` says that work on the objective has ended: a person's statement, or, for an\nautomatic session, QDash's record that everything started in it ended (see\n``CalibrationSessionCloseOrigin``). It says nothing about whether the objective was met or\nhow the runs ended, and is refused while a child still runs or waits."
       },
       "CancelExecutionResponse": {
         "properties": {
@@ -41419,6 +41463,17 @@
         ],
         "title": "RetryEvaluationRunResponse",
         "description": "A run reset for another attempt."
+      },
+      "RunFlowEndState": {
+        "type": "string",
+        "enum": [
+          "completed",
+          "failed",
+          "cancelled",
+          "crashed"
+        ],
+        "title": "RunFlowEndState",
+        "description": "How the whole flow run that carried out a run ended, as Prefect reported it.\n\nRecorded once QDash reads a terminal Prefect state for the run's flow run: the flow as a\nwhole, after its retries, never one step of it. A state Prefect may still leave (scheduled,\nawaiting retry, pending, running, paused, cancelling) is never recorded. ``completed``,\n``failed``, ``cancelled``, and ``crashed`` are Prefect's own terminal state types; they say\nhow the flow run ended, not whether its calibration results are good."
       },
       "SaveFileRequest": {
         "properties": {

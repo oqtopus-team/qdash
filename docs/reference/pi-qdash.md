@@ -112,7 +112,8 @@ A calibration session groups work toward an objective; it grants no execution pe
 | `qdash_list_calibration_sessions` | List objectives; default 20, maximum 100 |
 
 Use `calibrationSessionId` to associate a run with your open session on the same chip.
-Otherwise QDash creates an automatic session. Audit records distinguish measured evidence from
+Otherwise QDash creates an automatic session and closes it when its work ends. Closed sessions
+refuse new work; create a manual objective session for multiple trials. Audit records distinguish measured evidence from
 reported reasoning; they do not establish the current hardware state.
 
 ## Pipeline and flow operations

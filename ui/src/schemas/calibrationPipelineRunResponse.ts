@@ -8,6 +8,7 @@
 import type { CalibrationPipelineRunResponseActionId } from './calibrationPipelineRunResponseActionId';
 import type { CalibrationPipelineRunResponseAgentSessionId } from './calibrationPipelineRunResponseAgentSessionId';
 import type { CalibrationPipelineRunResponseExecutionId } from './calibrationPipelineRunResponseExecutionId';
+import type { CalibrationPipelineRunResponseFlowEndState } from './calibrationPipelineRunResponseFlowEndState';
 import type { CalibrationPipelineRunResponseFlowRunId } from './calibrationPipelineRunResponseFlowRunId';
 import type { CalibrationPipelineRunResponsePipeline } from './calibrationPipelineRunResponsePipeline';
 import type { CalibrationPipelineRunResponseReportedOrigin } from './calibrationPipelineRunResponseReportedOrigin';
@@ -43,6 +44,8 @@ export interface CalibrationPipelineRunResponse {
   pipeline_name: string;
   backend_name: string;
   flow_run_id?: CalibrationPipelineRunResponseFlowRunId;
+  /** How the run's whole flow run ended, as Prefect reported it once it was terminal (completed, failed, cancelled, or crashed); null while it may still run or was not observed */
+  flow_end_state?: CalibrationPipelineRunResponseFlowEndState;
   /** The first step's execution, as returned at dispatch */
   execution_id?: CalibrationPipelineRunResponseExecutionId;
   error?: string;

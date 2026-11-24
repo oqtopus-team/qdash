@@ -9,6 +9,7 @@ import type { CalibrationChildReservation } from './calibrationChildReservation'
 import type { CalibrationSessionOrigin } from './calibrationSessionOrigin';
 import type { CalibrationSessionResponseClosedAt } from './calibrationSessionResponseClosedAt';
 import type { CalibrationSessionResponseClosedBy } from './calibrationSessionResponseClosedBy';
+import type { CalibrationSessionResponseCloseOrigin } from './calibrationSessionResponseCloseOrigin';
 import type { CalibrationSessionStatus } from './calibrationSessionStatus';
 
 /**
@@ -27,7 +28,10 @@ export interface CalibrationSessionResponse {
   created_at: string;
   updated_at: string;
   closed_at?: CalibrationSessionResponseClosedAt;
+  /** The user who closed it, or system:auto-close when QDash closed it automatically */
   closed_by?: CalibrationSessionResponseClosedBy;
+  /** manual when the creator closed it; automatic when QDash closed an automatic session because every run and agent session in it ended. Null while open, and for a session closed before this was recorded (closed by its creator). Closing says nothing about how the runs ended. */
+  close_origin?: CalibrationSessionResponseCloseOrigin;
   closing_note?: string;
   /** Pipeline runs whose dispatch outcome was unknown when it was closed */
   closed_with_unknown_runs?: string[];

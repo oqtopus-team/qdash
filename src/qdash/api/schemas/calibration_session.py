@@ -27,10 +27,12 @@ from qdash.datamodel.calibration_session import (
     CalibrationPipelineRunStatus,
     CalibrationRunKind,
     CalibrationRunTrigger,
+    CalibrationSessionCloseOrigin,
     CalibrationSessionOrigin,
     CalibrationSessionStatus,
 )
 from qdash.datamodel.launch_origin import ReportedLaunchOrigin  # noqa: TC001 - pydantic field
+from qdash.datamodel.run import RunFlowEndState  # noqa: TC001 - pydantic field
 
 
 class CreateCalibrationSessionRequest(BaseModel):
@@ -84,7 +86,21 @@ class CalibrationSessionResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     closed_at: datetime | None = None
-    closed_by: str | None = None
+    closed_by: str | None = Field(
+        default=None,
+        description=(
+            "The user who closed it, or system:auto-close when QDash closed it automatically"
+        ),
+    )
+    close_origin: CalibrationSessionCloseOrigin | None = Field(
+        default=None,
+        description=(
+            "manual when the creator closed it; automatic when QDash closed an automatic "
+            "session because every run and agent session in it ended. Null while open, and "
+            "for a session closed before this was recorded (closed by its creator). Closing "
+            "says nothing about how the runs ended."
+        ),
+    )
     closing_note: str = ""
     closed_with_unknown_runs: list[str] = Field(
         default_factory=list,
@@ -155,6 +171,14 @@ class CalibrationPipelineRunResponse(BaseModel):
     pipeline_name: str
     backend_name: str
     flow_run_id: str | None = None
+    flow_end_state: RunFlowEndState | None = Field(
+        default=None,
+        description=(
+            "How the run's whole flow run ended, as Prefect reported it once it was terminal "
+            "(completed, failed, cancelled, or crashed); null while it may still run or was "
+            "not observed"
+        ),
+    )
     execution_id: str | None = Field(
         default=None, description="The first step's execution, as returned at dispatch"
     )

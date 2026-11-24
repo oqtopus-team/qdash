@@ -57,6 +57,14 @@ Cancellation requests can take time to stop an uninterruptible hardware operatio
 **Group sessions** collects runs under their calibration objective or agent session. Expand a
 row to inspect its runs. **Open** and **Closed** describe whether an objective accepts more work,
 not whether it succeeded. Runs started without an objective get an **Automatic** session.
+QDash closes these sessions after all their work ends, including failed or cancelled runs.
+An agent's automatic session stays open until the agent and its in-flight operations end.
+Closure can take longer than a minute; no additional setting is needed.
+
+Objectives you create remain open until you close them. To continue a closed objective, create
+a new session. If an automatic session stays open, inspect its runs for retries, uncertain launch
+outcomes, or missing status. Resolve uncertainty before closing it manually; closing does not
+stop work that may already have started.
 
 Switch to **Calibration sessions** to find objectives. Their pages show runs, recorded search
 progress, and an **Audit** with **Export JSON**. Recommendations are recorded statements;

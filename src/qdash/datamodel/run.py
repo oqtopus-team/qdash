@@ -80,6 +80,22 @@ class CalibrationPipelineRunStatus(StrEnum):
     UNKNOWN = "unknown"
 
 
+class RunFlowEndState(StrEnum):
+    """How the whole flow run that carried out a run ended, as Prefect reported it.
+
+    Recorded once QDash reads a terminal Prefect state for the run's flow run: the flow as a
+    whole, after its retries, never one step of it. A state Prefect may still leave (scheduled,
+    awaiting retry, pending, running, paused, cancelling) is never recorded. ``completed``,
+    ``failed``, ``cancelled``, and ``crashed`` are Prefect's own terminal state types; they say
+    how the flow run ended, not whether its calibration results are good.
+    """
+
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+    CRASHED = "crashed"
+
+
 # Canonical names in code; the classes keep their names for the API schema.
 RunKind = CalibrationRunKind
 RunTrigger = CalibrationRunTrigger
