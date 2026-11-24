@@ -29,7 +29,6 @@ import {
   getGetForumPostQueryKey,
   getListForumCategoriesQueryKey,
   getListForumPostsQueryKey,
-  useCreateForumCategory,
   useDeleteForumCategory,
   useGetForumPost,
   useGetForumPostReplies,
@@ -63,6 +62,7 @@ import {
   type ForumCategoryDefinition,
   type ForumLabelDefinition,
 } from "./categories";
+import { ForumCategoryForm } from "./ForumCategoryForm";
 import { ForumLabelBadge } from "./ForumLabelBadge";
 import { ForumLabelManager } from "./ForumLabelManager";
 import { ForumLabelPicker } from "./ForumLabelSelector";
@@ -816,11 +816,6 @@ export function ForumPageContent() {
   const [showCategoryManager, setShowCategoryManager] = useState(false);
   const [showLabelManager, setShowLabelManager] = useState(false);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
-  const [categoryKey, setCategoryKey] = useState("");
-  const [categoryName, setCategoryName] = useState("");
-  const [categoryDescription, setCategoryDescription] = useState("");
-  const [categoryColor, setCategoryColor] = useState("neutral");
-  const [categoryIcon, setCategoryIcon] = useState("message-square");
 
   useEffect(() => {
     const draftKeys = [
@@ -877,7 +872,6 @@ export function ForumPageContent() {
     [cooldownsResponse?.data.cooldowns],
   );
 
-  const createCategoryMutation = useCreateForumCategory();
   const deleteCategoryMutation = useDeleteForumCategory();
   const invalidateCategories = () => {
     queryClient.invalidateQueries({
@@ -987,29 +981,6 @@ export function ForumPageContent() {
     const boundedSkip = Math.max(0, nextSkip);
     setSkip(boundedSkip);
     replaceListQuery({ skip: boundedSkip });
-  };
-
-  const submitCategory = async () => {
-    const trimmedKey = categoryKey.trim();
-    const trimmedName = categoryName.trim();
-    if (!trimmedKey || !trimmedName) return;
-
-    await createCategoryMutation.mutateAsync({
-      data: {
-        key: trimmedKey,
-        name: trimmedName,
-        description: categoryDescription.trim(),
-        color: categoryColor,
-        icon: categoryIcon,
-        sort_order: null,
-      },
-    });
-    setCategoryKey("");
-    setCategoryName("");
-    setCategoryDescription("");
-    setCategoryColor("neutral");
-    setCategoryIcon("message-square");
-    invalidateCategories();
   };
 
   return (
@@ -1162,74 +1133,7 @@ export function ForumPageContent() {
                 Deleting archives the category and keeps existing threads readable.
               </span>
             </div>
-            <div className="mb-4 grid gap-2 sm:grid-cols-[150px_180px_1fr_130px_160px_auto]">
-              <input
-                className="input input-bordered input-sm"
-                value={categoryKey}
-                onChange={(event) => setCategoryKey(event.target.value)}
-                placeholder="key"
-              />
-              <input
-                className="input input-bordered input-sm"
-                value={categoryName}
-                onChange={(event) => setCategoryName(event.target.value)}
-                placeholder="Name"
-              />
-              <input
-                className="input input-bordered input-sm"
-                value={categoryDescription}
-                onChange={(event) => setCategoryDescription(event.target.value)}
-                placeholder="Description"
-              />
-              <select
-                className="select select-bordered select-sm"
-                value={categoryColor}
-                onChange={(event) => setCategoryColor(event.target.value)}
-              >
-                {[
-                  "neutral",
-                  "primary",
-                  "secondary",
-                  "accent",
-                  "info",
-                  "success",
-                  "warning",
-                  "error",
-                  "ghost",
-                ].map((color) => (
-                  <option key={color} value={color}>
-                    {color}
-                  </option>
-                ))}
-              </select>
-              <select
-                className="select select-bordered select-sm"
-                value={categoryIcon}
-                onChange={(event) => setCategoryIcon(event.target.value)}
-              >
-                {[
-                  "message-square",
-                  "activity",
-                  "network",
-                  "circuit-board",
-                  "settings",
-                  "calendar-check",
-                ].map((icon) => (
-                  <option key={icon} value={icon}>
-                    {icon}
-                  </option>
-                ))}
-              </select>
-              <button
-                className="btn btn-primary btn-sm"
-                onClick={submitCategory}
-                disabled={
-                  !categoryKey.trim() || !categoryName.trim() || createCategoryMutation.isPending
-                }
-              >
-                Add
-              </button>
-            </div>
+            <ForumCategoryForm />
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {categories.map((item) => {
                 const Icon = item.icon;
