@@ -25,8 +25,9 @@ on the main **Agent** page for a general conversation.
 
 ### Follow an Answer in Progress
 
-The header shows what the assistant is doing or waiting for. Closing the sidebar, navigating,
-or reloading does not stop it. Reopen the chat to reconnect; use **Stop** to end the answer.
+The status below the current answer shows what the assistant is doing. The header shows
+when it needs your approval or an answer. Closing the sidebar, navigating, or reloading
+does not stop it. Reopen the chat to reconnect; use **Stop** to end the answer.
 A lost connection does not mean the underlying operation stopped.
 
 ### Add to an Answer in Progress, or Continue One

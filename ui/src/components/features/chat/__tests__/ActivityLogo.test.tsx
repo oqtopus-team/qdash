@@ -4,14 +4,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 
 import {
+  ACTIVITY_LOGO_MODES,
   ASSEMBLED_AT,
-  ThinkingLogo,
+  ActivityLogo,
+  POINTS,
   adaptTint,
   logoFrame,
   resolveBrandTint,
   smallness,
   tintedInk,
-} from "../ThinkingLogo";
+} from "../ActivityLogo";
 
 interface Arc {
   x: number;
@@ -94,41 +96,62 @@ afterEach(() => {
   localStorage.clear();
 });
 
-describe("ThinkingLogo", () => {
-  it("is decorative and draws all 495 dots of the mark", () => {
+describe("ActivityLogo", () => {
+  it("is decorative, fits a 20px text line and draws the 244 baked dots", () => {
     setReducedMotion(false);
     const { frames } = stubCanvas();
-    render(<ThinkingLogo />);
-    const canvas = screen.getByTestId("thinking-logo");
+    render(<ActivityLogo />);
+    const canvas = screen.getByTestId("activity-logo");
     expect(canvas).toHaveAttribute("aria-hidden", "true");
-    expect(canvas.style.width).toBe("24px");
-    expect(frames[0]).toHaveLength(495);
+    expect(canvas).toHaveAttribute("data-mode", "thinking");
+    expect(canvas.style.width).toBe("20px");
+    expect(canvas.style.height).toBe("20px");
+    // No negative margin: the mark takes real layout space instead of overhanging its slot.
+    expect(canvas.className).toBe("");
+    expect(frames[0]).toHaveLength(244);
   });
 
-  it("shows the assembled mark face-on as one still frame under reduced motion", () => {
-    setReducedMotion(true);
-    const { frames } = stubCanvas();
-    render(<ThinkingLogo size={18} />);
+  it.each(ACTIVITY_LOGO_MODES)(
+    "shows the same assembled mark as one still frame under reduced motion (%s)",
+    (mode) => {
+      setReducedMotion(true);
+      const { frames } = stubCanvas();
+      render(<ActivityLogo mode={mode} size={18} />);
+      const canvas = screen.getByTestId("activity-logo");
+      expect(canvas).toHaveAttribute("data-mode", mode);
+      expect(canvas).toHaveAttribute("data-motion", "still");
+      expect(requestAnimationFrame).not.toHaveBeenCalled();
+      expect(observers).toHaveLength(0);
+      expect(frames).toHaveLength(1);
+      expect(frames[0]).toHaveLength(244);
+      // The first artwork point (0.16, 0.777) sits at its baked place: centre 9, radius 9 * 0.82.
+      const R = 9 * 0.82;
+      expect(
+        frames[0].some(
+          (d) => Math.abs(d.x - (9 + 0.16 * R)) < 1e-3 && Math.abs(d.y - (9 - 0.777 * R)) < 1e-3,
+        ),
+      ).toBe(true);
+    },
+  );
 
-    expect(screen.getByTestId("thinking-logo")).toHaveAttribute("data-motion", "still");
-    expect(requestAnimationFrame).not.toHaveBeenCalled();
-    expect(observers).toHaveLength(0);
-    expect(frames).toHaveLength(1);
-    // The first artwork point (0.191, 0.793) sits at its baked place: centre 9, radius 9 * 0.82.
-    const R = 9 * 0.82;
-    expect(
-      frames[0].some(
-        (d) => Math.abs(d.x - (9 + 0.191 * R)) < 1e-3 && Math.abs(d.y - (9 - 0.793 * R)) < 1e-3,
-      ),
-    ).toBe(true);
+  it("repaints in the new mode when a row changes what it is doing", () => {
+    setReducedMotion(false);
+    stubCanvas();
+    const { rerender } = render(<ActivityLogo mode="thinking" />);
+    expect(observers).toHaveLength(1);
+    rerender(<ActivityLogo mode="working" />);
+    expect(screen.getByTestId("activity-logo")).toHaveAttribute("data-mode", "working");
+    // The previous loop's observer is released and one new loop runs.
+    expect(observers[0].disconnect).toHaveBeenCalled();
+    expect(observers).toHaveLength(2);
   });
 
   it("pauses offscreen and on a hidden tab, and releases everything on unmount", () => {
     setReducedMotion(false);
     stubCanvas();
     const removeListener = vi.spyOn(document, "removeEventListener");
-    const { unmount } = render(<ThinkingLogo />);
-    expect(screen.getByTestId("thinking-logo")).toHaveAttribute("data-motion", "animated");
+    const { unmount } = render(<ActivityLogo mode="searching" />);
+    expect(screen.getByTestId("activity-logo")).toHaveAttribute("data-motion", "animated");
     expect(observers).toHaveLength(1);
     const [io] = observers;
     const entry = (isIntersecting: boolean) =>
@@ -159,7 +182,7 @@ describe("ThinkingLogo", () => {
     const { frames } = stubCanvas();
     render(
       <ThemeProvider>
-        <ThinkingLogo />
+        <ActivityLogo mode="waiting" />
       </ThemeProvider>,
     );
     // The provider settles on the saved theme after mount and the mark repaints.
@@ -175,6 +198,78 @@ describe("ThinkingLogo", () => {
   });
 });
 
+function spread(dots: ReturnType<typeof logoFrame>) {
+  const xs = dots.map((d) => d.x);
+  const ys = dots.map((d) => d.y);
+  return { w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) };
+}
+
+describe("baked artwork", () => {
+  it("keeps the playground's 244 points as baked: xyz per dot and one edge value each", () => {
+    expect(POINTS.n).toBe(244);
+    expect(POINTS.p).toHaveLength(732);
+    expect(POINTS.e).toHaveLength(244);
+    // First and last values of the pasted arrays, at Float32 precision.
+    expect([...POINTS.p.slice(0, 3)]).toEqual([...Float32Array.from([0.16, 0.777, 0.06])]);
+    expect([...POINTS.p.slice(-3)]).toEqual([...Float32Array.from([0.098, -0.754, 0.042])]);
+    expect([...POINTS.e.slice(0, 3)]).toEqual([...Float32Array.from([0.031, 0.062, 0.031])]);
+    expect(POINTS.e[243]).toBe(Math.fround(0.015));
+  });
+});
+
+describe("modes", () => {
+  // Mid-dwell: each mode is in its own form, before any morph.
+  const FORM_AT = 2;
+
+  it("keeps every dot of the mark inside the canvas and opaque when assembled, in every mode", () => {
+    for (const mode of ACTIVITY_LOGO_MODES) {
+      const mark = logoFrame(20, ASSEMBLED_AT, mode);
+      expect(mark).toHaveLength(244);
+      expect(mark.every((d) => d.a > 0.99)).toBe(true);
+      // The whole mark, dot radius included, stays inside the 20px canvas.
+      expect(mark.every((d) => d.x - d.r >= 0 && d.x + d.r <= 20)).toBe(true);
+      expect(mark.every((d) => d.y - d.r >= 0 && d.y + d.r <= 20)).toBe(true);
+    }
+  });
+
+  it("gives each mode its own form while it dwells", () => {
+    const forms = ACTIVITY_LOGO_MODES.map((mode) => logoFrame(96, FORM_AT, mode));
+    // Draw positions differ between every pair of modes.
+    for (let a = 0; a < forms.length; a++) {
+      for (let b = a + 1; b < forms.length; b++) {
+        const pa = forms[a].map((d) => `${d.x.toFixed(2)},${d.y.toFixed(2)}`).sort();
+        const pb = forms[b].map((d) => `${d.x.toFixed(2)},${d.y.toFixed(2)}`).sort();
+        expect(pa).not.toEqual(pb);
+      }
+    }
+    // Waiting's stack of rings is taller than it is wide; the thinking sphere is round.
+    const waiting = spread(forms[ACTIVITY_LOGO_MODES.indexOf("waiting")]);
+    expect(waiting.h).toBeGreaterThan(waiting.w);
+    const sphere = spread(forms[ACTIVITY_LOGO_MODES.indexOf("thinking")]);
+    expect(sphere.h / sphere.w).toBeCloseTo(1, 0);
+  });
+
+  it("winds working's thread over the dwell, faint ahead of the head when small", () => {
+    const opaque = (t: number, size: number) =>
+      logoFrame(size, t, "working").filter((d) => d.a > 0.99).length;
+    // Laid dots grow as the head winds on.
+    expect(opaque(1, 96)).toBeLessThan(opaque(3.5, 96));
+    // At 96px the thread ahead of the head is absent, as the playground draws it.
+    expect(logoFrame(96, 0.2, "working").length).toBeLessThan(40);
+    // At 20px it stays as a faint knot, so the slot is never empty.
+    const small = logoFrame(20, 0.2, "working");
+    expect(small.length).toBe(244);
+    expect(Math.min(...small.map((d) => d.a))).toBeGreaterThan(0.15);
+  });
+
+  it("dims searching's sphere outside the lit meridian", () => {
+    const dots = logoFrame(96, FORM_AT, "searching");
+    const alphas = dots.map((d) => d.a);
+    expect(Math.min(...alphas)).toBeCloseTo(0.4, 1);
+    expect(Math.max(...alphas)).toBeGreaterThan(0.9);
+  });
+});
+
 describe("small-mark legibility", () => {
   // Mid-dwell: the dots sit on the turning sphere, before any morph.
   const SPHERE_AT = 2;
@@ -182,34 +277,40 @@ describe("small-mark legibility", () => {
   it("eases in below 48px and leaves large marks untouched", () => {
     expect(smallness(96)).toBe(0);
     expect(smallness(48)).toBe(0);
-    expect(smallness(24)).toBeCloseTo(0.8);
+    expect(smallness(20)).toBeCloseTo(28 / 30);
     expect(smallness(18)).toBe(1);
     // At 96px the sphere keeps every dot fully opaque, as the playground tuning draws it.
     expect(logoFrame(96, SPHERE_AT).every((d) => d.a === 1)).toBe(true);
   });
 
-  it("fades the sphere's back hemisphere at 24px so it does not read as a flat disc", () => {
-    const dots = logoFrame(24, SPHERE_AT);
-    expect(dots).toHaveLength(495);
+  it("fades the sphere's back hemisphere at 20px so it does not read as a flat disc", () => {
+    const dots = logoFrame(20, SPHERE_AT);
+    expect(dots).toHaveLength(244);
     // Draw order is back to front.
-    const back = dots.slice(0, 100);
-    const front = dots.slice(-100);
+    const back = dots.slice(0, 50);
+    const front = dots.slice(-50);
     const mean = (ds: typeof dots) => ds.reduce((s, d) => s + d.a, 0) / ds.length;
-    expect(mean(back)).toBeLessThan(0.4);
+    expect(mean(back)).toBeLessThan(0.5);
     expect(mean(front)).toBeGreaterThan(0.85);
     // Nearer dots ink closer to the full tint than at 96px, on both substrates.
     const nearest = (size: number) => {
       const dots = logoFrame(size, SPHERE_AT);
       return dots[dots.length - 1].white;
     };
-    expect(nearest(24)).toBeLessThan(nearest(96));
+    expect(nearest(20)).toBeLessThan(nearest(96));
   });
 
-  it("keeps the assembled mark whole and its dots large enough to anti-alias", () => {
-    const mark = logoFrame(24, ASSEMBLED_AT);
-    expect(mark).toHaveLength(495);
-    expect(mark.every((d) => d.a > 0.99)).toBe(true);
-    expect(Math.min(...mark.map((d) => d.r))).toBeGreaterThanOrEqual(0.45);
+  it("keeps small dots fine: a modest radius floor, and the mark no longer a solid blot", () => {
+    const mark = logoFrame(20, ASSEMBLED_AT);
+    const radii = mark.map((d) => d.r);
+    // Between the playground's 0.3px floor and the 0.5px PR #1952 used.
+    expect(Math.min(...radii)).toBeGreaterThanOrEqual(0.34);
+    expect(Math.max(...radii)).toBeLessThan(0.5);
+    // Summed dot area over the mark's bounding box. PR #1952's 495 dots at 24px summed
+    // to 1.2 (dots overlapping into a blot); the 244 dots at 20px stay near half.
+    const { w, h } = spread(mark);
+    const ink = mark.reduce((s, d) => s + Math.PI * d.r * d.r, 0);
+    expect(ink / (w * h)).toBeLessThan(0.6);
   });
 });
 

@@ -5,11 +5,13 @@ import type { SessionRun } from "@/contexts/AgentChatSessionContext";
 import { useAgentChatSessionContext } from "@/contexts/AgentChatSessionContext";
 import {
   currentActivity,
+  displayStatusMessage,
   formatDuration,
   QUIET_AFTER_MS,
   useNow,
 } from "@/components/features/chat/ChatTrace";
 import { stepTitle } from "@/components/features/chat/ToolStepDetails";
+import { ActivityLogo } from "@/components/features/chat/ActivityLogo";
 import type {
   ChatMessage,
   AgentBlocksResult,
@@ -57,7 +59,7 @@ function runningTools(steps: TraceStep[]) {
 /** The phrase for a stored activity, as the live trace would show it. */
 function activityTitle(activity: TurnActivitySnapshot | null | undefined): string | null {
   if (!activity) return null;
-  if (!activity.tool) return activity.label;
+  if (!activity.tool) return displayStatusMessage(activity.label);
   const title = stepTitle({
     kind: "tool",
     id: "",
@@ -183,9 +185,36 @@ function isOngoing(status: ChatStatus | null): boolean {
 }
 
 /**
- * One line saying what the chat's turn is doing: a status dot with its label, what an
- * unwatched turn was last seen doing, and when the turn last sent something. The label is
- * the live region; the ticking time is not announced.
+ * Statuses the streaming turn's footer already shows with its live mark and label.
+ * A title line repeating them would be a second live presentation and a second
+ * announcement of the same change, so it shows nothing for them.
+ */
+const SHOWN_IN_FOOTER: ReadonlySet<ChatStatus["kind"]> = new Set([
+  "working",
+  "waiting_expert",
+  "waiting_execution",
+]);
+
+/** Whether the live turn's footer, not the title line, presents this status. */
+function shownInFooter(status: ChatStatus | null): boolean {
+  return status !== null && SHOWN_IN_FOOTER.has(status.kind);
+}
+
+/**
+ * Whether the chat waits on the user's own approval or answer. Only these
+ * settled states take the waiting mark: a live turn's mark is in its footer,
+ * and reconnecting or failures keep their warning and error dots.
+ */
+function awaitsUser(status: ChatStatus | null): boolean {
+  return status?.kind === "approval" || status?.kind === "question";
+}
+
+/**
+ * One line saying what the chat's turn is doing, apart from what the live footer
+ * presents (see `shownInFooter`): a status dot (the waiting mark while the
+ * chat waits on the user) with its label, what an unwatched turn was last seen doing, and
+ * when the turn last sent something. The label is the live region; the ticking time is not
+ * announced.
  */
 export function ChatStatusLine({
   status,
@@ -194,9 +223,9 @@ export function ChatStatusLine({
   status: ChatStatus | null;
   className?: string;
 }) {
-  const ongoing = isOngoing(status);
+  const ongoing = isOngoing(status) && !shownInFooter(status);
   const now = useNow(ongoing);
-  if (!status) return null;
+  if (!status || shownInFooter(status)) return null;
   const silent = status.lastUpdateAt != null ? now - status.lastUpdateAt : null;
   const showTime =
     silent !== null && (status.stale || status.kind === "reconnecting" || silent >= QUIET_AFTER_MS);
@@ -209,7 +238,15 @@ export function ChatStatusLine({
       data-testid="chat-status"
       data-kind={status.kind}
     >
-      <span className={`status status-xs shrink-0 ${TONE_CLASS[status.tone]}`} aria-hidden="true" />
+      {awaitsUser(status) ? (
+        // The turn has ended and is parked on the user: the waiting mark in place of the dot.
+        <ActivityLogo mode="waiting" size={16} />
+      ) : (
+        <span
+          className={`status status-xs shrink-0 ${TONE_CLASS[status.tone]}`}
+          aria-hidden="true"
+        />
+      )}
       <span role="status" className="truncate">
         {status.label}
         {status.lastActivity ? ` · last seen: ${status.lastActivity}` : ""}
