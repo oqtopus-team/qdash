@@ -20,15 +20,11 @@ describe("calibration session status", () => {
     expect(open.border).toBe(getStatusBorderStyle("running"));
   });
 
-  it("never gives a closed session the outcome colors of a completed or failed execution", () => {
+  it("reads a closed session like a completed execution, since all of its work ended", () => {
     const closed = calibrationSessionStatusStyle("closed");
     expect(closed.label).toBe("Closed");
-    for (const outcome of ["completed", "failed"]) {
-      expect(closed.badge).not.toBe(getStatusBadgeClass(outcome));
-      expect(closed.border).not.toBe(getStatusBorderStyle(outcome));
-    }
-    // It ends like a cancelled execution: the neutral accent of work that stopped.
-    expect(closed.border).toBe(getStatusBorderStyle("cancelled"));
+    expect(closed.badge).toBe(getStatusBadgeClass("completed"));
+    expect(closed.border).toBe(getStatusBorderStyle("completed"));
   });
 
   it("names the state in text, not by color alone", () => {

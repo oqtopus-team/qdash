@@ -15,8 +15,9 @@ type CalibrationSessionStatusStyle = {
 
 /**
  * A calibration session's state in the Execution status palette. Open reads like an active
- * execution. Closed only means the session ended: it says nothing about how its runs ended, so
- * it takes the neutral color of an ended execution, never the completed or failed one.
+ * execution. Closed reads like a completed execution so a finished session is easy to spot: all
+ * of its work has ended. The color does not mean every run succeeded; each child execution keeps
+ * its own result color.
  */
 export function calibrationSessionStatusStyle(
   status: CalibrationSessionStatus,
@@ -31,8 +32,8 @@ export function calibrationSessionStatusStyle(
   }
   return {
     label: "Closed",
-    badge: "badge-ghost",
-    border: getStatusBorderStyle("cancelled"),
+    badge: getStatusBadgeClass("completed"),
+    border: getStatusBorderStyle("completed"),
     Icon: Circle,
   };
 }
