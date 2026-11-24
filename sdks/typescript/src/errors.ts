@@ -74,6 +74,14 @@ export class QDashValidationError extends QDashApiError {}
  */
 export class QDashTransportError extends QDashApiError {}
 
+/** A launch preflight failed; no dispatch request was sent. The original failure is `cause`. */
+export class QDashPreflightError extends Error {
+  constructor(message: string, options: { cause?: unknown } = {}) {
+    super(message, options);
+    this.name = "QDashPreflightError";
+  }
+}
+
 /**
  * A dispatch was answered, but the answer does not show the run was recorded as requested
  * (its calibration session, retry key or decision), for example from a server that predates

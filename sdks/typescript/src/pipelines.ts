@@ -1,4 +1,4 @@
-import { call, read, resultUnknown, writeOptions, type Context } from "./_http.js";
+import { call, dispatch, read, resultUnknown, writeOptions, type Context } from "./_http.js";
 import type {
   CalibrationPipelineSpec,
   CalibrationPipelineSpecStepsItem,
@@ -11,6 +11,7 @@ import type {
 } from "./types.js";
 import { calibrationSpec, type CalibrationOptions } from "./definitions.js";
 import { Run, type Executions, type WaitOptions } from "./runs.js";
+import { QDashPreflightError } from "./errors.js";
 
 /**
  * A spec the pipeline routes accept: a typed version 2 spec, or any JSON object
@@ -69,7 +70,13 @@ function request(spec: PipelineSpecInput, target: PipelineTarget) {
   };
 }
 
-function recording(options: PipelineRecording | undefined) {
+interface RecordingFields {
+  calibration_session_id?: string;
+  idempotency_key?: string;
+  decision_id?: string;
+}
+
+function recording(options: PipelineRecording | undefined): RecordingFields {
   if (!options) return {};
   const blank = (value: unknown) => typeof value !== "string" || !value.trim();
   if (blank(options.idempotencyKey) || (options.calibrationSessionId !== undefined && blank(options.calibrationSessionId))) {
@@ -146,11 +153,13 @@ export class Pipelines {
    * problems. The run belongs to the session's project, or to the server's
    * default project for the user when none is configured. Returns once
    * dispatched; nothing waits. The request is sent once: a transport error or an
-   * error status is thrown, never retried.
+   * error status is thrown, never retried. A success answer that cannot be read throws
+   * `QDashResultUnknownError`.
    *
    * With `recording`, the run is recorded under its key and session before it is
-   * launched (see `PipelineRecording`). A named session is read first to check it
-   * exists on the chip; nothing is dispatched otherwise. A response that does not
+   * launched (see `PipelineRecording`). A named session is first looked up among the
+   * signed-in user's sessions on the chip, without reading its detail; nothing is
+   * dispatched when it is not found. A response that does not
    * echo the session, the recorded run or the decision throws
    * `QDashResultUnknownError`: the run may have started without them, so reconcile it
    * instead of retrying.
@@ -164,8 +173,18 @@ export class Pipelines {
   ): Promise<PipelineRun> {
     const recorded = recording(recordIn);
     const sessionId = recordIn?.calibrationSessionId;
-    if (sessionId) await this.preflightSession(sessionId, target.chipId);
-    const answer = await call(() =>
+    if (sessionId) {
+      try {
+        await this.preflightSession(sessionId, target.chipId);
+      } catch (cause) {
+        if (cause instanceof QDashPreflightError) throw cause;
+        throw new QDashPreflightError(
+          "Calibration session preflight failed; nothing dispatched. Check API connectivity, credentials and server compatibility.",
+          { cause },
+        );
+      }
+    }
+    const answer = await dispatch("Pipeline", () =>
       this.context.api.calibrationPipeline
         .executeCalibrationPipeline(
           {
@@ -190,9 +209,11 @@ export class Pipelines {
         );
       }
       // A server that drops the decision would record the run without its intent.
-      if (recordIn.decisionId && response.decision_id !== recordIn.decisionId) {
+      // Compare with the decision that was sent: the caller may change `recordIn` meanwhile.
+      const decisionId = recorded.decision_id;
+      if (decisionId && response.decision_id !== decisionId) {
         throw resultUnknown(
-          `Pipeline result unknown: the run may have been recorded without its decision ${recordIn.decisionId}. ` +
+          `Pipeline result unknown: the run may have been recorded without its decision ${decisionId}. ` +
             "Do not retry automatically or use a new key; reconcile the run in the calibration session audit first.",
           answer,
         );
@@ -201,17 +222,43 @@ export class Pipelines {
     return new PipelineRun(this.executions, response);
   }
 
-  /** Prove the server records sessions before an associated write; nothing is sent otherwise. */
+  /**
+   * Prove the server records sessions before an associated write; nothing is sent otherwise.
+   *
+   * Reads the session list, never the session detail: reading the detail of an open automatic
+   * session closes it when its work has ended, which would make the launch that follows fail.
+   * The list has no side effects and arrived with the same server release as the recording
+   * fields. Only the signed-in user's sessions on the chip are listed: the server starts work
+   * only in those, and an idempotent replay is always in one. Closed sessions are included, so
+   * a replay into one still reaches the server, which decides whether a run may start.
+   */
   private async preflightSession(sessionId: string, chipId: string): Promise<void> {
-    const session = await read(this.context.reads, (requestOptions) =>
-      this.context.api.calibrationSession.getCalibrationSession({ calibration_session_id: sessionId }, requestOptions),
-    );
-    // Closed sessions can still return an idempotent replay; the API decides whether a run may start.
-    if (!session || session.calibration_session_id !== sessionId || session.chip_id !== chipId) {
-      throw new Error("Calibration session preflight failed; nothing dispatched. Check server compatibility.");
+    for (let skip = 0; skip <= MAX_SESSION_SKIP; skip += SESSION_PAGE) {
+      const page = await read(this.context.reads, (requestOptions) =>
+        this.context.api.calibrationSession.listCalibrationSessions(
+          { chip_id: chipId, mine: true, limit: SESSION_PAGE, skip },
+          requestOptions,
+        ),
+      );
+      const items = Array.isArray(page?.items) ? page.items : undefined;
+      if (!items) break;
+      const found = items.find((session) => session?.calibration_session_id === sessionId);
+      if (found) {
+        if (found.chip_id === chipId) return;
+        break;
+      }
+      if (page.has_more !== true || items.length === 0) break;
     }
+    throw new QDashPreflightError(
+      `Calibration session preflight failed: ${sessionId} is not a session of yours on chip ${chipId}, ` +
+        "or the server cannot record sessions; nothing dispatched. Check the session and server compatibility.",
+    );
   }
 }
+
+// Sessions read per page by the preflight, and the last offset the list accepts.
+const SESSION_PAGE = 100;
+const MAX_SESSION_SKIP = 10_000;
 
 /** A dispatched calibration, returned by `Chip.calibrate`. */
 export class CalibrationRun extends Run {

@@ -1,4 +1,5 @@
 /** Building the generated client from a config, the SDK's error translation and read retries. */
+import { randomUUID } from "node:crypto";
 import { createRequire } from "node:module";
 import { setTimeout as delay } from "node:timers/promises";
 
@@ -85,10 +86,10 @@ export interface SessionAuth {
   readonly fetch: Fetch | undefined;
 }
 
-function bearerToken(input: RequestInfo | URL, init: RequestInit | undefined): string | undefined {
+function bearerValue(input: RequestInfo | URL, init: RequestInit | undefined): { headers: Headers; value: string | undefined } {
   const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
   const match = /^Bearer\s+(.+)$/i.exec(headers.get("Authorization") ?? "");
-  return match?.[1];
+  return { headers, value: match?.[1] };
 }
 
 /**
@@ -96,9 +97,16 @@ function bearerToken(input: RequestInfo | URL, init: RequestInit | undefined): s
  * sign-in shared by every request of the session and of its `withProject` sessions.
  *
  * A sign-in happens once, on the first request, and is reused. A 401 answer to a request
- * drops the sign-in whose token that request carried, so the next request signs in again;
- * a 401 to a request that carried an older token leaves a newer sign-in in place. The request
- * that got the 401 is not sent again (a write could act twice): its caller gets the 401.
+ * drops the sign-in that request was sent with, so the next request signs in again; a 401 to a
+ * request of an older sign-in leaves a newer one in place, even when the server issued the same
+ * token string again. The request that got the 401 is not sent again (a write could act twice):
+ * its caller gets the 401.
+ *
+ * Each request is tied to its sign-in by identity, not by token text: the generated client gets
+ * a per-session marker carrying the sign-in's number and token, and the session's fetch replaces
+ * it with the token right before sending, so the marker never reaches the network or the
+ * caller's fetch. The request owns that state; the session keeps only the current sign-in, so
+ * nothing accumulates across sign-ins or requests that never reach fetch.
  */
 export function sessionAuth(config: QDashConfig, fetchFn: Fetch | undefined, env: Environment): SessionAuth {
   if (config.apiToken) return { token: config.apiToken, fetch: fetchFn };
@@ -140,15 +148,20 @@ export function sessionAuth(config: QDashConfig, fetchFn: Fetch | undefined, env
     return token;
   };
 
-  // The current sign-in, shared by concurrent requests, and its token once it has one.
-  let pending: Promise<string> | undefined;
-  let signedIn: string | undefined;
-  const token = (): Promise<string> => {
+  // Marker prefix of this session's sign-ins; random so it cannot match a real token.
+  const marker = `qdash-sdk-sign-in-${randomUUID()}-`;
+  // The current sign-in, shared by concurrent requests, and its number once it has a token.
+  // Only numbers are kept: a request carries its own sign-in's token in its marker.
+  let issued = 0;
+  let pending: Promise<{ number: number; token: string }> | undefined;
+  let current: number | undefined;
+  const signedIn = (): Promise<{ number: number; token: string }> => {
     if (pending) return pending;
-    const attempt: Promise<string> = signIn().then(
+    const attempt: Promise<{ number: number; token: string }> = signIn().then(
       (value) => {
-        if (pending === attempt) signedIn = value;
-        return value;
+        issued += 1;
+        if (pending === attempt) current = issued;
+        return { number: issued, token: value };
       },
       (error: unknown) => {
         // A failed sign-in is tried again by the next request.
@@ -159,15 +172,24 @@ export function sessionAuth(config: QDashConfig, fetchFn: Fetch | undefined, env
     pending = attempt;
     return attempt;
   };
+  const token = async (): Promise<string> => {
+    const { number, token: value } = await signedIn();
+    return `${marker}${number}:${value}`;
+  };
   const base: Fetch = fetchFn ?? ((input, init) => globalThis.fetch(input, init));
   const apiFetch = (async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-    const used = bearerToken(input, init);
-    const signInAtStart = pending;
-    const response = await base(input, init);
-    // Only the sign-in this request used is dropped; a newer one stays.
-    if (response.status === 401 && used !== undefined && used === signedIn && pending === signInAtStart) {
+    const { headers, value } = bearerValue(input, init);
+    // A request without the session's marker (no auth, or the caller's own Authorization).
+    if (value === undefined || !value.startsWith(marker)) return base(input, init);
+    const carried = /^(\d+):(.+)$/s.exec(value.slice(marker.length));
+    if (!carried) throw new QDashAuthError("Malformed sign-in marker for this request; nothing was sent");
+    const signInNumber = Number(carried[1]);
+    headers.set("Authorization", `Bearer ${carried[2]}`);
+    const response = await base(input, { ...init, headers });
+    // Only the sign-in this request was sent with is dropped; a newer one stays.
+    if (response.status === 401 && signInNumber === current) {
       pending = undefined;
-      signedIn = undefined;
+      current = undefined;
     }
     return response;
   }) as Fetch;
@@ -320,6 +342,53 @@ export function resultUnknown(message: string, answer: { data: unknown; rawRespo
     rawResponse: answer.rawResponse,
     ...(executionId ? { executionId } : {}),
   });
+}
+
+const UNDECODABLE_DISPATCH =
+  "the dispatch was accepted but its answer could not be read, so the run may have started. " +
+  "Do not retry automatically or use a new key; reconcile the execution first.";
+
+/**
+ * Send a dispatch once and return its answer. A success status whose body is not a JSON
+ * object (truncated, not JSON or empty) throws `QDashResultUnknownError`, with the status, body
+ * and raw response of the answer and the client's error as cause: the server accepted the
+ * request, so the run may have started. Error statuses and transport errors are thrown as by
+ * `call`; nothing is sent again.
+ */
+export async function dispatch<T>(
+  what: string,
+  request: () => Promise<{ data: T; rawResponse: RawResponse }>,
+): Promise<{ data: T; rawResponse: RawResponse }> {
+  let answer: { data: T; rawResponse: RawResponse };
+  try {
+    answer = await request();
+  } catch (error) {
+    if (
+      error instanceof ApiError &&
+      !(error instanceof ApiTimeoutError) &&
+      error.statusCode !== undefined &&
+      error.statusCode >= 200 &&
+      error.statusCode < 400
+    ) {
+      throw new QDashResultUnknownError(`${what} result unknown: ${UNDECODABLE_DISPATCH}`, {
+        statusCode: error.statusCode,
+        ...(error.body !== undefined ? { body: error.body } : {}),
+        ...(error.rawResponse !== undefined ? { rawResponse: error.rawResponse } : {}),
+        cause: error,
+      });
+    }
+    throw translate(error);
+  }
+  const data: unknown = answer.data;
+  if (isResponseBodyError(data) || !isRecord(data)) {
+    const body = isResponseBodyError(data) && data.error.reason === "non-json" ? data.error.rawBody : data;
+    throw new QDashResultUnknownError(`${what} result unknown: ${UNDECODABLE_DISPATCH}`, {
+      statusCode: answer.rawResponse.status,
+      ...(body !== undefined ? { body } : {}),
+      rawResponse: answer.rawResponse,
+    });
+  }
+  return answer;
 }
 
 /** Options of a write: sent once. */

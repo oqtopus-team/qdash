@@ -234,8 +234,14 @@ With username/password authentication, a resource's 401 invalidates the login us
 request. The failed request is not replayed; the next call signs in again. Scoped sessions share
 this state, and a late 401 cannot invalidate a newer sign-in. Static API tokens are unchanged.
 
+With `calibrationSessionId`, pipeline execution first searches your sessions on the target
+chip without changing their state. It checks up to 10,100 sessions, including closed sessions
+for idempotent replay. If that check fails, `QDashPreflightError` means no launch request was
+sent; its `cause` preserves a failed API read. Check the session, credentials and API availability.
+
 `QDashResultUnknownError` means a dispatch response did not confirm the requested run
-recording. It extends `QDashApiError` and exposes `executionId` when available. The operation
+recording, or a successful HTTP response could not be read as a JSON object. The latter also
+applies without recording options. It extends `QDashApiError` and exposes `executionId` when available. The operation
 may have started: inspect that execution before deciding what to do; do not launch again
 with a new key.
 

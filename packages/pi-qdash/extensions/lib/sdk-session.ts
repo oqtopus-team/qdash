@@ -55,15 +55,31 @@ export function isResultUnknown(error: unknown): error is QDashResultUnknownErro
   return error instanceof QDashResultUnknownError || (error instanceof Error && error.name === "QDashResultUnknownError");
 }
 
+/** Where a launch whose outcome is unknown was meant to run, for finding it without an ID. */
+export interface LaunchTarget {
+  /** The chip the launch was for, when the tool knows it. */
+  chipId?: string;
+  /** How to name the chip when `chipId` is unknown, such as "the flow's saved chip". */
+  chipHint?: string;
+}
+
 /**
- * The tool error for a launch whose outcome is unknown: never started again by the tool, and
- * named so the model checks the executions and tells the user instead of retrying.
+ * What the model does after a launch whose outcome is unknown: never start it again, check the
+ * run and tell the user. With an execution ID it points at `qdash_get_execution`, which finds
+ * the run on any chip; without one, at `qdash_list_executions` for the launch's chip, page by
+ * page, since that tool reads one chip (the default one unless told otherwise) a page at a time.
  */
-export function resultUnknownToolError(error: QDashResultUnknownError): Error {
+export function unknownLaunchGuidance(executionId: string | undefined, target: LaunchTarget = {}): string {
+  const chip = target.chipId ? `chipId ${target.chipId}` : `chipId set to ${target.chipHint ?? "the launch's chip"}`;
+  const check = executionId
+    ? `check execution ${executionId} with qdash_get_execution`
+    : `no execution ID was returned, so look for the run with qdash_list_executions, passing ${chip}, ` +
+      "and page with skip until the rows are older than this launch";
+  return `Do not start this run again; ${check}, and tell the user.`;
+}
+
+/** The tool error for a launch whose outcome is unknown (see `unknownLaunchGuidance`). */
+export function resultUnknownToolError(error: QDashResultUnknownError, target: LaunchTarget = {}): Error {
   const executionId = typeof error.executionId === "string" && error.executionId ? error.executionId : undefined;
-  return new Error(
-    `${error.message} Do not start this run again; check qdash_list_executions` +
-      `${executionId ? ` for execution ${executionId}` : ""} and tell the user.`,
-    { cause: error },
-  );
+  return new Error(`${error.message} ${unknownLaunchGuidance(executionId, target)}`, { cause: error });
 }

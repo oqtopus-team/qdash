@@ -24,9 +24,10 @@ API tokens avoid separate password logins by the client and SDK; with username/p
 a tool using both can sign in twice.
 Set `QDASH_WEB_URL` if the web UI is not the API base URL without `/api`.
 
-If a launch reports an unknown outcome, do not repeat it. Check `qdash_list_executions` for
-the reported execution ID, if present, and reconcile its state before another launch. The
-pipeline and saved-workflow tools do not report such responses as successfully started.
+If a launch reports an unknown outcome, do not repeat it. Use `qdash_get_execution` with
+the reported execution ID. If no ID is available, use `qdash_list_executions` with the
+launch's chip and check subsequent pages before reconciling its state. The pipeline and
+saved-workflow tools do not report such responses as successfully started.
 
 ## Read-only query tools
 

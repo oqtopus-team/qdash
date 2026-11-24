@@ -232,7 +232,7 @@ describe("Chip calibration", () => {
 
   it("records a run in a calibration session under its retry key", async () => {
     const { fetch, requests } = server({
-      "GET /calibration-sessions/cs-1": [{ body: { calibration_session_id: "cs-1", chip_id: "64Qv3", status: "open" } }],
+      "GET /calibration-sessions": [{ body: { items: [{ calibration_session_id: "cs-1", chip_id: "64Qv3", status: "open" }], has_more: false } }],
       "POST /calibration-pipelines/execute": [{ body: { ...dispatched, calibration_session_id: "cs-1", pipeline_run_id: "cpr-1", replayed: false } }],
     });
     const qdash = session(fetch, "p1");
@@ -240,7 +240,7 @@ describe("Chip calibration", () => {
 
     expect(run.response.pipeline_run_id).toBe("cpr-1");
     expect(requests).toEqual([
-      { method: "GET", path: "/calibration-sessions/cs-1", body: undefined, project: "p1" },
+      { method: "GET", path: "/calibration-sessions", body: undefined, project: "p1" },
       {
         method: "POST",
         path: "/calibration-pipelines/execute",
@@ -255,7 +255,7 @@ describe("Chip calibration", () => {
 
   it("names the decision a recorded run carries out", async () => {
     const { fetch, requests } = server({
-      "GET /calibration-sessions/cs-1": [{ body: { calibration_session_id: "cs-1", chip_id: "64Qv3" } }],
+      "GET /calibration-sessions": [{ body: { items: [{ calibration_session_id: "cs-1", chip_id: "64Qv3" }], has_more: false } }],
       "POST /calibration-pipelines/execute": [{ body: { ...dispatched, calibration_session_id: "cs-1", pipeline_run_id: "cpr-1", decision_id: "d-1", replayed: false } }],
     });
     const qdash = session(fetch, "p1");
@@ -276,7 +276,7 @@ describe("Chip calibration", () => {
   ] as const) {
     it(`reports a launch whose answer ${name} as result unknown, sent once`, async () => {
       const { fetch, requests } = server({
-        "GET /calibration-sessions/cs-1": [{ body: { calibration_session_id: "cs-1", chip_id: "64Qv3" } }],
+        "GET /calibration-sessions": [{ body: { items: [{ calibration_session_id: "cs-1", chip_id: "64Qv3" }], has_more: false } }],
         "POST /calibration-pipelines/execute": [{ status: 201, body: answer }],
       });
       const error = await session(fetch, "p1")

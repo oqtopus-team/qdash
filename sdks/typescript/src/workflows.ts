@@ -3,7 +3,7 @@
  * `qdash.api.flow.saveFlow`, with a deployment and a target chip. These reach the
  * server's `/flows` routes; nothing is uploaded, registered or run locally.
  */
-import { call, read, resultUnknown, writeOptions, type Context } from "./_http.js";
+import { dispatch, read, resultUnknown, writeOptions, type Context } from "./_http.js";
 import { Run, type Executions } from "./runs.js";
 import type { ExecuteFlowResponse, FlowSummary, GetFlowResponse } from "./types.js";
 
@@ -107,7 +107,8 @@ export class Workflows {
    * Dispatch the registered workflow `name`. The server merges `parameters` over
    * the saved defaults and runs on the saved `chip_id` unless the merged
    * parameters carry one. Returns once dispatched. The request is sent once: a
-   * transport error or an error status is thrown, never retried. With a session or
+   * transport error or an error status is thrown, never retried. A success answer
+   * that cannot be read throws `QDashResultUnknownError`. With a session or
    * key, a response that does not echo the recorded run throws
    * `QDashResultUnknownError`: the run may have started without them, so reconcile
    * it instead of retrying.
@@ -118,7 +119,7 @@ export class Workflows {
     if ((id != null && (typeof id !== "string" || !id.trim())) || (key != null && (typeof key !== "string" || !key.trim()))) {
       throw new TypeError("calibrationSessionId and idempotencyKey must be non-empty when given");
     }
-    const answer = await call(() =>
+    const answer = await dispatch("Workflow", () =>
       this.context.api.flow
         .executeFlow(
           {

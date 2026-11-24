@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { read } from "../src/_http.js";
+import { read, sessionAuth } from "../src/_http.js";
 import {
   ApiError,
   QDash,
   QDashApiError,
   QDashAuthError,
+  QDashConfig,
   QDashConfigError,
   QDashConflictError,
   QDashTransportError,
@@ -331,6 +332,151 @@ describe("username and password sign-in", () => {
       `Bearer ${newToken}`,
       `Bearer ${newToken}`,
     ]);
+  });
+
+  it("keeps a new sign-in with the same token when a request of the old one, paused after taking its token, gets a 401", async () => {
+    let release: (value: string) => void = () => {};
+    const gate = new Promise<string>((resolve) => {
+      release = resolve;
+    });
+    const { fetch, seen } = server({
+      // The server issues the same token string twice.
+      "POST /auth/login": [() => json({ access_token: "same" }), () => json({ access_token: "same" })],
+      "GET /flows": [
+        () => json({ detail: "expired" }, 401),
+        () => json({ flows: [] }),
+        () => json({ detail: "expired" }, 401),
+        () => json({ flows: [] }),
+      ],
+    });
+    const { qdash } = session(fetch, password, { env });
+    // A generated call takes its token, then waits in an async header supplier before fetch.
+    const paused = qdash.api.flow.listFlows({ headers: { "X-Trace": () => gate } }).catch((caught: unknown) => caught);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(logins(seen)).toBe(1);
+    expect(seen.filter((request) => request.path === "/flows")).toHaveLength(0);
+    // Another request gets a 401 and drops the first sign-in; the next signs in again.
+    await expect(qdash.workflows.list()).rejects.toBeInstanceOf(QDashAuthError);
+    await qdash.workflows.list();
+    expect(logins(seen)).toBe(2);
+    // The paused request of the first sign-in is sent now and gets a 401: the new sign-in stays.
+    release("trace");
+    expect(await paused).toMatchObject({ statusCode: 401 });
+    await qdash.workflows.list();
+    expect(logins(seen)).toBe(2);
+    const flows = seen.filter((request) => request.path === "/flows");
+    expect(flows.map(bearer)).toEqual(["Bearer same", "Bearer same", "Bearer same", "Bearer same"]);
+    expect(flows[2]?.headers.get("X-Trace")).toBe("trace");
+    // Only the real token reaches the network.
+    for (const request of seen) {
+      for (const [name, value] of request.headers) {
+        expect(`${name}: ${value}`).not.toMatch(/qdash-sdk-sign-in/);
+      }
+    }
+  });
+
+  it("sends a caller's own Authorization of a generated call as given and keeps the sign-in after its 401", async () => {
+    const { fetch, seen } = server({
+      "POST /auth/login": [() => json({ access_token: "t1" })],
+      "GET /flows": [() => json({ detail: "bad" }, 401), () => json({ flows: [] })],
+    });
+    const { qdash } = session(fetch, password, { env });
+    const raw = await qdash.api.flow.listFlows({ headers: { Authorization: "Bearer mine" } }).catch((caught: unknown) => caught);
+    expect(raw).toMatchObject({ statusCode: 401 });
+    await qdash.workflows.list();
+    expect(seen.filter((request) => request.path === "/flows").map(bearer)).toEqual(["Bearer mine", "Bearer t1"]);
+    expect(logins(seen)).toBe(1);
+  });
+
+  it("sends a request paused across many sign-ins with its own token, and its 401 keeps the newest", async () => {
+    let release: (value: string) => void = () => {};
+    const gate = new Promise<string>((resolve) => {
+      release = resolve;
+    });
+    const cycles = 25;
+    const logins401 = Array.from({ length: cycles + 1 }, (_, index) => () => json({ access_token: `t${index + 1}` }));
+    const flows: Handler[] = [];
+    for (let index = 0; index < cycles; index += 1) flows.push(() => json({ detail: "expired" }, 401));
+    flows.push(() => json({ flows: [] }), () => json({ detail: "expired" }, 401));
+    const { fetch, seen } = server({ "POST /auth/login": logins401, "GET /flows": flows });
+    const { qdash } = session(fetch, password, { env });
+    const paused = qdash.api.flow.listFlows({ headers: { "X-Trace": () => gate } }).catch((caught: unknown) => caught);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    // Each 401 drops the current sign-in and the next request signs in again.
+    for (let index = 0; index < cycles; index += 1) {
+      await expect(qdash.workflows.list()).rejects.toBeInstanceOf(QDashAuthError);
+    }
+    expect(logins(seen)).toBe(cycles);
+    await expect(qdash.workflows.list()).resolves.toEqual([]);
+    const latest = `Bearer t${cycles + 1}`;
+    expect(bearer(seen.at(-1))).toBe(latest);
+    // The first sign-in's request still carries t1; its 401 does not drop the newest sign-in.
+    release("trace");
+    expect(await paused).toMatchObject({ statusCode: 401 });
+    expect(bearer(seen.at(-1))).toBe("Bearer t1");
+    expect(logins(seen)).toBe(cycles + 1);
+  });
+
+  it("leaves nothing behind for requests whose header supplier fails or is aborted before fetch", async () => {
+    const { fetch, seen } = server({
+      "POST /auth/login": [() => json({ access_token: "t1" })],
+      "GET /flows": [() => json({ flows: [] })],
+    });
+    const { qdash } = session(fetch, password, { env });
+    for (let index = 0; index < 20; index += 1) {
+      const failed = await qdash.api.flow
+        .listFlows({ headers: { "X-Trace": () => Promise.reject(new Error("no trace")) } })
+        .catch((caught: unknown) => caught);
+      expect((failed as Error).message).toMatch(/no trace/);
+      const controller = new AbortController();
+      const aborted = qdash.api.flow
+        .listFlows({
+          abortSignal: controller.signal,
+          headers: {
+            "X-Trace": () =>
+              new Promise<string>((_, reject) => {
+                if (controller.signal.aborted) reject(controller.signal.reason);
+                controller.signal.addEventListener("abort", () => reject(controller.signal.reason));
+              }),
+          },
+        })
+        .catch((caught: unknown) => caught);
+      controller.abort(new Error("stopped"));
+      expect(await aborted).toBeInstanceOf(Error);
+    }
+    // None reached the network, the one sign-in stays, and the next request uses it.
+    expect(seen.map((request) => request.path)).toEqual(["/auth/login"]);
+    await expect(qdash.workflows.list()).resolves.toEqual([]);
+    expect(seen.map((request) => `${request.path} ${bearer(request) ?? ""}`)).toEqual(["/auth/login ", "/flows Bearer t1"]);
+  });
+
+  it("looks up no sign-in history: the session's fetch sends the token a request carries", async () => {
+    const { fetch, seen } = server({
+      "POST /auth/login": [() => json({ access_token: "t1" })],
+      "GET /flows": [() => json({ detail: "x" }, 401), () => json({ flows: [] })],
+    });
+    const auth = sessionAuth(new QDashConfig({ baseUrl: "https://qdash.example/api", ...password }), fetch, env);
+    const marker = await (auth.token as () => Promise<string>)();
+    expect(marker).not.toBe("t1");
+    expect(marker.endsWith(":t1")).toBe(true);
+    // A marker naming a sign-in this session never issued is sent with its own token, and its
+    // 401 leaves the current sign-in: nothing is looked up or recorded per sign-in.
+    const forged = marker.replace(/\d+:t1$/, "999999:other");
+    const answer = await auth.fetch!("https://qdash.example/api/flows", { headers: { Authorization: `Bearer ${forged}` } });
+    expect(answer.status).toBe(401);
+    await auth.fetch!("https://qdash.example/api/flows", { headers: { Authorization: `Bearer ${marker}` } });
+    expect(seen.map((request) => `${request.path} ${bearer(request) ?? ""}`)).toEqual([
+      "/auth/login ",
+      "/flows Bearer other",
+      "/flows Bearer t1",
+    ]);
+    expect(await (auth.token as () => Promise<string>)()).toBe(marker);
+    // A malformed marker is refused before anything is sent.
+    const prefix = marker.slice(0, marker.lastIndexOf("1:t1"));
+    await expect(
+      auth.fetch!("https://qdash.example/api/flows", { headers: { Authorization: `Bearer ${prefix}nonsense` } }),
+    ).rejects.toBeInstanceOf(QDashAuthError);
+    expect(seen).toHaveLength(3);
   });
 
   it("shares the dropped sign-in with project-scoped sessions: one new sign-in for both", async () => {

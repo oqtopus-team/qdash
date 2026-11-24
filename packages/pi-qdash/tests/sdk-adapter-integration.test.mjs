@@ -22,6 +22,9 @@ const json = (response, status, body) => {
 const STATUS = Symbol("status");
 /** An answer with a status other than 200. */
 const answered = (status, body) => ({ [STATUS]: status, body });
+const RAW = Symbol("raw");
+/** An answer whose body is sent as these exact bytes, such as a truncated JSON document. */
+const rawAnswer = (status, text, contentType = "application/json") => ({ [RAW]: { status, text, contentType } });
 
 /**
  * A QDash API on 127.0.0.1 answering from `routes` ("METHOD /path" to a list of answers, the
@@ -39,6 +42,10 @@ async function fakeQDash(t, routes) {
     if (!queue?.length) return json(response, 404, { detail: `no ${key}` });
     const answer = queue.length > 1 ? queue.shift() : queue[0];
     const reply = typeof answer === "function" ? answer({ text, headers: request.headers }) : answer;
+    if (reply && typeof reply === "object" && RAW in reply) {
+      response.writeHead(reply[RAW].status, { "content-type": reply[RAW].contentType });
+      return response.end(reply[RAW].text);
+    }
     if (reply && typeof reply === "object" && STATUS in reply) return json(response, reply[STATUS], reply.body);
     return json(response, 200, reply);
   });
@@ -94,10 +101,10 @@ test("the hosted profile's token, project, gateway headers and user agent reach 
   assert.deepEqual(JSON.parse(validate.body), { chip_id: "64Qv3", spec: SPEC });
 });
 
-test("qdash_run_pipeline checks pauses with the client, reads the session, and dispatches once with the SDK", async (t) => {
+test("qdash_run_pipeline checks pauses with the client, lists the session, and dispatches once with the SDK", async (t) => {
   const { baseUrl, requests } = await fakeQDash(t, {
     "GET /agent-sessions": [NO_PAUSE],
-    "GET /calibration-sessions/cs-1": [{ calibration_session_id: "cs-1", chip_id: "64Qv3", status: "open" }],
+    "GET /calibration-sessions": [{ items: [{ calibration_session_id: "cs-1", chip_id: "64Qv3", status: "open" }], has_more: false }],
     "POST /calibration-pipelines/execute": [answered(201, { ...DISPATCHED, calibration_session_id: "cs-1", pipeline_run_id: "cpr-1", replayed: false })],
   });
   const connection = await profileFile(t, { base_url: baseUrl, api_token: "user-token", project_id: "p-1" });
@@ -105,12 +112,78 @@ test("qdash_run_pipeline checks pauses with the client, reads the session, and d
   const result = await extensionTools().get("qdash_run_pipeline").execute("call-1", params, undefined, undefined, approved("call-1", "qdash_run_pipeline"));
   assert.equal(result.details.started, true);
   assert.equal(result.details.pipelineRunId, "cpr-1");
-  assert.deepEqual(requests.map((request) => request.key), ["GET /agent-sessions", "GET /calibration-sessions/cs-1", "POST /calibration-pipelines/execute"]);
+  assert.deepEqual(requests.map((request) => request.key), ["GET /agent-sessions", "GET /calibration-sessions", "POST /calibration-pipelines/execute"]);
+  assert.deepEqual(requests[1].query, { chip_id: "64Qv3", mine: "true", limit: "100", skip: "0" });
   assert.ok(requests.every((request) => request.headers["x-project-id"] === "p-1" && request.headers.authorization === "Bearer user-token"));
   const body = JSON.parse(requests[2].body);
   assert.equal(body.calibration_session_id, "cs-1");
   assert.match(body.idempotency_key, /call-1/);
   assert.deepEqual(body.reported_origin, { source: "agent_tool", tool: "qdash_run_pipeline", client: "pi-qdash" });
+});
+
+test("qdash_run_pipeline launches into an open automatic session without reading its closing detail", async (t) => {
+  // The detail route closes an open automatic session whose work ended; the launch must not read it.
+  const automatic = { calibration_session_id: "cs-auto", chip_id: "64Qv3", status: "open", origin: "automatic" };
+  const others = Array.from({ length: 100 }, (_, index) => ({ calibration_session_id: `cs-${index}`, chip_id: "64Qv3", status: "closed" }));
+  const { baseUrl, requests } = await fakeQDash(t, {
+    "GET /agent-sessions": [NO_PAUSE],
+    "GET /calibration-sessions": [{ items: others, has_more: true }, { items: [automatic], has_more: false }],
+    "GET /calibration-sessions/cs-auto": [() => {
+      automatic.status = "closed";
+      return automatic;
+    }],
+    "POST /calibration-pipelines/execute": [() =>
+      automatic.status === "closed"
+        ? answered(409, { detail: "Calibration session cs-auto is closed; start a new one" })
+        : answered(201, { ...DISPATCHED, calibration_session_id: "cs-auto", pipeline_run_id: "cpr-1", replayed: false })],
+  });
+  const connection = await profileFile(t, { base_url: baseUrl, api_token: "user-token" });
+  const params = { ...connection, chipId: "64Qv3", spec: SPEC, calibrationSessionId: "cs-auto" };
+  const result = await extensionTools().get("qdash_run_pipeline").execute("call-a", params, undefined, undefined, approved("call-a", "qdash_run_pipeline"));
+  assert.equal(result.details.started, true);
+  assert.equal(automatic.status, "open");
+  assert.deepEqual(sdkRequests(requests).map((request) => `${request.key} ${request.query.skip ?? ""}`.trim()), [
+    "GET /calibration-sessions 0",
+    "GET /calibration-sessions 100",
+    "POST /calibration-pipelines/execute",
+  ]);
+});
+
+test("qdash_run_pipeline dispatches nothing when the session is not the user's on that chip", async (t) => {
+  for (const items of [[], [{ calibration_session_id: "cs-1", chip_id: "other", status: "open" }]]) {
+    const { baseUrl, requests } = await fakeQDash(t, {
+      "GET /agent-sessions": [NO_PAUSE],
+      "GET /calibration-sessions": [{ items, has_more: false }],
+    });
+    const connection = await profileFile(t, { base_url: baseUrl, api_token: "user-token" });
+    const params = { ...connection, chipId: "64Qv3", spec: SPEC, calibrationSessionId: "cs-1" };
+    await assert.rejects(
+      extensionTools().get("qdash_run_pipeline").execute("call-m", params, undefined, undefined, approved("call-m", "qdash_run_pipeline")),
+      /Calibration session preflight failed: cs-1 .*nothing dispatched/,
+    );
+    assert.equal(posts(requests, "/calibration-pipelines/execute").length, 0);
+    assert.ok(requests.every((request) => request.key !== "GET /calibration-sessions/cs-1"));
+  }
+});
+
+test("a preflight 503 reports no dispatch instead of advising a worker restart", async (t) => {
+  const { baseUrl, requests } = await fakeQDash(t, {
+    "GET /agent-sessions": [NO_PAUSE],
+    "GET /calibration-sessions": [answered(503, { detail: "API unavailable" })],
+  });
+  const connection = await profileFile(t, { base_url: baseUrl, api_token: "user-token", retry_max_attempts: 1 });
+  const params = { ...connection, chipId: "64Qv3", spec: SPEC, calibrationSessionId: "cs-1" };
+  await assert.rejects(
+    extensionTools().get("qdash_run_pipeline").execute("call-p", params, undefined, undefined, approved("call-p", "qdash_run_pipeline")),
+    (error) => {
+      assert.equal(error.name, "QDashPreflightError");
+      assert.match(error.message, /nothing dispatched/);
+      assert.doesNotMatch(error.message, /restart|worker/);
+      assert.equal(error.cause.statusCode, 503);
+      return true;
+    },
+  );
+  assert.equal(posts(requests, "/calibration-pipelines/execute").length, 0);
 });
 
 test("a pipeline answer without its recording is a result-unknown tool error, dispatched once", async (t) => {
@@ -121,7 +194,7 @@ test("a pipeline answer without its recording is a result-unknown tool error, di
   ]) {
     const { baseUrl, requests } = await fakeQDash(t, {
       "GET /agent-sessions": [NO_PAUSE],
-      "GET /calibration-sessions/cs-1": [{ calibration_session_id: "cs-1", chip_id: "64Qv3", status: "open" }],
+      "GET /calibration-sessions": [{ items: [{ calibration_session_id: "cs-1", chip_id: "64Qv3", status: "open" }], has_more: false }],
       "POST /calibration-pipelines/execute": [answered(201, answer)],
     });
     const connection = await profileFile(t, { base_url: baseUrl, api_token: "user-token" });
@@ -130,7 +203,7 @@ test("a pipeline answer without its recording is a result-unknown tool error, di
       extensionTools().get("qdash_run_pipeline").execute("call-2", params, undefined, undefined, approved("call-2", "qdash_run_pipeline")),
       (error) => {
         assert.match(error.message, /^Pipeline result unknown: .*Do not retry automatically/, name);
-        assert.match(error.message, /Do not start this run again; check qdash_list_executions for execution exec-1 and tell the user\.$/, name);
+        assert.match(error.message, /Do not start this run again; check execution exec-1 with qdash_get_execution, and tell the user\.$/, name);
         assert.equal(error.cause?.name, "QDashResultUnknownError", name);
         return true;
       },
@@ -168,9 +241,58 @@ test("qdash_execute_flow dispatches a saved workflow once; an unrecorded answer 
 
   await assert.rejects(
     tool.execute("call-5", { ...connection, name: "coherence_check" }, undefined, undefined, approved("call-5", "qdash_execute_flow")),
-    /^Error: Workflow result unknown: .*reconcile the execution first\. Do not start this run again; check qdash_list_executions for execution exec-1/,
+    /^Error: Workflow result unknown: .*reconcile the execution first\. Do not start this run again; check execution exec-1 with qdash_get_execution, and tell the user\.$/,
   );
   assert.equal(posts(requests, "/flows/coherence_check/execute").length, 2);
+});
+
+test("a dispatch acknowledged with truncated JSON is a result-unknown tool error, never started or sent again", async (t) => {
+  const truncated = JSON.stringify({ ...DISPATCHED, calibration_session_id: "cs-1" }).slice(0, 40);
+  const listFallback = (chip) =>
+    new RegExp(
+      `Do not start this run again; no execution ID was returned, so look for the run with qdash_list_executions, passing ${chip}, ` +
+        "and page with skip until the rows are older than this launch, and tell the user\\.$",
+    );
+  const cases = [
+    ["qdash_run_pipeline", "/calibration-pipelines/execute", { chipId: "64Qv3", spec: SPEC }, /^Pipeline result unknown: .*may have started/, "chipId 64Qv3"],
+    ["qdash_execute_flow", "/flows/coherence_check/execute", { name: "coherence_check", parameters: { chip_id: "64Qv3" } }, /^Workflow result unknown: .*may have started/, "chipId 64Qv3"],
+    [
+      "qdash_execute_flow",
+      "/flows/coherence_check/execute",
+      { name: "coherence_check" },
+      /^Workflow result unknown: .*may have started/,
+      "chipId set to the chip_id that qdash_get_flow shows for flow coherence_check",
+    ],
+  ];
+  for (const [toolName, path, params, message, chip] of cases) {
+    for (const contentType of ["application/json", "text/plain"]) {
+      const { baseUrl, requests } = await fakeQDash(t, {
+        "GET /agent-sessions": [NO_PAUSE],
+        [`POST ${path}`]: [rawAnswer(200, truncated, contentType)],
+      });
+      const connection = await profileFile(t, { base_url: baseUrl, api_token: "user-token" });
+      let started = false;
+      await assert.rejects(
+        extensionTools()
+          .get(toolName)
+          .execute("call-t", { ...connection, ...params }, undefined, undefined, approved("call-t", toolName))
+          .then((result) => {
+            started = result?.details?.started === true;
+            return result;
+          }),
+        (error) => {
+          assert.match(error.message, message, `${toolName} ${contentType}`);
+          assert.match(error.message, listFallback(chip), `${toolName} ${contentType}`);
+          assert.equal(error.cause?.name, "QDashResultUnknownError");
+          assert.equal(error.cause?.statusCode, 200);
+          assert.equal(error.cause?.body, truncated);
+          return true;
+        },
+      );
+      assert.equal(started, false);
+      assert.equal(posts(requests, path).length, 1, `${toolName} ${contentType}`);
+    }
+  }
 });
 
 test("qdash_save_metric_script validates with the client and creates the script once with the SDK", async (t) => {

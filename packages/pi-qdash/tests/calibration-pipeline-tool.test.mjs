@@ -60,8 +60,13 @@ function registeredTools(api, chipId = "64Qv3", projectId = "project-1", pausedS
   const client = {
     // The pause guard: the user's agent sessions waiting for an expert.
     async listAgentSessions() { return pausedSessions; },
-    // Every run is recorded under its key, so the SDK first reads a named session.
-    api: { async getCalibrationSession(id) { return { calibration_session_id: id, chip_id: chipId, status: "open" }; }, ...api },
+    // Every run is recorded under its key, so the SDK first lists the user's sessions on the chip.
+    api: {
+      async listCalibrationSessions() {
+        return { items: [{ calibration_session_id: "cs-1", chip_id: chipId, status: "open" }], has_more: false };
+      },
+      ...api,
+    },
     // null stands for a profile without a project.
     config: { projectId: projectId ?? undefined },
     // A tool that starts a run must not follow it.
@@ -258,7 +263,7 @@ test("a run whose launch outcome is unknown is reported, never retried", async (
   const tools = registeredTools({ async executeCalibrationPipeline() { throw error; } });
   await assert.rejects(
     tools.get("qdash_run_pipeline").execute("c", { chipId: "64Qv3", spec: SPEC, calibrationSessionId: "cs-1" }, undefined, undefined, approved("c")),
-    /Do not start this run again; check qdash_list_executions/,
+    /Do not start this run again; no execution ID was returned, so look for the run with qdash_list_executions, passing chipId 64Qv3, and page with skip until the rows are older than this launch, and tell the user\.$/,
   );
 });
 
@@ -490,7 +495,7 @@ for (const outdated of ["missing-route", "ignored-fields"]) {
       methods.push(request.method);
       const isGet = request.method === "GET";
       return new Response(JSON.stringify(isGet
-        ? { calibration_session_id: "cs-1", chip_id: "64Qv3", status: "open" }
+        ? { items: [{ calibration_session_id: "cs-1", chip_id: "64Qv3", status: "open" }], has_more: false }
         : { execution_id: "e1", flow_run_id: "f1" }), {
         status: isGet && outdated === "missing-route" ? 404 : 200,
         headers: { "Content-Type": "application/json" },
@@ -504,7 +509,7 @@ for (const outdated of ["missing-route", "ignored-fields"]) {
     });
     await assert.rejects(
       tools.get("qdash_run_pipeline").execute("old", { chipId: "64Qv3", spec: SPEC, calibrationSessionId: "cs-1" }, undefined, undefined, approved("old")),
-      outdated === "ignored-fields" ? /result unknown.*Do not retry automatically/ : /404/,
+      outdated === "ignored-fields" ? /result unknown.*Do not retry automatically/ : /preflight failed; nothing dispatched/,
     );
     assert.deepEqual(methods, outdated === "missing-route" ? ["GET"] : ["GET", "POST"]);
   });

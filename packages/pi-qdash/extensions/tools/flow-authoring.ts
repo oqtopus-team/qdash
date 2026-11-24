@@ -249,7 +249,9 @@ export function registerFlowAuthoringTools(pi: Pick<ExtensionAPI, "registerTool"
         })
         .catch((error: unknown) => {
           // Answered, but without the recording asked for: the run may be going.
-          throw isResultUnknown(error) ? resultUnknownToolError(error) : error;
+          throw isResultUnknown(error)
+            ? resultUnknownToolError(error, flowChip ? { chipId: flowChip } : { chipHint: `the chip_id that qdash_get_flow shows for flow ${params.name}` })
+            : error;
         });
       const result = run.response as FlowExecution;
       return toTextToolResult(formatFlowExecution(result, params.name), result, {

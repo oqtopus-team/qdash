@@ -5,7 +5,7 @@ import { Type } from "typebox";
 import { pausedSessionConflict } from "../lib/agent-loop.js";
 import { toTextToolResult } from "../lib/results.js";
 import { requireWriteApproval } from "../lib/write-approval.js";
-import { isResultUnknown, resultUnknownToolError, sdkSession, type SdkSessionFactory } from "../lib/sdk-session.js";
+import { isResultUnknown, resultUnknownToolError, sdkSession, unknownLaunchGuidance, type SdkSessionFactory } from "../lib/sdk-session.js";
 
 /**
  * Declarative calibration pipelines.
@@ -439,7 +439,7 @@ export function registerCalibrationPipelineTools(pi: Pick<ExtensionAPI, "registe
       "Use qdash_run_pipeline only for a spec that qdash_plan_pipeline reported valid.",
       "When the run serves a calibration objective, pass that objective's calibrationSessionId (from qdash_create_calibration_session or the user) so QDash records the run, with all its step executions, in it. Without it the run joins an automatic session of its own. It grants nothing: the user still approves this exact run.",
       "When the run carries out an experiment you recorded with qdash_record_calibration_decision, pass that decision's decisionId too, so the session's audit links your intent to this run. Record the decision first; never pass a decision of another session.",
-      "If QDash reports that a run's launch outcome is unknown, do not start it again: check qdash_list_executions and tell the user.",
+      "If QDash reports that a run's launch outcome is unknown, do not start it again: check the reported execution ID with qdash_get_execution, or without one page through qdash_list_executions for the run's chipId, and tell the user.",
       "Tell the user before running that completed tasks update calibrated parameters in QDash directly.",
       "Do not use qdash_run_pipeline to run a task an agent session action failed to run; that skips the session's candidate gate. Report the failure instead.",
       "After it starts, follow the execution with qdash_wait_execution and summarize failed targets.",
@@ -491,7 +491,7 @@ export function registerCalibrationPipelineTools(pi: Pick<ExtensionAPI, "registe
         });
       } catch (error) {
         // Answered, but without the recording asked for: the run may be going.
-        if (isResultUnknown(error)) throw resultUnknownToolError(error);
+        if (isResultUnknown(error)) throw resultUnknownToolError(error, { chipId: params.chipId });
         const problems = problemsFromError(error);
         if (problems) {
           const text = [
@@ -508,7 +508,7 @@ export function registerCalibrationPipelineTools(pi: Pick<ExtensionAPI, "registe
         const detail = errorDetail(error);
         if (detail && /unknown|may have started|being dispatched/i.test(detail)) {
           // Never retried with a new call: the first launch may be running.
-          throw new Error(`${detail} Do not start this run again; check qdash_list_executions and tell the user.`);
+          throw new Error(`${detail} ${unknownLaunchGuidance(undefined, { chipId: params.chipId })}`);
         }
         throw error;
       }

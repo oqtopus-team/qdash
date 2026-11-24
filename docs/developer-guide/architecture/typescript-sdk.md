@@ -25,7 +25,10 @@ Unlike the Python SDK, TypeScript dispatch permits that default-project behavior
 
 Run handles poll the whole pipeline, tolerate an initial execution 404, and preserve failed or
 cancelled outcomes. Polling sleeps stop at the deadline, but an in-flight read is not cancelled.
-Association/idempotency response mismatches raise `QDashResultUnknownError` and require
+Pipeline preflight searches the owner's chip-filtered session list; detail reads can close an
+automatic session. Preflight failures raise `QDashPreflightError` before any dispatch.
+Association/idempotency response mismatches and unreadable successful dispatch responses
+raise `QDashResultUnknownError`, including unrecorded launches for unreadable responses. They require
 reconciliation, not a new launch key; see [Calibration Sessions](../agent/calibration-sessions.md).
 
 ## Metric scripts and dashboards
