@@ -33,10 +33,26 @@ CHECK_SDK = """
 import importlib.util
 import math
 
-from qdash.sdk import QDash, QDashApi, QDashConfig, RunResult, Workflow, WorkflowRun
+from qdash.calibration import CouplingTargets, TwoQubitCalibration, pipeline_spec
+from qdash.sdk import (
+    CalibrationSession,
+    QDash,
+    QDashApi,
+    QDashConfig,
+    RunResult,
+    Workflow,
+    WorkflowRun,
+)
 from qdash.sdk.calibration import CustomOneQubit, QubitTargets, TaskCall, sweep
 from qdash.sdk.pipeline import Pipeline
 from qdash.sdk.types import ExecutionResponseDetail
+
+pairs = pipeline_spec(
+    CouplingTargets([("0", "1")]),
+    [TwoQubitCalibration(execution_mode="manual", rounds=[[("0", "1")]])],
+)
+assert pairs["targets"] == {"pairs": [["0", "1"]]}, pairs
+assert CalibrationSession.__module__ == "qdash.sdk._calibration_session"
 
 time_range = sweep.logspace(math.log10(300), math.log10(500_000), 51)
 spec = Pipeline(
@@ -161,9 +177,13 @@ def test_each_wheel_ships_only_its_own_namespace(dists) -> None:
         "qdash/sdk/_generated/__init__.py",
         "qdash/sdk/_generated/client.py",
         "qdash/sdk/_generated/_authoring.py",
+        "qdash/calibration/__init__.py",
+        "qdash/calibration/py.typed",
+        "qdash/calibration/sweep.py",
     } <= sdk
     assert all(n.startswith("qdash/client/") for n in client), client
-    assert all(n.startswith("qdash/sdk/") for n in sdk), sdk
+    # qdash.calibration, the definitions the worker shares, ships with the SDK.
+    assert all(n.startswith(("qdash/sdk/", "qdash/calibration/")) for n in sdk), sdk
     assert not client & sdk
 
 
@@ -176,6 +196,7 @@ def test_the_sdk_sdist_carries_its_sources_and_generation_config(dists) -> None:
 
     assert {"fern/generators.yml", "fern/fern.config.json", "pyproject.toml"} <= names
     assert "src/qdash/sdk/_generated/_authoring.py" in names
+    assert "src/qdash/calibration/steps.py" in names
     assert not [n for n in names if n.startswith("src/qdash/") and n.count("/") == 2]
     assert "src/qdash/__init__.py" not in names
 

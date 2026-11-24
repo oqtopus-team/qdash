@@ -1,33 +1,28 @@
-"""Step classes for calibration workflows.
+"""Runtime step classes: the worker's implementation of calibration steps.
 
-This module defines the Step abstraction for building calibration pipelines.
-Steps are composable units of calibration work that can be chained together.
+Write calibrations with the step definitions of :mod:`qdash.calibration`; the
+worker converts each definition into the runtime step here, through the same
+pipeline spec the SDK sends, so both run alike.
 
-Each step declares:
-- `requires`: Context keys it needs from previous steps
-- `provides`: Context keys it produces
+This module is the advanced, worker-only layer. A custom step subclasses
+:class:`CalibrationStep` or :class:`TransformStep`, declares the context keys
+it ``requires`` and ``provides``, and is passed to
+``qdash.workflow.CalibrationSession.run`` among the definitions. Such a step
+cannot be sent from the SDK, and the execution preview cannot read it, but it
+runs. Saved flows that build these runtime classes directly keep running.
 
 Example:
-    from qdash.workflow.service import CalibService
-    from qdash.workflow.service.targets import MuxTargets
-    from qdash.workflow.service.steps import (
-        OneQubitCheck,
-        OneQubitFineTune,
-        FilterByMetric,
-        TwoQubitCalibration,
+    from qdash.calibration import FilterByMetric, MuxTargets, OneQubitCheck
+    from qdash.workflow import CalibrationSession
+    from qdash.workflow.service.steps import CalibrationStep
+
+    class MyStep(CalibrationStep):
+        ...
+
+    session.run(
+        targets=MuxTargets([0, 1]),
+        steps=[OneQubitCheck(), MyStep(), FilterByMetric(metric="t1_average", threshold=30.0)],
     )
-
-    service = CalibService(username, chip_id)
-    targets = MuxTargets([0, 1, 2, 3])
-
-    steps = [
-        OneQubitCheck(),
-        OneQubitFineTune(),
-        FilterByMetric(metric="x90_fidelity", threshold=0.9),
-        TwoQubitCalibration(),
-    ]
-
-    results = service.run(targets, steps=steps)
 """
 
 # Base classes
@@ -60,10 +55,11 @@ from qdash.workflow.service.steps.one_qubit import (
     OneQubitFineTune,
 )
 
-# Context and Pipeline
+# Context and the internal step sequence validator
+from qdash.workflow.service.steps.pipeline import Pipeline as Pipeline  # deprecated name
 from qdash.workflow.service.steps.pipeline import (
-    Pipeline,
     StepContext,
+    StepSequence,
 )
 
 # 2-Qubit and system steps
@@ -89,11 +85,11 @@ __all__ = [
     "GenerateCRSchedule",
     "OneQubitCheck",
     "OneQubitFineTune",
-    "Pipeline",
     # Base classes
     "Step",
     # Context and Pipeline
     "StepContext",
+    "StepSequence",
     "TransformStep",
     "TwoQubitCalibration",
 ]

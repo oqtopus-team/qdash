@@ -36,6 +36,7 @@ from qdash.api.services.flow_service.execution import (
     FlowDispatchError,
 )
 from qdash.api.services.flow_service.execution_plan import uses_manual_rounds
+from qdash.api.services.flow_service.flow_metadata import declared_session_name
 from qdash.api.services.flow_service.plan_preview import build_execution_plan
 from qdash.api.services.flow_service.prefect_gateway import SystemDeploymentUnavailable
 from qdash.api.services.flow_service.source_store import FlowSourceStore
@@ -403,6 +404,7 @@ class FlowService:
 
         chip_id = str(parameters.get("chip_id") or flow.chip_id or "").strip()
         run_context: dict[str, Any] = {}
+        session_name = self._declared_session_name(flow.file_path, flow.flow_function_name)
         if request.target_override is not None:
             code = self._sources.read(Path(flow.file_path))
             if uses_manual_rounds(code):
@@ -419,9 +421,9 @@ class FlowService:
             # Omit unselected modes so workers that predate a mode still parse it.
             run_context[TARGET_CONTEXT_KEY] = request.target_override.model_dump(exclude_none=True)
             accepted = flow_parameter_names(code, flow.flow_function_name)
-            # Templates may validate targets before creating CalibService. Pass
+            # Templates may validate targets before running a calibration. Pass
             # them (and clear the other mode) only when the flow can receive
-            # this mode; otherwise saved parameters stay and CalibService.run
+            # this mode; otherwise saved parameters stay and CalibrationSession.run
             # applies the override from the run context.
             if mode in accepted:
                 parameters.update(
@@ -436,7 +438,21 @@ class FlowService:
             parameters=parameters,
             tags=list(parameters.get("tags") or flow.tags or []),
             context=run_context,
+            session_name=session_name,
         )
+
+    def _declared_session_name(self, file_path: str, function_name: str) -> str | None:
+        """The session name the saved source declares; None when it declares none.
+
+        Parsed, never imported. An unreadable source only loses the name: the launch then
+        names its automatic session as a flow without one does.
+        """
+        try:
+            code = self._sources.read(Path(file_path))
+        except Exception:
+            logger.warning("Could not read flow source %s for its session name", file_path)
+            return None
+        return declared_session_name(code, function_name)
 
     async def dispatch_flow_run(
         self,
@@ -845,6 +861,8 @@ class PreparedFlowRun:
     parameters: dict[str, Any]
     tags: list[str]
     context: dict[str, Any] = field(default_factory=dict)
+    session_name: str | None = None
+    """The ``@calibration_flow(session_name=...)`` literal, for an automatic session's name."""
 
 
 def with_calibration_run(

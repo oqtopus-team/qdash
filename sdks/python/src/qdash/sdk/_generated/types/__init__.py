@@ -86,6 +86,7 @@ from .backend_definition_response import BackendDefinitionResponse
 from .backend_response_model import BackendResponseModel
 from .body_login import BodyLogin
 from .bring_up_step import BringUpStep
+from .bring_up_step_execution_mode import BringUpStepExecutionMode
 from .bulk_user_import_response import BulkUserImportResponse
 from .bulk_user_import_result import BulkUserImportResult
 from .calibration_admission import CalibrationAdmission
@@ -215,6 +216,7 @@ from .evaluation_run_summary_trigger import EvaluationRunSummaryTrigger
 from .evaluation_verdict_model import EvaluationVerdictModel
 from .evaluation_verdict_model_issues_item import EvaluationVerdictModelIssuesItem
 from .evaluator_model import EvaluatorModel
+from .excluded_target import ExcludedTarget
 from .execute_flow_response import ExecuteFlowResponse
 from .execute_pipeline_response import ExecutePipelineResponse
 from .execution_activity_day import ExecutionActivityDay
@@ -536,6 +538,8 @@ from .template_preview_panel_type import TemplatePreviewPanelType
 from .template_script_to_create import TemplateScriptToCreate
 from .time_series_data import TimeSeriesData
 from .token_response import TokenResponse
+from .transform_step_record import TransformStepRecord
+from .transform_step_record_kind import TransformStepRecordKind
 from .two_qubit_calibration_step import TwoQubitCalibrationStep
 from .two_qubit_calibration_step_execution_mode import TwoQubitCalibrationStepExecutionMode
 from .ui_settings import UiSettings
@@ -640,6 +644,7 @@ __all__ = [
     "BackendResponseModel",
     "BodyLogin",
     "BringUpStep",
+    "BringUpStepExecutionMode",
     "BulkUserImportResponse",
     "BulkUserImportResult",
     "CalibrationAdmission",
@@ -767,6 +772,7 @@ __all__ = [
     "EvaluationVerdictModel",
     "EvaluationVerdictModelIssuesItem",
     "EvaluatorModel",
+    "ExcludedTarget",
     "ExecuteFlowResponse",
     "ExecutePipelineResponse",
     "ExecutionActivityDay",
@@ -1060,6 +1066,8 @@ __all__ = [
     "TemplateScriptToCreate",
     "TimeSeriesData",
     "TokenResponse",
+    "TransformStepRecord",
+    "TransformStepRecordKind",
     "TwoQubitCalibrationStep",
     "TwoQubitCalibrationStepExecutionMode",
     "UiSettings",

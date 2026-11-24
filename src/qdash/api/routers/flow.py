@@ -325,6 +325,7 @@ async def execute_flow(
         chip_id=prepared.chip_id,
         kind=RunKind.WORKFLOW,
         run_name=name,
+        session_name=prepared.session_name,
         request={
             "flow_name": name,
             "parameters": request.parameters,

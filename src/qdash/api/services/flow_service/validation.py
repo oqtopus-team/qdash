@@ -7,6 +7,8 @@ import re
 
 from fastapi import HTTPException
 
+from qdash.api.services.flow_service.flow_metadata import is_flow_decorator
+
 # Use full-string matching (fullmatch) so trailing newlines are rejected
 _NAME_PATTERN = re.compile(r"^[a-zA-Z0-9_]+$")
 
@@ -57,7 +59,10 @@ def validate_flow_code(code: str, expected_function_name: str) -> None:
     if not flow_functions:
         raise HTTPException(
             status_code=400,
-            detail="No @flow decorated function found in code. Please add @flow decorator to your flow function.",
+            detail=(
+                "No @flow or @calibration_flow decorated function found in code. Please add "
+                "@calibration_flow (or Prefect's @flow) to your flow function."
+            ),
         )
 
     if expected_function_name not in flow_functions:
@@ -73,14 +78,5 @@ def validate_flow_code(code: str, expected_function_name: str) -> None:
 
 
 def _has_flow_decorator(node: ast.FunctionDef) -> bool:
-    """Return whether the function is decorated with flow or flow(...)."""
-    for decorator in node.decorator_list:
-        if isinstance(decorator, ast.Name) and decorator.id == "flow":
-            return True
-        if (
-            isinstance(decorator, ast.Call)
-            and isinstance(decorator.func, ast.Name)
-            and decorator.func.id == "flow"
-        ):
-            return True
-    return False
+    """Return whether the function is decorated with flow or calibration_flow, bare or called."""
+    return any(is_flow_decorator(decorator) for decorator in node.decorator_list)

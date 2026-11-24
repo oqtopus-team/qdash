@@ -82,9 +82,15 @@ call ID. Without a step reference, filters read the latest check or fine-tune st
 
 ## Following a run
 
-Each calibration step creates an execution; transforms do not. Execution details expose the
-whole `pipeline`, including step status and figures. Use that aggregate rather than treating
-completion of the first step as completion of the run. Client wait helpers do this by default.
+Every reached step creates an execution, including filters and schedule generation. Execution
+details expose the whole `pipeline`, with `key` identifying each step occurrence and `transform`
+carrying a transform's recorded outcome. Measurements retain task counts and figures. Use the
+aggregate rather than treating completion of the first step as completion of the run.
+
+`pending` means the run may still reach the step; `skipped` means it ended without reaching it.
+`not_recorded` identifies transforms in old runs that did not record them. It does not imply
+success or failure. Transform execution status comes from its own record, not from an empty
+task list. Existing history is not backfilled.
 
 ## Where the pieces live
 

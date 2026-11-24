@@ -1,8 +1,9 @@
 """Entry points that build typed session settings and run them.
 
-Every route into a calibration goes through here: ``CalibService.run``, the
-declarative pipeline flow and the single-task executor. Each builds one
-:class:`SessionSettings` and hands it to a :class:`CalibSession` that owns the
+Every route into a calibration goes through here: ``CalibrationSession.run`` (and
+the legacy ``CalibService.run``), the declarative pipeline flow and the single-task
+executor. Each builds one :class:`SessionSettings` and hands it to an
+:class:`ExecutionRuntime` that owns the
 whole lifecycle, so no caller finishes, fails or cancels an Execution itself.
 """
 
@@ -15,7 +16,7 @@ from qdash.workflow.engine.task_parameters import (
     UPDATE_CALIBRATION_PARAMETERS,
     normalize_default_run_parameters,
 )
-from qdash.workflow.service._internal.session import CalibSession, SessionRepositories
+from qdash.workflow.service._internal.session import ExecutionRuntime, SessionRepositories
 from qdash.workflow.service._internal.settings import (
     GitHubPolicy,
     SessionSettings,
@@ -119,11 +120,27 @@ def run_calibration(
     two-qubit steps group them with the session's pinned MUX mapping, the one
     its reservation and workers use.
     """
+    results, _ = run_calibration_with_runtime(settings, targets, steps, repositories=repositories)
+    return results
+
+
+def run_calibration_with_runtime(
+    settings: SessionSettings,
+    targets: Target,
+    steps: Sequence[Step],
+    *,
+    repositories: SessionRepositories | None = None,
+) -> tuple[dict[str, Any], ExecutionRuntime]:
+    """:func:`run_calibration`, also returning the runtime that ran it.
+
+    The runtime's ``run_identity`` and ``run_execution_ids`` name the persisted run and
+    the step Executions; ``CalibrationSession.run`` reports them.
+    """
     from qdash.workflow.service.flow_targets import override_pipeline, read_target_override
 
     targets, pipeline_steps = override_pipeline(targets, steps, read_target_override())
-    session = CalibSession(settings, repositories=repositories)
-    return session.run_pipeline(targets, pipeline_steps)
+    runtime = ExecutionRuntime(settings, repositories=repositories)
+    return runtime.run_pipeline(targets, pipeline_steps), runtime
 
 
 def run_single_task(
@@ -140,7 +157,7 @@ def run_single_task(
     The session reserves ``qid``, and on success, failure or cancellation closes
     the Execution and releases the reservation, exactly as a pipeline step does.
     """
-    session = CalibSession(settings, repositories=repositories)
+    session = ExecutionRuntime(settings, repositories=repositories)
     with session.owned_execution([qid]):
         if reconfigure:
             # Pass the control on the call so a backend without Configure still

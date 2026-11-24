@@ -14,6 +14,23 @@ edit permission; use the Fake backend to learn without hardware.
 **Save Flow** creates a new workflow; it does not replace an existing name. To change an existing
 flow, open it and select **Edit**, then **Save**.
 
+## Name the Calibration Group
+
+Templates declare the name shown for a new calibration group:
+
+```python
+@calibration_flow(session_name="Coherence check")
+```
+
+Change the quoted string to describe the work. Keep it a string literal so QDash can read it
+before starting the workflow. This name is separate from **Flow Name** and the Python function
+name. Launching into an existing CalibrationSession preserves that group's name.
+
+The template creates `CalibrationSession.from_context(context)` and calls `session.run()`.
+Several calls inside the same workflow run stay in the same group and recorded run. Existing
+saved flows using `CalibService` still work; follow the
+[migration steps](../developer-guide/workflow/quickstart.md#preserve-terminal-handling) when editing them.
+
 ## Choose the Targets
 
 A MUX is a group of qubits sharing multiplexed readout. Use `mux_ids` for whole MUXes, `exclude_qids` to omit qubits, or `qids` for individual qubits.
@@ -99,7 +116,7 @@ Put experiment settings in `run`, calibration overrides in `input`, and output-s
 on each call:
 
 ```python
-from qdash.workflow import TaskCall, sweep
+from qdash.calibration import TaskCall, sweep
 
 TaskCall(
     name="CheckRamsey",
@@ -110,7 +127,7 @@ TaskCall(
 ```
 
 This example keeps outputs in history without making them current values. Use `default_run_parameters`
-for run settings shared by every task. The removed `CalibService` arguments `task_parameters`
+on `session.run()` for run settings shared by every task. The removed `CalibService` arguments `task_parameters`
 and `task_run_parameters` must move into individual calls. See [Task Calls](../developer-guide/workflow/task-calls.md).
 
 ## Use Earlier Calibration Results in Later Steps
@@ -134,6 +151,14 @@ and `synchronized` to `parallel_by_round`. The former names fail validation.
 
 Save, select **Execute**, and inspect **Execution preview**. Test on a small target before
 adding a schedule or expanding it. A workflow reserves the whole chip until its steps finish.
+
+## Inspect Step Results
+
+Each step reached by a run appears in **Execution**, including filters and schedule generation.
+For those steps, **Step outcome** shows the selected targets, exclusion reasons or scheduled
+groups. They have no measurement tasks or figures. Pipeline progress marks unreached steps as
+**Not reached**, and transforms from older runs as **Not recorded**; old missing results are
+not reconstructed.
 
 ## Organize Your Workflows
 

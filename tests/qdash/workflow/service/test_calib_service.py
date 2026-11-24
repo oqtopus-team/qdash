@@ -158,7 +158,7 @@ def test_run_hands_typed_settings_to_qdash_owned_execution(monkeypatch, recorded
     [run] = recorded_runs
     settings = run["settings"]
     assert result == {"candidate_qids": ["0"]}
-    assert run["steps"] is steps
+    assert run["steps"] == steps
     assert (settings.username, settings.chip_id, settings.project_id) == (
         "alice",
         "chip-1",
@@ -273,7 +273,7 @@ def test_internal_runs_keep_an_explicit_operational_policy(monkeypatch) -> None:
         def run_pipeline(self, targets: Any, steps: Any) -> dict[str, Any]:
             return {}
 
-    monkeypatch.setattr(runs, "CalibSession", RecordingSession)
+    monkeypatch.setattr(runs, "ExecutionRuntime", RecordingSession)
     settings = runs.workflow_settings(
         _context_on("qubex"),
         flow_name="maintenance",

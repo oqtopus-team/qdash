@@ -10,28 +10,26 @@ Workflow services save project flows, register Prefect deployments, and connect 
 | API `FlowScheduleService` | Project-scoped schedules |
 | Deployment service | Source import and Prefect registration |
 | Prefect server and worker | Queuing and running entrypoints |
-| `CalibService` | Checked author contract |
-| `CalibSession` | Runtime lifecycle and reservations |
+| `CalibrationSession` | Checked author context and grouped calibration execution |
+| `ExecutionRuntime` | Runtime lifecycle and reservations |
 
 ## Workflow Author Contract
 
-`CalibService` accepts the user/chip/project context, run metadata, and shared run defaults.
-Targets and steps go to `run()`; settings go to `TaskCall`. QDash owns execution IDs, reservations,
-workers, and cleanup. No finish call is needed.
+`CalibrationSession.from_context()` binds a checked user/chip/project context to the launch's
+calibration work. Pass shared definitions from `qdash.calibration` to `run(targets, steps)`;
+run metadata, tags, and `default_run_parameters` belong on that call. QDash owns execution IDs,
+reservations, workers, and cleanup. The persistent group itself holds no hardware.
 
-`resolve_calib_context()` checks an enabled user and active project write permission. Direct
-Python callers use `CalibService.from_context()`. Workers recheck permissions, so a schedule
-cannot retain access its creator has lost.
+`resolve_calib_context()` checks an enabled user and active project write permission. Workers
+recheck permissions, so a schedule cannot retain access its creator has lost.
+`run()` returns `CalibrationResult` after its steps finish; execution errors propagate.
+`validate()` checks definitions and dependency order without hardware or writes; unlike SDK
+validation, it does not read chip state or preflight calibration data.
 
-| Removed argument | Replacement |
-| --- | --- |
-| `qids`, `muxes` | Targets passed to `run()` |
-| `task_parameters`, `task_run_parameters` | Settings on each `TaskCall` |
-| `name` | `flow_name` |
-| `backend_name` | Checked context with `backend=` |
-| `configuration_mode` | First `ConfigureAll` call's run settings |
-| Execution, lock, repository, and GitHub controls | Runtime-owned policy; remove from author code |
-| Snapshot controls | Single-task re-execution or a `source_execution_id` flow parameter |
+`@calibration_flow(session_name="...")` installs terminal hooks and declares the automatic
+group's name. The API reads the literal before dispatch; the worker uses the same metadata for
+scheduled/direct runs. An explicitly selected session keeps its name. Old `@flow` sources and
+`CalibService` remain supported; see the [migration steps](./quickstart.md#preserve-terminal-handling).
 
 ### Configuration mode and GitHub policy
 
@@ -41,6 +39,14 @@ GitHub synchronization follows `config/app/workflow.yaml` and only applies to Qu
 alone do not enable it. Measurement-only calls do not disable step-level pull/push.
 Internal callers needing different policy use checked context and `SessionSettings` through
 `service/_internal/runs.py`; workers never pull or push.
+
+### Step History
+
+Each reached step, including filters and schedule generation, gets an Execution in the launch's
+run and session. Transform records contain their outcome without tasks or measurement artifacts.
+Execution detail shows **Step outcome** for these records. A saved workflow with several
+`run()` calls lists all executions; aggregate per-step progress is currently available only for
+the system pipeline flow, whose source-independent plan has one step sequence.
 
 ## Save and Register a Flow
 
@@ -93,7 +99,7 @@ See [Cancellation](./engine-architecture.md#cancellation).
 - `src/qdash/api/services/flow_service/`: files, dispatch, source inspection
 - `src/qdash/api/services/flow_schedule_service.py`: schedules
 - `src/qdash/workflow/deployment_service.py`: registration
-- `src/qdash/workflow/service/calib_service.py` and `context.py`: author contract
+- `src/qdash/workflow/service/calibration_session.py` and `context.py`: author contract
 - `src/qdash/workflow/service/_internal/`: runtime policy
 
 Run `task test-api` for persistence/dispatch changes and `task test-workflow` for runtime changes;

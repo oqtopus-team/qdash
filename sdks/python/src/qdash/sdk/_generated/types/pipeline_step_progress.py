@@ -4,11 +4,14 @@ import typing
 
 import pydantic
 from ..core.pydantic_utilities import UniversalBaseModel
+from .transform_step_record import TransformStepRecord
 
 
 class PipelineStepProgress(UniversalBaseModel):
     """
     One planned step of a pipeline run and how far its execution got.
+
+    Every step the run reaches, calibration or transform, has its own execution.
     """
 
     index: int = pydantic.Field()
@@ -20,6 +23,11 @@ class PipelineStepProgress(UniversalBaseModel):
     step_id: typing.Optional[str] = pydantic.Field(default=None)
     """
     Plan-scoped step id; null for transforms and older runs
+    """
+
+    key: typing.Optional[str] = pydantic.Field(default=None)
+    """
+    Identifier of this step occurrence in the plan: the step_id of a calibration step; a transform's name, suffixed with its index when the name repeats
     """
 
     type: typing.Optional[str] = None
@@ -35,7 +43,12 @@ class PipelineStepProgress(UniversalBaseModel):
 
     status: str = pydantic.Field()
     """
-    The execution status, "skipped" for transforms, or "pending" before it starts
+    The execution status; "pending" before the step starts while the run may still reach it; "skipped" when the run ended without reaching it; "not_recorded" for a transform of a run recorded before transform steps had executions
+    """
+
+    transform: typing.Optional[TransformStepRecord] = pydantic.Field(default=None)
+    """
+    A transform step's recorded outcome: candidates kept and excluded with reasons, or the CR groups planned; null for calibration steps and unfinished transforms
     """
 
     task_total: typing.Optional[int] = None

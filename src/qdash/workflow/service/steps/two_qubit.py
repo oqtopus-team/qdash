@@ -37,13 +37,14 @@ from qdash.workflow.service.results import (
     build_two_qubit_result,
     normalize_metric_value,
 )
-from qdash.workflow.service.steps.base import CalibrationStep, TransformStep
+from qdash.workflow.service.steps.base import CalibrationStep, CandidateSnapshot, TransformStep
 from qdash.workflow.service.targets import CouplingTargets
 from qdash.workflow.service.tasks import FULL_2Q_TASKS
 
 if TYPE_CHECKING:
+    from qdash.datamodel.step_record import TransformStepRecord
     from qdash.workflow.engine import CRScheduler
-    from qdash.workflow.service._internal.session import CalibSession
+    from qdash.workflow.service._internal.session import ExecutionRuntime
     from qdash.workflow.service.steps.pipeline import StepContext
     from qdash.workflow.service.targets import Target
 
@@ -51,7 +52,7 @@ PairGroups = list[list[tuple[str, str]]]
 
 
 def _run_coupling_groups(
-    session: CalibSession,
+    session: ExecutionRuntime,
     coupling_groups: list[list[str]],
     plan: StepCalls,
 ) -> dict[str, Any]:
@@ -78,7 +79,7 @@ def _run_coupling_groups(
     return all_raw_results
 
 
-def _cr_scheduler(session: CalibSession) -> CRScheduler:
+def _cr_scheduler(session: ExecutionRuntime) -> CRScheduler:
     """CR scheduler on the session's pinned MUX mapping.
 
     The session resolved the chip topology once for its reservation and
@@ -110,7 +111,7 @@ def _candidate_pairs(
 
 def _generate_groups(
     name: str,
-    session: CalibSession,
+    session: ExecutionRuntime,
     targets: Target,
     candidates: list[str],
     max_parallel_ops: int,
@@ -148,7 +149,7 @@ def _generate_groups(
 
 
 def _automatic_groups(
-    step: Any, session: CalibSession, targets: Target, ctx: StepContext
+    step: Any, session: ExecutionRuntime, targets: Target, ctx: StepContext
 ) -> PairGroups:
     """Groups of an automatic two-qubit step for the current candidates.
 
@@ -169,7 +170,7 @@ def _automatic_groups(
 
 def _run_automatic(
     step: Any,
-    session: CalibSession,
+    session: ExecutionRuntime,
     targets: Target,
     ctx: StepContext,
     plan: StepCalls,
@@ -204,7 +205,7 @@ def _max_parallel_ops(step: Any) -> int:
 
 
 def _execute_manual_two_qubit(
-    step: Any, session: CalibSession, ctx: StepContext, plan: StepCalls
+    step: Any, session: ExecutionRuntime, ctx: StepContext, plan: StepCalls
 ) -> dict[str, Any]:
     """Run manual rounds after checking them against the current candidate qubits."""
     from qdash.workflow.service.manual_rounds import run_pair_rounds
@@ -219,7 +220,7 @@ def _execute_manual_two_qubit(
     )
 
 
-def _preflight_manual(step: Any, session: CalibSession) -> None:
+def _preflight_manual(step: Any, session: ExecutionRuntime) -> None:
     if step._rounds is not None:
         from qdash.workflow.service.manual_rounds import check_pair_rounds
 
@@ -296,13 +297,13 @@ class CustomTwoQubit(CalibrationStep):
     def provides(self) -> set[str]:
         return {self.step_name, "candidate_couplings"}
 
-    def preflight(self, session: CalibSession) -> None:
+    def preflight(self, session: ExecutionRuntime) -> None:
         """Check manual rounds against the chip before the pipeline starts."""
         _preflight_manual(self, session)
 
     def execute(
         self,
-        session: CalibSession,
+        session: ExecutionRuntime,
         targets: Target,
         ctx: StepContext,
     ) -> StepContext:
@@ -384,10 +385,29 @@ class GenerateCRSchedule(TransformStep):
 
     max_parallel_ops: int = 10
     inverse: bool = False
+    # Direction and empty-schedule reason of the last execute, for result_record.
+    _outcome: dict[str, str] = field(default_factory=dict, init=False, repr=False, compare=False)
 
     @property
     def name(self) -> str:
         return "generate_cr_schedule"
+
+    def result_record(self, before: CandidateSnapshot, ctx: StepContext) -> TransformStepRecord:
+        """The groups planned, in order, with the candidates they started from."""
+        groups = ctx.metadata.get("cr_schedule") or []
+        return (
+            super()
+            .result_record(before, ctx)
+            .model_copy(
+                update={
+                    "kind": "cr_schedule",
+                    "groups": [[f"{c}-{t}" for c, t in group] for group in groups],
+                    "max_parallel_ops": self.max_parallel_ops,
+                    "direction": self._outcome.get("direction"),
+                    "message": self._outcome.get("message"),
+                }
+            )
+        )
 
     @property
     def requires(self) -> set[str]:
@@ -399,12 +419,17 @@ class GenerateCRSchedule(TransformStep):
 
     def execute(
         self,
-        session: CalibSession,
+        session: ExecutionRuntime,
         targets: Target,
         ctx: StepContext,
     ) -> StepContext:
         """Generate the CR schedule for the targets and current candidates."""
         logger = get_run_logger()
+        if isinstance(targets, CouplingTargets):
+            direction = "as listed"
+        else:
+            direction = "reverse" if self.inverse else "forward"
+        self._outcome = {"direction": direction}
 
         parallel_groups = _generate_groups(
             self.name,
@@ -417,17 +442,19 @@ class GenerateCRSchedule(TransformStep):
         ctx.metadata["cr_schedule"] = parallel_groups
         if not parallel_groups:
             logger.warning(f"[{self.name}] No valid CR pairs found")
+            if isinstance(targets, CouplingTargets):
+                reason = "No target pair has both qubits among the candidates"
+            elif len(ctx.candidate_qids) < 2:
+                reason = f"Fewer than 2 candidate qubits ({len(ctx.candidate_qids)})"
+            else:
+                reason = "The CR scheduler found no valid pair among the candidates"
+            self._outcome["message"] = reason
             ctx.candidate_couplings = []
             return ctx
 
         # Flatten to coupling IDs
         all_couplings = [f"{c}-{t}" for group in parallel_groups for c, t in group]
         ctx.candidate_couplings = all_couplings
-
-        if isinstance(targets, CouplingTargets):
-            direction = "as listed"
-        else:
-            direction = "reverse" if self.inverse else "forward"
         logger.info(
             f"[{self.name}] Generated {len(all_couplings)} couplings in "
             f"{len(parallel_groups)} groups (direction: {direction})"
@@ -477,13 +504,13 @@ class TwoQubitCalibration(CalibrationStep):
     def provides(self) -> set[str]:
         return {"two_qubit", "candidate_couplings"}
 
-    def preflight(self, session: CalibSession) -> None:
+    def preflight(self, session: ExecutionRuntime) -> None:
         """Check manual rounds against the chip before the pipeline starts."""
         _preflight_manual(self, session)
 
     def execute(
         self,
-        session: CalibSession,
+        session: ExecutionRuntime,
         targets: Target,
         ctx: StepContext,
     ) -> StepContext:

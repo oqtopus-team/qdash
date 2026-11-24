@@ -7,26 +7,24 @@ from typing import Any
 
 import pytest
 
-from qdash.datamodel.task_call import TaskCall, TaskNameNotCallError
+from qdash.datamodel.task_call import TaskCall
 from qdash.workflow.service.steps import CustomOneQubit
 from qdash.workflow.service.targets import MuxTargets, QubitTargets
+from tests.qdash.workflow.calibration_session_fake import (
+    fake_session_class,
+    install_fake_session,
+)
 from tests.qdash.workflow.task_call_helpers import effective_settings, settings
 
 simple_module = importlib.import_module("qdash.workflow.templates.simple")
 
 
-class FakeCalibService:
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        self.args = args
-        self.kwargs = kwargs
-
-    def run(self, targets: Any, *, steps: list[Any]) -> dict[str, Any]:
-        return {"targets": targets, "steps": steps, "kwargs": self.kwargs}
+FakeCalibService = fake_session_class()
 
 
 @pytest.fixture(autouse=True)
 def fake_calibration_service(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(simple_module, "CalibService", FakeCalibService)
+    install_fake_session(monkeypatch, simple_module, FakeCalibService)
 
 
 def _step(result: dict[str, Any]) -> CustomOneQubit:
@@ -112,10 +110,10 @@ def test_simple_calibration_accepts_mapping_entries_as_given() -> None:
     assert effective_settings(_step(result).tasks) == [("CreateHPIPulse", settings())]
 
 
-def test_simple_calibration_keeps_an_empty_task_list_empty() -> None:
-    result = simple_module.simple_calibration(username="alice", chip_id="64Q", qids=["0"], tasks=[])
-
-    assert _step(result).tasks == []
+def test_simple_calibration_rejects_an_empty_task_list() -> None:
+    # A CustomOneQubit step needs a call, in a workflow as in a pipeline spec the SDK sends.
+    with pytest.raises(ValueError, match="at least 1 item"):
+        simple_module.simple_calibration(username="alice", chip_id="64Q", qids=["0"], tasks=[])
 
 
 def test_simple_calibration_still_rejects_repeats_without_call_ids() -> None:
@@ -129,7 +127,7 @@ def test_simple_calibration_still_rejects_repeats_without_call_ids() -> None:
 
 
 def test_simple_calibration_still_rejects_plain_task_names() -> None:
-    with pytest.raises(TaskNameNotCallError):
+    with pytest.raises(ValueError, match="is the task name 'CreateHPIPulse'"):
         simple_module.simple_calibration(
             username="alice",
             chip_id="64Q",

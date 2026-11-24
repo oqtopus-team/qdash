@@ -11,15 +11,13 @@ Task Lists:
     FULL_2Q_TASKS: Complete 2Q task list
 
 Example:
-    from qdash.workflow.service import CalibService
-    from qdash.workflow.service.steps import CustomOneQubit, BringUp
-    from qdash.workflow.service.tasks import CHECK_1Q_TASKS, BRINGUP_TASKS
-    from qdash.workflow.service.targets import MuxTargets
+    from qdash.calibration import BringUp, CustomOneQubit, MuxTargets
+    from qdash.workflow.service.tasks import CHECK_1Q_TASKS
 
-    # Use in calibration
-    cal = CalibService(username, chip_id)
-    targets = MuxTargets([0, 1, 2, 3])
-    results = cal.run(targets, steps=[BringUp(), CustomOneQubit(tasks=CHECK_1Q_TASKS)])
+    session.run(
+        targets=MuxTargets([0, 1, 2, 3]),
+        steps=[BringUp(), CustomOneQubit(tasks=CHECK_1Q_TASKS)],
+    )
 """
 
 # The lists live in ``qdash.datamodel.calibration_pipeline`` so the API, which

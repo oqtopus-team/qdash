@@ -1,7 +1,11 @@
-"""Internal calibration session: one Execution's lifecycle and task execution.
+"""Internal execution runtime: one Execution's lifecycle, hardware and task execution.
 
-``CalibSession`` is what steps, strategies and workers operate on. Workflows do
-not create it: ``CalibService.run`` and the system flows build it from typed
+``ExecutionRuntime`` is what steps, strategies and workers operate on. It is not a
+calibration session: a persistent ``CalibrationSession`` groups runs and holds no
+hardware, while a runtime exists for one run, owns its Executions, reservation and
+backend connection, and is gone when the run ends. Workflows do not create it:
+``CalibrationSession.run`` (and the legacy ``CalibService.run``) and the system flows
+build it from typed
 :class:`~qdash.workflow.service._internal.settings.SessionSettings`, and an
 isolated worker builds it from the :class:`WorkerSpec` its owner hands over.
 
@@ -13,9 +17,12 @@ A session has one of two roles:
   claims an API-scheduled execution, takes or releases the lock, records a
   terminal status, updates chip history or talks to GitHub.
 
-Every owned Execution is opened and closed by :meth:`CalibSession.owned_execution`,
-which records success, failure or cancellation, or leaves the Execution open for
-the Prefect terminal hooks after an external termination signal.
+Every owned Execution is opened and closed by :meth:`ExecutionRuntime.owned_execution`
+(a calibration step: backend, tasks, calibration publication) or
+:meth:`ExecutionRuntime.transform_execution` (a transform step: history only, no
+backend, no tasks, nothing published). Both record success, failure or
+cancellation, or leave the Execution open for the Prefect terminal hooks after an
+external termination signal.
 """
 
 from __future__ import annotations
@@ -38,9 +45,9 @@ if TYPE_CHECKING:
         ExecutionLockRepository,
     )
     from qdash.workflow.engine.backend.base import BaseBackend
-    from qdash.workflow.engine.execution.service import ExecutionService
     from qdash.workflow.engine.task.context import TaskContext
-    from qdash.workflow.service.steps import Step
+    from qdash.workflow.service.steps import Step, StepContext
+    from qdash.workflow.service.steps.base import TransformStep
     from qdash.workflow.service.targets import Target
 
 from prefect import get_run_logger
@@ -59,7 +66,14 @@ from qdash.common.mux_mapping import (
     resolve_chip_mux_mapping,
 )
 from qdash.common.utils.datetime import now
+from qdash.datamodel.step_record import (
+    NOTE_STEP_KEY,
+    NOTE_STEP_KIND,
+    NOTE_STEP_TYPE,
+    NOTE_TRANSFORM_RESULT,
+)
 from qdash.workflow.engine import CalibConfig, CalibOrchestrator
+from qdash.workflow.engine.execution.service import ExecutionService
 from qdash.workflow.engine.params_updater import get_params_updater
 from qdash.workflow.engine.task_parameters import (
     INPUT,
@@ -135,8 +149,12 @@ class SessionRepositories:
     execution_repo: Any | None = None
 
 
-class CalibSession:
-    """One calibration Execution: its lifecycle, reservation and task execution."""
+class ExecutionRuntime:
+    """The worker-side runtime of one run: its Executions, reservation and task execution.
+
+    Formerly ``CalibSession``; ``CalibSession`` remains an alias for custom steps that
+    annotate it.
+    """
 
     def __init__(
         self,
@@ -168,6 +186,10 @@ class CalibSession:
 
         self.qids: list[str] | None = None
         self.execution_id: str | None = lease.execution_id if lease is not None else None
+        # The persisted run and session of the last pipeline (note keys), and the step
+        # Executions it opened, oldest first; read by CalibrationSession.run's result.
+        self.run_identity: dict[str, str] = {}
+        self.run_execution_ids: list[str] = []
         self._reserved_scope: ExecutionResourceScope | None = (
             lease.reservation.to_scope()
             if lease is not None and lease.reservation is not None
@@ -177,6 +199,8 @@ class CalibSession:
         self._lock_execution_id: str | None = None
         self._initialized = False
         self._pipeline_active = False
+        # The open Execution of a transform step, which has no orchestrator.
+        self._transform_service: ExecutionService | None = None
         # Version of the plan being run, recorded on each task's invocation.
         self.plan_digest: str | None = None
         self._configuration_mode = settings.configuration_mode
@@ -425,18 +449,7 @@ class CalibSession:
 
         # Interruptions before the caller holds a session also release the claim.
         try:
-            note = dict(self.note or {})
-            if flow_run_id:
-                note["flow_run_id"] = flow_run_id
-            if not self.is_worker:
-                # Every owned step execution names its calibration session and run.
-                note.update(self._calibration_note(self.flow_name))
-            if self._reserved_scope is not None:
-                note["hardware_reservation"] = {
-                    "chip_id": self._reserved_scope.chip_id,
-                    "resources": list(self._reserved_scope.resources),
-                    "exclusive": self._reserved_scope.exclusive,
-                }
+            note = self._execution_note(flow_run_id)
 
             settings = self.settings
             config = CalibConfig(
@@ -502,11 +515,28 @@ class CalibSession:
                 self._lock_execution_id = None
             raise
 
+    def _execution_note(self, flow_run_id: str | None) -> dict[str, Any]:
+        """The note of an Execution this session opens: settings note, flow run, run
+        identity and reservation."""
+        note = dict(self.note or {})
+        if flow_run_id:
+            note["flow_run_id"] = flow_run_id
+        if not self.is_worker:
+            # Every owned step execution names its calibration session and run.
+            note.update(self._calibration_note(self.flow_name))
+        if self._reserved_scope is not None:
+            note["hardware_reservation"] = {
+                "chip_id": self._reserved_scope.chip_id,
+                "resources": list(self._reserved_scope.resources),
+                "exclusive": self._reserved_scope.exclusive,
+            }
+        return note
+
     @property
     def execution_service(self) -> ExecutionService | None:
-        """Get the ExecutionService from CalibOrchestrator."""
+        """The open Execution: a calibration step's, or a transform step's."""
         if self._orchestrator is None:
-            return None
+            return self._transform_service
         # Access private attribute to avoid RuntimeError from property
         return self._orchestrator._execution_service
 
@@ -515,6 +545,8 @@ class CalibSession:
         """Set execution_service (for backward compatibility with reload)."""
         if self._orchestrator is not None:
             self._orchestrator._execution_service = value
+        elif self._transform_service is not None:
+            self._transform_service = value
 
     @property
     def task_context(self) -> TaskContext | None:
@@ -1365,7 +1397,7 @@ class CalibSession:
     @contextlib.contextmanager
     def owned_execution(
         self, qids: list[str], *, connect_backend: bool = True
-    ) -> Iterator[CalibSession]:
+    ) -> Iterator[ExecutionRuntime]:
         """Open this owner's Execution for ``qids`` and close it however the block ends.
 
         Success completes the Execution (chip history, GitHub push). An exception
@@ -1383,6 +1415,89 @@ class CalibSession:
             with contextlib.suppress(Exception):
                 self._close_after(exc)
             raise
+
+    @contextlib.contextmanager
+    def transform_execution(self) -> Iterator[ExecutionService]:
+        """Record a transform step in its own Execution, without hardware.
+
+        Opens the step's Execution under the next execution ID (the reserved one
+        for a pipeline's first step) with the same note as a calibration step,
+        but connects no backend, pulls no configuration, creates no task or
+        data directories and publishes nothing: success only completes the
+        Execution, with no chip history update or GitHub push. An exception
+        fails it, a cancellation cancels it, and an external termination signal
+        leaves it open for the Prefect terminal hooks. The pipeline reservation
+        is never released here.
+        """
+        if self.is_worker:
+            raise RuntimeError("A worker session borrows its Execution and cannot own one")
+        from qdash.workflow.paths import get_path_resolver
+
+        flow_run_id = read_flow_run_id_from_context()
+        self._ensure_execution_id()
+        assert self.execution_id is not None
+        name = self.flow_name or "Python Flow Execution"
+        service = ExecutionService.create(
+            username=self.username,
+            execution_id=self.execution_id,
+            calib_data_path=str(
+                get_path_resolver().execution_data_dir(
+                    self.project_id, self.chip_id, self.execution_id
+                )
+            ),
+            chip_id=self.chip_id,
+            name=name,
+            tags=self.tags if self.tags is not None else [name],
+            note=self._execution_note(flow_run_id),
+            project_id=self.project_id,
+        )
+        self._transform_service = service
+        try:
+            service.save()
+            service.start()
+            yield service
+            self._transform_service = service.reload().complete()
+        except BaseException as exc:
+            with contextlib.suppress(Exception):
+                self._close_transform_after(exc)
+            raise
+
+    def _close_transform_after(self, exc: BaseException) -> None:
+        """Record how a transform step's Execution ended; it holds no resource."""
+        service = self._transform_service
+        if service is None:
+            return
+        if is_cancellation(exc):
+            get_run_logger().info("Execution was cancelled")
+            self._transform_service = service.reload().cancel()
+        elif is_external_termination(exc):
+            get_run_logger().info(
+                "Interrupted by a termination signal; "
+                "leaving the execution for the flow run hooks to close"
+            )
+        else:
+            self._transform_service = service.reload().fail(str(exc))
+
+    def _run_transform_step(
+        self, step: TransformStep, targets: Target, ctx: StepContext
+    ) -> tuple[StepContext, dict[str, Any]]:
+        """Run a transform step in its own Execution and record its outcome there.
+
+        The outcome is built from copies of the candidates, so later steps
+        cannot change what was recorded.
+        """
+        from qdash.workflow.service.steps.base import CandidateSnapshot
+
+        before = CandidateSnapshot.of(ctx)
+        with self.transform_execution() as service:
+            if self.execution_id is not None:
+                self.run_execution_ids.append(self.execution_id)
+            ctx = step.execute(self, targets, ctx)
+            record = step.result_record(before, ctx).model_dump(mode="json")
+            service.note.extra[NOTE_TRANSFORM_RESULT] = record
+            # Stored now: completion reloads the Execution from the store first.
+            service.save()
+        return ctx, record
 
     def release_borrowed(self) -> None:
         """Release a worker's backend; the owner keeps the Execution and reservation."""
@@ -1404,11 +1519,18 @@ class CalibSession:
         """Forget the previous step's Execution while keeping the pipeline reservation."""
         self._initialized = False
         self._orchestrator = None
+        self._transform_service = None
         self.execution_id = None
         self.settings = settings
 
     def run_pipeline(self, targets: Target, steps: Sequence[Step]) -> dict[str, Any]:
-        """Reserve the whole plan, then run each hardware step in its own Execution.
+        """Reserve the whole plan, then run every step it reaches in its own Execution.
+
+        Calibration steps open their Execution with :meth:`owned_execution`;
+        transform steps with :meth:`transform_execution`, which records the
+        step's outcome without hardware. The first step, of either kind, keeps
+        the execution ID adopted while reserving. A step the run never reaches
+        gets no Execution.
 
         Returns:
             Dictionary with typed results from each step
@@ -1418,8 +1540,9 @@ class CalibSession:
             clear_current_session,
             set_current_session,
         )
-        from qdash.workflow.service.steps import Pipeline, StepContext
+        from qdash.workflow.service.steps import StepContext, StepSequence
         from qdash.workflow.service.steps.base import TransformStep
+        from qdash.workflow.service.steps.pipeline import plan_step_keys
 
         run_logger = get_run_logger()
         if self.is_worker:
@@ -1438,18 +1561,21 @@ class CalibSession:
                 check_qubex_mux_mapping(mux_mapping)
             qids = targets.to_qids(self.chip_id, mux_mapping=mux_mapping)
             # Validate pipeline dependencies, step ids and filter references
-            pipeline = Pipeline(steps)
+            pipeline = StepSequence(steps)
             # Manual rounds are checked against the chip before anything is
             # reserved or measured, so a bad round fails the run up front.
             for step in pipeline:
                 step.preflight(self)
             calibration_plan = self.calibration_plan(list(pipeline))
             self.plan_digest = calibration_plan["digest"]
+            # Resolved before anything is reserved, named after the whole pipeline.
+            identity = self._calibration_note(pipeline_flow_name)
+            self.run_identity = dict(identity)
+            self.run_execution_ids = []
             pipeline_note = {
                 **(base_settings.note or {}),
                 "calibration_plan": calibration_plan,
-                # Resolved before anything is reserved, named after the whole pipeline.
-                **self._calibration_note(pipeline_flow_name),
+                **identity,
             }
             self._acquire_resource_scope(
                 plan_pipeline_resources(self.chip_id, targets, steps, mux_mapping=mux_mapping)
@@ -1458,46 +1584,57 @@ class CalibSession:
 
             ctx = StepContext()
             ctx.candidate_qids = qids
-            completed_steps = 0
+            keys = plan_step_keys(list(pipeline))
+            transform_results: dict[str, dict[str, Any]] = {}
 
             for i, step in enumerate(pipeline):
                 run_logger.info(f"Step {i + 1}/{len(pipeline)}: {step.name}")
-                # Transform-only steps do not create an Execution.
-                if isinstance(step, TransformStep):
-                    ctx = step.execute(self, targets, ctx)
-                    continue
-                self._validate_resource_scope({"qids": ctx.candidate_qids})
-                layout = configured_layout(step)
-                if layout is not None:
-                    # The step, the steps after it and their workers share the layout.
-                    base_settings = base_settings.with_configuration_mode(layout)
-                    self._configuration_mode = layout
+                transform_step = step if isinstance(step, TransformStep) else None
+                transform = transform_step is not None
+                if not transform:
+                    self._validate_resource_scope({"qids": ctx.candidate_qids})
+                    layout = configured_layout(step)
+                    if layout is not None:
+                        # The step, the steps after it and their workers share the layout.
+                        base_settings = base_settings.with_configuration_mode(layout)
+                        self._configuration_mode = layout
+                step_note: dict[str, Any] = {
+                    **pipeline_note,
+                    "step_name": step.name,
+                    "step_index": i + 1,
+                    NOTE_STEP_KEY: keys[i],
+                    NOTE_STEP_KIND: "transform" if transform else "calibration",
+                    NOTE_STEP_TYPE: type(step).__name__,
+                    "pipeline_name": pipeline_flow_name,
+                }
+                if not transform:
+                    step_note["step_id"] = getattr(step, "resolved_step_id", step.name)
                 step_settings = base_settings.with_metadata(
                     flow_name=(
                         f"{pipeline_flow_name}_{step.name}" if pipeline_flow_name else step.name
                     ),
-                    note={
-                        **pipeline_note,
-                        "step_name": step.name,
-                        "step_id": getattr(step, "resolved_step_id", step.name),
-                        "step_index": i + 1,
-                        "pipeline_name": pipeline_flow_name,
-                    },
+                    note=step_note,
                 )
-                if completed_steps:
+                if i:
                     self._start_next_step(step_settings)
                 else:
                     # The first step keeps an execution_id adopted while reserving.
                     self.settings = step_settings
                 try:
+                    if transform_step is not None:
+                        ctx, transform_results[keys[i]] = self._run_transform_step(
+                            transform_step, targets, ctx
+                        )
+                        continue
                     with self.owned_execution(
                         ctx.candidate_qids, connect_backend=step.connect_parent_backend
                     ):
+                        if self.execution_id is not None:
+                            self.run_execution_ids.append(self.execution_id)
                         ctx = step.execute(self, targets, ctx)
                 except Exception as e:
                     run_logger.error(f"Step {step.name} failed: {e}")
                     raise
-                completed_steps += 1
 
             run_logger.info("Pipeline completed successfully")
 
@@ -1516,6 +1653,7 @@ class CalibSession:
             self._configuration_mode = original_settings.configuration_mode
             self.plan_digest = None
             self._pipeline_active = False
+            self._transform_service = None
             try:
                 self._release_lock_if_acquired()
             finally:
@@ -1537,6 +1675,9 @@ class CalibSession:
             results["metadata"] = ctx.metadata
         if ctx.step_results:
             results["steps"] = ctx.step_results
+        if transform_results:
+            # Each transform step's recorded outcome by its step key, in plan order.
+            results["transforms"] = transform_results
         return results
 
     def calibration_plan(self, steps: Sequence[Step]) -> dict[str, Any]:
@@ -1582,7 +1723,7 @@ class CalibSession:
 
 
 @contextlib.contextmanager
-def borrowed_session(spec: WorkerSpec, qids: list[str]) -> Iterator[CalibSession]:
+def borrowed_session(spec: WorkerSpec, qids: list[str]) -> Iterator[ExecutionRuntime]:
     """Run as an isolated worker of ``spec``'s owner for ``qids``.
 
     The worker inherits every measurement setting and the MUX mapping of its
@@ -1590,7 +1731,7 @@ def borrowed_session(spec: WorkerSpec, qids: list[str]) -> Iterator[CalibSession
     worker's backend: the owner records the terminal status, updates chip
     history, pushes to GitHub and releases the reservation.
     """
-    session = CalibSession(
+    session = ExecutionRuntime(
         spec.settings,
         lease=spec.lease,
         mux_mapping=spec.mux_mapping.to_mapping(),
@@ -1600,3 +1741,7 @@ def borrowed_session(spec: WorkerSpec, qids: list[str]) -> Iterator[CalibSession
         yield session
     finally:
         session.release_borrowed()
+
+
+CalibSession = ExecutionRuntime
+"""Deprecated name of :class:`ExecutionRuntime`, kept for custom steps that annotate it."""

@@ -5,6 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { BringUpStepExecutionMode } from './bringUpStepExecutionMode';
 import type { BringUpStepStepId } from './bringUpStepStepId';
 import type { BringUpStepTasks } from './bringUpStepTasks';
 
@@ -17,4 +18,6 @@ export interface BringUpStep {
   step_id?: BringUpStepStepId;
   /** Task calls to run on every target, in order. A task may appear more than once when each occurrence has its own call_id. Defaults to BRINGUP_TASKS. */
   tasks?: BringUpStepTasks;
+  /** How MUX targets run; explicit qubit targets run directly in parallel. parallel_by_mux (default): MUXes run in parallel and the qubits of one MUX run one after another. parallel_by_round: rounds of qubits from different MUXes. sequential: one MUX and one qubit at a time. simultaneous_spectroscopy: experimental batch spectroscopy. Bring-up has no manual rounds. */
+  execution_mode?: BringUpStepExecutionMode;
 }

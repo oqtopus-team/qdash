@@ -10,6 +10,9 @@ from pydantic import ValidationError
 from qdash.datamodel.flow_targets import FlowTargetOverride, TargetMode
 
 _OVERRIDABLE_TARGETS = {"MuxTargets", "QubitTargets", "CouplingTargets"}
+# Classes whose ``from_context(...)`` returns what a run is called on: the current
+# CalibrationSession and the legacy CalibService.
+_SESSION_CLASSES = frozenset({"CalibrationSession", "CalibService"})
 # Steps that run the target pairs; a pair override needs one of them.
 _PAIR_STEPS = frozenset({"CustomTwoQubit", "TwoQubitCalibration"})
 _QUBIT_MODES: list[TargetMode] = ["mux_ids", "qids"]
@@ -31,7 +34,8 @@ def flow_parameter_names(code: str, function_name: str) -> set[str]:
 def supported_target_modes(code: str, function_name: str) -> list[TargetMode]:
     """Return the override types the execution dialog may offer for this source.
 
-    Pair overrides need every ``CalibService.run`` the entrypoint executes to
+    Pair overrides need every ``CalibrationSession.run`` (or legacy ``CalibService.run``)
+    the entrypoint executes to
     receive ``CouplingTargets`` and a list of built-in steps. The selected pairs
     replace those targets, and the automatic two-qubit steps group exactly
     them. Only the entrypoint is inspected; anything the check cannot follow
@@ -61,7 +65,8 @@ def _runs_pair_pipelines(
 
     Conservative by design. Pair mode is rejected when the entrypoint:
 
-    - has no ``CalibService`` ``.run`` call, or runs one inside a loop,
+    - has no ``CalibrationSession`` or ``CalibService`` ``.run`` call, or runs one inside a
+      loop,
       comprehension or lambda;
     - defines nested functions or classes, or references any function or class
       defined in the module (a helper may run its own pipeline);
@@ -392,7 +397,8 @@ def _call_name(node: ast.Call) -> str:
 
 
 def _is_service(node: ast.expr) -> bool:
-    """``CalibService(...)`` or ``CalibService.from_context(...)``."""
+    """``CalibrationSession.from_context(...)``, ``CalibService(...)`` or
+    ``CalibService.from_context(...)``: what a run's ``.run(targets, steps)`` is called on."""
     if not isinstance(node, ast.Call):
         return False
     if _call_name(node) == "CalibService":
@@ -401,7 +407,7 @@ def _is_service(node: ast.expr) -> bool:
     return (
         isinstance(func, ast.Attribute)
         and func.attr == "from_context"
-        and _call_name(ast.Call(func=func.value, args=[], keywords=[])) == "CalibService"
+        and _call_name(ast.Call(func=func.value, args=[], keywords=[])) in _SESSION_CLASSES
     )
 
 
@@ -433,7 +439,7 @@ class _Resolver:
         return (
             isinstance(node.func, ast.Attribute)
             and node.func.attr == "run"
-            and _root_name(node.func.value) in self.service_names
+            and (_root_name(node.func.value) in self.service_names or _is_service(node.func.value))
         )
 
     def invalidate(self, name: str) -> None:
@@ -550,7 +556,7 @@ class _Resolver:
                     self.invalidate(name)
             elif isinstance(node, ast.Call):
                 # Method calls (qids.sort()) and calls receiving a name
-                # (shuffle(qids)) may mutate it in place. CalibService.run only
+                # (shuffle(qids)) may mutate it in place. CalibrationSession.run only
                 # reads its targets, so it keeps them resolvable.
                 if self.is_service_run(node):
                     continue

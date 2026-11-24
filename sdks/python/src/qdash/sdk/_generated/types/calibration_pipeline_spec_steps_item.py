@@ -7,6 +7,7 @@ import typing
 import pydantic
 import typing_extensions
 from ..core.pydantic_utilities import UniversalBaseModel
+from .bring_up_step_execution_mode import BringUpStepExecutionMode
 from .custom_one_qubit_step_execution_mode import CustomOneQubitStepExecutionMode
 from .custom_two_qubit_step_execution_mode import CustomTwoQubitStepExecutionMode
 from .one_qubit_check_step_execution_mode import OneQubitCheckStepExecutionMode
@@ -19,6 +20,7 @@ class CalibrationPipelineSpecStepsItem_BringUp(UniversalBaseModel):
     type: typing.Literal["BringUp"] = "BringUp"
     step_id: typing.Optional[str] = None
     tasks: typing.Optional[typing.List[TaskCall]] = None
+    execution_mode: typing.Optional[BringUpStepExecutionMode] = None
 
     model_config: typing.ClassVar[pydantic.ConfigDict] = pydantic.ConfigDict(extra="allow", frozen=True)
 

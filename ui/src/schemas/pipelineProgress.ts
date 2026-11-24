@@ -8,7 +8,7 @@
 import type { PipelineStepProgress } from './pipelineStepProgress';
 
 /**
- * A pipeline run as a whole: one execution per calibration step, same flow run.
+ * A pipeline run as a whole: one execution per step it reached, same flow run.
  *
  * ``status`` is the whole run's: running while any step runs or the run holds
  * the project lock between steps, otherwise the outcome of the last step.

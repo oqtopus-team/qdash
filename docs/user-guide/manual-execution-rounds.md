@@ -12,24 +12,22 @@ Use qubit IDs and couplings from your chip.
 `CustomOneQubit`, `OneQubitCheck`, and `OneQubitFineTune` accept rounds of qubit IDs:
 
 ```python
-from prefect import flow
-from qdash.workflow import TaskCall
-from qdash.workflow.service import CalibService
-from qdash.workflow.service.steps import CustomOneQubit
-from qdash.workflow.service.targets import QubitTargets
+from qdash.calibration import CustomOneQubit, QubitTargets, TaskCall
+from qdash.workflow import CalibrationSession, calibration_flow, resolve_calib_context
 
 
-@flow
+@calibration_flow(session_name="Rabi manual rounds")
 def rabi_in_rounds(username: str, chip_id: str, project_id: str | None = None,
                    flow_name: str | None = None):
-    cal = CalibService(username, chip_id, project_id=project_id, flow_name=flow_name)
+    context = resolve_calib_context(username, chip_id, project_id=project_id)
+    session = CalibrationSession.from_context(context)
     steps = [CustomOneQubit(
         step_name="rabi_rounds",
         execution_mode="manual",
         rounds=[["0", "8"], ["1", "9"]],
         tasks=[TaskCall(name="CheckRabi"), TaskCall(name="CheckT1")],
     )]
-    return cal.run(QubitTargets(["0", "8", "1", "9"]), steps=steps)
+    return session.run(QubitTargets(["0", "8", "1", "9"]), steps=steps, name=flow_name)
 ```
 
 The rounds must cover the step's current targets exactly once, after exclusions and filters.
@@ -46,8 +44,7 @@ Start from **2Q Manual Rounds** and edit `ROUNDS` and `TARGET_PAIRS` together. T
 directed `(control, target)` pairs:
 
 ```python
-from qdash.workflow import TaskCall
-from qdash.workflow.service.steps import CustomTwoQubit
+from qdash.calibration import CustomTwoQubit, TaskCall
 
 CustomTwoQubit(
     step_name="cr_rounds",

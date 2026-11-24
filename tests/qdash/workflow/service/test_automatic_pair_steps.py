@@ -15,7 +15,7 @@ from qdash.workflow.service.steps.pipeline import StepContext
 from qdash.workflow.service.targets import CouplingTargets, QubitTargets
 
 if TYPE_CHECKING:
-    from qdash.workflow.service._internal.session import CalibSession
+    from qdash.workflow.service._internal.session import ExecutionRuntime
 
 CR = [TaskCall(name="CheckCrossResonance")]
 PAIRS = [("0", "1"), ("1", "0"), ("4", "5")]
@@ -62,7 +62,7 @@ def groups(monkeypatch: pytest.MonkeyPatch) -> list[list[str]]:
     return ran
 
 
-def _session() -> CalibSession:
+def _session() -> ExecutionRuntime:
     session = SimpleNamespace(
         chip_id="chip",
         username="alice",
@@ -72,7 +72,7 @@ def _session() -> CalibSession:
         mux_mapping=MuxMapping.legacy(),
     )
     session.record_stage_result = lambda name, result: None
-    return cast("CalibSession", session)
+    return cast("ExecutionRuntime", session)
 
 
 BUILDERS = {

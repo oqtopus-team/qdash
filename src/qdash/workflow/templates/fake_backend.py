@@ -45,18 +45,15 @@ Example:
 
 from typing import Any
 
-from prefect import flow
-
-from qdash.datamodel.one_qubit_execution_mode import OneQubitExecutionMode
-from qdash.workflow import TaskCall
-from qdash.workflow.service import CalibService, resolve_calib_context
-from qdash.workflow.service.calib_service import (
-    on_flow_cancellation,
-    on_flow_crashed,
-    on_flow_failure,
+from qdash.calibration import (
+    CalibrationTargets,
+    CustomOneQubit,
+    MuxTargets,
+    OneQubitExecutionMode,
+    QubitTargets,
+    TaskCall,
 )
-from qdash.workflow.service.steps import CustomOneQubit
-from qdash.workflow.service.targets import MuxTargets, QubitTargets, Target
+from qdash.workflow import CalibrationSession, calibration_flow, resolve_calib_context
 
 # Tasks the template runs when none are given; every name is listed for the fake backend in
 # config/app/backend.yaml and resolves its inputs from the tasks before it.
@@ -77,11 +74,7 @@ FAKE_CALIBRATION_TASKS: list[TaskCall] = [
 MUX_IDS: list[int] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
 
 
-@flow(
-    on_cancellation=[on_flow_cancellation],
-    on_failure=[on_flow_failure],
-    on_crashed=[on_flow_crashed],
-)
+@calibration_flow(session_name="Fake Backend Calibration")
 def fake_calibration(
     username: str,
     chip_id: str = "64Q",
@@ -127,7 +120,7 @@ def fake_calibration(
     if tasks is None:
         tasks = list(FAKE_CALIBRATION_TASKS)
 
-    targets: Target
+    targets: CalibrationTargets
     if mux_ids is not None:
         targets = MuxTargets(mux_ids=mux_ids, exclude_qids=exclude_qids)
     elif qids is not None:
@@ -145,5 +138,5 @@ def fake_calibration(
     # The backend is part of the execution context; the default comes from
     # config/app/backend.yaml.
     context = resolve_calib_context(username, chip_id, project_id=project_id, backend=backend_name)
-    cal = CalibService.from_context(context, flow_name=flow_name, tags=tags)
-    return cal.run(targets, steps=steps)
+    session = CalibrationSession.from_context(context)
+    return session.run(targets=targets, steps=steps, name=flow_name, tags=tags)

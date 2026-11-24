@@ -3,29 +3,26 @@
 from __future__ import annotations
 
 import importlib
-from typing import Any
 
 import pytest
 
 from qdash.workflow.service.steps import OneQubitCheck
 from qdash.workflow.service.targets import MuxTargets, QubitTargets
+from tests.qdash.workflow.calibration_session_fake import (
+    fake_session_class,
+    install_fake_session,
+)
 from tests.qdash.workflow.task_call_helpers import effective_settings, names, settings
 
 coarse_one_module = importlib.import_module("qdash.workflow.templates.coarse_one")
 
 
-class FakeCalibService:
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        self.args = args
-        self.kwargs = kwargs
-
-    def run(self, targets: Any, *, steps: list[Any]) -> dict[str, Any]:
-        return {"targets": targets, "steps": steps, "args": self.args, "kwargs": self.kwargs}
+FakeCalibService = fake_session_class()
 
 
 @pytest.fixture(autouse=True)
 def fake_calibration_service(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(coarse_one_module, "CalibService", FakeCalibService)
+    install_fake_session(monkeypatch, coarse_one_module, FakeCalibService)
 
 
 def test_coarse_one_configures_before_readout_search_and_calibrates_all_pulses() -> None:

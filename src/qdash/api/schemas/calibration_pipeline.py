@@ -106,9 +106,15 @@ class ResolvedPipelineStep(BaseModel):
 class ResolvedPipelineTargets(BaseModel):
     """The starting targets after chip lookup."""
 
-    qids: list[str] = Field(description="Explicit qids, or empty when targeting MUXes.")
+    qids: list[str] = Field(
+        description="Explicit qids, the qubits of the pairs, or empty when targeting MUXes."
+    )
     mux_ids: list[int] = Field(default_factory=list)
     exclude_qids: list[str] = Field(default_factory=list)
+    pairs: list[list[str]] = Field(
+        default_factory=list,
+        description="Directed [control, target] coupling pairs, or empty without pair targets.",
+    )
 
 
 class ValidatePipelineRequest(BaseModel):

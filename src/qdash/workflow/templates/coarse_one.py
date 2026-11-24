@@ -12,24 +12,11 @@ Example:
 
 from typing import Any
 
-from prefect import flow
-
-from qdash.workflow import TaskCall
-from qdash.workflow.service import CalibService
-from qdash.workflow.service.calib_service import (
-    on_flow_cancellation,
-    on_flow_crashed,
-    on_flow_failure,
-)
-from qdash.workflow.service.steps import OneQubitCheck
-from qdash.workflow.service.targets import MuxTargets, QubitTargets, Target
+from qdash.calibration import CalibrationTargets, MuxTargets, OneQubitCheck, QubitTargets, TaskCall
+from qdash.workflow import CalibrationSession, calibration_flow, resolve_calib_context
 
 
-@flow(
-    on_cancellation=[on_flow_cancellation],
-    on_failure=[on_flow_failure],
-    on_crashed=[on_flow_crashed],
-)
+@calibration_flow(session_name="Coarse 1Q Calibration")
 def coarse_one(
     username: str,
     chip_id: str,
@@ -55,7 +42,7 @@ def coarse_one(
     Returns:
         Pipeline results with one_qubit_check output
     """
-    targets: Target
+    targets: CalibrationTargets
     if mux_ids is not None:
         targets = MuxTargets(mux_ids=mux_ids, exclude_qids=exclude_qids or [])
     elif qids is not None:
@@ -91,15 +78,15 @@ def coarse_one(
         )
     ]
 
-    cal = CalibService(
-        username,
-        chip_id,
-        flow_name=flow_name,
-        tags=tags,
-        project_id=project_id,
+    context = resolve_calib_context(username, chip_id, project_id=project_id)
+    session = CalibrationSession.from_context(context)
+    return session.run(
+        targets=targets,
+        steps=steps,
         default_run_parameters={
             "readout_duration": 1024,
             "interval": 150 * 1024,
         },
+        name=flow_name,
+        tags=tags,
     )
-    return cal.run(targets, steps=steps)

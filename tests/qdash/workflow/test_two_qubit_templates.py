@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import importlib
-from typing import Any
 
 import pytest
 
 from qdash.datamodel.task_call import TaskCall
 from qdash.workflow.service.steps import CustomTwoQubit, TwoQubitCalibration
+from tests.qdash.workflow.calibration_session_fake import (
+    fake_session_class,
+    install_fake_session,
+)
 from tests.qdash.workflow.task_call_helpers import names, settings
 
 two_qubit_module = importlib.import_module("qdash.workflow.templates.two_qubit")
@@ -16,17 +19,11 @@ two_qubit_manual_module = importlib.import_module(
 )
 
 
-class FakeCalibService:
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        self.args = args
-        self.kwargs = kwargs
-
-    def run(self, targets: Any, *, steps: list[Any]) -> dict[str, Any]:
-        return {"targets": targets, "steps": steps, "kwargs": self.kwargs}
+FakeCalibService = fake_session_class()
 
 
 def test_two_qubit_template_passes_template_task_list(monkeypatch) -> None:
-    monkeypatch.setattr(two_qubit_module, "CalibService", FakeCalibService)
+    install_fake_session(monkeypatch, two_qubit_module, FakeCalibService)
 
     result = two_qubit_module.two_qubit(
         username="alice",
@@ -41,7 +38,7 @@ def test_two_qubit_template_passes_template_task_list(monkeypatch) -> None:
 
 
 def test_two_qubit_template_keeps_custom_tasks(monkeypatch) -> None:
-    monkeypatch.setattr(two_qubit_module, "CalibService", FakeCalibService)
+    install_fake_session(monkeypatch, two_qubit_module, FakeCalibService)
 
     result = two_qubit_module.two_qubit(
         username="alice",
@@ -54,7 +51,7 @@ def test_two_qubit_template_keeps_custom_tasks(monkeypatch) -> None:
 
 
 def test_two_qubit_pairs_template_passes_template_task_list(monkeypatch) -> None:
-    monkeypatch.setattr(two_qubit_pairs_module, "CalibService", FakeCalibService)
+    install_fake_session(monkeypatch, two_qubit_pairs_module, FakeCalibService)
 
     result = two_qubit_pairs_module.two_qubit_pairs(
         username="alice",
@@ -72,7 +69,7 @@ def test_two_qubit_pairs_template_passes_template_task_list(monkeypatch) -> None
 
 
 def test_two_qubit_pairs_template_keeps_custom_tasks(monkeypatch) -> None:
-    monkeypatch.setattr(two_qubit_pairs_module, "CalibService", FakeCalibService)
+    install_fake_session(monkeypatch, two_qubit_pairs_module, FakeCalibService)
 
     result = two_qubit_pairs_module.two_qubit_pairs(
         username="alice",
@@ -88,7 +85,7 @@ def test_two_qubit_pairs_template_keeps_custom_tasks(monkeypatch) -> None:
 
 
 def test_two_qubit_pairs_template_targets_exactly_the_directed_pairs(monkeypatch) -> None:
-    monkeypatch.setattr(two_qubit_pairs_module, "CalibService", FakeCalibService)
+    install_fake_session(monkeypatch, two_qubit_pairs_module, FakeCalibService)
 
     result = two_qubit_pairs_module.two_qubit_pairs(
         "alice", "64Q", [("0", "1"), ("1", "0")], None, 10, ["daily"], "custom_flow", "project-1"
@@ -105,7 +102,7 @@ def test_two_qubit_pairs_template_accepts_a_pair_override(monkeypatch) -> None:
     from qdash.datamodel.flow_targets import FlowTargetOverride
     from qdash.workflow.service.flow_targets import override_pipeline
 
-    monkeypatch.setattr(two_qubit_pairs_module, "CalibService", FakeCalibService)
+    install_fake_session(monkeypatch, two_qubit_pairs_module, FakeCalibService)
     result = two_qubit_pairs_module.two_qubit_pairs(
         username="alice", chip_id="64Q", coupling_pairs=[("0", "1"), ("4", "5")]
     )
@@ -128,7 +125,7 @@ def test_two_qubit_pairs_template_accepts_a_pair_override(monkeypatch) -> None:
     ],
 )
 def test_two_qubit_pairs_template_validates_pairs(monkeypatch, pairs, message) -> None:
-    monkeypatch.setattr(two_qubit_pairs_module, "CalibService", FakeCalibService)
+    install_fake_session(monkeypatch, two_qubit_pairs_module, FakeCalibService)
 
     with pytest.raises(ValueError, match=message):
         two_qubit_pairs_module.two_qubit_pairs(
@@ -137,7 +134,7 @@ def test_two_qubit_pairs_template_validates_pairs(monkeypatch, pairs, message) -
 
 
 def test_two_qubit_manual_rounds_template_runs_its_rounds(monkeypatch) -> None:
-    monkeypatch.setattr(two_qubit_manual_module, "CalibService", FakeCalibService)
+    install_fake_session(monkeypatch, two_qubit_manual_module, FakeCalibService)
 
     result = two_qubit_manual_module.two_qubit_manual_rounds(username="alice", chip_id="64Q")
 
@@ -152,7 +149,7 @@ def test_two_qubit_manual_rounds_template_runs_its_rounds(monkeypatch) -> None:
 
 
 def test_two_qubit_manual_rounds_template_keeps_custom_tasks(monkeypatch) -> None:
-    monkeypatch.setattr(two_qubit_manual_module, "CalibService", FakeCalibService)
+    install_fake_session(monkeypatch, two_qubit_manual_module, FakeCalibService)
 
     result = two_qubit_manual_module.two_qubit_manual_rounds(
         username="alice", chip_id="64Q", tasks=[TaskCall(name="CheckCrossResonance")]
@@ -168,7 +165,7 @@ def test_two_qubit_manual_rounds_template_rejects_target_overrides(monkeypatch) 
     from qdash.datamodel.flow_targets import FlowTargetOverride
     from qdash.workflow.service.flow_targets import override_pipeline
 
-    monkeypatch.setattr(two_qubit_manual_module, "CalibService", FakeCalibService)
+    install_fake_session(monkeypatch, two_qubit_manual_module, FakeCalibService)
     result = two_qubit_manual_module.two_qubit_manual_rounds(username="alice", chip_id="64Q")
 
     with pytest.raises(ValueError, match="Target overrides are not accepted"):
@@ -180,7 +177,7 @@ def test_two_qubit_manual_rounds_template_rejects_target_overrides(monkeypatch) 
 
 
 def test_two_qubit_manual_rounds_template_requires_matching_targets(monkeypatch) -> None:
-    monkeypatch.setattr(two_qubit_manual_module, "CalibService", FakeCalibService)
+    install_fake_session(monkeypatch, two_qubit_manual_module, FakeCalibService)
     monkeypatch.setattr(two_qubit_manual_module, "TARGET_PAIRS", [("0", "1")])
 
     with pytest.raises(ValueError, match="TARGET_PAIRS must list every pair of ROUNDS"):

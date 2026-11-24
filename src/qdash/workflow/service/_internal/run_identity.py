@@ -14,7 +14,8 @@ The identity is read once per flow run:
 - A flow run without one (a cron or one-time schedule, or a run started in Prefect directly)
   is recorded by the worker as a run of its own, with IDs derived from the flow run, so
   every step and every retry of the flow run reaches the same records. It joins an automatic
-  session of its own.
+  session of its own, named by the flow's ``@calibration_flow(session_name=...)`` when it
+  declares one.
 
 A failure to resolve the identity fails the step before any hardware is used: a run whose
 history cannot be attributed is not started. Outside a Prefect flow run (a local script or a
@@ -31,7 +32,7 @@ from qdash.datamodel.run import RUN_CONTEXT_KEY
 logger = logging.getLogger(__name__)
 
 # Identity of each flow run this process resolved, with the project, chip and owner it was resolved
-# for: every step of a pipeline, and every CalibService run of one flow, shares it. ``None``
+# for: every step of a pipeline, and every CalibrationSession.run of one flow, shares it. ``None``
 # marks a launch QDash records no run for (``UNGROUPED_MARKER``).
 _resolved: dict[str, tuple[str, str, str, dict[str, str] | None]] = {}
 
@@ -45,6 +46,13 @@ def _flow_run_context() -> tuple[Any, Any] | None:
     if context is None or context.flow_run is None:
         return None
     return context.flow_run, getattr(context, "flow", None)
+
+
+def declared_session_name(flow: Any) -> str | None:
+    """The ``@calibration_flow(session_name=...)`` of the running flow, or None."""
+    from qdash.workflow.service.calibration_flow import session_name_of
+
+    return session_name_of(flow)
 
 
 def calibration_note(
@@ -104,6 +112,7 @@ def calibration_note(
             flow_name=getattr(flow, "name", None),
             run_name=run_name or str(getattr(flow_run, "name", "") or ""),
             auto_scheduled=bool(getattr(flow_run, "auto_scheduled", False)),
+            session_name=declared_session_name(flow),
         )
         logger.info(
             "Recorded flow run %s as run %s in calibration session %s",

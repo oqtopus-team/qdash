@@ -14,7 +14,7 @@ import type { ExecuteFlowRequestTargetOverride } from './executeFlowRequestTarge
  * Request to execute a Flow.
  */
 export interface ExecuteFlowRequest {
-  /** Targets for this run, overriding direct CalibService and pipeline targets */
+  /** Targets for this run, overriding the initial targets of every CalibrationSession.run (or legacy CalibService.run) and pipeline */
   target_override?: ExecuteFlowRequestTargetOverride;
   /** Execution parameters (overrides default_parameters) */
   parameters?: ExecuteFlowRequestParameters;

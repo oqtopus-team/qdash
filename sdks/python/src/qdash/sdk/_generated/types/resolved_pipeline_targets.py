@@ -13,10 +13,14 @@ class ResolvedPipelineTargets(UniversalBaseModel):
 
     qids: typing.List[str] = pydantic.Field()
     """
-    Explicit qids, or empty when targeting MUXes.
+    Explicit qids, the qubits of the pairs, or empty when targeting MUXes.
     """
 
     mux_ids: typing.Optional[typing.List[int]] = None
     exclude_qids: typing.Optional[typing.List[str]] = None
+    pairs: typing.Optional[typing.List[typing.List[str]]] = pydantic.Field(default=None)
+    """
+    Directed [control, target] coupling pairs, or empty without pair targets.
+    """
 
     model_config: typing.ClassVar[pydantic.ConfigDict] = pydantic.ConfigDict(extra="allow", frozen=True)

@@ -45,6 +45,7 @@ import {
   sessionReturnFromQuery,
   sessionReturnParsers,
 } from "@/lib/executionArea";
+import { transformSummary } from "@/lib/transformStep";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
 import { formatDateTime } from "@/lib/utils/datetime";
 import type {
@@ -107,9 +108,17 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
+/** Words for the planned-step states that have no execution behind them. */
+const STEP_STATUS_LABELS: Record<string, string> = {
+  skipped: "not reached",
+  not_recorded: "not recorded",
+};
+
 function StatusBadge({ status }: { status: string }) {
   return (
-    <span className={`badge badge-soft badge-sm ${getStatusBadgeClass(status)}`}>{status}</span>
+    <span className={`badge badge-soft badge-sm ${getStatusBadgeClass(status)}`}>
+      {STEP_STATUS_LABELS[status] ?? status}
+    </span>
   );
 }
 
@@ -188,9 +197,19 @@ function PipelineRunItem({
       {steps.length > 0 ? (
         <ol className="flex flex-col gap-1">
           {steps.map((step) => (
-            <li key={step.index} className="flex items-center justify-between gap-2 text-xs">
+            <li
+              key={step.key || step.index}
+              className="flex items-center justify-between gap-2 text-xs"
+            >
               <span className="min-w-0 truncate">
                 {step.index}. {step.name}
+                {step.transform ? (
+                  // A filter or schedule runs no task; its recorded decision is its result.
+                  <span className="text-base-content/60">
+                    {" "}
+                    · {transformSummary(step.transform)}
+                  </span>
+                ) : null}
               </span>
               <span className="flex shrink-0 items-center gap-2">
                 {step.execution_id ? (

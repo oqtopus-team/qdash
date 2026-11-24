@@ -12,8 +12,8 @@ deployment run goes through, in order:
    so this shows the payload would also pass if enforcement were on);
 3. ``Flow.validate_parameters``, which the flow engine calls on the worker
    before running the flow function;
-4. the flow function itself, with ``CalibService`` replaced by a recorder, to
-   read the steps it builds.
+4. the flow function itself, with ``CalibrationSession`` replaced by a recorder that
+   converts its definitions as the worker does, to read the steps it builds.
 
 It prints one JSON object: the calls it sent and a result per template module.
 """
@@ -32,6 +32,7 @@ from prefect.utilities.schema_tools import validate
 from qdash.api.schemas.flow import ExecuteFlowRequest
 from qdash.datamodel.task_call import StepCalls
 from qdash.workflow.service._internal.settings import WorkerSpec
+from qdash.workflow.service.definitions import runtime_steps
 
 CALLS: list[dict[str, Any]] = [
     {
@@ -58,16 +59,15 @@ TEMPLATES: dict[str, tuple[str, dict[str, Any]]] = {
 }
 
 
-class _RecordingCalibService:
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        pass
+class _RecordingCalibrationSession:
+    """Returns the runtime steps the worker builds from the template's definitions."""
 
     @classmethod
-    def from_context(cls, *args: Any, **kwargs: Any) -> _RecordingCalibService:
+    def from_context(cls, *args: Any, **kwargs: Any) -> _RecordingCalibrationSession:
         return cls()
 
-    def run(self, targets: Any, *, steps: list[Any]) -> list[Any]:
-        return steps
+    def run(self, targets: Any, steps: list[Any], **kwargs: Any) -> list[Any]:
+        return runtime_steps(steps)
 
 
 def _wire(parameters: dict[str, Any]) -> dict[str, Any]:
@@ -101,9 +101,8 @@ def check(module_name: str, function: str, required: dict[str, Any]) -> dict[str
     module = importlib.import_module(f"qdash.workflow.templates.{module_name}")
     flow = getattr(module, function)
     assert isinstance(flow, Flow), f"{module_name}.{function} is not a Prefect flow"
-    module.CalibService = _RecordingCalibService  # type: ignore[attr-defined]
-    if hasattr(module, "resolve_calib_context"):
-        module.resolve_calib_context = lambda *args, **kwargs: None  # type: ignore[attr-defined]
+    module.CalibrationSession = _RecordingCalibrationSession  # type: ignore[attr-defined]
+    module.resolve_calib_context = lambda *args, **kwargs: None  # type: ignore[attr-defined]
     schema = parameter_schema(flow.fn).model_dump_for_openapi()
     base = {"username": "alice", "chip_id": "64Q", **required}
 

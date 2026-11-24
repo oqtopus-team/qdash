@@ -6,8 +6,8 @@ The engine executes and records tasks; the service layer owns pipelines and rese
 
 | Component | Owns |
 | --- | --- |
-| `CalibService` | Checked author context and `run(targets, steps)` |
-| `CalibSession` | Pipeline lifecycle, reservations, and workers |
+| `CalibrationSession` | Checked author context and `run(targets, steps)` |
+| `ExecutionRuntime` | Pipeline lifecycle, reservations, and workers |
 | `CalibOrchestrator` | One execution's backend and context |
 | `ExecutionService` | Execution state and persistence |
 | `TaskContext` | In-memory task state and artifacts |
@@ -34,10 +34,25 @@ memory only; repositories own durable calibration. `TaskHistoryRecorder` saves h
 `BackendSaver` publishes accepted outputs, and the filesystem saver writes scoped artifacts.
 See [Calibration Data Lifecycle](./calibration-data-lifecycle.md).
 
+## Step Records
+
+Every reached step creates one Execution. `ExecutionStep` is the shared authoring definition;
+the internal runtime retains calibration and transform categories. Calibration steps use
+`owned_execution`; transforms use `transform_execution` to record start, end, status and output
+without a backend connection, task records, data directories, chip-history updates or GitHub sync.
+The surrounding pipeline retains its hardware reservation across transforms.
+
+A transform's note stores a copied `transform_result`: candidates before and after, filter
+exclusions with reasons, or generated CR groups. Exceptions fail the record, cancellation cancels
+it, and termination hooks finalize interrupted records. Unreached steps create no Execution.
+Existing measurement IDs and artifact references are unchanged. See
+[stored step fields](../../reference/database-structure.md#step-execution-metadata).
+
 ## Hardware Reservations
 
-A session reserves the union of pipeline scopes before hardware work and retains it until a
-terminal path. Requests exceeding that scope fail before the backend call. Worker sessions
+The owning `ExecutionRuntime` reserves the union of pipeline scopes before hardware work and
+retains it until a terminal path. The persistent CalibrationSession group holds no reservation.
+Requests exceeding that scope fail before the backend call. Worker runtimes
 borrow the owner execution and reservation; only the owner can release them.
 
 ## Isolated Workers

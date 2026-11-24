@@ -13,12 +13,12 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import TYPE_CHECKING, Any
 
+from qdash.calibration import TaskCall
 from qdash.sdk._generated import _authoring as models
 from qdash.sdk._http import api_errors, given, read_options
 from qdash.sdk._runs import Run
 from qdash.sdk._workflows import check_recorded_launch
 from qdash.sdk.errors import QDashConfigError, QDashNotFoundError
-from qdash.sdk.pipeline import TaskCall
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
@@ -565,7 +565,7 @@ class Tasks:
             if update_calibration_parameters is not None:
                 options["update_calibration_parameters"] = update_calibration_parameters
             return TaskCall(**options)
-        if not isinstance(task, models.TaskCall):
+        if not isinstance(task, TaskCall | models.TaskCall):
             raise TypeError(f"task must be a TaskCall or a task name, got {type(task).__name__}")
         duplicated = [
             label
@@ -590,7 +590,7 @@ class Tasks:
             raise ValueError(
                 f"{' and '.join(pipeline_only)} only apply to calls within a calibration "
                 "pipeline step; a single task run cannot carry them. Remove them, or run the "
-                "call in a pipeline with chip.calibrate(...)"
+                "call in a step with CalibrationSession.run(...)"
             )
         if isinstance(task, TaskCall):
             return task.model_copy(deep=True)

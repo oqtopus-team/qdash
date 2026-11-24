@@ -214,7 +214,7 @@ cal.run(MuxTargets([0, 1]), steps=[
             "username, chip_id",
             "comprehension",
         ),
-        ("print('no pipeline')", "username, chip_id", "no CalibService.run"),
+        ("print('no pipeline')", "username, chip_id", "no CalibrationSession.run"),
     ],
 )
 def test_dynamic_sources_are_unresolved_without_a_partial_plan(
@@ -334,7 +334,7 @@ RUN_TWO = "cal.run(QubitTargets(['1']), [OneQubitFineTune()])"
             "cal = CalibService(username, chip_id)\nother = cal\nother.run(QubitTargets(['0']), [OneQubitCheck()])",
             "username, chip_id",
             {},
-            "other.run(), which is not a CalibService",
+            "other.run(), which is not a CalibrationSession",
         ),
     ],
 )

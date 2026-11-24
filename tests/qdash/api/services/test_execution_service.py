@@ -650,7 +650,9 @@ def test_get_execution_follows_a_pipeline_across_its_steps(monkeypatch: Any, ini
     assert pipeline.name == "coarse-then-coherence"
     assert pipeline.root_execution_id == "exec-1"
     assert pipeline.status == "running"
-    assert [s.status for s in pipeline.steps] == ["completed", "skipped", "running"]
+    # A run recorded before transforms had executions: its filter is not reported as pending.
+    assert [s.status for s in pipeline.steps] == ["completed", "not_recorded", "running"]
+    assert pipeline.steps[1].execution_id is None and pipeline.steps[1].transform is None
     first = pipeline.steps[0]
     assert (first.execution_id, first.task_total, first.task_finished, first.task_failed) == (
         "exec-1",
@@ -680,13 +682,14 @@ def test_pipeline_between_steps_is_running_while_the_run_holds_the_lock(
     detail = service.get_execution(project_id=PROJECT_ID, execution_id="exec-1")
     assert detail is not None and detail.pipeline is not None
     assert detail.pipeline.status == "running"
-    assert [s.status for s in detail.pipeline.steps] == ["completed", "skipped", "pending"]
+    assert [s.status for s in detail.pipeline.steps] == ["completed", "not_recorded", "pending"]
 
-    # Lock gone with steps still pending: the run died.
+    # Lock gone with steps still pending: the run died and never reached them.
     service._lock_repo.unlock(project_id=PROJECT_ID, execution_id="exec-1")
     detail = service.get_execution(project_id=PROJECT_ID, execution_id="exec-1")
     assert detail is not None and detail.pipeline is not None
     assert detail.pipeline.status == "failed"
+    assert [s.status for s in detail.pipeline.steps] == ["completed", "not_recorded", "skipped"]
 
 
 def test_pipeline_outcome_is_the_last_step_outcome(monkeypatch: Any, init_db: Any) -> None:
@@ -702,6 +705,128 @@ def test_pipeline_outcome_is_the_last_step_outcome(monkeypatch: Any, init_db: An
     failed = _make_service().get_execution(project_id=PROJECT_ID, execution_id="exec-9")
     assert failed is not None and failed.pipeline is not None
     assert failed.pipeline.status == "failed"
+
+
+RECORDING_PLAN: dict[str, Any] = {
+    "name": "filter-twice-then-schedule",
+    "records_transform_steps": True,
+    "steps": [
+        {
+            "index": 1,
+            "name": "check",
+            "step_id": "check",
+            "type": "CustomOneQubit",
+            "kind": "calibration",
+        },
+        {"index": 2, "name": "filter_by_status", "type": "FilterByStatus", "kind": "transform"},
+        {"index": 3, "name": "filter_by_status", "type": "FilterByStatus", "kind": "transform"},
+        {
+            "index": 4,
+            "name": "generate_cr_schedule",
+            "type": "GenerateCRSchedule",
+            "kind": "transform",
+        },
+        {
+            "index": 5,
+            "name": "two_qubit",
+            "step_id": "two_qubit",
+            "type": "TwoQubitCalibration",
+            "kind": "calibration",
+        },
+    ],
+}
+
+
+def _recording_note(flow_run_id: str, index: int, **extra: Any) -> dict[str, Any]:
+    entry = RECORDING_PLAN["steps"][index - 1]
+    return {
+        "flow_run_id": flow_run_id,
+        "pipeline": RECORDING_PLAN,
+        "step_index": index,
+        "step_name": entry["name"],
+        "step_kind": entry["kind"],
+        **extra,
+    }
+
+
+def test_transform_steps_report_their_own_execution_and_outcome(
+    monkeypatch: Any, init_db: Any
+) -> None:
+    """Repeated filters keep apart; a transform's status is its execution's, not its tasks'."""
+    flow_run_id = str(uuid4())
+    _stub_prefect_running(monkeypatch, flow_run_id)
+    _make_execution(execution_id="exec-1", status="completed", note=_recording_note(flow_run_id, 1))
+    _make_execution(
+        execution_id="exec-2",
+        status="completed",
+        note=_recording_note(
+            flow_run_id,
+            2,
+            transform_result={
+                "kind": "filter",
+                "input_qids": ["0", "1"],
+                "output_qids": ["0"],
+                "excluded": [{"target": "1", "reason": "step check failed"}],
+                "criteria": "step check: status == success",
+                "source_step": "check",
+                "source_found": True,
+            },
+        ),
+    )
+    _make_execution(
+        execution_id="exec-3",
+        status="completed",
+        note=_recording_note(
+            flow_run_id,
+            3,
+            transform_result={"kind": "filter", "input_qids": ["0"], "output_qids": []},
+        ),
+    )
+    _make_execution(
+        execution_id="exec-4",
+        status="failed",
+        note=_recording_note(flow_run_id, 4),
+    )
+
+    detail = _make_service().get_execution(project_id=PROJECT_ID, execution_id="exec-2")
+
+    assert detail is not None and detail.pipeline is not None
+    steps = detail.pipeline.steps
+    assert [s.key for s in steps] == [
+        "check",
+        "filter_by_status_2",
+        "filter_by_status_3",
+        "generate_cr_schedule",
+        "two_qubit",
+    ]
+    assert [s.status for s in steps] == ["completed", "completed", "completed", "failed", "skipped"]
+    assert [s.execution_id for s in steps] == ["exec-1", "exec-2", "exec-3", "exec-4", None]
+    first_filter = steps[1].transform
+    assert first_filter is not None and first_filter.output_qids == ["0"]
+    assert [(e.target, e.reason) for e in first_filter.excluded] == [("1", "step check failed")]
+    assert steps[2].transform is not None and steps[2].transform.output_qids == []
+    # A failed transform without a recorded outcome is failed, not given a made-up one.
+    assert steps[3].transform is None and steps[3].task_total == 0
+    assert detail.pipeline.status == "failed"
+
+
+def test_a_running_transform_is_running_and_later_steps_pending(
+    monkeypatch: Any, init_db: Any
+) -> None:
+    flow_run_id = str(uuid4())
+    _stub_prefect_running(monkeypatch, flow_run_id)
+    _make_execution(execution_id="exec-1", status="completed", note=_recording_note(flow_run_id, 1))
+    _make_execution(execution_id="exec-2", status="running", note=_recording_note(flow_run_id, 2))
+    detail = _make_service().get_execution(project_id=PROJECT_ID, execution_id="exec-1")
+    assert detail is not None and detail.pipeline is not None
+    assert detail.pipeline.status == "running"
+    assert [s.status for s in detail.pipeline.steps] == [
+        "completed",
+        "running",
+        "pending",
+        "pending",
+        "pending",
+    ]
 
 
 def test_plain_executions_have_no_pipeline(init_db: Any) -> None:

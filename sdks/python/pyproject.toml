@@ -48,12 +48,14 @@ exclude = [
     "**/*.pyc",
 ]
 
-# qdash-client ships qdash/client; neither wheel owns the qdash namespace.
+# qdash-client ships qdash/client; neither wheel owns the qdash namespace. qdash/calibration
+# holds the calibration definitions the SDK sends and the QDash worker runs; the server tree
+# imports the same source from here.
 [tool.hatch.build.targets.wheel]
-only-include = ["src/qdash/sdk"]
+only-include = ["src/qdash/sdk", "src/qdash/calibration"]
 sources = ["src"]
 
 # The sdist carries the generation inputs next to the sources: the Fern configuration
 # reads docs/oas/openapi.json from the repository, so it is not part of the sdist.
 [tool.hatch.build.targets.sdist]
-only-include = ["src/qdash/sdk", "fern", "README.md", "pyproject.toml"]
+only-include = ["src/qdash/sdk", "src/qdash/calibration", "fern", "README.md", "pyproject.toml"]

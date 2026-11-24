@@ -8,25 +8,30 @@ from ..core.pydantic_utilities import UniversalBaseModel
 
 class PipelineTargets(UniversalBaseModel):
     """
-    Which qubits the pipeline starts from: explicit qids or whole MUXes.
+    Which qubits or couplings the pipeline starts from.
 
-    Set exactly one of qids and mux_ids to a nonempty list without duplicates.
+    Set exactly one of qids, mux_ids and pairs to a nonempty list without duplicates.
     exclude_qids may be nonempty only with mux_ids.
     """
 
     qids: typing.Optional[typing.List[str]] = pydantic.Field(default=None)
     """
-    Qubit ids as QDash lists them, e.g. ["0", "1"]. Set exactly one of qids and mux_ids, as a nonempty list without duplicates.
+    Qubit ids as QDash lists them, e.g. ["0", "1"]. Set exactly one of qids, mux_ids and pairs, as a nonempty list without duplicates.
     """
 
     mux_ids: typing.Optional[typing.List[int]] = pydantic.Field(default=None)
     """
-    MUX ids; every qubit of each MUX is a target. Set exactly one of qids and mux_ids, as a nonempty list without duplicates.
+    MUX ids; every qubit of each MUX is a target. Set exactly one of qids, mux_ids and pairs, as a nonempty list without duplicates.
+    """
+
+    pairs: typing.Optional[typing.List[typing.List[str]]] = pydantic.Field(default=None)
+    """
+    Directed coupling pairs [control, target], e.g. [["0", "1"], ["4", "5"]]; the candidate qubits are their qubits and the candidate couplings the pairs, in that direction. Set exactly one of qids, mux_ids and pairs.
     """
 
     exclude_qids: typing.Optional[typing.List[str]] = pydantic.Field(default=None)
     """
-    Qubits to leave out of the MUX targets. Must be empty with qids.
+    Qubits to leave out of the MUX targets. Must be empty with qids or pairs.
     """
 
     model_config: typing.ClassVar[pydantic.ConfigDict] = pydantic.ConfigDict(extra="allow", frozen=True)

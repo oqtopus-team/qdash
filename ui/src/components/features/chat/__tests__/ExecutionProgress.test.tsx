@@ -199,7 +199,8 @@ describe("ExecutionProgress for a pipeline run", () => {
                 task_failed: 1,
                 figure_paths: ["exec-1/CheckRabi_0.png"],
               },
-              { index: 2, name: "filter_by_status", kind: "transform", status: "skipped" },
+              // A run recorded before transform steps had executions.
+              { index: 2, name: "filter_by_status", kind: "transform", status: "not_recorded" },
               {
                 index: 3,
                 name: "coherence",
@@ -238,6 +239,104 @@ describe("ExecutionProgress for a pipeline run", () => {
       "/execution/64Qv3/exec-2",
     );
     expect(screen.getByText("2. filter_by_status").closest("a")).toBeNull();
+    expect(screen.getByText("not recorded")).toBeTruthy();
+  });
+
+  it("shows each transform step's own execution and decision, not task counts", () => {
+    useGetExecution.mockReturnValue({
+      data: {
+        data: {
+          name: "p",
+          status: "completed",
+          chip_id: "64Qv3",
+          note: {},
+          task: [],
+          pipeline: {
+            name: "filter-then-pairs",
+            flow_run_id: "run-1",
+            root_execution_id: "exec-1",
+            status: "failed",
+            steps: [
+              {
+                index: 1,
+                name: "check",
+                key: "check",
+                kind: "calibration",
+                execution_id: "exec-1",
+                status: "completed",
+                task_total: 2,
+                task_finished: 2,
+              },
+              {
+                index: 2,
+                name: "filter_by_status",
+                key: "filter_by_status",
+                kind: "transform",
+                execution_id: "exec-2",
+                status: "completed",
+                task_total: 0,
+                transform: {
+                  kind: "filter",
+                  input_qids: ["0", "1", "2"],
+                  output_qids: ["0"],
+                  excluded: [
+                    { target: "1", reason: "step check failed" },
+                    { target: "2", reason: "no result from step check" },
+                  ],
+                  source_found: true,
+                },
+              },
+              {
+                index: 3,
+                name: "generate_cr_schedule",
+                key: "generate_cr_schedule",
+                kind: "transform",
+                execution_id: "exec-3",
+                status: "failed",
+              },
+              {
+                index: 4,
+                name: "two_qubit",
+                key: "two_qubit",
+                kind: "calibration",
+                status: "skipped",
+              },
+            ],
+          },
+        },
+      },
+    });
+    wrap(<ExecutionProgress executionId="exec-1" />);
+
+    expect(screen.getByText(/failed · 3\/4 steps/)).toBeTruthy();
+    expect(screen.getByText("Kept 1 of 3 qubits")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "2. filter_by_status" }).getAttribute("href")).toBe(
+      "/execution/64Qv3/exec-2",
+    );
+    // A failed transform links to its execution and shows no 0/0 task count.
+    expect(screen.getByRole("link", { name: "3. generate_cr_schedule" })).toBeTruthy();
+    expect(screen.queryByText("0/0")).toBeNull();
+    expect(screen.getByText("not reached")).toBeTruthy();
+  });
+
+  it("summarizes a transform step's execution instead of reporting missing tasks", () => {
+    useGetExecution.mockReturnValue({
+      data: {
+        data: {
+          name: "nightly_generate_cr_schedule",
+          status: "completed",
+          chip_id: "c",
+          note: {
+            step_kind: "transform",
+            transform_result: { kind: "cr_schedule", groups: [["0-1", "2-3"], ["4-5"]] },
+          },
+          task: [],
+        },
+      },
+    });
+    wrap(<ExecutionProgress executionId="exec-1" />);
+    expect(screen.getByText(/completed · 3 pairs in 2 groups/)).toBeTruthy();
+    expect(screen.queryByText("No tasks were recorded.")).toBeNull();
   });
 
   it("does not show a cancelled step as a failure", () => {

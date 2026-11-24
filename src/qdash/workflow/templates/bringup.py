@@ -13,18 +13,14 @@ Example:
 
 from typing import Any
 
-from prefect import flow
-
-from qdash.datamodel.one_qubit_execution_mode import OneQubitExecutionMode
-from qdash.workflow import TaskCall, sweep  # noqa: F401  # used by commented range overrides below
-from qdash.workflow.service import CalibService
-from qdash.workflow.service.calib_service import (
-    on_flow_cancellation,
-    on_flow_crashed,
-    on_flow_failure,
+from qdash.calibration import (
+    BringUp,
+    MuxTargets,
+    OneQubitExecutionMode,
+    TaskCall,
+    sweep,  # noqa: F401  # used by commented range overrides below
 )
-from qdash.workflow.service.steps import BringUp
-from qdash.workflow.service.targets import MuxTargets
+from qdash.workflow import CalibrationSession, calibration_flow, resolve_calib_context
 
 # Each call keeps its task-specific acquisition settings, so the shared defaults
 # do not replace the values selected for bring-up measurements.
@@ -78,11 +74,7 @@ BRINGUP_TASKS: list[TaskCall] = [
 ]
 
 
-@flow(
-    on_cancellation=[on_flow_cancellation],
-    on_failure=[on_flow_failure],
-    on_crashed=[on_flow_crashed],
-)
+@calibration_flow(session_name="Bring-up")
 def bringup(
     username: str,
     chip_id: str,
@@ -137,12 +129,12 @@ def bringup(
         )
     ]
 
-    cal = CalibService(
-        username,
-        chip_id,
-        flow_name=flow_name,
-        tags=tags,
-        project_id=project_id,
+    context = resolve_calib_context(username, chip_id, project_id=project_id)
+    session = CalibrationSession.from_context(context)
+    return session.run(
+        targets=targets,
+        steps=steps,
         default_run_parameters=default_run_parameters,
+        name=flow_name,
+        tags=tags,
     )
-    return cal.run(targets, steps=steps)
