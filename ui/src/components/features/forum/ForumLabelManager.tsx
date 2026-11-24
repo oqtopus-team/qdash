@@ -209,7 +209,10 @@ type ForumLabelEditFormProps = {
 /** Inline form for editing one existing forum label. */
 function ForumLabelEditForm({ label, onCancel, onSaved }: ForumLabelEditFormProps) {
   const baseId = useId();
-  const updateMutation = useUpdateForumLabel();
+  // Scope by label so a save started before Cancel and a save from the reopened form run in order.
+  const updateMutation = useUpdateForumLabel({
+    mutation: { scope: { id: `forum-label-update:${label.id}` } },
+  });
   const {
     register,
     control,

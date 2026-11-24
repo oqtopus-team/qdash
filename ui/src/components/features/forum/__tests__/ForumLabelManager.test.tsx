@@ -1,11 +1,12 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { QueryClient, useMutation } from "@tanstack/react-query";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ForumLabelManager } from "../ForumLabelManager";
 
 const mocks = vi.hoisted(() => ({
   createMutateAsync: vi.fn(),
-  updateMutateAsync: vi.fn(),
+  updateLabel: vi.fn(),
   deleteMutate: vi.fn(),
   invalidateQueries: vi.fn(),
   toastError: vi.fn(),
@@ -19,11 +20,18 @@ vi.mock("@tanstack/react-query", async (importOriginal) => ({
 vi.mock("@/client/forum/forum", () => ({
   getListForumLabelsQueryKey: () => ["/forum/labels"],
   useCreateForumLabel: () => ({ mutateAsync: mocks.createMutateAsync, isPending: false }),
-  useUpdateForumLabel: () => ({ mutateAsync: mocks.updateMutateAsync, isPending: false }),
+  // A real mutation, so the scope passed by the edit form is applied.
+  useUpdateForumLabel: (options?: { mutation?: { scope?: { id: string } } }) =>
+    useMutation(
+      { ...options?.mutation, mutationFn: (variables) => mocks.updateLabel(variables) },
+      mutationClient,
+    ),
   useDeleteForumLabel: () => ({ mutate: mocks.deleteMutate, isPending: false }),
 }));
 
 vi.mock("sonner", () => ({ toast: { error: mocks.toastError } }));
+
+const mutationClient = new QueryClient();
 
 const LABELS = [{ id: "bug", label: "Bug", description: "Something broke", color: "#ff0000" }];
 
@@ -33,6 +41,7 @@ const createForm = () => screen.getByRole("form", { name: "Create label" });
 describe("ForumLabelManager", () => {
   afterEach(() => {
     cleanup();
+    mutationClient.clear();
     vi.clearAllMocks();
   });
 
@@ -107,11 +116,11 @@ describe("ForumLabelManager", () => {
 
     expect(await form.findByText("Name is required")).toBeTruthy();
     expect(form.getByLabelText("Name").getAttribute("aria-invalid")).toBe("true");
-    expect(mocks.updateMutateAsync).not.toHaveBeenCalled();
+    expect(mocks.updateLabel).not.toHaveBeenCalled();
   });
 
   it("saves trimmed edits and closes the edit form", async () => {
-    mocks.updateMutateAsync.mockResolvedValue({});
+    mocks.updateLabel.mockResolvedValue({});
     render(<ForumLabelManager labels={LABELS} />);
     fireEvent.click(screen.getByRole("button", { name: "Edit label" }));
     const form = within(screen.getByRole("form", { name: "Edit label Bug" }));
@@ -122,7 +131,7 @@ describe("ForumLabelManager", () => {
     fireEvent.click(form.getByRole("button", { name: "Save" }));
 
     await waitFor(() =>
-      expect(mocks.updateMutateAsync).toHaveBeenCalledWith({
+      expect(mocks.updateLabel).toHaveBeenCalledWith({
         labelKey: "bug",
         data: { name: "Defect", description: "", color: "#ff0000" },
       }),
@@ -132,7 +141,7 @@ describe("ForumLabelManager", () => {
   });
 
   it("keeps the edit form open and shows a toast when the update fails", async () => {
-    mocks.updateMutateAsync.mockRejectedValue(new Error("boom"));
+    mocks.updateLabel.mockRejectedValue(new Error("boom"));
     render(<ForumLabelManager labels={LABELS} />);
     fireEvent.click(screen.getByRole("button", { name: "Edit label" }));
     const form = within(screen.getByRole("form", { name: "Edit label Bug" }));
@@ -141,6 +150,36 @@ describe("ForumLabelManager", () => {
 
     await waitFor(() => expect(mocks.toastError).toHaveBeenCalledWith("Failed to update label"));
     expect(screen.getByRole("form", { name: "Edit label Bug" })).toBeTruthy();
+  });
+
+  it("runs a save from a reopened edit form after the earlier save of the same label", async () => {
+    let resolveFirst: (value: unknown) => void = () => {};
+    mocks.updateLabel
+      .mockImplementationOnce(() => new Promise((resolve) => (resolveFirst = resolve)))
+      .mockResolvedValueOnce({});
+    render(<ForumLabelManager labels={LABELS} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit label" }));
+    let form = within(screen.getByRole("form", { name: "Edit label Bug" }));
+    fireEvent.change(form.getByLabelText("Name"), { target: { value: "First" } });
+    fireEvent.click(form.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(mocks.updateLabel).toHaveBeenCalledTimes(1));
+    fireEvent.click(form.getByRole("button", { name: "Cancel" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit label" }));
+    form = within(screen.getByRole("form", { name: "Edit label Bug" }));
+    fireEvent.change(form.getByLabelText("Name"), { target: { value: "Second" } });
+    fireEvent.click(form.getByRole("button", { name: "Save" }));
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(mocks.updateLabel).toHaveBeenCalledTimes(1);
+
+    resolveFirst({});
+    await waitFor(() => expect(mocks.updateLabel).toHaveBeenCalledTimes(2));
+    expect(mocks.updateLabel.mock.calls[1][0]).toEqual({
+      labelKey: "bug",
+      data: { name: "Second", description: "Something broke", color: "#ff0000" },
+    });
   });
 
   it("deletes a label after confirmation", async () => {
