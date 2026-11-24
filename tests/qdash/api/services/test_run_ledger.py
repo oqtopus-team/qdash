@@ -53,6 +53,10 @@ class _Launcher:
     def __init__(self) -> None:
         self.dispatched: list[RunIdentity] = []
         self.fail_with: BaseException | None = None
+        # The preflight check: refuses with 409 while ``busy``; counts its calls.
+        self.busy = False
+        self.checked = 0
+        self.invalid = False
 
     async def __call__(
         self,
@@ -76,6 +80,15 @@ class _Launcher:
                 message="started",
             )
 
+        def validate() -> None:
+            if self.invalid:
+                raise HTTPException(status_code=422, detail="invalid request")
+
+        def preflight(_: Any) -> None:
+            self.checked += 1
+            if self.busy:
+                raise HTTPException(status_code=409, detail="hardware busy")
+
         return await RunLedger(CalibrationSessionService()).launch(
             project_id=PROJECT,
             username=username,
@@ -85,9 +98,10 @@ class _Launcher:
             request_hash=run_request_hash(RunKind.WORKFLOW, chip_id, request or {"a": 1}),
             calibration_session_id=session,
             idempotency_key=key,
-            validate=lambda: None,
+            validate=validate,
             dispatch=dispatch,
             response=lambda _validated, dispatched: dispatched.model_dump(mode="json"),
+            preflight=preflight,
         )
 
 
@@ -265,6 +279,101 @@ class TestExplicitSession:
         with pytest.raises(HTTPException) as other:
             await launch()
         assert other.value.status_code == 409 and "different request" in other.value.detail
+        assert len(launch.dispatched) == 1
+
+
+class TestPreflight:
+    """A request its preflight refuses (busy hardware) leaves no run, session, or reservation."""
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("key", ["k-1", None])
+    async def test_a_refused_request_creates_no_automatic_session_or_run(
+        self, launch: _Launcher, key: str | None
+    ) -> None:
+        launch.busy = True
+        with pytest.raises(HTTPException) as refused:
+            await launch(key=key)
+        assert refused.value.status_code == 409
+        assert launch.checked == 1
+        assert launch.dispatched == []
+        assert RunDocument.find_all().count() == 0
+        assert CalibrationSessionDocument.find_all().count() == 0
+
+    @pytest.mark.asyncio
+    async def test_a_refused_request_leaves_a_named_session_untouched(
+        self, launch: _Launcher
+    ) -> None:
+        _manual_session()
+        launch.busy = True
+        with pytest.raises(HTTPException) as refused:
+            await launch(session="cs-1")
+        assert refused.value.status_code == 409
+        assert launch.dispatched == []
+        assert RunDocument.find_all().count() == 0
+        session = CalibrationSessionDocument.find_one({"calibration_session_id": "cs-1"}).run()
+        assert session is not None
+        assert session.child_count == 0
+        assert session.pending_children == []
+        assert session.status == CalibrationSessionStatus.OPEN
+
+    @pytest.mark.asyncio
+    async def test_an_invalid_request_is_refused_before_the_preflight(
+        self, launch: _Launcher
+    ) -> None:
+        launch.invalid = launch.busy = True
+        with pytest.raises(HTTPException) as refused:
+            await launch()
+        assert refused.value.status_code == 422
+        assert launch.checked == 0
+
+    @pytest.mark.asyncio
+    async def test_a_retry_of_a_launched_run_replays_without_the_preflight(
+        self, launch: _Launcher
+    ) -> None:
+        first = await launch()
+        # The run's own execution now holds the hardware.
+        launch.busy = True
+        again = await launch()
+        assert again.replayed is True
+        assert again.run_id == first.run_id
+        assert again.response == first.response
+        assert launch.checked == 1
+        assert len(launch.dispatched) == 1
+
+    @pytest.mark.asyncio
+    async def test_a_late_refusal_stays_rejected_until_its_retry_passes_the_preflight(
+        self, launch: _Launcher
+    ) -> None:
+        # The preflight passed, but the claim at dispatch found the hardware taken.
+        launch.fail_with = HTTPException(status_code=409, detail="claimed meanwhile")
+        with pytest.raises(HTTPException):
+            await launch()
+        [run] = RunDocument.find_all().to_list()
+        assert run.status == RunDispatchStatus.REJECTED and run.attempts == 1
+        session = CalibrationSessionDocument.find_one(
+            {"calibration_session_id": run.calibration_session_id}
+        ).run()
+        assert session is not None
+        count = session.child_count
+
+        launch.fail_with = None
+        launch.busy = True
+        with pytest.raises(HTTPException) as refused:
+            await launch()
+        assert refused.value.status_code == 409
+        # No new attempt and no reservation in its session.
+        assert _run(run.run_id).attempts == 1
+        assert _run(run.run_id).status == RunDispatchStatus.REJECTED
+        session = CalibrationSessionDocument.find_one(
+            {"calibration_session_id": run.calibration_session_id}
+        ).run()
+        assert session is not None
+        assert session.child_count == count and session.pending_children == []
+
+        launch.busy = False
+        retried = await launch()
+        assert retried.run_id == run.run_id and retried.replayed is False
+        assert _run(run.run_id).attempts == 2
         assert len(launch.dispatched) == 1
 
 

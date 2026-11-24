@@ -681,7 +681,7 @@ class TestLaunchChecks:
         assert coordinator.runs == []
         assert CalibrationSessionDocument.find_all().count() == 1
 
-    def test_a_busy_chip_is_a_refusal_the_same_key_can_retry(
+    def test_a_chip_claimed_after_the_preflight_is_a_refusal_the_same_key_can_retry(
         self,
         test_client: TestClient,
         coordinator: _RecordingCoordinator,  # noqa: F811
@@ -689,6 +689,7 @@ class TestLaunchChecks:
     ) -> None:
         from fastapi import HTTPException
 
+        # The preflight found the chip free; the claim at dispatch then found it taken.
         async def busy(**_: Any) -> Any:
             raise HTTPException(status_code=409, detail="busy")
 

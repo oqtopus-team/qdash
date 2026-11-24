@@ -260,6 +260,86 @@ export class CalibrationSessionClient {
     }
 
     /**
+     * The run with every step execution, found by its ID however many runs the session has.
+     *
+     * ``flow_status`` is the whole flow run's state, read from Prefect in this request; a step
+     * execution that completed never makes it completed. Prefect being unreadable is
+     * ``unavailable`` and a flow run Prefect does not report is ``unknown``, never running or
+     * ended. The read changes nothing: no session is checked or closed.
+     *
+     * @param {QDashApi.GetCalibrationSessionRunRequest} request
+     * @param {CalibrationSessionClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link QDashApi.UnprocessableEntityError}
+     * @throws {@link errors.ApiError}
+     * @throws {@link errors.ApiTimeoutError}
+     *
+     * @example
+     *     await client.calibrationSession.getCalibrationSessionRun({
+     *         calibration_session_id: "calibration_session_id",
+     *         run_id: "run_id"
+     *     })
+     */
+    public getCalibrationSessionRun(
+        request: QDashApi.GetCalibrationSessionRunRequest,
+        requestOptions?: CalibrationSessionClient.RequestOptions,
+    ): core.HttpResponsePromise<QDashApi.CalibrationRunStateResponse> {
+        return core.HttpResponsePromise.fromPromise(this.__getCalibrationSessionRun(request, requestOptions));
+    }
+
+    private async __getCalibrationSessionRun(
+        request: QDashApi.GetCalibrationSessionRunRequest,
+        requestOptions?: CalibrationSessionClient.RequestOptions,
+    ): Promise<core.WithRawResponse<QDashApi.CalibrationRunStateResponse>> {
+        const { calibration_session_id: calibrationSessionId, run_id: runId } = request;
+        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+            _authRequest.headers,
+            this._options?.headers,
+            mergeOnlyDefinedHeaders({ "X-Project-Id": requestOptions?.projectId ?? this._options?.projectId }),
+            requestOptions?.headers,
+        );
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)),
+                `calibration-sessions/${core.url.encodePathParam(calibrationSessionId, errors.ApiError)}/runs/${core.url.encodePathParam(runId, errors.ApiError)}`,
+            ),
+            method: "GET",
+            headers: _headers,
+            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return { data: _response.body as QDashApi.CalibrationRunStateResponse, rawResponse: _response.rawResponse };
+        }
+
+        if (_response.error.reason === "status-code") {
+            switch (_response.error.statusCode) {
+                case 422:
+                    throw new QDashApi.UnprocessableEntityError(_response.error.body as unknown, _response.rawResponse);
+                default:
+                    throw new errors.ApiError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
+        }
+
+        return handleNonStatusCodeError(
+            _response.error,
+            _response.rawResponse,
+            "GET",
+            "/calibration-sessions/{calibration_session_id}/runs/{run_id}",
+        );
+    }
+
+    /**
      * End work on the objective; no new run can start in it.
      *
      * Refused (409) while a pipeline run or agent session in it still runs or waits. Closing

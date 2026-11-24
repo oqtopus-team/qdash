@@ -46,6 +46,7 @@ from fastapi import HTTPException, status
 from qdash.api.schemas.calibration_session import (
     CalibrationAgentSessionChild,
     CalibrationPipelineRunResponse,
+    CalibrationRunStateResponse,
     CalibrationSessionDetailResponse,
     CalibrationSessionResponse,
     CloseCalibrationSessionRequest,
@@ -260,6 +261,43 @@ class CalibrationSessionService:
             doc = self._load(project_id, calibration_session_id)
         doc = self._recover_pipeline_reservations(doc)
         return self._detail(doc, self._blockers(doc))
+
+    def get_run(
+        self, *, project_id: str, calibration_session_id: str, run_id: str
+    ) -> CalibrationRunStateResponse:
+        """One run of the session, whatever its age, with its whole flow run's state now.
+
+        Found by its ID in the session and project, never through the page a detail response
+        lists. Prefect is read for a launched run in this request (``calibration_run_state``).
+        Read-only: the session is not checked or closed, whatever its origin, and nothing is
+        recorded on the run.
+        """
+        self._load(project_id, calibration_session_id)
+        run = CalibrationPipelineRunDocument.find_one(
+            {
+                "project_id": project_id,
+                "calibration_session_id": calibration_session_id,
+                "run_id": run_id,
+            }
+        ).run()
+        if run is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Run '{run_id}' not found in calibration session '{calibration_session_id}'",
+            )
+        # Imported here: the state read builds on the lifecycle, which builds on this service.
+        from qdash.api.services.calibration_run_state import observe_run_flow
+
+        observation = observe_run_flow(run)
+        listed = self._run_response(run).model_dump()
+        listed["flow_end_state"] = observation.end_state
+        return CalibrationRunStateResponse(
+            **listed,
+            flow_status=observation.status,
+            prefect_state=observation.prefect_state,
+            flow_status_reason=observation.reason,
+            observed_at=observation.observed_at,
+        )
 
     def close(
         self,

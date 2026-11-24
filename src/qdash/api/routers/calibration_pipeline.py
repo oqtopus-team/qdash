@@ -161,6 +161,13 @@ async def execute_pipeline(
         backend_name=request.backend_name,
         reported_origin=request.reported_origin,
         decision_id=request.decision_id,
+        # A pipeline claims the whole chip; refuse it before anything is recorded.
+        preflight=lambda _: flows.ensure_hardware_available(
+            project_id=ctx.project_id,
+            chip_id=request.chip_id,
+            parameters={},
+            workflow=True,
+        ),
     )
     return ExecutePipelineResponse.model_validate(
         {

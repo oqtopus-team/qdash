@@ -13,6 +13,7 @@ from __future__ import annotations
 from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, Any, Literal
 
+from qdash.sdk._parameters import Parameters
 from qdash.sdk._runs import TERMINAL_STATUSES
 
 if TYPE_CHECKING:
@@ -116,8 +117,9 @@ class TaskResult:
     A result taken from :attr:`ExecutionResult.tasks` wraps the execution's task entry, in
     which optional fields may be missing; :meth:`get` reads the full saved result.
     Collections default to empty ones and scalars to None when the server left them out.
-    ``input_parameters`` and ``output_parameters`` keep the server's parameter objects, with
-    ``value``, ``unit``, ``error`` and the other fields as reported. Two results of the same task
+    ``input_parameters`` and ``output_parameters`` are :class:`~qdash.sdk.Parameters`: each
+    :class:`~qdash.sdk.Parameter` has ``value``, ``unit`` and ``error`` and keeps every other
+    reported field in ``metadata``; a bare value from an older result becomes its ``value``. Two results of the same task
     on the same target are told apart by ``task_id`` and ``invocation``, never by name.
     ``detail`` is the model as the API returned it. Reading the fields sends no request.
     """
@@ -199,12 +201,14 @@ class TaskResult:
         return invocation.call_id if invocation is not None else None
 
     @property
-    def input_parameters(self) -> dict[str, Any]:
-        return dict(self.detail.input_parameters or {})
+    def input_parameters(self) -> Parameters:
+        """The task's input parameters by name, as :class:`~qdash.sdk.Parameter` values."""
+        return Parameters.from_reported(self.detail.input_parameters)
 
     @property
-    def output_parameters(self) -> dict[str, Any]:
-        return dict(self.detail.output_parameters or {})
+    def output_parameters(self) -> Parameters:
+        """The task's output parameters by name, as :class:`~qdash.sdk.Parameter` values."""
+        return Parameters.from_reported(self.detail.output_parameters)
 
     @property
     def output_parameter_names(self) -> list[str]:

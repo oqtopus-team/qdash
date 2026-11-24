@@ -40,7 +40,11 @@ or CRASHED. Agent sessions must have ended with no in-flight measurements, commi
 applies, or have been rejected before operating. Pending reservations, unknown dispatches,
 missing flow records, and retries still waiting to run prevent automatic close.
 
-A rejected non-agent run keeps its session open so the same key can retry. Existing stale
+Workflow, pipeline, Workbench, and task-result re-execution API launches check existing
+hardware claims after validation and idempotent replay, before recording a new run or session.
+An existing conflict returns 409 without those records. The atomic claim at dispatch still
+handles races; a conflict acquired after the check can leave a rejected run.
+A recorded rejected non-agent run keeps its session open so the same key can retry. Existing stale
 pipeline-reservation recovery can reject an unlaunched attempt; it does not make that session
 eligible to close. Automatic close never acknowledges unknown work.
 

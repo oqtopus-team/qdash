@@ -96,6 +96,30 @@ class RunFlowEndState(StrEnum):
     CRASHED = "crashed"
 
 
+class RunFlowStatus(StrEnum):
+    """The state of a run's whole flow run, as one read of the run found it.
+
+    Never stored: each read decides it from the run's record and, for a launched run, from
+    Prefect at that moment. ``dispatching``: the launch has not reported back.
+    ``not_launched``: QDash refused the launch; no flow run was created. ``running``: Prefect
+    reports a state the flow run may still leave (scheduled, awaiting retry, late, pending,
+    running, paused, or cancelling). ``completed``, ``failed``, ``cancelled``, and ``crashed``:
+    Prefect reports that terminal state now. ``unknown``: the launch outcome is unknown, no flow
+    run was recorded, or Prefect does not report the flow run. ``unavailable``: Prefect could
+    not be read. A step execution's status never decides it.
+    """
+
+    DISPATCHING = "dispatching"
+    NOT_LAUNCHED = "not_launched"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+    CRASHED = "crashed"
+    UNKNOWN = "unknown"
+    UNAVAILABLE = "unavailable"
+
+
 # Canonical names in code; the classes keep their names for the API schema.
 RunKind = CalibrationRunKind
 RunTrigger = CalibrationRunTrigger

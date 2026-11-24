@@ -62,6 +62,9 @@ class _RecordingCoordinator:
     def __init__(self) -> None:
         self.runs: list[dict[str, Any]] = []
 
+    def ensure_available(self, **_: Any) -> None:
+        """No execution holds any hardware here, so every launch passes the preflight."""
+
     async def dispatch_run(self, **kwargs: Any) -> DispatchResult:
         self.runs.append(kwargs)
         # Each launch is its own flow run, as Prefect creates it: flow-run-1, flow-run-2, ...

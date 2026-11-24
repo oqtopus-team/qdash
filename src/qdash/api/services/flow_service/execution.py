@@ -25,6 +25,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable
     from uuid import UUID
 
+    from qdash.common.execution_resources import ExecutionResourceScope
     from qdash.repository import MongoExecutionLockRepository
 
 logger = logging.getLogger("uvicorn.app")
@@ -85,14 +86,32 @@ class ExecutionCoordinator:
         if self._locks is None:
             raise HTTPException(status_code=503, detail="Execution availability is unavailable")
 
-        scope = (
-            resolve_workflow_resource_scope(chip_id)
-            if workflow
-            else resolve_execution_resource_scope(chip_id, parameters, project_id=project_id)
-        )
+        scope = _resource_scope(project_id, chip_id, parameters, workflow=workflow)
         if self._locks.has_conflict(project_id, scope):
             return False, _WHOLE_CHIP_REASON if workflow else _SCOPED_CONFLICT_REASON
         return True, None
+
+    def ensure_available(
+        self,
+        *,
+        project_id: str,
+        chip_id: str,
+        parameters: dict[str, Any],
+        workflow: bool,
+    ) -> None:
+        """Refuse a run whose hardware an existing claim already holds, claiming nothing.
+
+        A launch checks this before it records its run, so a request the lock would refuse
+        leaves no run, session or execution behind. It answers the same 409 as the claim at
+        dispatch and skips exactly where the claim does (no lock repository, no chip). It is
+        only a preflight: a claim made between this check and the dispatch still makes the
+        claim itself refuse the run, before any flow run is created.
+        """
+        if self._locks is None or not chip_id:
+            return
+        scope = _resource_scope(project_id, chip_id, parameters, workflow=workflow)
+        if self._locks.has_conflict(project_id, scope):
+            raise HTTPException(status_code=409, detail=EXECUTION_IN_PROGRESS_DETAIL)
 
     async def dispatch_run(
         self,
@@ -195,11 +214,7 @@ class ExecutionCoordinator:
             return None
 
         execution_id = self._new_execution_id(username, chip_id, project_id=project_id)
-        scope = (
-            resolve_workflow_resource_scope(chip_id)
-            if workflow
-            else resolve_execution_resource_scope(chip_id, parameters, project_id=project_id)
-        )
+        scope = _resource_scope(project_id, chip_id, parameters, workflow=workflow)
         if not self._locks.try_lock(
             project_id=project_id,
             execution_id=execution_id,
@@ -295,6 +310,15 @@ class ExecutionCoordinator:
                 exc_info=True,
             )
             return None
+
+
+def _resource_scope(
+    project_id: str, chip_id: str, parameters: dict[str, Any], *, workflow: bool
+) -> ExecutionResourceScope:
+    """The hardware a run claims: the whole chip for a workflow, else its targets' scope."""
+    if workflow:
+        return resolve_workflow_resource_scope(chip_id)
+    return resolve_execution_resource_scope(chip_id, parameters, project_id=project_id)
 
 
 def _flow_run_url(public_url: str, flow_run_id: str) -> str:

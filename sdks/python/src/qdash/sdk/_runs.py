@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeVar
 
 from qdash.sdk._http import api_errors, read_options
 from qdash.sdk.errors import QDashNotFoundError, QDashTransportError
@@ -17,11 +17,18 @@ if TYPE_CHECKING:
     from qdash.sdk._config import QDashConfig
     from qdash.sdk._generated.client import QDashApi
     from qdash.sdk._generated.core.request_options import RequestOptions
+    from qdash.sdk._generated.types.calibration_run_state_response import (
+        CalibrationRunStateResponse,
+    )
+    from qdash.sdk._generated.types.cancel_execution_response import CancelExecutionResponse
     from qdash.sdk._generated.types.execution_response_detail import ExecutionResponseDetail
     from qdash.sdk._results import ExecutionResult, TaskResult
 
 # Execution and pipeline statuses after which nothing more runs.
 TERMINAL_STATUSES = frozenset({"completed", "failed", "cancelled", "canceled", "crashed"})
+# Whole flow run states (``flow_status``) of a recorded run after which nothing more runs.
+# ``unknown`` and ``unavailable`` say nothing about the flow run, so they are never terminal.
+FLOW_TERMINAL_STATUSES = frozenset({"completed", "failed", "cancelled", "crashed", "not_launched"})
 
 
 def run_status(detail: ExecutionResponseDetail) -> str:
@@ -39,6 +46,9 @@ def _file_content(response: httpx.Response) -> bytes:
             headers=dict(response.headers),
         )
     return response.content
+
+
+_T = TypeVar("_T")
 
 
 class Executions:
@@ -63,6 +73,57 @@ class Executions:
             return self._api.execution.get_execution(
                 execution_id, request_options=read_options(self._config)
             )
+
+    def calibration_run(
+        self, calibration_session_id: str, run_id: str
+    ) -> CalibrationRunStateResponse:
+        """A recorded run with its whole flow run's state, read from Prefect by the server now.
+
+        Raises ``QDashNotFoundError`` when the session or the run is not found, including on a
+        server that predates this read, and ``QDashTransportError`` when the response names
+        another session or run, so another run's state is never reported as this one's.
+        """
+        with api_errors():
+            state = self._api.calibration_session.get_calibration_session_run(
+                calibration_session_id, run_id, request_options=read_options(self._config)
+            )
+        returned = (state.calibration_session_id, state.run_id)
+        if returned != (calibration_session_id, run_id):
+            raise QDashTransportError(
+                f"requested run {run_id!r} of calibration session {calibration_session_id!r} "
+                f"but the response describes run {state.run_id!r} of calibration session "
+                f"{state.calibration_session_id!r}; check the base URL and any proxy settings"
+            )
+        return state
+
+    def cancel_flow_run(self, flow_run_id: str) -> CancelExecutionResponse:
+        """Ask the server to cancel the whole Prefect flow run ``flow_run_id``.
+
+        A request that changes state: it is sent once, never retried, and does not wait.
+        """
+        with api_errors():
+            return self._api.execution.cancel_execution(flow_run_id)
+
+    def poll(
+        self,
+        read: Callable[[], _T | None],
+        *,
+        timeout_seconds: float,
+        poll_interval_seconds: float,
+        describe: Callable[[], str],
+    ) -> _T:
+        """Call ``read`` until it returns a value; ``TimeoutError`` (with ``describe()``) after
+        ``timeout_seconds``. Nothing is cancelled on a timeout."""
+        if timeout_seconds < 0 or poll_interval_seconds < 0:
+            raise ValueError("Polling timeout and interval must be non-negative")
+        deadline = self._clock() + timeout_seconds
+        while True:
+            found = read()
+            if found is not None:
+                return found
+            if self._clock() >= deadline:
+                raise TimeoutError(describe())
+            self._sleep(poll_interval_seconds)
 
     def task_result(self, task_id: str) -> TaskResult:
         """The full saved result of ``task_id``; raises ``QDashNotFoundError`` when absent."""
@@ -122,7 +183,7 @@ class Executions:
             self._sleep(poll_interval_seconds)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, repr=False)
 class RunResult:
     """The state of a run when it was read.
 
@@ -148,6 +209,9 @@ class RunResult:
     def done(self) -> bool:
         """Whether the whole run ended: completed, failed, cancelled, canceled or crashed."""
         return self.status.lower() in TERMINAL_STATUSES
+
+    def __repr__(self) -> str:
+        return f"{type(self).__name__}(execution_id={self.execution_id!r}, status={self.status!r})"
 
 
 class Run:

@@ -108,7 +108,7 @@ SHUTDOWN_WAIT_SECONDS = 10.0
 
 # Prefect's terminal state types. Every other type (SCHEDULED, which includes AwaitingRetry
 # and Late, PENDING, RUNNING, PAUSED, CANCELLING) means the flow run may still run.
-_TERMINAL_PREFECT_STATES = {
+TERMINAL_PREFECT_STATES = {
     "COMPLETED": RunFlowEndState.COMPLETED,
     "FAILED": RunFlowEndState.FAILED,
     "CANCELLED": RunFlowEndState.CANCELLED,
@@ -370,7 +370,7 @@ class CalibrationSessionLifecycle:
                 )
                 continue
             state = str(flow_states.states[flow_run_id] or "").upper()
-            end = _TERMINAL_PREFECT_STATES.get(state)
+            end = TERMINAL_PREFECT_STATES.get(state)
             _record_flow_state(run, end, observed_at)
             if end is None:
                 waiting.append(

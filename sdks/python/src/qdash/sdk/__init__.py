@@ -26,6 +26,7 @@ from qdash.sdk._dashboards import Dashboards, SavedDashboard, SavedScript, Scrip
 from qdash.sdk._device_topology import DeviceTopologies, DeviceTopology, DeviceTopologyPlot
 from qdash.sdk._generated.client import AsyncQDashApi, QDashApi
 from qdash.sdk._history import ExecutionHistory, ExecutionPage, TaskResultHistory, TaskResultPage
+from qdash.sdk._parameters import Parameter, Parameters
 from qdash.sdk._pipelines import PipelineRun, Pipelines
 from qdash.sdk._qubex import Qubex, UnsafeArchiveError
 from qdash.sdk._results import Artifact, Execution, ExecutionResult, Figure, TaskResult
@@ -33,7 +34,13 @@ from qdash.sdk._runs import Run, RunResult
 from qdash.sdk._session import QDash
 from qdash.sdk._tasks import TaskParameters, TaskRun, Tasks
 from qdash.sdk._version import __version__, version
-from qdash.sdk._workflows import Workflow, WorkflowRun, Workflows
+from qdash.sdk._workflows import (
+    Workflow,
+    WorkflowCancellation,
+    WorkflowRun,
+    WorkflowRunResult,
+    Workflows,
+)
 from qdash.sdk.dashboard import Dashboard, MetricScriptError, Script, ScriptMetric
 from qdash.sdk.errors import (
     ApiError,
@@ -65,6 +72,8 @@ __all__ = [
     "ExecutionResult",
     "Figure",
     "MetricScriptError",
+    "Parameter",
+    "Parameters",
     "PipelineRun",
     "Pipelines",
     "QDash",
@@ -94,7 +103,9 @@ __all__ = [
     "Tasks",
     "UnsafeArchiveError",
     "Workflow",
+    "WorkflowCancellation",
     "WorkflowRun",
+    "WorkflowRunResult",
     "Workflows",
     "__version__",
     "version",

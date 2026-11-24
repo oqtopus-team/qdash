@@ -539,6 +539,71 @@ class TestFlowExecutionRunRecording:
         assert run.dispatch_token not in second.text
 
 
+class TestFlowExecutionOnBusyHardware:
+    """A saved flow whose chip is already claimed is refused before anything is recorded."""
+
+    CREATE = "qdash.api.services.flow_service.prefect_gateway.PrefectGateway.create_flow_run"
+
+    @staticmethod
+    def _hold(chip_id: str, resources: tuple[str, ...] = (), exclusive: bool = True) -> None:
+        from qdash.repository import MongoExecutionLockRepository
+
+        assert MongoExecutionLockRepository().try_lock(
+            project_id="test_project",
+            execution_id="running-elsewhere",
+            chip_id=chip_id,
+            resources=resources,
+            exclusive=exclusive,
+        )
+
+    @staticmethod
+    def _recorded() -> tuple[int, int, int]:
+        from qdash.dbmodel.calibration_session import CalibrationSessionDocument
+        from qdash.dbmodel.execution_history import ExecutionHistoryDocument
+        from qdash.dbmodel.run import RunDocument
+
+        return (
+            CalibrationSessionDocument.find_all().count(),
+            RunDocument.find_all().count(),
+            ExecutionHistoryDocument.find_all().count(),
+        )
+
+    @pytest.mark.parametrize("options", [{}, {"idempotency_key": "tool-call-busy"}])
+    def test_a_claimed_chip_refuses_the_flow_before_it_is_recorded(
+        self, test_client, auth_headers, sample_flow, options
+    ):
+        # Another execution holds only one MUX; a saved flow needs the whole chip.
+        self._hold("test_chip", ("mux:0",), exclusive=False)
+        create_flow_run = AsyncMock(return_value="never")
+        with patch(self.CREATE, new=create_flow_run):
+            response = test_client.post(
+                "/flows/test_flow/execute",
+                headers=auth_headers,
+                json={"parameters": {}, **options},
+            )
+
+        assert response.status_code == 409
+        assert "overlapping hardware resources" in response.json()["detail"]
+        create_flow_run.assert_not_awaited()
+        assert self._recorded() == (0, 0, 0)
+
+    def test_a_claim_on_another_chip_does_not_refuse_the_flow(
+        self, test_client, auth_headers, sample_flow
+    ):
+        self._hold("other_chip")
+        create_flow_run = AsyncMock(return_value="flow-run-free")
+        with patch(self.CREATE, new=create_flow_run):
+            response = test_client.post(
+                "/flows/test_flow/execute",
+                headers=auth_headers,
+                json={"parameters": {}, "idempotency_key": "tool-call-free"},
+            )
+
+        assert response.status_code == 200, response.text
+        create_flow_run.assert_awaited_once()
+        assert self._recorded() == (1, 1, 1)
+
+
 class TestFlowTemplates:
     """Tests for flow template endpoints."""
 

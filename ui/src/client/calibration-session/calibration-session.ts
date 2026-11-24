@@ -26,6 +26,7 @@ import type {
 
 import type {
   CalibrationDecisionResponse,
+  CalibrationRunStateResponse,
   CalibrationSessionAuditResponse,
   CalibrationSessionDetailResponse,
   CalibrationSessionResponse,
@@ -307,6 +308,111 @@ export function useGetCalibrationSession<TData = Awaited<ReturnType<typeof getCa
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetCalibrationSessionQueryOptions(calibrationSessionId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
+ * The run with every step execution, found by its ID however many runs the session has.
+ *
+ * ``flow_status`` is the whole flow run's state, read from Prefect in this request; a step
+ * execution that completed never makes it completed. Prefect being unreadable is
+ * ``unavailable`` and a flow run Prefect does not report is ``unknown``, never running or
+ * ended. The read changes nothing: no session is checked or closed.
+ * @summary Get one run of a calibration session with its flow run state
+ */
+export const getCalibrationSessionRun = (
+    calibrationSessionId: string,
+    runId: string,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<CalibrationRunStateResponse>(
+      {url: `/calibration-sessions/${calibrationSessionId}/runs/${runId}`, method: 'GET', signal
+    },
+      options);
+    }
+
+
+
+
+export const getGetCalibrationSessionRunQueryKey = (calibrationSessionId: string,
+    runId: string,) => {
+    return [
+    `/calibration-sessions/${calibrationSessionId}/runs/${runId}`
+    ] as const;
+    }
+
+
+export const getGetCalibrationSessionRunQueryOptions = <TData = Awaited<ReturnType<typeof getCalibrationSessionRun>>, TError = HTTPValidationError>(calibrationSessionId: string,
+    runId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCalibrationSessionRun>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCalibrationSessionRunQueryKey(calibrationSessionId,runId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCalibrationSessionRun>>> = ({ signal }) => getCalibrationSessionRun(calibrationSessionId,runId, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: calibrationSessionId !== null && calibrationSessionId !== undefined && runId !== null && runId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCalibrationSessionRun>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetCalibrationSessionRunQueryResult = NonNullable<Awaited<ReturnType<typeof getCalibrationSessionRun>>>
+export type GetCalibrationSessionRunQueryError = HTTPValidationError
+
+
+export function useGetCalibrationSessionRun<TData = Awaited<ReturnType<typeof getCalibrationSessionRun>>, TError = HTTPValidationError>(
+ calibrationSessionId: string,
+    runId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCalibrationSessionRun>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getCalibrationSessionRun>>,
+          TError,
+          Awaited<ReturnType<typeof getCalibrationSessionRun>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetCalibrationSessionRun<TData = Awaited<ReturnType<typeof getCalibrationSessionRun>>, TError = HTTPValidationError>(
+ calibrationSessionId: string,
+    runId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCalibrationSessionRun>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getCalibrationSessionRun>>,
+          TError,
+          Awaited<ReturnType<typeof getCalibrationSessionRun>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetCalibrationSessionRun<TData = Awaited<ReturnType<typeof getCalibrationSessionRun>>, TError = HTTPValidationError>(
+ calibrationSessionId: string,
+    runId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCalibrationSessionRun>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get one run of a calibration session with its flow run state
+ */
+
+export function useGetCalibrationSessionRun<TData = Awaited<ReturnType<typeof getCalibrationSessionRun>>, TError = HTTPValidationError>(
+ calibrationSessionId: string,
+    runId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCalibrationSessionRun>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetCalibrationSessionRunQueryOptions(calibrationSessionId,runId,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

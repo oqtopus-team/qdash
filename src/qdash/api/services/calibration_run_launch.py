@@ -36,6 +36,7 @@ async def launch_run(
     idempotency_key: str | None,
     validate: Callable[[], Any],
     dispatch: Callable[[Any, RunIdentity | None], Awaitable[ExecuteFlowResponse]],
+    preflight: Callable[[Any], None] | None = None,
 ) -> ExecuteFlowResponse:
     """Record and launch one run, returning the launch response with its run and session.
 
@@ -45,6 +46,9 @@ async def launch_run(
     the worker records its run on the chip it calibrates when it starts.
     With either, it is refused before anything is launched: neither the session nor the
     replay by key could be honored, and QDash never guesses the chip.
+
+    ``preflight`` refuses a validated request before anything is recorded (see
+    ``RunLedger.launch``); a run without a chip claims no hardware, so it is not checked.
     """
     if not chip_id:
         if calibration_session_id is not None or idempotency_key is not None:
@@ -73,6 +77,7 @@ async def launch_run(
         validate=validate,
         dispatch=dispatch,
         response=lambda _validated, dispatched: dispatched.model_dump(mode="json"),
+        preflight=preflight,
     )
     return ExecuteFlowResponse.model_validate(
         {

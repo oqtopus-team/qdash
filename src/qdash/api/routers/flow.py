@@ -323,6 +323,13 @@ async def execute_flow(
         idempotency_key=request.idempotency_key,
         validate=lambda: prepared,
         dispatch=service.dispatch_flow_run,
+        # A saved flow claims the whole chip; refuse it before anything is recorded.
+        preflight=lambda checked: service.ensure_hardware_available(
+            project_id=checked.project_id,
+            chip_id=checked.chip_id,
+            parameters=checked.parameters,
+            workflow=True,
+        ),
     )
 
 

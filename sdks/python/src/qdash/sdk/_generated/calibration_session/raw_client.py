@@ -18,6 +18,7 @@ from ..types.agent_model_identity import AgentModelIdentity
 from ..types.calibration_conclusion_model import CalibrationConclusionModel
 from ..types.calibration_decision_response import CalibrationDecisionResponse
 from ..types.calibration_experiment_plan_model import CalibrationExperimentPlanModel
+from ..types.calibration_run_state_response import CalibrationRunStateResponse
 from ..types.calibration_session_audit_response import CalibrationSessionAuditResponse
 from ..types.calibration_session_detail_response import CalibrationSessionDetailResponse
 from ..types.calibration_session_origin import CalibrationSessionOrigin
@@ -215,6 +216,66 @@ class RawCalibrationSessionClient:
                     CalibrationSessionDetailResponse,
                     parse_obj_as(
                         type_=CalibrationSessionDetailResponse,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return HttpResponse(response=_response, data=_data)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    def get_calibration_session_run(
+        self, calibration_session_id: str, run_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> HttpResponse[CalibrationRunStateResponse]:
+        """
+        The run with every step execution, found by its ID however many runs the session has.
+
+        ``flow_status`` is the whole flow run's state, read from Prefect in this request; a step
+        execution that completed never makes it completed. Prefect being unreadable is
+        ``unavailable`` and a flow run Prefect does not report is ``unknown``, never running or
+        ended. The read changes nothing: no session is checked or closed.
+
+        Parameters
+        ----------
+        calibration_session_id : str
+
+        run_id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        HttpResponse[CalibrationRunStateResponse]
+            Successful Response
+        """
+        _response = self._client_wrapper.httpx_client.request(
+            f"calibration-sessions/{quote_path_param(calibration_session_id)}/runs/{quote_path_param(run_id)}",
+            method="GET",
+            request_options=request_options,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    CalibrationRunStateResponse,
+                    parse_obj_as(
+                        type_=CalibrationRunStateResponse,  # type: ignore
                         object_=_response.json(),
                     ),
                 )
@@ -801,6 +862,66 @@ class AsyncRawCalibrationSessionClient:
                     CalibrationSessionDetailResponse,
                     parse_obj_as(
                         type_=CalibrationSessionDetailResponse,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return AsyncHttpResponse(response=_response, data=_data)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    async def get_calibration_session_run(
+        self, calibration_session_id: str, run_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> AsyncHttpResponse[CalibrationRunStateResponse]:
+        """
+        The run with every step execution, found by its ID however many runs the session has.
+
+        ``flow_status`` is the whole flow run's state, read from Prefect in this request; a step
+        execution that completed never makes it completed. Prefect being unreadable is
+        ``unavailable`` and a flow run Prefect does not report is ``unknown``, never running or
+        ended. The read changes nothing: no session is checked or closed.
+
+        Parameters
+        ----------
+        calibration_session_id : str
+
+        run_id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        AsyncHttpResponse[CalibrationRunStateResponse]
+            Successful Response
+        """
+        _response = await self._client_wrapper.httpx_client.request(
+            f"calibration-sessions/{quote_path_param(calibration_session_id)}/runs/{quote_path_param(run_id)}",
+            method="GET",
+            request_options=request_options,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    CalibrationRunStateResponse,
+                    parse_obj_as(
+                        type_=CalibrationRunStateResponse,  # type: ignore
                         object_=_response.json(),
                     ),
                 )

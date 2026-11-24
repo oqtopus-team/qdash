@@ -3,6 +3,7 @@ export type { CreateCalibrationSessionRequest } from "./CreateCalibrationSession
 export type { ExportCalibrationSessionAuditRequest } from "./ExportCalibrationSessionAuditRequest.js";
 export type { GetCalibrationSessionAuditRequest } from "./GetCalibrationSessionAuditRequest.js";
 export type { GetCalibrationSessionRequest } from "./GetCalibrationSessionRequest.js";
+export type { GetCalibrationSessionRunRequest } from "./GetCalibrationSessionRunRequest.js";
 export type { ListCalibrationDecisionsRequest } from "./ListCalibrationDecisionsRequest.js";
 export type { ListCalibrationSessionsRequest } from "./ListCalibrationSessionsRequest.js";
 export type { RecordCalibrationDecisionRequest } from "./RecordCalibrationDecisionRequest.js";

@@ -695,8 +695,13 @@ def _no_task_service() -> SimpleNamespace:
     return SimpleNamespace()
 
 
-def _quick_run_client(execute: AsyncMock, monkeypatch: pytest.MonkeyPatch) -> Any:
-    """Return a client that posts quick runs through the real router and schema."""
+def _quick_run_client(
+    execute: AsyncMock, monkeypatch: pytest.MonkeyPatch, ensure: Mock | None = None
+) -> Any:
+    """Return a client that posts quick runs through the real router, schema, and ledger.
+
+    ``ensure`` stands in for the hardware availability check; by default the hardware is free.
+    """
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
 
@@ -717,11 +722,129 @@ def _quick_run_client(execute: AsyncMock, monkeypatch: pytest.MonkeyPatch) -> An
     app.include_router(router)
     app.dependency_overrides[get_project_context_editor] = _project_context
     app.dependency_overrides[get_flow_service] = lambda: SimpleNamespace(
-        execute_single_task_from_snapshot=execute
+        execute_single_task_from_snapshot=execute,
+        ensure_hardware_available=ensure or Mock(),
     )
     app.dependency_overrides[get_task_file_service] = lambda: _task_file_service(_task_info())
     app.dependency_overrides[get_task_service] = _no_task_service
     return TestClient(app)
+
+
+def _busy() -> Mock:
+    from qdash.api.services.flow_service.execution import EXECUTION_IN_PROGRESS_DETAIL
+
+    return Mock(side_effect=HTTPException(status_code=409, detail=EXECUTION_IN_PROGRESS_DETAIL))
+
+
+def _recorded() -> tuple[int, int]:
+    from qdash.dbmodel.calibration_session import CalibrationSessionDocument
+    from qdash.dbmodel.run import RunDocument
+
+    return CalibrationSessionDocument.find_all().count(), RunDocument.find_all().count()
+
+
+@pytest.mark.parametrize("key", [None, "quick-1"])
+def test_quick_run_on_busy_hardware_records_nothing(
+    init_db: Any, monkeypatch: pytest.MonkeyPatch, key: str | None
+) -> None:
+    execute = AsyncMock()
+    ensure = _busy()
+    client = _quick_run_client(execute, monkeypatch, ensure)
+
+    body: dict[str, Any] = {"chip_id": "chip-1", "qid": "0", "backend_name": "fake"}
+    if key is not None:
+        body["idempotency_key"] = key
+    response = client.post("/tasks/CheckRabi/execute", json=body)
+
+    assert response.status_code == 409
+    assert "overlapping hardware resources" in response.json()["detail"]
+    # Only the qubit's hardware is checked, so a run on disjoint hardware is not refused.
+    ensure.assert_called_once_with(
+        project_id="project-1", chip_id="chip-1", parameters={"qid": "0"}, workflow=False
+    )
+    execute.assert_not_awaited()
+    assert _recorded() == (0, 0)
+
+
+def test_quick_run_on_free_hardware_is_recorded_and_dispatched(
+    init_db: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    execute = AsyncMock()
+    ensure = Mock()
+    client = _quick_run_client(execute, monkeypatch, ensure)
+
+    response = client.post(
+        "/tasks/CheckRabi/execute",
+        json={"chip_id": "chip-1", "qid": "4", "backend_name": "fake", "idempotency_key": "k"},
+    )
+
+    assert response.status_code == 200, response.text
+    ensure.assert_called_once_with(
+        project_id="project-1", chip_id="chip-1", parameters={"qid": "4"}, workflow=False
+    )
+    execute.assert_awaited_once()
+    assert _recorded() == (1, 1)
+
+
+def test_quick_run_invalid_overrides_are_refused_before_the_hardware_check(
+    init_db: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    execute = AsyncMock()
+    ensure = _busy()
+    client = _quick_run_client(execute, monkeypatch, ensure)
+
+    response = client.post(
+        "/tasks/CheckRabi/execute",
+        json={
+            "chip_id": "chip-1",
+            "qid": "0",
+            "backend_name": "fake",
+            "run_parameter_overrides": {"shotz": 1},
+        },
+    )
+
+    assert response.status_code == 400
+    ensure.assert_not_called()
+    assert _recorded() == (0, 0)
+
+
+def test_re_execute_on_busy_hardware_records_nothing(
+    test_client: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from qdash.api.dependencies import (
+        get_flow_service,
+        get_task_file_service,
+        get_task_result_service,
+    )
+    from qdash.api.lib.auth import get_current_active_user
+    from qdash.api.lib.project import get_project_context_editor
+    from qdash.api.main import app
+
+    _reexecution_doc(monkeypatch)
+    execute = AsyncMock()
+    ensure = _busy()
+    previous_overrides = app.dependency_overrides.copy()
+    app.dependency_overrides[get_current_active_user] = lambda: _project_context().user
+    app.dependency_overrides[get_project_context_editor] = _project_context
+    app.dependency_overrides[get_task_result_service] = _empty_namespace
+    app.dependency_overrides[get_flow_service] = lambda: SimpleNamespace(
+        execute_single_task_from_snapshot=execute, ensure_hardware_available=ensure
+    )
+    app.dependency_overrides[get_task_file_service] = lambda: _task_file_service(_task_info())
+    try:
+        response = test_client.post(
+            "/task-results/task-1/re-execute", json={"idempotency_key": "again-1"}
+        )
+    finally:
+        app.dependency_overrides.clear()
+        app.dependency_overrides.update(previous_overrides)
+
+    assert response.status_code == 409
+    ensure.assert_called_once_with(
+        project_id="project-1", chip_id="chip-1", parameters={"qid": "0"}, workflow=False
+    )
+    execute.assert_not_awaited()
+    assert _recorded() == (0, 0)
 
 
 @pytest.mark.parametrize(

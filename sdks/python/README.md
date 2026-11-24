@@ -22,6 +22,9 @@ print(result.status)
 Reuse `qdash` across notebook cells or script operations. Call `qdash.close()` when you finish
 using the connection.
 
+Keep the handle from `workflow.run()` to request cancellation with `run.cancel()`;
+`run.wait()` then confirms the workflow's terminal state.
+
 This starts hardware work. Choose an existing workflow and targets suitable for your deployment.
 See the [Python reference](../../docs/reference/clients/python.md) for TOML profiles and other operations.
 SDK reads of existing INI profiles remain supported with a deprecation warning.
@@ -37,8 +40,8 @@ Configure a `local` TOML profile, then open:
 5. [Investigate results](examples/05_investigate_results.ipynb)
 6. [Export device gateway files](examples/06_device_gateway.ipynb)
 
-The investigation example uses optional `pandas`, `pyarrow`, and `perspective-python[jupyter]` packages
-for interactive tables. Install them in your notebook environment. Table operations apply
+The investigation example uses optional `pandas` for tables. Install it in your notebook
+environment. Table operations apply
 to the loaded page; use SDK filters to search history.
 
 The **Run Calibration**, **Run Task**, and **Run Workflow** cells start measurements when executed.
