@@ -95,6 +95,7 @@ export class FlowClient {
      *
      * @throws {@link QDashApi.ConflictError}
      * @throws {@link QDashApi.UnprocessableEntityError}
+     * @throws {@link QDashApi.InternalServerError}
      * @throws {@link errors.ApiError}
      * @throws {@link errors.ApiTimeoutError}
      *
@@ -161,6 +162,11 @@ export class FlowClient {
                     throw new QDashApi.ConflictError(_response.error.body as QDashApi.Detail, _response.rawResponse);
                 case 422:
                     throw new QDashApi.UnprocessableEntityError(_response.error.body as unknown, _response.rawResponse);
+                case 500:
+                    throw new QDashApi.InternalServerError(
+                        _response.error.body as QDashApi.OperationErrorDetail,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.ApiError({
                         statusCode: _response.error.statusCode,
@@ -764,7 +770,9 @@ export class FlowClient {
      * @param {QDashApi.GetFlowRequest} request
      * @param {FlowClient.RequestOptions} requestOptions - Request-specific configuration.
      *
+     * @throws {@link QDashApi.NotFoundError}
      * @throws {@link QDashApi.UnprocessableEntityError}
+     * @throws {@link QDashApi.InternalServerError}
      * @throws {@link errors.ApiError}
      * @throws {@link errors.ApiTimeoutError}
      *
@@ -813,8 +821,15 @@ export class FlowClient {
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
+                case 404:
+                    throw new QDashApi.NotFoundError(_response.error.body as unknown, _response.rawResponse);
                 case 422:
                     throw new QDashApi.UnprocessableEntityError(_response.error.body as unknown, _response.rawResponse);
+                case 500:
+                    throw new QDashApi.InternalServerError(
+                        _response.error.body as QDashApi.OperationErrorDetail,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.ApiError({
                         statusCode: _response.error.statusCode,
@@ -833,7 +848,9 @@ export class FlowClient {
      * @param {QDashApi.DeleteFlowRequest} request
      * @param {FlowClient.RequestOptions} requestOptions - Request-specific configuration.
      *
+     * @throws {@link QDashApi.NotFoundError}
      * @throws {@link QDashApi.UnprocessableEntityError}
+     * @throws {@link QDashApi.InternalServerError}
      * @throws {@link errors.ApiError}
      * @throws {@link errors.ApiTimeoutError}
      *
@@ -882,8 +899,15 @@ export class FlowClient {
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
+                case 404:
+                    throw new QDashApi.NotFoundError(_response.error.body as unknown, _response.rawResponse);
                 case 422:
                     throw new QDashApi.UnprocessableEntityError(_response.error.body as unknown, _response.rawResponse);
+                case 500:
+                    throw new QDashApi.InternalServerError(
+                        _response.error.body as QDashApi.OperationErrorDetail,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.ApiError({
                         statusCode: _response.error.statusCode,
@@ -909,6 +933,7 @@ export class FlowClient {
      * @throws {@link QDashApi.BadRequestError}
      * @throws {@link QDashApi.NotFoundError}
      * @throws {@link QDashApi.UnprocessableEntityError}
+     * @throws {@link QDashApi.InternalServerError}
      * @throws {@link errors.ApiError}
      * @throws {@link errors.ApiTimeoutError}
      *
@@ -970,6 +995,11 @@ export class FlowClient {
                     throw new QDashApi.NotFoundError(_response.error.body as unknown, _response.rawResponse);
                 case 422:
                     throw new QDashApi.UnprocessableEntityError(_response.error.body as unknown, _response.rawResponse);
+                case 500:
+                    throw new QDashApi.InternalServerError(
+                        _response.error.body as QDashApi.OperationErrorDetail,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.ApiError({
                         statusCode: _response.error.statusCode,
@@ -995,6 +1025,7 @@ export class FlowClient {
      * @param {FlowClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @throws {@link QDashApi.UnprocessableEntityError}
+     * @throws {@link QDashApi.InternalServerError}
      * @throws {@link errors.ApiError}
      * @throws {@link errors.ApiTimeoutError}
      *
@@ -1055,6 +1086,11 @@ export class FlowClient {
             switch (_response.error.statusCode) {
                 case 422:
                     throw new QDashApi.UnprocessableEntityError(_response.error.body as unknown, _response.rawResponse);
+                case 500:
+                    throw new QDashApi.InternalServerError(
+                        _response.error.body as QDashApi.OperationErrorDetail,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.ApiError({
                         statusCode: _response.error.statusCode,

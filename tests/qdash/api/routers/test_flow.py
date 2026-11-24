@@ -1,5 +1,6 @@
 """Tests for flow router endpoints."""
 
+import logging
 from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
@@ -14,6 +15,7 @@ from qdash.dbmodel.flow import FlowDocument
 from qdash.dbmodel.project import ProjectDocument
 from qdash.dbmodel.project_membership import ProjectMembershipDocument
 from qdash.dbmodel.user import UserDocument
+from tests.qdash.api._operation_errors import ERRORS_LOGGER, assert_operation_failure
 
 
 @pytest.fixture
@@ -961,3 +963,72 @@ class TestFlowExecutionPlan:
             params={"chip_id": "unknown_chip"},
         )
         assert chip.status_code == 404
+
+
+class TestFlowSourceFailures:
+    """Unexpected flow file failures return a safe message and the ID of the logged cause."""
+
+    def _save(self, test_client, auth_headers):
+        body = {"name": "first_calibration", "code": FLOW_SOURCE, "chip_id": "chip-1"}
+        return test_client.post("/flows", json=body, headers=auth_headers)
+
+    def test_read_failure_returns_code_message_and_logged_error_id(
+        self, test_client, test_project, auth_headers, flow_service_on_tmp, caplog
+    ):
+        """A flow file that cannot be read answers 500 without the path or exception text."""
+        assert self._save(test_client, auth_headers).status_code == 200
+        stored = FlowDocument.find_by_project_and_name("test_project", "first_calibration")
+        assert stored is not None
+        file_path = Path(stored.file_path)
+        file_path.unlink()
+        file_path.mkdir()  # exists, but reading it raises IsADirectoryError
+
+        with caplog.at_level(logging.ERROR, logger=ERRORS_LOGGER):
+            response = test_client.get("/flows/first_calibration", headers=auth_headers)
+
+        assert_operation_failure(
+            response,
+            caplog,
+            code="flow_source_read_failed",
+            message="Failed to read the flow file",
+            cause=IsADirectoryError,
+            hidden=(str(file_path), str(flow_service_on_tmp.store.base_dir), "Errno"),
+        )
+
+    def test_write_failure_returns_code_message_and_logged_error_id(
+        self, test_client, test_project, auth_headers, flow_service_on_tmp, caplog
+    ):
+        """A flow file that cannot be written answers 500 and registers no deployment."""
+        file_path = flow_service_on_tmp.store.path_for("test_project", "first_calibration")
+        file_path.mkdir()
+
+        with caplog.at_level(logging.ERROR, logger=ERRORS_LOGGER):
+            response = self._save(test_client, auth_headers)
+
+        assert_operation_failure(
+            response,
+            caplog,
+            code="flow_source_write_failed",
+            message="Failed to save the flow file",
+            cause=IsADirectoryError,
+            hidden=(str(file_path), "Errno"),
+        )
+        assert flow_service_on_tmp.deployment.calls == []
+        assert FlowDocument.find_by_project_and_name("test_project", "first_calibration") is None
+
+    def test_expected_errors_and_success_keep_their_payloads(
+        self, test_client, test_project, auth_headers, flow_service_on_tmp
+    ):
+        """Not-found and success responses are unchanged by the structured 500s."""
+        missing = test_client.get("/flows/unknown_flow", headers=auth_headers)
+        assert missing.status_code == 404
+        assert missing.json() == {"detail": "Flow 'unknown_flow' not found"}
+
+        saved = self._save(test_client, auth_headers)
+        assert saved.status_code == 200
+        assert set(saved.json()) == {"name", "file_path", "message", "code"}
+        assert saved.json()["message"] == "Flow 'first_calibration' created successfully"
+
+        fetched = test_client.get("/flows/first_calibration", headers=auth_headers)
+        assert fetched.status_code == 200
+        assert fetched.json()["code"] == FLOW_SOURCE

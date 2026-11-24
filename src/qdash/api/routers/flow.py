@@ -11,7 +11,7 @@ from qdash.api.dependencies import (
     get_flow_service,
 )
 from qdash.api.lib.project import ProjectContext, get_project_context, get_project_context_editor
-from qdash.api.schemas.error import Detail
+from qdash.api.schemas.error import Detail, OperationErrorDetail
 from qdash.api.schemas.flow import (
     DeleteScheduleResponse,
     ExecuteFlowRequest,
@@ -57,6 +57,10 @@ logger = getLogger("uvicorn.app")
         409: {
             "model": Detail,
             "description": "create_only is set and a flow with this name already exists",
+        },
+        500: {
+            "model": OperationErrorDetail,
+            "description": "The flow file, its deployment or its metadata could not be saved",
         },
     },
 )
@@ -244,6 +248,10 @@ async def update_flow_schedule(
     response_model=GetFlowResponse,
     summary="Get flow details",
     operation_id="getFlow",
+    responses={
+        404: {"model": Detail, "description": "The flow or its source file is not found"},
+        500: {"model": OperationErrorDetail, "description": "The flow file could not be read"},
+    },
 )
 async def get_flow(
     name: str,
@@ -262,6 +270,7 @@ async def get_flow(
     responses={
         400: {"model": Detail, "description": "No chip is selected or saved for the flow"},
         404: {"model": Detail, "description": "The flow, its source or the chip is not found"},
+        500: {"model": OperationErrorDetail, "description": "The flow file could not be read"},
     },
 )
 async def get_flow_execution_plan(
@@ -286,6 +295,12 @@ async def get_flow_execution_plan(
     response_model=ExecuteFlowResponse,
     summary="Execute a flow",
     operation_id="executeFlow",
+    responses={
+        500: {
+            "model": OperationErrorDetail,
+            "description": "The flow file could not be read or the run could not be started",
+        },
+    },
 )
 async def execute_flow(
     name: str,
@@ -353,6 +368,13 @@ async def move_flow(
     "/flows/{name}",
     summary="Delete a flow",
     operation_id="deleteFlow",
+    responses={
+        404: {"model": Detail, "description": "The flow is not found"},
+        500: {
+            "model": OperationErrorDetail,
+            "description": "The flow file or its metadata could not be deleted",
+        },
+    },
 )
 async def delete_flow(
     name: str,

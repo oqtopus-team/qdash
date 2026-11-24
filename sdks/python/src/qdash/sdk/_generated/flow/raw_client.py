@@ -14,6 +14,7 @@ from ..core.serialization import convert_and_respect_annotation_metadata
 from ..errors.bad_request_error import BadRequestError
 from ..errors.conflict_error import ConflictError
 from ..errors.content_too_large_error import ContentTooLargeError
+from ..errors.internal_server_error import InternalServerError
 from ..errors.not_found_error import NotFoundError
 from ..errors.service_unavailable_error import ServiceUnavailableError
 from ..errors.unprocessable_entity_error import UnprocessableEntityError
@@ -29,6 +30,7 @@ from ..types.get_flow_response import GetFlowResponse
 from ..types.list_flow_schedules_response import ListFlowSchedulesResponse
 from ..types.list_flows_response import ListFlowsResponse
 from ..types.move_flow_response import MoveFlowResponse
+from ..types.operation_error_detail import OperationErrorDetail
 from ..types.save_flow_response import SaveFlowResponse
 from ..types.schedule_flow_response import ScheduleFlowResponse
 from ..types.update_schedule_response import UpdateScheduleResponse
@@ -202,6 +204,17 @@ class RawFlowClient:
                         typing.Any,
                         parse_obj_as(
                             type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 500:
+                raise InternalServerError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        OperationErrorDetail,
+                        parse_obj_as(
+                            type_=OperationErrorDetail,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -735,6 +748,17 @@ class RawFlowClient:
                     ),
                 )
                 return HttpResponse(response=_response, data=_data)
+            if _response.status_code == 404:
+                raise NotFoundError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
             if _response.status_code == 422:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
@@ -742,6 +766,17 @@ class RawFlowClient:
                         typing.Any,
                         parse_obj_as(
                             type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 500:
+                raise InternalServerError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        OperationErrorDetail,
+                        parse_obj_as(
+                            type_=OperationErrorDetail,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -788,6 +823,17 @@ class RawFlowClient:
                     ),
                 )
                 return HttpResponse(response=_response, data=_data)
+            if _response.status_code == 404:
+                raise NotFoundError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
             if _response.status_code == 422:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
@@ -795,6 +841,17 @@ class RawFlowClient:
                         typing.Any,
                         parse_obj_as(
                             type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 500:
+                raise InternalServerError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        OperationErrorDetail,
+                        parse_obj_as(
+                            type_=OperationErrorDetail,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -888,6 +945,17 @@ class RawFlowClient:
                         ),
                     ),
                 )
+            if _response.status_code == 500:
+                raise InternalServerError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        OperationErrorDetail,
+                        parse_obj_as(
+                            type_=OperationErrorDetail,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
             _response_json = _response.json()
         except JSONDecodeError:
             raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
@@ -974,6 +1042,17 @@ class RawFlowClient:
                         typing.Any,
                         parse_obj_as(
                             type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 500:
+                raise InternalServerError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        OperationErrorDetail,
+                        parse_obj_as(
+                            type_=OperationErrorDetail,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -1370,6 +1449,17 @@ class AsyncRawFlowClient:
                         typing.Any,
                         parse_obj_as(
                             type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 500:
+                raise InternalServerError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        OperationErrorDetail,
+                        parse_obj_as(
+                            type_=OperationErrorDetail,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -1903,6 +1993,17 @@ class AsyncRawFlowClient:
                     ),
                 )
                 return AsyncHttpResponse(response=_response, data=_data)
+            if _response.status_code == 404:
+                raise NotFoundError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
             if _response.status_code == 422:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
@@ -1910,6 +2011,17 @@ class AsyncRawFlowClient:
                         typing.Any,
                         parse_obj_as(
                             type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 500:
+                raise InternalServerError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        OperationErrorDetail,
+                        parse_obj_as(
+                            type_=OperationErrorDetail,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -1956,6 +2068,17 @@ class AsyncRawFlowClient:
                     ),
                 )
                 return AsyncHttpResponse(response=_response, data=_data)
+            if _response.status_code == 404:
+                raise NotFoundError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
             if _response.status_code == 422:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
@@ -1963,6 +2086,17 @@ class AsyncRawFlowClient:
                         typing.Any,
                         parse_obj_as(
                             type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 500:
+                raise InternalServerError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        OperationErrorDetail,
+                        parse_obj_as(
+                            type_=OperationErrorDetail,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -2056,6 +2190,17 @@ class AsyncRawFlowClient:
                         ),
                     ),
                 )
+            if _response.status_code == 500:
+                raise InternalServerError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        OperationErrorDetail,
+                        parse_obj_as(
+                            type_=OperationErrorDetail,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
             _response_json = _response.json()
         except JSONDecodeError:
             raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
@@ -2142,6 +2287,17 @@ class AsyncRawFlowClient:
                         typing.Any,
                         parse_obj_as(
                             type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 500:
+                raise InternalServerError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        OperationErrorDetail,
+                        parse_obj_as(
+                            type_=OperationErrorDetail,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),

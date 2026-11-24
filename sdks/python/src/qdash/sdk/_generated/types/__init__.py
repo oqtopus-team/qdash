@@ -400,6 +400,7 @@ from .one_qubit_check_step import OneQubitCheckStep
 from .one_qubit_check_step_execution_mode import OneQubitCheckStepExecutionMode
 from .one_qubit_fine_tune_step import OneQubitFineTuneStep
 from .one_qubit_fine_tune_step_execution_mode import OneQubitFineTuneStepExecutionMode
+from .operation_error_detail import OperationErrorDetail
 from .panel_layout_model import PanelLayoutModel
 from .parameter_change_response import ParameterChangeResponse
 from .parameter_change_response_previous_value import ParameterChangeResponsePreviousValue
@@ -939,6 +940,7 @@ __all__ = [
     "OneQubitCheckStepExecutionMode",
     "OneQubitFineTuneStep",
     "OneQubitFineTuneStepExecutionMode",
+    "OperationErrorDetail",
     "PanelLayoutModel",
     "ParameterChangeResponse",
     "ParameterChangeResponsePreviousValue",

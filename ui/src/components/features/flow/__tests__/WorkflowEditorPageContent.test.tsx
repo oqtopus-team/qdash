@@ -202,6 +202,13 @@ vi.mock("@/client/flow/flow", () => ({
     Promise.resolve(mocks.formatSource(body)).then((data) => ({ data })),
 }));
 
+// An Axios error carrying an API error body, as the client rejects with.
+function serverError(data: unknown) {
+  return Object.assign(new Error("Request failed with status code 500"), {
+    response: { status: 500, data },
+  });
+}
+
 function renderEditor() {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
@@ -840,6 +847,43 @@ describe("WorkflowEditorPageContent properties", () => {
       await screen.findByText("Failed to save first_calibration: disk full"),
     ).toBeInTheDocument();
     expect(screen.queryByText("Please enter a username")).toBeNull();
+  });
+
+  it("shows the public message and error ID of an unexpected save failure", async () => {
+    vi.mocked(saveFlow).mockRejectedValue(
+      serverError({
+        detail: "Failed to save the flow file",
+        code: "flow_source_write_failed",
+        error_id: "5c0ffee5c0ffee5c0ffee5c0ffee5c0f",
+      }),
+    );
+    renderEditor();
+    await unlockEditor();
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(
+      await screen.findByText(
+        "Failed to save first_calibration: Failed to save the flow file (Error ID: 5c0ffee5c0ffee5c0ffee5c0ffee5c0f)",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/status code 500/)).toBeNull();
+  });
+
+  it("shows the public message and error ID when the flow cannot be read", async () => {
+    mocks.getFlow.mockRejectedValueOnce(
+      serverError({
+        detail: "Failed to read the flow file",
+        code: "flow_source_read_failed",
+        error_id: "0123456789abcdef0123456789abcdef",
+      }),
+    );
+    renderEditor();
+
+    expect(await screen.findByText("Failed to load flow")).toBeInTheDocument();
+    expect(
+      screen.getByText("Failed to read the flow file (Error ID: 0123456789abcdef0123456789abcdef)"),
+    ).toBeInTheDocument();
   });
 });
 

@@ -370,6 +370,7 @@ export * from "./OneQubitCheckStep.js";
 export * from "./OneQubitCheckStepExecutionMode.js";
 export * from "./OneQubitFineTuneStep.js";
 export * from "./OneQubitFineTuneStepExecutionMode.js";
+export * from "./OperationErrorDetail.js";
 export * from "./PanelLayoutModel.js";
 export * from "./ParameterChangeResponse.js";
 export * from "./ParameterChangeResponsePreviousValue.js";

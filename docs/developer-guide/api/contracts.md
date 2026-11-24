@@ -45,6 +45,29 @@ Return 404 for a resource outside the resolved project to avoid revealing its ex
 Use the JSON `detail` field, without exposing credentials or internal exception details.
 Declare public errors in route metadata and test their status and payload.
 
+### Report Unexpected File Operation Failures
+
+Workspace text-file reads and saves, and workflow source reads, writes, creation, and deletion,
+report unexpected failures with a safe `detail` string, a stable operation `code`, and an opaque
+`error_id`. The API logs the same ID with the underlying traceback. Expected 4xx responses keep
+their existing payloads.
+
+Raise `OperationFailedError` from `qdash.api.lib.errors` with a fixed public message and chain
+the original exception with `from exc`. Do not include exception text or internal paths in the
+message, or log the same failure again in the service. The handler registered in the app factory
+owns diagnostic logging. This exception currently extends `HTTPException` so existing HTTP-error
+pass-through handlers preserve it.
+
+Declare `OperationErrorDetail` from `qdash.api.schemas.error` in the route's `responses` metadata.
+Its `code` and `error_id` fields are optional because other failure paths on the same routes still
+return only `detail`. Directory preparation, deployment, dispatch, Git operations, and post-save
+hooks are outside this migration; clients must continue to accept responses without an error ID.
+The UI's `getApiErrorMessage` appends the ID when present. See
+[error investigation](../../user-guide/operations.md#investigate-an-error-id) for the operator procedure.
+
+Test the HTTP response and matching traceback log together, including absence of internal
+exception text in the response. Keep regression coverage for expected errors and successful calls.
+
 ## Keep OpenAPI and Clients Synchronized
 
 After changing a route, parameter, schema, status, or operation ID:
