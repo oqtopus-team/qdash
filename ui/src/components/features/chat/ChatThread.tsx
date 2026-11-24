@@ -312,8 +312,14 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
         onSubmit={() => submit(input)}
         onStop={stop}
         isStreaming={isStreaming}
-        disabled={isLoadingMessages}
-        placeholder={context ? "Ask about this result" : "Ask a question"}
+        disabled={isLoadingMessages || model.status === "none"}
+        placeholder={
+          model.status === "none"
+            ? "No chat model is available"
+            : context
+              ? "Ask about this result"
+              : "Ask a question"
+        }
         attachments={attachments}
         onAttach={attach}
         onRemoveAttachment={remove}

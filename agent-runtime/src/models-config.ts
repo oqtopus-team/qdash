@@ -65,6 +65,40 @@ export function missingCredentialMessage(providerId: string, modelId: string, ha
   );
 }
 
+/** Whether one chat.yaml model can run, as the API and the chat's model menus see it. */
+export interface ChatModelAvailability {
+  /** The provider as chat.yaml names it (before aliases such as bedrock). */
+  provider: string;
+  name: string;
+  available: boolean;
+}
+
+/**
+ * chat.yaml's `chat_models` in their declared order, each marked by whether Pi has a
+ * credential for it. `available` holds the `providerId/modelId` of every model Pi
+ * reports as available (ModelRuntime.getAvailable), so this follows Pi's own rules:
+ * an unset, empty, or blank key leaves a model unavailable, and a keyless local
+ * endpoint is available once its placeholder key is set. Names only, never a value.
+ */
+export function chatModelAvailability(
+  chatYaml: string,
+  available: ReadonlySet<string>,
+): ChatModelAvailability[] {
+  const result: ChatModelAvailability[] = [];
+  const seen = new Set<string>();
+  for (const model of readModels(chatYaml, "chat_models")) {
+    const name = asString(model.name);
+    const provider = asString(model.provider);
+    if (!name || !provider) continue;
+    const key = `${provider}/${name}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const providerId = PROVIDER_ALIASES[provider] ?? provider;
+    result.push({ provider, name, available: available.has(`${providerId}/${name}`) });
+  }
+  return result;
+}
+
 /** Used for locally hosted models, whose context window chat.yaml does not state. */
 const DEFAULT_CONTEXT_WINDOW = 131072;
 const DEFAULT_MAX_TOKENS = 4096;

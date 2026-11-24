@@ -8,7 +8,7 @@ For deployment steps, see [AI Setup](../../user-guide/setup/ai.md).
 | File | Purpose |
 | --- | --- |
 | `config.yaml` | Shared Agent settings |
-| `chat.yaml` | Chat models; first entry is the default |
+| `chat.yaml` | Chat models; first available entry is the chat default |
 | `evaluation.yaml` | Figure-evaluation models |
 | `classifier.yaml` | Optional classifier models |
 
@@ -42,7 +42,14 @@ list is allowed. Keep API and runtime validation aligned through `tests/data/age
 
 Custom API base URLs include `/v1`, not `/chat/completions` or `/responses`. Reference matching
 `OPENAI_COMPATIBLE_BASE_URL_<SUFFIX>` and `OPENAI_COMPATIBLE_API_KEY_<SUFFIX>` variables from each
-model. Catalog providers use their own credentials; missing credentials never select another model.
+model. Catalog providers use their own credentials.
+
+The runtime's authenticated `/chat-models` endpoint reports model identities and availability from
+Pi's credential registry, never credential values. The API filters the chat configuration with this
+list and uses its first available entry for chats without an explicit model choice. Missing or blank
+credentials hide a model; if none are available, the UI disables sending. Explicit model requests
+still fail on that model rather than switching providers. If the runtime availability request fails,
+the API preserves the configured list so a chat can report the runtime error.
 
 ## Gateway Compatibility Keys
 

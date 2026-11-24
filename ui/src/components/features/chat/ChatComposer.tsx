@@ -581,6 +581,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
 function fixedModelReason(status: ChatModelListStatus, optionCount: number): string | null {
   if (status === "loading") return "Loading the configured chat models";
   if (status === "error") return "Could not load the chat models; the configured default answers";
+  if (status === "none") return "No chat model has its API key set";
   if (optionCount < 2) return "Only one chat model is configured";
   return null;
 }

@@ -13,15 +13,18 @@ import {
   buildChatModelOptions,
   chatModelChoice,
   chatModelIdentityOfKey,
+  hasNoChatModel,
+  modelIdentity,
   resolveChatModelOption,
   type ModelOption,
 } from "@/lib/agentModels";
 import type { StoredChoice } from "@/lib/storedChoice";
 
-export type ChatModelListStatus = "loading" | "error" | "ready";
+/** `none`: the config loaded, but no chat model has its API key set in the agent runtime. */
+export type ChatModelListStatus = "loading" | "error" | "ready" | "none";
 
 export interface ChatModelSelection {
-  /** The configured chat models, default first. */
+  /** The chat models whose API key is set, default first. */
   options: ModelOption[];
   /** The model the next message goes to. */
   selected: ModelOption;
@@ -47,8 +50,9 @@ function useStoredChoice<T extends string>(store: StoredChoice<T>): T {
  *
  * The model list is fetched again whenever a surface mounts, the window regains
  * focus, or the network reconnects, so a list changed by a redeploy shows up
- * without a manual reload. A remembered model the list no longer offers falls
- * back to the configured default instead of being sent.
+ * without a manual reload. The server lists only models whose API key the agent
+ * runtime has, and its default is the first of them. A remembered model the list
+ * no longer offers falls back to that default instead of being sent.
  */
 export function useChatModelSelection(): ChatModelSelection {
   const { data, isError } = useGetAgentConfig({
@@ -63,9 +67,20 @@ export function useChatModelSelection(): ChatModelSelection {
   const storedKey = useStoredChoice(chatModelChoice);
   const options = useMemo(() => buildChatModelOptions(config), [config]);
   const selected = resolveChatModelOption(options, storedKey);
-  const status: ChatModelListStatus = config ? "ready" : isError ? "error" : "loading";
+  const status: ChatModelListStatus = config
+    ? hasNoChatModel(options)
+      ? "none"
+      : "ready"
+    : isError
+      ? "error"
+      : "loading";
+  // A remembered model that became the default is still the one that answers.
+  const storedIdentity = chatModelIdentityOfKey(storedKey);
+  const selectedIdentity = selected.resolvedModel ? modelIdentity(selected.resolvedModel) : null;
   const unavailableModel =
-    status === "ready" && selected.key !== storedKey ? chatModelIdentityOfKey(storedKey) : null;
+    status === "ready" && storedIdentity !== null && storedIdentity !== selectedIdentity
+      ? storedIdentity
+      : null;
   return { options, selected, select: chatModelChoice.write, status, unavailableModel };
 }
 

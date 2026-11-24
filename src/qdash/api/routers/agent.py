@@ -18,6 +18,8 @@ if TYPE_CHECKING:
 
 from qdash.agent.config import (
     AgentConfig,
+    NoChatModelAvailableError,
+    available_chat_models,
     load_agent_config,
     select_chat_model,
 )
@@ -126,11 +128,30 @@ def _deleted_chat_stopper(username: str, auth: pi_chat_service.QDashAuth) -> Sto
     return stop
 
 
-def _config_with_chat_model(config: AgentConfig, request: ChatRequest) -> AgentConfig:
-    """Resolve the planner for a general chat into ``config.model``."""
-    return config.model_copy(
-        update={"model": select_chat_model(config, request.chat_model_override)}
-    )
+async def _available_chat_models(config: AgentConfig) -> set[tuple[str, str]] | None:
+    """The chat models the runtime has credentials for, or ``None`` when it cannot say.
+
+    When the runtime cannot be asked, every configured model is kept: the chat then
+    reports the runtime's own error instead of an empty model menu.
+    """
+    if not config.chat_models:
+        return None
+    try:
+        return await pi_chat_service.available_chat_models()
+    except Exception as exc:
+        logger.warning("chat model availability unavailable: %s", exc)
+        return None
+
+
+async def _config_with_chat_model(config: AgentConfig, request: ChatRequest) -> AgentConfig:
+    """Resolve the planner for a general chat into ``config.model``.
+
+    A chat without a choice runs the first chat model whose credential is set, the one
+    the chat menus offer as the default.
+    """
+    override = request.chat_model_override
+    available = None if override is not None else await _available_chat_models(config)
+    return config.model_copy(update={"model": select_chat_model(config, override, available)})
 
 
 @router.get(
@@ -153,7 +174,15 @@ async def get_agent_config() -> dict[str, Any]:
 
     """
     config = load_agent_config()
-    return dict(config.model_dump())
+    data = dict(config.model_dump())
+    available = await _available_chat_models(config)
+    if available is not None:
+        # Only models the runtime has a credential for are offered, in declared order;
+        # the first of them is the default a chat without a choice runs.
+        models = available_chat_models(config, available)
+        data["chat_models"] = [model.model_dump() for model in models]
+        data["model"] = models[0].model_dump() if models else None
+    return data
 
 
 @public_router.get("/expected-image", include_in_schema=False)
@@ -374,7 +403,11 @@ async def chat_stream(
         if not config.enabled:
             yield sse_event("error", {"step": "init", "detail": "Agent is not enabled"})
             return
-        chat_config = _config_with_chat_model(config, request)
+        try:
+            chat_config = await _config_with_chat_model(config, request)
+        except NoChatModelAvailableError as exc:
+            yield sse_event("error", {"step": "init", "detail": str(exc)})
+            return
 
         task_bundle = None
         images_sent: dict[str, Any] | None = None

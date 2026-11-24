@@ -148,6 +148,25 @@ describe("ChatComposer model control", () => {
     );
   });
 
+  it("says no model can answer when none has its API key set", () => {
+    const none = { ...defaultOption, label: "No chat model available", resolvedModel: null };
+    render(
+      <ChatComposer
+        {...props()}
+        disabled
+        modelOptions={[none]}
+        selectedModelKey="default"
+        modelStatus="none"
+      />,
+    );
+    expect(
+      screen.getByRole("button", {
+        name: "Chat model: No chat model available. No chat model has its API key set",
+      }),
+    ).toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByRole("button", { name: /send/i })).toBeDisabled();
+  });
+
   it("cannot be switched while an answer streams", () => {
     render(
       <ChatComposer

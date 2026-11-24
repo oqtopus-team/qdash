@@ -9,11 +9,14 @@ names a profile.
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, Field, model_validator
 
 from qdash.common.config.loader import ConfigLoader
+
+if TYPE_CHECKING:
+    from collections.abc import Collection
 
 
 class ModelConfig(BaseModel):
@@ -72,11 +75,51 @@ class AgentConfig(BaseModel):
         return self
 
 
-def select_chat_model(config: AgentConfig, override: ModelConfig | None = None) -> ModelConfig:
-    """The planner for a chat: a per-request override, else the first chat model."""
+class NoChatModelAvailableError(RuntimeError):
+    """None of the configured chat models has its credential set in the agent runtime."""
+
+
+def available_chat_models(
+    config: AgentConfig, available: Collection[tuple[str, str]] | None
+) -> list[ModelConfig]:
+    """The chat models whose ``(provider, name)`` is in ``available``, in declared order.
+
+    ``available`` comes from the agent runtime, which holds the model credentials;
+    ``None`` means it could not be asked, and every configured model is kept.
+    """
+    if available is None:
+        return list(config.chat_models)
+    return [model for model in config.chat_models if (model.provider, model.name) in available]
+
+
+def select_chat_model(
+    config: AgentConfig,
+    override: ModelConfig | None = None,
+    available: Collection[tuple[str, str]] | None = None,
+) -> ModelConfig:
+    """The planner for a chat: a per-request override, else the first available chat model.
+
+    Without ``available`` the first chat model is the default, as it always was. With it,
+    the default is the first chat model in declared order whose credential is set, which
+    is the model the chat menus label as the default.
+
+    Raises
+    ------
+    NoChatModelAvailableError
+        When no override is given and none of the chat models is available.
+
+    """
     if override is not None:
         return override
-    return config.chat_models[0] if config.chat_models else config.model
+    if not config.chat_models:
+        return config.model
+    models = available_chat_models(config, available)
+    if not models:
+        raise NoChatModelAvailableError(
+            "No chat model is available: none of the models in chat_models has its API key "
+            "set in the agent runtime. Set one in .env and recreate the agent-runtime container."
+        )
+    return models[0]
 
 
 @lru_cache(maxsize=1)

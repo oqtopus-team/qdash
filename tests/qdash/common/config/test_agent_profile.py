@@ -533,6 +533,7 @@ def test_the_default_chat_model_is_native_openai_gpt_6_sol_and_qwen_stays_select
         ("openai", "gpt-6-sol"),
         ("openai-compatible-chat", "qwen3.8-flash-next"),
         ("anthropic", "claude-opus-5-5"),
+        ("openai-compatible-deepseek", "preview/DeepSeek-V4.1-Flash-1017"),
     ]
     assert raw_opus[2] == {
         "provider": "anthropic",
@@ -544,6 +545,26 @@ def test_the_default_chat_model_is_native_openai_gpt_6_sol_and_qwen_stays_select
     opus_payload = _request_payload(request, opus_chat, "alice")
     assert opus_payload["model"] == {"provider": "anthropic", "name": "claude-opus-5-5"}
     assert opus_payload["thinking_level"] == "medium"
+
+    # DeepSeek V4.1 Flash is offered on its own endpoint and key, with the endpoint's
+    # documented limits and no thinking control it does not document.
+    assert raw_opus[3] == {
+        "provider": "openai-compatible-deepseek",
+        "name": "preview/DeepSeek-V4.1-Flash-1017",
+        "api_style": "completion",
+        "base_url": "env:OPENAI_COMPATIBLE_BASE_URL_DEEPSEEK",
+        "api_key_env": "OPENAI_COMPATIBLE_API_KEY_DEEPSEEK",
+        "num_ctx": 1048575,
+        "max_output_tokens": 32000,
+    }
+    deepseek = config.chat_models[3]
+    deepseek_chat = config.model_copy(update={"model": select_chat_model(config, deepseek)})
+    deepseek_payload = _request_payload(request, deepseek_chat, "alice")
+    assert deepseek_payload["model"] == {
+        "provider": "openai-compatible-deepseek",
+        "name": "preview/DeepSeek-V4.1-Flash-1017",
+    }
+    assert deepseek_payload["thinking_level"] is None
 
     # Planner-mode evaluations follow the default chat model; the evaluators do not change.
     assert planner == ({"provider": "openai", "name": "gpt-6-sol"}, "medium")

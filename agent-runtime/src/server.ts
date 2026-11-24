@@ -1397,6 +1397,17 @@ const server = createServer((req, res) => {
     sendJson(res, 200, { skills: runtime.chatSkills() });
     return;
   }
+  if (req.method === "GET" && req.url === "/chat-models") {
+    if (!authorized(req)) {
+      sendJson(res, 401, { error: "unauthorized" });
+      return;
+    }
+    runtime
+      .chatModels()
+      .then((chatModels) => sendJson(res, 200, { chat_models: chatModels }))
+      .catch((error: unknown) => handleRouteError(res, error, "chat models"));
+    return;
+  }
   if (req.method === "POST" && req.url === "/chat/active") {
     if (!authorized(req)) {
       sendJson(res, 401, { error: "unauthorized" });

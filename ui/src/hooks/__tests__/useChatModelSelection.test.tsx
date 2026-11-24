@@ -125,6 +125,36 @@ describe("useChatModelSelection", () => {
     expect(result.current.dock.unavailableModel).toBeNull();
   });
 
+  it("keeps a remembered model that became the default without a warning", async () => {
+    // The first model's key was removed, so the server now lists KIMI first.
+    localStorage.setItem("qdash_chat_model_key", "model:openai-compatible-chat:kimi");
+    serveModels(KIMI);
+    const { result } = renderHook(useTwoSurfaces, { wrapper: wrapper() });
+    await waitFor(() => expect(result.current.dock.status).toBe("ready"));
+    expect(result.current.dock.selected).toMatchObject({
+      label: "kimi",
+      model: null,
+      isConfiguredDefault: true,
+    });
+    expect(result.current.dock.unavailableModel).toBeNull();
+  });
+
+  it("offers no model when none has its API key set", async () => {
+    localStorage.setItem("qdash_chat_model_key", "model:openai-compatible-chat:kimi");
+    customInstance.mockResolvedValue({ data: { enabled: true, chat_models: [], model: null } });
+    const { result } = renderHook(useTwoSurfaces, { wrapper: wrapper() });
+    await waitFor(() => expect(result.current.dock.status).toBe("none"));
+    expect(result.current.dock.options).toHaveLength(1);
+    expect(result.current.dock.selected).toMatchObject({
+      label: "No chat model available",
+      model: null,
+      resolvedModel: null,
+    });
+    expect(result.current.settings.status).toBe("none");
+    expect(result.current.dock.unavailableModel).toBeNull();
+    expect(result.current.thinking.modelDefault).toBeNull();
+  });
+
   it("falls back to the configured default when the list fails to load", async () => {
     customInstance.mockRejectedValue(new Error("down"));
     const { result } = renderHook(useTwoSurfaces, { wrapper: wrapper() });

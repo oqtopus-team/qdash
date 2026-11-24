@@ -548,6 +548,29 @@ async def skills() -> dict[str, Any]:
         return result
 
 
+async def available_chat_models() -> set[tuple[str, str]]:
+    """The ``(provider, name)`` of every chat model whose credential the runtime has.
+
+    The agent runtime holds the model credentials, so it alone decides; the API never
+    reads them. The answer carries model names and a flag only, never a key.
+    """
+    async with httpx.AsyncClient(timeout=10, trust_env=False) as client:
+        response = await client.get(f"{RUNTIME_URL}/chat-models", headers=_runtime_headers())
+        response.raise_for_status()
+        entries = response.json().get("chat_models")
+    if not isinstance(entries, list):
+        msg = "The agent runtime's chat model list is malformed"
+        raise TypeError(msg)
+    return {
+        (entry["provider"], entry["name"])
+        for entry in entries
+        if isinstance(entry, dict)
+        and entry.get("available") is True
+        and isinstance(entry.get("provider"), str)
+        and isinstance(entry.get("name"), str)
+    }
+
+
 def user_instructions(username: str) -> str | None:
     """The user's own Agent instructions, when they set any (chat only)."""
     from qdash.dbmodel.user import UserDocument
