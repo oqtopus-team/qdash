@@ -43,9 +43,12 @@ Do not manually edit generated files:
 - `ui/src/client/`
 - `ui/src/schemas/`
 - `clients/typescript/src/generated/`
+- `sdks/python/src/qdash/sdk/_generated/`
+- `sdks/typescript/src/_generated/`
 - `docs/oas/openapi.json`
 
-When backend API schemas or routes change, run `task generate` from the repository root to regenerate the OpenAPI document and TypeScript clients.
+When backend API schemas or routes change, run `task generate` from the repository root to regenerate the OpenAPI document, clients, and SDKs.
+SDK-only regeneration uses `task generate-python-sdk` or `task generate-typescript-sdk`; both require Node.js (`npx`) and Docker.
 
 ## Common Commands
 

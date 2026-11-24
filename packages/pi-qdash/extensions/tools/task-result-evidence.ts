@@ -11,11 +11,12 @@
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { QDashClient } from "@oqtopus-team/qdash-client";
-import { QDash, type TaskResultContext, type TaskResultEvidence } from "@oqtopus-team/qdash-sdk";
+import type { TaskResultContext, TaskResultEvidence } from "@oqtopus-team/qdash-sdk";
 import { Type } from "typebox";
 
 import { qdashObjectLinks, qdashWebBaseUrl } from "../lib/links.js";
 import { redact, toTextToolResult } from "../lib/results.js";
+import { sdkSession, type SdkSessionFactory } from "../lib/sdk-session.js";
 
 export const TASK_RESULT_EVIDENCE_TOOL = "qdash_get_task_result_evidence";
 
@@ -29,6 +30,8 @@ type EvidenceParams = {
 
 export type TaskResultEvidenceDependencies = {
   makeClient(params: EvidenceParams): Promise<QDashClient>;
+  /** The SDK session for a resolved client; defaults to one with the client's settings. */
+  sdk?: SdkSessionFactory;
 };
 
 type Json = Record<string, unknown>;
@@ -310,7 +313,7 @@ export function registerTaskResultEvidenceTool(pi: Pick<ExtensionAPI, "registerT
     }),
     async execute(_toolCallId, params: EvidenceParams) {
       const client = await deps.makeClient(params);
-      const evidence = await new QDash(client).taskResults.evidence(params.taskId, params.cooldownId ? { cooldownId: params.cooldownId } : {});
+      const evidence = await (deps.sdk ?? sdkSession)(client).taskResults.evidence(params.taskId, params.cooldownId ? { cooldownId: params.cooldownId } : {});
       const result = evidence.result as unknown as Json;
       const executionId = str(result.execution_id);
       const chipId = str(result.chip_id);

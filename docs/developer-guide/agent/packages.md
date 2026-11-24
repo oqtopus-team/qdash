@@ -26,7 +26,8 @@ or skill changes. [Pi Extension Design](./extensions.md) explains the shared-hos
 ## Distribution
 
 `.github/workflows/publish-typescript-packages.yml` owns the release sequence:
-client → TypeScript SDK → pi packages. Its verified release record supplies the Python client
+client → TypeScript SDK → pi packages. The SDK includes its generated API client and has no
+dependency on the legacy client package. Its verified release record supplies the Python client
 and SDK versions to `publish-qdash-client.yml`.
 
 | Trigger | Result |

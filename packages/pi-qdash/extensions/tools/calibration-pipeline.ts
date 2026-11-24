@@ -1,11 +1,11 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { QDashClient } from "@oqtopus-team/qdash-client";
-import { QDash } from "@oqtopus-team/qdash-sdk";
 import { Type } from "typebox";
 
 import { pausedSessionConflict } from "../lib/agent-loop.js";
 import { toTextToolResult } from "../lib/results.js";
 import { requireWriteApproval } from "../lib/write-approval.js";
+import { sdkSession, type SdkSessionFactory } from "../lib/sdk-session.js";
 
 /**
  * Declarative calibration pipelines.
@@ -135,6 +135,8 @@ export type CalibrationPipelineDependencies = {
   makeClient(params: ConnectionParams): Promise<PipelineClient>;
   /** The chip to run on: the explicit id, else the session/default chip. */
   resolveChipId(client: PipelineClient, chipId?: string): Promise<string>;
+  /** The SDK session for a resolved client; defaults to one with the client's settings. */
+  sdk?: SdkSessionFactory;
 };
 
 const TASK_PREVIEW = 8;
@@ -380,7 +382,7 @@ export function registerCalibrationPipelineTools(pi: Pick<ExtensionAPI, "registe
     }),
     async execute(_toolCallId, params: ConnectionParams & { backendName?: string; taskNames?: string[] }) {
       const client = await deps.makeClient(params);
-      const qdash = new QDash(client);
+      const qdash = (deps.sdk ?? sdkSession)(client);
       const catalog = (await qdash.pipelines.catalog({ backendName: params.backendName })) as PipelineCatalog;
       const taskNames = params.taskNames ?? [];
       let declared: TaskParameters[] | string = [];
@@ -415,7 +417,7 @@ export function registerCalibrationPipelineTools(pi: Pick<ExtensionAPI, "registe
     async execute(_toolCallId, params: ConnectionParams & { chipId?: string; spec: Record<string, unknown>; backendName?: string }) {
       const client = await deps.makeClient(params);
       const chipId = await deps.resolveChipId(client, params.chipId);
-      const result = (await new QDash(client).pipelines.validate(params.spec, {
+      const result = (await (deps.sdk ?? sdkSession)(client).pipelines.validate(params.spec, {
         chipId,
         backendName: params.backendName,
       })) as PipelineValidation;
@@ -464,7 +466,7 @@ export function registerCalibrationPipelineTools(pi: Pick<ExtensionAPI, "registe
       if (conflict) {
         return toTextToolResult(conflict, { blocked: true }, { tool: "qdash_run_pipeline", chipId: params.chipId, started: false, blockedByPausedSession: true });
       }
-      const qdash = new QDash(client);
+      const qdash = (deps.sdk ?? sdkSession)(client);
       try {
         // Dispatch only: the run handle's wait() is deliberately not called here.
         // Every run is recorded before it starts, in the named calibration session if any.
