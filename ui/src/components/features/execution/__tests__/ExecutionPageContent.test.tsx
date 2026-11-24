@@ -836,7 +836,10 @@ describe("ExecutionPageContent calibration session groups", () => {
     expect(
       screen.getByText(/2 runs · 1 agent session · 3 executions · 1 failed · 5 decisions/),
     ).toBeTruthy();
-    expect(screen.getByText("Targets 0, 1, 0-1")).toBeTruthy();
+    // Each recorded target is a qubit tile, as everywhere a qubit or coupling is named.
+    const targets = screen.getByTestId("calibration-session-targets");
+    expect(within(targets).getByText("Targets")).toBeTruthy();
+    expect(["0", "1", "0-1"].every((qid) => within(targets).getByText(qid))).toBe(true);
     // Closed says nothing about the objective; no recommendation was recorded, so none is shown.
     expect(screen.getByText("Closed")).toBeTruthy();
     expect(screen.queryByText(/Recommends/)).toBeNull();

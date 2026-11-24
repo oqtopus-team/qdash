@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 
-import { Bot, ChevronRight, ExternalLink, Target } from "lucide-react";
+import { Bot, ChevronRight, ExternalLink } from "lucide-react";
 
 import type { ExecutionGroupItem, ExecutionResponseSummary } from "@/schemas";
 
@@ -124,7 +124,6 @@ export function AgentSessionGroupRow({
               title={`Calibration session: ${summary.calibration_session.objective}`}
               aria-label={`Calibration session: ${summary.calibration_session.objective}`}
             >
-              <Target data-icon="inline-start" aria-hidden="true" />
               <span className="truncate">{summary.calibration_session.objective}</span>
             </Link>
           ) : null}

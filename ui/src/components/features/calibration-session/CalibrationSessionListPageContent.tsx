@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { X } from "lucide-react";
 import { useQueryState } from "nuqs";
 
 import type {
@@ -20,8 +20,14 @@ import {
   useLinkedProject,
 } from "@/components/features/agent-session/useLinkedProject";
 import { ExecutionViewSwitch } from "@/components/features/execution/ExecutionAreaNav";
+import { ExecutionActor } from "@/components/features/execution/ExecutionAttribution";
+import {
+  CalibrationSessionStatusBadge,
+  calibrationSessionBorderStyle,
+} from "@/components/features/execution/CalibrationSessionStatus";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageContainer } from "@/components/ui/PageContainer";
+import { PageFiltersBar } from "@/components/ui/PageFiltersBar";
 import { PageHeader } from "@/components/ui/PageHeader";
 import {
   SESSION_ORIGIN_FILTERS as ORIGIN_FILTERS,
@@ -45,8 +51,7 @@ const ORIGIN_LABELS: Record<(typeof ORIGIN_FILTERS)[number], string> = {
   automatic: "Automatic",
 };
 
-const DESCRIPTION =
-  "Calibration sessions group the runs and agent sessions started for one objective. A run started without one gets an automatic session.";
+const DESCRIPTION = "Runs and agent sessions grouped by objective";
 
 /**
  * The project's calibration sessions, newest first: one row per objective, linked to its page.
@@ -96,7 +101,7 @@ export function CalibrationSessionListPageContent() {
 
   if (linked.status === "unavailable" || linked.status === "no_project") {
     return (
-      <PageContainer maxWidth>
+      <PageContainer>
         <PageHeader title="Execution" description={DESCRIPTION} />
         <ExecutionViewSwitch current="sessions" chipId={chip} className="mb-4" />
         <div role="alert" className="alert alert-error alert-soft">
@@ -111,7 +116,7 @@ export function CalibrationSessionListPageContent() {
   }
 
   return (
-    <PageContainer maxWidth>
+    <PageContainer>
       <PageHeader title="Execution" description={DESCRIPTION} />
       <ExecutionViewSwitch
         current="sessions"
@@ -119,152 +124,173 @@ export function CalibrationSessionListPageContent() {
         projectId={projectId}
         className="mb-4"
       />
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-        <div role="tablist" aria-label="Status" className="tabs tabs-box tabs-sm w-fit">
-          {STATUS_FILTERS.map((value) => (
-            <button
-              key={value}
-              type="button"
-              role="tab"
-              aria-selected={statusFilter === value}
-              className={`tab ${statusFilter === value ? "tab-active" : ""}`}
-              onClick={() => {
-                void setStatusFilter(value === "all" ? null : value);
-                resetPage();
-              }}
-            >
-              {STATUS_LABELS[value]}
-            </button>
-          ))}
-        </div>
-        <select
-          className="select select-sm w-fit"
-          aria-label="Origin"
-          value={originFilter}
-          onChange={(event) => {
-            const value = event.target.value as (typeof ORIGIN_FILTERS)[number];
-            void setOriginFilter(value === "all" ? null : value);
-            resetPage();
-          }}
-        >
-          {ORIGIN_FILTERS.map((value) => (
-            <option key={value} value={value}>
-              {ORIGIN_LABELS[value]}
-            </option>
-          ))}
-        </select>
-        <label className="choice-field gap-2 text-sm">
-          <input
-            type="checkbox"
-            className="toggle toggle-sm"
-            checked={mine}
-            onChange={(event) => {
-              void setMine(event.target.checked ? true : null);
-              resetPage();
-            }}
-          />
-          <span>Only mine</span>
-        </label>
-        {chip ? (
-          <span className="badge badge-outline gap-1">
-            Chip {chip}
-            <button
-              type="button"
-              className="btn btn-ghost btn-xs btn-circle"
-              aria-label="Show every chip"
-              onClick={() => {
-                void setChip(null);
-                resetPage();
-              }}
-            >
-              <X className="h-3 w-3" aria-hidden="true" />
-            </button>
-          </span>
-        ) : null}
-      </div>
-
-      {linked.status === "pending" || list.isLoading ? (
-        <div className="flex flex-col gap-2" aria-busy="true">
-          <div className="skeleton h-14 w-full" />
-          <div className="skeleton h-14 w-full" />
-          <div className="skeleton h-14 w-full" />
-        </div>
-      ) : list.isError ? (
-        <div role="alert" className="alert alert-error alert-soft">
-          <span>{getApiErrorMessage(list.error, "Calibration sessions could not be loaded")}</span>
-        </div>
-      ) : items.length === 0 ? (
-        <EmptyState
-          title="No calibration sessions"
-          description={
-            currentPage > 1
-              ? "No more sessions match these filters"
-              : "A calibration session appears here when a run starts, or when someone, or an agent on their behalf, creates one for an objective"
-          }
-          emoji="empty"
-        />
-      ) : (
-        <ul className="list rounded-box border border-base-200 bg-base-100">
-          {items.map((session) => (
-            <li key={session.calibration_session_id} className="list-row items-center">
-              <span
-                className={`badge badge-soft badge-sm ${session.status === "open" ? "badge-info" : "badge-ghost"}`}
-              >
-                {session.status === "open" ? "Open" : "Closed"}
-              </span>
-              <div className="min-w-0">
-                <Link
-                  href={calibrationSessionDetailHref(
-                    session.calibration_session_id,
-                    projectId,
-                    sessionReturn,
-                  )}
-                  className="link link-hover line-clamp-2 text-sm font-medium wrap-anywhere"
+      <PageFiltersBar className="mb-4 sm:mb-6">
+        <PageFiltersBar.Group className="sm:items-center">
+          <PageFiltersBar.Item>
+            <div role="tablist" aria-label="Status" className="tabs tabs-box tabs-sm w-fit">
+              {STATUS_FILTERS.map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  role="tab"
+                  aria-selected={statusFilter === value}
+                  className={`tab ${statusFilter === value ? "tab-active" : ""}`}
+                  onClick={() => {
+                    void setStatusFilter(value === "all" ? null : value);
+                    resetPage();
+                  }}
                 >
-                  {session.objective}
-                </Link>
-                <div className="flex flex-wrap items-center gap-x-1 text-xs text-base-content/60">
-                  {session.origin === "automatic" ? (
-                    <span
-                      className="badge badge-ghost badge-xs"
-                      title="QDash created this session for a run started without one"
-                    >
-                      Automatic
-                    </span>
-                  ) : null}
-                  <span>
-                    {session.chip_id} · @{session.created_by} · {formatDateTime(session.created_at)}
+                  {STATUS_LABELS[value]}
+                </button>
+              ))}
+            </div>
+          </PageFiltersBar.Item>
+          <PageFiltersBar.Item className="sm:w-56">
+            <select
+              className="select select-sm w-full"
+              aria-label="Origin"
+              value={originFilter}
+              onChange={(event) => {
+                const value = event.target.value as (typeof ORIGIN_FILTERS)[number];
+                void setOriginFilter(value === "all" ? null : value);
+                resetPage();
+              }}
+            >
+              {ORIGIN_FILTERS.map((value) => (
+                <option key={value} value={value}>
+                  {ORIGIN_LABELS[value]}
+                </option>
+              ))}
+            </select>
+          </PageFiltersBar.Item>
+          {chip ? (
+            <PageFiltersBar.Item>
+              <span className="badge badge-outline gap-1">
+                Chip {chip}
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-xs btn-circle"
+                  aria-label="Show every chip"
+                  onClick={() => {
+                    void setChip(null);
+                    resetPage();
+                  }}
+                >
+                  <X className="h-3 w-3" aria-hidden="true" />
+                </button>
+              </span>
+            </PageFiltersBar.Item>
+          ) : null}
+        </PageFiltersBar.Group>
+        <PageFiltersBar.Group>
+          <PageFiltersBar.Item>
+            <label className="choice-field gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="toggle toggle-sm"
+                checked={mine}
+                onChange={(event) => {
+                  void setMine(event.target.checked ? true : null);
+                  resetPage();
+                }}
+              />
+              <span>Only mine</span>
+            </label>
+          </PageFiltersBar.Item>
+        </PageFiltersBar.Group>
+      </PageFiltersBar>
+
+      <section aria-labelledby="calibration-sessions-heading">
+        <h2 id="calibration-sessions-heading" className="mb-3 text-sm font-medium">
+          Calibration sessions
+        </h2>
+        {linked.status === "pending" || list.isLoading ? (
+          <div className="grid grid-cols-1 gap-2" aria-busy="true">
+            <div className="skeleton h-20 w-full" />
+            <div className="skeleton h-20 w-full" />
+            <div className="skeleton h-20 w-full" />
+          </div>
+        ) : list.isError ? (
+          <div role="alert" className="alert alert-error alert-soft">
+            <span>
+              {getApiErrorMessage(list.error, "Calibration sessions could not be loaded")}
+            </span>
+          </div>
+        ) : items.length === 0 ? (
+          <EmptyState
+            title="No calibration sessions"
+            description={
+              currentPage > 1
+                ? "No more sessions match these filters"
+                : "Sessions appear here when a run starts or someone creates one for an objective"
+            }
+            emoji="empty"
+          />
+        ) : (
+          <ul className="grid grid-cols-1 gap-2">
+            {items.map((session) => (
+              <li
+                key={session.calibration_session_id}
+                className={`rounded-box border border-base-200 bg-base-100 p-3 shadow-sm sm:p-4 ${calibrationSessionBorderStyle(session.status)}`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <Link
+                    href={calibrationSessionDetailHref(
+                      session.calibration_session_id,
+                      projectId,
+                      sessionReturn,
+                    )}
+                    className="link link-hover line-clamp-2 min-w-0 text-sm font-medium wrap-anywhere"
+                  >
+                    {session.objective}
+                  </Link>
+                  <span className="flex shrink-0 items-center gap-1">
+                    {session.origin === "automatic" ? (
+                      <span
+                        className="badge badge-ghost badge-sm"
+                        title="QDash created this session for a run started without one"
+                      >
+                        Automatic
+                      </span>
+                    ) : null}
+                    <CalibrationSessionStatusBadge status={session.status} />
                   </span>
                 </div>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
+                <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-base-content/60 sm:mt-1">
+                  <span>{formatDateTime(session.created_at)}</span>
+                  <ExecutionActor actor={{ username: session.created_by }} />
+                  <span>Chip {session.chip_id}</span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
 
-      {currentPage > 1 || hasMore ? (
-        <nav aria-label="Pages" className="mt-4 flex items-center justify-center gap-2">
-          <button
-            type="button"
-            className="btn btn-ghost btn-sm"
-            disabled={currentPage <= 1}
-            onClick={() => void setPage(currentPage - 1 <= 1 ? null : currentPage - 1)}
+        {currentPage > 1 || hasMore ? (
+          <nav
+            aria-label="Pages"
+            className="my-3 flex items-center justify-center gap-2 sm:my-4 sm:gap-4"
           >
-            <ChevronLeft data-icon="inline-start" aria-hidden="true" />
-            Previous
-          </button>
-          <span className="text-sm text-base-content/60">Page {currentPage}</span>
-          <button
-            type="button"
-            className="btn btn-ghost btn-sm"
-            disabled={!hasMore}
-            onClick={() => void setPage(currentPage + 1)}
-          >
-            Next
-            <ChevronRight data-icon="inline-end" aria-hidden="true" />
-          </button>
-        </nav>
-      ) : null}
+            <button
+              type="button"
+              className="btn btn-outline btn-xs sm:btn-sm"
+              disabled={currentPage <= 1}
+              onClick={() => void setPage(currentPage - 1 <= 1 ? null : currentPage - 1)}
+            >
+              Previous
+            </button>
+            <span className="text-sm">Page {currentPage}</span>
+            <button
+              type="button"
+              className="btn btn-outline btn-xs sm:btn-sm"
+              disabled={!hasMore}
+              onClick={() => void setPage(currentPage + 1)}
+            >
+              Next
+            </button>
+          </nav>
+        ) : null}
+      </section>
     </PageContainer>
   );
 }
