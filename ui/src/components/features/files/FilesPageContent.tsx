@@ -110,7 +110,11 @@ export function FilesPageContent({ workspace }: { workspace: FileWorkspace }) {
     queryFn: workspace.getTree,
   });
 
-  const { data: savedFileContent, isLoading: isContentLoading } = useQuery({
+  const {
+    data: savedFileContent,
+    isLoading: isContentLoading,
+    error: contentError,
+  } = useQuery({
     queryKey: workspaceQueryKeys.content(workspace, selectedFile),
     queryFn: () => workspace.getContent(selectedFile || ""),
     enabled: !!selectedFile,
@@ -505,6 +509,15 @@ export function FilesPageContent({ workspace }: { workspace: FileWorkspace }) {
                 {isContentLoading ? (
                   <div className="flex items-center justify-center h-full">
                     <span className="loading loading-spinner loading-lg"></span>
+                  </div>
+                ) : contentError ? (
+                  <div className="p-4">
+                    <div role="alert" className="alert alert-error">
+                      <span>
+                        Failed to load {selectedFile}:{" "}
+                        {getApiErrorMessage(contentError, "Unknown error")}
+                      </span>
+                    </div>
                   </div>
                 ) : isMarkdown && markdownView !== "code" ? (
                   <div className="flex h-full min-h-0">

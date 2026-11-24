@@ -45,6 +45,7 @@ import type {
   ListFlowsResponse,
   MoveFlowRequest,
   MoveFlowResponse,
+  OperationErrorDetail,
   SaveFlowRequest,
   SaveFlowResponse,
   ScheduleFlowRequest,
@@ -100,7 +101,7 @@ export const saveFlow = (
 
 
 
-export const getSaveFlowMutationOptions = <TError = Detail | HTTPValidationError,
+export const getSaveFlowMutationOptions = <TError = Detail | HTTPValidationError | OperationErrorDetail,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveFlow>>, TError,{data: SaveFlowRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof saveFlow>>, TError,{data: SaveFlowRequest}, TContext> => {
 
@@ -129,12 +130,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type SaveFlowMutationResult = NonNullable<Awaited<ReturnType<typeof saveFlow>>>
     export type SaveFlowMutationBody = SaveFlowRequest
-    export type SaveFlowMutationError = Detail | HTTPValidationError
+    export type SaveFlowMutationError = Detail | HTTPValidationError | OperationErrorDetail
 
     /**
  * @summary Save a flow
  */
-export const useSaveFlow = <TError = Detail | HTTPValidationError,
+export const useSaveFlow = <TError = Detail | HTTPValidationError | OperationErrorDetail,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveFlow>>, TError,{data: SaveFlowRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof saveFlow>>,
@@ -927,7 +928,7 @@ export const getGetFlowQueryKey = (name: string,) => {
     }
 
 
-export const getGetFlowQueryOptions = <TData = Awaited<ReturnType<typeof getFlow>>, TError = HTTPValidationError>(name: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFlow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getGetFlowQueryOptions = <TData = Awaited<ReturnType<typeof getFlow>>, TError = Detail | HTTPValidationError | OperationErrorDetail>(name: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFlow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -946,10 +947,10 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetFlowQueryResult = NonNullable<Awaited<ReturnType<typeof getFlow>>>
-export type GetFlowQueryError = HTTPValidationError
+export type GetFlowQueryError = Detail | HTTPValidationError | OperationErrorDetail
 
 
-export function useGetFlow<TData = Awaited<ReturnType<typeof getFlow>>, TError = HTTPValidationError>(
+export function useGetFlow<TData = Awaited<ReturnType<typeof getFlow>>, TError = Detail | HTTPValidationError | OperationErrorDetail>(
  name: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFlow>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getFlow>>,
@@ -959,7 +960,7 @@ export function useGetFlow<TData = Awaited<ReturnType<typeof getFlow>>, TError =
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetFlow<TData = Awaited<ReturnType<typeof getFlow>>, TError = HTTPValidationError>(
+export function useGetFlow<TData = Awaited<ReturnType<typeof getFlow>>, TError = Detail | HTTPValidationError | OperationErrorDetail>(
  name: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFlow>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getFlow>>,
@@ -969,7 +970,7 @@ export function useGetFlow<TData = Awaited<ReturnType<typeof getFlow>>, TError =
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetFlow<TData = Awaited<ReturnType<typeof getFlow>>, TError = HTTPValidationError>(
+export function useGetFlow<TData = Awaited<ReturnType<typeof getFlow>>, TError = Detail | HTTPValidationError | OperationErrorDetail>(
  name: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFlow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
@@ -977,7 +978,7 @@ export function useGetFlow<TData = Awaited<ReturnType<typeof getFlow>>, TError =
  * @summary Get flow details
  */
 
-export function useGetFlow<TData = Awaited<ReturnType<typeof getFlow>>, TError = HTTPValidationError>(
+export function useGetFlow<TData = Awaited<ReturnType<typeof getFlow>>, TError = Detail | HTTPValidationError | OperationErrorDetail>(
  name: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFlow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
@@ -1013,7 +1014,7 @@ export const deleteFlow = (
 
 
 
-export const getDeleteFlowMutationOptions = <TError = HTTPValidationError,
+export const getDeleteFlowMutationOptions = <TError = Detail | HTTPValidationError | OperationErrorDetail,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteFlow>>, TError,{name: string}, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof deleteFlow>>, TError,{name: string}, TContext> => {
 
@@ -1042,12 +1043,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type DeleteFlowMutationResult = NonNullable<Awaited<ReturnType<typeof deleteFlow>>>
 
-    export type DeleteFlowMutationError = HTTPValidationError
+    export type DeleteFlowMutationError = Detail | HTTPValidationError | OperationErrorDetail
 
     /**
  * @summary Delete a flow
  */
-export const useDeleteFlow = <TError = HTTPValidationError,
+export const useDeleteFlow = <TError = Detail | HTTPValidationError | OperationErrorDetail,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteFlow>>, TError,{name: string}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof deleteFlow>>,
@@ -1090,7 +1091,7 @@ export const getGetFlowExecutionPlanQueryKey = (name: string,
     }
 
 
-export const getGetFlowExecutionPlanQueryOptions = <TData = Awaited<ReturnType<typeof getFlowExecutionPlan>>, TError = Detail | HTTPValidationError>(name: string,
+export const getGetFlowExecutionPlanQueryOptions = <TData = Awaited<ReturnType<typeof getFlowExecutionPlan>>, TError = Detail | HTTPValidationError | OperationErrorDetail>(name: string,
     params?: GetFlowExecutionPlanParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFlowExecutionPlan>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
@@ -1110,10 +1111,10 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetFlowExecutionPlanQueryResult = NonNullable<Awaited<ReturnType<typeof getFlowExecutionPlan>>>
-export type GetFlowExecutionPlanQueryError = Detail | HTTPValidationError
+export type GetFlowExecutionPlanQueryError = Detail | HTTPValidationError | OperationErrorDetail
 
 
-export function useGetFlowExecutionPlan<TData = Awaited<ReturnType<typeof getFlowExecutionPlan>>, TError = Detail | HTTPValidationError>(
+export function useGetFlowExecutionPlan<TData = Awaited<ReturnType<typeof getFlowExecutionPlan>>, TError = Detail | HTTPValidationError | OperationErrorDetail>(
  name: string,
     params: undefined |  GetFlowExecutionPlanParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFlowExecutionPlan>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -1124,7 +1125,7 @@ export function useGetFlowExecutionPlan<TData = Awaited<ReturnType<typeof getFlo
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetFlowExecutionPlan<TData = Awaited<ReturnType<typeof getFlowExecutionPlan>>, TError = Detail | HTTPValidationError>(
+export function useGetFlowExecutionPlan<TData = Awaited<ReturnType<typeof getFlowExecutionPlan>>, TError = Detail | HTTPValidationError | OperationErrorDetail>(
  name: string,
     params?: GetFlowExecutionPlanParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFlowExecutionPlan>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -1135,7 +1136,7 @@ export function useGetFlowExecutionPlan<TData = Awaited<ReturnType<typeof getFlo
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetFlowExecutionPlan<TData = Awaited<ReturnType<typeof getFlowExecutionPlan>>, TError = Detail | HTTPValidationError>(
+export function useGetFlowExecutionPlan<TData = Awaited<ReturnType<typeof getFlowExecutionPlan>>, TError = Detail | HTTPValidationError | OperationErrorDetail>(
  name: string,
     params?: GetFlowExecutionPlanParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFlowExecutionPlan>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -1144,7 +1145,7 @@ export function useGetFlowExecutionPlan<TData = Awaited<ReturnType<typeof getFlo
  * @summary Preview a flow's execution plan
  */
 
-export function useGetFlowExecutionPlan<TData = Awaited<ReturnType<typeof getFlowExecutionPlan>>, TError = Detail | HTTPValidationError>(
+export function useGetFlowExecutionPlan<TData = Awaited<ReturnType<typeof getFlowExecutionPlan>>, TError = Detail | HTTPValidationError | OperationErrorDetail>(
  name: string,
     params?: GetFlowExecutionPlanParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFlowExecutionPlan>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -1190,7 +1191,7 @@ export const executeFlow = (
 
 
 
-export const getExecuteFlowMutationOptions = <TError = HTTPValidationError,
+export const getExecuteFlowMutationOptions = <TError = HTTPValidationError | OperationErrorDetail,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof executeFlow>>, TError,{name: string;data: ExecuteFlowRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof executeFlow>>, TError,{name: string;data: ExecuteFlowRequest}, TContext> => {
 
@@ -1219,12 +1220,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type ExecuteFlowMutationResult = NonNullable<Awaited<ReturnType<typeof executeFlow>>>
     export type ExecuteFlowMutationBody = ExecuteFlowRequest
-    export type ExecuteFlowMutationError = HTTPValidationError
+    export type ExecuteFlowMutationError = HTTPValidationError | OperationErrorDetail
 
     /**
  * @summary Execute a flow
  */
-export const useExecuteFlow = <TError = HTTPValidationError,
+export const useExecuteFlow = <TError = HTTPValidationError | OperationErrorDetail,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof executeFlow>>, TError,{name: string;data: ExecuteFlowRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof executeFlow>>,

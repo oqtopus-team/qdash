@@ -2581,6 +2581,36 @@
               }
             }
           },
+          "400": {
+            "description": "The path is invalid or not a text file",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Detail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The file is not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Detail"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The file could not be read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationErrorDetail"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -2625,6 +2655,26 @@
                     "type": "string"
                   },
                   "title": "Response Savefilecontent"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The path is outside the workspace",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Detail"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The file could not be saved or applying the save failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationErrorDetail"
                 }
               }
             }
@@ -12979,6 +13029,16 @@
               }
             }
           },
+          "500": {
+            "description": "The flow file, its deployment or its metadata could not be saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationErrorDetail"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -13581,6 +13641,26 @@
               }
             }
           },
+          "404": {
+            "description": "The flow or its source file is not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Detail"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The flow file could not be read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationErrorDetail"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -13643,6 +13723,26 @@
                     "type": "string"
                   },
                   "title": "Response Deleteflow"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The flow is not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Detail"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The flow file or its metadata could not be deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationErrorDetail"
                 }
               }
             }
@@ -13749,6 +13849,16 @@
               }
             }
           },
+          "500": {
+            "description": "The flow file could not be read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationErrorDetail"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -13819,6 +13929,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ExecuteFlowResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The flow file could not be read or the run could not be started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationErrorDetail"
                 }
               }
             }
@@ -39254,6 +39374,44 @@
         "type": "object",
         "title": "NumericBounds",
         "description": "Inclusive numeric bounds for one agent-controlled parameter."
+      },
+      "OperationErrorDetail": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code",
+            "description": "Stable code of the failed operation, e.g. file_read_failed"
+          },
+          "error_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Id",
+            "description": "Opaque ID of the server log entry recording the cause"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "OperationErrorDetail",
+        "description": "Error body of a failed operation.\n\n``detail`` is a message safe to show users. An unexpected failure also carries ``code``,\nnaming the failed operation, and ``error_id``, the ID under which the server logged the\ncause; endpoints that do not report one yet return ``detail`` alone."
       },
       "PanelLayoutModel": {
         "properties": {

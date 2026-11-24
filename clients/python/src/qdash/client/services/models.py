@@ -4527,6 +4527,26 @@ class NumericBounds(BaseModel):
     maximum: Annotated[float | None, Field(title="Maximum")] = None
 
 
+class OperationErrorDetail(BaseModel):
+    """
+    Error body of a failed operation.
+
+    ``detail`` is a message safe to show users. An unexpected failure also carries ``code``,
+    naming the failed operation, and ``error_id``, the ID under which the server logged the
+    cause; endpoints that do not report one yet return ``detail`` alone.
+    """
+
+    detail: Annotated[str, Field(title="Detail")]
+    code: Annotated[str | None, Field(title="Code")] = None
+    """
+    Stable code of the failed operation, e.g. file_read_failed
+    """
+    error_id: Annotated[str | None, Field(title="Error Id")] = None
+    """
+    Opaque ID of the server log entry recording the cause
+    """
+
+
 class PanelLayoutModel(BaseModel):
     """
     Position and size of a panel on the 12-column grid.

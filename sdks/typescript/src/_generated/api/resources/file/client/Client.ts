@@ -251,7 +251,10 @@ export class FileClient {
      * @param {QDashApi.GetFileContentRequest} request
      * @param {FileClient.RequestOptions} requestOptions - Request-specific configuration.
      *
+     * @throws {@link QDashApi.BadRequestError}
+     * @throws {@link QDashApi.NotFoundError}
      * @throws {@link QDashApi.UnprocessableEntityError}
+     * @throws {@link QDashApi.InternalServerError}
      * @throws {@link errors.ApiError}
      * @throws {@link errors.ApiTimeoutError}
      *
@@ -307,8 +310,17 @@ export class FileClient {
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
+                case 400:
+                    throw new QDashApi.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                case 404:
+                    throw new QDashApi.NotFoundError(_response.error.body as unknown, _response.rawResponse);
                 case 422:
                     throw new QDashApi.UnprocessableEntityError(_response.error.body as unknown, _response.rawResponse);
+                case 500:
+                    throw new QDashApi.InternalServerError(
+                        _response.error.body as QDashApi.OperationErrorDetail,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.ApiError({
                         statusCode: _response.error.statusCode,
@@ -325,7 +337,9 @@ export class FileClient {
      * @param {QDashApi.SaveFileRequest} request
      * @param {FileClient.RequestOptions} requestOptions - Request-specific configuration.
      *
+     * @throws {@link QDashApi.BadRequestError}
      * @throws {@link QDashApi.UnprocessableEntityError}
+     * @throws {@link QDashApi.InternalServerError}
      * @throws {@link errors.ApiError}
      * @throws {@link errors.ApiTimeoutError}
      *
@@ -377,8 +391,15 @@ export class FileClient {
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
+                case 400:
+                    throw new QDashApi.BadRequestError(_response.error.body as unknown, _response.rawResponse);
                 case 422:
                     throw new QDashApi.UnprocessableEntityError(_response.error.body as unknown, _response.rawResponse);
+                case 500:
+                    throw new QDashApi.InternalServerError(
+                        _response.error.body as QDashApi.OperationErrorDetail,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.ApiError({
                         statusCode: _response.error.statusCode,

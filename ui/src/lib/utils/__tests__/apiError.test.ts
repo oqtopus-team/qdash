@@ -8,6 +8,12 @@ function apiError(detail: unknown, message = "Request failed with status code 40
   return Object.assign(new Error(message), { response: { data: { detail } } });
 }
 
+function serverError(data: unknown) {
+  return Object.assign(new Error("Request failed with status code 500"), {
+    response: { status: 500, data },
+  });
+}
+
 function blobError(body: string, type = "application/json") {
   return Object.assign(new Error("Request failed with status code 404"), {
     response: { data: new Blob([body], { type }) },
@@ -17,6 +23,27 @@ function blobError(body: string, type = "application/json") {
 describe("getApiErrorMessage", () => {
   it("returns a string detail", () => {
     expect(getApiErrorMessage(apiError("Chip not found"), FALLBACK)).toBe("Chip not found");
+  });
+
+  it("appends the error ID of an unexpected server failure", () => {
+    const error = serverError({
+      detail: "Failed to read the flow file",
+      code: "flow_source_read_failed",
+      error_id: "0f1e2d3c4b5a69788796a5b4c3d2e1f0",
+    });
+
+    expect(getApiErrorMessage(error, FALLBACK)).toBe(
+      "Failed to read the flow file (Error ID: 0f1e2d3c4b5a69788796a5b4c3d2e1f0)",
+    );
+  });
+
+  it("keeps a legacy server failure without an error ID as its detail", () => {
+    expect(getApiErrorMessage(serverError({ detail: "Failed to list flows" }), FALLBACK)).toBe(
+      "Failed to list flows",
+    );
+    expect(
+      getApiErrorMessage(serverError({ detail: "Failed to list flows", error_id: "" }), FALLBACK),
+    ).toBe("Failed to list flows");
   });
 
   it("joins the messages of a 422 validation detail array", () => {

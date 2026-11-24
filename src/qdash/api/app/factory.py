@@ -15,6 +15,7 @@ from pydantic.json_schema import GenerateJsonSchema
 from qdash.api.app.metadata import API_METADATA, OPENAPI_EXTRA
 from qdash.api.app.router_registry import register_routers
 from qdash.api.db.session import lifespan
+from qdash.api.lib.errors import register_error_handlers
 from qdash.api.middleware.request_id import RequestIdMiddleware
 from qdash.config import Settings, get_settings, resolve_api_cors_origins
 from qdash.datamodel.calibration_pipeline import CalibrationPipelineSpec
@@ -115,6 +116,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_headers=["*"],
     )
     app.add_middleware(RequestIdMiddleware)
+    register_error_handlers(app)
     register_routers(app)
     _configure_openapi_schema(app)
 

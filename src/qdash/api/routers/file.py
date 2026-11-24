@@ -16,6 +16,7 @@ from fastapi.responses import FileResponse
 from qdash.api.dependencies import get_file_service
 from qdash.api.lib.auth import get_current_active_user
 from qdash.api.schemas.auth import User
+from qdash.api.schemas.error import Detail, OperationErrorDetail
 from qdash.api.schemas.file import (
     FileTreeNode,
     GitPushRequest,
@@ -112,6 +113,11 @@ def _workspace_router(
         f"{prefix}/content",
         summary=f"Get {label} file content for editing",
         operation_id=f"get{operation_prefix}FileContent",
+        responses={
+            400: {"model": Detail, "description": "The path is invalid or not a text file"},
+            404: {"model": Detail, "description": "The file is not found"},
+            500: {"model": OperationErrorDetail, "description": "The file could not be read"},
+        },
     )
     def get_file_content(path: str, service: FileService = service_dep) -> dict[str, Any]:
         return service.get_file_content(path)
@@ -133,6 +139,13 @@ def _workspace_router(
         f"{prefix}/content",
         summary=f"Save {label} file content",
         operation_id=f"save{operation_prefix}FileContent",
+        responses={
+            400: {"model": Detail, "description": "The path is outside the workspace"},
+            500: {
+                "model": OperationErrorDetail,
+                "description": "The file could not be saved or applying the save failed",
+            },
+        },
     )
     def save_file_content(
         request: SaveFileRequest, _current_user: User = user_dep, service: FileService = service_dep

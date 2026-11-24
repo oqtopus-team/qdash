@@ -957,7 +957,7 @@ export function WorkflowEditorPageContent() {
           <AlertTriangle className="h-5 w-5" />
           <div>
             <div className="font-medium">Failed to load flow</div>
-            <div className="text-sm">{(primary.error as Error)?.message}</div>
+            <div className="text-sm">{getApiErrorMessage(primary.error, "Unknown error")}</div>
           </div>
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
@@ -976,7 +976,7 @@ export function WorkflowEditorPageContent() {
         {deleteMutation.isError && (
           <div className="alert alert-error mt-4">
             <span>
-              Failed to delete flow: {(deleteMutation.error as Error)?.message || "Unknown error"}
+              Failed to delete flow: {getApiErrorMessage(deleteMutation.error, "Unknown error")}
             </span>
           </div>
         )}
@@ -1054,7 +1054,7 @@ export function WorkflowEditorPageContent() {
           <div className="alert alert-error">
             <AlertTriangle className="h-5 w-5" aria-hidden="true" />
             <span>
-              Failed to load {doc.name}: {(doc.error as Error)?.message || "Unknown error"}
+              Failed to load {doc.name}: {getApiErrorMessage(doc.error, "Unknown error")}
             </span>
           </div>
         </div>
@@ -1267,7 +1267,7 @@ export function WorkflowEditorPageContent() {
           doc.saveError && doc.name ? (
             <div key={doc.name} className="alert alert-error mx-4 mt-2">
               <span>
-                Failed to save {doc.name}: {(doc.saveError as Error)?.message || "Unknown error"}
+                Failed to save {doc.name}: {getApiErrorMessage(doc.saveError, "Unknown error")}
               </span>
             </div>
           ) : null,
@@ -1276,7 +1276,7 @@ export function WorkflowEditorPageContent() {
         {deleteMutation.isError && (
           <div className="alert alert-error mx-4 mt-2">
             <span>
-              Failed to delete flow: {(deleteMutation.error as Error)?.message || "Unknown error"}
+              Failed to delete flow: {getApiErrorMessage(deleteMutation.error, "Unknown error")}
             </span>
           </div>
         )}

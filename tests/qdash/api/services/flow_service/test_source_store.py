@@ -3,9 +3,17 @@
 from pathlib import Path
 
 import pytest
-from fastapi import HTTPException
 
+from qdash.api.lib.errors import OperationFailedError
 from qdash.api.services.flow_service.source_store import FlowSourceStore
+
+
+def _assert_safe_failure(error: OperationFailedError, code: str, message: str) -> None:
+    """The error names the operation, carries an ID, and leaks no exception text."""
+    assert error.status_code == 500
+    assert error.code == code
+    assert error.detail == message
+    assert len(error.error_id) == 32
 
 
 def test_path_for_sanitizes_the_project_and_creates_its_directory(tmp_path: Path) -> None:
@@ -33,22 +41,22 @@ def test_write_failure_is_reported_as_a_server_error(tmp_path: Path) -> None:
     """A write that cannot complete raises the save error."""
     store = FlowSourceStore(tmp_path)
 
-    with pytest.raises(HTTPException) as exc_info:
+    with pytest.raises(OperationFailedError) as exc_info:
         store.write(tmp_path, "print('hello')\n")
 
-    assert exc_info.value.status_code == 500
-    assert str(exc_info.value.detail).startswith("Failed to save flow file:")
+    _assert_safe_failure(exc_info.value, "flow_source_write_failed", "Failed to save the flow file")
+    assert isinstance(exc_info.value.__cause__, OSError)
 
 
 def test_read_failure_is_reported_as_a_server_error(tmp_path: Path) -> None:
     """A missing file raises the read error."""
     store = FlowSourceStore(tmp_path)
 
-    with pytest.raises(HTTPException) as exc_info:
+    with pytest.raises(OperationFailedError) as exc_info:
         store.read(tmp_path / "missing.py")
 
-    assert exc_info.value.status_code == 500
-    assert str(exc_info.value.detail).startswith("Failed to read flow file:")
+    _assert_safe_failure(exc_info.value, "flow_source_read_failed", "Failed to read the flow file")
+    assert isinstance(exc_info.value.__cause__, FileNotFoundError)
 
 
 def test_delete_removes_the_file(tmp_path: Path) -> None:
@@ -66,11 +74,27 @@ def test_delete_failure_is_reported_as_a_server_error(tmp_path: Path) -> None:
     """Deleting a file that is gone raises the delete error."""
     store = FlowSourceStore(tmp_path)
 
-    with pytest.raises(HTTPException) as exc_info:
+    with pytest.raises(OperationFailedError) as exc_info:
         store.delete(tmp_path / "missing.py")
 
-    assert exc_info.value.status_code == 500
-    assert str(exc_info.value.detail).startswith("Failed to delete flow file:")
+    _assert_safe_failure(
+        exc_info.value, "flow_source_delete_failed", "Failed to delete the flow file"
+    )
+    assert isinstance(exc_info.value.__cause__, FileNotFoundError)
+
+
+def test_create_failure_is_reported_as_a_save_error(tmp_path: Path) -> None:
+    """A create into a missing directory raises the save error; an existing file does not."""
+    store = FlowSourceStore(tmp_path)
+
+    with pytest.raises(OperationFailedError) as exc_info:
+        store.create(tmp_path / "missing" / "flow.py", "print('hello')\n")
+
+    _assert_safe_failure(exc_info.value, "flow_source_write_failed", "Failed to save the flow file")
+    existing = tmp_path / "flow.py"
+    existing.write_text("# keep\n", encoding="utf-8")
+    with pytest.raises(FileExistsError):
+        store.create(existing, "print('hello')\n")
 
 
 def test_to_deployment_path_maps_host_user_flow_path(tmp_path: Path) -> None:

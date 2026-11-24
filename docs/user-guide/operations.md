@@ -69,6 +69,18 @@ In particular, deleting `agent-runtime-state` loses conversations and unfinished
 
 ## Resolve Common Failures
 
+### Investigate an Error ID
+
+Some file and workflow errors display **Error ID** after the message.
+
+1. Copy the message and ID, and record the operation and approximate time. If you do not operate
+   the deployment, send these details to its operator.
+2. As the operator, run `docker compose logs --since 30m api`, adjusting the time window as needed,
+   and locate the exact ID. The matching entry includes the underlying error and traceback.
+3. Resolve the cause, then check the file or workflow's saved state before retrying a write.
+
+Not every error has an ID. For those errors, use the operation and time to locate the API logs.
+
 ### A Page Shows No Data
 
 Check the active project, chip, time range, and filters. If requests fail, inspect `caddy` and
