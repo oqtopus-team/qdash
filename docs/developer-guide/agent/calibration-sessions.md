@@ -25,8 +25,10 @@ runs use the decorator's metadata when the worker first records their run. Expli
 session membership takes precedence and its objective is never renamed by a template.
 Without the metadata, the existing automatic naming behavior applies.
 
-A name is trimmed and limited to 500 characters. Keep it a literal: the API does not evaluate
-source expressions to obtain a name. SDK `create(..., name=...)` stores the name as the session
+A name is trimmed and limited to 500 characters. Saving rejects empty, oversized, non-string
+or expression-based `session_name` values with HTTP 400; omitted names and literal `None`
+keep the default. The API never evaluates source expressions. Previously saved invalid
+metadata is still read defensively, so resave with a valid literal to align launch paths. SDK `create(..., name=...)` stores the name as the session
 objective. See the [SDK example](../../reference/clients/python.md#run-a-calibration) and
 [workflow authoring](../workflow/quickstart.md#define-a-flow).
 

@@ -56,6 +56,12 @@ Execution detail shows **Step outcome** for these records. A saved workflow with
 `run()` calls lists all executions; aggregate per-step progress is currently available only for
 the system pipeline flow, whose source-independent plan has one step sequence.
 
+Runtime custom transforms receive their own history-only Execution. `execution_service`,
+`get_parameter()` and `get_stage_result()` no longer expose the preceding measurement
+Execution during a transform. Read earlier step outputs from the supplied `StepContext`
+(for example `ctx.get_step_result(step_id)`) instead. Built-in filters and schedulers already
+use that context.
+
 ## Save and Register a Flow
 
 The API formats and validates source, writes the shared project file, asks the deployment service

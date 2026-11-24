@@ -7,7 +7,10 @@ import re
 
 from fastapi import HTTPException
 
-from qdash.api.services.flow_service.flow_metadata import is_flow_decorator
+from qdash.api.services.flow_service.flow_metadata import (
+    is_flow_decorator,
+    validate_session_name_declaration,
+)
 
 # Use full-string matching (fullmatch) so trailing newlines are rejected
 _NAME_PATTERN = re.compile(r"^[a-zA-Z0-9_]+$")
@@ -49,6 +52,13 @@ def validate_flow_code(code: str, expected_function_name: str) -> None:
             status_code=400,
             detail=f"Python syntax error in code: {exc}",
         ) from exc
+
+    try:
+        for node in ast.walk(tree):
+            if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
+                validate_session_name_declaration(node)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     flow_functions = [
         node.name

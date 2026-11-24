@@ -149,3 +149,31 @@ return session.run(targets=targets, steps=[TwoQubitCalibration()], name=flow_nam
     )
     assert response.status == "resolved", response.reason
     assert response.has_manual_rounds and not response.target_override_allowed
+
+
+@pytest.mark.parametrize(
+    "value",
+    ['""', '"   "', repr("x" * 501), "42", "True", "NAME", '"a" + "b"', 'f"{NAME}"'],
+)
+def test_invalid_session_names_are_rejected_before_saving(value: str) -> None:
+    code = _flow(f"@calibration_flow(session_name={value})", RUN)
+    with pytest.raises(HTTPException) as caught:
+        validate_flow_code(code, "my_flow")
+    assert caught.value.status_code == 400
+    assert "session_name" in caught.value.detail
+    assert "500" in caught.value.detail
+
+
+@pytest.mark.parametrize("value", ["None", repr("x" * 500), repr("  padded  ")])
+def test_valid_session_names_can_be_saved(value: str) -> None:
+    validate_flow_code(_flow(f"@calibration_flow(session_name={value})", RUN), "my_flow")
+
+
+def test_invalid_helper_decorator_also_blocks_save_without_evaluating_source() -> None:
+    code = (
+        'raise AssertionError("must not execute")\n'
+        + _flow('@qdash.workflow.calibration_flow(session_name=" ")', RUN, name="helper")
+        + _flow("@flow", RUN)
+    )
+    with pytest.raises(HTTPException, match="helper: session_name"):
+        validate_flow_code(code, "my_flow")

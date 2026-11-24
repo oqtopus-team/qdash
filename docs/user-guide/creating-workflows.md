@@ -22,8 +22,10 @@ Templates declare the name shown for a new calibration group:
 @calibration_flow(session_name="Coherence check")
 ```
 
-Change the quoted string to describe the work. Keep it a string literal so QDash can read it
-before starting the workflow. This name is separate from **Flow Name** and the Python function
+Change the quoted string to describe the work. Use a non-empty string literal of at most
+500 characters after trimming whitespace; saving rejects expressions and invalid names so
+manual and scheduled launches use the same name. Omit `session_name` or use `None` for the
+default name. This name is separate from **Flow Name** and the Python function
 name. Launching into an existing CalibrationSession preserves that group's name.
 
 The template creates `CalibrationSession.from_context(context)` and calls `session.run()`.

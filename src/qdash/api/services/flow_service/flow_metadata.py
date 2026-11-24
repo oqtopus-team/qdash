@@ -3,8 +3,8 @@
 A workflow names the calibration session QDash creates for its launches with
 ``@calibration_flow(session_name="Coherence Check")``. The API reads that literal
 from the entrypoint's decorator with :mod:`ast`; the source is never imported or
-evaluated. A name that is not a plain string literal is not read, and the launch
-keeps the automatic session's default name, as a flow without one does.
+evaluated. Saving rejects invalid or expression-based names. Reading older source
+remains defensive: an unusable name is not read and the launch keeps its default name.
 """
 
 from __future__ import annotations
@@ -40,6 +40,26 @@ def checked_session_name(value: object) -> str | None:
     if not name or len(name) > SESSION_NAME_MAX_LENGTH:
         return None
     return name
+
+
+def validate_session_name_declaration(node: ast.FunctionDef | ast.AsyncFunctionDef) -> None:
+    """Reject saved decorator names that cannot be read consistently before launch."""
+    for decorator in node.decorator_list:
+        if not (
+            isinstance(decorator, ast.Call) and _decorator_name(decorator) == "calibration_flow"
+        ):
+            continue
+        for keyword in decorator.keywords:
+            if keyword.arg != "session_name":
+                continue
+            if isinstance(keyword.value, ast.Constant):
+                value = keyword.value.value
+                if value is None or checked_session_name(value) is not None:
+                    continue
+            raise ValueError(
+                f"{node.name}: session_name must be None or a non-empty string literal "
+                f"of at most {SESSION_NAME_MAX_LENGTH} characters after trimming"
+            )
 
 
 def declared_session_name(code: str, function_name: str) -> str | None:
