@@ -10,12 +10,12 @@ packages:
     from qdash.sdk import CalibrationSession, QDash
     from qdash.sdk.calibration import CustomOneQubit, QubitTargets, TaskCall
 
-    with QDash.from_env() as client:
-        session = CalibrationSession.create(client, chip_id="64Qv3", name="T1 check")
-        result = session.run(
-            targets=QubitTargets(["0", "1"]),
-            steps=[CustomOneQubit(step_name="t1", tasks=[TaskCall(name="CheckT1")])],
-        )
+    client = QDash.from_env()
+    session = CalibrationSession.create(client, chip_id="64Qv3", name="T1 check")
+    result = session.run(
+        targets=QubitTargets(["0", "1"]),
+        steps=[CustomOneQubit(step_name="t1", tasks=[TaskCall(name="CheckT1")])],
+    )
 
 :class:`Pipeline` (from :mod:`qdash.sdk.pipeline`) holds a whole spec for the legacy
 ``Chip.calibrate(pipeline)``; it accepts these definitions too.

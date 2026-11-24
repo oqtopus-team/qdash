@@ -19,8 +19,9 @@ result = workflow.run(parameters={"qids": ["0", "1"]}).wait()
 print(result.status)
 ```
 
-Reuse `qdash` across notebook cells or script operations. Call `qdash.close()` when you finish
-using the connection.
+Reuse `qdash` across notebook cells or script operations. The SDK closes its remaining owned
+connections at normal Python process shutdown. Use `qdash.close()` or a `with` block only
+when you want to release the connection earlier.
 
 Keep the handle from `workflow.run()` to request cancellation with `run.cancel()`;
 `run.wait()` then confirms the workflow's terminal state.

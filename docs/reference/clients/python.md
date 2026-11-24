@@ -112,27 +112,29 @@ for chip in chips:
 
 Create one client and reuse `qdash` across notebook cells or script operations. Each example
 below includes initialization so it can run on its own; skip that line when reusing your client.
-Call `qdash.close()` when you finish using the connection. For a short script that needs
-automatic cleanup, `with QDash.from_profile("local") as qdash:` is also supported.
+No `with` block or explicit `close()` is needed for this usage: the SDK closes its remaining
+owned connections at normal Python process shutdown. To release a connection earlier, use
+`qdash.close()` or a `with` block.
 Closing the connection does not cancel work already dispatched to the server.
 
 `qdash.chips.list()` returns chip metadata as a list; `qdash.chips.get(chip_id)` reads one
 chip. `qdash.chip(chip_id)` creates a calibration handle without contacting the server.
 
 `qdash.api` exposes the generated resources, grouped by API tags. Response types are available
-from `qdash.sdk.types`. These calls use the session's authentication and project header,
+from `qdash.sdk.types`. These calls use the client's authentication and project header,
 perform no automatic retries by default, and raise generated `ApiError` subclasses or httpx
 exceptions. SDK helpers such as `qdash.workflows.run()` translate failures to SDK errors;
 HTTP 409 becomes `QDashConflictError`. Helper reads use `QDASH_RETRY_MAX_ATTEMPTS`; helper
 writes are sent once. Do not enable retries on execution writes without reconciling their effects.
 
-`qdash.with_project(project_id)` shares the connection; close the original session after both
-are done. Token authentication is preferred. Password authentication caches a login token;
-create a new session if that token expires.
+`qdash.with_project(project_id)` shares the connection and remains usable after the original
+client variable is discarded. Explicitly closing the original owner closes the shared connection.
+An externally supplied `httpx.Client` remains the caller’s responsibility. Token authentication
+is preferred. Password authentication caches a login token; create a new client if it expires.
 
-`QDash` sessions and helpers are synchronous. The exported `AsyncQDashApi` is a separate
+`QDash` clients and helpers are synchronous. The exported `AsyncQDashApi` is a separate
 generated client: configure its base URL, authentication, and project explicitly; it does not
-inherit a `QDash` session's configuration.
+inherit a `QDash` client's configuration.
 
 ## Call the Existing Client's High-Level API
 
@@ -227,8 +229,8 @@ Writes are sent once. Pass an `idempotency_key` to `run()` or `submit()` when a 
 to be retried; reconcile an uncertain response before starting another run.
 
 Call `session.close()` when the objective is finished. Closing prevents new launches and does
-not cancel work; the server can refuse closure while work remains. Close the HTTP connection
-separately with `client.close()`. Explicit sessions remain open until closed; automatic sessions
+not cancel work; the server can refuse closure while work remains. HTTP connection cleanup
+does not close this group. Explicit sessions remain open until closed; automatic sessions
 created by other launch APIs follow the [automatic closing rules](../../developer-guide/agent/calibration-sessions.md#closing).
 
 Existing `chip.calibrate(targets, steps, ...)` and `chip.calibrate(pipeline)` remain available

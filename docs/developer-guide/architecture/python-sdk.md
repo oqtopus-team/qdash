@@ -52,10 +52,18 @@ Workflow results retain typed calibration steps in `steps` and transform snapsho
 ## Client ownership
 
 Create one `QDash` client and reuse it across operations or notebook cells.
-`QDash(config)`, `from_env()`, and `from_profile()` own their HTTP connection; call `close()`
-when the client is no longer needed. A `with` block is an optional way to close it on exit. `QDash(config, http_client=...)` borrows an `httpx.Client` and never
-closes it. The supplied client's TLS and proxy settings apply. `with_project()` creates a
-client on the same connection without taking ownership. Close the owning client last.
+`QDash(config)`, `from_env()`, and `from_profile()` own their HTTP connection. No explicit
+cleanup is needed for a client reused until normal process shutdown; `close()` and `with`
+remain available for earlier release. `QDash(config, http_client=...)` borrows an
+`httpx.Client` and never closes it. The supplied client's TLS and proxy settings apply.
+`with_project()`, generated resources, and helpers keep the shared connection usable even
+when the original client variable is discarded. Explicitly closing the owner closes it for all.
+
+`_http.py` tracks owned transports in a weak registry and closes those still referenced at
+normal interpreter exit through one `atexit` handler. A close failure does not prevent cleanup
+of the others. The registry does not retain unused clients; garbage collection does not guarantee
+an explicit transport close. Abrupt termination bypasses the handler, leaving connections to
+OS cleanup. The handler sends no requests and never closes a `CalibrationSession`.
 
 `qdash.api` exposes generated resources with the client's authentication and project header.
 Generated calls disable retries by default. Helper reads may retry transient failures according

@@ -10,14 +10,14 @@ it and never closes it.
     from qdash.calibration import CustomOneQubit, QubitTargets, TaskCall
     from qdash.sdk import CalibrationSession, QDash
 
-    with QDash.from_env() as client:
-        session = CalibrationSession.create(client, chip_id="64Qv3", name="Coherence check")
-        result = session.run(
-            targets=QubitTargets(["0", "1"]),
-            steps=[CustomOneQubit(step_name="t1", tasks=[TaskCall(name="CheckT1")])],
-        )
-        print(result.status, result.execution_ids)
-        session.close()
+    client = QDash.from_env()
+    session = CalibrationSession.create(client, chip_id="64Qv3", name="Coherence check")
+    result = session.run(
+        targets=QubitTargets(["0", "1"]),
+        steps=[CustomOneQubit(step_name="t1", tasks=[TaskCall(name="CheckT1")])],
+    )
+    print(result.status, result.execution_ids)
+    session.close()
 
 The same targets and steps run in a saved workflow through ``qdash.workflow.CalibrationSession``
 and return the same :class:`~qdash.calibration.CalibrationResult`.
