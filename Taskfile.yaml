@@ -521,7 +521,13 @@ tasks:
 
   check-lane-python-after-lint:
     internal: true
-    deps: [ci-typecheck, ci-test, check-typescript-sdk-generated]
+    deps: [ci-typecheck, check-test-python, check-typescript-sdk-generated]
+
+  check-test-python:
+    internal: true
+    cmds:
+      # Same tests and flags as ci-test, without coverage instrumentation or reports.
+      - uv run pytest tests/ clients/python/tests/ sdks/python/tests/ -v --tb=short
 
   check-lane-typescript:
     internal: true

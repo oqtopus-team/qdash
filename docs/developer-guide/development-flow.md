@@ -46,6 +46,9 @@ the leak scan after those checks pass. Output is grouped by task, so long-runnin
 remain silent until they finish. For focused troubleshooting, `task check-lanes` runs only
 the parallel checks; it does not replace the full pre-push check.
 
+Local checks run the full Python test suite without coverage instrumentation. CI collects
+coverage with `task ci-test`; run that task locally when you need a coverage report.
+
 1. Stage intended new files so the leak scan includes them.
 2. Fetch the PR target and run the checks from the repository root:
 
