@@ -4,6 +4,7 @@ import { setTimeout as delay } from "node:timers/promises";
 
 import { ApiError, ApiTimeoutError, QDashApiClient } from "./_generated/index.js";
 import { isResponseBodyError } from "./_generated/core/fetcher/getResponseBody.js";
+import type { RawResponse } from "./_generated/core/index.js";
 import type { QDashConfig } from "./config.js";
 import {
   QDashApiError,
@@ -11,6 +12,7 @@ import {
   QDashConfigError,
   QDashConflictError,
   QDashNotFoundError,
+  QDashResultUnknownError,
   QDashTransportError,
   QDashValidationError,
 } from "./errors.js";
@@ -72,13 +74,34 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-/** The bearer token, or a function that signs in once with username and password. */
-export function tokenProvider(
-  config: QDashConfig,
-  fetchFn: Fetch | undefined,
-  env: Environment,
-): string | (() => Promise<string>) {
-  if (config.apiToken) return config.apiToken;
+/** How a session authenticates its API requests. */
+export interface SessionAuth {
+  /** The bearer token, or a function returning the current sign-in's token. */
+  readonly token: string | (() => Promise<string>);
+  /**
+   * The fetch API requests go through: the given one, or, for a username/password sign-in, a
+   * wrapper that drops the sign-in after a 401. Undefined means the built-in fetch.
+   */
+  readonly fetch: Fetch | undefined;
+}
+
+function bearerToken(input: RequestInfo | URL, init: RequestInit | undefined): string | undefined {
+  const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
+  const match = /^Bearer\s+(.+)$/i.exec(headers.get("Authorization") ?? "");
+  return match?.[1];
+}
+
+/**
+ * The session's authentication: a configured API token as it is, or a username/password
+ * sign-in shared by every request of the session and of its `withProject` sessions.
+ *
+ * A sign-in happens once, on the first request, and is reused. A 401 answer to a request
+ * drops the sign-in whose token that request carried, so the next request signs in again;
+ * a 401 to a request that carried an older token leaves a newer sign-in in place. The request
+ * that got the 401 is not sent again (a write could act twice): its caller gets the 401.
+ */
+export function sessionAuth(config: QDashConfig, fetchFn: Fetch | undefined, env: Environment): SessionAuth {
+  if (config.apiToken) return { token: config.apiToken, fetch: fetchFn };
   if (!config.username) {
     throw new QDashConfigError(
       "No authentication configured: set QDASH_API_TOKEN (api_token or api_token_env), or username " +
@@ -87,7 +110,6 @@ export function tokenProvider(
   }
   const { username, passwordEnv } = config;
   if (!passwordEnv) throw new QDashConfigError("password_env is required when using username/password");
-  let pending: Promise<string> | undefined;
   const signIn = async (): Promise<string> => {
     const password = env[passwordEnv];
     if (!password) throw new QDashConfigError(`Missing password in environment variable ${passwordEnv}`);
@@ -117,12 +139,39 @@ export function tokenProvider(
     if (typeof token !== "string" || !token) throw new QDashAuthError("Login response did not include access_token");
     return token;
   };
-  return () =>
-    (pending ??= signIn().catch((error: unknown) => {
-      // A failed sign-in is tried again by the next request.
+
+  // The current sign-in, shared by concurrent requests, and its token once it has one.
+  let pending: Promise<string> | undefined;
+  let signedIn: string | undefined;
+  const token = (): Promise<string> => {
+    if (pending) return pending;
+    const attempt: Promise<string> = signIn().then(
+      (value) => {
+        if (pending === attempt) signedIn = value;
+        return value;
+      },
+      (error: unknown) => {
+        // A failed sign-in is tried again by the next request.
+        if (pending === attempt) pending = undefined;
+        throw error;
+      },
+    );
+    pending = attempt;
+    return attempt;
+  };
+  const base: Fetch = fetchFn ?? ((input, init) => globalThis.fetch(input, init));
+  const apiFetch = (async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    const used = bearerToken(input, init);
+    const signInAtStart = pending;
+    const response = await base(input, init);
+    // Only the sign-in this request used is dropped; a newer one stays.
+    if (response.status === 401 && used !== undefined && used === signedIn && pending === signInAtStart) {
       pending = undefined;
-      throw error;
-    }));
+      signedIn = undefined;
+    }
+    return response;
+  }) as Fetch;
+  return { token, fetch: apiFetch };
 }
 
 export interface ApiOptions {
@@ -256,6 +305,21 @@ export async function read<T>(policy: ReadPolicy, request: (options: CallOptions
       await policy.sleep(retryDelayMilliseconds(attempt, error as QDashApiError));
     }
   }
+}
+
+/**
+ * The error for a dispatch answer that does not confirm how the run was recorded: the run may
+ * have started, so it is reported for reconciliation, never sent again.
+ */
+export function resultUnknown(message: string, answer: { data: unknown; rawResponse: RawResponse }): QDashResultUnknownError {
+  const data = answer.data;
+  const executionId = isRecord(data) && typeof data.execution_id === "string" && data.execution_id ? data.execution_id : undefined;
+  return new QDashResultUnknownError(message, {
+    statusCode: answer.rawResponse.status,
+    body: data,
+    rawResponse: answer.rawResponse,
+    ...(executionId ? { executionId } : {}),
+  });
 }
 
 /** Options of a write: sent once. */

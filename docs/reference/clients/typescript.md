@@ -56,7 +56,8 @@ TOML keys and profile selection rules. The SDK does not provide a profile-writin
 `qdash.withProject(projectId)` returns a new scoped session without changing the original.
 Configuration is a frozen snapshot. `proxy` or `verifyTls: false` requires a custom `fetch`
 passed as the second constructor argument, such as `new QDash(config, { fetch: customFetch })`.
-That fetch must implement the requested proxy or TLS policy; otherwise construction fails.
+Construction fails if no custom fetch is supplied. The caller must ensure that the supplied
+fetch implements the requested proxy or TLS policy; the SDK cannot verify that behavior.
 
 An empty chip array indicates a successful connection to a project with no chips. Before
 calibration examples, [create a chip and run its first calibration](../../user-guide/first-calibration.md).
@@ -169,7 +170,10 @@ console.log(result.status);
 
 `validateCalibration()` dispatches nothing; `calibrate()` starts the run. `wait()` returns the
 whole run's status, including failure or cancellation. A timeout throws `QDashTimeoutError`
-and leaves the run active. `get()` reads current status without waiting.
+and leaves the run active. Sleeps are capped at the remaining budget; no subsequent read
+starts at or after the deadline. A read already in flight is not cancelled and remains subject
+to its request timeout and retries. A zero timeout makes one initial read.
+`get()` reads current status without waiting.
 
 For stored specs, use `qdash.pipelines.catalog()`, `validate(spec, { chipId })`, and
 `execute(spec, { chipId })`. The returned pipeline run's `wait()` returns raw execution detail.
@@ -225,6 +229,15 @@ and throw generated `ApiError` or `ApiTimeoutError`. SDK helpers translate failu
 `QDashApiError`. Helper GETs retry transient statuses, connection failures, and timeouts up to
 `readAttempts`; caller cancellation is not retried. Writes are sent once. Do not opt into
 retries for execution writes without reconciling their effects.
+
+With username/password authentication, a resource's 401 invalidates the login used by that
+request. The failed request is not replayed; the next call signs in again. Scoped sessions share
+this state, and a late 401 cannot invalidate a newer sign-in. Static API tokens are unchanged.
+
+`QDashResultUnknownError` means a dispatch response did not confirm the requested run
+recording. It extends `QDashApiError` and exposes `executionId` when available. The operation
+may have started: inspect that execution before deciding what to do; do not launch again
+with a new key.
 
 Import generated types through the `QDashApi` namespace from `@oqtopus-team/qdash-sdk`. Existing client users can continue
 using `client.api.listChips()` and the client's `/models` and `/openapi` exports.

@@ -34,6 +34,7 @@ export {
   QDashConfigError,
   QDashConflictError,
   QDashNotFoundError,
+  QDashResultUnknownError,
   QDashTimeoutError,
   QDashTransportError,
   QDashValidationError,

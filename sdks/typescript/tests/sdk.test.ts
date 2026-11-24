@@ -7,7 +7,9 @@ import {
   QDash,
   QDashConfig,
   QDashConfigError,
+  QDashApiError,
   QDashNotFoundError,
+  QDashResultUnknownError,
   QDashTimeoutError,
   QDashValidationError,
   customOneQubit,
@@ -267,6 +269,28 @@ describe("Chip calibration", () => {
     });
   });
 
+  for (const [name, answer, recordIn] of [
+    ["drops the recording", { ...dispatched }, { idempotencyKey: "key-1" }],
+    ["records another session", { ...dispatched, calibration_session_id: "cs-other", pipeline_run_id: "cpr-1" }, { calibrationSessionId: "cs-1", idempotencyKey: "key-1" }],
+    ["drops the decision", { ...dispatched, calibration_session_id: "cs-1", pipeline_run_id: "cpr-1" }, { calibrationSessionId: "cs-1", idempotencyKey: "key-1", decisionId: "d-1" }],
+  ] as const) {
+    it(`reports a launch whose answer ${name} as result unknown, sent once`, async () => {
+      const { fetch, requests } = server({
+        "GET /calibration-sessions/cs-1": [{ body: { calibration_session_id: "cs-1", chip_id: "64Qv3" } }],
+        "POST /calibration-pipelines/execute": [{ status: 201, body: answer }],
+      });
+      const error = await session(fetch, "p1")
+        .pipelines.execute(expectedSpec, { chipId: "64Qv3" }, recordIn)
+        .catch((caught: unknown) => caught);
+      expect(error).toBeInstanceOf(QDashResultUnknownError);
+      expect(error).toBeInstanceOf(QDashApiError);
+      expect(error).toBeInstanceOf(ApiError);
+      expect(error).toMatchObject({ name: "QDashResultUnknownError", executionId: "exec-1", statusCode: 201, body: answer });
+      expect((error as Error).message).toMatch(/^Pipeline result unknown: .*Do not retry automatically/);
+      expect(requests.filter((request) => request.method === "POST")).toHaveLength(1);
+    });
+  }
+
   it("sends a reported origin only when the caller gives one", async () => {
     const { fetch, requests } = server({
       "POST /calibration-pipelines/execute": [{ body: dispatched }],
@@ -462,6 +486,32 @@ describe("Workflows", () => {
       { parameters: {} },
       { parameters: { qids: ["0", "1"] } },
     ]);
+  });
+});
+
+describe("Workflows with a recorded run", () => {
+  for (const [name, answer, options] of [
+    ["drops the recorded run", { ...dispatched }, { idempotencyKey: "k" }],
+    ["records another session", { ...dispatched, calibration_session_id: "cs-other", calibration_run_id: "cr-1" }, { calibrationSessionId: "cs-1", idempotencyKey: "k" }],
+  ] as const) {
+    it(`reports a run whose answer ${name} as result unknown, sent once`, async () => {
+      const { fetch, requests } = server({ "POST /flows/coherence_check/execute": [{ body: answer }] });
+      const error = await session(fetch)
+        .workflows.run("coherence_check", options)
+        .catch((caught: unknown) => caught);
+      expect(error).toBeInstanceOf(QDashResultUnknownError);
+      expect(error).toBeInstanceOf(QDashApiError);
+      expect(error).toMatchObject({ executionId: "exec-1", statusCode: 200 });
+      expect((error as Error).message).toMatch(/^Workflow result unknown: .*reconcile the execution first/);
+      expect(requests).toHaveLength(1);
+    });
+  }
+
+  it("returns a run whose answer echoes the session and recorded run", async () => {
+    const answer = { ...dispatched, calibration_session_id: "cs-1", calibration_run_id: "cr-1" };
+    const { fetch } = server({ "POST /flows/coherence_check/execute": [{ body: answer }] });
+    const run = await session(fetch).workflows.run("coherence_check", { calibrationSessionId: "cs-1", idempotencyKey: "k" });
+    expect(run.calibrationRunId).toBe("cr-1");
   });
 });
 

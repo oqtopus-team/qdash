@@ -5,7 +5,7 @@ import { Type } from "typebox";
 import { pausedSessionConflict } from "../lib/agent-loop.js";
 import { toTextToolResult } from "../lib/results.js";
 import { requireWriteApproval } from "../lib/write-approval.js";
-import { sdkSession, type SdkSessionFactory } from "../lib/sdk-session.js";
+import { isResultUnknown, resultUnknownToolError, sdkSession, type SdkSessionFactory } from "../lib/sdk-session.js";
 
 /**
  * Declarative calibration pipelines.
@@ -490,6 +490,8 @@ export function registerCalibrationPipelineTools(pi: Pick<ExtensionAPI, "registe
           ...(result.replayed ? { replayed: true } : {}),
         });
       } catch (error) {
+        // Answered, but without the recording asked for: the run may be going.
+        if (isResultUnknown(error)) throw resultUnknownToolError(error);
         const problems = problemsFromError(error);
         if (problems) {
           const text = [

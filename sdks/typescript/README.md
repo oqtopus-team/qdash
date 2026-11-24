@@ -26,7 +26,9 @@ console.log(run.executionId, result.status);
 ```
 
 Check `check.valid` before calling `calibrate()`. The example measures real targets; choose them
-for your deployment. `wait()` returns the whole run's status. A timeout leaves the run active.
+for your deployment. `wait()` returns the whole run's status. A timeout leaves the run active; it stops further polling but does not cancel a read already in flight.
+`QDashResultUnknownError` means a launch may have started without confirmed recording: inspect
+its `executionId` when present before launching again.
 
 See the [TypeScript reference](https://oqtopus-team.github.io/qdash/reference/clients/typescript)
 for shared Python/TypeScript TOML profiles, workflows, metrics, and dashboards.

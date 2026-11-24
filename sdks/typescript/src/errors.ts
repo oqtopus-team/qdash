@@ -75,6 +75,23 @@ export class QDashValidationError extends QDashApiError {}
 export class QDashTransportError extends QDashApiError {}
 
 /**
+ * A dispatch was answered, but the answer does not show the run was recorded as requested
+ * (its calibration session, retry key or decision), for example from a server that predates
+ * run recording and ignores them. The run may have started anyway. Do not send it again or
+ * with a new key: reconcile it first, from `executionId` when the answer carries one.
+ * `statusCode`, `body` and `rawResponse` are those of the dispatch answer.
+ */
+export class QDashResultUnknownError extends QDashApiError {
+  /** The execution the answer names, if any: where to start reconciling. */
+  readonly executionId: string | undefined;
+
+  constructor(message: string, options: QDashErrorOptions & { executionId?: string } = {}) {
+    super(message, options);
+    this.executionId = options.executionId;
+  }
+}
+
+/**
  * A polling helper gave up waiting. Waiting is client-side only: the run it waited for is not
  * cancelled and keeps running in QDash.
  */

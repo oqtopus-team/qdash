@@ -1,4 +1,4 @@
-import { call, read, writeOptions, type Context } from "./_http.js";
+import { call, read, resultUnknown, writeOptions, type Context } from "./_http.js";
 import type {
   CalibrationPipelineSpec,
   CalibrationPipelineSpecStepsItem,
@@ -151,8 +151,9 @@ export class Pipelines {
    * With `recording`, the run is recorded under its key and session before it is
    * launched (see `PipelineRecording`). A named session is read first to check it
    * exists on the chip; nothing is dispatched otherwise. A response that does not
-   * echo the session, the recorded run or the decision throws: the run may have
-   * started without them, so reconcile it instead of retrying.
+   * echo the session, the recorded run or the decision throws
+   * `QDashResultUnknownError`: the run may have started without them, so reconcile it
+   * instead of retrying.
    * `options.reportedOrigin` records how the caller says it started the run.
    */
   async execute(
@@ -164,31 +165,36 @@ export class Pipelines {
     const recorded = recording(recordIn);
     const sessionId = recordIn?.calibrationSessionId;
     if (sessionId) await this.preflightSession(sessionId, target.chipId);
-    const response = await call(() =>
-      this.context.api.calibrationPipeline.executeCalibrationPipeline(
-        {
-          ...request(spec, target),
-          ...recorded,
-          ...(options.reportedOrigin ? { reported_origin: options.reportedOrigin } : {}),
-        },
-        writeOptions(),
-      ),
+    const answer = await call(() =>
+      this.context.api.calibrationPipeline
+        .executeCalibrationPipeline(
+          {
+            ...request(spec, target),
+            ...recorded,
+            ...(options.reportedOrigin ? { reported_origin: options.reportedOrigin } : {}),
+          },
+          writeOptions(),
+        )
+        .withRawResponse(),
     );
+    const response = answer.data;
     if (recordIn) {
       // A server that predates run recording ignores the fields and launches anyway.
       const runId = response?.pipeline_run_id;
       const isRecorded = typeof runId === "string" && !!runId.trim() && typeof response.calibration_session_id === "string";
       if (!isRecorded || (sessionId && response.calibration_session_id !== sessionId)) {
-        throw new Error(
+        throw resultUnknown(
           "Pipeline result unknown: the execution may have started without its association. " +
             "Do not retry automatically or use a new key; reconcile the execution first.",
+          answer,
         );
       }
       // A server that drops the decision would record the run without its intent.
       if (recordIn.decisionId && response.decision_id !== recordIn.decisionId) {
-        throw new Error(
+        throw resultUnknown(
           `Pipeline result unknown: the run may have been recorded without its decision ${recordIn.decisionId}. ` +
             "Do not retry automatically or use a new key; reconcile the run in the calibration session audit first.",
+          answer,
         );
       }
     }

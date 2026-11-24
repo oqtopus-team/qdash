@@ -5,7 +5,7 @@ import { Type } from "typebox";
 import { pausedSessionConflict } from "../lib/agent-loop.js";
 import { toTextToolResult } from "../lib/results.js";
 import { requireWriteApproval } from "../lib/write-approval.js";
-import { sdkSession, type SdkSessionFactory } from "../lib/sdk-session.js";
+import { isResultUnknown, resultUnknownToolError, sdkSession, type SdkSessionFactory } from "../lib/sdk-session.js";
 
 /**
  * Flow authoring: saving a Prefect flow the agent wrote.
@@ -241,11 +241,16 @@ export function registerFlowAuthoringTools(pi: Pick<ExtensionAPI, "registerTool"
       }
       const qdash = (deps.sdk ?? sdkSession)(client);
       // Recorded under this call's key: a replayed call returns the run it started.
-      const run = await qdash.workflows.run(params.name, {
-        parameters: params.parameters,
-        idempotencyKey: flowRunKey(toolCallId),
-        ...(params.calibrationSessionId ? { calibrationSessionId: params.calibrationSessionId } : {}),
-      });
+      const run = await qdash.workflows
+        .run(params.name, {
+          parameters: params.parameters,
+          idempotencyKey: flowRunKey(toolCallId),
+          ...(params.calibrationSessionId ? { calibrationSessionId: params.calibrationSessionId } : {}),
+        })
+        .catch((error: unknown) => {
+          // Answered, but without the recording asked for: the run may be going.
+          throw isResultUnknown(error) ? resultUnknownToolError(error) : error;
+        });
       const result = run.response as FlowExecution;
       return toTextToolResult(formatFlowExecution(result, params.name), result, {
         tool: "qdash_execute_flow",

@@ -24,7 +24,8 @@ original. Without a configured project, the API uses the user's default.
 Unlike the Python SDK, TypeScript dispatch permits that default-project behavior.
 
 Run handles poll the whole pipeline, tolerate an initial execution 404, and preserve failed or
-cancelled outcomes. Timeout is not cancellation. Association/idempotency failures require
+cancelled outcomes. Polling sleeps stop at the deadline, but an in-flight read is not cancelled.
+Association/idempotency response mismatches raise `QDashResultUnknownError` and require
 reconciliation, not a new launch key; see [Calibration Sessions](../agent/calibration-sessions.md).
 
 ## Metric scripts and dashboards
@@ -54,7 +55,8 @@ retries default to zero. Helpers add one GET retry layer; writes are sent once, 
 409, 5xx, and timeout. Caller aborts are not retried. Helpers translate errors into SDK types;
 direct resource calls retain generated errors. Proxy or custom TLS configuration requires a
 caller-supplied fetch implementation. Password login validates its response and shares its token
-between scoped sessions.
+between scoped sessions. A resource 401 invalidates only the sign-in used for that request;
+the next call authenticates again without replaying the failed request.
 
 ## Generation
 

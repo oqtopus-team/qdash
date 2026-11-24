@@ -8,11 +8,16 @@ type ExecutionResponseDetail = QDashApi.ExecutionResponseDetail;
 // Execution and pipeline statuses after which nothing more runs.
 const TERMINAL_STATUSES = new Set(["completed", "failed", "cancelled", "canceled", "crashed"]);
 
-/** How long `wait()` polls `GET /executions/{id}`; the run is never cancelled. */
+/**
+ * How long `wait()` polls `GET /executions/{id}`; the run is never cancelled.
+ *
+ * The timeout bounds the waits between reads, not a read in flight: subsequent reads start before
+ * the deadline and may take up to the config's `timeoutSec` per attempt, with read retries.
+ */
 export interface WaitOptions {
   /** Give up after this many seconds with `QDashTimeoutError` (default 3600). */
   timeoutSeconds?: number;
-  /** Seconds between reads (default 5). */
+  /** Seconds between reads (default 5); the last wait is shortened to end at the deadline. */
   pollIntervalSeconds?: number;
 }
 
@@ -65,7 +70,14 @@ export class Executions {
     const timeoutSeconds = checkedSeconds("timeoutSeconds", options.timeoutSeconds ?? 3600);
     const pollIntervalSeconds = checkedSeconds("pollIntervalSeconds", options.pollIntervalSeconds ?? 5);
     const deadline = this.context.now() + timeoutSeconds * 1_000;
+    let attempted = false;
     while (true) {
+      if (attempted && this.context.now() >= deadline) {
+        throw new QDashTimeoutError(
+          `Execution '${executionId}' did not reach a terminal state within ${timeoutSeconds} seconds`,
+        );
+      }
+      attempted = true;
       let detail: ExecutionResponseDetail | undefined;
       try {
         detail = await this.get(executionId);
@@ -73,12 +85,14 @@ export class Executions {
         if (!(error instanceof QDashNotFoundError)) throw error;
       }
       if (detail && TERMINAL_STATUSES.has(runStatus(detail).toLowerCase())) return detail;
-      if (this.context.now() >= deadline) {
+      const remaining = deadline - this.context.now();
+      if (remaining <= 0) {
         throw new QDashTimeoutError(
           `Execution '${executionId}' did not reach a terminal state within ${timeoutSeconds} seconds`,
         );
       }
-      await this.context.sleep(pollIntervalSeconds * 1_000);
+      // Never sleep past the deadline or start another read once the budget runs out.
+      await this.context.sleep(Math.min(pollIntervalSeconds * 1_000, remaining));
     }
   }
 }

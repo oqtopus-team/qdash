@@ -251,6 +251,111 @@ describe("username and password sign-in", () => {
     expect(seen).toHaveLength(3);
   });
 
+  const logins = (seen: Seen[]) => seen.filter((request) => request.path === "/auth/login").length;
+  const bearer = (request: Seen | undefined) => request?.headers.get("Authorization");
+
+  it("signs in again on the next request after a 401, without resending the read that got it", async () => {
+    const { fetch, seen } = server({
+      "POST /auth/login": [() => json({ access_token: "t1" }), () => json({ access_token: "t2" })],
+      "GET /flows": [() => json({ detail: "expired" }, 401), () => json({ flows: [] }), () => json({ flows: [] })],
+    });
+    const { qdash, sleeps } = session(fetch, password, { env });
+    const error = await qdash.workflows.list().catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(QDashAuthError);
+    expect((error as QDashAuthError).statusCode).toBe(401);
+    expect(seen.map((request) => request.path)).toEqual(["/auth/login", "/flows"]);
+    await qdash.workflows.list();
+    await qdash.workflows.list();
+    expect(seen.map((request) => request.path)).toEqual(["/auth/login", "/flows", "/auth/login", "/flows", "/flows"]);
+    expect(seen.slice(3).map(bearer)).toEqual(["Bearer t2", "Bearer t2"]);
+    expect(sleeps).toEqual([]);
+  });
+
+  it("sends a write that got a 401 once and throws it; the next call signs in", async () => {
+    const { fetch, seen } = server({
+      "POST /auth/login": [() => json({ access_token: "t1" }), () => json({ access_token: "t2" })],
+      "POST /calibration-pipelines/execute": [() => json({ detail: "expired" }, 401), () => json({ execution_id: "e", flow_run_id: "r", flow_run_url: "", qdash_ui_url: "", message: "" })],
+    });
+    const { qdash } = session(fetch, password, { env });
+    await expect(qdash.pipelines.execute(spec, { chipId: "64Qv3" })).rejects.toBeInstanceOf(QDashAuthError);
+    expect(seen.map((request) => request.path)).toEqual(["/auth/login", "/calibration-pipelines/execute"]);
+    await qdash.pipelines.execute(spec, { chipId: "64Qv3" });
+    expect(seen.map((request) => request.path)).toEqual([
+      "/auth/login",
+      "/calibration-pipelines/execute",
+      "/auth/login",
+      "/calibration-pipelines/execute",
+    ]);
+    expect(bearer(seen[3])).toBe("Bearer t2");
+  });
+
+  it("drops the sign-in after a 401 to a generated client call too", async () => {
+    const { fetch, seen } = server({
+      "POST /auth/login": [() => json({ access_token: "t1" }), () => json({ access_token: "t2" })],
+      "GET /flows": [() => json({ detail: "expired" }, 401), () => json({ flows: [] })],
+    });
+    const { qdash } = session(fetch, password, { env });
+    const raw = await qdash.api.flow.listFlows().catch((caught: unknown) => caught);
+    expect(raw).toBeInstanceOf(ApiError);
+    expect((raw as ApiError).statusCode).toBe(401);
+    await qdash.workflows.list();
+    expect(logins(seen)).toBe(2);
+    expect(bearer(seen.at(-1))).toBe("Bearer t2");
+  });
+
+  it.each(["t2", "t1"])("keeps a newer sign-in (%s) when an older request gets a 401", async (newToken) => {
+    let answerStale: (response: Response) => void = () => {};
+    const stale = new Promise<Response>((resolve) => {
+      answerStale = resolve;
+    });
+    const { fetch, seen } = server({
+      "POST /auth/login": [() => json({ access_token: "t1" }), () => json({ access_token: newToken })],
+      "GET /flows": [() => stale, () => json({ detail: "expired" }, 401), () => json({ flows: [] }), () => json({ flows: [] })],
+    });
+    const { qdash } = session(fetch, password, { env });
+    // Both requests share one sign-in and carry t1.
+    const slow = qdash.workflows.list().catch((caught: unknown) => caught);
+    await expect(qdash.workflows.list()).rejects.toBeInstanceOf(QDashAuthError);
+    expect(logins(seen)).toBe(1);
+    // The next request signs in again and gets t2.
+    await qdash.workflows.list();
+    expect(logins(seen)).toBe(2);
+    // The 401 of the request that carried t1 arrives last; t2 stays.
+    answerStale(json({ detail: "expired" }, 401));
+    expect(await slow).toBeInstanceOf(QDashAuthError);
+    await qdash.workflows.list();
+    expect(logins(seen)).toBe(2);
+    expect(seen.filter((request) => request.path === "/flows").map(bearer)).toEqual([
+      "Bearer t1",
+      "Bearer t1",
+      `Bearer ${newToken}`,
+      `Bearer ${newToken}`,
+    ]);
+  });
+
+  it("shares the dropped sign-in with project-scoped sessions: one new sign-in for both", async () => {
+    const { fetch, seen } = server({
+      "POST /auth/login": [() => json({ access_token: "t1" }), () => json({ access_token: "t2" })],
+      "GET /flows": [() => json({ detail: "expired" }, 401), () => json({ flows: [] }), () => json({ flows: [] })],
+    });
+    const { qdash } = session(fetch, password, { env });
+    const scoped = qdash.withProject("p2");
+    await expect(qdash.workflows.list()).rejects.toBeInstanceOf(QDashAuthError);
+    await Promise.all([scoped.workflows.list(), qdash.workflows.list()]);
+    expect(logins(seen)).toBe(2);
+    expect(seen.slice(-2).map(bearer)).toEqual(["Bearer t2", "Bearer t2"]);
+  });
+
+  it("does not sign in or resend after a 401 with a configured API token", async () => {
+    const { fetch, seen } = server({
+      "GET /flows": [() => json({ detail: "revoked" }, 401), () => json({ detail: "revoked" }, 401)],
+    });
+    const { qdash } = session(fetch);
+    await expect(qdash.workflows.list()).rejects.toBeInstanceOf(QDashAuthError);
+    await expect(qdash.workflows.list()).rejects.toBeInstanceOf(QDashAuthError);
+    expect(seen.map((request) => `${request.path} ${bearer(request)}`)).toEqual(["/flows Bearer token", "/flows Bearer token"]);
+  });
+
   it("needs the password variable before anything is sent", async () => {
     const { fetch, seen } = server({});
     const { qdash } = session(fetch, password, { env: {} });

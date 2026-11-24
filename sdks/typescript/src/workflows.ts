@@ -3,7 +3,7 @@
  * `qdash.api.flow.saveFlow`, with a deployment and a target chip. These reach the
  * server's `/flows` routes; nothing is uploaded, registered or run locally.
  */
-import { call, read, writeOptions, type Context } from "./_http.js";
+import { call, read, resultUnknown, writeOptions, type Context } from "./_http.js";
 import { Run, type Executions } from "./runs.js";
 import type { ExecuteFlowResponse, FlowSummary, GetFlowResponse } from "./types.js";
 
@@ -108,8 +108,9 @@ export class Workflows {
    * the saved defaults and runs on the saved `chip_id` unless the merged
    * parameters carry one. Returns once dispatched. The request is sent once: a
    * transport error or an error status is thrown, never retried. With a session or
-   * key, a response that does not echo the recorded run throws: the run may have
-   * started without them, so reconcile it instead of retrying.
+   * key, a response that does not echo the recorded run throws
+   * `QDashResultUnknownError`: the run may have started without them, so reconcile
+   * it instead of retrying.
    */
   async run(name: string, options: WorkflowRunOptions = {}): Promise<WorkflowRun> {
     const checked = checkedName(name);
@@ -117,25 +118,29 @@ export class Workflows {
     if ((id != null && (typeof id !== "string" || !id.trim())) || (key != null && (typeof key !== "string" || !key.trim()))) {
       throw new TypeError("calibrationSessionId and idempotencyKey must be non-empty when given");
     }
-    const response = await call(() =>
-      this.context.api.flow.executeFlow(
-        {
-          name: checked,
-          parameters: { ...(options.parameters ?? {}) },
-          ...(id != null ? { calibration_session_id: id } : {}),
-          ...(key != null ? { idempotency_key: key } : {}),
-        },
-        writeOptions(),
-      ),
+    const answer = await call(() =>
+      this.context.api.flow
+        .executeFlow(
+          {
+            name: checked,
+            parameters: { ...(options.parameters ?? {}) },
+            ...(id != null ? { calibration_session_id: id } : {}),
+            ...(key != null ? { idempotency_key: key } : {}),
+          },
+          writeOptions(),
+        )
+        .withRawResponse(),
     );
+    const response = answer.data;
     // A server that predates run recording ignores both fields and starts the flow anyway.
     if (
       (id != null || key != null) &&
       (typeof response?.calibration_run_id !== "string" || (id != null && response.calibration_session_id !== id))
     ) {
-      throw new Error(
+      throw resultUnknown(
         "Workflow result unknown: the run may have started without its calibration session or key. " +
           "Do not retry automatically; reconcile the execution first.",
+        answer,
       );
     }
     return new WorkflowRun(this.executions, checked, response);

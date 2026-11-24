@@ -2,8 +2,8 @@ import type { QDashApiClient } from "./_generated/index.js";
 import {
   buildApi,
   defaultSleep,
+  sessionAuth,
   sessionFetch,
-  tokenProvider,
   type Context,
   type Fetch,
   type Sleep,
@@ -47,6 +47,7 @@ function checkedProject(projectId: unknown): string | undefined {
 }
 
 interface Shared {
+  /** The fetch of API requests, which drops a sign-in after a 401 (see `sessionAuth`). */
   fetch: Fetch | undefined;
   env: Environment;
   sleep: Sleep;
@@ -68,6 +69,10 @@ const SHARED = Symbol("qdash.shared");
  * `run`) throw the SDK's errors, send every write once and send reads again after a transient
  * failure, up to `config.readAttempts` in total. `api` sends every call once unless the call
  * asks for retries with `{ maxRetries }`, and throws the generated `ApiError` types.
+ *
+ * A username/password sign-in happens on the first request and is shared with `withProject`
+ * sessions. A 401 answer, to a helper or an `api` call, drops that sign-in so the next request
+ * signs in again; the request that got the 401 is not sent again and throws it.
  */
 export class QDash {
   /**
@@ -94,17 +99,16 @@ export class QDash {
     // A frozen copy: what the session reports is what its requests send.
     this.snapshot = projectId !== undefined ? base.with({ projectId }) : base.with({});
     const inherited = (options as { [SHARED]?: Shared })[SHARED];
-    const fetchFn = inherited ? inherited.fetch : sessionFetch(this.snapshot, options.fetch);
-    const env = inherited?.env ?? options.env ?? process.env;
-    this[SHARED] = {
-      fetch: fetchFn,
-      env,
-      sleep: inherited?.sleep ?? options.sleep ?? defaultSleep,
-      token: inherited?.token ?? tokenProvider(this.snapshot, fetchFn, env),
-    };
+    if (inherited) {
+      this[SHARED] = inherited;
+    } else {
+      const env = options.env ?? process.env;
+      const auth = sessionAuth(this.snapshot, sessionFetch(this.snapshot, options.fetch), env);
+      this[SHARED] = { fetch: auth.fetch, env, sleep: options.sleep ?? defaultSleep, token: auth.token };
+    }
     this.api = buildApi(this.snapshot, {
       projectId: this.snapshot.projectId,
-      fetch: fetchFn,
+      fetch: this[SHARED].fetch,
       token: this[SHARED].token,
     });
     const context: Context = {
