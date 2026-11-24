@@ -33,6 +33,14 @@ import {
   ChainOfThoughtTrigger,
 } from "@/components/ui/ChainOfThought";
 import { Loader } from "@/components/ui/Loader";
+import { ThinkingLogo } from "@/components/features/chat/ThinkingLogo";
+
+/**
+ * The 24px live mark takes the 14px icon slot: negative margins keep labels
+ * aligned with icon rows and the row height unchanged, while the sphere
+ * (82% of the canvas) fills the 20px line box and spills into the gap.
+ */
+const LIVE_MARK_CLASS = "-m-[5px]";
 
 export function formatDuration(ms: number): string {
   const s = Math.max(0, Math.round(ms / 1000));
@@ -312,10 +320,13 @@ function ThinkingStepRow({
   step,
   now,
   live,
+  hidden = false,
 }: {
   step: Extract<TraceStep, { kind: "thinking" }>;
   now: number;
   live: boolean;
+  /** Folded away behind a group summary, which then shows the live mark itself. */
+  hidden?: boolean;
 }) {
   const active = live && step.endedAt === undefined;
   const elapsed = (step.endedAt ?? now) - step.startedAt;
@@ -330,11 +341,16 @@ function ThinkingStepRow({
         disabled={!hasText}
         className={`group min-w-0 gap-2 text-sm ${hasText ? "" : "cursor-default"}`}
       >
-        <Brain
-          className="w-3.5 h-3.5 shrink-0 text-base-content/45"
-          strokeWidth={1.75}
-          aria-hidden="true"
-        />
+        {active && !hidden ? (
+          // Only a live thought animates; a finished one keeps the quiet icon.
+          <ThinkingLogo className={LIVE_MARK_CLASS} />
+        ) : (
+          <Brain
+            className="w-3.5 h-3.5 shrink-0 text-base-content/45"
+            strokeWidth={1.75}
+            aria-hidden="true"
+          />
+        )}
         {active ? (
           <span className="loader-text-shimmer">Thinking</span>
         ) : (
@@ -479,6 +495,9 @@ function WorkGroup({
   const label = active
     ? (currentActivity(steps, null) ?? "Working")
     : `Used ${plural(tools.length, "tool")}`;
+  // A folded summary stands in for the live thought row it hides. Opened, the
+  // row animates instead, so the mark is never drawn twice.
+  const thinkingInSummary = folded && active && !activeTools(steps).length && isThinking(steps);
 
   return (
     <div className="min-w-0" data-testid="trace-work" data-grouped={grouped}>
@@ -492,11 +511,15 @@ function WorkGroup({
           data-testid="tool-group-summary"
           data-active={active}
         >
-          <Wrench
-            className="w-3.5 h-3.5 shrink-0 text-base-content/45"
-            strokeWidth={1.75}
-            aria-hidden="true"
-          />
+          {thinkingInSummary ? (
+            <ThinkingLogo className={LIVE_MARK_CLASS} />
+          ) : (
+            <Wrench
+              className="w-3.5 h-3.5 shrink-0 text-base-content/45"
+              strokeWidth={1.75}
+              aria-hidden="true"
+            />
+          )}
           <span
             className={`min-w-0 truncate ${
               active
@@ -543,7 +566,7 @@ function WorkGroup({
               // A draft's ID can change when execution starts; the position cannot.
               <ToolStepRow step={step} now={now} extrasOutside={folded} />
             ) : (
-              <ThinkingStepRow step={step} now={now} live={live} />
+              <ThinkingStepRow step={step} now={now} live={live} hidden={folded} />
             )}
           </li>
         ))}
@@ -724,7 +747,11 @@ export function TurnActivity({
           {activity ? (
             <Loader variant="text-shimmer" size="sm" text={activity} className="truncate" />
           ) : (
-            <Loader variant="typing" size="sm" />
+            // Before the turn's first event: the same live mark a thought row shows.
+            <span className="flex min-w-0 items-center gap-2">
+              <ThinkingLogo className={LIVE_MARK_CLASS} />
+              <Loader variant="text-shimmer" size="sm" text="Thinking" className="truncate" />
+            </span>
           )}
         </div>
       )}
