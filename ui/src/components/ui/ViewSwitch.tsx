@@ -5,7 +5,7 @@ import { useRef, type KeyboardEvent, type ReactNode } from "react";
 export interface ViewSwitchItem<T extends string> {
   value: T;
   label: ReactNode;
-  /** Leading Lucide icon; it is hidden from assistive technology. */
+  /** Leading Lucide icon, sized to 1rem; mark it `aria-hidden`. */
   icon?: ReactNode;
   /** Accessible name when `label` is visually hidden or not plain text. */
   ariaLabel?: string;
@@ -25,19 +25,20 @@ interface ViewSwitchProps<T extends string> {
   className?: string;
 }
 
-// Literal class names keep the daisyUI megamenu size classes visible to Tailwind's scanner.
+// Literal class names keep the daisyUI tab size classes visible to Tailwind's scanner.
 const SIZE_CLASS: Record<ViewSwitchSize, string> = {
-  xs: "megamenu-xs p-1",
-  sm: "megamenu-sm p-1",
-  md: "megamenu-md p-2",
+  xs: "tabs-xs",
+  sm: "tabs-sm",
+  md: "tabs-md",
 };
 
 /**
  * Segmented switch between views that render inline on the same page.
  *
- * It uses the daisyUI megamenu with plain direct-child buttons, so items need no popovers.
- * The `view-switch` rules in `globals.css` keep the moving indicator on the selected item
- * while no item is hovered. Selection follows focus with Arrow, Home, and End keys.
+ * It renders static daisyUI tabs with the `tabs-boxed` rules in `globals.css`: a subdued
+ * base-200 track and a base-100 surface on the selected tab. Selection follows focus with
+ * Arrow, Home, and End keys, and clicking the selected tab calls `onValueChange` again so
+ * callers can treat it as a reset action.
  */
 export function ViewSwitch<T extends string>({
   items,
@@ -88,9 +89,8 @@ export function ViewSwitch<T extends string>({
       role="tablist"
       aria-label={ariaLabel}
       aria-orientation="horizontal"
-      className={`megamenu view-switch ${SIZE_CLASS[size]} border border-base-300 w-fit max-w-full ${className}`}
+      className={`tabs tabs-boxed ${SIZE_CLASS[size]} w-fit max-w-full flex-nowrap gap-1 ${className}`}
     >
-      <span className="megamenu-active" aria-hidden="true" />
       {items.map((item, index) => {
         const selected = index === selectedIndex;
         return (
@@ -105,6 +105,7 @@ export function ViewSwitch<T extends string>({
             aria-label={item.ariaLabel}
             title={item.title}
             tabIndex={index === focusableIndex ? 0 : -1}
+            className={`tab shrink-0 gap-1.5 whitespace-nowrap [&>svg]:size-4 [&>svg]:shrink-0 ${selected ? "tab-active" : ""}`}
             onClick={() => selectAt(index, true)}
             onKeyDown={(event) => handleKeyDown(event, index)}
           >
