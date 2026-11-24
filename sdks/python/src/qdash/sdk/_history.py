@@ -163,22 +163,25 @@ class _Page(Generic[RowT]):
         self.skip = skip
         self.limit = limit
         self._fetch = fetch
+        # Paging follows the rows the server returned, even if ``items`` is edited later.
+        self._returned = len(items)
 
     @property
     def has_next(self) -> bool | None:
         """Whether a next page has rows; None when unknown (no total, and a full page)."""
-        return _has_next(self.skip, len(self.items), self.limit, self.total)
+        return _has_next(self.skip, self._returned, self.limit, self.total)
 
     def next_page(self: PageT) -> PageT | None:
         """The page after this one, with the same filters and limit; one request, or None.
 
         Returns None without a request when :attr:`has_next` is false. The next page starts
-        after the rows this page returned. An empty page always ends paging; a short page
-        ends paging when the total is unknown.
+        after the rows the server returned for this page, whatever is later done to
+        ``items``. An empty page always ends paging; a short page ends paging when the total
+        is unknown.
         """
         if self.has_next is False:
             return None
-        page: PageT = self._fetch(self.skip + len(self.items))
+        page: PageT = self._fetch(self.skip + self._returned)
         return page
 
     def __iter__(self) -> Iterator[RowT]:
@@ -408,7 +411,13 @@ class TaskResultHistory:
         }
         lower = _instant("start_from", start_from)
         upper = _instant("start_to", start_to)
-        if lower is not None and upper is not None and lower > upper:
+        # Compare instants in UTC: aware datetimes sharing one tzinfo compare by wall time,
+        # which ignores ``fold`` and misorders the repeated hour at a DST fall-back.
+        if (
+            lower is not None
+            and upper is not None
+            and lower.astimezone(dt.UTC) > upper.astimezone(dt.UTC)
+        ):
             raise ValueError("start_from must not be later than start_to")
         filters["start_from"] = lower
         filters["start_to"] = upper

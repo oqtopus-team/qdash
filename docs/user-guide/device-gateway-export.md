@@ -69,6 +69,9 @@ A missing destination directory is created if its parent exists. Existing files 
 unless `overwrite=True`; unrelated files are never removed. Prefer a new directory when
 comparing exports. Updating an existing directory is not atomic across all files, so an
 operating-system failure may leave a partial update; retry into a new directory to recover.
+With `overwrite=False`, a file created by another export during the download is also kept,
+and the download raises `FileExistsError`. Writing into an existing directory with this
+setting requires filesystem support for hard links; otherwise, export into a new directory.
 
 A missing calibration note fails the download before writing files. Check the selected
 project and calibration history, or omit the note explicitly. A topology request without

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import json
+import pathlib
 import stat
 import zipfile
 from typing import TYPE_CHECKING, Any
@@ -98,6 +99,20 @@ def snapshot(root: Path) -> list[str]:
     return sorted(str(path.relative_to(root)) for path in root.rglob("*"))
 
 
+def file_mode(path: Path) -> int:
+    return stat.S_IMODE(path.stat().st_mode)
+
+
+def control_mode(directory: Path) -> int:
+    """The mode a file normally created in ``directory`` gets under the current umask."""
+    control = directory / ".control"
+    control.write_bytes(b"")
+    try:
+        return file_mode(control)
+    finally:
+        control.unlink()
+
+
 def test_calibration_note_reads_the_latest_note_with_retries() -> None:
     fake = Server({NOTE_ROUTE: [httpx.Response(503), note_response()]})
     with fake.session(project_id="project-b") as qdash:
@@ -143,8 +158,8 @@ def test_download_config_unpacks_the_tree_and_writes_the_latest_note(tmp_path: P
     assert zip_request.url.params["path"] == "."
     assert zip_request.headers["Authorization"] == "Bearer api-token"
     assert all(request.headers["X-Project-Id"] == "project-b" for request in fake.requests)
-    mode = stat.S_IMODE((destination / "calib_note.json").stat().st_mode)
-    assert mode & 0o044  # default permissions, not a private temporary file's 0600
+    # The same permissions as any file created here, not a private temporary file's 0600.
+    assert file_mode(destination / "calib_note.json") == control_mode(tmp_path)
 
 
 def test_download_config_without_the_note_keeps_the_archive_file(tmp_path: Path) -> None:
@@ -353,3 +368,112 @@ def test_note_casing_is_preserved_when_no_note_is_merged(tmp_path: Path) -> None
     with fake.session() as qdash:
         qdash.qubex.download_config(destination, include_calibration_note=False)
     assert tree(destination) == {"CALIB_NOTE.JSON": b"archive note"}
+
+
+def test_files_written_into_an_existing_directory_get_default_permissions(
+    tmp_path: Path,
+) -> None:
+    destination = tmp_path / "qubex-config"
+    (destination / "64Qv3" / "config").mkdir(parents=True)
+    (destination / "64Qv3" / "config" / "chip.yaml").write_text("old")
+    expected = control_mode(destination)
+    with server().session() as qdash:
+        qdash.qubex.download_config(destination, overwrite=True)
+
+    for name in ("calib_note.json", "64Qv3/config/chip.yaml", "64Qv3/params/params.yaml"):
+        assert file_mode(destination / name) == expected, name
+
+
+# A file that appears after the destination check, as another process might write it.
+RACED = {
+    "archive file": ("64Qv3/config/chip.yaml", b"chip: 64Qv3\n"),
+    "merged note": ("calib_note.json", None),
+}
+
+
+def appear_after_check(monkeypatch: pytest.MonkeyPatch, path: Path, content: bytes) -> None:
+    from qdash.sdk import _qubex
+
+    check = _qubex._check_destination
+
+    def check_then_appear(*args: Any, **kwargs: Any) -> None:
+        check(*args, **kwargs)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(content)
+
+    monkeypatch.setattr(_qubex, "_check_destination", check_then_appear)
+
+
+@pytest.mark.parametrize("raced", list(RACED))
+def test_a_file_appearing_after_the_check_is_kept_without_overwrite(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, raced: str
+) -> None:
+    name, _ = RACED[raced]
+    destination = tmp_path / "qubex-config"
+    destination.mkdir()
+    appear_after_check(monkeypatch, destination / name, b"theirs")
+
+    with server().session() as qdash, pytest.raises(FileExistsError):
+        qdash.qubex.download_config(destination)
+
+    assert (destination / name).read_bytes() == b"theirs"
+    assert not list(tmp_path.rglob("*.partial"))
+
+
+@pytest.mark.parametrize("raced", list(RACED))
+def test_a_file_appearing_after_the_check_is_replaced_with_overwrite(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, raced: str
+) -> None:
+    name, expected = RACED[raced]
+    destination = tmp_path / "qubex-config"
+    destination.mkdir()
+    appear_after_check(monkeypatch, destination / name, b"theirs")
+
+    with server().session() as qdash:
+        qdash.qubex.download_config(destination, overwrite=True)
+
+    written = (destination / name).read_bytes()
+    if expected is None:
+        assert json.loads(written) == NOTE
+    else:
+        assert written == expected
+    assert not list(tmp_path.rglob("*.partial"))
+
+
+def test_a_failed_cleanup_does_not_hide_the_existing_file_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    destination = tmp_path / "qubex-config"
+    destination.mkdir()
+    appear_after_check(monkeypatch, destination / "calib_note.json", b"theirs")
+    unlink = pathlib.Path.unlink
+
+    def failing_unlink(self: pathlib.Path, missing_ok: bool = False) -> None:
+        if self.name.startswith(".calib_note.json.") and self.name.endswith(".partial"):
+            raise PermissionError(f"cannot remove {self}")
+        unlink(self, missing_ok=missing_ok)
+
+    monkeypatch.setattr(pathlib.Path, "unlink", failing_unlink)
+    with server().session() as qdash, pytest.raises(FileExistsError):
+        qdash.qubex.download_config(destination)
+    assert (destination / "calib_note.json").read_bytes() == b"theirs"
+
+
+def test_a_failed_cleanup_after_a_commit_is_reported(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    destination = tmp_path / "qubex-config"
+    destination.mkdir()
+    unlink = pathlib.Path.unlink
+
+    def failing_unlink(self: pathlib.Path, missing_ok: bool = False) -> None:
+        if self.name.startswith(".calib_note.json.") and self.name.endswith(".partial"):
+            raise PermissionError(f"cannot remove {self}")
+        unlink(self, missing_ok=missing_ok)
+
+    monkeypatch.setattr(pathlib.Path, "unlink", failing_unlink)
+    with server().session() as qdash, pytest.raises(PermissionError, match="cannot remove"):
+        qdash.qubex.download_config(destination)
+    # The note was committed; only the extra hidden name is left, and the error says so.
+    assert json.loads((destination / "calib_note.json").read_bytes()) == NOTE
+    assert len(list(destination.glob(".calib_note.json.*.partial"))) == 1

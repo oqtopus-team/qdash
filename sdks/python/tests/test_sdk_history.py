@@ -245,6 +245,87 @@ def test_an_empty_page_ends_paging_even_when_the_total_says_otherwise() -> None:
     assert len(server.requests) == 1
 
 
+def _edit(page: ExecutionPage, edit: str) -> None:
+    if edit == "remove":
+        page.items.pop()
+    elif edit == "append":
+        page.items.append(ExecutionResponseSummary.model_validate(execution_row("extra")))
+    elif edit == "clear":
+        page.items.clear()
+
+
+@pytest.mark.parametrize("edit", ["none", "remove", "append", "clear"])
+def test_paging_with_a_known_total_follows_the_rows_returned_not_edited_items(edit: str) -> None:
+    server = Server(
+        {
+            ("GET", EXECUTIONS): [
+                httpx.Response(
+                    200,
+                    json=executions_body(
+                        [execution_row("a"), execution_row("b")], total=5, skip=0, limit=2
+                    ),
+                ),
+                httpx.Response(
+                    200,
+                    json=executions_body(
+                        [execution_row("c"), execution_row("d")], total=5, skip=2, limit=2
+                    ),
+                ),
+            ]
+        }
+    )
+    page = server.session().executions.list(chip_id="64Qv3", limit=2)
+    _edit(page, edit)
+    shown = [row.execution_id for row in page]
+
+    assert len(page) == len(shown)
+    assert f"rows={len(shown)}," in repr(page)
+    assert page.has_next is True
+    second = page.next_page()
+    assert second is not None
+    assert params(server)["skip"] == "2"
+    assert [row.execution_id for row in second] == ["c", "d"]
+
+
+@pytest.mark.parametrize("edit", ["none", "remove", "append", "clear"])
+def test_paging_without_a_total_follows_the_rows_returned_not_edited_items(edit: str) -> None:
+    server = Server(
+        {
+            ("GET", EXECUTIONS): [
+                httpx.Response(200, json=executions_body([execution_row("a"), execution_row("b")])),
+                httpx.Response(200, json=executions_body([execution_row("c")])),
+            ]
+        }
+    )
+    full = server.session().executions.list(chip_id="64Qv3", limit=2)
+    _edit(full, edit)
+    assert full.has_next is None
+    short = full.next_page()
+    assert short is not None
+    assert params(server)["skip"] == "2"
+
+    _edit(short, "append")
+    _edit(short, "append")  # now as long as a full page, but the server's page was short
+    assert len(short) == 3
+    assert short.has_next is False
+    assert short.next_page() is None
+    assert len(server.requests) == 2
+
+
+@pytest.mark.parametrize("edit", ["append", "clear"])
+def test_an_empty_returned_page_stays_the_end_after_items_are_edited(edit: str) -> None:
+    server = Server(
+        {("GET", EXECUTIONS): [httpx.Response(200, json=executions_body([], total=10, skip=4))]}
+    )
+    page = server.session().executions.list(chip_id="64Qv3", skip=4)
+    _edit(page, edit)
+
+    assert len(page) == (1 if edit == "append" else 0)
+    assert page.has_next is False
+    assert page.next_page() is None
+    assert len(server.requests) == 1
+
+
 def test_execution_records_and_iteration_send_nothing() -> None:
     server = Server(
         {
@@ -417,6 +498,48 @@ def test_an_equal_start_range_is_accepted() -> None:
     server = Server({("GET", TASK_RESULTS): [httpx.Response(200, json=tasks_body([], total=0))]})
     moment = dt.datetime(2026, 11, 24, 9, tzinfo=dt.UTC)
     server.session().task_results.list(start_from=moment, start_to=moment)
+    assert len(server.requests) == 1
+
+
+NEW_YORK = ZoneInfo("America/New_York")
+# 2026-11-01 01:30 happens twice in New York: first in EDT (05:30Z), then in EST (06:30Z).
+FIRST_0130 = dt.datetime(2026, 11, 1, 1, 30, tzinfo=NEW_YORK)
+FIRST_0110 = dt.datetime(2026, 11, 1, 1, 10, tzinfo=NEW_YORK)
+SECOND_0110 = dt.datetime(2026, 11, 1, 1, 10, fold=1, tzinfo=NEW_YORK)
+SECOND_0130 = dt.datetime(2026, 11, 1, 1, 30, fold=1, tzinfo=NEW_YORK)
+
+
+def test_a_forward_range_across_a_dst_fold_is_accepted() -> None:
+    # 01:30 EDT (05:30Z) is before 01:10 EST (06:10Z), though its wall time is later.
+    server = Server({("GET", TASK_RESULTS): [httpx.Response(200, json=tasks_body([], total=0))]})
+    server.session().task_results.list(start_from=FIRST_0130, start_to=SECOND_0110)
+
+    assert len(server.requests) == 1
+    assert params(server)["start_from"] == "2026-11-01T01:30:00-04:00"
+    assert params(server)["start_to"] == "2026-11-01T01:10:00-05:00"
+
+
+def test_a_reversed_range_across_a_dst_fold_is_rejected_before_a_request() -> None:
+    # 01:10 EST (06:10Z) is after 01:30 EDT (05:30Z), though its wall time is earlier.
+    server = Server()
+    with pytest.raises(ValueError, match="later than"):
+        server.session().task_results.list(start_from=SECOND_0110, start_to=FIRST_0130)
+    assert server.requests == []
+
+
+@pytest.mark.parametrize(
+    ("lower", "upper"),
+    [
+        (SECOND_0130, dt.datetime(2026, 11, 1, 6, 30, tzinfo=dt.UTC)),
+        (dt.datetime(2026, 11, 1, 5, 10, tzinfo=dt.UTC), FIRST_0110),
+        (SECOND_0130, SECOND_0130),
+    ],
+)
+def test_equal_instants_across_a_dst_fold_are_accepted(
+    lower: dt.datetime, upper: dt.datetime
+) -> None:
+    server = Server({("GET", TASK_RESULTS): [httpx.Response(200, json=tasks_body([], total=0))]})
+    server.session().task_results.list(start_from=lower, start_to=upper)
     assert len(server.requests) == 1
 
 

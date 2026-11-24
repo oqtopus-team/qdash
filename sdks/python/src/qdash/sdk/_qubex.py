@@ -8,6 +8,7 @@ written; the archive is unpacked member by member, never with ``extractall``.
 
 from __future__ import annotations
 
+import contextlib
 import io
 import json
 import os
@@ -154,18 +155,30 @@ def _sibling(target: Path) -> Path:
     return target.with_name(f".{target.name}.{secrets.token_hex(8)}.partial")
 
 
-def _replace_file(target: Path, write: Any) -> None:
-    """Write through ``write(path)`` to a new file beside ``target``, then replace ``target``.
+def _commit_file(target: Path, write: Any, *, overwrite: bool) -> None:
+    """Write through ``write(path)`` to a new file beside ``target``, then commit it as ``target``.
 
-    The new file is created like any other, so it gets the default permissions.
+    With ``overwrite``, the new file atomically replaces ``target``. Without it, the new file is
+    hard-linked as ``target``, which fails with ``FileExistsError`` and leaves ``target`` as it
+    is when ``target`` already exists, even if it appeared after the destination was checked;
+    a file system without hard links raises its ``OSError`` instead of falling back to a check
+    and a replace. The new file is created like any other, so it gets the default permissions.
     """
     temporary = _sibling(target)
     try:
         write(temporary)
-        os.replace(temporary, target)
+        if overwrite:
+            os.replace(temporary, target)
+            return
+        os.link(temporary, target)
     except BaseException:
-        temporary.unlink(missing_ok=True)
+        # Do not let a failed cleanup hide the error that stopped the write.
+        with contextlib.suppress(OSError):
+            temporary.unlink(missing_ok=True)
         raise
+    # ``target`` is committed; a failure to remove the extra name propagates so that a stray
+    # hidden file is reported rather than left silently.
+    temporary.unlink()
 
 
 class Qubex:
@@ -234,8 +247,10 @@ class Qubex:
         (``QDashNotFoundError``), a response that is not a ZIP archive or an unsafe archive
         leaves the file system unchanged. A new ``destination`` is assembled in a temporary
         directory beside it and renamed into place. Into an existing directory, each file is
-        replaced atomically, but an operating-system failure part way can leave some files
-        updated and others not. Returns ``destination``.
+        committed atomically: with ``overwrite`` it replaces the file there, and without it a
+        file that appeared after the check is kept and raises ``FileExistsError``. A failure
+        part way, including such a file, can leave some files written and others not. Returns
+        ``destination``.
         """
         root = Path(destination)
         if root.is_symlink() and not root.is_dir():
@@ -270,7 +285,7 @@ class Qubex:
             targets = list(files) + ([note_parts] if note_parts is not None else [])
             if root.exists():
                 _check_destination(root, directories, targets, overwrite=overwrite)
-                self._write_into(root, archive, directories, files, note_bytes)
+                self._write_into(root, archive, directories, files, note_bytes, overwrite=overwrite)
             else:
                 self._write_new(root, archive, directories, files, note_bytes)
         return root
@@ -305,13 +320,20 @@ class Qubex:
         directories: set[tuple[str, ...]],
         files: dict[tuple[str, ...], zipfile.ZipInfo],
         note: bytes | None,
+        *,
+        overwrite: bool,
     ) -> None:
         for parts in sorted(directories):
             root.joinpath(*parts).mkdir(exist_ok=True)
         for parts, info in files.items():
-            _replace_file(
+            _commit_file(
                 root.joinpath(*parts),
                 lambda path, info=info: _write_member(archive, info, path),
+                overwrite=overwrite,
             )
         if note is not None:
-            _replace_file(root / CALIBRATION_NOTE_FILE, lambda path: path.write_bytes(note))
+            _commit_file(
+                root / CALIBRATION_NOTE_FILE,
+                lambda path: path.write_bytes(note),
+                overwrite=overwrite,
+            )
