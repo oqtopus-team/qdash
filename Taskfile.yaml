@@ -379,6 +379,9 @@ tasks:
 
   build-docs:
     dir: docs
+    # check-docs-links and check-docs-mermaid run in one invocation share one build
+    # instead of writing .vitepress/dist concurrently.
+    run: once
     cmds:
       - bun run docs:build
 
