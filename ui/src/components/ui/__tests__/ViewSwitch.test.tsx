@@ -46,13 +46,17 @@ function selectedTab() {
 describe("ViewSwitch", () => {
   afterEach(() => cleanup());
 
-  it("renders a labeled megamenu tab list with the selected tab marked", () => {
+  it("renders a labeled boxed tab list with only the selected tab active", () => {
     render(<ControlledSwitch initial="2q" />);
 
     const tablist = screen.getByRole("tablist", { name: "Chip view" });
-    expect(tablist.classList.contains("megamenu")).toBe(true);
-    expect(tablist.querySelector(".megamenu-active")?.getAttribute("aria-hidden")).toBe("true");
+    expect(tablist.classList.contains("tabs-boxed")).toBe(true);
     expect(selectedTab().textContent).toBe("Coupling");
+    expect(screen.getAllByRole("tab").map((tab) => tab.classList.contains("tab-active"))).toEqual([
+      false,
+      true,
+      false,
+    ]);
     expect(screen.getAllByRole("tab").map((tab) => tab.getAttribute("tabindex"))).toEqual([
       "-1",
       "0",
@@ -131,9 +135,9 @@ describe("ViewSwitch", () => {
       />,
     );
 
-    expect(
-      screen.getByRole("tablist", { name: "Grid view" }).classList.contains("megamenu-sm"),
-    ).toBe(true);
+    expect(screen.getByRole("tablist", { name: "Grid view" }).classList.contains("tabs-sm")).toBe(
+      true,
+    );
     expect(screen.getByRole("tab", { name: "Lock" }).getAttribute("aria-selected")).toBe("false");
   });
 });
