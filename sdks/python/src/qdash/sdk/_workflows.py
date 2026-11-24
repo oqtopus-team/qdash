@@ -36,6 +36,25 @@ def _checked_name(name: str) -> str:
     return name
 
 
+def check_recorded_launch(
+    response: ExecuteFlowResponse, calibration_session_id: str | None, *, what: str
+) -> None:
+    """Raise ``RuntimeError`` when a launch sent with a session or key was not recorded so.
+
+    A server that predates run recording ignores both fields and starts the run anyway, so a
+    missing echo means the run started without them.
+    """
+    recorded = isinstance(response.calibration_run_id, str)
+    named = (
+        calibration_session_id is None or response.calibration_session_id == calibration_session_id
+    )
+    if not (recorded and named):
+        raise RuntimeError(
+            f"{what} result unknown: the run may have started without its calibration "
+            "session or key. Do not retry automatically; reconcile the execution first."
+        )
+
+
 class WorkflowRun(Run):
     """A dispatched workflow run, returned by :meth:`Workflow.run` and :meth:`Workflows.run`.
 
@@ -183,16 +202,5 @@ class Workflows:
                 **options,
             )
         if options:
-            # A server that predates run recording ignores both fields and starts the flow
-            # anyway, so a missing echo means the run started without them.
-            recorded = isinstance(response.calibration_run_id, str)
-            named = (
-                calibration_session_id is None
-                or response.calibration_session_id == calibration_session_id
-            )
-            if not (recorded and named):
-                raise RuntimeError(
-                    "Workflow result unknown: the run may have started without its calibration "
-                    "session or key. Do not retry automatically; reconcile the execution first."
-                )
+            check_recorded_launch(response, calibration_session_id, what="Workflow")
         return WorkflowRun(self._executions, checked, response)

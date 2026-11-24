@@ -26,6 +26,33 @@ This starts hardware work. Choose an existing workflow and targets suitable for 
 See the [Python reference](../../docs/reference/clients/python.md) for TOML profiles and other operations.
 SDK reads of existing INI profiles remain supported with a deprecation warning.
 
+## Examples
+
+Configure a `local` TOML profile, then open:
+
+1. [Read a project](examples/01_read_project.ipynb)
+2. [Run a registered workflow](examples/02_registered_workflow.ipynb)
+3. [Run a calibration](examples/03_calibration.ipynb)
+4. [Run a task and inspect results](examples/04_task_workbench.ipynb)
+5. [Investigate results](examples/05_investigate_results.ipynb)
+6. [Export device gateway files](examples/06_device_gateway.ipynb)
+
+The investigation example uses optional `pandas`, `pyarrow`, and `perspective-python[jupyter]` packages
+for interactive tables. Install them in your notebook environment. Table operations apply
+to the loaded page; use SDK filters to search history.
+
+The **Run Calibration**, **Run Task**, and **Run Workflow** cells start measurements when executed.
+To use this checkout, run
+`pip install -e sdks/python` from the repository root in your notebook environment.
+
+To check the installed SDK version:
+
+```python
+from qdash.sdk import version
+
+print(version())
+```
+
 ## Development
 
 From the repository root:

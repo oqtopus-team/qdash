@@ -25,6 +25,7 @@ const userSidebar = [
             ],
           },
           { text: "Operations", link: "/user-guide/operations" },
+          { text: "Device Gateway Export", link: "/user-guide/device-gateway-export" },
           { text: "System Updates", link: "/user-guide/system-updates" },
           { text: "Upgrade MongoDB", link: "/user-guide/mongodb-upgrade" },
         ],

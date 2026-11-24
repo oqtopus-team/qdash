@@ -5,7 +5,6 @@ from __future__ import annotations
 import os
 import threading
 from contextlib import contextmanager
-from importlib.metadata import PackageNotFoundError, version
 from typing import TYPE_CHECKING, Any
 
 import httpx
@@ -13,6 +12,7 @@ import httpx
 from qdash.sdk._generated.client import QDashApi
 from qdash.sdk._generated.core.api_error import ApiError
 from qdash.sdk._generated.core.parse_error import ParsingError
+from qdash.sdk._version import __version__
 from qdash.sdk.errors import (
     QDashApiError,
     QDashAuthError,
@@ -43,10 +43,7 @@ _STATUS_ERRORS: dict[int, type[QDashApiError]] = {
 def user_agent(config: QDashConfig) -> str:
     if config.user_agent:
         return config.user_agent
-    try:
-        return f"qdash-sdk/{version('qdash-sdk')}"
-    except PackageNotFoundError:
-        return "qdash-sdk/unknown"
+    return f"qdash-sdk/{__version__}"
 
 
 def common_headers(config: QDashConfig) -> dict[str, str]:
