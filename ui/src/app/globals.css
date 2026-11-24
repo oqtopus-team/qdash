@@ -366,6 +366,60 @@ a.card:hover {
 }
 
 /* ----------------------------------------
+   View Switch - daisyUI megamenu with a persistent selection
+   ---------------------------------------- */
+
+/*
+ * `ViewSwitch` renders a daisyUI megamenu whose items are plain direct-child buttons.
+ * daisyUI moves `.megamenu-active` only to a hovered item and hides it otherwise, so these
+ * rules rest it on the selected tab. The selected button gets a second anchor name, and
+ * `anchor-scope` keeps several switches on one page from sharing anchors. The rules stay
+ * unlayered so they win over daisyUI's layered megamenu styles.
+ */
+.view-switch {
+  anchor-scope: all;
+}
+
+.view-switch > button {
+  flex-shrink: 0;
+  white-space: nowrap;
+  color: color-mix(in oklab, var(--color-base-content) 70%, transparent);
+}
+
+.view-switch > button:hover,
+.view-switch > button[aria-selected="true"] {
+  color: var(--color-base-content);
+}
+
+.view-switch > button[aria-selected="true"] {
+  anchor-name: var(--mm-anchor), --view-switch-selected;
+}
+
+.view-switch:not(:has(> button:hover)) > .megamenu-active {
+  inset: anchor(--view-switch-selected top) anchor(--view-switch-selected right)
+    anchor(--view-switch-selected bottom) anchor(--view-switch-selected left);
+  background-color: color-mix(in oklab, var(--color-base-content) 10%, transparent);
+}
+
+.view-switch > button > svg {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+}
+
+/* Without anchor positioning the indicator cannot move, so the selected tab is filled. */
+@supports not (anchor-name: --view-switch-selected) {
+  .view-switch > .megamenu-active {
+    display: none;
+  }
+
+  .view-switch > button[aria-selected="true"] {
+    border-radius: var(--radius-field);
+    background-color: color-mix(in oklab, var(--color-base-content) 10%, transparent);
+  }
+}
+
+/* ----------------------------------------
    Modal Styles - Rich Interactive
    ---------------------------------------- */
 

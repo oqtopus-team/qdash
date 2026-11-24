@@ -78,7 +78,7 @@ const commonProps = {
 };
 
 function expectLockedScroller(container: HTMLElement, contentClasses: string[]) {
-  fireEvent.click(screen.getByRole("button", { name: "Lock" }));
+  fireEvent.click(screen.getByRole("tab", { name: "Lock" }));
 
   const scroller = container.querySelector<HTMLElement>(".overflow-auto.justify-center-safe");
   expect(scroller).not.toBeNull();
@@ -111,7 +111,7 @@ describe("metrics grids locked view", () => {
       expect(screen.queryByText("N/A")).toBeNull();
       expect(screen.queryByText("(us)")).toBeNull();
 
-      fireEvent.click(screen.getByRole("button", { name: "Lock" }));
+      fireEvent.click(screen.getByRole("tab", { name: "Lock" }));
 
       expect(screen.getAllByText("N/A")).toHaveLength(24);
       expect(screen.getAllByText("(us)")).toHaveLength(24);
