@@ -5547,6 +5547,31 @@ class RunFlowEndState(StrEnum):
     crashed = "crashed"
 
 
+class RunFlowStatus(StrEnum):
+    """
+    The state of a run's whole flow run, as one read of the run found it.
+
+    Never stored: each read decides it from the run's record and, for a launched run, from
+    Prefect at that moment. ``dispatching``: the launch has not reported back.
+    ``not_launched``: QDash refused the launch; no flow run was created. ``running``: Prefect
+    reports a state the flow run may still leave (scheduled, awaiting retry, late, pending,
+    running, paused, or cancelling). ``completed``, ``failed``, ``cancelled``, and ``crashed``:
+    Prefect reports that terminal state now. ``unknown``: the launch outcome is unknown, no flow
+    run was recorded, or Prefect does not report the flow run. ``unavailable``: Prefect could
+    not be read. A step execution's status never decides it.
+    """
+
+    dispatching = "dispatching"
+    not_launched = "not_launched"
+    running = "running"
+    completed = "completed"
+    failed = "failed"
+    cancelled = "cancelled"
+    crashed = "crashed"
+    unknown = "unknown"
+    unavailable = "unavailable"
+
+
 class SaveFileRequest(BaseModel):
     """
     Request model for saving file content.
@@ -10694,6 +10719,88 @@ class CalibrationPipelineRunResponse(BaseModel):
     executions: Annotated[list[ExecutionResponseSummary] | None, Field(title="Executions")] = None
     """
     Every step execution of the run on the chip, oldest first: those the worker stamped with the run, or, for older runs, those of its flow run
+    """
+
+
+class CalibrationRunStateResponse(BaseModel):
+    """
+    One run of a calibration session, with its whole flow run's state read now.
+
+    ``flow_end_state`` is the terminal state Prefect reports in this read, and null otherwise,
+    whatever an earlier read recorded.
+    """
+
+    run_id: Annotated[str, Field(title="Run Id")]
+    calibration_session_id: Annotated[str, Field(title="Calibration Session Id")]
+    chip_id: Annotated[str, Field(title="Chip Id")]
+    run_kind: CalibrationRunKind = CalibrationRunKind.pipeline
+    """
+    What the run launched: a pipeline, a saved workflow, a task, or an agent action
+    """
+    trigger: CalibrationRunTrigger = CalibrationRunTrigger.api
+    """
+    api when a signed-in request recorded it before launch; schedule or worker when the worker recorded a flow run QDash had not launched (a schedule) as it started
+    """
+    run_name: Annotated[str, Field(title="Run Name")] = ""
+    """
+    The workflow or pipeline name, or the task the run launched
+    """
+    agent_session_id: Annotated[str | None, Field(title="Agent Session Id")] = None
+    """
+    For an agent action's run, the agent session that ran it
+    """
+    action_id: Annotated[str | None, Field(title="Action Id")] = None
+    """
+    For an agent action's run, the action that dispatched it
+    """
+    idempotency_key: Annotated[str, Field(title="Idempotency Key")]
+    requested_by: Annotated[str, Field(title="Requested By")]
+    reported_origin: ReportedLaunchOrigin | None = None
+    """
+    How the caller said it started the run (client reported, not verified); null when nothing was reported, as for a run requested directly
+    """
+    dispatch_status: CalibrationPipelineRunStatus
+    """
+    Whether QDash launched the run: dispatching, dispatched, rejected (nothing was started), or unknown (it may have started; check the Execution list)
+    """
+    attempts: Annotated[int, Field(title="Attempts")]
+    pipeline_name: Annotated[str, Field(title="Pipeline Name")]
+    backend_name: Annotated[str, Field(title="Backend Name")]
+    flow_run_id: Annotated[str | None, Field(title="Flow Run Id")] = None
+    flow_end_state: RunFlowEndState | None = None
+    """
+    How the run's whole flow run ended, as Prefect reported it once it was terminal (completed, failed, cancelled, or crashed); null while it may still run or was not observed
+    """
+    execution_id: Annotated[str | None, Field(title="Execution Id")] = None
+    """
+    The first step's execution, as returned at dispatch
+    """
+    error: Annotated[str, Field(title="Error")] = ""
+    requested_at: Annotated[AwareDatetime, Field(title="Requested At")]
+    updated_at: Annotated[AwareDatetime, Field(title="Updated At")]
+    pipeline: PipelineProgress | None = None
+    """
+    The run as a whole, from its step executions; null until its first execution exists
+    """
+    executions: Annotated[list[ExecutionResponseSummary] | None, Field(title="Executions")] = None
+    """
+    Every step execution of the run on the chip, oldest first: those the worker stamped with the run, or, for older runs, those of its flow run
+    """
+    flow_status: RunFlowStatus
+    """
+    The whole flow run's state in this read: dispatching, not_launched, running (Prefect reports a state it may still leave), completed, failed, cancelled, crashed, unknown (no flow run recorded, an unknown launch outcome, or Prefect does not report it), or unavailable (Prefect could not be read). Never derived from step executions
+    """
+    prefect_state: Annotated[str | None, Field(title="Prefect State")] = None
+    """
+    Prefect's state type for the flow run in this read, such as RUNNING or SCHEDULED; null when Prefect was not read or did not report it
+    """
+    flow_status_reason: Annotated[str, Field(title="Flow Status Reason")] = ""
+    """
+    Why the state is what it is, for display
+    """
+    observed_at: Annotated[AwareDatetime, Field(title="Observed At")]
+    """
+    When this read decided flow_status
     """
 
 

@@ -10,6 +10,7 @@ from ..types.agent_model_identity import AgentModelIdentity
 from ..types.calibration_conclusion_model import CalibrationConclusionModel
 from ..types.calibration_decision_response import CalibrationDecisionResponse
 from ..types.calibration_experiment_plan_model import CalibrationExperimentPlanModel
+from ..types.calibration_run_state_response import CalibrationRunStateResponse
 from ..types.calibration_session_audit_response import CalibrationSessionAuditResponse
 from ..types.calibration_session_detail_response import CalibrationSessionDetailResponse
 from ..types.calibration_session_origin import CalibrationSessionOrigin
@@ -176,6 +177,50 @@ class CalibrationSessionClient:
         )
         """
         _response = self._raw_client.get_calibration_session(calibration_session_id, request_options=request_options)
+        return _response.data
+
+    def get_calibration_session_run(
+        self, calibration_session_id: str, run_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> CalibrationRunStateResponse:
+        """
+        The run with every step execution, found by its ID however many runs the session has.
+
+        ``flow_status`` is the whole flow run's state, read from Prefect in this request; a step
+        execution that completed never makes it completed. Prefect being unreadable is
+        ``unavailable`` and a flow run Prefect does not report is ``unknown``, never running or
+        ended. The read changes nothing: no session is checked or closed.
+
+        Parameters
+        ----------
+        calibration_session_id : str
+
+        run_id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        CalibrationRunStateResponse
+            Successful Response
+
+        Examples
+        --------
+        from qdash.sdk._generated import QDashApi
+
+        client = QDashApi(
+            project_id="YOUR_PROJECT_ID",
+            token="YOUR_TOKEN",
+            base_url="https://yourhost.com/path/to/api",
+        )
+        client.calibration_session.get_calibration_session_run(
+            calibration_session_id="calibration_session_id",
+            run_id="run_id",
+        )
+        """
+        _response = self._raw_client.get_calibration_session_run(
+            calibration_session_id, run_id, request_options=request_options
+        )
         return _response.data
 
     def close_calibration_session(
@@ -630,6 +675,58 @@ class AsyncCalibrationSessionClient:
         """
         _response = await self._raw_client.get_calibration_session(
             calibration_session_id, request_options=request_options
+        )
+        return _response.data
+
+    async def get_calibration_session_run(
+        self, calibration_session_id: str, run_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> CalibrationRunStateResponse:
+        """
+        The run with every step execution, found by its ID however many runs the session has.
+
+        ``flow_status`` is the whole flow run's state, read from Prefect in this request; a step
+        execution that completed never makes it completed. Prefect being unreadable is
+        ``unavailable`` and a flow run Prefect does not report is ``unknown``, never running or
+        ended. The read changes nothing: no session is checked or closed.
+
+        Parameters
+        ----------
+        calibration_session_id : str
+
+        run_id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        CalibrationRunStateResponse
+            Successful Response
+
+        Examples
+        --------
+        import asyncio
+
+        from qdash.sdk._generated import AsyncQDashApi
+
+        client = AsyncQDashApi(
+            project_id="YOUR_PROJECT_ID",
+            token="YOUR_TOKEN",
+            base_url="https://yourhost.com/path/to/api",
+        )
+
+
+        async def main() -> None:
+            await client.calibration_session.get_calibration_session_run(
+                calibration_session_id="calibration_session_id",
+                run_id="run_id",
+            )
+
+
+        asyncio.run(main())
+        """
+        _response = await self._raw_client.get_calibration_session_run(
+            calibration_session_id, run_id, request_options=request_options
         )
         return _response.data
 

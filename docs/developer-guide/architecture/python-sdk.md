@@ -55,6 +55,19 @@ status. Both use the same whole-run status as `RunResult.status` and send no req
 Run handles wait for pipeline-wide status, retry an initial execution 404, return failed/cancelled
 outcomes, and raise `TimeoutError` on timeout. A timeout does not prove the operation stopped.
 
+Registered `WorkflowRun` handles instead use the session and run IDs to read
+`GET /calibration-sessions/{session_id}/runs/{run_id}`. This endpoint observes Prefect on
+request without closing the session or trusting cached terminal state. It retrieves the run
+directly, beyond the session detail's recent-run limit. Unknown or unavailable observations
+do not end SDK polling. Execution statuses remain local to each execution. `WorkflowRunResult` is independent of
+`RunResult`; its optional `detail` does not gate terminal status, since a workflow can end
+before creating an execution.
+
+Recorded-run reads verify both session and run IDs in the response. `WorkflowRun.cancel()`
+uses the launch response's Prefect flow UUID with the existing cancellation endpoint. It
+sends one POST without retries and leaves completion polling to `wait()`; it never selects
+an execution or closes the calibration session.
+
 Pass `calibration_session_id` and `idempotency_key` to `qdash.pipelines.execute()` or
 `qdash.workflows.run()` to associate and safely retry a launch.
 `decision_id` requires a session. If a response fails to echo requested association fields,
@@ -74,7 +87,8 @@ new records arrive. See [list filters](../../reference/clients/python.md#list-ex
 `qdash.execution(id).get()` reads one execution. Its `ExecutionResult.status` is local to
 that execution; `RunResult.status` remains the whole-run status. `run.executions()` reads
 started steps in index order and deduplicates execution IDs. Task wrappers preserve parameter
-metadata and invocation identity; `qdash.task_result(id)` reads the full persisted record.
+metadata and invocation identity; `_parameters.py` exposes concise `Parameter` values and
+read-only `Parameters` mappings with optional DataFrame conversion; `qdash.task_result(id)` reads the full persisted record.
 Artifact handles fetch bytes only through explicit `read()`, `save()`, or `Figure.show()` calls,
 using the configured client. Notebook display imports IPython lazily.
 

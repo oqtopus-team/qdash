@@ -212,7 +212,8 @@ def test_task_result_reads_the_full_saved_result() -> None:
         "Traceback ...",
     )
     assert task.source_task_id == "t-0"
-    assert task.output_parameters["t1"].error == 0.5
+    t1 = task.output_parameters["t1"]
+    assert t1 is not None and t1.error == 0.5
     assert task.run_parameters == {} and task.invocation is None
     assert server.requests[0].headers["X-Project-Id"] == "project-a"
 

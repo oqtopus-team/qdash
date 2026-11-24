@@ -245,6 +245,31 @@ print(result.status)
 `qdash.workflows.list()` lists saved workflows. Parameters override saved defaults for this run
 only; nothing is uploaded. A project is required for execution.
 
+`WorkflowRun.get()` and `wait()` follow the recorded run and query Prefect for the whole
+workflow state. They do not treat a completed first execution or a closed session as success.
+`unknown` and `unavailable` are not terminal states; waiting retries until the timeout.
+This requires a server with the calibration run state endpoint and a recorded run identity.
+Older launches without that identity raise `RuntimeError` rather than report partial success.
+
+Workflow handles and results now use `WorkflowRun` and `WorkflowRunResult`, rather than
+subclasses of `Run` and `RunResult`. Update code that checks those base types.
+`result.detail` is the first execution snapshot, or `None` if no execution exists yet;
+`result.status`, `done`, and `succeeded` still describe the whole workflow.
+`not_launched` ends the wait for a rejected attempt; a later explicit retry can launch it.
+
+To cancel the whole workflow, keep its launch handle and use:
+
+```python
+run.cancel()
+result = run.wait(timeout_seconds=600)
+```
+
+`cancel()` requires editor permission and returns `WorkflowCancellation` with the Prefect
+`flow_run_id`, status, and message. `cancelling` acknowledges the request, not completion.
+It sends one request and does not retry or wait. If the connection fails, check the run's
+state before requesting cancellation again. A run that already ended raises
+`QDashConflictError`. Other runs in the calibration session are not targeted.
+
 ## Follow an Existing Run
 
 ```python
@@ -277,15 +302,16 @@ page. `next_page()` retains filters and returns None at the end. New records can
 offset-based pages. Execution `total` and `has_next` can be None when the server omits totals.
 `results.status_counts` covers all pages with the other filters applied, ignoring `status`.
 
-`to_dataframe()` needs pandas; `to_records()` needs no extra package. For an interactive
-notebook table, install `pandas`, `pyarrow`, and `perspective-python[jupyter]`, then use
-`PerspectiveWidget(results.to_dataframe())` from `perspective.widget`. Widget filters and
-aggregates cover only the loaded page, not all matching history. Read full details with
+`to_dataframe()` needs pandas; `to_records()` needs no extra package. In a notebook, display
+`results.to_dataframe()[["start_at", "task_name", "qid", "status", "task_id"]]` for a compact
+table. The table contains only the loaded page. Read full details with
 `qdash.execution(row.execution_id).get()` or `qdash.task_result(row.task_id)`.
 
 ## Inspect Execution Results
 
-`run.get()` and `run.wait()` report the whole run. `run.executions()` reads each started
+`WorkflowRun.get()` and `wait()` report the whole workflow. A handle from
+`qdash.run(execution_id)` follows that execution and its pipeline progress, not an arbitrary
+workflow containing multiple executions. `run.executions()` reads each started
 execution in step order; each returned `ExecutionResult.status` is that execution's own
 status. Pending steps without an execution ID are omitted.
 
@@ -302,7 +328,11 @@ for execution in run.executions():
 ```
 
 `task.input_parameters` and `task.output_parameters` retain parameter metadata, including
-units and reported errors. Use `task_id` or `invocation` to distinguish repeated calls.
+units and reported errors, in a read-only `Parameters` mapping. Each `Parameter` displays
+only its value, unit, and error; properties such as `calibrated_at` and `task_id`, plus
+`metadata`, retain the details. A parameter reported as null stays `None`. Display
+`task.input_parameters.to_dataframe()` or `task.output_parameters.to_dataframe()` to inspect
+them as tables. Use `task_id` or `invocation` to distinguish repeated calls.
 To read one execution, use `qdash.execution(execution_id).get()`. To read the full saved task
 result, including any `stack_trace`, use `qdash.task_result(task_id)` or `task.get()`.
 These are snapshots; fetch them again to see updates. `detail` retains the original response.

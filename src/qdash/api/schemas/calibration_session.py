@@ -32,7 +32,10 @@ from qdash.datamodel.calibration_session import (
     CalibrationSessionStatus,
 )
 from qdash.datamodel.launch_origin import ReportedLaunchOrigin  # noqa: TC001 - pydantic field
-from qdash.datamodel.run import RunFlowEndState  # noqa: TC001 - pydantic field
+from qdash.datamodel.run import (  # noqa: TC001 - pydantic fields
+    RunFlowEndState,
+    RunFlowStatus,
+)
 
 
 class CreateCalibrationSessionRequest(BaseModel):
@@ -198,6 +201,35 @@ class CalibrationPipelineRunResponse(BaseModel):
             "stamped with the run, or, for older runs, those of its flow run"
         ),
     )
+
+
+class CalibrationRunStateResponse(CalibrationPipelineRunResponse):
+    """One run of a calibration session, with its whole flow run's state read now.
+
+    ``flow_end_state`` is the terminal state Prefect reports in this read, and null otherwise,
+    whatever an earlier read recorded.
+    """
+
+    flow_status: RunFlowStatus = Field(
+        description=(
+            "The whole flow run's state in this read: dispatching, not_launched, running "
+            "(Prefect reports a state it may still leave), completed, failed, cancelled, "
+            "crashed, unknown (no flow run recorded, an unknown launch outcome, or Prefect does "
+            "not report it), or unavailable (Prefect could not be read). Never derived from "
+            "step executions"
+        )
+    )
+    prefect_state: str | None = Field(
+        default=None,
+        description=(
+            "Prefect's state type for the flow run in this read, such as RUNNING or SCHEDULED; "
+            "null when Prefect was not read or did not report it"
+        ),
+    )
+    flow_status_reason: str = Field(
+        default="", description="Why the state is what it is, for display"
+    )
+    observed_at: datetime = Field(description="When this read decided flow_status")
 
 
 class CalibrationAgentSessionChild(BaseModel):
