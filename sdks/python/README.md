@@ -23,7 +23,8 @@ Reuse `qdash` across notebook cells or script operations. Call `qdash.close()` w
 using the connection.
 
 This starts hardware work. Choose an existing workflow and targets suitable for your deployment.
-See the [Python reference](../../docs/reference/clients/python.md) for configuration and other operations.
+See the [Python reference](../../docs/reference/clients/python.md) for TOML profiles and other operations.
+SDK reads of existing INI profiles remain supported with a deprecation warning.
 
 ## Development
 

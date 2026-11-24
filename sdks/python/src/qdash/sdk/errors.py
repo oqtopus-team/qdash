@@ -17,6 +17,7 @@ __all__ = [
     "ApiError",
     "QDashApiError",
     "QDashAuthError",
+    "QDashConfigDeprecationWarning",
     "QDashConfigError",
     "QDashConflictError",
     "QDashNotFoundError",
@@ -27,6 +28,10 @@ __all__ = [
 
 class QDashConfigError(ValueError):
     """The SDK configuration is missing or invalid; nothing was sent."""
+
+
+class QDashConfigDeprecationWarning(FutureWarning):
+    """The SDK read a deprecated configuration source, such as an INI config file."""
 
 
 class QDashApiError(ApiError):

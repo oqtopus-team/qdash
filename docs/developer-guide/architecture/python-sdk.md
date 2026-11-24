@@ -32,7 +32,15 @@ Generated calls disable retries by default. Helper reads may retry transient fai
 to `QDashConfig.read_attempts`; helper writes send once, including on 409, 5xx, and timeouts.
 Helpers translate HTTP errors to SDK errors; direct generated calls retain generated exceptions
 and httpx errors. Password authentication caches a token without refreshing on 401; create a
-new session after expiry, or use API tokens.
+new session after expiry, or use API tokens. Read helpers retry connection and remote protocol
+errors, but not read timeouts. Writes retain a single attempt. A session snapshots its
+configuration; `config` returns a copy, and `with_project()` explicitly changes scope.
+
+Profiles use `config.toml` with `[profiles.<name>]` tables. Explicit profile selection takes
+precedence over `default_profile`, then `"default"`. The SDK reads deprecated INI only when
+the default TOML file is absent or the caller explicitly supplies an INI path; it emits
+`QDashConfigDeprecationWarning`. TOML errors never trigger fallback. `api_token_env` resolves
+only the selected profile's token. See the [migration procedure](../../reference/clients/python.md#migrate-an-ini-profile).
 
 ## Following a run
 

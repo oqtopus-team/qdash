@@ -6,7 +6,7 @@ import time
 from typing import TYPE_CHECKING
 
 from qdash.sdk._calibration import Chip
-from qdash.sdk._config import QDashConfig
+from qdash.sdk._config import QDashConfig, _load_config
 from qdash.sdk._dashboards import Dashboards, Scripts
 from qdash.sdk._http import build_api, owned_http_client
 from qdash.sdk._pipelines import Pipelines
@@ -52,7 +52,8 @@ class QDash:
             if not project_id:
                 raise ValueError("project_id must be a non-empty string")
             config = config.model_copy(update={"project_id": project_id})
-        self._config = config
+        self._config = config.model_copy(deep=True)
+        config = self._config
         self._owns_http_client = http_client is None
         self._http_client = http_client if http_client is not None else owned_http_client(config)
         self._sleep = sleep
@@ -75,13 +76,17 @@ class QDash:
     @classmethod
     def from_profile(
         cls,
-        profile: str = "default",
+        profile: str | None = None,
         path: str | Path | None = None,
         *,
         project_id: str | None = None,
     ) -> QDash:
-        """A session configured from a profile of the QDash config file."""
-        return cls(QDashConfig.from_file(profile=profile, path=path), project_id=project_id)
+        """A session configured from a profile of the QDash config file.
+
+        The file and profile resolve as in :meth:`QDashConfig.from_file`: ``config.toml``
+        and its ``default_profile`` unless ``path`` or ``profile`` is given.
+        """
+        return cls(_load_config(profile, path, stacklevel=3), project_id=project_id)
 
     def with_project(self, project_id: str) -> QDash:
         """A session scoped to ``project_id`` on this session's connection.
@@ -106,7 +111,8 @@ class QDash:
 
     @property
     def config(self) -> QDashConfig:
-        return self._config
+        """A copy of the session settings; use with_project() to change project scope."""
+        return self._config.model_copy(deep=True)
 
     @property
     def project_id(self) -> str | None:

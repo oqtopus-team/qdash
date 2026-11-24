@@ -99,7 +99,13 @@ def token_provider(config: QDashConfig, http_client: httpx.Client) -> str | Call
                         headers=dict(response.headers),
                         body=_body(response),
                     )
-            access = response.json().get("access_token") if response.content else None
+            try:
+                payload = response.json()
+            except ValueError:
+                raise QDashAuthError("Login response was not valid JSON") from None
+            if not isinstance(payload, dict):
+                raise QDashAuthError("Login response must be a JSON object")
+            access = payload.get("access_token")
             if not isinstance(access, str) or not access:
                 raise QDashAuthError("Login response did not include access_token")
             token.append(access)
@@ -129,7 +135,7 @@ def build_api(
 
 def read_options(config: QDashConfig) -> RequestOptions:
     """Request options for a GET the SDK may send again after a transient failure."""
-    return {"max_retries": config.read_attempts - 1}
+    return {"max_retries": config.read_attempts - 1, "retry_remote_protocol_errors": True}
 
 
 def given(**values: Any) -> dict[str, Any]:

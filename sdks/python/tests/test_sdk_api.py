@@ -16,6 +16,7 @@ from qdash.sdk import (
     QDashApiError,
     QDashAuthError,
     QDashConfig,
+    QDashConfigDeprecationWarning,
     QDashConfigError,
     QDashConflictError,
     QDashNotFoundError,
@@ -305,7 +306,8 @@ def test_from_file_reads_a_client_profile(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
-    config = QDashConfig.from_file("lab", path)
+    with pytest.warns(QDashConfigDeprecationWarning):
+        config = QDashConfig.from_file("lab", path)
 
     assert (config.base_url, config.api_token, config.project_id) == (
         "http://lab.local",
@@ -313,9 +315,15 @@ def test_from_file_reads_a_client_profile(tmp_path: Path) -> None:
         "lab",
     )
     assert (config.timeout_sec, config.verify_tls, config.read_attempts) == (9.0, False, 2)
-    with pytest.raises(QDashConfigError, match="profile not found"):
+    with (
+        pytest.warns(QDashConfigDeprecationWarning),
+        pytest.raises(QDashConfigError, match="profile not found"),
+    ):
         QDashConfig.from_file("missing", path)
-    with pytest.raises(QDashConfigError, match="not found"):
+    with (
+        pytest.warns(QDashConfigDeprecationWarning),
+        pytest.raises(QDashConfigError, match="not found"),
+    ):
         QDashConfig.from_file("lab", tmp_path / "absent.ini")
 
 
@@ -326,7 +334,10 @@ def test_from_profile_owns_a_client_with_the_configured_transport(tmp_path: Path
         "timeout_seconds = 4\nproxy = http://proxy.local:3128\nverify_tls = false\n",
         encoding="utf-8",
     )
-    with QDash.from_profile("lab", path, project_id="other") as qdash:
+    with (
+        pytest.warns(QDashConfigDeprecationWarning),
+        QDash.from_profile("lab", path, project_id="other") as qdash,
+    ):
         http_client = qdash._http_client
         assert qdash.project_id == "other"
         assert http_client.timeout.read == 4.0
