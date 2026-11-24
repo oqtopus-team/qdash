@@ -9,15 +9,15 @@ import httpx
 import pytest
 from test_sdk_session import Server
 
-from qdash.client.services.models import AbsolutePeriod, MetricInfo
 from qdash.sdk import (
     Dashboard,
     MetricScriptError,
-    QDash,
     QDashApiError,
     Script,
     ScriptMetric,
 )
+from qdash.sdk._generated._authoring import AbsolutePeriod
+from qdash.sdk.types import MetricInfo
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -116,7 +116,7 @@ def test_definitions_send_nothing_and_read_files_as_text(tmp_path: Path) -> None
     server = Server()
     path = tmp_path / "zx90.py"
     path.write_text("raise SystemExit('never run')\n", encoding="utf-8")
-    QDash(server.client())
+    server.session()
 
     script = Script.from_file(path, visibility="project")
     board = Dashboard("Ops")
@@ -202,7 +202,7 @@ def test_saved_script_metric_is_bound_to_the_saved_revision() -> None:
             ]
         }
     )
-    qdash = QDash(server.client())
+    qdash = server.session()
 
     active = qdash.scripts.get(SCRIPT_ID)
     assert active.metric("zx90_median") == metric()
@@ -226,7 +226,7 @@ def test_script_create_and_update_send_only_given_fields() -> None:
             ],
         }
     )
-    qdash = QDash(server.client())
+    qdash = server.session()
 
     created = qdash.scripts.create(Script("ZX90", "# 1", visibility="project"))
     updated = qdash.scripts.update(created, Script("ZX90", "def broken(:"))
@@ -261,7 +261,7 @@ def test_dashboard_update_sends_the_version_it_is_based_on() -> None:
             ],
         }
     )
-    qdash = QDash(server.client())
+    qdash = server.session()
 
     current = qdash.dashboards.get(DASHBOARD_ID)
     edited = current.edit()
@@ -290,7 +290,7 @@ def test_dashboard_update_sends_the_version_it_is_based_on() -> None:
 
 def test_create_omits_unset_settings() -> None:
     server = Server({("POST", "/dashboards"): [httpx.Response(201, json=dashboard_body())]})
-    qdash = QDash(server.client())
+    qdash = server.session()
 
     qdash.dashboards.create(Dashboard("Ops"))
 

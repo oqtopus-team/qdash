@@ -2,23 +2,26 @@
 
 These operations reach the server's ``/metric-scripts`` and ``/dashboards`` routes with
 the session's project and the caller's permissions. Every create and update names its target
-explicitly: nothing is matched by name, cached locally, retried or rolled back.
+explicitly: nothing is matched by name, cached locally, retried or rolled back. A save based
+on a stale revision or version raises :class:`~qdash.sdk.QDashConflictError` (409).
 """
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from qdash.sdk._http import api_errors, body, read_options
 from qdash.sdk.dashboard import Dashboard, MetricScriptError, Script, ScriptMetric, Visibility
 
 if TYPE_CHECKING:
-    from qdash.client.services.client import QDashClient
-    from qdash.client.services.models import (
-        DashboardResponse,
-        MetricInfo,
-        MetricScriptResponse,
-        MetricScriptRevision,
-        MetricScriptSummary,
+    from qdash.sdk._config import QDashConfig
+    from qdash.sdk._generated.client import QDashApi
+    from qdash.sdk._generated.types.dashboard_response import DashboardResponse
+    from qdash.sdk._generated.types.metric_info import MetricInfo
+    from qdash.sdk._generated.types.metric_script_response import MetricScriptResponse
+    from qdash.sdk._generated.types.metric_script_revision import MetricScriptRevision
+    from qdash.sdk._generated.types.metric_script_summary import MetricScriptSummary
+    from qdash.sdk._generated.types.metric_script_validate_response import (
         MetricScriptValidateResponse,
     )
 
@@ -57,7 +60,7 @@ class SavedScript:
     def valid(self) -> bool:
         """Whether the bound revision validated, so its metrics can back panels."""
         entry = self._entry()
-        return entry is not None and entry.status.value == "valid"
+        return entry is not None and entry.status == "valid"
 
     @property
     def diagnostics(self) -> list[str]:
@@ -121,16 +124,24 @@ class SavedScript:
 class Scripts:
     """The project's metric scripts, reached as ``QDash.scripts``."""
 
-    def __init__(self, client: QDashClient) -> None:
-        self._client = client
+    def __init__(self, api: QDashApi, config: QDashConfig) -> None:
+        self._api = api
+        self._config = config
 
     def list(self) -> list[MetricScriptSummary]:
         """Scripts visible to the caller: shared with the project or their own."""
-        return list(self._client.list_metric_scripts().scripts)
+        with api_errors():
+            response = self._api.metric_script.list_metric_scripts(
+                request_options=read_options(self._config)
+            )
+        return list(response.scripts)
 
     def get(self, script_id: str, *, revision: int | None = None) -> SavedScript:
         """A saved script bound to ``revision``, by default its active (last valid) revision."""
-        response = self._client.get_metric_script(script_id)
+        with api_errors():
+            response = self._api.metric_script.get_metric_script(
+                script_id, request_options=read_options(self._config)
+            )
         return SavedScript(response, revision if revision is not None else response.active_revision)
 
     def template(
@@ -142,7 +153,10 @@ class Scripts:
         visibility: Visibility | None = None,
     ) -> Script:
         """A local :class:`Script` holding a starter template's source; nothing is saved."""
-        templates = self._client.list_metric_script_templates().templates
+        with api_errors():
+            templates = self._api.metric_script.list_metric_script_templates(
+                request_options=read_options(self._config)
+            ).templates
         template = next((t for t in templates if t.template_id == template_id), None)
         if template is None:
             known = ", ".join(t.template_id for t in templates)
@@ -157,11 +171,13 @@ class Scripts:
     def validate(self, script: Script | str) -> MetricScriptValidateResponse:
         """Compile source on the server and return its catalog or diagnostics; saves nothing."""
         source = script.source if isinstance(script, Script) else script
-        return self._client.validate_metric_script(source)
+        with api_errors():
+            return self._api.metric_script.validate_metric_script(source=source)
 
     def create(self, script: Script) -> SavedScript:
         """Save a new script; the result is bound to its first revision, valid or not."""
-        response = self._client.create_metric_script(script.create_request())
+        with api_errors():
+            response = self._api.metric_script.create_metric_script(**body(script.create_request()))
         return SavedScript(response, response.revision)
 
     def update(
@@ -176,9 +192,9 @@ class Scripts:
         New source is validated and recorded as the next revision; source equal to the latest
         saved source adds none. The result is bound to that latest revision, so an invalid
         save is reported by :meth:`SavedScript.metric` instead of falling back to the old
-        active revision. With a :class:`SavedScript` target the update is refused (409) when
-        the script was saved again since it was read; ``expected_revision`` sets that guard
-        for an ID.
+        active revision. With a :class:`SavedScript` target the update is refused with
+        :class:`~qdash.sdk.QDashConflictError` when the script was saved again since it was
+        read; ``expected_revision`` sets that guard for an ID. Nothing is retried.
         """
         if isinstance(target, SavedScript):
             script_id = target.script_id
@@ -186,9 +202,9 @@ class Scripts:
                 expected_revision = target.response.revision
         else:
             script_id = target
-        response = self._client.update_metric_script(
-            script_id, script.update_request(expected_revision=expected_revision)
-        )
+        request = script.update_request(expected_revision=expected_revision)
+        with api_errors():
+            response = self._api.metric_script.update_metric_script(script_id, **body(request))
         return SavedScript(response, response.revision)
 
 
@@ -228,19 +244,31 @@ class SavedDashboard:
 class Dashboards:
     """The project's dashboards, reached as ``QDash.dashboards``."""
 
-    def __init__(self, client: QDashClient) -> None:
-        self._client = client
+    def __init__(self, api: QDashApi, config: QDashConfig) -> None:
+        self._api = api
+        self._config = config
 
     def list(self) -> list[DashboardResponse]:
         """Dashboards visible to the caller: shared with the project or their own."""
-        return list(self._client.list_dashboards().dashboards)
+        with api_errors():
+            response = self._api.dashboard.list_dashboards(
+                request_options=read_options(self._config)
+            )
+        return list(response.dashboards)
 
     def get(self, dashboard_id: str) -> SavedDashboard:
-        return SavedDashboard(self._client.get_dashboard(dashboard_id))
+        with api_errors():
+            return SavedDashboard(
+                self._api.dashboard.get_dashboard(
+                    dashboard_id, request_options=read_options(self._config)
+                )
+            )
 
     def create(self, dashboard: Dashboard) -> SavedDashboard:
         """Save a new dashboard owned by the caller."""
-        return SavedDashboard(self._client.create_dashboard(dashboard.create_request()))
+        with api_errors():
+            response = self._api.dashboard.create_dashboard(**body(dashboard.create_request()))
+        return SavedDashboard(response)
 
     def update(
         self,
@@ -251,8 +279,8 @@ class Dashboards:
     ) -> SavedDashboard:
         """Replace the settings and panels of the dashboard ``target`` names.
 
-        The update is refused with a 409 error when the dashboard changed since the version
-        it is based on: ``expected_version``, else the version of a :class:`SavedDashboard`
+        The update is refused with :class:`~qdash.sdk.QDashConflictError` (409) when the
+        dashboard changed since the version it is based on: ``expected_version``, else the version of a :class:`SavedDashboard`
         target, else the version read from the server just before saving. Nothing is retried.
         """
         if isinstance(target, SavedDashboard):
@@ -262,8 +290,8 @@ class Dashboards:
         else:
             dashboard_id = target
             if expected_version is None:
-                expected_version = self._client.get_dashboard(dashboard_id).version
-        response = self._client.update_dashboard(
-            dashboard_id, dashboard.update_request(expected_version=expected_version)
-        )
+                expected_version = self.get(dashboard_id).version
+        request = dashboard.update_request(expected_version=expected_version)
+        with api_errors():
+            response = self._api.dashboard.update_dashboard(dashboard_id, **body(request))
         return SavedDashboard(response)

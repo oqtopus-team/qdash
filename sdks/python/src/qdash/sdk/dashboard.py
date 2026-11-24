@@ -18,12 +18,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
-from qdash.client.services.models import (
+from qdash.sdk._generated._authoring import (
     AbsolutePeriod,
     DashboardCreateRequest,
     DashboardPanelModel,
     DashboardUpdateRequest,
-    MetricInfo,
     MetricScriptCreateRequest,
     MetricScriptPanelConfig,
     MetricScriptUpdateRequest,
@@ -34,7 +33,8 @@ from qdash.client.services.models import (
 if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping, Sequence
 
-    from qdash.client.services.models import DashboardResponse
+    from qdash.sdk._generated.types.dashboard_response import DashboardResponse
+    from qdash.sdk._generated.types.metric_info import MetricInfo
 
 Visibility = Literal["private", "project"]
 PeriodInput = int | RelativePeriod | AbsolutePeriod
@@ -152,7 +152,7 @@ class ScriptMetric:
 
     @property
     def target(self) -> str:
-        return str(self.info.target.value)
+        return str(self.info.target)
 
     @property
     def hops(self) -> list[int]:
@@ -163,7 +163,7 @@ class ScriptMetric:
     @property
     def result(self) -> str:
         """``scalar`` (one value per target, a map or table) or ``series`` (a chart)."""
-        return str(self.info.result.value) if self.info.result is not None else "scalar"
+        return str(self.info.result) if self.info.result is not None else "scalar"
 
 
 def _period(period: PeriodInput | None) -> RelativePeriod | AbsolutePeriod:
@@ -215,7 +215,7 @@ class Dashboard:
         return cls(
             response.name,
             description=response.description,
-            visibility=response.visibility.value,
+            visibility=response.visibility,
             chip_id=response.chip_id,
             panels=[
                 DashboardPanelModel.model_validate(panel.model_dump(include=fields))

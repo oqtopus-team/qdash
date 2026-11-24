@@ -1,6 +1,6 @@
 """The qdash.sdk calibration and pipeline examples against the real calibration pipeline routes.
 
-The SDK's QDashClient sends its requests through FastAPI's TestClient, so the spec it builds
+The SDK session sends its requests through FastAPI's TestClient, so the spec it builds
 is parsed by the server's CalibrationPipelineSpec and checked by the same preflight as any
 other request. Prefect dispatch is patched; nothing runs.
 """
@@ -14,8 +14,6 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from qdash.client import QDashClient, QDashConfig
-from qdash.client.services.models import CustomTwoQubitStep, TwoQubitCalibrationStep
 from qdash.datamodel import sweep as server_sweep
 from qdash.datamodel.calibration_pipeline import CalibrationPipelineSpec as ServerSpec
 from qdash.datamodel.project import ProjectRole
@@ -23,9 +21,18 @@ from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.project_membership import ProjectMembershipDocument
 from qdash.dbmodel.qubit import QubitDocument
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
-from qdash.sdk import QDash, QDashApiError, QDashValidationError
+from qdash.sdk import QDash, QDashApiError, QDashConfig, QDashValidationError
 from qdash.sdk.calibration import MuxTargets, QubitTargets
-from qdash.sdk.pipeline import CustomOneQubit, Pipeline, Qubits, TaskCall, sweep, to_spec
+from qdash.sdk.pipeline import (
+    CustomOneQubit,
+    CustomTwoQubitStep,
+    Pipeline,
+    Qubits,
+    TaskCall,
+    TwoQubitCalibrationStep,
+    sweep,
+    to_spec,
+)
 from tests.qdash.api.routers.test_calibration_pipeline import (  # noqa: F401 - pytest fixtures
     CHIP,
     chip,
@@ -144,8 +151,7 @@ def qdash(test_client: Any, chip: None) -> Iterator[QDash]:  # noqa: F811
         api_token="test_token",
         project_id="test_project",
     )
-    client = QDashClient(config, http_client=test_client)
-    with QDash(client) as session:
+    with QDash(config, http_client=test_client) as session:
         yield session
 
 

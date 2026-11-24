@@ -8,12 +8,17 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
-from qdash.client.services.models import (
+from qdash.sdk.pipeline import (
     CalibrationPipelineSpec,
+    CustomOneQubit,
     OneQubitCheckStep,
+    Pipeline,
     PipelineTargets,
+    Qubits,
+    TaskCall,
+    sweep,
+    to_spec,
 )
-from qdash.sdk.pipeline import CustomOneQubit, Pipeline, Qubits, TaskCall, sweep, to_spec
 
 TIME_RANGE = sweep.logspace(math.log10(300), math.log10(500_000), 51)
 
@@ -210,8 +215,10 @@ def test_sweeps_reject_invalid_arguments() -> None:
 def test_string_literals_match_the_generated_enums() -> None:
     from typing import get_args
 
-    from qdash.client.services import models
+    from qdash.sdk._generated import _authoring as models
     from qdash.sdk.pipeline import OneQubitExecutionMode, OnFailure
 
-    assert set(get_args(OneQubitExecutionMode)) == {mode.value for mode in models.ExecutionMode}
+    modes = models.CustomOneQubitStep.model_fields["execution_mode"].annotation
+    assert isinstance(modes, type)
+    assert set(get_args(OneQubitExecutionMode)) == {mode.value for mode in modes}
     assert set(get_args(OnFailure)) == {value.value for value in models.OnFailure}

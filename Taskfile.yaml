@@ -25,11 +25,12 @@ tasks:
         ENV=test uv run python -c 'import json, os; from dotenv import load_dotenv; load_dotenv(".env"); os.environ["ENV"] = "test"; from qdash.api.main import app; print(json.dumps(app.openapi(), ensure_ascii=False, indent=2))' > "$OPENAPI_TMP"
         mv "$OPENAPI_TMP" docs/oas/openapi.json
       - task: generate-python-schema
+      - task: generate-python-sdk
       - cd clients/typescript && bun run generate:ui
       - cd clients/typescript && bun run generate
       - cd ui && bun run fmt
       - cd ui && bun run lint:fix
-    desc: Generate the OpenAPI document and the Python and TypeScript clients
+    desc: Generate the OpenAPI document, the Python client and SDK, and the TypeScript clients
 
   generate-task-catalog:
     desc: Generate task metadata catalog from workflow classes
@@ -40,6 +41,16 @@ tasks:
     desc: Generate the Python client's Pydantic models from the OpenAPI document
     cmds:
       - uv run python scripts/generate_python_client_models.py
+
+  generate-python-sdk:
+    desc: Generate qdash.sdk._generated from the OpenAPI document (needs npx and Docker)
+    cmds:
+      - uv run python scripts/generate_python_sdk.py
+
+  check-python-sdk-generated:
+    desc: Fail when qdash.sdk._generated differs from a fresh generation (needs npx and Docker)
+    cmds:
+      - uv run python scripts/generate_python_sdk.py --check
 
   knowledge-pull:
     desc: Pull task-knowledge.json from the knowledge repository (KNOWLEDGE_REPO_URL)
@@ -267,7 +278,7 @@ tasks:
   test-sdk:
     desc: Run Python SDK tests
     cmds:
-      - uv run pytest sdks/python/tests/ -v
+      - uv run --package qdash-sdk pytest sdks/python/tests/ -v
 
   build-client-ts:
     desc: Build the local TypeScript client and SDK for pi packages and the runtime
@@ -497,6 +508,7 @@ tasks:
     cmds:
       - uv run --all-packages scripts/generate_task_catalog.py --check
       - uv run python scripts/generate_python_client_models.py --check
+      - task: check-python-sdk-generated
       - uv run ruff check .
       - uv run ruff format --check .
 

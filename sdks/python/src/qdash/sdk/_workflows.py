@@ -1,6 +1,6 @@
 """Registered workflows of a project: list, inspect and run them by name.
 
-A registered workflow is a flow saved to QDash, from the UI or ``QDashClient.save_flow``, with a
+A registered workflow is a flow saved to QDash, from the UI or ``QDash.api.flow.save_flow``, with a
 deployment and a target chip. These operations reach the server's ``/flows`` routes: they read
 the stored metadata and dispatch the saved deployment. Nothing is uploaded, registered,
 imported or run locally.
@@ -11,18 +11,19 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING, Any
 
-from qdash.client.services.errors import QDashConfigError
-from qdash.sdk._runs import RunResult
+from qdash.sdk._http import api_errors, given, read_options
+from qdash.sdk._runs import Run
+from qdash.sdk.errors import QDashConfigError
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
-    from qdash.client.services.client import QDashClient
-    from qdash.client.services.models import (
-        ExecuteFlowResponse,
-        FlowSummary,
-        GetFlowResponse,
-    )
+    from qdash.sdk._config import QDashConfig
+    from qdash.sdk._generated.client import QDashApi
+    from qdash.sdk._generated.types.execute_flow_response import ExecuteFlowResponse
+    from qdash.sdk._generated.types.flow_summary import FlowSummary
+    from qdash.sdk._generated.types.get_flow_response import GetFlowResponse
+    from qdash.sdk._runs import Executions
 
 # The names the server accepts when a flow is saved; anything else cannot name a saved flow,
 # and is rejected before it becomes part of a request path.
@@ -35,22 +36,19 @@ def _checked_name(name: str) -> str:
     return name
 
 
-class WorkflowRun:
+class WorkflowRun(Run):
     """A dispatched workflow run, returned by :meth:`Workflow.run` and :meth:`Workflows.run`.
 
     ``execution_id`` is the QDash execution the server created for the run; ``response`` is
     the dispatch response as the API returned it, including ``flow_run_id``. Every step
     execution of the run belongs to ``calibration_session_id`` and ``calibration_run_id``.
+    :meth:`get` and :meth:`wait` follow the whole run, as for a calibration.
     """
 
-    def __init__(self, client: QDashClient, name: str, response: ExecuteFlowResponse) -> None:
-        self._client = client
+    def __init__(self, executions: Executions, name: str, response: ExecuteFlowResponse) -> None:
+        super().__init__(executions, response.execution_id)
         self.name = name
         self.response = response
-
-    @property
-    def execution_id(self) -> str:
-        return self.response.execution_id
 
     @property
     def calibration_session_id(self) -> str | None:
@@ -64,31 +62,6 @@ class WorkflowRun:
 
     def __repr__(self) -> str:
         return f"WorkflowRun(name={self.name!r}, execution_id={self.execution_id!r})"
-
-    def get(self) -> RunResult:
-        """The run's current state; raises ``QDashNotFoundError`` before it exists."""
-        return RunResult(self.execution_id, self._client.get_execution(self.execution_id))
-
-    def wait(
-        self,
-        *,
-        timeout_seconds: float = 3600.0,
-        poll_interval_seconds: float = 5.0,
-    ) -> RunResult:
-        """Poll until the whole run ends and return its result.
-
-        A failed or cancelled run is returned, not raised; check ``result.status``. An
-        execution the server does not list yet is polled again. Raises ``TimeoutError`` when
-        the run has not ended within ``timeout_seconds``; the run itself keeps going. Same
-        polling as :meth:`PipelineRun.wait`.
-        """
-        detail = self._client.wait_for_execution(
-            self.execution_id,
-            timeout_seconds=timeout_seconds,
-            poll_interval_seconds=poll_interval_seconds,
-            whole_pipeline=True,
-        )
-        return RunResult(self.execution_id, detail)
 
 
 class Workflow:
@@ -141,16 +114,26 @@ class Workflow:
 class Workflows:
     """The project's registered workflows, reached as ``QDash.workflows``."""
 
-    def __init__(self, client: QDashClient) -> None:
-        self._client = client
+    def __init__(
+        self, api: QDashApi, config: QDashConfig, executions: Executions, project_id: str | None
+    ) -> None:
+        self._api = api
+        self._config = config
+        self._executions = executions
+        self._project_id = project_id
 
     def list(self) -> list[FlowSummary]:
         """Summaries of the workflows registered in the session's project."""
-        return list(self._client.list_flows().flows)
+        with api_errors():
+            response = self._api.flow.list_flows(request_options=read_options(self._config))
+        return list(response.flows)
 
     def get(self, name: str) -> Workflow:
         """The registered workflow ``name``; raises ``QDashNotFoundError`` when there is none."""
-        return Workflow(self, self._client.get_flow(_checked_name(name)))
+        checked = _checked_name(name)
+        with api_errors():
+            detail = self._api.flow.get_flow(checked, request_options=read_options(self._config))
+        return Workflow(self, detail)
 
     def run(
         self,
@@ -173,17 +156,43 @@ class Workflows:
         joins ``calibration_session_id`` when given (open, on the run's chip, created by the
         signed-in user); otherwise an automatic session created for it. A retry with the same ``idempotency_key`` returns the
         recorded run instead of starting another; without a key every call starts a new run.
+        The request is sent once: a transport error or an error status is raised, never
+        retried. With a session or key, a response that does not echo the recorded run raises
+        ``RuntimeError``: the run may have started without them, so reconcile it first.
         """
         checked = _checked_name(name)
-        if not self._client.config.project_id:
+        for label, value in (
+            ("calibration_session_id", calibration_session_id),
+            ("idempotency_key", idempotency_key),
+        ):
+            if value is not None and not value.strip():
+                raise ValueError(f"{label} must be non-empty")
+        if not self._project_id:
             raise QDashConfigError(
                 "running a workflow needs a project: set QDASH_PROJECT_ID, "
                 "project_id in the profile, or QDash(..., project_id=...)"
             )
-        response = self._client.execute_flow(
-            checked,
-            parameters=dict(parameters) if parameters is not None else {},
-            calibration_session_id=calibration_session_id,
-            idempotency_key=idempotency_key,
+        options = given(
+            calibration_session_id=calibration_session_id, idempotency_key=idempotency_key
         )
-        return WorkflowRun(self._client, checked, response)
+        with api_errors():
+            # The request's parameters are an object; null is rejected, so None sends {}.
+            response = self._api.flow.execute_flow(
+                checked,
+                parameters=dict(parameters) if parameters is not None else {},
+                **options,
+            )
+        if options:
+            # A server that predates run recording ignores both fields and starts the flow
+            # anyway, so a missing echo means the run started without them.
+            recorded = isinstance(response.calibration_run_id, str)
+            named = (
+                calibration_session_id is None
+                or response.calibration_session_id == calibration_session_id
+            )
+            if not (recorded and named):
+                raise RuntimeError(
+                    "Workflow result unknown: the run may have started without its calibration "
+                    "session or key. Do not retry automatically; reconcile the execution first."
+                )
+        return WorkflowRun(self._executions, checked, response)

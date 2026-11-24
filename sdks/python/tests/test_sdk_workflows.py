@@ -9,7 +9,6 @@ import httpx
 import pytest
 from test_sdk_session import Server, detail
 
-from qdash.client.services.models import FlowSummary
 from qdash.sdk import (
     QDash,
     QDashConfigError,
@@ -19,6 +18,7 @@ from qdash.sdk import (
     Workflow,
     WorkflowRun,
 )
+from qdash.sdk.types import FlowSummary
 
 NAME = "coherence_check"
 FLOW_CHIP = "64Qv3"
@@ -75,7 +75,7 @@ def executions(*responses: httpx.Response) -> dict[str, list[httpx.Response]]:
 
 def test_list_returns_summaries_scoped_to_the_project() -> None:
     server = Server(routes())
-    with QDash(server.client(), project_id="project-b") as qdash:
+    with server.session(project_id="project-b") as qdash:
         workflows = qdash.workflows.list()
 
     assert [type(w) for w in workflows] == [FlowSummary, FlowSummary]
@@ -89,7 +89,7 @@ def test_list_returns_summaries_scoped_to_the_project() -> None:
 
 def test_get_maps_the_saved_workflow_and_dispatches_nothing() -> None:
     server = Server(routes())
-    workflow = QDash(server.client()).workflows.get(NAME)
+    workflow = server.session().workflows.get(NAME)
 
     assert isinstance(workflow, Workflow)
     assert (workflow.name, workflow.chip_id) == (NAME, FLOW_CHIP)
@@ -109,13 +109,13 @@ def test_get_of_a_missing_workflow_raises_not_found() -> None:
         {("GET", "/flows/missing"): [httpx.Response(404, json={"detail": "Flow not found"})]}
     )
     with pytest.raises(QDashNotFoundError):
-        QDash(server.client()).workflows.get("missing")
+        server.session().workflows.get("missing")
 
 
 @pytest.mark.parametrize("name", ["", "../flows", "a/b", "templates/x", "a b", "x\n", 3])
 def test_names_a_saved_workflow_cannot_have_are_rejected_before_a_request(name: Any) -> None:
     server = Server(routes())
-    workflows = QDash(server.client()).workflows
+    workflows = server.session().workflows
 
     with pytest.raises(ValueError, match="workflow name"):
         workflows.get(name)
@@ -135,7 +135,7 @@ def test_run_of_a_read_workflow_forwards_the_parameters_and_follows_the_whole_ru
             )
         )
     )
-    qdash = QDash(server.client())
+    qdash = server.session()
     workflow = qdash.workflows.get(NAME)
 
     run = workflow.run(parameters={"qids": ["0", "1"]})
@@ -160,7 +160,7 @@ def test_run_of_a_read_workflow_forwards_the_parameters_and_follows_the_whole_ru
 
 def test_run_by_name_without_parameters_runs_the_saved_defaults() -> None:
     server = Server(routes(**executions(httpx.Response(200, json=detail("cancelled", None)))))
-    run = QDash(server.client()).workflows.run(NAME)
+    run = server.session().workflows.run(NAME)
 
     assert server.paths() == [("POST", f"/flows/{NAME}/execute")]
     assert json.loads(server.requests[0].content) == {"parameters": {}}
@@ -171,7 +171,7 @@ def test_run_by_name_without_parameters_runs_the_saved_defaults() -> None:
 
 def test_get_reads_the_current_state_without_waiting() -> None:
     server = Server(routes(**executions(httpx.Response(200, json=detail("completed", "running")))))
-    run = QDash(server.client()).workflows.run(NAME)
+    run = server.session().workflows.run(NAME)
 
     assert run.get().status == "running"
     assert server.sleeps == []
@@ -179,7 +179,7 @@ def test_get_reads_the_current_state_without_waiting() -> None:
 
 def test_wait_times_out_without_cancelling() -> None:
     server = Server(routes(**executions(httpx.Response(404, json={"detail": "not found"}))))
-    run = QDash(server.client()).workflows.run(NAME)
+    run = server.session().workflows.run(NAME)
 
     with pytest.raises(TimeoutError):
         run.wait(timeout_seconds=0)
@@ -188,7 +188,7 @@ def test_wait_times_out_without_cancelling() -> None:
 
 def test_run_needs_a_project_but_list_and_get_do_not() -> None:
     server = Server(routes())
-    workflows = QDash(server.client(project_id=None)).workflows
+    workflows = server.session(project_id=None).workflows
 
     with pytest.raises(QDashConfigError):
         workflows.run(NAME)
@@ -204,7 +204,7 @@ def test_a_rejected_run_raises_the_api_error() -> None:
     rejected = {"detail": [{"loc": ["body", "parameters"], "msg": "bad", "type": "dict_type"}]}
     server = Server({("POST", f"/flows/{NAME}/execute"): [httpx.Response(422, json=rejected)]})
     with pytest.raises(QDashValidationError):
-        QDash(server.client()).workflows.run(NAME, parameters={"qids": ["0"]})
+        server.session().workflows.run(NAME, parameters={"qids": ["0"]})
     assert len(server.requests) == 1
 
 
@@ -216,12 +216,12 @@ def test_workflows_share_the_session_client_and_its_lifecycle(
     monkeypatch.setenv("QDASH_PROJECT_ID", "project-a")
 
     qdash = QDash.from_env()
-    transport = qdash.client._rest_client._client
-    assert qdash.workflows._client is qdash.client
-    assert qdash.chip(FLOW_CHIP)._pipelines._client is qdash.client
+    http_client = qdash._http_client
+    assert qdash.workflows._api is qdash.api
+    assert qdash.chip(FLOW_CHIP)._pipelines._api is qdash.api
     qdash.close()
 
-    assert transport.is_closed
+    assert http_client.is_closed
 
 
 def test_a_run_names_its_calibration_session_and_run() -> None:
@@ -236,7 +236,7 @@ def test_a_run_names_its_calibration_session_and_run() -> None:
             ("POST", f"/flows/{NAME}/execute"): [httpx.Response(200, json=recorded)],
         }
     )
-    run = QDash(server.client()).workflows.run(
+    run = server.session().workflows.run(
         NAME, calibration_session_id="cs-1", idempotency_key="trial-1"
     )
 

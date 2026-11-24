@@ -17,8 +17,8 @@ const compare = (a, b) => {
 };
 
 /**
- * The TypeScript SDK releases at exactly the client version of the same run, like the
- * Python qdash-sdk beside qdash-client, and depends on that client only, pinned to it.
+ * The TypeScript SDK releases at exactly the client version of the same run, and depends on
+ * that client only, pinned to it.
  * The client job computes the version once (client-release.mjs); this never reads tags.
  */
 export function sdkManifest(manifest, clientVersion) {
