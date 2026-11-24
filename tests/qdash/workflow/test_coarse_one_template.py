@@ -87,7 +87,8 @@ def test_coarse_one_forwards_execution_context_and_preserves_task_scan_defaults(
     assert result["args"] == ("alice", "64Q")
     assert result["kwargs"] == {
         "project_id": "project-1",
-        "flow_name": "coarse-check",
+        # The run is named from the launch; the template does not pass flow_name on.
+        "flow_name": None,
         "tags": ["coarse"],
         "default_run_parameters": {
             "readout_duration": 1024,

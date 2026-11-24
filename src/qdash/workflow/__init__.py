@@ -30,7 +30,6 @@ Example:
                     tasks=[TaskCall(name="CheckRabi"), TaskCall(name="CreateHPIPulse")],
                 )
             ],
-            name=flow_name,
         )
     ```
 """

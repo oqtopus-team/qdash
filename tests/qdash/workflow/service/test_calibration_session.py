@@ -257,3 +257,185 @@ def test_calibration_flow_sets_qdash_hooks_and_the_session_name(
             calibration_flow(session_name=bad)
     with pytest.raises(TypeError, match="session_name"):
         calibration_flow(session_name=cast("str", 3))
+
+
+# --- Run name and saved defaults from the launch ---------------------------------------------
+
+
+@pytest.fixture
+def saved_defaults(monkeypatch: pytest.MonkeyPatch) -> list[str | None]:
+    """Record the saved flow each run reads defaults from; only "Nightly" has any."""
+    lookups: list[str | None] = []
+
+    def load(project_id: str, flow_name: str | None) -> dict[str, Any]:
+        lookups.append(flow_name)
+        return {"interval": {"value": 7}} if flow_name == "Nightly" else {}
+
+    monkeypatch.setattr(
+        "qdash.workflow.service._internal.runs.load_flow_default_run_parameters", load
+    )
+    return lookups
+
+
+def _in_flow_run(
+    monkeypatch: pytest.MonkeyPatch,
+    parameters: dict[str, Any] | None,
+    *,
+    prefect_flow_name: str = "nightly-calibration",
+) -> None:
+    """Run inside a Prefect flow run with these parameters and this Prefect flow name."""
+    import sys
+    from types import SimpleNamespace
+
+    flow_run = SimpleNamespace(id="flow-run-1", parameters=parameters or {})
+    context = SimpleNamespace(flow_run=flow_run, flow=SimpleNamespace(name=prefect_flow_name))
+    monkeypatch.setitem(
+        sys.modules,
+        "prefect.context",
+        SimpleNamespace(
+            FlowRunContext=SimpleNamespace(get=lambda: context),
+            get_run_context=lambda: context,
+        ),
+    )
+
+
+def _outside_flow_run(monkeypatch: pytest.MonkeyPatch) -> None:
+    import sys
+    from types import SimpleNamespace
+
+    def no_context() -> Any:
+        raise RuntimeError("no run context")
+
+    monkeypatch.setitem(
+        sys.modules,
+        "prefect.context",
+        SimpleNamespace(
+            FlowRunContext=SimpleNamespace(get=lambda: None), get_run_context=no_context
+        ),
+    )
+
+
+STEPS = [CustomOneQubit(step_name="rabi", tasks=[TaskCall(name="CheckRabi")])]
+
+
+def test_a_qdash_launch_names_the_run_and_reads_defaults_from_its_saved_flow(
+    runs: list[dict[str, Any]],
+    saved_defaults: list[str | None],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _in_flow_run(monkeypatch, {"flow_name": "Nightly", "source_execution_id": "exec-src"})
+
+    _session().run(QubitTargets(["0"]), STEPS)
+
+    settings = runs[0]["settings"]
+    assert settings.flow_name == "Nightly"
+    assert saved_defaults == ["Nightly"]
+    assert settings.default_run_parameters == {"interval": {"value": 7}}
+    # Naming adds no metadata and leaves the snapshot source as it was.
+    assert (settings.tags, settings.note) == (None, None)
+    assert settings.snapshot.execution_id == "exec-src"
+    # The steps keep their own names; the run name only prefixes their Executions.
+    [step] = runs[0]["steps"]
+    assert step.name == "rabi"
+
+
+def test_an_explicit_name_overrides_the_display_name_only(
+    runs: list[dict[str, Any]],
+    saved_defaults: list[str | None],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _in_flow_run(monkeypatch, {"flow_name": "Nightly"})
+
+    _session().run(QubitTargets(["0"]), STEPS, name="nightly-manual")
+    # A legacy flow forwarding the injected flow_name behaves as the omitted name.
+    _session().run(QubitTargets(["0"]), STEPS, name="Nightly")
+
+    assert [run["settings"].flow_name for run in runs] == ["nightly-manual", "Nightly"]
+    assert saved_defaults == ["Nightly", "Nightly"]
+    assert all(run["settings"].default_run_parameters == {"interval": {"value": 7}} for run in runs)
+
+
+def test_explicit_defaults_skip_the_saved_flow(
+    runs: list[dict[str, Any]],
+    saved_defaults: list[str | None],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _in_flow_run(monkeypatch, {"flow_name": "Nightly"})
+
+    _session().run(QubitTargets(["0"]), STEPS, default_run_parameters={"shots": 64})
+
+    assert saved_defaults == []
+    assert runs[0]["settings"].default_run_parameters == {"shots": {"value": 64}}
+    assert runs[0]["settings"].flow_name == "Nightly"
+
+
+@pytest.mark.parametrize("parameters", [{}, {"flow_name": None}, {"flow_name": "  "}])
+def test_a_flow_run_started_without_qdash_takes_the_prefect_flow_name(
+    runs: list[dict[str, Any]],
+    saved_defaults: list[str | None],
+    monkeypatch: pytest.MonkeyPatch,
+    parameters: dict[str, Any],
+) -> None:
+    _in_flow_run(monkeypatch, parameters)
+
+    _session().run(QubitTargets(["0"]), STEPS)
+
+    assert runs[0]["settings"].flow_name == "nightly-calibration"
+    # The Prefect flow name is not a saved flow: no defaults are looked up by it.
+    assert saved_defaults == [None]
+    assert runs[0]["settings"].default_run_parameters == {}
+
+
+def test_outside_a_flow_run_the_name_is_unset_unless_passed(
+    runs: list[dict[str, Any]],
+    saved_defaults: list[str | None],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _outside_flow_run(monkeypatch)
+
+    _session().run(QubitTargets(["0"]), STEPS)
+    _session().run(QubitTargets(["0"]), STEPS, name="Nightly")
+
+    assert [run["settings"].flow_name for run in runs] == [None, "Nightly"]
+    # Outside QDash a passed name still selects its saved flow's defaults, as before.
+    assert saved_defaults == [None, "Nightly"]
+    assert runs[0]["settings"].snapshot.execution_id is None
+    assert runs[1]["settings"].default_run_parameters == {"interval": {"value": 7}}
+
+
+def test_first_party_templates_do_not_forward_the_run_name() -> None:
+    """Every template leaves the run name to the launch and keeps the injected parameter."""
+    import ast
+    import inspect
+    from pathlib import Path
+
+    import qdash.workflow
+
+    templates = sorted((Path(qdash.workflow.__file__).parent / "templates").glob("*.py"))
+    checked = 0
+    for path in templates:
+        tree = ast.parse(path.read_text())
+        runs_in_file = [
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "run"
+        ]
+        for call in runs_in_file:
+            assert "name" not in {kw.arg for kw in call.keywords}, path.name
+        if not runs_in_file:
+            continue
+        checked += 1
+        flows = [
+            node
+            for node in tree.body
+            if isinstance(node, ast.FunctionDef)
+            and any("calibration_flow" in ast.unparse(d) for d in node.decorator_list)
+        ]
+        assert flows, path.name
+        for flow in flows:
+            params = {a.arg for a in flow.args.args + flow.args.kwonlyargs}
+            assert {"flow_name", "project_id"} <= params, (path.name, flow.name)
+    assert checked >= 15
+    assert "name=flow_name" not in inspect.getsource(qdash.workflow)

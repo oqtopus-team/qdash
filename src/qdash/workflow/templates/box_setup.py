@@ -51,7 +51,8 @@ def box_setup(
               all of its tasks
             - "sequential": one MUX and one qubit at a time
         tags: Flow tags
-        flow_name: Flow name (auto-injected)
+        flow_name: Saved flow name QDash injects at launch; keep it in the signature
+            and do not pass it on (session.run reads the launch name itself)
         project_id: Project ID (auto-injected)
 
     Returns:
@@ -96,6 +97,5 @@ def box_setup(
         default_run_parameters={
             "readout_duration": 1024,
         },
-        name=flow_name,
         tags=tags,
     )

@@ -27,7 +27,7 @@ def rabi_in_rounds(username: str, chip_id: str, project_id: str | None = None,
         rounds=[["0", "8"], ["1", "9"]],
         tasks=[TaskCall(name="CheckRabi"), TaskCall(name="CheckT1")],
     )]
-    return session.run(QubitTargets(["0", "8", "1", "9"]), steps=steps, name=flow_name)
+    return session.run(QubitTargets(["0", "8", "1", "9"]), steps=steps)
 ```
 
 The rounds must cover the step's current targets exactly once, after exclusions and filters.

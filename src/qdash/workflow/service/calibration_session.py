@@ -26,9 +26,12 @@ Example:
         return session.run(
             targets=MuxTargets(mux_ids),
             steps=[CustomOneQubit(step_name="rabi", tasks=[TaskCall(name="CheckRabi")])],
-            name=flow_name,
         )
     ```
+
+``flow_name`` and ``project_id`` are launch metadata QDash injects into every saved flow;
+keep them in the signature so the launch is accepted. ``run`` reads the launch's flow name
+itself, so the flow does not pass it on.
 """
 
 from __future__ import annotations
@@ -156,8 +159,12 @@ class CalibrationSession:
                 including custom ``Step`` subclasses, are accepted on this worker-only path.
             default_run_parameters: Run values every task call starts from, plain or as
                 sweeps. When omitted, the saved flow's defaults apply.
-            name: Display name of the run; each step's Execution is named
-                ``<name>_<step name>``. Pass the injected ``flow_name``.
+            name: Optional display name of the run; each step's Execution is named
+                ``<name>_<step name>``. Omit it: the run is named after the saved flow
+                the launch came from (the Prefect flow's name for a flow run started
+                without QDash; outside a flow run each Execution takes its step name).
+                A name passed here takes precedence for display only; the saved flow's
+                defaults are still those of the launch.
             tags: Tags recorded on every Execution.
             note: Extra JSON-serializable data recorded in every Execution's note.
 
@@ -173,6 +180,7 @@ class CalibrationSession:
         """
         from qdash.repository.run_ledger import NOTE_RUN_KEY, NOTE_SESSION_KEY
         from qdash.workflow.service._internal.runs import (
+            resolve_launch_names,
             run_calibration_with_runtime,
             workflow_settings,
         )
@@ -180,9 +188,11 @@ class CalibrationSession:
 
         runtime_targets = runtime_target(targets)
         built = runtime_steps(steps)
+        display_name, saved_flow_name = resolve_launch_names(name)
         settings = workflow_settings(
             self._context,
-            flow_name=name,
+            flow_name=display_name,
+            saved_flow_name=saved_flow_name,
             tags=list(tags) if tags is not None else None,
             note=copy.deepcopy(dict(note)) if note is not None else None,
             default_run_parameters=(

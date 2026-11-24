@@ -99,7 +99,8 @@ def two_qubit(
             (higher design frequency).
         max_parallel_ops: Maximum number of CR operations to run in parallel.
             Limited by hardware constraints. Default: 10.
-        flow_name: Flow name (auto-injected)
+        flow_name: Saved flow name QDash injects at launch; keep it in the signature
+            and do not pass it on (session.run reads the launch name itself)
         project_id: Project ID (auto-injected)
 
     Returns:
@@ -193,6 +194,5 @@ def two_qubit(
             "readout_duration": 1024,
             "interval": 150 * 1024,
         },
-        name=flow_name,
         tags=tags,
     )

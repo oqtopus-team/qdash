@@ -25,6 +25,7 @@ from qdash.workflow.service._internal.settings import (
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+    from types import EllipsisType
 
     from qdash.workflow.service.context import CalibContext
     from qdash.workflow.service.steps import Step
@@ -46,6 +47,58 @@ def read_source_execution_id_from_context() -> str | None:
     except Exception:
         logger.debug("No Prefect run context available for source_execution_id")
     return None
+
+
+def _flow_run_context() -> tuple[Any, Any] | None:
+    """The current Prefect flow run and its flow, or None outside a flow run."""
+    try:
+        from prefect.context import FlowRunContext
+
+        context = FlowRunContext.get()
+    except Exception:
+        logger.debug("No Prefect flow run context available")
+        return None
+    if context is None or context.flow_run is None:
+        return None
+    return context.flow_run, getattr(context, "flow", None)
+
+
+def _text(value: object) -> str | None:
+    return value.strip() if isinstance(value, str) and value.strip() else None
+
+
+def read_saved_flow_name_from_context() -> str | None:
+    """The saved QDash flow the current flow run was launched from, or None.
+
+    QDash injects the saved flow's name as the ``flow_name`` parameter of every launch
+    (execute, schedule and preview). A flow run started in Prefect directly, or a call
+    outside a flow run, has no saved flow.
+    """
+    found = _flow_run_context()
+    if found is None:
+        return None
+    parameters = getattr(found[0], "parameters", None) or {}
+    return _text(parameters.get("flow_name")) if isinstance(parameters, dict) else None
+
+
+def resolve_launch_names(name: str | None) -> tuple[str | None, str | None]:
+    """The display name of a ``CalibrationSession.run`` and the saved flow of its defaults.
+
+    The display name is, in order: ``name`` when the flow passes one (legacy flows pass
+    the injected ``flow_name``), the saved QDash flow the launch came from, the Prefect
+    flow's name for a flow run started without QDash, and None outside a flow run (the
+    Execution then falls back to its step name). The saved defaults are read from the
+    launch's saved flow, whatever display name is passed; without one (outside QDash)
+    from ``name``, as before. The Prefect flow name never selects saved defaults.
+    """
+    saved = read_saved_flow_name_from_context()
+    display = name
+    if display is None:
+        display = saved
+    if display is None:
+        found = _flow_run_context()
+        display = _text(getattr(found[1], "name", None)) if found is not None else None
+    return display, saved if saved is not None else name
 
 
 def load_flow_default_run_parameters(project_id: str, flow_name: str | None) -> dict[str, Any]:
@@ -78,6 +131,7 @@ def workflow_settings(
     note: dict[str, Any] | None,
     default_run_parameters: dict[str, Any] | None,
     task_defaults: dict[str, dict[str, Any]] | None = None,
+    saved_flow_name: str | None | EllipsisType = ...,
 ) -> SessionSettings:
     """Settings of a workflow run.
 
@@ -86,10 +140,13 @@ def workflow_settings(
     snapshot parameters from it, in its own sessions and in its workers alike.
     ``task_defaults`` is only set by the declarative pipeline flow, from its
     spec's deprecated ``task_parameters``. GitHub pull and push follow the
-    deployment (:meth:`GitHubPolicy.from_deployment`).
+    deployment (:meth:`GitHubPolicy.from_deployment`). ``saved_flow_name`` names the saved
+    flow whose defaults apply when it differs from the display ``flow_name``
+    (see :func:`resolve_launch_names`); by default it is ``flow_name``.
     """
+    defaults_from = flow_name if saved_flow_name is ... else saved_flow_name
     defaults = default_run_parameters or load_flow_default_run_parameters(
-        context.project_id, flow_name
+        context.project_id, defaults_from
     )
     source_execution_id = read_source_execution_id_from_context()
     return SessionSettings(

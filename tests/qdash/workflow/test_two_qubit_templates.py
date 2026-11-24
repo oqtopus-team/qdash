@@ -93,7 +93,8 @@ def test_two_qubit_pairs_template_targets_exactly_the_directed_pairs(monkeypatch
 
     assert result["targets"].to_coupling_ids("64Q") == ["0-1", "1-0"]
     assert result["kwargs"]["tags"] == ["daily"]
-    assert result["kwargs"]["flow_name"] == "custom_flow"
+    # The run is named from the launch; the template does not pass flow_name on.
+    assert result["kwargs"]["flow_name"] is None
     assert result["kwargs"]["project_id"] == "project-1"
 
 

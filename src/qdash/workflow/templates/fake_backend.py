@@ -109,7 +109,8 @@ def fake_calibration(
         backend_name: Backend to use ("fake" for testing, "qubex" for production,
                       None for default from config/app/backend.yaml)
         tags: Flow tags
-        flow_name: Flow name (auto-injected)
+        flow_name: Saved flow name QDash injects at launch; keep it in the signature
+            and do not pass it on (session.run reads the launch name itself)
         project_id: Project ID (auto-injected)
 
     Returns:
@@ -139,4 +140,4 @@ def fake_calibration(
     # config/app/backend.yaml.
     context = resolve_calib_context(username, chip_id, project_id=project_id, backend=backend_name)
     session = CalibrationSession.from_context(context)
-    return session.run(targets=targets, steps=steps, name=flow_name, tags=tags)
+    return session.run(targets=targets, steps=steps, tags=tags)

@@ -105,7 +105,8 @@ def bringup(
               MUXes; the next round starts after every qubit of the round has run
               all of its tasks
             - "sequential": one MUX and one qubit at a time
-        flow_name: Flow name (auto-injected)
+        flow_name: Saved flow name QDash injects at launch; keep it in the signature
+            and do not pass it on (session.run reads the launch name itself)
         project_id: Project ID (auto-injected)
 
     Returns:
@@ -135,6 +136,5 @@ def bringup(
         targets=targets,
         steps=steps,
         default_run_parameters=default_run_parameters,
-        name=flow_name,
         tags=tags,
     )

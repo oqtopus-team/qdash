@@ -62,7 +62,8 @@ def coherence_limit(
               MUXes; the next round starts after every qubit of the round has run
               all of its tasks
             - "sequential": one MUX and one qubit at a time
-        flow_name: Flow name (auto-injected)
+        flow_name: Saved flow name QDash injects at launch; keep it in the signature
+            and do not pass it on (session.run reads the launch name itself)
         project_id: Project ID (auto-injected)
 
     Returns:
@@ -106,6 +107,5 @@ def coherence_limit(
     return session.run(
         targets=targets,
         steps=steps,
-        name=flow_name,
         tags=tags,
     )

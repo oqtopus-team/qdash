@@ -234,7 +234,8 @@ def characterization(
         max_parallel_couplings: Maximum coupling pairs in each schedule group.
         reverse_coupling_direction: Reverse the CR direction used to select coupling pairs.
         tags: Tags applied to execution history.
-        flow_name: Flow name supplied by QDash.
+        flow_name: Saved flow name QDash injects at launch; keep it in the signature
+            and do not pass it on (session.run reads the launch name itself).
         project_id: Project ID supplied by QDash.
     """
     if not any((run_ge_characterization, run_ef_characterization, run_coupling_characterization)):
@@ -338,6 +339,5 @@ def characterization(
             "readout_duration": 1024,
             "interval": STANDARD_INTERVAL,
         },
-        name=flow_name,
         tags=tags,
     )

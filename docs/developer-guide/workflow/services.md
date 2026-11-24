@@ -20,6 +20,14 @@ calibration work. Pass shared definitions from `qdash.calibration` to `run(targe
 run metadata, tags, and `default_run_parameters` belong on that call. QDash owns execution IDs,
 reservations, workers, and cleanup. The persistent group itself holds no hardware.
 
+`CalibrationSession.run()` derives its display name from QDash's injected `flow_name`, or from
+the Prefect flow name for direct runs without that parameter. Keep `flow_name` in the entrypoint
+signature; templates need not pass it to `run()`. An explicit `name` still overrides display.
+Saved defaults are looked up using the launch's saved Workflow name, even when display is
+overridden. Without that launch name, only an explicit `name` selects saved defaults for
+compatibility; the Prefect name alone never selects them. Outside a flow run with no explicit
+name, Executions use their step names.
+
 `resolve_calib_context()` checks an enabled user and active project write permission. Workers
 recheck permissions, so a schedule cannot retain access its creator has lost.
 `run()` returns `CalibrationResult` after its steps finish; execution errors propagate.

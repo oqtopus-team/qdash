@@ -20,7 +20,7 @@ Migration:
     # After
     context = resolve_calib_context(username, chip_id, project_id=project_id)
     session = CalibrationSession.from_context(context)
-    return session.run(targets=targets, steps=steps, name=flow_name)
+    return session.run(targets=targets, steps=steps)
     ```
 """
 

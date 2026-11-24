@@ -212,7 +212,8 @@ def test_fine_one_optimizes_readout_before_classification_in_fine_tune_stage(
     assert result["kwargs"]["default_run_parameters"] == full["kwargs"]["default_run_parameters"]
     assert "task_parameters" not in result["kwargs"]
     assert effective_settings(step.tasks) == effective_settings(full["steps"][2].tasks)
-    assert result["kwargs"]["flow_name"] == "fine-check"
+    # The run is named from the launch; the template does not pass flow_name on.
+    assert result["kwargs"]["flow_name"] is None
     assert result["kwargs"]["project_id"] == "project-1"
     assert result["kwargs"]["tags"] == ["fine"]
     assert "skip_execution" not in result["kwargs"]

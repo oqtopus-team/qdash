@@ -22,7 +22,9 @@ source as a new flow, and inspect its run in **Execution**.
 
 A flow has an entrypoint, targets, ordered steps, and `CalibrationSession.run(targets, steps)`.
 Keep `username`, `chip_id`, `flow_name`, and `project_id` in the signature so QDash can inject
-execution context. Build the context and session explicitly:
+execution context. `flow_name` is launch metadata: keep the parameter, but do not forward it
+to `session.run()`. The session derives the display name and saved defaults from the launch.
+Build the context and session explicitly:
 
 ```python
 from qdash.calibration import CustomOneQubit, QubitTargets, TaskCall
@@ -40,7 +42,6 @@ def coherence(username: str, chip_id: str, qids: list[str],
             step_name="coherence",
             tasks=[TaskCall(name="Configure"), TaskCall(name="CheckT1")],
         )],
-        name=flow_name,
     )
 ```
 
@@ -105,7 +106,8 @@ flows borrowing another run's reservation must use the `*_keep_lock` hooks from
 
 Existing `@flow` and `CalibService` sources remain supported. To migrate, back up the source,
 use shared definitions from `qdash.calibration`, construct `CalibrationSession.from_context`,
-and move defaults and tags to `session.run()`. Pass `name=flow_name` there. Replace the top-level
+and move defaults and tags to `session.run()`. Existing `name=flow_name` forwarding still works,
+but is unnecessary. Replace the top-level
 hook block with `@calibration_flow(session_name="...")`; preserve custom or borrowing hooks.
 Test the edited source on Fake and inspect **Execution preview** before using hardware.
 

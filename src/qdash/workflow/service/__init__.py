@@ -27,7 +27,6 @@ Example:
                 OneQubitFineTune(),
                 FilterByMetric(metric="x90_fidelity", threshold=0.9),
             ],
-            name=flow_name,
         )
 """
 

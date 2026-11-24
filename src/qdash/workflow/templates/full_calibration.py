@@ -119,7 +119,8 @@ def full_calibration(
         mux_ids: MUX IDs to calibrate (required)
         exclude_qids: Qubit IDs to exclude
         qids: Not used (for UI compatibility)
-        flow_name: Flow name (auto-injected)
+        flow_name: Saved flow name QDash injects at launch; keep it in the signature
+            and do not pass it on (session.run reads the launch name itself)
         project_id: Project ID (auto-injected)
         fidelity_threshold: Minimum X90 fidelity for 2Q candidates (default: 0.90)
         max_parallel_ops: Max parallel CR operations (default: 10)
@@ -180,6 +181,5 @@ def full_calibration(
             "readout_duration": 1024,
             "interval": 150 * 1024,
         },
-        name=flow_name,
         tags=tags,
     )

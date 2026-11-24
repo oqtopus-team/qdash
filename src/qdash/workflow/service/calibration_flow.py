@@ -9,7 +9,7 @@
     def coherence_check(username, chip_id, flow_name=None, project_id=None):
         context = resolve_calib_context(username, chip_id, project_id=project_id)
         session = CalibrationSession.from_context(context)
-        return session.run(targets=..., steps=[...], name=flow_name)
+        return session.run(targets=..., steps=[...])
 
 The decorator is ``prefect.flow`` with ``on_cancellation``, ``on_failure`` and ``on_crashed``
 set to QDash's hooks, which close the run's Executions and release its reservation; pass any

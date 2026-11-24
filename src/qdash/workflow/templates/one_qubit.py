@@ -48,7 +48,8 @@ def one_qubit(
         mux_ids: MUX IDs to calibrate when using MUX-based scheduling
         exclude_qids: Qubit IDs to exclude
         qids: Qubit IDs to calibrate when mux_ids is not set
-        flow_name: Flow name (auto-injected)
+        flow_name: Saved flow name QDash injects at launch; keep it in the signature
+            and do not pass it on (session.run reads the launch name itself)
         project_id: Project ID (auto-injected)
         check_only: If True, run only the coarse stage with all four pulse types
 
@@ -183,6 +184,5 @@ def one_qubit(
             "readout_duration": 1024,
             "interval": 150 * 1024,
         },
-        name=flow_name,
         tags=tags,
     )

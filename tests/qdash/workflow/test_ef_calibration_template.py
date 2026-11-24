@@ -63,7 +63,8 @@ def test_ef_calibration_forwards_context_and_shared_defaults() -> None:
     )
 
     assert result["kwargs"] == {
-        "flow_name": "ef-check",
+        # The run is named from the launch; the template does not pass flow_name on.
+        "flow_name": None,
         "tags": ["ef"],
         "project_id": "project-1",
         "default_run_parameters": {
