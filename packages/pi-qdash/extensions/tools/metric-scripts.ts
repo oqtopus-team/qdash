@@ -1,11 +1,12 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { QDashClient } from "@oqtopus-team/qdash-client";
-import { QDash, Script } from "@oqtopus-team/qdash-sdk";
+import { Script } from "@oqtopus-team/qdash-sdk";
 import { Type } from "typebox";
 
 import { dashboardPagePath, metricScriptPagePath } from "../lib/links.js";
 import { toTextToolResult } from "../lib/results.js";
 import { requireWriteApproval } from "../lib/write-approval.js";
+import { sdkSession, type SdkSessionFactory } from "../lib/sdk-session.js";
 
 /**
  * Metric scripts and dashboards.
@@ -50,6 +51,8 @@ export type MetricScriptDependencies = {
   resolveChipId(client: MetricScriptClient, chipId?: string): Promise<string>;
   /** The QDash web URL of a page path, when the web URL is known. */
   pageUrl?(client: MetricScriptClient, path: string): string | undefined;
+  /** The SDK session for a resolved client; defaults to one with the client's settings. */
+  sdk?: SdkSessionFactory;
 };
 
 // ---------------------------------------------------------------------------
@@ -744,7 +747,7 @@ export function registerMetricScriptTools(pi: Pick<ExtensionAPI, "registerTool">
       await requireWriteApproval(tool, toolCallId, params, ctx, { title: "Save QDash metric script?", message: `This saves ${what} to the project.` });
       try {
         const created = !params.scriptId;
-        const qdash = new QDash(client as QDashClient);
+        const qdash = (deps.sdk ?? sdkSession)(client as QDashClient);
         const script = new Script({
           name: params.name,
           source: params.source,

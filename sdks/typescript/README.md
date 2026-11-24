@@ -1,10 +1,9 @@
 # @oqtopus-team/qdash-sdk
 
 `@oqtopus-team/qdash-sdk` validates and starts QDash calibrations on a chip, lists and runs
-the workflows registered in a project, and saves metric scripts and dashboards. It is built on
-[`@oqtopus-team/qdash-client`](https://www.npmjs.com/package/@oqtopus-team/qdash-client), which
-stays the lower-level API for every other route. Installing the SDK installs the client of the
-same release:
+the workflows registered in a project, and saves metric scripts and dashboards. Its Fern-generated
+API client is included; it does not depend on `@oqtopus-team/qdash-client`. Existing client
+applications can continue using that package independently.
 
 ```bash
 npm install @oqtopus-team/qdash-sdk
@@ -15,7 +14,7 @@ The package is ESM only and requires Node.js 20 or later.
 ```ts
 import { QDash, customOneQubit, qubitTargets } from "@oqtopus-team/qdash-sdk";
 
-const qdash = QDash.fromEnv(); // or new QDash(client, { projectId: "your-project-id" })
+const qdash = QDash.fromEnv(); // or await QDash.fromProfile("local")
 const chip = qdash.chip("64Qv3");
 const steps = [customOneQubit({ step_name: "t1", tasks: [{ name: "CheckT1" }] })];
 
@@ -30,14 +29,16 @@ Check `check.valid` before calling `calibrate()`. The example measures real targ
 for your deployment. `wait()` returns the whole run's status. A timeout leaves the run active.
 
 See the [TypeScript reference](https://oqtopus-team.github.io/qdash/reference/clients/typescript)
-for configuration, workflows, metrics, and dashboards.
+for shared Python/TypeScript TOML profiles, workflows, metrics, and dashboards.
+INI profiles remain readable with a deprecation warning. Reuse the session across operations;
+there is no connection to close.
 
 ## Read a Result with Context
 
-Reuse a configured `qdash` session and a task ID from `qdash.client.listTaskResults()`:
+Reuse a configured `qdash` session and a task ID from `qdash.api.taskResult.listTaskResults()`:
 
 ```ts
-const page = await qdash.client.listTaskResults({ chipId: "64Qv3", qid: "0", limit: 1 });
+const page = await qdash.api.taskResult.listTaskResults({ chip_id: "64Qv3", qid: "0", limit: 1 });
 if (!page.items[0]) throw new Error("No saved results for this target");
 const evidence = await qdash.taskResults.evidence(page.items[0].task_id);
 console.log(evidence.result.output_parameters);
@@ -51,7 +52,7 @@ See the [result context contract](https://oqtopus-team.github.io/qdash/reference
 
 ## Develop the Package
 
-Install from the repository root; the SDK builds against the client in the same checkout:
+Install from the repository root. Generation checks require Node.js (`npx`) and Docker:
 
 ```bash
 bun install --frozen-lockfile

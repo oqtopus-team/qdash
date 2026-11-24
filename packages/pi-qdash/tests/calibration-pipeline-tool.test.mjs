@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { QDashClient, QDashConfig } from "@oqtopus-team/qdash-client";
+import { QDash } from "@oqtopus-team/qdash-sdk";
 
 import {
   firstSentence,
@@ -10,6 +10,7 @@ import {
   problemsFromError,
   registerCalibrationPipelineTools,
 } from "../.test-dist/tools/calibration-pipeline.js";
+import { sdkOver } from "./helpers/sdk-session.mjs";
 
 // What qdash_run_pipeline reports with every launch; never taken from the model.
 const TOOL_ORIGIN = { source: "agent_tool", tool: "qdash_run_pipeline", client: "pi-qdash" };
@@ -59,7 +60,8 @@ function registeredTools(api, chipId = "64Qv3", projectId = "project-1", pausedS
   const client = {
     // The pause guard: the user's agent sessions waiting for an expert.
     async listAgentSessions() { return pausedSessions; },
-    api,
+    // Every run is recorded under its key, so the SDK first reads a named session.
+    api: { async getCalibrationSession(id) { return { calibration_session_id: id, chip_id: chipId, status: "open" }; }, ...api },
     // null stands for a profile without a project.
     config: { projectId: projectId ?? undefined },
     // A tool that starts a run must not follow it.
@@ -67,7 +69,7 @@ function registeredTools(api, chipId = "64Qv3", projectId = "project-1", pausedS
     async waitForExecution() { throw new Error("must not wait"); },
   };
   registerCalibrationPipelineTools({ registerTool(tool) { tools.set(tool.name, tool); } }, {
-    async makeClient() { return client; },
+    sdk: sdkOver, async makeClient() { return client; },
     async resolveChipId(_client, explicit) { return explicit ?? chipId; },
   });
   return tools;
@@ -161,6 +163,9 @@ test("run requires confirmation, then reports the execution", async () => {
     message: "Calibration pipeline 'coarse-then-coherence' started",
     steps: STEPS,
     targets: VALID.targets,
+    // Without a named session QDash records the run in an automatic one.
+    calibration_session_id: "cs-auto",
+    pipeline_run_id: "cpr-auto",
   };
   const tools = registeredTools({
     async executeCalibrationPipeline(request) { calls.push(request); return execution; },
@@ -232,7 +237,8 @@ test("a run names the decision it carries out only together with its calibration
   const tools = registeredTools({
     async executeCalibrationPipeline(request) {
       calls.push(request);
-      return { execution_id: "e", flow_run_id: "fr", flow_run_url: "", qdash_ui_url: "", message: "started", steps: STEPS, targets: VALID.targets, calibration_session_id: "cs-1", pipeline_run_id: "cpr-2", replayed: false };
+      // QDash echoes the decision it linked; a reply without it would be refused as unknown.
+      return { execution_id: "e", flow_run_id: "fr", flow_run_url: "", qdash_ui_url: "", message: "started", steps: STEPS, targets: VALID.targets, calibration_session_id: "cs-1", pipeline_run_id: "cpr-2", decision_id: request.decision_id, replayed: false };
     },
   });
   const run = tools.get("qdash_run_pipeline");
@@ -258,7 +264,7 @@ test("a run whose launch outcome is unknown is reported, never retried", async (
 
 test("without a project every tool keeps the server's default: the run is still confirmation-gated, then dispatched", async () => {
   const calls = [];
-  const execution = { execution_id: "20261006-013", flow_run_id: "fr", flow_run_url: "", qdash_ui_url: "", message: "started", steps: STEPS, targets: VALID.targets };
+  const execution = { execution_id: "20261006-013", flow_run_id: "fr", flow_run_url: "", qdash_ui_url: "", message: "started", steps: STEPS, targets: VALID.targets, calibration_session_id: "cs-auto", pipeline_run_id: "cpr-auto" };
   const tools = registeredTools({
     async executeCalibrationPipeline(request) { calls.push(request); return execution; },
     async validateCalibrationPipeline(request) { calls.push(request); return VALID; },
@@ -414,7 +420,7 @@ test("a pipeline does not run on qubits of the user's agent session paused for a
       async listAgentSessions() { const error = new Error(`HTTP ${status}`); error.statusCode = status; throw error; },
     };
     const own = new Map();
-    registerCalibrationPipelineTools({ registerTool(tool) { own.set(tool.name, tool); } }, { async makeClient() { return errorClient; }, async resolveChipId() { return "64Qv3"; } });
+    registerCalibrationPipelineTools({ registerTool(tool) { own.set(tool.name, tool); } }, { sdk: sdkOver, async makeClient() { return errorClient; }, async resolveChipId() { return "64Qv3"; } });
     const outcome = await own.get("qdash_run_pipeline").execute("t", { chipId: "64Qv3", spec: SPEC }, undefined, undefined, approved("t"));
     assert.match(outcome.content[0].text, message, String(status));
     assert.equal(outcome.details.started, false, String(status));
@@ -429,7 +435,7 @@ test("a pipeline does not run when a full page of paused sessions hides older on
   }));
   for (const [count, started] of [[99, true], [100, false], [101, false]]) {
     let dispatched = 0;
-    const api = { async executeCalibrationPipeline() { dispatched += 1; return { execution_id: "e-1", flow_run_id: "f", message: "" }; } };
+    const api = { async executeCalibrationPipeline() { dispatched += 1; return { execution_id: "e-1", flow_run_id: "f", message: "", calibration_session_id: "cs-auto", pipeline_run_id: "cpr-auto" }; } };
     const tools = registeredTools(api, "64Qv3", "project-1", pausedOn(count, "99"));
     const result = await tools.get("qdash_run_pipeline").execute("t", { chipId: "64Qv3", spec: SPEC }, undefined, undefined, approved("t"));
     assert.equal(result.details.started, started, String(count));
@@ -459,7 +465,7 @@ test("catalog with taskNames lists each task's declared inputs and outputs with 
     config: {},
     async listTasks(backend) { backends.push(backend); return { tasks }; },
   };
-  registerCalibrationPipelineTools({ registerTool(tool) { withTasks.set(tool.name, tool); } }, { async makeClient() { return stub; }, async resolveChipId() { return "X"; } });
+  registerCalibrationPipelineTools({ registerTool(tool) { withTasks.set(tool.name, tool); } }, { sdk: sdkOver, async makeClient() { return stub; }, async resolveChipId() { return "X"; } });
   const text = (await withTasks.get("qdash_get_pipeline_catalog").execute("t", { taskNames: ["CheckChevron", "CheckMissing"] })).content[0].text;
   assert.deepEqual(backends, ["fake"]);
   assert.match(text, /Declared task parameters \(names and units as QDash stores them\):\n- CheckChevron\n  Inputs: control_frequency \(GHz\), readout_amplitude \(a\.u\.\), shots\n  Outputs: control_amplitude \(a\.u\.\), qubit_frequency \(GHz\)\n- CheckMissing: not in this backend's task list/);
@@ -474,25 +480,28 @@ test("catalog with taskNames lists each task's declared inputs and outputs with 
   assert.match(formatTaskParameters([{ name: "T" }], ["T"]).join("\n"), /Inputs: none\n  Outputs: none/);
 });
 
-// Use the real client here: mock api objects above intentionally test tool presentation,
-// while this contract must exercise the shared preflight and post-dispatch guard.
+// Answer the SDK's own requests here: the fake api objects above test tool presentation,
+// while this contract must exercise the SDK's session preflight and post-dispatch guard.
 for (const outdated of ["missing-route", "ignored-fields"]) {
   test(`associated pipeline refuses an outdated API (${outdated}) without retry`, async () => {
     const methods = [];
-    const client = new QDashClient(new QDashConfig({ baseUrl: "http://qdash.test", apiToken: "token" }), {
-      fetch: async (input, init) => {
-        const request = new Request(input, init);
-        methods.push(request.method);
-        const isGet = request.method === "GET";
-        return new Response(JSON.stringify(isGet
-          ? { calibration_session_id: "cs-1", chip_id: "64Qv3", status: "open" }
-          : { execution_id: "e1", flow_run_id: "f1" }), {
-          status: isGet && outdated === "missing-route" ? 404 : 200,
-          headers: { "Content-Type": "application/json" },
-        });
-      },
+    const fetch = async (input, init) => {
+      const request = new Request(input, init);
+      methods.push(request.method);
+      const isGet = request.method === "GET";
+      return new Response(JSON.stringify(isGet
+        ? { calibration_session_id: "cs-1", chip_id: "64Qv3", status: "open" }
+        : { execution_id: "e1", flow_run_id: "f1" }), {
+        status: isGet && outdated === "missing-route" ? 404 : 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    };
+    const tools = new Map();
+    registerCalibrationPipelineTools({ registerTool(tool) { tools.set(tool.name, tool); } }, {
+      sdk: () => new QDash({ baseUrl: "http://qdash.test", apiToken: "token" }, { fetch }),
+      async makeClient() { return { config: {}, async listAgentSessions() { return []; } }; },
+      async resolveChipId(_client, explicit) { return explicit; },
     });
-    const tools = registeredTools(client.api);
     await assert.rejects(
       tools.get("qdash_run_pipeline").execute("old", { chipId: "64Qv3", spec: SPEC, calibrationSessionId: "cs-1" }, undefined, undefined, approved("old")),
       outdated === "ignored-fields" ? /result unknown.*Do not retry automatically/ : /404/,

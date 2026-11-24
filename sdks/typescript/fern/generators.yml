@@ -1,0 +1,40 @@
+# Fern generation of src/_generated; run through scripts/generate.mjs (bun run generate).
+# docs/oas/openapi.json is the only API definition: it is read in place, never copied.
+api:
+  specs:
+    - openapi: ../../../docs/oas/openapi.json
+  # Every project-scoped route declares X-Project-Id. As a global header it is set once on the
+  # client and sent with every request; a call's own projectId only overrides it when defined.
+  headers:
+    X-Project-Id:
+      name: projectId
+      type: optional<string>
+default-group: typescript-sdk
+groups:
+  typescript-sdk:
+    generators:
+      - name: fernapi/fern-typescript-sdk
+        version: 3.109.3
+        output:
+          location: local-file-system
+          path: ../build/fern-typescript
+        config:
+          naming:
+            namespace: QDashApi
+            client: QDashApiClient
+            error: ApiError
+            timeoutError: ApiTimeoutError
+          # Wire names, unchanged: request and response objects use the API's snake_case keys
+          # and are sent as written, with no serialization layer.
+          noSerdeLayer: true
+          retainOriginalCasing: true
+          # Requests that change state are never retried by default; the SDK retries reads only.
+          maxRetries: 0
+          omitFernHeaders: true
+          outputSourceFiles: true
+          fetchSupport: native
+          streamType: web
+          formDataSupport: Node18
+          fileResponseType: binary-response
+          includeApiReference: false
+          enableInlineTypes: false

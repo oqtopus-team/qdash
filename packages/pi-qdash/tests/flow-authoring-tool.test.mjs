@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { flowCodeProblems, formatFlowExecution, registerFlowAuthoringTools } from "../.test-dist/tools/flow-authoring.js";
+import { sdkOver } from "./helpers/sdk-session.mjs";
 
 const CODE = [
   "from prefect import flow",
@@ -17,7 +18,7 @@ function registeredTools(saveFlow, chipId = "64Qv3", executeFlow = async () => {
   const calls = [];
   const sessionQueries = [];
   registerFlowAuthoringTools({ registerTool(tool) { tools.set(tool.name, tool); } }, {
-    async makeClient() {
+    sdk: sdkOver, async makeClient() {
       return {
         // null stands for a profile without a project.
         config: { projectId: projectId ?? undefined },
@@ -77,7 +78,7 @@ test("a save sends QDash's request shape and reports the registered flow", async
 });
 
 test("running a saved flow is confirmation-gated and reports the execution", async () => {
-  const started = { execution_id: "20261022-001", flow_run_id: "fr-1", flow_run_url: "http://prefect/fr-1", qdash_ui_url: "http://qdash/execution/20261022-001", message: "Flow 'my_check' started" };
+  const started = { execution_id: "20261022-001", flow_run_id: "fr-1", flow_run_url: "http://prefect/fr-1", qdash_ui_url: "http://qdash/execution/20261022-001", message: "Flow 'my_check' started", calibration_session_id: "cs-auto", calibration_run_id: "cr-auto" };
   const { run, calls } = registeredTools(async () => ({}), "64Qv3", async () => started);
   await assert.rejects(run.execute("t", { name: "my_check" }, undefined, undefined, uiContext(false)), /requires explicit confirmation/);
   assert.equal(calls.length, 0);
@@ -113,7 +114,7 @@ test("a chipless flow QDash refuses before launch is reported once, never retrie
 });
 
 test("running a flow without a project keeps the server's default and the confirmation gate", async () => {
-  const started = { execution_id: "20261022-002", flow_run_id: "fr-2", flow_run_url: "", qdash_ui_url: "", message: "started" };
+  const started = { execution_id: "20261022-002", flow_run_id: "fr-2", flow_run_url: "", qdash_ui_url: "", message: "started", calibration_session_id: "cs-auto", calibration_run_id: "cr-auto" };
   const { run, calls } = registeredTools(async () => ({}), "64Qv3", async () => started, null);
   await assert.rejects(run.execute("t", { name: "my_check" }, undefined, undefined, { hasUI: false }), /requires explicit confirmation/);
   await assert.rejects(run.execute("t", { name: "my_check" }, undefined, undefined, uiContext(false)), /requires explicit confirmation/);
@@ -187,7 +188,7 @@ test("a flow does not run around the user's agent session paused for an expert",
   const any = await unknown.run.execute("t", { name: "my_check" }, undefined, undefined, approved("t"));
   assert.equal(any.details.blockedByPausedSession, true);
   assert.deepEqual(unknown.sessionQueries, [{ chipId: undefined, statuses: ["waiting_for_human"], mine: true, limit: 100 }]);
-  const started = registeredTools(async () => ({}), "64Qv3", async () => ({ execution_id: "e-1", flow_run_id: "f", flow_run_url: "", qdash_ui_url: "", message: "ok" }), "project-1", paused);
+  const started = registeredTools(async () => ({}), "64Qv3", async () => ({ execution_id: "e-1", flow_run_id: "f", flow_run_url: "", qdash_ui_url: "", message: "ok", calibration_session_id: "cs-auto", calibration_run_id: "cr-auto" }), "project-1", paused);
   const other = await started.run.execute("t", { name: "my_check", parameters: { chip_id: "64Qv3", qids: ["Q02"] } }, undefined, undefined, approved("t"));
   assert.equal(other.details.started, true);
 });
@@ -197,7 +198,7 @@ test("a flow does not run when a full page of paused sessions hides older ones",
   const pausedOn = (count, qid) => Array.from({ length: count }, (_, index) => ({
     session_id: `s-${index}`, chip_id: "64Qv3", status: "waiting_for_human", active_intervention_id: `int-${index}`, policy: { qids: [qid] },
   }));
-  const ok = async () => ({ execution_id: "e-1", flow_run_id: "f", flow_run_url: "", qdash_ui_url: "", message: "ok" });
+  const ok = async () => ({ execution_id: "e-1", flow_run_id: "f", flow_run_url: "", qdash_ui_url: "", message: "ok", calibration_session_id: "cs-auto", calibration_run_id: "cr-auto" });
   const params = { name: "my_check", parameters: { chip_id: "64Qv3", qids: ["Q00"] } };
   for (const count of [100, 101]) {
     const execute = async () => { throw new Error("must not run"); };

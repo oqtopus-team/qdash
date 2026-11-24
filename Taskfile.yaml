@@ -26,11 +26,12 @@ tasks:
         mv "$OPENAPI_TMP" docs/oas/openapi.json
       - task: generate-python-schema
       - task: generate-python-sdk
+      - task: generate-typescript-sdk
       - cd clients/typescript && bun run generate:ui
       - cd clients/typescript && bun run generate
       - cd ui && bun run fmt
       - cd ui && bun run lint:fix
-    desc: Generate the OpenAPI document, the Python client and SDK, and the TypeScript clients
+    desc: Generate the OpenAPI document, the Python client and SDK, the TypeScript SDK, and the TypeScript clients
 
   generate-task-catalog:
     desc: Generate task metadata catalog from workflow classes
@@ -51,6 +52,16 @@ tasks:
     desc: Fail when qdash.sdk._generated differs from a fresh generation (needs npx and Docker)
     cmds:
       - uv run python scripts/generate_python_sdk.py --check
+
+  generate-typescript-sdk:
+    desc: Generate sdks/typescript/src/_generated from the OpenAPI document (needs npx and Docker)
+    cmds:
+      - node sdks/typescript/scripts/generate.mjs
+
+  check-typescript-sdk-generated:
+    desc: Fail when sdks/typescript/src/_generated differs from a fresh generation (needs npx and Docker)
+    cmds:
+      - node sdks/typescript/scripts/generate.mjs --check
 
   knowledge-pull:
     desc: Pull task-knowledge.json from the knowledge repository (KNOWLEDGE_REPO_URL)
@@ -305,11 +316,10 @@ tasks:
       - bun run check
 
   test-sdk-ts:
-    desc: Run TypeScript SDK checks against the built client
-    deps: [build-client-ts]
-    dir: sdks/typescript
+    desc: Check the TypeScript SDK's generated client is fresh, then typecheck and test the SDK
     cmds:
-      - bun run check
+      - task: check-typescript-sdk-generated
+      - cd sdks/typescript && bun run check
 
   test-workflow:
     desc: Run workflow engine tests

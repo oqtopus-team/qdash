@@ -1,12 +1,14 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
-import { pinClientDependency } from "./client-release.mjs";
 import { registryState } from "./pi-package-release.mjs";
 
 export const SDK = "@oqtopus-team/qdash-sdk";
 export const CLIENT = "@oqtopus-team/qdash-client";
 export const SDK_MANIFEST = "sdks/typescript/package.json";
+// The SDK's own runtime dependencies; it carries its generated API client and never the client.
+export const SDK_DEPENDENCIES = ["ini", "smol-toml"];
+const exact = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(-[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*)?$/;
 const stable = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
 const beta = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)-beta\.[1-9]\d*$/;
 const compare = (a, b) => {
@@ -17,27 +19,43 @@ const compare = (a, b) => {
 };
 
 /**
- * The TypeScript SDK releases at exactly the client version of the same run, and depends on
- * that client only, pinned to it.
+ * The TypeScript SDK releases at exactly the client version of the same run, like the Python
+ * qdash-sdk beside qdash-client. It is self-contained: it must not depend on the client, and
+ * its dependencies are its own runtime libraries, unchanged.
  * The client job computes the version once (client-release.mjs); this never reads tags.
  */
 export function sdkManifest(manifest, clientVersion) {
   if (manifest.name !== SDK) throw new Error(`Expected the ${SDK} manifest`);
-  const dependencies = Object.keys(manifest.dependencies ?? {});
-  if (dependencies.join() !== CLIENT) throw new Error(`${SDK} must depend on ${CLIENT} and nothing else`);
-  return { ...pinClientDependency(manifest, clientVersion), version: clientVersion };
+  checkDependencies(manifest);
+  if (typeof clientVersion !== "string" || !exact.test(clientVersion) || clientVersion === "0.0.0") {
+    throw new Error(`An exact built client version is required before packing ${SDK}`);
+  }
+  return { ...manifest, version: clientVersion };
+}
+
+function checkDependencies(manifest) {
+  const dependencies = Object.keys(manifest.dependencies ?? {}).sort();
+  if (manifest.dependencies?.[CLIENT] !== undefined || manifest.peerDependencies?.[CLIENT] !== undefined) {
+    throw new Error(`${SDK} must not depend on ${CLIENT}`);
+  }
+  if (dependencies.join() !== [...SDK_DEPENDENCIES].sort().join()) {
+    throw new Error(`${SDK} must depend on ${SDK_DEPENDENCIES.join(", ")} only`);
+  }
+  for (const [name, range] of Object.entries(manifest.dependencies)) {
+    if (/^(workspace:|file:|link:)/.test(range)) throw new Error(`${name} must resolve outside the workspace`);
+  }
 }
 
 /**
  * Pick the npm dist-tag for a built SDK tarball, or null to skip publication. The
- * tarball must pin the client at its own version. develop publishes the run's client
- * beta version; a QDash vX.Y.Z tag publishes X.Y.Z as latest. A rerun finds the
- * version published and skips it, as the client job does.
+ * tarball must not depend on the client. develop publishes the run's client beta
+ * version; a QDash vX.Y.Z tag publishes X.Y.Z as latest. A rerun finds the version
+ * published and skips it, as the client job does.
  */
 export function sdkPublishTag({ ref, manifest, published = [], latest }) {
   const { version } = manifest;
   if (manifest.name !== SDK) throw new Error(`Expected the ${SDK} tarball`);
-  if (manifest.dependencies?.[CLIENT] !== version) throw new Error(`The tarball must pin ${CLIENT}@${version}`);
+  checkDependencies(manifest);
   if (ref === "refs/heads/develop") {
     if (!beta.test(version)) throw new Error("develop publishes only a QDash beta version");
     return published.includes(version) ? null : "beta";
@@ -61,5 +79,5 @@ if (main && process.argv[2] === "--publish-tag") {
 } else if (main) {
   const manifest = sdkManifest(JSON.parse(readFileSync(SDK_MANIFEST, "utf8")), process.env.QDASH_CLIENT_VERSION);
   writeFileSync(SDK_MANIFEST, `${JSON.stringify(manifest, null, 2)}\n`);
-  console.log(`${manifest.name}@${manifest.version} (${CLIENT}@${manifest.dependencies[CLIENT]})`);
+  console.log(`${manifest.name}@${manifest.version} (self-contained, no ${CLIENT} dependency)`);
 }

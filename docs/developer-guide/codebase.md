@@ -11,7 +11,7 @@ QDash keeps application code and generated clients in the following areas.
 | Python client | `clients/python/` | `qdash-client`: typed client package and service wrappers |
 | Python SDK | `sdks/python/` | `qdash-sdk`: self-contained Fern API client with calibration, workflow, and dashboard helpers |
 | TypeScript client | `clients/typescript/` | Published client; local workspace dependency of the TypeScript SDK and pi-qdash |
-| TypeScript SDK | `sdks/typescript/` | `@oqtopus-team/qdash-sdk`: calibration and registered workflow runs on the TypeScript client; local workspace dependency of pi-qdash |
+| TypeScript SDK | `sdks/typescript/` | `@oqtopus-team/qdash-sdk`: self-contained Fern API client with calibration, workflow, dashboard, and result helpers; used by pi-qdash |
 | Agent runtime | `agent-runtime/` | Agent sessions and host integration for pi tools |
 | Pi extensions | `packages/pi-qdash/`, `packages/pi-qcaleval/` | Independently published tools and skills |
 
