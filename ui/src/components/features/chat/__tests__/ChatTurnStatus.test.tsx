@@ -94,44 +94,15 @@ describe("the chat's status", () => {
   });
 });
 
-describe("ChatStatusLine during a live turn", () => {
-  const tool = (name: string) => ({
-    turn: {
-      startedAt: NOW - 1000,
-      steps: [
-        {
-          kind: "tool" as const,
-          id: "t",
-          tool: name,
-          label: "Bash",
-          status: "running" as const,
-          startedAt: NOW - 1000,
-        },
-      ],
-    },
+describe("ChatStatusLine during a long quiet wait", () => {
+  it("shows the waiting state with when the turn last sent something", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(NOW);
+    render(<ChatStatusLine status={chatStatus({ run: run(), messages: [] })} />);
+    expect(screen.getByRole("status")).toHaveTextContent("Waiting for the expert's answer");
+    expect(screen.getByTestId("chat-status")).toHaveTextContent("last update 5m 0s ago");
   });
 
-  it("leaves what the streaming turn does to its footer: no dot, label or live region", () => {
-    const statuses = [
-      chatStatus({ run: run(tool("bash")), messages: [] }),
-      chatStatus({ run: run(), messages: [] }),
-      chatStatus({ run: run(tool("qdash_wait_execution")), messages: [] }),
-    ];
-    expect(statuses.map((s) => s?.kind)).toEqual([
-      "working",
-      "waiting_expert",
-      "waiting_execution",
-    ]);
-    for (const status of statuses) {
-      const { container } = render(<ChatStatusLine status={status} />);
-      expect(container.innerHTML).toBe("");
-      expect(screen.queryByRole("status")).toBeNull();
-      cleanup();
-    }
-  });
-});
-
-describe("ChatStatusLine for a turn no footer follows", () => {
   it("calls a stale turn's time the last known update", () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(NOW);
@@ -152,40 +123,5 @@ describe("ChatStatusLine for a turn no footer follows", () => {
     );
     expect(screen.getByRole("status")).toHaveTextContent("Reconnecting to the running answer");
     expect(screen.getByTestId("chat-status")).toHaveTextContent("last known update 10s ago");
-  });
-});
-
-describe("ChatStatusLine waiting on the user", () => {
-  const blocks = (type: string) => ({ blocks: [{ type, content: "x" }], assessment: null });
-  const mark = () => screen.queryByTestId("activity-logo");
-  const dot = () => screen.getByTestId("chat-status").querySelector(".status");
-
-  it.each([
-    ["approval", "Waiting for your approval"],
-    ["ask", "Waiting for your answer"],
-  ])("shows the waiting mark in place of the dot for a %s", (type, label) => {
-    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
-    render(<ChatStatusLine status={chatStatus({ messages: [assistant(blocks(type))] })} />);
-    expect(mark()).toHaveAttribute("data-mode", "waiting");
-    expect(dot()).toBeNull();
-    expect(screen.getByRole("status").textContent).toBe(label);
-    vi.restoreAllMocks();
-  });
-
-  it("keeps the dot for a lost connection and a failure", () => {
-    const statuses = [
-      chatStatus({
-        run: run({ connection: { state: "reconnecting", lastUpdateAt: NOW, attempt: 1 } }),
-        messages: [],
-      }),
-      chatStatus({ messages: [{ role: "assistant", content: "Error: boom" } as ChatMessage] }),
-    ];
-    expect(statuses.map((s) => s?.kind)).toEqual(["reconnecting", "failed"]);
-    for (const status of statuses) {
-      render(<ChatStatusLine status={status} />);
-      expect(mark()).toBeNull();
-      expect(dot()).not.toBeNull();
-      cleanup();
-    }
   });
 });

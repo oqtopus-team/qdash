@@ -56,7 +56,7 @@ describe("connection note", () => {
 });
 
 describe("TurnActivity with a connection", () => {
-  it("names a busy turn's activity beside its mark, with no note while updates arrive", () => {
+  it("keeps a busy turn's footer hidden while updates arrive", () => {
     render(
       <TurnActivity
         steps={[waitStep("running")]}
@@ -65,8 +65,7 @@ describe("TurnActivity with a connection", () => {
         connection={live(1000)}
       />,
     );
-    expect(screen.getByRole("status")).not.toHaveClass("sr-only");
-    expect(screen.getByTestId("turn-activity")).toHaveAttribute("data-mode", "waiting");
+    expect(screen.getByTestId("turn-activity").className).toBe("sr-only");
     expect(screen.queryByTestId("turn-connection")).toBeNull();
     expect(screen.getByRole("status").textContent).toBe("Waiting for the expert's answer");
   });
@@ -84,9 +83,8 @@ describe("TurnActivity with a connection", () => {
     expect(note.textContent).toBe("Connected · last update 4m 0s ago");
     expect(note.dataset.state).toBe("live");
     expect(note.className).not.toMatch(/text-warning/);
-    // The activity stays named beside the mark; the quiet time replaces the turn's timer.
+    // The activity is already the trace row's title: it is announced, not drawn again.
     expect(screen.getByRole("status").textContent).toBe("Waiting for the expert's answer");
-    expect(screen.getAllByTestId("activity-logo")).toHaveLength(1);
   });
 
   it("shows a lost connection instead of the last activity, which is no longer known", () => {
@@ -102,8 +100,6 @@ describe("TurnActivity with a connection", () => {
     expect(note.textContent).toBe("Connection lost, reconnecting · last update 1m 10s ago");
     expect(note.className).toMatch(/text-warning/);
     expect(screen.getByRole("status").textContent).toBe("Connection lost, reconnecting");
-    expect(screen.getAllByRole("status")).toHaveLength(1);
     expect(screen.queryByText("AI is thinking...")).toBeNull();
-    expect(screen.queryByTestId("activity-logo")).toBeNull();
   });
 });

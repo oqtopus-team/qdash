@@ -724,16 +724,18 @@ export function LiveAssistantMessage({
     .slice(split)
     .map((s) => (s.kind === "text" ? s.text : ""))
     .join("");
+  const busy = turn.steps.some(
+    (s) =>
+      (s.kind === "tool" && (s.status === "running" || s.status === "drafting")) ||
+      (s.kind === "thinking" && s.endedAt === undefined),
+  );
+  const idle = !answer && !busy;
   const figures = answer ? figuresInSteps(work) : [];
 
   return (
     // The activity footer is the live region; the streaming text itself is not announced.
     <AssistantRow className="animate-fade-in-up" aria-busy="true">
-      <LiveTrace
-        steps={work}
-        figuresOutside={figures.length > 0}
-        activityInFooter={connection?.state !== "reconnecting"}
-      />
+      <LiveTrace steps={work} figuresOutside={figures.length > 0} />
       {figures.length > 0 && <FigureStrip paths={figures} className="mb-3" />}
       {turn.blocks?.map((block, i) =>
         block.type === "ui" ? (
@@ -749,8 +751,7 @@ export function LiveAssistantMessage({
         startedAt={turn.startedAt}
         statusMessage={statusMessage}
         connection={connection}
-        // Sized once per turn, not per phase, so the footer's fixed mark never jumps.
-        className={`h-7 gap-2.5 ${turn.steps.length === 0 ? "text-sm" : "mt-1"}`}
+        className={`h-7 gap-2.5 ${idle ? "text-sm" : "mt-1"}`}
       />
     </AssistantRow>
   );

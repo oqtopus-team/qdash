@@ -32,7 +32,7 @@ import {
   ChainOfThoughtStep,
   ChainOfThoughtTrigger,
 } from "@/components/ui/ChainOfThought";
-import { ActivityLogo, type ActivityLogoMode } from "@/components/features/chat/ActivityLogo";
+import { Loader } from "@/components/ui/Loader";
 
 export function formatDuration(ms: number): string {
   const s = Math.max(0, Math.round(ms / 1000));
@@ -190,28 +190,13 @@ function RowChevron({ open }: { open: boolean }) {
   );
 }
 
-/**
- * Holds a live row's place where its icon goes. The turn's footer is its one live mark,
- * so an active row draws no icon of its own; the gap keeps its title where the icon
- * will stand once the step ends.
- */
-function IconSlot() {
-  return <span className="w-3.5 h-3.5 shrink-0" aria-hidden="true" data-testid="icon-slot" />;
-}
-
 function ToolStepRow({
   step,
   now,
-  live,
-  named = false,
   extrasOutside = false,
 }: {
   step: ToolStep;
   now: number;
-  /** The turn is streaming: its footer shows what an active call is doing. */
-  live: boolean;
-  /** The footer names this call beside the live mark, so the row does not repeat it. */
-  named?: boolean;
   /** The row sits in a folded group, which shows its failure, execution and figures instead. */
   extrasOutside?: boolean;
 }) {
@@ -231,9 +216,7 @@ function ToolStepRow({
   const failure = open || extrasOutside ? null : failureLine(step);
   // While the assistant waits on an execution, show its tasks and figures as they land.
   const waitingOn = extrasOutside ? null : waitedExecution(step);
-  // A call in flight is plain text: the footer's mark is the one live sign.
-  const active = live && (running || drafting);
-  // One icon per settled row: what the tool is, or that it failed or never ran.
+  // One icon per row: what the tool is, or that it failed or never ran.
   const Icon = failed ? CircleX : cancelled ? Ban : toolIcon(step.tool);
 
   return (
@@ -245,37 +228,22 @@ function ToolStepRow({
         title={title}
         data-status={step.status}
       >
-        {active ? (
-          <IconSlot />
-        ) : (
-          <Icon
-            className={`w-3.5 h-3.5 shrink-0 ${failed ? "text-error" : "text-base-content/45"}`}
-            strokeWidth={1.75}
-            aria-hidden="true"
-          />
-        )}
-        {named ? (
-          // The footer shows this title and its time; the row only opens what the call
-          // is doing. Its name stays for assistive tech, which reads rows out of order.
-          <>
-            <span className="sr-only">{title}</span>
-            {!preview && (
-              <span className="text-xs text-base-content/50 group-hover:text-base-content/80">
-                Details
-              </span>
-            )}
-          </>
-        ) : (
-          <span
-            className={`min-w-0 truncate ${
-              cancelled
+        <Icon
+          className={`w-3.5 h-3.5 shrink-0 ${failed ? "text-error" : "text-base-content/45"}`}
+          strokeWidth={1.75}
+          aria-hidden="true"
+        />
+        <span
+          className={`min-w-0 truncate ${
+            running || drafting
+              ? "loader-text-shimmer"
+              : cancelled
                 ? "text-base-content/45"
                 : "text-base-content/65 group-hover:text-base-content/85"
-            }`}
-          >
-            {title}
-          </span>
-        )}
+          }`}
+        >
+          {title}
+        </span>
         {/* Status and time sit beside the title, not at the far edge of the row. */}
         <span
           className="flex shrink-0 items-center gap-1.5 text-xs tabular-nums text-base-content/40"
@@ -288,7 +256,7 @@ function ToolStepRow({
           ) : (
             <span className="sr-only">{TOOL_STATUS_LABEL[step.status]}</span>
           )}
-          {!drafting && !cancelled && !named && <span>{formatDuration(elapsed)}</span>}
+          {!drafting && !cancelled && <span>{formatDuration(elapsed)}</span>}
         </span>
         {preview && (
           <span className="min-w-0 flex-[1_1_0%] truncate text-xs text-base-content/40">
@@ -353,8 +321,6 @@ function ThinkingStepRow({
   const elapsed = (step.endedAt ?? now) - step.startedAt;
   const [open, setOpen] = useState(false);
   const hasText = Boolean(step.text);
-  // A live thought is announced by the footer ("Thinking" beside the mark); its row
-  // only offers the text so far (see `rowless`), with no live heading of its own.
 
   return (
     // Folded like a tool row; the thought itself is one click away.
@@ -364,19 +330,13 @@ function ThinkingStepRow({
         disabled={!hasText}
         className={`group min-w-0 gap-2 text-sm ${hasText ? "" : "cursor-default"}`}
       >
+        <Brain
+          className="w-3.5 h-3.5 shrink-0 text-base-content/45"
+          strokeWidth={1.75}
+          aria-hidden="true"
+        />
         {active ? (
-          <IconSlot />
-        ) : (
-          <Brain
-            className="w-3.5 h-3.5 shrink-0 text-base-content/45"
-            strokeWidth={1.75}
-            aria-hidden="true"
-          />
-        )}
-        {active ? (
-          <span className="text-base-content/65 group-hover:text-base-content/85">
-            Thought so far
-          </span>
+          <span className="loader-text-shimmer">Thinking</span>
         ) : (
           <span className="text-base-content/65 group-hover:text-base-content/85">
             Thought for {formatDuration(elapsed)}
@@ -429,26 +389,6 @@ export function groupTraceSteps(steps: TraceStep[]): TraceSegment[] {
 
 /** A run with this many tool calls folds into one summary row. */
 const GROUP_MIN_TOOLS = 2;
-
-/**
- * Whether a live step has no row: the footer already says what it is doing, and the
- * row would only repeat it. A thought with no text yet, or the call the footer names
- * when it has no details, preview or execution to show.
- */
-function rowless(step: TraceStep, live: boolean, named: ToolStep | null): boolean {
-  if (!live) return false;
-  if (step.kind === "thinking") return step.endedAt === undefined && !step.text;
-  // The call the footer names, with nothing more to show than its name.
-  return (
-    step === named &&
-    !hasDetails(step) &&
-    !stepPreview(step) &&
-    !waitedExecution(step) &&
-    !step.figures?.length &&
-    !step.evaluation &&
-    !step.classification
-  );
-}
 
 function isStepActive(step: TraceStep): boolean {
   if (step.kind === "tool") return step.status === "drafting" || step.status === "running";
@@ -507,8 +447,8 @@ function FoldedGroupNotes({ steps, showFigures }: { steps: ToolStep[]; showFigur
 
 /**
  * One run of work steps. Fewer than two tool calls show as their own rows;
- * from the second call on, the run folds into a summary that counts its calls
- * (settled, it says it used them), and opens to the same rows. The rows stay
+ * from the second call on, the run folds into a summary that names what it is
+ * doing and how many calls it made, and opens to the same rows. The rows stay
  * mounted at the same place in the tree either way, so a row the user opened
  * keeps its state as the run grows into a group.
  */
@@ -517,15 +457,12 @@ function WorkGroup({
   start,
   now,
   live,
-  named,
   figuresOutside,
 }: {
   steps: WorkStep[];
   start: number;
   now: number;
   live: boolean;
-  /** The call the live footer names, if any. */
-  named: ToolStep | null;
   /** The message already shows the turn's figures, so a folded group need not. */
   figuresOutside: boolean;
 }) {
@@ -539,8 +476,9 @@ function WorkGroup({
   const notRun = tools.filter((s) => s.status === "cancelled").length;
   const startedAt = Math.min(...steps.map((s) => s.startedAt));
   const endedAt = active ? now : Math.max(...steps.map((s) => s.endedAt ?? now));
-  // Live, the footer says what the run does; the summary only counts its calls.
-  const label = active ? plural(tools.length, "tool call") : `Used ${plural(tools.length, "tool")}`;
+  const label = active
+    ? (currentActivity(steps, null) ?? "Working")
+    : `Used ${plural(tools.length, "tool")}`;
 
   return (
     <div className="min-w-0" data-testid="trace-work" data-grouped={grouped}>
@@ -554,16 +492,18 @@ function WorkGroup({
           data-testid="tool-group-summary"
           data-active={active}
         >
-          {active ? (
-            <IconSlot />
-          ) : (
-            <Wrench
-              className="w-3.5 h-3.5 shrink-0 text-base-content/45"
-              strokeWidth={1.75}
-              aria-hidden="true"
-            />
-          )}
-          <span className="min-w-0 truncate text-base-content/65 group-hover:text-base-content/85">
+          <Wrench
+            className="w-3.5 h-3.5 shrink-0 text-base-content/45"
+            strokeWidth={1.75}
+            aria-hidden="true"
+          />
+          <span
+            className={`min-w-0 truncate ${
+              active
+                ? "loader-text-shimmer"
+                : "text-base-content/65 group-hover:text-base-content/85"
+            }`}
+          >
             {label}
           </span>
           <span
@@ -573,6 +513,11 @@ function WorkGroup({
           >
             {formatDuration(endedAt - startedAt)}
           </span>
+          {active && (
+            <span className="shrink-0 text-xs text-base-content/40">
+              · {plural(tools.length, "tool")}
+            </span>
+          )}
           {failed > 0 && (
             <span className="inline-flex shrink-0 items-center gap-1 text-xs text-error">
               · <CircleX className="w-3 h-3" aria-hidden="true" />
@@ -592,24 +537,16 @@ function WorkGroup({
         hidden={folded}
         className={`flex flex-col gap-2 ${grouped ? `${ROW_INDENT} mt-2` : ""}`}
       >
-        {steps.map((step, j) =>
-          rowless(step, live, named) ? null : (
-            <li key={`${step.kind}-${start + j}`} className="min-w-0">
-              {step.kind === "tool" ? (
-                // A draft's ID can change when execution starts; the position cannot.
-                <ToolStepRow
-                  step={step}
-                  now={now}
-                  live={live}
-                  named={step === named}
-                  extrasOutside={folded}
-                />
-              ) : (
-                <ThinkingStepRow step={step} now={now} live={live} />
-              )}
-            </li>
-          ),
-        )}
+        {steps.map((step, j) => (
+          <li key={`${step.kind}-${start + j}`} className="min-w-0">
+            {step.kind === "tool" ? (
+              // A draft's ID can change when execution starts; the position cannot.
+              <ToolStepRow step={step} now={now} extrasOutside={folded} />
+            ) : (
+              <ThinkingStepRow step={step} now={now} live={live} />
+            )}
+          </li>
+        ))}
       </ol>
     </div>
   );
@@ -618,12 +555,10 @@ function WorkGroup({
 function TraceSteps({
   steps,
   live,
-  named = null,
   figuresOutside,
 }: {
   steps: TraceStep[];
   live: boolean;
-  named?: ToolStep | null;
   figuresOutside: boolean;
 }) {
   const running = live && steps.some((s) => s.kind === "thinking" || s.kind === "tool");
@@ -632,18 +567,15 @@ function TraceSteps({
     <ol className="flex flex-col gap-2">
       {groupTraceSteps(steps).map((segment) =>
         segment.kind === "work" ? (
-          segment.steps.every((step) => rowless(step, live, named)) ? null : (
-            <li key={`work-${segment.start}`} className="min-w-0">
-              <WorkGroup
-                steps={segment.steps}
-                start={segment.start}
-                now={now}
-                live={live}
-                named={named}
-                figuresOutside={figuresOutside}
-              />
-            </li>
-          )
+          <li key={`work-${segment.start}`} className="min-w-0">
+            <WorkGroup
+              steps={segment.steps}
+              start={segment.start}
+              now={now}
+              live={live}
+              figuresOutside={figuresOutside}
+            />
+          </li>
         ) : (
           // Prose between calls stays outside every group.
           <li key={`text-${segment.index}`} className="min-w-0">
@@ -677,22 +609,15 @@ export function ChatTraceSummary({ trace }: { trace: ChatTraceData }) {
 export function LiveTrace({
   steps,
   figuresOutside = false,
-  activityInFooter = true,
 }: {
   steps: TraceStep[];
   /** The message already shows the turn's figures above its answer. */
   figuresOutside?: boolean;
-  /**
-   * The footer names what the turn does. False while the connection is lost: the
-   * footer then shows only the warning, so the running call keeps its own title.
-   */
-  activityInFooter?: boolean;
 }) {
-  const named = activityInFooter ? namedTool(steps) : null;
-  if (steps.every((step) => rowless(step, true, named))) return null;
+  if (steps.length === 0) return null;
   return (
     <div className="mb-3">
-      <TraceSteps steps={steps} live named={named} figuresOutside={figuresOutside} />
+      <TraceSteps steps={steps} live figuresOutside={figuresOutside} />
     </div>
   );
 }
@@ -710,35 +635,8 @@ function activeTools(steps: TraceStep[]): ToolStep[] {
   );
 }
 
-/**
- * The one call the footer names: the only call in flight, or the last one when the
- * others are still being written. Null when none is, or when several run at once
- * and the footer counts them instead.
- */
-function namedTool(steps: TraceStep[]): ToolStep | null {
-  const active = activeTools(steps);
-  if (active.length === 0) return null;
-  if (active.length > 1 && active.filter((s) => s.status === "running").length > 1) return null;
-  return active[active.length - 1];
-}
-
 function isThinking(steps: TraceStep[]): boolean {
   return steps.some((s) => s.kind === "thinking" && s.endedAt === undefined);
-}
-
-/** What the trace calls a thought, and what the turn is shown doing while the model thinks. */
-const THINKING_LABEL = "Thinking";
-
-/**
- * The server's generic status while the model works out its next output, for
- * example right after a tool result. It is not a thought event (those arrive
- * as thinking steps), but it means the same to the user, so it reads the same.
- */
-const SERVER_THINKING_STATUS = "AI is thinking...";
-
-/** A server status as the chat shows it: its generic thinking note as "Thinking", the rest as sent. */
-export function displayStatusMessage(statusMessage: string | null): string | null {
-  return statusMessage?.trim() === SERVER_THINKING_STATUS ? THINKING_LABEL : statusMessage;
 }
 
 /**
@@ -747,14 +645,16 @@ export function displayStatusMessage(statusMessage: string | null): string | nul
  * server last said it was doing, or null when it has said nothing.
  */
 export function currentActivity(steps: TraceStep[], statusMessage: string | null): string | null {
-  const named = namedTool(steps);
-  if (named) return toolActivity(named);
-  const running = activeTools(steps).filter((s) => s.status === "running").length;
-  if (running > 1) return `Running ${running} tools`;
-  if (isThinking(steps)) return THINKING_LABEL;
+  const active = activeTools(steps);
+  if (active.length > 1) {
+    const running = active.filter((s) => s.status === "running").length;
+    return running > 1 ? `Running ${running} tools` : toolActivity(active[active.length - 1]);
+  }
+  if (active.length === 1) return toolActivity(active[0]);
+  if (isThinking(steps)) return "Thinking";
   const last = steps[steps.length - 1];
   if (last?.kind === "text" && last.text) return "Writing the answer";
-  return displayStatusMessage(statusMessage);
+  return statusMessage;
 }
 
 /** How long a turn may send nothing before the footer says when it last did. */
@@ -779,74 +679,16 @@ export function connectionNote(
   return silent >= QUIET_AFTER_MS ? { lost: false, text: `Connected · ${last}` } : null;
 }
 
-/** Search tools, by exact name: the searching mark is never guessed from a label. */
-const SEARCH_TOOLS: ReadonlySet<string> = new Set(["qdash_search_source"]);
-
-/** Tools that park the turn on a person's answer rather than on work. */
-const HUMAN_WAIT_TOOLS: ReadonlySet<string> = new Set(["qdash_wait_agent_intervention"]);
-
-/**
- * The live mark for one call: searching for a search tool, waiting while a
- * person's answer is awaited, working for everything else. A call still being
- * written is working whatever the tool is.
- */
-export function toolLogoMode(step: Pick<ToolStep, "tool" | "status">): ActivityLogoMode {
-  if (step.status !== "running") return "working";
-  if (SEARCH_TOOLS.has(step.tool)) return "searching";
-  if (HUMAN_WAIT_TOOLS.has(step.tool)) return "waiting";
-  return "working";
-}
-
-/** The live mark for calls in flight together: their shared mode, or working for a mix. */
-export function activeToolsMode(steps: ToolStep[]): ActivityLogoMode {
-  const modes = new Set(steps.map(toolLogoMode));
-  return modes.size === 1 ? [...modes][0] : "working";
-}
-
-/** The footer's mark for the turn's steps: the mode of its calls in flight, else thinking. */
-function liveMode(steps: TraceStep[]): ActivityLogoMode {
-  const tools = activeTools(steps);
-  return tools.length > 0 ? activeToolsMode(tools) : "thinking";
+/** Whether a row of the live trace already shows what the turn is doing. */
+function activityShownInTrace(steps: TraceStep[]): boolean {
+  return activeTools(steps).length > 0 || isThinking(steps);
 }
 
 /**
- * How long a new mode, or the generic "Thinking" label, must last before the
- * footer shows it. A turn hops between calls and the server's "thinking" note in
- * well under a second; held this long, those hops do not flash the mark or label.
- */
-export const STEADY_PHASE_MS = 600;
-
-/**
- * `next` once it has held `STEADY_PHASE_MS`, dropped if it changes first. An
- * `immediate` value, the first value and null show at once.
- */
-function useSteady<T>(next: T | null, key: string, immediate: boolean): T | null {
-  const [shown, setShown] = useState<{ key: string; value: T | null }>({ key, value: next });
-  const now = immediate || next === null || shown.value === null;
-  useEffect(() => {
-    if (key === shown.key) return;
-    if (now) {
-      setShown({ key, value: next });
-      return;
-    }
-    const id = setTimeout(() => setShown({ key, value: next }), STEADY_PHASE_MS);
-    return () => clearTimeout(id);
-    // `next` is described by its key; a new value with the same key changes nothing.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, shown.key, now]);
-  return now ? next : shown.value;
-}
-
-/**
- * The streaming turn's footer: the turn's one live presentation. In a fixed slot
- * under the turn it shows the animated mark beside what the turn is doing and how
- * long it has run, for the whole turn. Trace rows stay text while active and take
- * their static icons once they end, so no row repeats the live status.
- *
- * The label names the actual call as soon as it starts, a person's wait at once,
- * and a lost connection replaces it at once; the generic "Thinking" between calls
- * and the mark's mode change only once they have held (see `useSteady`), so short
- * hops neither flash nor re-announce. The ticking timer stays out of the live region.
+ * The streaming turn's footer: what it is doing now and for how long. When a
+ * trace row already shows the activity, the footer is not drawn again but its
+ * status region stays mounted and screen-reader only, so the change is still
+ * announced. The ticking timer stays out of the live region.
  */
 export function TurnActivity({
   steps,
@@ -858,54 +700,59 @@ export function TurnActivity({
   steps: TraceStep[];
   startedAt: number;
   statusMessage: string | null;
-  /** The stream's health; its note shows beside the activity. */
+  /** The stream's health; its note shows even when a trace row shows the activity. */
   connection?: TurnConnection | null;
   className?: string;
 }) {
   const now = useNow(true);
   const note = connectionNote(connection, now);
-  // While reconnecting, what the turn does is unknown: neither mark nor activity is repeated.
-  const lost = note?.lost ?? false;
-  const nextMode = lost ? null : liveMode(steps);
-  const mode = useSteady(nextMode, nextMode ?? "none", nextMode === "waiting");
-  const nextLabel = lost ? null : (currentActivity(steps, statusMessage) ?? THINKING_LABEL);
-  const label = useSteady(nextLabel, nextLabel ?? "none", nextLabel !== THINKING_LABEL);
+  // While reconnecting, what the turn does is unknown: the last activity is not repeated.
+  const activity = note?.lost ? null : currentActivity(steps, statusMessage);
+  const inTrace = activityShownInTrace(steps);
   return (
     <div
-      className={twMerge("flex min-w-0 items-center gap-2 text-xs text-base-content/50", className)}
+      className={
+        inTrace && !note
+          ? "sr-only"
+          : twMerge("flex min-w-0 items-center gap-2 text-xs text-base-content/50", className)
+      }
       data-testid="turn-activity"
-      data-mode={mode ?? undefined}
+      data-in-trace={inTrace}
     >
-      {mode && <ActivityLogo mode={mode} />}
-      {label && (
-        <div
-          role="status"
-          className="min-w-0 truncate text-base-content/70"
-          data-testid="turn-activity-label"
-        >
-          {label}
+      {!inTrace && !note?.lost && (
+        <div role="status" className="flex min-w-0 items-center">
+          {activity ? (
+            <Loader variant="text-shimmer" size="sm" text={activity} className="truncate" />
+          ) : (
+            <Loader variant="typing" size="sm" />
+          )}
         </div>
       )}
-      {label && !note && (
+      {inTrace && !note?.lost && (
+        <div role="status" className="sr-only">
+          {activity}
+        </div>
+      )}
+      {!inTrace && !note && (
         <span className="shrink-0 tabular-nums" aria-hidden="true">
           {formatDuration(now - startedAt)}
         </span>
       )}
       {/* Announced once when the connection drops; the ticking time is not. */}
-      {lost && (
+      {note?.lost && (
         <div role="status" className="sr-only">
           Connection lost, reconnecting
         </div>
       )}
       {note && (
         <span
-          className={`flex min-w-0 items-center gap-1.5 ${lost ? "text-warning" : ""}`}
+          className={`flex min-w-0 items-center gap-1.5 ${note.lost ? "text-warning" : ""}`}
           data-testid="turn-connection"
           data-state={connection?.state}
           aria-hidden="true"
         >
           <span
-            className={`status status-xs shrink-0 ${lost ? "status-warning" : "status-neutral"}`}
+            className={`status status-xs shrink-0 ${note.lost ? "status-warning" : "status-neutral"}`}
             aria-hidden="true"
           />
           <span className="truncate tabular-nums">{note.text}</span>

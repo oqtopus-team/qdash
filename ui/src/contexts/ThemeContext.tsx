@@ -65,12 +65,8 @@ export function useTheme() {
   return context;
 }
 
-/** The active theme's name; "light" outside a ThemeProvider. */
-export function useThemeName(): Theme {
-  return useContext(ThemeContext)?.theme ?? "light";
-}
-
 /** True when the active theme has dark surfaces; "light" outside a ThemeProvider. */
 export function useIsDarkTheme(): boolean {
-  return DARK_THEMES.includes(useThemeName());
+  const context = useContext(ThemeContext);
+  return DARK_THEMES.includes(context?.theme ?? "light");
 }
