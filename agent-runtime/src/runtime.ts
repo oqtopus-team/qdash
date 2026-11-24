@@ -107,7 +107,7 @@ import {
   type SkillCommand,
   type SkillSummary,
 } from "./skill-tool.ts";
-import { extractToolGuide, TOOL_GUIDE_SKILL, toolGuideNames } from "./tool-guide.ts";
+import { buildIntentGuide, extractToolGuide, TOOL_GUIDE_SKILL, toolGuideNames } from "./tool-guide.ts";
 
 const AGENT_DIR = process.env.PI_CODING_AGENT_DIR ?? "/app/.pi-agent";
 const WORK_DIR = process.env.AGENT_WORK_DIR ?? "/app/workspace";
@@ -351,6 +351,7 @@ export class SharedRuntime {
       ? extractToolGuide(readFileSync(guideSkill.filePath, "utf8"), qdashToolNames, deferredToolNames)
       : null;
     if (!toolGuide) console.warn("[agent-runtime] no tool guide: qdash skill not found");
+    const intentGuide = buildIntentGuide(qdashToolNames, deferredToolNames);
     const localToolGuide = buildLocalToolGuide(extensions, EXTENSION_PATHS, new Set(localTools));
 
     const classifiers = configureClassifierModels(
@@ -376,7 +377,11 @@ export class SharedRuntime {
       classify ? CLASSIFY_GUIDELINE : null,
       {
         codemode: CODEMODE_GUIDELINE,
-        deferredTools: deferredToolsGuideline(deferredToolNames, toolGuideNames(toolGuide)),
+        deferredTools: deferredToolsGuideline(
+          deferredToolNames,
+          new Set([...toolGuideNames(toolGuide), ...toolGuideNames(intentGuide)]),
+        ),
+        intentGuide,
       },
     );
     const agentExtension = buildAgentExtension(systemPrompt, [

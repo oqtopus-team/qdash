@@ -71,6 +71,40 @@ This SDK call compares output values in the two newest results of each task with
 lists tasks with only one result. A failed detail read never means unchanged.
 Replace `64Qv3` and `6` with a chip and target in your project.
 
+## Read a Result with Context
+
+`qdash.taskResults.evidence(taskId, { cooldownId? })` joins a saved result with its execution,
+current qubit or coupling state, and an optional named cooldown. It performs only reads in the
+session's project. Use a task ID from `listTaskResults`:
+
+```ts
+import { QDash } from "@oqtopus-team/qdash-sdk";
+
+const qdash = await QDash.fromProfile("local");
+const page = await qdash.client.listTaskResults({ chipId: "64Qv3", qid: "6", limit: 1 });
+if (!page.items[0]) throw new Error("No saved results for this target");
+const evidence = await qdash.taskResults.evidence(page.items[0].task_id);
+console.log(evidence.result.output_parameters);
+if (evidence.target.status === "ok") console.log(evidence.target.value.outputs);
+else console.log(evidence.target);
+```
+
+Replace the chip and target with your own. A failed result read rejects the call. Each of
+`execution`, `target`, and `cooldown` uses the exported `TaskResultContext<T>` union:
+
+| Status | Fields |
+| --- | --- |
+| `ok` | `value` contains the context |
+| `failed` | `error` and, for HTTP errors, `statusCode` |
+| `not_applicable` | `reason` explains the missing execution ID, target, or chip |
+| `not_associated` | `reason` explains the unavailable cooldown association |
+
+Target outputs are current stored values, not a historical snapshot. `fromThisResult` is
+`true` or `false` when a stored entry names a task, otherwise `null`.
+The API does not expose the result's cooldown ID, so no cooldown is inferred. Pass a known
+`cooldownId` to check its chip membership and time compatibility; these checks do not establish
+that the result belongs to that cooldown. Inspect failed or missing parts before drawing a conclusion.
+
 ## Run a Calibration
 
 This example measures qubits 0 and 1. Choose targets and settings suitable for your hardware;

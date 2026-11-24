@@ -17,6 +17,16 @@ Keep reusable domain operations in the SDK, tool arguments and approval rules in
 and web presentation in the runtime/UI. `qdash-guidance.ts` supplies shared request policy and
 tool routing. Skills describe procedures and read task knowledge instead of duplicating it.
 
+`extensions/lib/tool-intents.ts` maps common tools to request purposes. For classified deferred
+tools, `applyToolPolicy` appends purpose words to the description used by Pi's native BM25
+`tool_search`. Both hosts include a guide built from the same mapping. This changes search
+relevance, not access or the session's tool selection. Update the mapping when adding a tool
+for one of these purposes; keep measurement preparation free of writes.
+
+`qdash_get_task_result_evidence` is a presentation adapter over the SDK's
+`taskResults.evidence`: the SDK joins authorized reads; the tool bounds and redacts output and
+adds web links. Keep reusable joins in the SDK so scripts can use them without Pi.
+
 Reviewed writes require user approval. Session-granted tools are limited to the approved session
 and still pass server checks. A model-provided approval flag is never authority.
 

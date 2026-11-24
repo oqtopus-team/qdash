@@ -22,6 +22,7 @@ import {
   QDASH_GUIDANCE_SKILL,
   toolRoutingNames,
 } from "@oqtopus-team/pi-qdash/extensions/lib/qdash-guidance.ts";
+import { intentRoutingGuide } from "@oqtopus-team/pi-qdash/extensions/lib/tool-intents.ts";
 
 export const TOOL_GUIDE_SKILL = QDASH_GUIDANCE_SKILL;
 
@@ -42,4 +43,16 @@ export function extractToolGuide(
 ): string | null {
   const guide = extractToolRouting(skillMarkdown, enabledTools);
   return guide ? markDeferredTools(guide, deferredTools) : null;
+}
+
+/**
+ * The request-type guide (pi-qdash tool-intents.ts) for the exposed tools,
+ * with `deferredTools` marked, or null. The pi CLI puts the same guide in its
+ * guidance section.
+ */
+export function buildIntentGuide(
+  enabledTools: Iterable<string>,
+  deferredTools: Iterable<string> = [],
+): string | null {
+  return intentRoutingGuide(enabledTools, deferredTools);
 }

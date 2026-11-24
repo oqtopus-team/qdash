@@ -3,6 +3,7 @@ import { Type } from "typebox";
 
 import { createOwnershipCheck, type SourceInfoLike } from "./extension-identity.js";
 import { CODEMODE_TOOL_NAME, TOOL_SEARCH_TOOL_NAME } from "./qdash-guidance.js";
+import { withIntentSearchText } from "./tool-intents.js";
 import {
   boundScriptData,
   isDeferredTool,
@@ -68,6 +69,7 @@ type Exposure = "direct" | "model-only" | "codemode" | "deferred" | "hidden";
 /** The fields of a tool definition the policy reads and sets. */
 export interface PolicyToolDefinition {
   name: string;
+  description?: string;
   parameters?: unknown;
   exposure?: Exposure;
   outputSchema?: unknown;
@@ -100,8 +102,15 @@ export function applyToolPolicy<T extends PolicyToolDefinition>(definition: T): 
   const read = isNestedReadTool(name);
   const exposure: Exposure | undefined =
     definition.exposure ?? (isDeferredTool(name) ? "deferred" : read ? undefined : "model-only");
+  // pi's tool_search ranks deferred tools by their description: the request-type
+  // words let a search phrased as a request type find them (tool-intents.ts).
+  const searchable =
+    exposure === "deferred" && typeof definition.description === "string"
+      ? { description: withIntentSearchText(name, definition.description) }
+      : {};
   return {
     ...definition,
+    ...searchable,
     namespace: definition.namespace ?? QDASH_TOOL_NAMESPACE,
     ...(exposure ? { exposure } : {}),
     ...(read

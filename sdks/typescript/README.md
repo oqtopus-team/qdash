@@ -32,6 +32,23 @@ for your deployment. `wait()` returns the whole run's status. A timeout leaves t
 See the [TypeScript reference](https://oqtopus-team.github.io/qdash/reference/clients/typescript)
 for configuration, workflows, metrics, and dashboards.
 
+## Read a Result with Context
+
+Reuse a configured `qdash` session and a task ID from `qdash.client.listTaskResults()`:
+
+```ts
+const page = await qdash.client.listTaskResults({ chipId: "64Qv3", qid: "0", limit: 1 });
+if (!page.items[0]) throw new Error("No saved results for this target");
+const evidence = await qdash.taskResults.evidence(page.items[0].task_id);
+console.log(evidence.result.output_parameters);
+if (evidence.target.status === "ok") console.log(evidence.target.value.outputs);
+```
+
+This reads the result, its execution, and its target's current stored values. Secondary reads
+report missing or failed context without discarding the result. Cooldown is `not_associated`
+unless you pass `{ cooldownId }`; a supplied cooldown is checked, not treated as proven provenance.
+See the [result context contract](https://oqtopus-team.github.io/qdash/reference/clients/typescript#read-a-result-with-context).
+
 ## Develop the Package
 
 Install from the repository root; the SDK builds against the client in the same checkout:
