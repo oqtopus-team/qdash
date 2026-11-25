@@ -21,7 +21,7 @@ class CalibrationPipelineSpec(UniversalBaseModel):
 
     name: typing.Optional[str] = pydantic.Field(default=None)
     """
-    Display name of the execution.
+    Optional display name of the run. Each step's execution is named <name>_<step name> when given, and after the step alone when omitted.
     """
 
     targets: PipelineTargets

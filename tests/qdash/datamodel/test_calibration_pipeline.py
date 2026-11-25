@@ -50,8 +50,20 @@ def test_defaults_fill_in_the_template_task_lists() -> None:
     assert step_tasks(parsed.steps[0]) == names(CHECK_1Q_TASKS)
     assert step_tasks(parsed.steps[1]) == names(FULL_2Q_TASKS)
     assert [call.call_id for call in step_calls(parsed.steps[0])] == names(CHECK_1Q_TASKS)
-    assert parsed.name == "pipeline"
+    assert parsed.name is None
     assert parsed.all_tasks() == names(CHECK_1Q_TASKS) + names(FULL_2Q_TASKS)
+
+
+def test_name_is_optional_and_left_out_of_dumps_when_omitted() -> None:
+    """An unnamed spec stays unnamed through a dump; a given name, even 'pipeline', stays."""
+    unnamed = parse()
+    assert "name" not in unnamed.model_dump(mode="json")
+    assert "name" not in unnamed.model_dump(mode="json", exclude_none=True)
+    assert CalibrationPipelineSpec.model_validate(unnamed.model_dump(mode="json")).name is None
+
+    named = parse(name="pipeline")
+    assert named.model_dump(mode="json")["name"] == "pipeline"
+    assert named.plan()["name"] == "pipeline"
 
 
 def test_default_lists_are_valid_call_lists() -> None:

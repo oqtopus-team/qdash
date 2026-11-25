@@ -11,6 +11,7 @@ from qdash.api.services.flow_service.prefect_gateway import SystemDeploymentUnav
 from qdash.datamodel.project import ProjectRole
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.chip import ChipDocument
+from qdash.dbmodel.execution_history import ExecutionHistoryDocument
 from qdash.dbmodel.project import ProjectDocument
 from qdash.dbmodel.project_membership import ProjectMembershipDocument
 from qdash.dbmodel.qubit import QubitDocument
@@ -817,7 +818,7 @@ class TestExecute:
         assert parameters["chip_id"] == CHIP
         assert parameters["flow_name"] == "coarse-then-coherence"
         assert parameters["backend_name"] == "qubex"
-        assert "pipeline" in parameters["tags"]
+        assert parameters["tags"] == []
         # The worker gets the normalized spec, not the raw request body.
         assert parameters["spec"]["steps"][0]["configure"] is False
         assert parameters["spec"]["steps"][2]["execution_mode"] == "parallel_by_round"
@@ -827,6 +828,71 @@ class TestExecute:
             "t1_long",
             "CheckT2Echo",
         ]
+
+    def test_execute_leaves_an_unnamed_spec_unnamed(self, test_client, chip, auth_headers):
+        """An omitted name reaches the worker as omitted, and adds no pipeline tag.
+
+        The scheduled execution is named after the first step, as the worker will
+        name that step's execution, not after a default pipeline name.
+        """
+        read_deployment, create_flow_run = prefect_gateway_mocks()
+        spec = good_spec()
+        del spec["name"]
+        with (
+            patch(
+                "qdash.api.services.flow_service.prefect_gateway.PrefectGateway.read_deployment_id",
+                new=read_deployment,
+            ),
+            patch(
+                "qdash.api.services.flow_service.prefect_gateway.PrefectGateway.create_flow_run",
+                new=create_flow_run,
+            ),
+        ):
+            response = test_client.post(
+                "/calibration-pipelines/execute",
+                headers=auth_headers,
+                json={"chip_id": CHIP, "spec": spec},
+            )
+        assert response.status_code == 202, response.text
+        data = response.json()
+        parameters = create_flow_run.call_args.kwargs["parameters"]
+        assert parameters["flow_name"] is None
+        assert "name" not in parameters["spec"]
+        assert parameters["tags"] == []
+        execution = ExecutionHistoryDocument.find_one({"execution_id": data["execution_id"]}).run()
+        assert execution is not None
+        assert execution.name == data["steps"][0]["name"] == "one_qubit_check"
+        assert execution.tags == []
+
+    def test_execute_keeps_explicit_name_and_tags(self, test_client, chip, auth_headers):
+        """A given name, even 'pipeline', and a caller's own 'pipeline' tag are kept."""
+        read_deployment, create_flow_run = prefect_gateway_mocks()
+        spec = {**good_spec(), "name": "pipeline", "tags": ["pipeline", "nightly"]}
+        with (
+            patch(
+                "qdash.api.services.flow_service.prefect_gateway.PrefectGateway.read_deployment_id",
+                new=read_deployment,
+            ),
+            patch(
+                "qdash.api.services.flow_service.prefect_gateway.PrefectGateway.create_flow_run",
+                new=create_flow_run,
+            ),
+        ):
+            response = test_client.post(
+                "/calibration-pipelines/execute",
+                headers=auth_headers,
+                json={"chip_id": CHIP, "spec": spec},
+            )
+        assert response.status_code == 202, response.text
+        parameters = create_flow_run.call_args.kwargs["parameters"]
+        assert parameters["flow_name"] == "pipeline"
+        assert parameters["spec"]["name"] == "pipeline"
+        assert parameters["tags"] == ["nightly", "pipeline"]
+        execution = ExecutionHistoryDocument.find_one(
+            {"execution_id": response.json()["execution_id"]}
+        ).run()
+        assert execution is not None
+        assert execution.name == "pipeline"
 
     def test_execute_rejects_invalid_spec_before_dispatch(self, test_client, chip, auth_headers):
         _, create_flow_run = prefect_gateway_mocks()

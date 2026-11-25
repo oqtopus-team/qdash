@@ -18,6 +18,11 @@ A version 2 pipeline spec selects targets and ordered task calls without Python 
 The selected chip must already have the task's required calibration. Specs cannot reference code.
 Calls use the same settings and identity rules as [Python task calls](./task-calls.md).
 
+The spec's `name` is optional and separate from the calibration session's name. When supplied,
+it prefixes each step's execution name as `<name>_<step name>`; when omitted, the execution
+uses the step name alone. The execution list appends the execution ID to this name.
+Tags combine the spec's tags and the execute request's tags; `pipeline` is not added automatically.
+
 ## Endpoints
 
 | Endpoint | Access | Purpose |

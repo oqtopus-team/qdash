@@ -13,9 +13,11 @@ from qdash.datamodel.calibration_pipeline import (
     LegacyExecutionModeError,
     PipelineStep,
     step_calls,
+    step_name,
     step_provides,
 )
 from qdash.datamodel.task_call import TaskCall
+from qdash.workflow.service import pipeline_flow
 from qdash.workflow.service.pipeline_flow import (
     build_step,
     build_steps,
@@ -365,3 +367,76 @@ def test_pipeline_note_lists_the_plan_with_step_kinds() -> None:
             ],
         }
     }
+
+
+def test_spec_step_names_match_the_built_step_names() -> None:
+    """The API names an unnamed run's scheduled row with ``step_name``; the worker's
+    first step execution adopts that row under the built step's name."""
+    parsed = spec(EVERY_STEP)
+    assert [step_name(step) for step in parsed.steps] == [
+        built.name for built in build_steps(parsed)
+    ]
+
+
+def _run_flow(
+    monkeypatch: pytest.MonkeyPatch, raw_spec: dict[str, Any], **kwargs: Any
+) -> dict[str, Any]:
+    """Run the pipeline flow body with its context, settings and run captured."""
+    captured: dict[str, Any] = {}
+    monkeypatch.setattr(pipeline_flow, "get_run_logger", MagicMock)
+    monkeypatch.setattr(pipeline_flow, "resolve_calib_context", MagicMock())
+
+    def settings(context: Any, **fields: Any) -> dict[str, Any]:
+        captured.update(fields)
+        return fields
+
+    monkeypatch.setattr(pipeline_flow, "workflow_settings", settings)
+    monkeypatch.setattr(pipeline_flow, "run_calibration", MagicMock())
+    # The test suite stubs Prefect's decorator; ``fn`` is the body under real Prefect.
+    body = getattr(pipeline_flow.calibration_pipeline, "fn", pipeline_flow.calibration_pipeline)
+    body(username="alice", chip_id="chip-1", spec=raw_spec, **kwargs)
+    return captured
+
+
+def _raw_spec(**fields: Any) -> dict[str, Any]:
+    return {
+        "spec_version": 2,
+        "targets": {"qids": ["0"]},
+        "steps": [{"type": "CustomOneQubit", "step_name": "t1", "tasks": [{"name": "CheckT1"}]}],
+        **fields,
+    }
+
+
+def test_unnamed_flow_run_stays_unnamed_and_adds_no_pipeline_tag(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Without a name each step's execution is named after the step alone."""
+    captured = _run_flow(monkeypatch, _raw_spec())
+    assert captured["flow_name"] is None
+    assert captured["tags"] == []
+    assert captured["note"]["pipeline"]["name"] is None
+
+
+def test_named_flow_run_keeps_the_name_and_the_callers_tags(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A given name, even 'pipeline', and the caller's own tags are passed on as given."""
+    captured = _run_flow(
+        monkeypatch,
+        _raw_spec(name="pipeline", tags=["nightly"]),
+        flow_name="pipeline",
+        tags=["pipeline"],
+    )
+    assert captured["flow_name"] == "pipeline"
+    assert captured["tags"] == ["nightly", "pipeline"]
+
+
+def test_queued_spec_with_the_former_default_name_keeps_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A run queued before names became optional carries name 'pipeline' explicitly."""
+    captured = _run_flow(
+        monkeypatch, _raw_spec(name="pipeline"), flow_name="pipeline", tags=["pipeline"]
+    )
+    assert captured["flow_name"] == "pipeline"
+    assert captured["tags"] == ["pipeline"]

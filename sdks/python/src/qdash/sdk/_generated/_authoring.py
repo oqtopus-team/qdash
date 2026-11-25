@@ -827,10 +827,10 @@ class CalibrationPipelineSpec(BaseModel):
     Spec format version. Convert a version 1 spec with migrate_pipeline_spec.
     """
     name: Annotated[
-        str, Field(pattern='^[A-Za-z][A-Za-z0-9_-]{0,63}$', title='Name')
-    ] = 'pipeline'
+        str | None, Field(pattern='^[A-Za-z][A-Za-z0-9_-]{0,63}$', title='Name')
+    ] = None
     """
-    Display name of the execution.
+    Optional display name of the run. Each step's execution is named <name>_<step name> when given, and after the step alone when omitted.
     """
     targets: PipelineTargets
     steps: Annotated[

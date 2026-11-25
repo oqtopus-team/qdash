@@ -24,17 +24,19 @@ from __future__ import annotations
 import copy
 from collections import Counter
 from collections.abc import Mapping, Sequence
-from typing import Annotated, Any, Literal
+from typing import TYPE_CHECKING, Annotated, Any, Literal
 
 from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
     SerializerFunctionWrapHandler,
+    StringConstraints,
     field_validator,
     model_serializer,
     model_validator,
 )
+from pydantic.json_schema import SkipJsonSchema  # noqa: TC002 - pydantic resolves it at runtime
 
 from qdash.common.manual_rounds import (
     PairRounds,
@@ -63,6 +65,9 @@ from qdash.datamodel.two_qubit_execution_mode import (
     DEFAULT_MAX_PARALLEL_OPS,
     TwoQubitExecutionMode,
 )
+
+if TYPE_CHECKING:
+    from pydantic.config import JsonDict
 
 SPEC_VERSION = 2
 
@@ -819,6 +824,14 @@ def step_continue_on_failure(step: PipelineStep) -> bool:
 # ---------------------------------------------------------------------------
 
 
+_RUN_NAME_PATTERN = r"^[A-Za-z][A-Za-z0-9_-]{0,63}$"
+
+
+def _without_default(schema: JsonDict) -> None:
+    """Leave the ``None`` default of an optional field out of its JSON schema."""
+    schema.pop("default", None)
+
+
 class CalibrationPipelineSpec(BaseModel):
     """A complete, runnable calibration pipeline."""
 
@@ -827,10 +840,19 @@ class CalibrationPipelineSpec(BaseModel):
     spec_version: Literal[2] = Field(
         description="Spec format version. Convert a version 1 spec with migrate_pipeline_spec.",
     )
-    name: str = Field(
-        default="pipeline",
-        pattern=r"^[A-Za-z][A-Za-z0-9_-]{0,63}$",
-        description="Display name of the execution.",
+    # Optional and omitted from dumps when unset: an unnamed run names each step's
+    # execution after the step alone, while a given name prefixes them. The schema
+    # shows an optional string, not a nullable one with a default.
+    name: Annotated[str, StringConstraints(pattern=_RUN_NAME_PATTERN)] | SkipJsonSchema[None] = (
+        Field(
+            default=None,
+            exclude_if=lambda value: value is None,
+            description=(
+                "Optional display name of the run. Each step's execution is named "
+                "<name>_<step name> when given, and after the step alone when omitted."
+            ),
+            json_schema_extra=_without_default,
+        )
     )
     targets: PipelineTargets
     steps: list[PipelineStep] = Field(min_length=1, max_length=32)

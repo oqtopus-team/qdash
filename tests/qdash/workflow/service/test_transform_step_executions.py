@@ -237,6 +237,45 @@ def test_calibration_filters_and_schedule_record_ordered_executions(
     assert env.lock.locked is False
 
 
+@pytest.mark.parametrize(
+    ("flow_name", "expected"),
+    [
+        (None, ["check", "filter_by_status"]),
+        ("pipeline", ["pipeline_check", "pipeline_filter_by_status"]),
+    ],
+)
+def test_step_executions_are_named_after_the_run_only_when_it_has_a_name(
+    pipeline_execution_env: Any,  # noqa: F811
+    monkeypatch: pytest.MonkeyPatch,
+    flow_name: str | None,
+    expected: list[str],
+) -> None:
+    """An unnamed run names each step's execution after the step; a named one, even
+    'pipeline', prefixes the run's name."""
+    env = pipeline_execution_env
+    monkeypatch.setattr(CustomOneQubit, "execute", _check_result({"0": "success"}))
+    session = _session(
+        username="alice",
+        chip_id="chip-1",
+        project_id="project-1",
+        flow_name=flow_name,
+        lock_repo=env.lock,
+        counter_repo=IncrementingExecutionCounterRepository(2),
+    )
+
+    session.run_pipeline(
+        QubitTargets(["0"]),
+        steps=[
+            CustomOneQubit(step_name="check", tasks=[TaskCall(name="CheckRabi")]),
+            FilterByStatus(step="check"),
+        ],
+    )
+
+    assert [r.config.flow_name for r in env.records] == expected
+    assert [r.config.note["pipeline_name"] for r in env.records] == [flow_name, flow_name]
+    assert env.records[0].config.execution_id == "exec-reserved"
+
+
 def test_recorded_outcomes_are_snapshots(
     pipeline_execution_env: Any,  # noqa: F811
     monkeypatch: pytest.MonkeyPatch,
