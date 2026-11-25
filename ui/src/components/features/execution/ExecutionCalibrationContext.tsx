@@ -59,9 +59,9 @@ export function CalibrationSessionBadge({ link }: { link: CalibrationSessionRef 
 
 function membershipText(link: ExecutionCalibrationSessionLink): string {
   if (link.via === "pipeline_run") {
-    return `A step of run ${link.pipeline_run_id ?? ""} recorded in this calibration session`;
+    return `Step of run ${link.pipeline_run_id ?? ""}`;
   }
-  return `Run by agent session ${link.agent_session_id ?? ""}, which was admitted to this calibration session`;
+  return `Run by admitted agent session ${link.agent_session_id ?? ""}`;
 }
 
 /**
@@ -103,7 +103,7 @@ export function ExecutionCalibrationNotice({
         ) : null}
         {origin ? (
           <span className="text-base-content/70">
-            {reportedOriginDetail(origin)}. The recorded user started it with their own sign-in.
+            {reportedOriginDetail(origin)}. Started with the recorded user's sign-in.
           </span>
         ) : null}
       </div>

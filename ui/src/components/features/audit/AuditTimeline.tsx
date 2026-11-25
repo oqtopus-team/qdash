@@ -132,7 +132,8 @@ function EventLinks({ event, sessionId }: { event: AgentAuditEvent; sessionId: s
   );
 }
 
-function EventDetail({ event }: { event: AgentAuditEvent }) {
+/** The event's payload as label/value rows, for its details disclosure. */
+function eventDetailRows(event: AgentAuditEvent): { label: string; value: string }[] {
   const data = (event.data ?? {}) as Data;
   const rows: { label: string; value: string }[] = [];
   if (event.kind === "action_proposed" && data.intent) {
@@ -145,7 +146,7 @@ function EventDetail({ event }: { event: AgentAuditEvent }) {
     if (outputs.length) rows.push({ label: "Outputs", value: outputs.join(", ") });
     const metrics = scalarList(data.quality_metrics);
     if (metrics.length) rows.push({ label: "Quality metrics", value: metrics.join(", ") });
-    const gate = Array.isArray(data.gate) ? (data.gate as Data[]) : [];
+    const gate = gateRows(event);
     if (gate.length) {
       rows.push({
         label: "Gate",
@@ -212,16 +213,50 @@ function EventDetail({ event }: { event: AgentAuditEvent }) {
   if (event.kind === "intervention_response" && data.guidance) {
     rows.push({ label: "Guidance (expert)", value: String(data.guidance) });
   }
-  if (rows.length === 0) return null;
+  return rows;
+}
+
+function gateRows(event: AgentAuditEvent): Data[] {
+  const gate = (event.data as Data | undefined)?.gate;
+  return Array.isArray(gate) ? (gate as Data[]) : [];
+}
+
+/** Gate checks that failed; an out-of-scope output is reference only, not a failure. */
+function failedGateCount(event: AgentAuditEvent): number {
+  if (event.kind !== "measurement") return 0;
+  return gateRows(event).filter((row) => !row.accepted && row.rejection !== "not_in_scope").length;
+}
+
+/**
+ * The event's secondary facts — who recorded it, the model its record reported, and its
+ * payload — behind a per-event disclosure, so the timeline reads as kind, source, and summary.
+ */
+function EventDetails({ event, label }: { event: AgentAuditEvent; label: string }) {
+  const rows = eventDetailRows(event);
+  const meta: { label: string; value: ReactNode }[] = [];
+  if (event.actor) meta.push({ label: "Recorded by", value: event.actor });
+  if (event.model) {
+    meta.push({
+      label: "Model",
+      value: <span title={reportedModelTitle(event.model)}>{reportedModelLabel(event.model)}</span>,
+    });
+  }
+  const all = [...meta, ...rows];
+  if (all.length === 0) return null;
   return (
-    <dl className="mt-1 grid gap-x-3 gap-y-0.5 text-xs sm:grid-cols-[max-content_1fr]">
-      {rows.map((row) => (
-        <div key={row.label} className="contents">
-          <dt className="text-base-content/60">{row.label}</dt>
-          <dd className="break-words">{row.value}</dd>
-        </div>
-      ))}
-    </dl>
+    <details className="mt-1 text-xs" data-testid="audit-event-details">
+      <summary className="w-fit cursor-pointer text-base-content/60 hover:text-base-content">
+        Details<span className="sr-only">: {label}</span>
+      </summary>
+      <dl className="mt-1 grid gap-x-3 gap-y-0.5 sm:grid-cols-[max-content_1fr]">
+        {all.map((row) => (
+          <div key={row.label} className="contents">
+            <dt className="text-base-content/60">{row.label}</dt>
+            <dd className="break-words">{row.value}</dd>
+          </div>
+        ))}
+      </dl>
+    </details>
   );
 }
 
@@ -239,6 +274,10 @@ function AuditEventItem({
   last: boolean;
 }) {
   const missing = event.missing ?? [];
+  const kindLabel = auditKindLabel(event.kind, event.provenance, scope, event.agent_session_id);
+  const failedGates = failedGateCount(event);
+  const superseded =
+    event.kind === "decision" && Boolean((event.data as Data)?.superseded_by_decision_id);
   return (
     <li>
       {first ? null : <hr />}
@@ -257,9 +296,7 @@ function AuditEventItem({
       <div className="timeline-end mb-4 min-w-0">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-base-content/60">
           <time dateTime={event.at}>{formatDateTime(event.at)}</time>
-          <span className="font-medium text-base-content">
-            {auditKindLabel(event.kind, event.provenance, scope, event.agent_session_id)}
-          </span>
+          <span className="font-medium text-base-content">{kindLabel}</span>
           {event.agent_session_id ? (
             <span className="badge badge-soft badge-info badge-xs">
               Agent session {event.agent_session_id.slice(0, 8)}
@@ -268,22 +305,22 @@ function AuditEventItem({
           <span className="badge badge-ghost badge-xs">
             {auditProvenanceLabel(event.provenance)}
           </span>
-          {event.actor ? <span>{event.actor}</span> : null}
-          {event.model ? (
-            <span title={reportedModelTitle(event.model)}>
-              model {reportedModelLabel(event.model)}
-            </span>
-          ) : null}
           {event.status_is_current && event.status ? (
             <span title="Live status of a record that can still change">now {event.status}</span>
           ) : null}
+          {failedGates ? (
+            <span className="badge badge-soft badge-warning badge-xs">
+              {failedGates} gate check{failedGates === 1 ? "" : "s"} failed
+            </span>
+          ) : null}
+          {superseded ? <span className="badge badge-ghost badge-xs">Superseded</span> : null}
         </div>
         <p className="mt-0.5 text-sm break-words">{event.summary}</p>
-        <EventDetail event={event} />
         {missing.length ? (
           <p className="mt-1 text-xs text-warning">Not recorded: {missing.join(", ")}</p>
         ) : null}
         <EventLinks event={event} sessionId={sessionId} />
+        <EventDetails event={event} label={`${kindLabel}, ${formatDateTime(event.at)}`} />
       </div>
       {last ? null : <hr />}
     </li>
@@ -341,7 +378,7 @@ export function AuditTimeline<P extends AuditPageLike>({
   source: AuditTimelineSource<P>;
   scope?: AuditScope;
   title: string;
-  description: string;
+  description?: string;
   header?: (first: P | undefined) => ReactNode;
 }) {
   const queryClient = useQueryClient();
@@ -395,7 +432,7 @@ export function AuditTimeline<P extends AuditPageLike>({
             <h2 id="audit-heading" className="text-sm font-medium">
               {title}
             </h2>
-            <p className="text-xs text-base-content/60">{description}</p>
+            {description ? <p className="text-xs text-base-content/60">{description}</p> : null}
           </div>
           <div className="flex gap-2">
             <button
@@ -430,8 +467,8 @@ export function AuditTimeline<P extends AuditPageLike>({
         {exportNewer ? (
           <div role="status" className="alert alert-info alert-soft">
             <span>
-              The exported file is a newer read of the audit than the timeline shown here: the
-              records changed after the timeline loaded. Refresh to show the same records.
+              The exported file is a newer read of the audit than this timeline. Refresh to match
+              it.
             </span>
           </div>
         ) : null}
@@ -481,9 +518,8 @@ export function AuditTimeline<P extends AuditPageLike>({
             {changed ? (
               <div role="alert" className="alert alert-warning alert-soft">
                 <span>
-                  The audit changed while it was being read (a new result, decision, or status). The
-                  events above are from the earlier read and stop here; read the audit again to see
-                  all of it.
+                  The audit changed while it was being read. The events above stop at the earlier
+                  read.
                 </span>
                 <button type="button" className="btn btn-sm" onClick={reload}>
                   Read again from the start

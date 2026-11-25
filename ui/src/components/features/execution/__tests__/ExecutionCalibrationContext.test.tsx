@@ -123,7 +123,7 @@ describe("calibration session and reported origin on executions", () => {
     );
     const note = screen.getByRole("note");
     expect(note.textContent).toContain("Bring up qubits 0 and 1");
-    expect(note.textContent).toContain("A step of run cpr-1");
+    expect(note.textContent).toContain("Step of run cpr-1");
     expect(note.textContent).toContain("pi-qdash reported that the agent tool qdash_run_pipeline");
     expect(note.textContent).toContain("QDash does not verify this");
     expect(
@@ -132,14 +132,14 @@ describe("calibration session and reported origin on executions", () => {
     cleanup();
     render(<ExecutionCalibrationNotice link={AGENT_MEMBER} projectId="lab-a" />);
     expect(screen.getByRole("note").textContent).toContain(
-      "Run by agent session session-1, which was admitted to this calibration session",
+      "Run by admitted agent session session-1",
     );
   });
 
   it("states a report without a session and offers no link", () => {
     render(<ExecutionCalibrationNotice origin={AGENT_TOOL} projectId="lab-a" />);
     const note = screen.getByRole("note");
-    expect(note.textContent).toContain("The recorded user started it with their own sign-in");
+    expect(note.textContent).toContain("Started with the recorded user's sign-in");
     expect(within(note).queryByRole("link")).toBeNull();
   });
 
