@@ -25,7 +25,7 @@ const DEADLINE_MEMO = "qdash.wait.deadline";
  *
  * Each run polls QDash once with `spec.check`. A value ends the call with the
  * same result the pi CLI builds; otherwise the call fails with the tool's
- * timeout error once the deadline passed, or parks (`{ sleep: { until } }`)
+ * timeout error once the deadline passed, or parks (`{ kind: "sleep", until }`)
  * for one poll interval. While parked the call holds no process and no
  * pending request, and its slot shows `sleeping`.
  *
@@ -71,5 +71,5 @@ export async function parkingWait<P extends object, T>(
   if (value !== undefined) return spec.result(client, params, value);
   const now = api.now();
   if (now >= deadline) throw spec.timeoutError(params, timing);
-  return { sleep: { checkpoint: { deadline }, until: now + timing.pollIntervalSeconds * 1_000 } };
+  return { kind: "sleep", checkpoint: { deadline }, until: now + timing.pollIntervalSeconds * 1_000 };
 }

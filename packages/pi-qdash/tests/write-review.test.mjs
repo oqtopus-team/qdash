@@ -4,7 +4,7 @@
  * on screen and an explicit key, and decline, Escape, and pi's abort signal
  * never approve. The view runs inside pi-tui's real `TuiMainScreen` (fake
  * terminal, real overlay compositing and input routing, pi's default
- * keybindings); `ctx.ui.custom()` is reproduced from pi 1.6.0's interactive
+ * keybindings); `ctx.ui.custom()` is reproduced from pi 1.6.1's interactive
  * mode overlay path. RPC mode keeps `ctx.ui.confirm()` with the full text.
  */
 
@@ -68,7 +68,7 @@ function screen(columns, rows) {
   };
 }
 
-/** pi 1.6.0 InteractiveMode.showExtensionCustom, overlay branch. */
+/** pi 1.6.1 InteractiveMode.showExtensionCustom, overlay branch. */
 function tuiUi(tui, opened = []) {
   return {
     confirm: async () => assert.fail("the terminal UI never uses confirm() for a write review"),
@@ -216,7 +216,24 @@ test("RPC mode sends the complete text to the client through confirm()", async (
   const ui = { confirm: async (title, message, opts) => (received.push({ title, message, opts }), true), custom: () => assert.fail("RPC has no custom UI") };
   assert.equal(await reviewWrite({ mode: "rpc", ui }, "Approve?", text, signal), true);
   assert.equal(received[0].message, text);
-  assert.equal(received[0].opts.signal, signal);
+  assert.deepEqual(received[0].opts, { signal, blockedKind: "permission" });
+});
+
+test("confirm() reports the review as a permission wait with or without an abort signal", async () => {
+  const received = [];
+  const ui = (answer) => ({ confirm: async (title, message, opts) => (received.push(opts), answer) });
+  assert.equal(await reviewWrite({ mode: "rpc", ui: ui(true) }, "t", "x"), true);
+  assert.deepEqual(received[0], { blockedKind: "permission" });
+  assert.equal("signal" in received[0], false, "no signal key without an abort signal");
+  // A declined review stays declined.
+  assert.equal(await reviewWrite({ mode: "rpc", ui: ui(false) }, "t", "x", new AbortController().signal), false);
+  assert.equal(received[1].blockedKind, "permission");
+  assert.ok(received[1].signal instanceof AbortSignal);
+  // An aborted turn opens no dialog.
+  const aborted = new AbortController();
+  aborted.abort();
+  assert.equal(await reviewWrite({ mode: "rpc", ui: ui(true) }, "t", "x", aborted.signal), false);
+  assert.equal(received.length, 2);
 });
 
 test("a tool's own dialog in the terminal shows every argument and needs the end before approval", async () => {
