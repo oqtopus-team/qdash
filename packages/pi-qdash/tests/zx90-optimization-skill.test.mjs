@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import test from "node:test";
 
-import { QDashClient, QDashTimeoutError } from "@oqtopus-team/qdash-client";
+import { QDashTimeoutError } from "@oqtopus-team/qdash-sdk";
+
+import { QDashConnection } from "../.test-dist/lib/qdash-connection.js";
 
 import { REVIEWED_WRITE_TOOL_NAMES, SESSION_GRANTED_WRITE_TOOL_NAMES } from "../.test-dist/lib/tool-policy.js";
 import { WAIT_EXECUTION } from "../.test-dist/lib/waits.js";
@@ -29,7 +31,7 @@ function registeredToolNames() {
 
 /** A client whose getExecution returns `responses` in order (the last repeats) and has no write method. */
 function readOnlyClient(responses) {
-  const client = Object.create(QDashClient.prototype);
+  const client = Object.create(QDashConnection.prototype);
   const queue = [...responses];
   const calls = [];
   client.getExecution = async (id) => {

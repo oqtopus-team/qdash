@@ -9,7 +9,7 @@ import type * as QDashApi from "../../../../index.js";
 export interface ListAgentSessionsRequest {
     chip_id?: string | null;
     /** Only sessions in these statuses */
-    status?: QDashApi.AgentSessionStatus[] | null;
+    status?: QDashApi.AgentSessionStatus | QDashApi.AgentSessionStatus[];
     /** Only sessions the signed-in user created */
     mine?: boolean;
     limit?: number;

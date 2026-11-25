@@ -8,7 +8,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
-import { QDashClient, QDashConfig } from "@oqtopus-team/qdash-client";
+import { QDash } from "@oqtopus-team/qdash-sdk";
+
+import { QDashConnection } from "../.test-dist/lib/qdash-connection.js";
 
 import qdashExtension from "../.test-dist/qdash.js";
 import { registerTaskResultEvidenceTool } from "../.test-dist/tools/task-result-evidence.js";
@@ -76,6 +78,18 @@ const posts = (requests, path) => requests.filter((request) => request.key === `
 const SPEC = { spec_version: 2, targets: { qids: ["0"] }, steps: [{ type: "CustomOneQubit", tasks: [{ name: "CheckT1" }] }] };
 const DISPATCHED = { execution_id: "exec-1", flow_run_id: "run-1", flow_run_url: "", qdash_ui_url: "", message: "started", steps: [] };
 const NO_PAUSE = { items: [], total: 0 };
+
+test("the registered raw GET tool forwards its query and returns the SDK response", async (t) => {
+  const { baseUrl, requests } = await fakeQDash(t, { "GET /chips": [{ chips: ["sample-chip"] }] });
+  const connection = await profileFile(t, { base_url: baseUrl, api_token: "user-token" });
+  const result = await extensionTools().get("qdash_raw_get").execute("raw", {
+    ...connection, path: "/chips", query: { limit: 1 },
+  });
+  assert.deepEqual(requests.map(({ key, query }) => ({ key, query })), [
+    { key: "GET /chips", query: { limit: "1" } },
+  ]);
+  assert.match(result.content[0].text, /sample-chip/);
+});
 
 test("the hosted profile's token, project, gateway headers and user agent reach the SDK's requests", async (t) => {
   const { baseUrl, requests } = await fakeQDash(t, {
@@ -325,7 +339,7 @@ test("qdash_save_metric_script validates with the client and creates the script 
   assert.equal(requests[1].headers["x-project-id"], "p-1");
 });
 
-test("a username/password profile signs in for the client and the SDK, with the password from password_env", async (t) => {
+test("a username/password profile signs in once for every request of the call, with the password from password_env", async (t) => {
   const logins = [];
   const { baseUrl, requests } = await fakeQDash(t, {
     "POST /auth/login": [({ text }) => {
@@ -344,10 +358,10 @@ test("a username/password profile signs in for the client and the SDK, with the 
   const connection = await profileFile(t, { base_url: baseUrl, username: "alice", password_env: "PI_QDASH_TEST_PASSWORD" });
   const result = await extensionTools().get("qdash_execute_flow").execute("call-7", { ...connection, name: "coherence_check" }, undefined, undefined, approved("call-7", "qdash_execute_flow"));
   assert.equal(result.details.started, true);
-  // The client and the SDK session each sign in once; the dispatch is sent once.
-  assert.deepEqual(logins, [{ username: "alice", password: "s3cret" }, { username: "alice", password: "s3cret" }]);
+  // The connection's reads and the SDK dispatch share one session, so one sign-in; the dispatch is sent once.
+  assert.deepEqual(logins, [{ username: "alice", password: "s3cret" }]);
   assert.equal(posts(requests, "/flows/coherence_check/execute").length, 1);
-  assert.equal(posts(requests, "/flows/coherence_check/execute")[0].headers.authorization, "Bearer jwt-2");
+  assert.equal(posts(requests, "/flows/coherence_check/execute")[0].headers.authorization, "Bearer jwt-1");
   assert.doesNotMatch(JSON.stringify(result), /s3cret/);
 });
 
@@ -364,7 +378,7 @@ test("a 401 to the SDK's dispatch is reported once, not sent again", async (t) =
   assert.equal(sdkRequests(requests).length, 1);
 });
 
-test("a proxy profile is refused before anything is sent, by the client as before", async (t) => {
+test("a proxy profile is refused before anything is sent", async (t) => {
   const { baseUrl, requests } = await fakeQDash(t, {});
   const connection = await profileFile(t, { base_url: baseUrl, api_token: "user-token", proxy: "http://proxy.example:3128" });
   await assert.rejects(extensionTools().get("qdash_plan_pipeline").execute("t", { ...connection, chipId: "64Qv3", spec: SPEC }), /custom fetch/);
@@ -384,7 +398,7 @@ test("a host whose client has a custom fetch passes it to the SDK sessions throu
     routed.push(request.url);
     return globalThis.fetch(request.url.replace("http://qdash.internal", baseUrl), { method: request.method, headers: request.headers });
   };
-  const client = new QDashClient(new QDashConfig({ baseUrl: "http://qdash.internal", apiToken: "user-token" }), { fetch });
+  const client = new QDashConnection(new QDash({ baseUrl: "http://qdash.internal", apiToken: "user-token" }, { fetch }));
   const tools = new Map();
   registerTaskResultEvidenceTool({ registerTool: (tool) => tools.set(tool.name, tool) }, { makeClient: async () => client, sdk: sdkSessionFactory({ fetch }) });
   const result = await tools.get("qdash_get_task_result_evidence").execute("t", { taskId: "t-1" });

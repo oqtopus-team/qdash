@@ -327,7 +327,7 @@ class RawTaskClient:
 
     def get_task_knowledge_markdown(
         self, task_name: str, *, request_options: typing.Optional[RequestOptions] = None
-    ) -> HttpResponse[None]:
+    ) -> HttpResponse[str]:
         """
         Get raw markdown content for a task knowledge entry.
 
@@ -343,7 +343,8 @@ class RawTaskClient:
 
         Returns
         -------
-        HttpResponse[None]
+        HttpResponse[str]
+            The task's knowledge as Markdown, images inlined as data URIs
         """
         _response = self._client_wrapper.httpx_client.request(
             f"tasks/{quote_path_param(task_name)}/knowledge/markdown",
@@ -352,7 +353,7 @@ class RawTaskClient:
         )
         try:
             if 200 <= _response.status_code < 300:
-                return HttpResponse(response=_response, data=None)
+                return HttpResponse(response=_response, data=_response.text)  # type: ignore
             if _response.status_code == 422:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
@@ -894,7 +895,7 @@ class AsyncRawTaskClient:
 
     async def get_task_knowledge_markdown(
         self, task_name: str, *, request_options: typing.Optional[RequestOptions] = None
-    ) -> AsyncHttpResponse[None]:
+    ) -> AsyncHttpResponse[str]:
         """
         Get raw markdown content for a task knowledge entry.
 
@@ -910,7 +911,8 @@ class AsyncRawTaskClient:
 
         Returns
         -------
-        AsyncHttpResponse[None]
+        AsyncHttpResponse[str]
+            The task's knowledge as Markdown, images inlined as data URIs
         """
         _response = await self._client_wrapper.httpx_client.request(
             f"tasks/{quote_path_param(task_name)}/knowledge/markdown",
@@ -919,7 +921,7 @@ class AsyncRawTaskClient:
         )
         try:
             if 200 <= _response.status_code < 300:
-                return AsyncHttpResponse(response=_response, data=None)
+                return AsyncHttpResponse(response=_response, data=_response.text)  # type: ignore
             if _response.status_code == 422:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),

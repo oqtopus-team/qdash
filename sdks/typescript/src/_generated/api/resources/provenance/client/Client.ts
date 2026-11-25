@@ -4,7 +4,6 @@ import type { BaseClientOptions, BaseRequestOptions } from "../../../../BaseClie
 import { type NormalizedClientOptionsWithAuth, normalizeClientOptionsWithAuth } from "../../../../BaseClient.js";
 import { mergeHeaders, mergeOnlyDefinedHeaders } from "../../../../core/headers.js";
 import * as core from "../../../../core/index.js";
-import { toJson } from "../../../../core/json.js";
 import { handleNonStatusCodeError } from "../../../../errors/handleNonStatusCodeError.js";
 import * as errors from "../../../../errors/index.js";
 import * as QDashApi from "../../../index.js";
@@ -729,7 +728,7 @@ export class ProvenanceClient {
         const _queryParams: Record<string, unknown> = {
             limit,
             within_hours: withinHours,
-            parameter_names: parameterNames !== undefined ? toJson(parameterNames) : undefined,
+            parameter_names: parameterNames,
         };
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
@@ -826,7 +825,7 @@ export class ProvenanceClient {
         const _queryParams: Record<string, unknown> = {
             min_streak: minStreak,
             limit,
-            parameter_names: parameterNames !== undefined ? toJson(parameterNames) : undefined,
+            parameter_names: parameterNames,
         };
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(

@@ -43,8 +43,12 @@ class CalibrationSessionClient:
         self,
         *,
         chip_id: typing.Optional[str] = None,
-        status: typing.Optional[typing.Sequence[CalibrationSessionStatus]] = None,
-        origin: typing.Optional[typing.Sequence[CalibrationSessionOrigin]] = None,
+        status: typing.Optional[
+            typing.Union[CalibrationSessionStatus, typing.Sequence[CalibrationSessionStatus]]
+        ] = None,
+        origin: typing.Optional[
+            typing.Union[CalibrationSessionOrigin, typing.Sequence[CalibrationSessionOrigin]]
+        ] = None,
         mine: typing.Optional[bool] = None,
         limit: typing.Optional[int] = None,
         skip: typing.Optional[int] = None,
@@ -57,10 +61,10 @@ class CalibrationSessionClient:
         ----------
         chip_id : typing.Optional[str]
 
-        status : typing.Optional[typing.Sequence[CalibrationSessionStatus]]
+        status : typing.Optional[typing.Union[CalibrationSessionStatus, typing.Sequence[CalibrationSessionStatus]]]
             Only sessions in these statuses
 
-        origin : typing.Optional[typing.Sequence[CalibrationSessionOrigin]]
+        origin : typing.Optional[typing.Union[CalibrationSessionOrigin, typing.Sequence[CalibrationSessionOrigin]]]
             Only sessions of these origins: manual (created for an objective) or automatic (created by QDash for a run started without a session ID)
 
         mine : typing.Optional[bool]
@@ -516,8 +520,12 @@ class AsyncCalibrationSessionClient:
         self,
         *,
         chip_id: typing.Optional[str] = None,
-        status: typing.Optional[typing.Sequence[CalibrationSessionStatus]] = None,
-        origin: typing.Optional[typing.Sequence[CalibrationSessionOrigin]] = None,
+        status: typing.Optional[
+            typing.Union[CalibrationSessionStatus, typing.Sequence[CalibrationSessionStatus]]
+        ] = None,
+        origin: typing.Optional[
+            typing.Union[CalibrationSessionOrigin, typing.Sequence[CalibrationSessionOrigin]]
+        ] = None,
         mine: typing.Optional[bool] = None,
         limit: typing.Optional[int] = None,
         skip: typing.Optional[int] = None,
@@ -530,10 +538,10 @@ class AsyncCalibrationSessionClient:
         ----------
         chip_id : typing.Optional[str]
 
-        status : typing.Optional[typing.Sequence[CalibrationSessionStatus]]
+        status : typing.Optional[typing.Union[CalibrationSessionStatus, typing.Sequence[CalibrationSessionStatus]]]
             Only sessions in these statuses
 
-        origin : typing.Optional[typing.Sequence[CalibrationSessionOrigin]]
+        origin : typing.Optional[typing.Union[CalibrationSessionOrigin, typing.Sequence[CalibrationSessionOrigin]]]
             Only sessions of these origins: manual (created for an objective) or automatic (created by QDash for a run started without a session ID)
 
         mine : typing.Optional[bool]

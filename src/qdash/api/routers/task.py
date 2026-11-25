@@ -219,6 +219,12 @@ def list_task_knowledge(
     summary="Get raw markdown for a task knowledge entry",
     operation_id="getTaskKnowledgeMarkdown",
     response_class=Response,
+    responses={
+        200: {
+            "description": "The task's knowledge as Markdown, images inlined as data URIs",
+            "content": {"text/markdown": {"schema": {"type": "string"}}},
+        }
+    },
 )
 def get_task_knowledge_markdown(
     task_name: str,

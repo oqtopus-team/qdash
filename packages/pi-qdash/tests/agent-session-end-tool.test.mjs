@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 
-import { QDashClient, QDashConfig } from "@oqtopus-team/qdash-client";
+import { QDash } from "@oqtopus-team/qdash-sdk";
+
+import { QDashConnection } from "../.test-dist/lib/qdash-connection.js";
 
 import { DEFERRED_TOOL_NAMES, NESTED_READ_TOOL_NAMES, REVIEWED_WRITE_TOOL_NAMES, SESSION_GRANTED_WRITE_TOOL_NAMES } from "../.test-dist/lib/tool-policy.js";
 import { HOST_WRITE_APPROVAL_KEY } from "../.test-dist/lib/write-approval.js";
@@ -18,7 +20,7 @@ function endTool() {
   let tool;
   registerAgentSessionEndTool({ registerTool(registered) { tool = registered; } }, {
     async makeClient() {
-      return new QDashClient(new QDashConfig({ baseUrl: fake.baseUrl, apiToken: "fixture-token" }));
+      return new QDashConnection(new QDash({ baseUrl: fake.baseUrl, apiToken: "fixture-token" }));
     },
   });
   return tool;

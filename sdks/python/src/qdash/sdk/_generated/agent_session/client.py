@@ -55,7 +55,7 @@ class AgentSessionClient:
         self,
         *,
         chip_id: typing.Optional[str] = None,
-        status: typing.Optional[typing.Sequence[AgentSessionStatus]] = None,
+        status: typing.Optional[typing.Union[AgentSessionStatus, typing.Sequence[AgentSessionStatus]]] = None,
         mine: typing.Optional[bool] = None,
         limit: typing.Optional[int] = None,
         request_options: typing.Optional[RequestOptions] = None,
@@ -67,7 +67,7 @@ class AgentSessionClient:
         ----------
         chip_id : typing.Optional[str]
 
-        status : typing.Optional[typing.Sequence[AgentSessionStatus]]
+        status : typing.Optional[typing.Union[AgentSessionStatus, typing.Sequence[AgentSessionStatus]]]
             Only sessions in these statuses
 
         mine : typing.Optional[bool]
@@ -1473,7 +1473,7 @@ class AsyncAgentSessionClient:
         self,
         *,
         chip_id: typing.Optional[str] = None,
-        status: typing.Optional[typing.Sequence[AgentSessionStatus]] = None,
+        status: typing.Optional[typing.Union[AgentSessionStatus, typing.Sequence[AgentSessionStatus]]] = None,
         mine: typing.Optional[bool] = None,
         limit: typing.Optional[int] = None,
         request_options: typing.Optional[RequestOptions] = None,
@@ -1485,7 +1485,7 @@ class AsyncAgentSessionClient:
         ----------
         chip_id : typing.Optional[str]
 
-        status : typing.Optional[typing.Sequence[AgentSessionStatus]]
+        status : typing.Optional[typing.Union[AgentSessionStatus, typing.Sequence[AgentSessionStatus]]]
             Only sessions in these statuses
 
         mine : typing.Optional[bool]

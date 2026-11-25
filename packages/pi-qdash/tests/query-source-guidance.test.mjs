@@ -17,8 +17,8 @@ async function fakeQDash(t, { fileContentStatus } = {}) {
       response.writeHead(status, { "content-type": "application/json" });
       response.end(JSON.stringify(body));
     };
-    if (url.pathname === "/files/tree") return send(200, [{ name: "qubex-config.yaml", path: "qubex-config.yaml", type: "file" }]);
-    if (url.pathname === "/files/content") {
+    if (url.pathname === "/config/files/tree") return send(200, [{ name: "qubex-config.yaml", path: "qubex-config.yaml", type: "file" }]);
+    if (url.pathname === "/config/files/content") {
       const path = url.searchParams.get("path");
       if (fileContentStatus) return send(fileContentStatus, { detail: `config API failed with ${fileContentStatus}` });
       if (path === "qubex-config.yaml" || path === "qdash/chip.yaml") return send(200, { content: "chip_id: 64Qv3\n", path });
@@ -71,8 +71,8 @@ for (const prefix of ["", "./", "././"]) {
     const { run, requests } = await fakeQDash(t);
     const result = await run("qdash_query", { action: "file_content", path: prefix + EXECUTOR });
     const text = result.content[0].text;
-    assert.deepEqual(requests, [`/files/content?path=${encodeURIComponent(prefix + EXECUTOR)}`]);
-    assert.match(text, /not a config file \(config file API: 404 \/files\/content: File not found/);
+    assert.deepEqual(requests, [`/config/files/content?path=${encodeURIComponent(prefix + EXECUTOR)}`]);
+    assert.match(text, /not a config file \(config file API: 404 \/config\/files\/content: File not found/);
     assert.match(text, /serve only the calibration config directory/);
     assert.match(text, /Do not retry file_content for source/);
     assert.ok(text.includes(`qdash_read_source {"path":"${EXECUTOR}"}`));
@@ -88,7 +88,7 @@ for (const prefix of ["", "./", "././"]) {
 test("a traceback path rejected by the config API also gets source guidance", async (t) => {
   const { run } = await fakeQDash(t);
   const text = (await run("qdash_query", { action: "file_content", path: "/app/qdash/workflow/engine/task/executor.py" })).content[0].text;
-  assert.match(text, /config file API: 400 \/files\/content: Path outside allowed directory/);
+  assert.match(text, /config file API: 400 \/config\/files\/content: Path outside allowed directory/);
   assert.ok(text.includes('qdash_read_source {"path":"/app/qdash/workflow/engine/task/executor.py"}'));
 });
 
@@ -128,7 +128,7 @@ test("the user's files_tree request with a source path is not silently answered 
 test("files_tree without a path still lists the config directory", async (t) => {
   const { run, requests } = await fakeQDash(t);
   const result = await run("qdash_query", { action: "files_tree" });
-  assert.deepEqual(requests, ["/files/tree"]);
+  assert.deepEqual(requests, ["/config/files/tree"]);
   assert.equal(JSON.parse(result.content[0].text)[0].name, "qubex-config.yaml");
 });
 
@@ -172,7 +172,7 @@ test("absolute config paths keep the config API error instead of source guidance
   for (const path of ["/data/calibtasks/64Qv3/params/qubit.yaml", "/tmp/settings.json"]) {
     assert.equal(looksLikeSourcePath(path), false);
     await assert.rejects(run("qdash_query", { action: "file_content", path }),
-      /400 \/files\/content: Path outside allowed directory/);
+      /400 \/config\/files\/content: Path outside allowed directory/);
   }
   assert.equal(looksLikeSourcePath("/app/qdash"), true);
   assert.equal(looksLikeSourcePath("/app/qdash/workflow/engine/task/executor.py"), true);

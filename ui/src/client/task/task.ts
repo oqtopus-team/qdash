@@ -450,7 +450,7 @@ export const getTaskKnowledgeMarkdown = (
 ) => {
 
 
-      return customInstance<void>(
+      return customInstance<string>(
       {url: `/tasks/${taskName}/knowledge/markdown`, method: 'GET', signal
     },
       options);

@@ -68,6 +68,13 @@ coverage with `task ci-test`; run that task locally when you need a coverage rep
 4. Require exit status 0 before pushing. Fix failures; never bypass them.
 5. Record the command and result in the PR and handoff.
 
+## Publish a Release
+
+Each push to `develop` updates the release PR targeting `main`. Merge it with **Create a
+merge commit**, then tag the merged commit on `main` with the intended `vX.Y.Z` version
+and push that tag. Verify the GitHub Release and the [six package publications](./agent/packages.md#distribution).
+That guide also covers registry setup and retrying a partial publication.
+
 ## Secret Scanning
 
 On the host, run checks and commits inside Nix (`nix develop -c git commit`). Inside the

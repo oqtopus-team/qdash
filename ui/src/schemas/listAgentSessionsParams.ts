@@ -12,7 +12,7 @@ chip_id?: string | null;
 /**
  * Only sessions in these statuses
  */
-status?: AgentSessionStatus[] | null;
+status?: AgentSessionStatus[];
 /**
  * Only sessions the signed-in user created
  */

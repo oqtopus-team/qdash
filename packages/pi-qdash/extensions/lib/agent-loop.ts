@@ -22,7 +22,7 @@ import type {
   AgentDecisionResponse,
   AgentInterventionResponse,
   AgentSessionResponse,
-} from "@oqtopus-team/qdash-client";
+} from "./qdash-connection.js";
 
 import { compareServerTimestamps, parseServerTimestamp, serverTimestampText } from "./server-time.js";
 

@@ -78,8 +78,8 @@ nested types. TypeScript declarations are emitted with `tsc` to preserve generat
 The package is ESM and requires Node.js 20 or later. It installs independently of the legacy
 client, with `ini` and `smol-toml` for profile parsing. Distribution tests install the packed SDK
 outside the workspace and check Node.js, Bun, and TypeScript declarations. See
-[Pi Packages](../agent/packages.md#distribution). The pi-qdash adapter builds SDK sessions from
-its existing connection settings while retaining legacy client operations where needed.
+[Pi Packages](../agent/packages.md#distribution). The pi-qdash extension uses the SDK for QDash API access. Its
+[connection settings](../../reference/pi-qdash.md#configuration) apply to both standalone tools and waits.
 
 ## Implementation Files
 

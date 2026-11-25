@@ -5,17 +5,18 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import type { ExtensionAPI, Theme } from "@earendil-works/pi-coding-agent";
 import {
   EXECUTIONS_MAX_PAGE_SIZE,
-  QDashClient,
-  defaultConfigPath,
+  QDashConnection,
   executionListProblems,
   type CooldownResponse,
   type DownloadedFile,
   type TaskResultFigureOptions,
-} from "@oqtopus-team/qdash-client";
+} from "./lib/qdash-connection.js";
+import type { QDashQueryValue } from "@oqtopus-team/qdash-sdk";
 import { Text, truncateToWidth } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import type { TaskResultComparison } from "@oqtopus-team/qdash-sdk";
 
+import { CONFIG_PATH_DESCRIPTION, PROFILE_DESCRIPTION, configProfiles, connectClient, connectionSource, selectedProfile, shouldUseEnv } from "./lib/connection.js";
 import { analyzePlotlyFigure, figureAnalysisText } from "./lib/figure-analysis.js";
 import { fetchFigureDetails, figureComponent, figureResultText, mediaTypeForPath, type FigureDetails } from "./lib/figures.js";
 import { forumImageReplyContent, forumImageReplyPreview, loadLocalForumImages, type LocalForumImage } from "./lib/forum-images.js";
@@ -185,7 +186,7 @@ function contextStatusLine(theme?: Theme): string {
   const dim = (value: string) => theme ? theme.fg("dim", value) : value;
   const success = (value: string) => theme ? theme.fg("success", value) : value;
   const warn = (value: string) => theme ? theme.fg("warning", value) : value;
-  const profile = currentContext.profile ?? (shouldUseEnv({}) ? "env" : "default");
+  const profile = currentContext.profile ?? (shouldUseEnv({}) ? "env" : selectedProfile({}));
   const chip = currentContext.chipId ?? "auto";
   const session = currentContext.agentSessionId ? shortId(currentContext.agentSessionId, 8) : "none";
   const target = currentContext.qid ? `q${currentContext.qid}` : currentContext.couplingId ? `c${currentContext.couplingId}` : "none";
@@ -353,8 +354,8 @@ const QueryAction = Type.Union([
 ]);
 
 const connectionParams = {
-  profile: Type.Optional(Type.String({ description: "QDash profile name. Defaults to env when QDASH_BASE_URL is set, otherwise 'default'." })),
-  configPath: Type.Optional(Type.String({ description: "Optional path to qdash config.ini." })),
+  profile: Type.Optional(Type.String({ description: PROFILE_DESCRIPTION })),
+  configPath: Type.Optional(Type.String({ description: CONFIG_PATH_DESCRIPTION })),
   useEnv: Type.Optional(Type.Boolean({ description: "Force QDASH_* environment variables instead of a profile." })),
 };
 
@@ -407,26 +408,18 @@ const querySchema = Type.Object({
   offset: Type.Optional(Type.Number()),
 });
 
-function shouldUseEnv(params: { useEnv?: boolean; profile?: string; configPath?: string }): boolean {
-  if (params.useEnv !== undefined) return params.useEnv;
-  return !params.profile && !params.configPath && Boolean(process.env.QDASH_BASE_URL);
+async function makeClient(params: { useEnv?: boolean; profile?: string; configPath?: string }): Promise<QDashConnection> {
+  return connectClient(applyQDashContext(params));
 }
 
-async function makeClient(params: { useEnv?: boolean; profile?: string; configPath?: string }): Promise<QDashClient> {
-  params = applyQDashContext(params);
-  if (shouldUseEnv(params)) return QDashClient.fromEnv();
-  return QDashClient.fromProfile(params.profile ?? "default", params.configPath);
-}
-
-async function defaultChipId(client: QDashClient, chipId?: string): Promise<string> {
+async function defaultChipId(client: QDashConnection, chipId?: string): Promise<string> {
   return chipId ?? currentContext.chipId ?? client.getDefaultChipId();
 }
 
-// Keep arbitrary GET access isolated for qdash_raw_get and legacy filters that are
-// not represented in the generated OpenAPI surface. Normal operations should use
-// QDashClient's high-level methods or client.api so upgrades remain type-checked.
-async function rawGet<T>(client: QDashClient, path: string, query?: Record<string, unknown>): Promise<T> {
-  return (client as unknown as { get<T>(path: string, query?: Record<string, unknown>): Promise<T> }).get(path, cleanQuery(query));
+// Arbitrary GET access for the explicit qdash_raw_get fallback only. Every other tool calls
+// QDashConnection's methods, which use the SDK's generated client, so upgrades stay type-checked.
+async function rawGet<T>(client: QDashConnection, path: string, query?: Record<string, unknown>): Promise<T> {
+  return client.rawGet<T>(path, cleanQuery(query) as Record<string, QDashQueryValue>);
 }
 
 type TaskResultFigureFile = DownloadedFile & {
@@ -437,7 +430,7 @@ type TaskResultFigureFile = DownloadedFile & {
 
 /** A figure of a task result already read, selected as `client.getTaskResultFigure` selects it. */
 async function taskResultFigure(
-  client: QDashClient,
+  client: QDashConnection,
   taskId: string,
   task: Record<string, unknown>,
   options: TaskResultFigureOptions = {},
@@ -556,20 +549,20 @@ async function resolveCooldownWiring(params: CooldownWiringParams) {
   let resolvedChipId = params.chipId ?? currentContext.chipId;
 
   if (params.cooldownId) {
-    cooldown = await client.api.getCooldown(params.cooldownId);
+    cooldown = await client.getCooldown(params.cooldownId);
     selection = "explicit cooldownId";
   } else {
     resolvedChipId = params.chipId ?? (params.cryoId ? undefined : await defaultChipId(client));
-    const response = await client.api.listCooldowns({
-      cryo_id: params.cryoId,
-      chip_id: resolvedChipId,
+    const response = await client.listCooldowns({
+      cryoId: params.cryoId,
+      chipId: resolvedChipId,
     });
     const selected = newestCooldown(response.cooldowns ?? []);
     if (!selected) {
       const scope = params.cryoId ? `cryo ${params.cryoId}` : `chip ${resolvedChipId}`;
       throw new Error(`No cooldown containing wiring information was found for ${scope}`);
     }
-    cooldown = await client.api.getCooldown(selected.cooldown_id);
+    cooldown = await client.getCooldown(selected.cooldown_id);
     selection = params.cryoId ? "active/newest cooldown for cryo" : "active/newest cooldown for chip";
   }
 
@@ -577,14 +570,14 @@ async function resolveCooldownWiring(params: CooldownWiringParams) {
   const wiringInfo = typeof cooldown.wiring_info === "string" ? cooldown.wiring_info.trim() : "";
   const includeBlocks = params.includeBlocks === true || !wiringInfo;
   const history = params.includeHistory
-    ? await client.api.listCooldownWiringEvents(cooldown.cooldown_id, {
+    ? await client.listCooldownWiringEvents(cooldown.cooldown_id, {
         limit: params.historyLimit ?? 20,
         skip: 0,
       })
     : undefined;
   let cryostat: unknown;
   try {
-    cryostat = await client.api.getCryostat(cooldown.cryo_id);
+    cryostat = await client.getCryostat(cooldown.cryo_id);
   } catch {
     // Wiring remains useful on servers where cryostat detail is not accessible.
   }
@@ -618,13 +611,6 @@ async function resolveCooldownWiring(params: CooldownWiringParams) {
   };
 }
 
-function configProfiles(configPath = defaultConfigPath()): { path: string; exists: boolean; profiles: string[] } {
-  if (!existsSync(configPath)) return { path: configPath, exists: false, profiles: [] };
-  const contents = readFileSync(configPath, "utf8");
-  const profiles = [...contents.matchAll(/^\s*\[([^\]]+)]\s*$/gm)].map((m) => m[1]);
-  return { path: configPath, exists: true, profiles };
-}
-
 async function buildDashboard(params: { profile?: string; configPath?: string; useEnv?: boolean; chipId?: string; limit?: number }) {
   params = applyQDashContext(params);
   const limit = params.limit ?? 5;
@@ -633,8 +619,8 @@ async function buildDashboard(params: { profile?: string; configPath?: string; u
   const [chips, openThreads, recentExecutions, failedTaskResults, provenanceStats] = await Promise.allSettled([
     client.listChips(),
     client.listForumPosts({ chipId, status: "open", limit }),
-    client.api.listExecutions({ chip_id: chipId, limit }),
-    client.api.listTaskResults({ chip_id: chipId, status: "failed", limit }),
+    client.listExecutions({ chipId, limit }),
+    client.listTaskResults({ chipId, status: "failed", limit }),
     client.getProvenanceStats(),
   ]);
   const value = <T>(result: PromiseSettledResult<T>): T | { error: string } => result.status === "fulfilled" ? result.value : { error: result.reason instanceof Error ? result.reason.message : String(result.reason) };
@@ -776,7 +762,7 @@ async function buildRecentCalibrationSummary(params: { profile?: string; configP
   const chipId = await defaultChipId(client, params.chipId);
   const end = new Date();
   const start = new Date(end.getTime() - (params.withinHours ?? 24) * 3600_000);
-  const payload = await client.api.listTaskResults({ chip_id: chipId, start_from: start.toISOString(), start_to: end.toISOString(), limit: params.limit ?? 30 });
+  const payload = await client.listTaskResults({ chipId, startFrom: start.toISOString(), startTo: end.toISOString(), limit: params.limit ?? 30 });
   const items = arrayFromPayload(payload).filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object");
   const byTarget = new Map<string, Record<string, unknown>[]>();
   for (const item of items) {
@@ -1236,7 +1222,7 @@ function addEvidence(map: Map<string, DashboardInsight>, target: string, severit
   for (const [key, value] of Object.entries(links)) existing.links[key] = [...(existing.links[key] ?? []), value];
 }
 
-function addMetricInsights(map: Map<string, DashboardInsight>, metrics: unknown, client: QDashClient) {
+function addMetricInsights(map: Map<string, DashboardInsight>, metrics: unknown, client: QDashConnection) {
   if (!metrics || typeof metrics !== "object") return;
   const qubitMetrics = (metrics as Record<string, unknown>).qubit_metrics;
   if (!qubitMetrics || typeof qubitMetrics !== "object") return;
@@ -1269,7 +1255,7 @@ async function buildDashboardInsights(params: { profile?: string; configPath?: s
   const start = new Date(end.getTime() - (params.withinHours ?? 168) * 3600_000);
   const [forums, failed, metrics] = await Promise.allSettled([
     client.listForumPosts({ chipId, status: "open", limit }),
-    client.api.listTaskResults({ chip_id: chipId, status: "failed", start_from: start.toISOString(), start_to: end.toISOString(), limit }),
+    client.listTaskResults({ chipId, status: "failed", startFrom: start.toISOString(), startTo: end.toISOString(), limit }),
     client.getChipMetrics(chipId),
   ]);
   const value = <T>(result: PromiseSettledResult<T>): T | undefined => result.status === "fulfilled" ? result.value : undefined;
@@ -1358,7 +1344,7 @@ type PreparedForumImageReply = {
   preview: string;
 };
 
-async function prepareForumImageReply(client: QDashClient, params: ForumImageReplyParams): Promise<PreparedForumImageReply> {
+async function prepareForumImageReply(client: QDashConnection, params: ForumImageReplyParams): Promise<PreparedForumImageReply> {
   const parent = await client.getForumPost(params.parentPostId) as unknown as Record<string, unknown>;
   const images = loadLocalForumImages(params.imagePaths);
   const title = params.title ?? `${new Date().toISOString().slice(0, 10)} 追加分析画像`;
@@ -1366,7 +1352,7 @@ async function prepareForumImageReply(client: QDashClient, params: ForumImageRep
   return { parent, images, title, preview };
 }
 
-async function createForumImageReply(client: QDashClient, params: ForumImageReplyParams, prepared: PreparedForumImageReply) {
+async function createForumImageReply(client: QDashConnection, params: ForumImageReplyParams, prepared: PreparedForumImageReply) {
   const uploaded = [];
   for (const image of prepared.images) {
     const result = await client.uploadForumImage(image.blob, image.filename);
@@ -1394,7 +1380,7 @@ async function createForumImageReply(client: QDashClient, params: ForumImageRepl
   };
 }
 
-async function buildForumEvidenceReply(client: QDashClient, params: ForumEvidenceReplyParams) {
+async function buildForumEvidenceReply(client: QDashConnection, params: ForumEvidenceReplyParams) {
   const [parent, task] = await Promise.all([
     client.getForumPost(params.parentPostId) as unknown as Promise<Record<string, unknown>>,
     client.getTaskResult(params.taskId) as unknown as Promise<Record<string, unknown>>,
@@ -1510,18 +1496,18 @@ async function dispatchQuery(params: QDashQueryParams) {
     case "chip_qubit": return client.getChipQubit(await defaultChipId(client, params.chipId), requireValue(params.qid, "qid"));
     case "chip_couplings": return client.listChipCouplings(await defaultChipId(client, params.chipId), { limit: params.limit, offset: params.offset });
     case "chip_coupling": return client.getChipCoupling(await defaultChipId(client, params.chipId), requireValue(params.couplingId, "couplingId"));
-    case "cryostats": return client.api.listCryostats();
-    case "cryostat": return client.api.getCryostat(requireValue(params.cryoId, "cryoId"));
-    case "cooldowns": return client.api.listCooldowns({ cryo_id: params.cryoId, chip_id: params.chipId });
-    case "cooldown": return client.api.getCooldown(requireValue(params.cooldownId, "cooldownId"));
-    case "cooldown_wiring_events": return client.api.listCooldownWiringEvents(requireValue(params.cooldownId, "cooldownId"), { limit: params.limit, skip: params.skip });
+    case "cryostats": return client.listCryostats();
+    case "cryostat": return client.getCryostat(requireValue(params.cryoId, "cryoId"));
+    case "cooldowns": return client.listCooldowns({ cryoId: params.cryoId, chipId: params.chipId });
+    case "cooldown": return client.getCooldown(requireValue(params.cooldownId, "cooldownId"));
+    case "cooldown_wiring_events": return client.listCooldownWiringEvents(requireValue(params.cooldownId, "cooldownId"), { limit: params.limit, skip: params.skip });
     case "timeseries": return client.getTaskResultsTimeseries({ chipId: await defaultChipId(client, params.chipId), parameter: requireValue(params.parameter, "parameter"), tag: params.tag, qid: params.qid, startAt: requireValue(params.startAt, "startAt"), endAt: requireValue(params.endAt, "endAt") });
-    case "task_results": return rawGet(client, "/task-results", { chip_id: params.chipId, task_name: params.taskName, qid: taskResultTarget(params), execution_id: params.executionId, username: params.username, status: params.status, start_from: params.startFrom ?? params.startAt, start_to: params.startTo ?? params.endAt, message_contains: params.messageContains, limit: params.limit, skip: params.skip });
+    case "task_results": return client.listTaskResults({ chipId: params.chipId, taskName: params.taskName, qid: taskResultTarget(params), executionId: params.executionId, username: params.username, status: params.status, startFrom: params.startFrom ?? params.startAt, startTo: params.startTo ?? params.endAt, messageContains: params.messageContains, limit: params.limit, skip: params.skip });
     case "task_result": return client.getTaskResult(requireValue(params.taskId, "taskId"));
-    case "task_note": return client.api.getTaskNote(requireValue(params.taskId, "taskId"));
-    case "qubit_latest": return client.api.getLatestQubitTaskResults({ chip_id: await defaultChipId(client, params.chipId), task: requireValue(params.task ?? params.taskName, "task") });
+    case "task_note": return client.getTaskNote(requireValue(params.taskId, "taskId"));
+    case "qubit_latest": return client.getLatestQubitTaskResults(await defaultChipId(client, params.chipId), requireValue(params.task ?? params.taskName, "task"));
     case "qubit_history": return client.getQubitTaskHistory({ chipId: await defaultChipId(client, params.chipId), qid: requireValue(params.qid, "qid"), task: requireValue(params.task ?? params.taskName, "task") });
-    case "coupling_latest": return client.api.getLatestCouplingTaskResults({ chip_id: await defaultChipId(client, params.chipId), task: requireValue(params.task ?? params.taskName, "task") });
+    case "coupling_latest": return client.getLatestCouplingTaskResults(await defaultChipId(client, params.chipId), requireValue(params.task ?? params.taskName, "task"));
     case "coupling_history": return client.getCouplingTaskHistory({ chipId: await defaultChipId(client, params.chipId), couplingId: requireValue(params.couplingId, "couplingId"), task: requireValue(params.task ?? params.taskName, "task") });
     case "tasks": return client.listTasks(params.backend);
     case "task_knowledge": return params.taskName ? client.getTaskKnowledge(params.taskName) : client.listTaskKnowledge();
@@ -1535,13 +1521,13 @@ async function dispatchQuery(params: QDashQueryParams) {
     case "flow": return client.getFlow(requireValue(params.flowName, "flowName"));
     case "flow_templates": return client.listFlowTemplates();
     case "flow_template": return client.getFlowTemplate(requireValue(params.templateId, "templateId"));
-    case "flow_helper_files": return client.api.listFlowHelperFiles();
-    case "flow_helper_file": return client.api.getFlowHelperFile(requireValue(params.filename, "filename"));
+    case "flow_helper_files": return client.listFlowHelperFiles();
+    case "flow_helper_file": return client.getFlowHelperFile(requireValue(params.filename, "filename"));
     case "executions": return client.listExecutions({ chipId: await defaultChipId(client, params.chipId), skip: params.skip, limit: params.limit, date: params.date, timezone: params.timezone });
     case "execution": return client.getExecution(requireValue(params.executionId, "executionId"));
     case "forum_posts": return client.listForumPosts({ status: params.status, chipId: params.chipId, limit: params.limit, skip: params.skip });
     case "provenance_stats": return client.getProvenanceStats();
-    case "provenance_history": return client.api.getParameterHistory({ parameter_name: requireValue(params.parameterName ?? params.parameter, "parameterName"), qid: requireValue(params.qid, "qid"), limit: params.limit });
+    case "provenance_history": return client.getParameterHistory({ parameterName: requireValue(params.parameterName ?? params.parameter, "parameterName"), qid: requireValue(params.qid, "qid"), limit: params.limit });
     case "provenance_changes": {
       const parameterName = params.parameterName ?? params.parameter;
       return client.getRecentChanges({ parameterNames: parameterName ? [parameterName] : undefined, withinHours: params.withinHours, limit: params.limit });
@@ -1604,21 +1590,21 @@ export default function qdashExtension(host: ExtensionAPI) {
   registerAgentSessionEndTool(pi, { makeClient });
   registerCalibrationPipelineTools(pi, {
     makeClient,
-    resolveChipId: (client, chipId) => defaultChipId(client as QDashClient, chipId),
+    resolveChipId: (client, chipId) => defaultChipId(client as QDashConnection, chipId),
   });
   registerCalibrationSessionTools(pi, {
     makeClient,
-    resolveChipId: (client, chipId) => defaultChipId(client as QDashClient, chipId),
+    resolveChipId: (client, chipId) => defaultChipId(client as QDashConnection, chipId),
   });
   registerFlowAuthoringTools(pi, {
     makeClient,
-    resolveChipId: (client, chipId) => defaultChipId(client as QDashClient, chipId),
-    flowPageUrl: (client, name) => qdashWebUrl(client as QDashClient, `/workflow/${encodeURIComponent(name)}`),
+    resolveChipId: (client, chipId) => defaultChipId(client as QDashConnection, chipId),
+    flowPageUrl: (client, name) => qdashWebUrl(client as QDashConnection, `/workflow/${encodeURIComponent(name)}`),
   });
   registerMetricScriptTools(pi, {
     makeClient,
-    resolveChipId: (client, chipId) => defaultChipId(client as QDashClient, chipId),
-    pageUrl: (client, path) => qdashWebUrl(client as QDashClient, path),
+    resolveChipId: (client, chipId) => defaultChipId(client as QDashConnection, chipId),
+    pageUrl: (client, path) => qdashWebUrl(client as QDashConnection, path),
   });
 
   pi.registerTool({
@@ -1632,7 +1618,7 @@ export default function qdashExtension(host: ExtensionAPI) {
       const profiles = configProfiles(params.configPath);
       try {
         const client = await makeClient(params);
-        return toToolResult({ profiles, active: safeConfig(client, shouldUseEnv(params) ? "env" : `profile:${params.profile ?? "default"}`) });
+        return toToolResult({ profiles, active: safeConfig(client, connectionSource(applyQDashContext(params))) });
       } catch (error) {
         return toToolResult({ profiles, error: error instanceof Error ? error.message : String(error) });
       }
@@ -1642,7 +1628,7 @@ export default function qdashExtension(host: ExtensionAPI) {
   pi.registerTool({
     name: "qdash_query",
     label: "QDash Query",
-    description: "Run common read-only QDash queries via @oqtopus-team/qdash-client.",
+    description: "Run common read-only QDash queries via @oqtopus-team/qdash-sdk.",
     promptSnippet: "Query QDash chips, cryostats, cooldown wiring, metrics, tasks, files, flows, metric scripts, dashboards, executions, projects, forum posts, and provenance",
     promptGuidelines: [
       "Prefer dedicated QDash tools such as qdash_list_chips, qdash_get_chip_metrics, qdash_list_task_results, qdash_list_forum_posts, qdash_list_flows, and qdash_list_executions when they match the task.",
@@ -1700,7 +1686,7 @@ export default function qdashExtension(host: ExtensionAPI) {
   registerQueryTool({
     name: "qdash_list_chips",
     label: "QDash List Chips",
-    description: "List QDash chips through qdash-client.",
+    description: "List QDash chips through qdash-sdk.",
     promptSnippet: "List QDash chips and their status",
     action: "chips",
     parameters: Type.Object(connectionParams),
@@ -1950,7 +1936,7 @@ export default function qdashExtension(host: ExtensionAPI) {
     async execute(_toolCallId, params: { profile?: string; configPath?: string; useEnv?: boolean; executionId: string; timeoutSeconds?: number; pollIntervalSeconds?: number }, signal) {
       const client = await makeClient(params);
       const data = await withAbort(
-        client.waitForExecution(params.executionId, { timeoutSeconds: params.timeoutSeconds, pollIntervalSeconds: params.pollIntervalSeconds }),
+        client.waitForExecution(params.executionId, { timeoutSeconds: params.timeoutSeconds, pollIntervalSeconds: params.pollIntervalSeconds, signal }),
         signal,
         `Waiting for execution ${params.executionId}`,
       );
@@ -2191,7 +2177,7 @@ export default function qdashExtension(host: ExtensionAPI) {
     }),
     async execute(_toolCallId, params: { profile?: string; configPath?: string; useEnv?: boolean; sessionId: string; actionId: string; waitForExecution?: boolean; timeoutSeconds?: number; pollIntervalSeconds?: number }, signal) {
       const client = await makeClient(params);
-      const options = { timeoutSeconds: params.timeoutSeconds, pollIntervalSeconds: params.pollIntervalSeconds };
+      const options = { timeoutSeconds: params.timeoutSeconds, pollIntervalSeconds: params.pollIntervalSeconds, signal };
       const data = await withAbort(
         params.waitForExecution
           ? client.waitForAgentActionExecution(params.sessionId, params.actionId, options)
@@ -2563,7 +2549,7 @@ export default function qdashExtension(host: ExtensionAPI) {
       const client = await makeClient(params);
       return toToolResult(
         await withAbort(
-          client.waitForAgentCandidateApply(params.sessionId, params.commitId, { timeoutSeconds: params.timeoutSeconds, pollIntervalSeconds: params.pollIntervalSeconds }),
+          client.waitForAgentCandidateApply(params.sessionId, params.commitId, { timeoutSeconds: params.timeoutSeconds, pollIntervalSeconds: params.pollIntervalSeconds, signal }),
           signal,
           `Waiting for candidate commit ${params.commitId}`,
         ),
@@ -3148,8 +3134,8 @@ export default function qdashExtension(host: ExtensionAPI) {
   pi.registerTool({
     name: "qdash_raw_get",
     label: "QDash Raw GET",
-    description: "Run a read-only raw GET request through qdash-client transport for endpoints not covered by qdash_query.",
-    promptSnippet: "Call a read-only QDash GET endpoint through qdash-client",
+    description: "Run a read-only raw GET request through the qdash-sdk session for endpoints not covered by qdash_query.",
+    promptSnippet: "Call a read-only QDash GET endpoint through qdash-sdk",
     promptGuidelines: ["Use qdash_raw_get only for read-only QDash endpoints not covered by qdash_query. Do not use it for operationally sensitive endpoints without user confirmation."],
     parameters: Type.Object({
       ...connectionParams,
@@ -3162,7 +3148,7 @@ export default function qdashExtension(host: ExtensionAPI) {
         throw new Error("This endpoint is operationally sensitive; ask the user for explicit confirmation and use an appropriate dedicated workflow.");
       }
       const client = await makeClient(params);
-      const data = await (client as unknown as { get<T>(path: string, query?: unknown): Promise<T> }).get(params.path, params.query ?? {});
+      const data = await rawGet(client, params.path, params.query);
       return toToolResult(data, { path: params.path });
     },
   });
@@ -3200,7 +3186,7 @@ export default function qdashExtension(host: ExtensionAPI) {
     description: "Quickly configure QDash context; usage: /qdash-setup [profile] [chip_id]",
     handler: async (args, ctx) => {
       const [profileArg, chipArg] = args.trim().split(/\s+/).filter(Boolean);
-      const profile = profileArg ?? currentContext.profile ?? "default";
+      const profile = profileArg ?? currentContext.profile ?? selectedProfile({});
       try {
         const client = await makeClient({ profile });
         const chipId = chipArg ?? currentContext.chipId ?? await client.getDefaultChipId();
@@ -3448,7 +3434,7 @@ export default function qdashExtension(host: ExtensionAPI) {
       const profiles = configProfiles();
       try {
         const client = await makeClient({ profile });
-        ctx.ui.setWidget("qdash", JSON.stringify({ profiles, active: safeConfig(client, profile ? `profile:${profile}` : shouldUseEnv({}) ? "env" : "profile:default") }, null, 2).split("\n"));
+        ctx.ui.setWidget("qdash", JSON.stringify({ profiles, active: safeConfig(client, connectionSource(applyQDashContext({ profile }))) }, null, 2).split("\n"));
         ctx.ui.notify("QDash config shown in widget", "info");
       } catch (error) {
         ctx.ui.notify(`QDash config error: ${error instanceof Error ? error.message : String(error)}`, "error");

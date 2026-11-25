@@ -3,9 +3,10 @@ import test from "node:test";
 
 import { formatCalibrationSession, registerCalibrationSessionTools } from "../.test-dist/tools/calibration-session.js";
 
-function registeredTools(api, chipId = "64Qv3") {
+/** The tools over a connection whose calibration-session methods are `methods`. */
+function registeredTools(methods, chipId = "64Qv3") {
   const tools = new Map();
-  const client = { api, config: { projectId: "project-1" } };
+  const client = { ...methods, config: { projectId: "project-1" } };
   registerCalibrationSessionTools({ registerTool(tool) { tools.set(tool.name, tool); } }, {
     async makeClient() { return client; },
     async resolveChipId(_client, explicit) { return explicit ?? chipId; },

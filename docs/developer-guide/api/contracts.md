@@ -14,6 +14,10 @@ Use snake_case names and domain types such as dates and enums. Add `Query` const
 value has bounds. Keep pagination names and defaults consistent within each endpoint family.
 FastAPI schema validation returns 422; domain validation uses the appropriate status below.
 
+Represent optional list queries as optional arrays in OpenAPI. Generated clients then send
+one query key per element. For a plain-text response, declare the media type and string
+schema so generated methods return the body, as in the task knowledge Markdown route.
+
 ## Preserve Project Boundaries
 
 Use dependencies from `src/qdash/api/lib/project.py`:
@@ -78,7 +82,8 @@ task test-api
 task test-client-ts
 ```
 
-Never edit generated OpenAPI, UI clients/schemas, or TypeScript client files manually.
+Run generation with `npx` and a running Docker engine for the two Fern SDK generators.
+Regenerate OpenAPI, clients, and SDK bindings from their sources.
 Review their diff for breaking paths, required fields, enum values, statuses, and response shapes.
 Application-wide OpenAPI changes belong in `src/qdash/api/app/factory.py` and
 `tests/qdash/api/test_app_factory.py`.

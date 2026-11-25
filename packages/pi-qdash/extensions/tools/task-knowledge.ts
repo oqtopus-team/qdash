@@ -1,8 +1,9 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import type { QDashClient } from "@oqtopus-team/qdash-client";
+import type { QDashConnection } from "../lib/qdash-connection.js";
 import { Type } from "typebox";
 
 import { toTextToolResult } from "../lib/results.js";
+import { CONFIG_PATH_DESCRIPTION, PROFILE_DESCRIPTION } from "../lib/connection.js";
 
 type TaskKnowledgeParams = {
   profile?: string;
@@ -24,7 +25,7 @@ type TaskKnowledge = {
 type TaskKnowledgeList = { items?: Array<{ name?: string }> } | Array<{ name?: string }>;
 
 export type TaskKnowledgeDependencies = {
-  makeClient(params: TaskKnowledgeParams): Promise<QDashClient>;
+  makeClient(params: TaskKnowledgeParams): Promise<QDashConnection>;
 };
 
 function text(value: unknown): string | undefined {
@@ -123,8 +124,8 @@ export function registerTaskKnowledgeTool(pi: Pick<ExtensionAPI, "registerTool">
       "This tool is read-only and does not execute tasks or change parameters.",
     ],
     parameters: Type.Object({
-      profile: Type.Optional(Type.String({ description: "QDash profile name. Defaults to env when QDASH_BASE_URL is set, otherwise 'default'." })),
-      configPath: Type.Optional(Type.String({ description: "Optional path to qdash config.ini." })),
+      profile: Type.Optional(Type.String({ description: PROFILE_DESCRIPTION })),
+      configPath: Type.Optional(Type.String({ description: CONFIG_PATH_DESCRIPTION })),
       useEnv: Type.Optional(Type.Boolean({ description: "Force QDASH_* environment variables instead of a profile." })),
       taskName: Type.String({ description: "QDash task name, for example CheckRabi." }),
       format: Type.Optional(Type.Union([Type.Literal("markdown"), Type.Literal("summary")], { description: "Output format. Defaults to markdown." })),

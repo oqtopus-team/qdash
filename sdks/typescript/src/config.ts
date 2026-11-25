@@ -222,6 +222,14 @@ export class QDashConfig {
   ): Promise<QDashConfig> {
     return loadConfig(profile, path, options.env ?? process.env);
   }
+
+  /** Read a legacy INI profile at an explicit path, including files without an extension. */
+  static async fromIniFile(path: string, profile?: string): Promise<QDashConfig> {
+    const configPath = expandUser(path);
+    const file = readText(configPath);
+    if (file.kind === "missing") throw new QDashConfigError(`Config file not found: ${configPath}`);
+    return fromIni(file.text, profile);
+  }
 }
 
 function envName(field: string): string {

@@ -896,7 +896,7 @@ class QDashClient:
         idempotency_key: str | None = None,
         decision_id: str | None = None,
     ) -> ExecutePipelineResponse:
-        """Validate a pipeline spec on the server and dispatch it as one execution.
+        """Dispatch a validated pipeline run with an execution for each step reached.
 
         A spec with problems raises :class:`QDashValidationError` (422) whose ``payload`` holds
         the server's problem list; nothing is dispatched. The run is recorded before it is

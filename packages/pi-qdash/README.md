@@ -21,7 +21,8 @@ Requires Node.js 20 or later. Append `@beta` to the extension package for a prer
 
 ## Quick Start
 
-Configure a [QDash client profile](https://oqtopus-team.github.io/qdash/reference/clients/python#connect-to-a-deployment), then in pi:
+Reuse your Python or TypeScript SDK’s `config.toml`, or [create a profile with the SDK](https://oqtopus-team.github.io/qdash/reference/clients/typescript#connect-to-a-deployment).
+In pi, select your profile and chip:
 
 ```text
 /qdash-setup <profile> <chip_id>

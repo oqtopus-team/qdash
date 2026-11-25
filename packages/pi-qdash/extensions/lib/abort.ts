@@ -1,12 +1,13 @@
 /**
  * Stop waiting when the host cancels the call.
  *
- * The client's polling helpers (`waitForExecution` and friends) run until the
- * execution finishes or their own timeout passes; they take no signal. A tool
- * that awaits one directly keeps a cancelled turn alive until then: the host
- * cannot end the turn, and the chat refuses the next message because the
- * conversation is still busy. This races the wait against the signal, so the
- * call returns as cancelled at once; the poll it leaves behind only reads.
+ * The connection's polling helpers (`waitForExecution` and friends) run until
+ * the execution finishes or their own timeout passes. A tool that awaits one
+ * directly would keep a cancelled turn alive until then: the host cannot end
+ * the turn, and the chat refuses the next message because the conversation is
+ * still busy. This races the wait against the signal, so the call returns as
+ * cancelled at once with this error; the tools also pass the signal to the
+ * helper, which stops polling and aborts its read in flight.
  */
 export class WaitCancelled extends Error {
   override readonly name = "AbortError";

@@ -55,11 +55,13 @@ test("packing refuses a missing version, a client dependency and unexpected depe
   assert.throws(() => sdkManifest({ ...source(), dependencies: { ...dependencies, ini: "workspace:*" } }, "1.10.3"));
 });
 
-test("pi-qdash pins the client and the SDK of the same run", () => {
+test("pi-qdash pins the SDK of the same run and adds no client", () => {
   const clientVersion = client("refs/heads/develop");
-  const manifest = { name: "@oqtopus-team/pi-qdash", dependencies: { [CLIENT]: "workspace:*", [SDK]: "workspace:*" } };
+  const manifest = { name: "@oqtopus-team/pi-qdash", dependencies: { [SDK]: "workspace:*" } };
   const pinned = pinClientDependency(manifest, clientVersion);
-  assert.deepEqual(pinned.dependencies, { [CLIENT]: clientVersion, [SDK]: clientVersion });
+  assert.deepEqual(pinned.dependencies, { [SDK]: clientVersion });
+  // A package that still depends on both, such as an older pi-qdash, gets both pinned.
+  assert.deepEqual(pinClientDependency({ dependencies: { [CLIENT]: "workspace:*", [SDK]: "workspace:*" } }, clientVersion).dependencies, { [CLIENT]: clientVersion, [SDK]: clientVersion });
   // pi-qdash's own version keeps the run identity; its dependencies keep the shared version.
   assert.equal(releaseVersion({ name: "pi-qdash", clientVersion, ref: "refs/heads/develop", event: "push", runId: "9", attempt: "1" }).version, "1.10.3-beta.9.1");
 });
@@ -113,7 +115,9 @@ test("the pipeline releases client, then SDK, then pi packages, from one client 
   assert.match(publishSdk, /id-token: write/);
   assert.match(publishSdk, /--publish-tag/);
   assert.match(build, /needs: \[client, sdk\]/);
-  assert.match(build, /bun run build:client\n\s+bun run build:sdk/);
+  // The pi packages build, test and install with the SDK only; the client is neither built nor installed.
+  assert.match(build, /run: bun run build:sdk\n/);
+  assert.doesNotMatch(build, /build:client|qdash-typescript-client-dist|client-dist/);
   assert.match(build, /name: qdash-typescript-sdk-dist/);
   assert.match(publish, /needs: \[client, publish-sdk, build\]/);
   for (const path of ["sdks/typescript/**", ".github/scripts/sdk-package-*"]) {

@@ -8980,7 +8980,7 @@ class ExecuteFlowRequest(BaseModel):
 
 class ExecutePipelineRequest(BaseModel):
     """
-    Validate, then dispatch the pipeline as one execution.
+    Dispatch one pipeline run with a separate execution for each step reached.
     """
 
     chip_id: Annotated[str, Field(min_length=1, title="Chip Id")]

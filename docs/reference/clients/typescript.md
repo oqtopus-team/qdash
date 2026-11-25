@@ -71,6 +71,9 @@ fetch implements the requested proxy or TLS policy; the SDK cannot verify that b
 An empty chip array indicates a successful connection to a project with no chips. Before
 calibration examples, [create a chip and run its first calibration](../../user-guide/first-calibration.md).
 
+For a host that supplies its own INI file, use `QDashConfig.fromIniFile(path, profile)`.
+It reads the named file directly, including paths without a filename extension.
+
 ### Existing Client Applications
 
 `@oqtopus-team/qdash-client` continues to use `config.ini` without this deprecation.
@@ -203,7 +206,10 @@ console.log((await workflowRun.wait()).status);
 ```
 
 `qdash.workflows.list()` lists saved workflows. Parameters override saved defaults for this run
-only; the workflow source stays on the server.
+only; the workflow source stays on the server. The TypeScript handle polls the returned
+execution ID. When that execution includes pipeline progress, it uses the pipeline status.
+Otherwise it reports the execution’s own status. For a saved workflow that starts several
+executions, use `workflowRun.response.flow_run_url` to verify the final workflow state in Prefect.
 
 ## Save Metric Scripts and Dashboards
 
@@ -232,12 +238,28 @@ const chips = await qdash.api.chip.listChips();
 const execution = await qdash.api.execution.getExecution({ execution_id: "your-execution-id" });
 ```
 
+Pass optional list filters as arrays. For example, `status: ["active", "waiting_for_human"]`
+on `qdash.api.agentSession.listAgentSessions` sends one query key per status.
+When upgrading code that passes `null` for a session, qubit, or provenance list filter,
+omit the field or use `undefined`.
+
 These calls share the session's authentication and project header, disable retries by default,
 and throw generated `ApiError` or `ApiTimeoutError`. SDK helpers translate failures to
 `QDashApiError` subclasses: 409 becomes `QDashConflictError`, and 5xx responses remain
 `QDashApiError`. Helper GETs retry transient statuses, connection failures, and timeouts up to
 `readAttempts`; caller cancellation is not retried. Writes are sent once. Do not opt into
 retries for execution writes without reconciling their effects.
+
+Use `qdash.read(options => qdash.api.chip.listChips(options))` to apply the SDK’s read
+retry and error handling to a generated read. Use `qdash.send(callback)` for a write and
+forward its options to the generated method so the write is sent once. Both accept
+`{ signal }` as a second argument for cancellation.
+
+For a read that needs the raw HTTP response, `qdash.fetch(path, options)` accepts
+a path relative to the API and returns a successful `Response`. Array entries in
+`options.query` become repeated keys. Only GET and HEAD are retried. When implementing a
+write into an existing calibration session, `qdash.preflightCalibrationSession(id, chipId)`
+checks the owner’s session list before dispatch.
 
 With username/password authentication, a resource's 401 invalidates the login used by that
 request. The failed request is not replayed; the next call signs in again. Scoped sessions share

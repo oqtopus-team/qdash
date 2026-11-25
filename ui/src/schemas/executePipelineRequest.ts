@@ -13,7 +13,7 @@ import type { ExecutePipelineRequestReportedOrigin } from './executePipelineRequ
 import type { ExecutePipelineRequestSpec } from './executePipelineRequestSpec';
 
 /**
- * Validate, then dispatch the pipeline as one execution.
+ * Dispatch one pipeline run with a separate execution for each step reached.
  */
 export interface ExecutePipelineRequest {
   /** @minLength 1 */

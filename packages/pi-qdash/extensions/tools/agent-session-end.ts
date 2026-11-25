@@ -1,9 +1,9 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type {
   AgentSessionResponse,
-  QDashClient,
+  QDashConnection,
   StopAgentSessionResponse,
-} from "@oqtopus-team/qdash-client";
+} from "../lib/qdash-connection.js";
 import { Type } from "typebox";
 
 import { withAbort } from "../lib/abort.js";
@@ -19,7 +19,7 @@ type ConnectionParams = { profile?: string; configPath?: string; useEnv?: boolea
 type Outcome = "stopped" | "completed";
 
 export interface AgentSessionEndDependencies {
-  makeClient(params: ConnectionParams): Promise<QDashClient>;
+  makeClient(params: ConnectionParams): Promise<QDashConnection>;
 }
 
 function errorText(error: unknown): string {
@@ -32,7 +32,7 @@ function statusOf(error: unknown): number | undefined {
 }
 
 /** The session page, scoped to the session's own project. */
-export function sessionPageUrl(client: QDashClient, session: Pick<AgentSessionResponse, "session_id" | "project_id">): string {
+export function sessionPageUrl(client: QDashConnection, session: Pick<AgentSessionResponse, "session_id" | "project_id">): string {
   return qdashWebUrl(client, `/agent-sessions/${encodeURIComponent(session.session_id)}?project=${encodeURIComponent(session.project_id)}`);
 }
 
@@ -57,7 +57,7 @@ function inFlightLines(operations: StopAgentSessionResponse["in_flight"] = []): 
  * action); this line says whether the decision was added too.
  */
 async function recordEnd(
-  client: QDashClient,
+  client: QDashConnection,
   params: { sessionId: string; outcome: Outcome },
   session: AgentSessionResponse,
   reason: string,

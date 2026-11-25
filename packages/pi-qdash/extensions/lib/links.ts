@@ -1,4 +1,4 @@
-import type { QDashClient } from "@oqtopus-team/qdash-client";
+import type { QDashConnection } from "./qdash-connection.js";
 
 function firstString(object: Record<string, unknown>, keys: string[]): string | undefined {
   for (const key of keys) {
@@ -17,13 +17,13 @@ function firstString(object: Record<string, unknown>, keys: string[]): string | 
  * the UI is assumed to sit next to the API with the `/api` prefix stripped,
  * which holds for a local checkout.
  */
-export function qdashWebBaseUrl(client: QDashClient, env: NodeJS.ProcessEnv = process.env): string {
+export function qdashWebBaseUrl(client: QDashConnection, env: NodeJS.ProcessEnv = process.env): string {
   const configured = env.QDASH_WEB_URL?.trim();
   if (configured) return configured.replace(/\/+$/, "");
   return client.config.baseUrl.replace(/\/api\/?$/, "").replace(/\/$/, "");
 }
 
-export function qdashWebUrl(client: QDashClient, path: string): string {
+export function qdashWebUrl(client: QDashConnection, path: string): string {
   return `${qdashWebBaseUrl(client)}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
@@ -48,7 +48,7 @@ export function dashboardPagePath(dashboardId: string): string {
   return `/dashboards/${encodeURIComponent(dashboardId)}`;
 }
 
-export function qdashObjectLinks(client: QDashClient, object: Record<string, unknown>): Record<string, string> {
+export function qdashObjectLinks(client: QDashConnection, object: Record<string, unknown>): Record<string, string> {
   const links: Record<string, string> = {};
   const taskId = firstString(object, ["task_id", "taskId"]);
   const executionId = firstString(object, ["execution_id", "executionId"]);
@@ -66,7 +66,7 @@ export function qdashObjectLinks(client: QDashClient, object: Record<string, unk
   return links;
 }
 
-export function withQDashLinks(client: QDashClient, data: unknown): unknown {
+export function withQDashLinks(client: QDashConnection, data: unknown): unknown {
   if (!data || typeof data !== "object" || Array.isArray(data)) return data;
   const object = data as Record<string, unknown>;
   const links = qdashObjectLinks(client, object);
@@ -74,18 +74,19 @@ export function withQDashLinks(client: QDashClient, data: unknown): unknown {
   return { ...object, _links: links };
 }
 
-export function safeConfig(client: QDashClient, source: string) {
+export function safeConfig(client: QDashConnection, source: string) {
   const config = client.config;
   return {
     source,
     baseUrl: config.baseUrl,
     projectId: config.projectId ?? null,
-    timeoutSeconds: config.timeoutSeconds,
+    timeoutSeconds: config.timeoutSec,
     verifyTls: config.verifyTls,
     proxyConfigured: Boolean(config.proxy),
     apiTokenConfigured: Boolean(config.apiToken),
     cloudflareAccessConfigured: Boolean(config.cfAccessClientId || config.cfAccessClientSecret),
-    userAgent: config.userAgent,
-    retry: config.retry,
+    // Null when the SDK's own user agent is sent.
+    userAgent: config.userAgent ?? null,
+    readAttempts: config.readAttempts,
   };
 }

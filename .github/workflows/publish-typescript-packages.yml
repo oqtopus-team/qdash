@@ -217,10 +217,9 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Build local TypeScript client and SDK
-        run: |
-          bun run build:client
-          bun run build:sdk
+      # pi-qdash and the Agent Runtime use the self-contained SDK only.
+      - name: Build local TypeScript SDK
+        run: bun run build:sdk
 
       - name: Check and test package
         working-directory: packages/${{ matrix.package }}
@@ -244,13 +243,6 @@ jobs:
         working-directory: packages/${{ matrix.package }}
         run: npm pack --ignore-scripts
 
-      - name: Download matching client tarball
-        if: matrix.package == 'pi-qdash'
-        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
-        with:
-          name: qdash-typescript-client-dist
-          path: client-dist
-
       - name: Download matching SDK tarball
         if: matrix.package == 'pi-qdash'
         uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
@@ -263,16 +255,17 @@ jobs:
           PI_PACKAGE: ${{ matrix.package }}
         shell: bash
         # This tests a fresh consumer install; the artifact itself was built from bun.lock.
+        # pi-qdash installs with the SDK tarball of this run and without the client.
         # jactionlint ignore=adhoc-packages
         run: |
           consumer="$(mktemp -d)"
           archive="$(realpath packages/"$PI_PACKAGE"/*.tgz)"
-          client=()
+          sdk=()
           if [ "$PI_PACKAGE" = "pi-qdash" ]; then
-            client=("$(realpath client-dist/*.tgz)" "$(realpath sdk-dist/*.tgz)")
+            sdk=("$(realpath sdk-dist/*.tgz)")
           fi
           npm install --prefix "$consumer" --ignore-scripts --no-audit --no-fund \
-            "$archive" "${client[@]}" @earendil-works/pi-coding-agent@1.6.1 @earendil-works/pi-ai@1.6.1 typebox@1.3.27
+            "$archive" "${sdk[@]}" @earendil-works/pi-coding-agent@1.6.1 @earendil-works/pi-ai@1.6.1 typebox@1.3.27
           bun .github/scripts/pi-package-smoke.mjs "$consumer" "$PI_PACKAGE"
 
       - name: Upload package artifact

@@ -6,8 +6,7 @@ single-qubit workflow.
 
 ## Before you start
 
-Use the web **Agent**, or pi with `pi install npm:@oqtopus-team/pi-qdash` and a
-[client profile](../reference/clients/python.md#connect-to-a-deployment). Match the extension to
+Use the web **Agent** or [configure standalone pi-qdash](../reference/pi-qdash.md#configuration). Match the extension to
 your deployment. Approvals and expert answers require project edit permission.
 
 ## Ask for a calibration
@@ -76,7 +75,7 @@ Use `qdash-agent` when you want an explicit plan rather than chat-selected steps
 
 ### Install and configure
 
-Install `qdash-client` and configure a [profile](../reference/clients/python.md#connect-to-a-deployment).
+Install `qdash-client` and configure its [INI profile](../reference/clients/python.md#configure-the-existing-client).
 Commands below use `local`; replace it with your profile. For environment-managed credentials,
 use `--from-env` instead.
 

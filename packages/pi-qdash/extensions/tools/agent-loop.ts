@@ -9,8 +9,8 @@ import type {
   AgentInterventionReason,
   AgentModelIdentity,
   AgentSessionAuditResponse,
-  QDashClient,
-} from "@oqtopus-team/qdash-client";
+  QDashConnection,
+} from "../lib/qdash-connection.js";
 import { Type } from "typebox";
 
 import { withAbort } from "../lib/abort.js";
@@ -31,6 +31,7 @@ import { qdashWebUrl } from "../lib/links.js";
 import { toTextToolResult } from "../lib/results.js";
 import { serverTimestampText } from "../lib/server-time.js";
 import { pollUntilSettled, WAIT_AGENT_INTERVENTION } from "../lib/waits.js";
+import { CONFIG_PATH_DESCRIPTION, PROFILE_DESCRIPTION } from "../lib/connection.js";
 
 /**
  * Tools of the model-driven calibration loop in an agent session.
@@ -66,12 +67,12 @@ import { pollUntilSettled, WAIT_AGENT_INTERVENTION } from "../lib/waits.js";
 type ConnectionParams = { profile?: string; configPath?: string; useEnv?: boolean };
 
 export type AgentLoopDependencies = {
-  makeClient(params: ConnectionParams): Promise<QDashClient>;
+  makeClient(params: ConnectionParams): Promise<QDashConnection>;
 };
 
 const connectionParams = {
-  profile: Type.Optional(Type.String({ description: "QDash profile name. Defaults to env when QDASH_BASE_URL is set, otherwise 'default'." })),
-  configPath: Type.Optional(Type.String({ description: "Optional path to qdash config.ini." })),
+  profile: Type.Optional(Type.String({ description: PROFILE_DESCRIPTION })),
+  configPath: Type.Optional(Type.String({ description: CONFIG_PATH_DESCRIPTION })),
   useEnv: Type.Optional(Type.Boolean({ description: "Force QDASH_* environment variables instead of a profile." })),
 };
 
@@ -129,14 +130,14 @@ export const REQUEST_HUMAN_DECISION_NOTE =
  * dispatched.
  */
 export async function loadAgentLoopContext(
-  client: QDashClient,
+  client: QDashConnection,
   sessionId: string,
   options: { withCandidates?: boolean; signal?: AbortSignal } = {},
 ): Promise<{ context: AgentLoopContext; actions: AgentActionResponse[]; decisions: AgentDecisionResponse[] | null; decisionsUnavailable: DecisionsUnavailable | null }> {
   const read = <T>(promise: Promise<T>, what: string) => withAbort(promise, options.signal, what);
   let session = await read(client.getAgentSession(sessionId), `Agent session ${sessionId}`);
   let actions: AgentActionResponse[] = [];
-  let interventions: Awaited<ReturnType<QDashClient["listAgentInterventions"]>> = [];
+  let interventions: Awaited<ReturnType<QDashConnection["listAgentInterventions"]>> = [];
   let listed: DecisionList = { items: null, unavailable: { unsupported: false, reason: "not read" } };
   let consistent = false;
   for (let attempt = 0; attempt < SNAPSHOT_ATTEMPTS && !consistent; attempt++) {
@@ -176,7 +177,7 @@ type DecisionsUnavailable = { unsupported: boolean; reason: string };
 type DecisionList = { items: AgentDecisionResponse[]; unavailable?: undefined } | { items: null; unavailable: DecisionsUnavailable };
 
 /** The session's decisions, or why QDash did not list them. */
-async function listDecisions(client: QDashClient, sessionId: string, signal: AbortSignal | undefined): Promise<DecisionList> {
+async function listDecisions(client: QDashConnection, sessionId: string, signal: AbortSignal | undefined): Promise<DecisionList> {
   try {
     return { items: await withAbort(client.listAgentDecisions(sessionId), signal, `Decisions of ${sessionId}`) };
   } catch (error) {
@@ -223,7 +224,7 @@ const QUOTA_FULL = /audit is full|already holds \d+ decisions/i;
  * throws for a failed write, so the caller decides what may still run.
  */
 async function recordCallDecision(
-  client: QDashClient,
+  client: QDashConnection,
   sessionId: string,
   key: string,
   fields: DecisionFields,
@@ -286,7 +287,7 @@ function undispatchedText(outcome: Exclude<DecisionOutcome, { kind: "recorded" }
 }
 
 /** The user QDash authenticated this client as, or undefined when QDash cannot say. */
-async function signedInUser(client: QDashClient, signal: AbortSignal | undefined): Promise<string | undefined> {
+async function signedInUser(client: QDashConnection, signal: AbortSignal | undefined): Promise<string | undefined> {
   try {
     const user = await withAbort(client.getCurrentUser(), signal, "Signed-in user");
     return typeof user?.username === "string" && user.username ? user.username : undefined;
@@ -301,7 +302,7 @@ async function signedInUser(client: QDashClient, signal: AbortSignal | undefined
  * not run for the signed-in user (see `sessionOwnerRefusal`).
  */
 async function ownedSessionContext(
-  client: QDashClient,
+  client: QDashConnection,
   sessionId: string,
   signal: AbortSignal | undefined,
 ): Promise<{ context: AgentLoopContext; actions: AgentActionResponse[]; decisions: AgentDecisionResponse[] | null; decisionsUnavailable: DecisionsUnavailable | null; refusal: string | null }> {
@@ -318,7 +319,7 @@ function refusedByQDash(error: unknown): string | undefined {
 const UNVERIFIED_SERVER =
   "This QDash server did not confirm that it checks autonomous steps (the action has no `autonomous` field), so nothing was dispatched. Session-granted steps need a QDash release that checks the session creator, running measurements, rounds, and repeats itself; until then use the reviewed tools with per-call approval.";
 
-function contextLinks(client: QDashClient, context: AgentLoopContext) {
+function contextLinks(client: QDashConnection, context: AgentLoopContext) {
   return {
     sessionUrl: qdashWebUrl(client, `/agent-sessions/${encodeURIComponent(context.session.session_id)}`),
     interventionUrl: context.intervention ? qdashWebUrl(client, context.intervention.page_path) : undefined,

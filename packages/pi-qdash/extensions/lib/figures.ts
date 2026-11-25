@@ -1,6 +1,6 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { Image, truncateToWidth } from "@earendil-works/pi-tui";
-import type { QDashClient } from "@oqtopus-team/qdash-client";
+import type { QDashConnection } from "./qdash-connection.js";
 
 export type FigureDetails = {
   tool: string;
@@ -26,7 +26,7 @@ export function mediaTypeForPath(path: string): string {
   return "application/octet-stream";
 }
 
-export async function fetchFigureDetails(client: QDashClient, path: string): Promise<FigureDetails> {
+export async function fetchFigureDetails(client: QDashConnection, path: string): Promise<FigureDetails> {
   const file = await client.getExecutionFigure(path);
   const bytes = Buffer.from(file.data);
   const mediaType = file.mediaType || mediaTypeForPath(path);

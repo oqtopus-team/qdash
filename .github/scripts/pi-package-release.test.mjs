@@ -26,13 +26,14 @@ test("a QDash tag releases both pi packages and the client at the same X.Y.Z", (
   );
 });
 
-test("a QDash tag packs pi-qdash with the stable client it releases", () => {
+test("a QDash tag packs pi-qdash with the stable SDK it releases, and no client", () => {
   const ref = "refs/tags/v1.10.3";
   const clientVersion = client(ref);
-  const manifest = { name: "@oqtopus-team/pi-qdash", version: "0.1.10", dependencies: { "@oqtopus-team/qdash-client": "workspace:*" } };
+  const manifest = JSON.parse(readFileSync(new URL("../../packages/pi-qdash/package.json", import.meta.url), "utf8"));
   const packed = { ...pinClientDependency(manifest, clientVersion), version: releaseVersion({ name: "pi-qdash", clientVersion, ref, ...run }).version };
   assert.equal(packed.version, "1.10.3");
-  assert.equal(packed.dependencies["@oqtopus-team/qdash-client"], "1.10.3");
+  assert.equal(packed.dependencies["@oqtopus-team/qdash-sdk"], "1.10.3");
+  assert.equal(packed.dependencies["@oqtopus-team/qdash-client"], undefined);
 });
 
 test("a QDash tag refuses a client version from another computation", () => {
@@ -104,22 +105,21 @@ test("retrying a beta publish skips the exact version in the existing tarball", 
   }
 });
 
-test("the CLI packs the manifest at the QDash tag version with the pinned client and SDK", () => {
+test("the CLI packs the manifest at the QDash tag version with the pinned SDK", () => {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "pi-release-")));
   for (const dir of ["packages/pi-qdash", ".github/scripts"]) mkdirSync(join(root, dir), { recursive: true });
   for (const file of ["pi-package-release.mjs", "client-release.mjs"]) {
     writeFileSync(join(root, ".github/scripts", file), readFileSync(new URL(`./${file}`, import.meta.url)));
   }
   const path = join(root, "packages/pi-qdash/package.json");
-  writeFileSync(path, JSON.stringify({ name: "@oqtopus-team/pi-qdash", version: "0.1.10", dependencies: { "@oqtopus-team/qdash-client": "workspace:*", "@oqtopus-team/qdash-sdk": "workspace:*" } }));
+  writeFileSync(path, JSON.stringify({ name: "@oqtopus-team/pi-qdash", version: "0.1.10", dependencies: { "@oqtopus-team/qdash-sdk": "workspace:*", "smol-toml": "^1.9.1" } }));
   execFileSync("node", [join(root, ".github/scripts/pi-package-release.mjs"), "pi-qdash"], {
     cwd: root,
     env: { ...process.env, GITHUB_REF: "refs/tags/v1.10.3", GITHUB_EVENT_NAME: "push", QDASH_CLIENT_VERSION: "1.10.3", GITHUB_RUN_ID: "1", GITHUB_RUN_ATTEMPT: "1" },
   });
   const packed = JSON.parse(readFileSync(path, "utf8"));
   assert.equal(packed.version, "1.10.3");
-  assert.equal(packed.dependencies["@oqtopus-team/qdash-client"], "1.10.3");
-  assert.equal(packed.dependencies["@oqtopus-team/qdash-sdk"], "1.10.3");
+  assert.deepEqual(packed.dependencies, { "@oqtopus-team/qdash-sdk": "1.10.3", "smol-toml": "^1.9.1" });
 });
 
 test("the pipeline has no independent pi stable tags", () => {

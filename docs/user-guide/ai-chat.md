@@ -17,6 +17,12 @@ An administrator must configure [AI endpoints](./setup/ai.md).
 Confirm the project and chip, then ask a specific question. Name the time range when it matters;
 chat does not automatically send it. Start a new chat when the goal changes substantially.
 
+To use a calibration skill, type `/` at the start of the message. Select a skill, add the
+chip, targets, and goal after its name, then send. Selecting a skill leaves the message
+in the composer for review. For example, `/skill:qdash-zx90-optimization` guides a search
+on one directed coupling. Supply the allowed parameter bounds and hardware time budget,
+then review each proposed pipeline before it runs.
+
 ### Check What the Agent Uses
 
 The labels above the message box show the **Result**, **Investigating**, or **Page** context

@@ -257,7 +257,7 @@ class TaskClient:
 
     def get_task_knowledge_markdown(
         self, task_name: str, *, request_options: typing.Optional[RequestOptions] = None
-    ) -> None:
+    ) -> str:
         """
         Get raw markdown content for a task knowledge entry.
 
@@ -273,7 +273,8 @@ class TaskClient:
 
         Returns
         -------
-        None
+        str
+            The task's knowledge as Markdown, images inlined as data URIs
 
         Examples
         --------
@@ -716,7 +717,7 @@ class AsyncTaskClient:
 
     async def get_task_knowledge_markdown(
         self, task_name: str, *, request_options: typing.Optional[RequestOptions] = None
-    ) -> None:
+    ) -> str:
         """
         Get raw markdown content for a task knowledge entry.
 
@@ -732,7 +733,8 @@ class AsyncTaskClient:
 
         Returns
         -------
-        None
+        str
+            The task's knowledge as Markdown, images inlined as data URIs
 
         Examples
         --------

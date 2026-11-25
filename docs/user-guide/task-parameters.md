@@ -31,6 +31,10 @@ Keep **Update calibration values** off for exploration. Results and artifacts ar
 Enable it when successful outputs should become current values for later tasks; mapped backend
 configuration is also updated when enabled in the deployment.
 
+For Qubex **CheckCrossResonance** and **CreateZX90**, an accepted fit still updates the
+Qubex calibration note with this setting off. Take that write into account before an
+exploratory run.
+
 ## Re-run Previous Work
 
 Re-running an execution uses current calibration inputs. To repeat one measurement, open its

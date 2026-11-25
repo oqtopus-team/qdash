@@ -148,7 +148,7 @@ export class Pipelines {
   }
 
   /**
-   * Dispatch a spec as one execution, which measures on the hardware. The server
+   * Dispatch a hardware pipeline run. Each reached step creates an execution. The server
    * validates it again and answers 422 (`QDashValidationError`) with the same
    * problems. The run belongs to the session's project, or to the server's
    * default project for the user when none is configured. Returns once
@@ -173,17 +173,7 @@ export class Pipelines {
   ): Promise<PipelineRun> {
     const recorded = recording(recordIn);
     const sessionId = recordIn?.calibrationSessionId;
-    if (sessionId) {
-      try {
-        await this.preflightSession(sessionId, target.chipId);
-      } catch (cause) {
-        if (cause instanceof QDashPreflightError) throw cause;
-        throw new QDashPreflightError(
-          "Calibration session preflight failed; nothing dispatched. Check API connectivity, credentials and server compatibility.",
-          { cause },
-        );
-      }
-    }
+    if (sessionId) await preflightCalibrationSession(this.context, sessionId, target.chipId);
     const answer = await dispatch("Pipeline", () =>
       this.context.api.calibrationPipeline
         .executeCalibrationPipeline(
@@ -221,21 +211,37 @@ export class Pipelines {
     }
     return new PipelineRun(this.executions, response);
   }
+}
 
-  /**
-   * Prove the server records sessions before an associated write; nothing is sent otherwise.
-   *
-   * Reads the session list, never the session detail: reading the detail of an open automatic
-   * session closes it when its work has ended, which would make the launch that follows fail.
-   * The list has no side effects and arrived with the same server release as the recording
-   * fields. Only the signed-in user's sessions on the chip are listed: the server starts work
-   * only in those, and an idempotent replay is always in one. Closed sessions are included, so
-   * a replay into one still reaches the server, which decides whether a run may start.
-   */
-  private async preflightSession(sessionId: string, chipId: string): Promise<void> {
+// Sessions read per page by the preflight, and the last offset the list accepts.
+const SESSION_PAGE = 100;
+const MAX_SESSION_SKIP = 10_000;
+
+/**
+ * Prove the server records sessions before an associated write; nothing is sent otherwise.
+ *
+ * Reads the session list, never the session detail: reading the detail of an open automatic
+ * session closes it when its work has ended, which would make the write that follows fail.
+ * The list has no side effects and arrived with the same server release as the recording
+ * fields. Only the signed-in user's sessions on the chip are listed: the server starts work
+ * only in those, and an idempotent replay is always in one. Closed sessions are included, so
+ * a replay into one still reaches the server, which decides whether work may start.
+ * Any failure, including a failed read, is a `QDashPreflightError` whose `cause` is the
+ * failure; a caller's abort rejects with the signal's reason.
+ */
+export async function preflightCalibrationSession(
+  context: Context,
+  sessionId: string,
+  chipId: string,
+  signal?: AbortSignal,
+): Promise<void> {
+  if (typeof sessionId !== "string" || !sessionId.trim()) {
+    throw new QDashPreflightError("Calibration session preflight failed: the session ID is empty; nothing dispatched.");
+  }
+  try {
     for (let skip = 0; skip <= MAX_SESSION_SKIP; skip += SESSION_PAGE) {
-      const page = await read(this.context.reads, (requestOptions) =>
-        this.context.api.calibrationSession.listCalibrationSessions(
+      const page = await read({ ...context.reads, ...(signal ? { signal } : {}) }, (requestOptions) =>
+        context.api.calibrationSession.listCalibrationSessions(
           { chip_id: chipId, mine: true, limit: SESSION_PAGE, skip },
           requestOptions,
         ),
@@ -249,16 +255,18 @@ export class Pipelines {
       }
       if (page.has_more !== true || items.length === 0) break;
     }
+  } catch (cause) {
+    if (signal?.aborted) throw signal.reason ?? cause;
     throw new QDashPreflightError(
-      `Calibration session preflight failed: ${sessionId} is not a session of yours on chip ${chipId}, ` +
-        "or the server cannot record sessions; nothing dispatched. Check the session and server compatibility.",
+      "Calibration session preflight failed; nothing dispatched. Check API connectivity, credentials and server compatibility.",
+      { cause },
     );
   }
+  throw new QDashPreflightError(
+    `Calibration session preflight failed: ${sessionId} is not a session of yours on chip ${chipId}, ` +
+      "or the server cannot record sessions; nothing dispatched. Check the session and server compatibility.",
+  );
 }
-
-// Sessions read per page by the preflight, and the last offset the list accepts.
-const SESSION_PAGE = 100;
-const MAX_SESSION_SKIP = 10_000;
 
 /** A dispatched calibration, returned by `Chip.calibrate`. */
 export class CalibrationRun extends Run {
@@ -301,9 +309,8 @@ export class Chip {
   }
 
   /**
-   * Start a calibration of `targets` on this chip: `steps` run in order as one
-   * pipeline execution. Does not call `validateCalibration` first; the server
-   * validates before dispatch.
+   * Start a calibration of `targets` on this chip. Each step reached creates an execution.
+   * The server validates before dispatch.
    */
   async calibrate(
     targets: PipelineTargets,

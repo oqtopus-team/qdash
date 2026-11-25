@@ -10,5 +10,5 @@ export interface GetDegradationTrendsRequest {
     /** Maximum number of trends to return */
     limit?: number;
     /** Filter by parameter names */
-    parameter_names?: string[] | null;
+    parameter_names?: string | string[];
 }
