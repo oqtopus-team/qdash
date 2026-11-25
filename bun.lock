@@ -82,6 +82,9 @@
     "sdks/typescript": {
       "name": "@oqtopus-team/qdash-sdk",
       "version": "0.0.0",
+      "bin": {
+        "qdash": "./dist/cli.js",
+      },
       "dependencies": {
         "ini": "^6.0.0",
         "smol-toml": "^1.9.1",

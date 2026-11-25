@@ -98,6 +98,22 @@ def _lookup(
     return _MISSING
 
 
+def _run_default(spec: Mapping[str, Any]) -> Any:
+    """A run parameter's declared default, in the form the server accepts as an override.
+
+    A sweep becomes ``{"value": [...], "value_type": ...}``. An ``int`` parameter whose
+    default is an integral float, such as qubex's ``DEFAULT_INTERVAL`` (``153600.0``), is sent
+    as an int, as the Workbench sends it; the server rejects a float for an ``int``.
+    """
+    default = deepcopy(spec.get("value"))
+    value_type = spec.get("value_type")
+    if value_type in _SWEEP_VALUE_TYPES:
+        return {"value": default, "value_type": value_type}
+    if value_type == "int" and isinstance(default, float) and default.is_integer():
+        return int(default)
+    return default
+
+
 def _same(left: object, right: object) -> bool:
     if type(left) is not type(right):
         return False
@@ -116,7 +132,8 @@ class TaskParameters:
     calibration value, else the definition's default, else None. ``run`` maps each run
     parameter that declares a default to that default, in the form a
     :class:`~qdash.sdk.calibration.TaskCall` carries it (a sweep as ``{"value": [...],
-    "value_type": ...}``, not expanded). Both are plain dictionaries to read and edit;
+    "value_type": ...}``, not expanded, and an integral float default of an ``int`` parameter
+    as an int). Both are plain dictionaries to read and edit;
     :meth:`to_call` turns them into the call :meth:`Tasks.run` sends.
 
     ``name``, ``chip_id``, ``qid`` and ``backend_name`` identify what was loaded, and
@@ -449,15 +466,8 @@ class Tasks:
             inputs[input_name] = deepcopy(value)
         runs: dict[str, Any] = {}
         for run_name, spec in (definition.run_parameters or {}).items():
-            default = spec.get("value")
-            if default is None:
-                continue
-            value_type = spec.get("value_type")
-            runs[run_name] = (
-                {"value": deepcopy(default), "value_type": value_type}
-                if value_type in _SWEEP_VALUE_TYPES
-                else deepcopy(default)
-            )
+            if spec.get("value") is not None:
+                runs[run_name] = _run_default(spec)
         return TaskParameters(
             definition,
             chip_id=chip,

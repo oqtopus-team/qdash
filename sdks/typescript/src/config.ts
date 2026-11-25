@@ -2,12 +2,13 @@
  * SDK configuration: `QDASH_*` variables, or a profile of the TOML config file shared with the
  * Python SDK (`$XDG_CONFIG_HOME/qdash/config.toml`, else `~/.config/qdash/config.toml`).
  *
- * The file and its keys are the Python SDK's, snake_case on disk:
+ * The file and its keys are the Python SDK's, snake_case on disk. Each profile is a top-level
+ * table; the optional root `default_profile` names the profile used when none is given:
  *
  * ```toml
  * default_profile = "lab"
  *
- * [profiles.lab]
+ * [lab]
  * base_url = "https://qdash.example/api"
  * api_token_env = "QDASH_LAB_TOKEN"
  * project_id = "p1"
@@ -15,7 +16,7 @@
  * read_attempts = 3
  * ```
  *
- * The `config.ini` file of `@oqtopus-team/qdash-client` is still read when no `config.toml`
+ * `qdash config init` writes such a file. The `config.ini` file of `@oqtopus-team/qdash-client` is still read when no `config.toml`
  * exists, or when given explicitly, with a deprecation warning of this SDK only.
  */
 import { readFileSync } from "node:fs";
@@ -114,7 +115,12 @@ const TOML_STRING_KEYS = new Set([
   "user_agent",
 ]);
 const TOML_PROFILE_KEYS = new Set([...TOML_STRING_KEYS, "timeout_sec", "verify_tls", "read_attempts"]);
-const TOML_TOP_LEVEL_KEYS = new Set(["default_profile", "profiles"]);
+// Root keys of config.toml that are not profile tables. "profiles" held the profiles of the
+// earlier [profiles.<name>] layout; it stays reserved so that layout fails with a migration hint.
+const DEFAULT_PROFILE_KEY = "default_profile";
+const LEGACY_PROFILES_KEY = "profiles";
+/** Root keys of `config.toml` that cannot name a profile. */
+export const RESERVED_PROFILE_NAMES: ReadonlySet<string> = new Set([DEFAULT_PROFILE_KEY, LEGACY_PROFILES_KEY]);
 
 /** Where and how a `QDash` session reaches the API. Immutable. */
 export class QDashConfig {
@@ -324,8 +330,8 @@ function loadConfig(profile: string | undefined, path: string | undefined, env: 
 function warnIni(path: string, env: Environment): void {
   process.emitWarning(
     `@oqtopus-team/qdash-sdk read the INI config file ${path}. Reading INI config files is deprecated ` +
-      `in @oqtopus-team/qdash-sdk; move the profiles to ${defaultConfigPath(env)} as [profiles.<name>] ` +
-      "tables (TOML). @oqtopus-team/qdash-client keeps using config.ini; this deprecation applies to " +
+      `in @oqtopus-team/qdash-sdk; move the profiles to ${defaultConfigPath(env)} as top-level ` +
+      "[<name>] tables (TOML); `qdash config init` creates a starting file. @oqtopus-team/qdash-client keeps using config.ini; this deprecation applies to " +
       "@oqtopus-team/qdash-sdk only.",
     { type: "DeprecationWarning", code: INI_CONFIG_DEPRECATION_CODE },
   );
@@ -395,29 +401,33 @@ function parseDocument(path: string, text: string): Record<string, unknown> {
 
 function fromToml(path: string, text: string, profile: string | undefined, env: Environment): QDashConfig {
   const document = parseDocument(path, text);
-  const unknown = Object.keys(document).filter((key) => !TOML_TOP_LEVEL_KEYS.has(key)).sort();
-  if (unknown.length > 0) {
+  if (Object.hasOwn(document, LEGACY_PROFILES_KEY)) {
     throw new QDashConfigError(
-      `Unknown top-level keys in config file ${path}: ${unknown.join(", ")}. Put profile settings under [profiles.<name>].`,
+      `Config file ${path} uses the removed [profiles.<name>] layout: move each [profiles.<name>] table ` +
+        "to a top-level [<name>] table and keep default_profile at the top.",
     );
   }
-  const defaultProfile = document.default_profile;
+  const defaultProfile = document[DEFAULT_PROFILE_KEY];
   if (defaultProfile !== undefined && (typeof defaultProfile !== "string" || !defaultProfile)) {
     throw new QDashConfigError(`default_profile in config file ${path} must be a non-empty string.`);
   }
-  const profiles = document.profiles ?? {};
-  if (!isTable(profiles)) {
-    throw new QDashConfigError(`profiles in config file ${path} must be a table of [profiles.<name>].`);
+  // Every other root key is a profile table; a root value holds a misplaced setting.
+  const unknown = Object.keys(document)
+    .filter((key) => key !== DEFAULT_PROFILE_KEY && !isTable(document[key]))
+    .sort();
+  if (unknown.length > 0) {
+    throw new QDashConfigError(
+      `Unknown top-level keys in config file ${path}: ${unknown.join(", ")}. Put profile settings under a [<name>] table.`,
+    );
   }
-  for (const [name, table] of Object.entries(profiles)) {
-    if (!isTable(table)) throw new QDashConfigError(`Profile '${name}' in config file ${path} must be a table.`);
-  }
+  if (Object.hasOwn(document, "")) throw new QDashConfigError(`A profile in config file ${path} has an empty name.`);
   const selected = profile ?? (defaultProfile as string | undefined) ?? DEFAULT_PROFILE;
-  if (!Object.hasOwn(profiles, selected)) throw new QDashConfigError(`Config profile not found: ${selected}`);
-  return profileConfig(selected, profiles[selected] as Record<string, unknown>, env);
+  if (RESERVED_PROFILE_NAMES.has(selected)) throw new QDashConfigError(`Config profile name '${selected}' is reserved.`);
+  if (!Object.hasOwn(document, selected)) throw new QDashConfigError(`Config profile not found: ${selected}`);
+  return profileConfig(selected, document[selected] as Record<string, unknown>, env);
 }
 
-/** Validate one `[profiles.<name>]` table; error messages never carry values. */
+/** Validate one `[<name>]` profile table; error messages never carry values. */
 function profileConfig(profile: string, table: Record<string, unknown>, env: Environment): QDashConfig {
   const unknown = Object.keys(table).filter((key) => !TOML_PROFILE_KEYS.has(key)).sort();
   if (unknown.length > 0) throw new QDashConfigError(`Unknown keys in profile '${profile}': ${unknown.join(", ")}`);

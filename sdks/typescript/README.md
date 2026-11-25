@@ -9,7 +9,12 @@ applications can continue using that package independently.
 npm install @oqtopus-team/qdash-sdk
 ```
 
-The package is ESM only and requires Node.js 20 or later.
+The package is ESM only and requires Node.js 20 or later. For a shared Python/TypeScript
+profile, run `npx qdash config init --project-id your-project-id`, fill in `api_token`
+in the generated file, and use `await QDash.fromProfile("local")` below. Use `--base-url` for a
+remote deployment. The command creates a new TOML file with `[local]` and never overwrites
+an existing file. For `QDash.fromEnv()`, set `QDASH_BASE_URL`, `QDASH_API_TOKEN`, and
+`QDASH_PROJECT_ID` instead.
 
 ```ts
 import { QDash, customOneQubit, qubitTargets } from "@oqtopus-team/qdash-sdk";
