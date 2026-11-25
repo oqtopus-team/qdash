@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQueryClient } from "@tanstack/react-query";
 import { Pencil, Trash2 } from "lucide-react";
@@ -220,11 +220,13 @@ function ForumLabelEditForm({ label, onCancel, onSaved }: ForumLabelEditFormProp
     formState: { errors, isSubmitting },
   } = useForm<ForumLabelFormValues>({
     resolver: zodResolver(forumLabelSchema),
-    defaultValues: {
+    // Follow refetched label values, such as an earlier save, without discarding the user's edits.
+    values: {
       name: label.label,
       description: label.description,
       color: label.color,
     },
+    resetOptions: { keepDirtyValues: true },
   });
 
   /** Saves the edited label, then closes the form and refreshes the label list. */
@@ -320,7 +322,8 @@ type ForumLabelManagerProps = {
 /** Editor-level CRUD panel for forum labels: create, edit, and delete. */
 export function ForumLabelManager({ labels }: ForumLabelManagerProps) {
   const queryClient = useQueryClient();
-  const [editingKey, setEditingKey] = useState<string | null>(null);
+  const [editing, setEditing] = useState<{ key: string; session: number } | null>(null);
+  const editSessionRef = useRef(0);
   const [pendingDelete, setPendingDelete] = useState<ForumLabelDefinition | null>(null);
 
   const deleteMutation = useDeleteForumLabel();
@@ -332,6 +335,17 @@ export function ForumLabelManager({ labels }: ForumLabelManagerProps) {
       predicate: (query) =>
         typeof query.queryKey[0] === "string" && query.queryKey[0].startsWith("/forum/posts"),
     });
+  };
+
+  /** Opens the edit form for one label in a new edit session. */
+  const startEditing = (key: string) => {
+    editSessionRef.current += 1;
+    setEditing({ key, session: editSessionRef.current });
+  };
+
+  /** Closes the edit form only if the given session still owns it. */
+  const stopEditing = (session: number) => {
+    setEditing((current) => (current?.session === session ? null : current));
   };
 
   /** Deletes a label after confirmation and refreshes the label list. */
@@ -363,18 +377,18 @@ export function ForumLabelManager({ labels }: ForumLabelManagerProps) {
             <div className="px-2.5 py-2 text-xs text-base-content/45">No labels yet</div>
           )}
           {labels.map((item) => {
-            const isEditing = editingKey === item.id;
+            const session = editing?.key === item.id ? editing.session : null;
             return (
               <div
                 key={item.id}
                 className="flex items-center justify-between gap-2 rounded-lg border border-base-300 px-3 py-2"
               >
-                {isEditing ? (
+                {session !== null ? (
                   <ForumLabelEditForm
                     label={item}
-                    onCancel={() => setEditingKey(null)}
+                    onCancel={() => stopEditing(session)}
                     onSaved={() => {
-                      setEditingKey(null);
+                      stopEditing(session);
                       invalidateLabels();
                     }}
                   />
@@ -394,7 +408,7 @@ export function ForumLabelManager({ labels }: ForumLabelManagerProps) {
                       <button
                         type="button"
                         className="btn btn-ghost btn-xs"
-                        onClick={() => setEditingKey(item.id)}
+                        onClick={() => startEditing(item.id)}
                         title="Edit label"
                         aria-label="Edit label"
                       >

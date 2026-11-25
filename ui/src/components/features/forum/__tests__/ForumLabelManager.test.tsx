@@ -182,6 +182,57 @@ describe("ForumLabelManager", () => {
     });
   });
 
+  it("keeps another label's edit form open when an earlier save finishes", async () => {
+    let resolveSave: (value: unknown) => void = () => {};
+    mocks.updateLabel.mockImplementationOnce(
+      () => new Promise((resolve) => (resolveSave = resolve)),
+    );
+    render(<ForumLabelManager labels={[...LABELS, { ...LABELS[0], id: "idea", label: "Idea" }]} />);
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Edit label" })[0]);
+    const bugForm = within(screen.getByRole("form", { name: "Edit label Bug" }));
+    fireEvent.click(bugForm.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(mocks.updateLabel).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByRole("button", { name: "Edit label" }));
+    expect(screen.getByRole("form", { name: "Edit label Idea" })).toBeTruthy();
+
+    resolveSave({});
+    await waitFor(() => expect(mocks.invalidateQueries).toHaveBeenCalled());
+    expect(screen.getByRole("form", { name: "Edit label Idea" })).toBeTruthy();
+  });
+
+  it("keeps a reopened edit form open when the save from before Cancel finishes", async () => {
+    let resolveSave: (value: unknown) => void = () => {};
+    mocks.updateLabel.mockImplementationOnce(
+      () => new Promise((resolve) => (resolveSave = resolve)),
+    );
+    render(<ForumLabelManager labels={LABELS} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit label" }));
+    const form = within(screen.getByRole("form", { name: "Edit label Bug" }));
+    fireEvent.click(form.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(mocks.updateLabel).toHaveBeenCalledTimes(1));
+    fireEvent.click(form.getByRole("button", { name: "Cancel" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit label" }));
+
+    resolveSave({});
+    await waitFor(() => expect(mocks.invalidateQueries).toHaveBeenCalled());
+    expect(screen.getByRole("form", { name: "Edit label Bug" })).toBeTruthy();
+  });
+
+  it("updates untouched edit fields from refetched labels and keeps edited ones", async () => {
+    const { rerender } = render(<ForumLabelManager labels={LABELS} />);
+    fireEvent.click(screen.getByRole("button", { name: "Edit label" }));
+    let form = within(screen.getByRole("form", { name: "Edit label Bug" }));
+    fireEvent.change(form.getByLabelText("Description"), { target: { value: "Edited" } });
+
+    rerender(<ForumLabelManager labels={[{ ...LABELS[0], label: "Defect" }]} />);
+
+    form = within(screen.getByRole("form", { name: "Edit label Defect" }));
+    await waitFor(() => expect(form.getByLabelText<HTMLInputElement>("Name").value).toBe("Defect"));
+    expect(form.getByLabelText<HTMLInputElement>("Description").value).toBe("Edited");
+  });
+
   it("deletes a label after confirmation", async () => {
     render(<ForumLabelManager labels={LABELS} />);
     fireEvent.click(screen.getByRole("button", { name: "Delete label" }));
