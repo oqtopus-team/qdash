@@ -14,7 +14,7 @@ Qubex configuration directory populated. Choose physical qubit IDs from that chi
 
 ## Export Files
 
-1. Create a client and generate the topology. Replace the labels and qubit IDs below.
+1. Create a client and generate the topology. Replace the qubit IDs below.
    The server uses the chip associated with the project's latest master calibration note.
    `device_id` labels the output; it does not select a chip.
 
@@ -23,14 +23,11 @@ Qubex configuration directory populated. Choose physical qubit IDs from that chi
 
    qdash = QDash.from_profile("local")
    topology = qdash.device_topology.create(
-       name="anemone",
-       device_id="anemone",
        qubits=["0", "2", "3"],
    )
    ```
 
-   Omit `name` or `device_id` to use the selected profile name for that label. For example,
-   `QDash()` with `default_profile = "anemone"` defaults both labels to `anemone`.
+   Omitted `name` and `device_id` use the selected profile name (`local` in this example).
    Explicit labels override these defaults independently. With `QDash.from_env()` or
    `QDash(config)`, supply both labels; there is no profile name to use.
 

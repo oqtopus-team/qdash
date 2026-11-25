@@ -255,9 +255,8 @@ class DeviceTopologies:
         The server reads the latest calibration note of the session's project and that note's
         chip; there is no chip argument. ``name`` and ``device_id`` are labels copied into the
         result, and ``device_id`` does not select a chip. Each label that is omitted defaults
-        to the name of the config profile the session was opened from, such as ``"anemone"``
-        for ``QDash.from_profile("anemone")`` or for ``QDash()`` with
-        ``default_profile = "anemone"``; an explicit label always wins, and an empty one raises
+        to the name of the config profile the session was opened from. An explicit label
+        always wins, and an empty one raises
         ``ValueError``. A session without a profile, such as ``QDash.from_env()`` or
         ``QDash(config)``, needs both labels, and a missing one raises ``TypeError`` before
         anything is sent. ``qubits`` are physical qubit IDs as
