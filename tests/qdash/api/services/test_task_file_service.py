@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 
 import pytest
+from fastapi import HTTPException
 
 from qdash.api.dependencies import get_task_file_service
 from qdash.api.services.chip.service import _get_task_names_cached, get_task_names
@@ -649,3 +650,98 @@ def test_catalog_publishes_the_same_documentation_for_fake_and_qubex_tasks() -> 
         documentation = fake[name].documentation
         assert documentation is not None, name
         assert fake[name].description == documentation.description
+
+
+# --- Backend path confinement ---
+
+_TASK_SOURCE = 'class {cls}:\n    name: str = "{name}"\n'
+
+
+def _write_task(path: Path, name: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(_TASK_SOURCE.format(cls=name, name=name), encoding="utf-8")
+
+
+@pytest.fixture
+def calibtasks(tmp_path: Path) -> Path:
+    base = tmp_path / "calibtasks"
+    _write_task(base / "fake" / "one_qubit" / "rabi.py", "FakeRabi")
+    _write_task(base / "fakeextra" / "secret.py", "SiblingTask")
+    _write_task(tmp_path / "outside" / "outside.py", "OutsideTask")
+    return base
+
+
+@pytest.mark.parametrize(
+    "backend",
+    ["../outside", "..", ".", "", "fake/one_qubit", "fake/../fake", ".hidden", "__pycache__"],
+)
+def test_list_task_info_rejects_backend_that_is_not_a_single_name(
+    calibtasks: Path, backend: str
+) -> None:
+    with pytest.raises(HTTPException) as exc_info:
+        TaskFileService(calibtasks).list_task_info(backend)
+
+    assert exc_info.value.status_code == 400
+
+
+def test_list_task_info_rejects_absolute_backend(calibtasks: Path) -> None:
+    with pytest.raises(HTTPException) as exc_info:
+        TaskFileService(calibtasks).list_task_info(str(calibtasks.parent / "outside"))
+
+    assert exc_info.value.status_code == 400
+
+
+def test_list_task_info_rejects_backend_link_outside_base(calibtasks: Path) -> None:
+    (calibtasks / "escape").symlink_to(calibtasks.parent / "outside", target_is_directory=True)
+
+    with pytest.raises(HTTPException) as exc_info:
+        TaskFileService(calibtasks).list_task_info("escape")
+
+    assert exc_info.value.status_code == 400
+
+
+def test_list_task_info_reports_missing_backend(calibtasks: Path) -> None:
+    with pytest.raises(HTTPException) as exc_info:
+        TaskFileService(calibtasks).list_task_info("missing")
+
+    assert exc_info.value.status_code == 404
+
+
+def test_list_task_info_reads_only_the_named_backend(calibtasks: Path) -> None:
+    """A sibling sharing the name as a prefix ("fakeextra") is not part of "fake"."""
+    tasks = TaskFileService(calibtasks).list_task_info("fake").tasks
+
+    assert [(task.name, task.file_path) for task in tasks] == [("FakeRabi", "one_qubit/rabi.py")]
+
+
+def test_list_task_info_accepts_discovered_backend_without_config(calibtasks: Path) -> None:
+    clear_backend_config_cache()
+    service = TaskFileService(calibtasks)
+
+    assert "fakeextra" in [backend.name for backend in service.list_backends().backends]
+    tasks = service.list_task_info("fakeextra").tasks
+
+    assert [task.name for task in tasks] == ["SiblingTask"]
+    assert tasks[0].enabled is False
+
+
+def test_list_task_info_does_not_follow_links_out_of_backend(calibtasks: Path) -> None:
+    backend = calibtasks / "fake"
+    outside = calibtasks.parent / "outside"
+    (backend / "linked_dir").symlink_to(outside, target_is_directory=True)
+    (backend / "linked_file.py").symlink_to(outside / "outside.py")
+    (backend / "one_qubit" / "loop").symlink_to(backend, target_is_directory=True)
+    (backend / "sibling.py").symlink_to(calibtasks / "fakeextra" / "secret.py")
+
+    tasks = TaskFileService(calibtasks).list_task_info("fake").tasks
+
+    assert [task.name for task in tasks] == ["FakeRabi"]
+
+
+def test_list_task_info_keeps_file_links_inside_backend(calibtasks: Path) -> None:
+    backend = calibtasks / "fake"
+    (backend / "alias.py").symlink_to(backend / "one_qubit" / "rabi.py")
+
+    tasks = TaskFileService(calibtasks).list_task_info("fake", sort_order="file_path").tasks
+
+    assert [task.file_path for task in tasks] == ["alias.py", "one_qubit/rabi.py"]

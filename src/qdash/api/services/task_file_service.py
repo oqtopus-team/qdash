@@ -38,7 +38,7 @@ from qdash.datamodel.task import TaskDocumentation
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Iterator
 
 TASK_METADATA_CACHE_VERSION = 5
 TASK_CATALOG_FILENAME = "task_catalog.json"
@@ -174,13 +174,7 @@ class TaskFileService:
             List of task information.
 
         """
-        backend_path = self._base_path / backend
-
-        if not backend_path.exists():
-            raise HTTPException(status_code=404, detail=f"Backend directory not found: {backend}")
-
-        if not backend_path.is_dir():
-            raise HTTPException(status_code=400, detail=f"Not a directory: {backend}")
+        backend_path = self._resolve_backend_path(backend)
 
         # Check cache
         cache_key = (
@@ -227,6 +221,73 @@ class TaskFileService:
         return ListTaskInfoResponse(tasks=enriched_tasks)
 
     # --- Private helpers ---
+
+    def _resolve_backend_path(self, backend: str) -> Path:
+        """Return the directory of ``backend``, confined to the task base directory.
+
+        A backend is a single directory name under the base directory, as listed by
+        ``list_backends``; separators, ``..``, absolute paths, and hidden names are
+        rejected, and the resolved directory must stay inside the base directory.
+
+        Raises
+        ------
+        HTTPException
+            400 for an invalid name or a directory outside the base directory,
+            404 when the backend directory does not exist.
+
+        """
+        if (
+            not backend
+            or backend in {".", ".."}
+            or backend.startswith(".")
+            or backend == "__pycache__"
+            or any(separator in backend for separator in ("/", "\\", "\0"))
+            or Path(backend).is_absolute()
+            or Path(backend).name != backend
+        ):
+            raise HTTPException(status_code=400, detail=f"Invalid backend name: {backend}")
+
+        base_path = self._base_path.resolve()
+        candidate = base_path / backend
+        if not candidate.exists():
+            raise HTTPException(status_code=404, detail=f"Backend directory not found: {backend}")
+        resolved = candidate.resolve()
+        if resolved == base_path or not resolved.is_relative_to(base_path):
+            raise HTTPException(status_code=400, detail=f"Invalid backend name: {backend}")
+        if not resolved.is_dir():
+            raise HTTPException(status_code=400, detail=f"Not a directory: {backend}")
+        return resolved
+
+    @staticmethod
+    def _iter_python_files(directory: Path) -> Iterator[Path]:
+        """Yield the Python files under ``directory`` without leaving it.
+
+        Directory links are never followed, so discovery cannot escape the
+        directory or loop. A file link is yielded only when its target is a file
+        inside ``directory``. Hidden entries and ``__pycache__`` are skipped.
+        """
+        root = directory.resolve()
+        pending = [directory]
+        while pending:
+            current = pending.pop()
+            try:
+                entries = sorted(current.iterdir())
+            except PermissionError:
+                logger.warning(f"Permission denied accessing directory: {current}")
+                continue
+            for item in entries:
+                if item.name.startswith(".") or item.name == "__pycache__":
+                    continue
+                if item.is_symlink():
+                    target = item.resolve()
+                    if item.suffix == ".py" and target.is_relative_to(root) and target.is_file():
+                        yield item
+                    else:
+                        logger.warning("Skipping task link outside %s: %s", root, item)
+                elif item.is_dir():
+                    pending.append(item)
+                elif item.suffix == ".py" and item.is_file():
+                    yield item
 
     def _load_catalog_tasks(self, backend: str) -> list[TaskInfo] | None:
         """Load generated metadata when a catalog is available for this backend."""
@@ -756,39 +817,26 @@ class TaskFileService:
         return constants
 
     def _collect_tasks_from_directory(self, directory: Path, base_path: Path) -> list[TaskInfo]:
-        """Recursively collect task info from all Python files in a directory."""
-        tasks = []
-
-        try:
-            for item in sorted(directory.iterdir()):
-                if item.name.startswith(".") or item.name == "__pycache__":
-                    continue
-
-                if item.is_dir():
-                    tasks.extend(self._collect_tasks_from_directory(item, base_path))
-                elif item.suffix == ".py" and item.name != "__init__.py":
-                    relative_path = str(item.relative_to(base_path))
-                    tasks.extend(self._extract_task_info_from_file(item, relative_path))
-        except PermissionError:
-            logger.warning(f"Permission denied accessing directory: {directory}")
-
+        """Collect task info from the Python files under a directory."""
+        tasks: list[TaskInfo] = []
+        files = sorted(
+            (item for item in self._iter_python_files(directory) if item.name != "__init__.py"),
+            key=lambda item: item.relative_to(base_path).parts,
+        )
+        for item in files:
+            relative_path = str(item.relative_to(base_path))
+            tasks.extend(self._extract_task_info_from_file(item, relative_path))
         return tasks
 
-    @staticmethod
-    def _get_directory_mtime_sum(directory: Path) -> float:
+    def _get_directory_mtime_sum(self, directory: Path) -> float:
         """Calculate sum of modification times for all Python files in directory."""
         mtime_sum = 0.0
-        try:
-            for item in directory.rglob("*.py"):
-                if item.name.startswith(".") or "__pycache__" in str(item):
-                    continue
-                with contextlib.suppress(OSError):
-                    mtime_sum += item.stat().st_mtime
-            catalog_path = directory.parent / TASK_CATALOG_FILENAME
+        for item in self._iter_python_files(directory):
             with contextlib.suppress(OSError):
-                mtime_sum += catalog_path.stat().st_mtime
-        except PermissionError:
-            pass
+                mtime_sum += item.stat().st_mtime
+        catalog_path = self._base_path / TASK_CATALOG_FILENAME
+        with contextlib.suppress(OSError):
+            mtime_sum += catalog_path.stat().st_mtime
         return mtime_sum
 
     @staticmethod
