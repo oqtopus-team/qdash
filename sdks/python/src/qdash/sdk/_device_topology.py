@@ -227,12 +227,25 @@ class DeviceTopologies:
     def __init__(self, api: QDashApi, config: QDashConfig) -> None:
         self._api = api
         self._config = config
+        # The config profile the session was read from; the default label, if any.
+        self._profile: str | None = None
+
+    def _label(self, value: str | None, what: str) -> str:
+        if value is not None:
+            return _text(value, what)
+        if self._profile is not None:
+            return self._profile
+        raise TypeError(
+            f"device_topology.create() needs {what}: this session was not opened from a config "
+            f"profile, so there is no profile name to use as the default {what}; pass "
+            f"{what}=... explicitly"
+        )
 
     def create(
         self,
         *,
-        name: str,
-        device_id: str,
+        name: str | None = None,
+        device_id: str | None = None,
         qubits: Sequence[str],
         exclude_couplings: Sequence[str] | None = None,
         condition: Condition | Mapping[str, Any] | None = None,
@@ -241,7 +254,13 @@ class DeviceTopologies:
 
         The server reads the latest calibration note of the session's project and that note's
         chip; there is no chip argument. ``name`` and ``device_id`` are labels copied into the
-        result, and ``device_id`` does not select a chip. ``qubits`` are physical qubit IDs as
+        result, and ``device_id`` does not select a chip. Each label that is omitted defaults
+        to the name of the config profile the session was opened from, such as ``"anemone"``
+        for ``QDash.from_profile("anemone")`` or for ``QDash()`` with
+        ``default_profile = "anemone"``; an explicit label always wins, and an empty one raises
+        ``ValueError``. A session without a profile, such as ``QDash.from_env()`` or
+        ``QDash(config)``, needs both labels, and a missing one raises ``TypeError`` before
+        anything is sent. ``qubits`` are physical qubit IDs as
         strings, such as ``["0", "2", "3"]``; ``exclude_couplings`` are couplings written
         ``"control-target"``, such as ``"0-1"``. ``condition`` is a ``Condition`` from
         :mod:`qdash.sdk.types` or a mapping with the same fields, including the
@@ -258,8 +277,8 @@ class DeviceTopologies:
         ``QDashApiError``.
         """
         request: dict[str, Any] = {
-            "name": _text(name, "name"),
-            "device_id": _text(device_id, "device_id"),
+            "name": self._label(name, "name"),
+            "device_id": self._label(device_id, "device_id"),
             "qubits": _labels(qubits, "qubits"),
         }
         if exclude_couplings is not None:

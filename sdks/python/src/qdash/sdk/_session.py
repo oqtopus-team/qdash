@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 from qdash.sdk._calibration import Chip
 from qdash.sdk._chips import Chips
-from qdash.sdk._config import QDashConfig, _load_config
+from qdash.sdk._config import QDashConfig, _load_profile
 from qdash.sdk._dashboards import Dashboards, Scripts
 from qdash.sdk._device_topology import DeviceTopologies
 from qdash.sdk._history import ExecutionHistory, TaskResultHistory
@@ -75,10 +75,15 @@ class QDash:
         ``"default"``; the deprecated ``config.ini`` is read only when ``config.toml`` does
         not exist. A missing or invalid file raises
         :class:`~qdash.sdk.errors.QDashConfigError`. Opening a session sends no request.
+
+        A session read from a profile remembers the profile name, which
+        :meth:`DeviceTopologies.create` uses as its default labels; a session with an
+        explicit ``config`` has no profile name.
         """
+        profile: str | None = None
         if config is None:
-            # Level 1 is _load_config, 2 this method, 3 the caller.
-            config = _load_config(None, None, stacklevel=3)
+            # Level 1 is _load_profile, 2 this method, 3 the caller.
+            config, profile = _load_profile(None, None, stacklevel=3)
         if project_id is not None:
             if not project_id:
                 raise ValueError("project_id must be a non-empty string")
@@ -100,6 +105,7 @@ class QDash:
             self.executions = ExecutionHistory(self._api, config)
             self.task_results = TaskResultHistory(self._api, config)
             self.device_topology = DeviceTopologies(self._api, config)
+            self._bind_profile(profile)
             self.qubex = Qubex(self._api, config)
         except BaseException:
             self.close()
@@ -124,7 +130,15 @@ class QDash:
         and its ``default_profile`` unless ``path`` or ``profile`` is given. Without
         arguments it is the same as ``QDash()``.
         """
-        return cls(_load_config(profile, path, stacklevel=3), project_id=project_id)
+        config, selected = _load_profile(profile, path, stacklevel=3)
+        session = cls(config, project_id=project_id)
+        session._bind_profile(selected)
+        return session
+
+    def _bind_profile(self, profile: str | None) -> None:
+        """Record the config profile this session was read from; None for no profile."""
+        self._profile = profile
+        self.device_topology._profile = profile
 
     def with_project(self, project_id: str) -> QDash:
         """A session scoped to ``project_id`` on this session's connection.
@@ -133,9 +147,11 @@ class QDash:
         keeps working after this session is no longer referenced, until this session is
         closed or the interpreter exits. This session and its configuration are unchanged.
         """
-        return QDash(
+        session = QDash(
             self._config, project_id=project_id, http_client=self._http_client, sleep=self._sleep
         )
+        session._bind_profile(self._profile)
+        return session
 
     @property
     def api(self) -> QDashApi:

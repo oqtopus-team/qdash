@@ -144,6 +144,19 @@ def _load_config(profile: str | None, path: str | Path | None, *, stacklevel: in
     ``stacklevel`` locates the caller to blame for a deprecation warning, counted from this
     function: 1 is ``_load_config``, 2 the public method calling it, 3 that method's caller.
     """
+    config, _ = _load_profile(profile, path, stacklevel=stacklevel + 1)
+    return config
+
+
+def _load_profile(
+    profile: str | None, path: str | Path | None, *, stacklevel: int
+) -> tuple[QDashConfig, str]:
+    """Resolve and read the config file, and return the config with its profile name.
+
+    The name is the profile actually read: ``profile`` when given, else the TOML
+    ``default_profile``, else ``"default"``. ``stacklevel`` counts as in :func:`_load_config`,
+    from this function.
+    """
     if profile is not None and not isinstance(profile, str):
         raise QDashConfigError("Config profile must be a string.")
     if path is None:
@@ -180,7 +193,7 @@ def _warn_ini(path: Path, *, stacklevel: int) -> None:
     )
 
 
-def _from_ini(config_path: Path, profile: str | None) -> QDashConfig:
+def _from_ini(config_path: Path, profile: str | None) -> tuple[QDashConfig, str]:
     """The profile section of a qdash-client ``config.ini``; keys keep their INI meaning."""
     profile = DEFAULT_PROFILE if profile is None else profile
     parser = configparser.ConfigParser()
@@ -209,7 +222,7 @@ def _from_ini(config_path: Path, profile: str | None) -> QDashConfig:
     if attempts:
         raw["read_attempts"] = attempts
     try:
-        return QDashConfig.model_validate(raw)
+        return QDashConfig.model_validate(raw), profile
     except ValidationError as exc:
         raise QDashConfigError(f"Invalid config values in profile '{profile}'.") from exc
 
@@ -232,7 +245,7 @@ def _read_toml(config_path: Path) -> dict[str, Any]:
         raise QDashConfigError(f"Invalid TOML in config file {config_path}: {exc}") from None
 
 
-def _from_toml(config_path: Path, profile: str | None) -> QDashConfig:
+def _from_toml(config_path: Path, profile: str | None) -> tuple[QDashConfig, str]:
     document = _read_toml(config_path)
     if LEGACY_PROFILES_KEY in document:
         raise QDashConfigError(
@@ -266,7 +279,7 @@ def _from_toml(config_path: Path, profile: str | None) -> QDashConfig:
         raise QDashConfigError(f"Config profile name '{selected}' is reserved.")
     if selected not in document:
         raise QDashConfigError(f"Config profile not found: {selected}")
-    return _profile_config(selected, document[selected])
+    return _profile_config(selected, document[selected]), selected
 
 
 def _profile_config(profile: str, table: dict[str, Any]) -> QDashConfig:

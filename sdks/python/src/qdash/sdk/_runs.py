@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, TypeVar
 
 from qdash.sdk._http import api_errors, read_options
+from qdash.sdk._progress import WaitProgress, state_not_found, state_of_detail
 from qdash.sdk.errors import QDashNotFoundError, QDashTransportError
 
 if TYPE_CHECKING:
@@ -111,19 +112,30 @@ class Executions:
         timeout_seconds: float,
         poll_interval_seconds: float,
         describe: Callable[[], str],
+        progress: WaitProgress | None = None,
     ) -> _T:
         """Call ``read`` until it returns a value; ``TimeoutError`` (with ``describe()``) after
-        ``timeout_seconds``. Nothing is cancelled on a timeout."""
+        ``timeout_seconds``. Nothing is cancelled on a timeout.
+
+        ``progress``, which ``read`` feeds, is shown from the first read and ended however
+        the polling ends.
+        """
         if timeout_seconds < 0 or poll_interval_seconds < 0:
             raise ValueError("Polling timeout and interval must be non-negative")
-        deadline = self._clock() + timeout_seconds
-        while True:
-            found = read()
-            if found is not None:
-                return found
-            if self._clock() >= deadline:
-                raise TimeoutError(describe())
-            self._sleep(poll_interval_seconds)
+        display = progress if progress is not None else self.progress("", enabled=False)
+        with display:
+            deadline = self._clock() + timeout_seconds
+            while True:
+                found = read()
+                if found is not None:
+                    return found
+                if self._clock() >= deadline:
+                    raise TimeoutError(describe())
+                self._sleep(poll_interval_seconds)
+
+    def progress(self, label: str, *, enabled: bool) -> WaitProgress:
+        """A progress display for one wait, timed by this session's clock."""
+        return WaitProgress(label, enabled=enabled, clock=self._clock)
 
     def task_result(self, task_id: str) -> TaskResult:
         """The full saved result of ``task_id``; raises ``QDashNotFoundError`` when absent."""
@@ -158,29 +170,42 @@ class Executions:
         return options
 
     def wait(
-        self, execution_id: str, *, timeout_seconds: float, poll_interval_seconds: float
+        self,
+        execution_id: str,
+        *,
+        timeout_seconds: float,
+        poll_interval_seconds: float,
+        progress: bool = False,
+        label: str | None = None,
     ) -> ExecutionResponseDetail:
         """Poll until the whole run reaches a terminal status and return its detail.
 
         An execution the server does not list yet (404) is polled again. A failed or
         cancelled run is returned, not raised. ``TimeoutError`` leaves the run going.
+        ``progress`` shows each read's state under ``label`` while waiting.
         """
         if timeout_seconds < 0 or poll_interval_seconds < 0:
             raise ValueError("Polling timeout and interval must be non-negative")
-        deadline = self._clock() + timeout_seconds
-        while True:
-            try:
-                detail: ExecutionResponseDetail | None = self.get(execution_id)
-            except QDashNotFoundError:
-                detail = None
-            if detail is not None and run_status(detail).lower() in TERMINAL_STATUSES:
-                return detail
-            if self._clock() >= deadline:
-                raise TimeoutError(
-                    f"Execution '{execution_id}' did not reach a terminal state "
-                    f"within {timeout_seconds} seconds"
-                )
-            self._sleep(poll_interval_seconds)
+        with self.progress(label or f"run {execution_id}", enabled=progress) as display:
+            deadline = self._clock() + timeout_seconds
+            while True:
+                try:
+                    detail: ExecutionResponseDetail | None = self.get(execution_id)
+                except QDashNotFoundError:
+                    detail = None
+                if detail is None:
+                    display.update(state_not_found())
+                else:
+                    status = run_status(detail)
+                    display.update(state_of_detail(status, detail))
+                    if status.lower() in TERMINAL_STATUSES:
+                        return detail
+                if self._clock() >= deadline:
+                    raise TimeoutError(
+                        f"Execution '{execution_id}' did not reach a terminal state "
+                        f"within {timeout_seconds} seconds"
+                    )
+                self._sleep(poll_interval_seconds)
 
 
 @dataclass(frozen=True, repr=False)
@@ -228,6 +253,9 @@ class Run:
     def __repr__(self) -> str:
         return f"{type(self).__name__}(execution_id={self.execution_id!r})"
 
+    def _progress_label(self) -> str:
+        return f"run {self.execution_id}"
+
     def get(self) -> RunResult:
         """The run's current state; raises ``QDashNotFoundError`` before it exists."""
         return RunResult(self.execution_id, self._executions.get(self.execution_id))
@@ -250,6 +278,7 @@ class Run:
         *,
         timeout_seconds: float = 3600.0,
         poll_interval_seconds: float = 5.0,
+        progress: bool = True,
     ) -> RunResult:
         """Poll until the whole run ends and return its result.
 
@@ -257,10 +286,17 @@ class Run:
         execution the server does not list yet is polled again. Raises ``TimeoutError`` when
         the run has not ended within ``timeout_seconds``; the run itself keeps going and is
         not cancelled.
+
+        ``progress`` shows the whole run's status, its step and task counts as each poll
+        reads them, and the time waited: updated in place in a notebook cell or an
+        interactive terminal (on stderr), and as one stderr line per change otherwise.
+        ``progress=False`` writes nothing.
         """
         detail = self._executions.wait(
             self.execution_id,
             timeout_seconds=timeout_seconds,
             poll_interval_seconds=poll_interval_seconds,
+            progress=progress,
+            label=self._progress_label(),
         )
         return RunResult(self.execution_id, detail)

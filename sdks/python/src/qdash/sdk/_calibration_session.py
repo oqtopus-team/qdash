@@ -34,6 +34,7 @@ from qdash.calibration import (
     pipeline_spec,
 )
 from qdash.sdk._http import api_errors, read_options
+from qdash.sdk._progress import state_not_found, state_of_run
 from qdash.sdk._runs import FLOW_TERMINAL_STATUSES
 from qdash.sdk.errors import QDashConfigError, QDashNotFoundError, QDashTransportError
 
@@ -131,7 +132,11 @@ class CalibrationLaunch:
         return _state_result(self._state())
 
     def wait(
-        self, *, timeout_seconds: float = 3600.0, poll_interval_seconds: float = 5.0
+        self,
+        *,
+        timeout_seconds: float = 3600.0,
+        poll_interval_seconds: float = 5.0,
+        progress: bool = True,
     ) -> CalibrationResult:
         """Poll until the whole run ends and return the completed result.
 
@@ -140,15 +145,23 @@ class CalibrationLaunch:
         ``TimeoutError`` when the run has not ended within ``timeout_seconds``; the run keeps
         going, nothing is cancelled and the session stays open. ``unknown`` and
         ``unavailable`` states, and a run the server does not list yet, are polled again.
+
+        ``progress`` shows the whole run's status, its step and task counts as each poll
+        reads them, and the time waited: updated in place in a notebook cell or an
+        interactive terminal (on stderr), and as one stderr line per change otherwise.
+        ``progress=False`` writes nothing.
         """
         last: list[str] = ["the run was not found"]
+        display = self._executions.progress(f"calibration run {self.run_id}", enabled=progress)
 
         def read() -> CalibrationRunStateResponse | None:
             try:
                 state = self._state()
             except QDashNotFoundError:
                 last[0] = "the run was not found"
+                display.update(state_not_found())
                 return None
+            display.update(state_of_run(state))
             status = str(state.flow_status)
             last[0] = f"{status}: {state.flow_status_reason or ''}".rstrip(": ")
             return state if status in FLOW_TERMINAL_STATUSES else None
@@ -161,6 +174,7 @@ class CalibrationLaunch:
                 f"Calibration run {self.run_id!r} did not end within {timeout_seconds} "
                 f"seconds; last read: {last[0]}. The run was not cancelled."
             ),
+            progress=display,
         )
         result = _state_result(state)
         if not result.succeeded:
@@ -412,13 +426,15 @@ class CalibrationSession:
         decision_id: str | None = None,
         timeout_seconds: float = 3600.0,
         poll_interval_seconds: float = 5.0,
+        progress: bool = True,
     ) -> CalibrationResult:
         """Launch a calibration into this session and wait until the whole run ends.
 
         :meth:`submit` followed by :meth:`CalibrationLaunch.wait`: returns the completed
         result, raises :class:`~qdash.calibration.CalibrationRunError` for a run that did not
         complete, and raises ``TimeoutError`` without cancelling anything when the run has not
-        ended within ``timeout_seconds``.
+        ended within ``timeout_seconds``. ``progress`` is passed to the wait:
+        ``progress=False`` writes nothing.
         """
         launch = self.submit(
             targets,
@@ -431,7 +447,9 @@ class CalibrationSession:
             decision_id=decision_id,
         )
         return launch.wait(
-            timeout_seconds=timeout_seconds, poll_interval_seconds=poll_interval_seconds
+            timeout_seconds=timeout_seconds,
+            poll_interval_seconds=poll_interval_seconds,
+            progress=progress,
         )
 
 

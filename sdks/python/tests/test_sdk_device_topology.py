@@ -12,8 +12,10 @@ from test_sdk_session import Server
 from qdash.sdk import (
     DeviceTopology,
     DeviceTopologyPlot,
+    QDash,
     QDashApiError,
     QDashAuthError,
+    QDashConfigDeprecationWarning,
     QDashTransportError,
     QDashValidationError,
 )
@@ -278,3 +280,141 @@ def test_a_failed_plot_is_sent_once() -> None:
         with pytest.raises(QDashApiError):
             topology.plot()
     assert [path for _, path in server.paths()].count("/device-topology/plot") == 1
+
+
+# Profile names as default labels.
+
+PROFILES_TOML = """\
+default_profile = "anemone"
+
+[anemone]
+base_url = "http://qdash.local"
+api_token = "api-token"
+
+[other]
+base_url = "http://qdash.local"
+api_token = "api-token"
+"""
+
+
+@pytest.fixture
+def profile_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Server:
+    """A fake server behind every owned session, with a config.toml in $XDG_CONFIG_HOME."""
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))
+    directory = tmp_path / "xdg" / "qdash"
+    directory.mkdir(parents=True)
+    (directory / "config.toml").write_text(PROFILES_TOML, encoding="utf-8")
+    server = topology_server()
+    monkeypatch.setattr("qdash.sdk._session.owned_http_client", lambda config: server.http_client())
+    return server
+
+
+def sent_labels(server: Server) -> list[tuple[str, str]]:
+    return [
+        (body["name"], body["device_id"])
+        for body in (json.loads(request.content) for request in server.requests)
+    ]
+
+
+def test_labels_default_to_the_default_profile_name(profile_server: Server) -> None:
+    with QDash() as qdash:
+        qdash.device_topology.create(qubits=["0"])
+    with QDash.from_profile() as qdash:
+        qdash.device_topology.create(qubits=["0"])
+
+    assert sent_labels(profile_server) == [("anemone", "anemone")] * 2
+
+
+def test_labels_default_to_an_explicit_profile_name(profile_server: Server) -> None:
+    with QDash.from_profile("other") as qdash:
+        qdash.device_topology.create(qubits=["0"])
+        # A session for another project keeps the profile name.
+        qdash.with_project("p").device_topology.create(qubits=["0"])
+
+    assert sent_labels(profile_server) == [("other", "other")] * 2
+
+
+def test_labels_fall_back_to_the_profile_named_default(
+    profile_server: Server, tmp_path: Path
+) -> None:
+    config_toml = tmp_path / "xdg" / "qdash" / "config.toml"
+    config_toml.write_text(
+        PROFILES_TOML.replace('default_profile = "anemone"', "").replace("[other]", "[default]"),
+        encoding="utf-8",
+    )
+    with QDash() as qdash:
+        qdash.device_topology.create(qubits=["0"])
+
+    assert sent_labels(profile_server) == [("default", "default")]
+
+
+def test_labels_default_to_the_legacy_ini_profile_name(
+    profile_server: Server, tmp_path: Path
+) -> None:
+    directory = tmp_path / "xdg" / "qdash"
+    (directory / "config.toml").unlink()
+    (directory / "config.ini").write_text(
+        "[default]\nbase_url = http://qdash.local\napi_token = api-token\n\n"
+        "[lab]\nbase_url = http://qdash.local\napi_token = api-token\n",
+        encoding="utf-8",
+    )
+    with pytest.warns(QDashConfigDeprecationWarning), QDash() as qdash:
+        qdash.device_topology.create(qubits=["0"])
+    with pytest.warns(QDashConfigDeprecationWarning), QDash.from_profile("lab") as qdash:
+        qdash.device_topology.create(qubits=["0"])
+
+    assert sent_labels(profile_server) == [("default", "default"), ("lab", "lab")]
+
+
+def test_an_explicit_label_overrides_the_profile_name(profile_server: Server) -> None:
+    with QDash.from_profile("anemone") as qdash:
+        qdash.device_topology.create(name="gateway", qubits=["0"])
+        qdash.device_topology.create(device_id="anemone-2", qubits=["0"])
+        qdash.device_topology.create(name="n", device_id="d", qubits=["0"])
+
+    assert sent_labels(profile_server) == [
+        ("gateway", "anemone"),
+        ("anemone", "anemone-2"),
+        ("n", "d"),
+    ]
+
+
+@pytest.mark.parametrize("labels", [{"name": ""}, {"device_id": ""}])
+def test_an_explicit_empty_label_is_rejected_with_a_profile(
+    profile_server: Server, labels: dict[str, Any]
+) -> None:
+    with QDash.from_profile("anemone") as qdash, pytest.raises(ValueError, match="non-empty"):
+        qdash.device_topology.create(qubits=["0"], **labels)
+    assert profile_server.requests == []
+
+
+@pytest.mark.parametrize(
+    ("labels", "missing"),
+    [({}, "name"), ({"name": "n"}, "device_id"), ({"device_id": "d"}, "name")],
+)
+def test_a_session_without_a_profile_needs_both_labels(
+    labels: dict[str, Any], missing: str
+) -> None:
+    server = topology_server()
+    with server.session() as qdash, pytest.raises(TypeError, match=missing) as raised:
+        qdash.device_topology.create(qubits=["0"], **labels)
+    assert "not opened from a config profile" in str(raised.value)
+    assert f"pass {missing}=" in str(raised.value)
+    assert server.requests == []
+
+
+def test_an_environment_session_needs_both_labels(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))
+    monkeypatch.setenv("QDASH_BASE_URL", "http://qdash.local")
+    monkeypatch.setenv("QDASH_API_TOKEN", "api-token")
+    server = topology_server()
+    monkeypatch.setattr("qdash.sdk._session.owned_http_client", lambda config: server.http_client())
+    with QDash.from_env() as qdash:
+        with pytest.raises(TypeError, match="name"):
+            qdash.device_topology.create(qubits=["0"])
+        assert server.requests == []
+        qdash.device_topology.create(name="n", device_id="d", qubits=["0"])
+
+    assert sent_labels(server) == [("n", "d")]

@@ -142,7 +142,7 @@ def test_qdash_with_a_config_reads_no_file(
     # The config directory holds a file the explicit config must not touch.
     write(config_home / "config.toml", "default_profile = \n")
     monkeypatch.setattr(
-        "qdash.sdk._session._load_config",
+        "qdash.sdk._session._load_profile",
         lambda *args, **kwargs: pytest.fail("QDash(config) read the config file"),
     )
     config = QDashConfig(base_url="http://explicit.local", api_token="t")

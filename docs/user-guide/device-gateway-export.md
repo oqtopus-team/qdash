@@ -29,6 +29,11 @@ Qubex configuration directory populated. Choose physical qubit IDs from that chi
    )
    ```
 
+   Omit `name` or `device_id` to use the selected profile name for that label. For example,
+   `QDash()` with `default_profile = "anemone"` defaults both labels to `anemone`.
+   Explicit labels override these defaults independently. With `QDash.from_env()` or
+   `QDash(config)`, supply both labels; there is no profile name to use.
+
    To reuse a gateway request file, pass `**json.load(file)` to `create()` instead.
    `exclude_couplings` and `condition` accept the request's filters. Omitted filters use
    server defaults, including freshness filtering and the largest connected component.

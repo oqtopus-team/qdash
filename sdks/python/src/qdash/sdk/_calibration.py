@@ -42,6 +42,9 @@ class CalibrationRun(Run):
         super().__init__(executions, response.execution_id)
         self.response = response
 
+    def _progress_label(self) -> str:
+        return f"calibration run {self.execution_id}"
+
 
 class Chip:
     """Calibration on one chip, reached as ``QDash.chip(chip_id)``.
