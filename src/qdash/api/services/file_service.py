@@ -206,14 +206,12 @@ class FileService:
         zip_filename = f"{source_path.name}_{timestamp}.zip"
 
         try:
-            if source_path.is_dir():
-                actual_zip_path = Path(
-                    shutil.make_archive(str(temp_dir_path / source_path.name), "zip", source_path)
-                )
-            else:
-                actual_zip_path = temp_dir_path / zip_filename
-                with zipfile.ZipFile(actual_zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
-                    zf.write(source_path, source_path.name)
+            actual_zip_path = temp_dir_path / zip_filename
+            with zipfile.ZipFile(actual_zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+                if source_path.is_dir():
+                    self._archive_directory(zf, source_path)
+                else:
+                    self._archive_file(zf, source_path, source_path.name)
 
             if not actual_zip_path.is_file():
                 raise Exception(f"Failed to create zip file at {actual_zip_path}")
@@ -240,6 +238,62 @@ class FileService:
             shutil.rmtree(temp_dir, ignore_errors=True)
             logger.error(f"Error creating zip file: {e}")
             raise HTTPException(status_code=500, detail=f"Error creating zip file: {e!s}")
+
+    def _archive_directory(self, zf: zipfile.ZipFile, root: Path) -> None:
+        """Archive ``root`` with paths relative to it, never leaving the config tree.
+
+        The tree is walked without following symbolic links, so a directory link
+        cannot pull in outside content or create a cycle. A file link is archived
+        only when its target resolves to a regular file inside the config tree;
+        every other link and every special file is skipped and logged.
+        """
+        base_path = self._base_path.resolve()
+        pending: list[tuple[Path, str]] = [(root, "")]
+        while pending:
+            directory, prefix = pending.pop()
+            with os.scandir(directory) as scan:
+                entries = sorted(scan, key=lambda entry: entry.name)
+            for entry in entries:
+                entry_path = Path(entry.path)
+                arcname = f"{prefix}{entry.name}"
+                if entry.is_symlink():
+                    target = entry_path.resolve()
+                    if not target.is_relative_to(base_path):
+                        logger.warning("Skipping link outside config directory: %s", entry_path)
+                    elif target.is_file():
+                        self._archive_file(zf, target, arcname)
+                    else:
+                        logger.warning("Skipping link to a non-file: %s", entry_path)
+                elif entry.is_dir(follow_symlinks=False):
+                    zf.write(entry_path, f"{arcname}/")
+                    pending.append((entry_path, f"{arcname}/"))
+                elif entry.is_file(follow_symlinks=False):
+                    self._archive_file(zf, entry_path, arcname)
+                else:
+                    logger.warning("Skipping special file: %s", entry_path)
+
+    @staticmethod
+    def _archive_file(zf: zipfile.ZipFile, file_path: Path, arcname: str) -> None:
+        """Add one regular file, refusing a link swapped in after it was checked."""
+        import shutil
+        import stat
+        import time
+
+        fd = os.open(file_path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+        with os.fdopen(fd, "rb") as source:
+            file_stat = os.fstat(source.fileno())
+            if not stat.S_ISREG(file_stat.st_mode):
+                raise OSError(f"Not a regular file: {arcname}")
+            # ZIP timestamps start in 1980; clamp older times as ZipInfo.from_file does.
+            modified = time.localtime(file_stat.st_mtime)[:6]
+            if modified[0] < 1980:
+                modified = (1980, 1, 1, 0, 0, 0)
+            info = zipfile.ZipInfo(arcname, date_time=modified)
+            info.compress_type = zipfile.ZIP_DEFLATED
+            info.external_attr = (file_stat.st_mode & 0xFFFF) << 16
+            info.file_size = file_stat.st_size
+            with zf.open(info, "w") as target:
+                shutil.copyfileobj(source, target)
 
     def _resolve_download_path(self, path: str) -> Path:
         """Resolve a download path to the configured qubex-config tree."""

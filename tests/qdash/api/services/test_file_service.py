@@ -148,6 +148,98 @@ def test_download_zip_file_rejects_paths_outside_qubex_config(tmp_path: Path) ->
     assert exc_info.value.detail == "Path outside config directory"
 
 
+def _archived_files(response) -> dict[str, bytes]:
+    with zipfile.ZipFile(response.path) as archive:
+        return {name: archive.read(name) for name in archive.namelist() if not name.endswith("/")}
+
+
+def test_download_zip_file_skips_file_link_outside_config(tmp_path: Path) -> None:
+    config_dir = tmp_path / "qubex-config"
+    (config_dir / "64Q").mkdir(parents=True)
+    (config_dir / "64Q" / "chip.yaml").write_text("chip: test\n", encoding="utf-8")
+    secret = tmp_path / "secret.txt"
+    secret.write_text("top secret\n", encoding="utf-8")
+    (config_dir / "64Q" / "leak.yaml").symlink_to(secret)
+
+    response = FileService(config_base_path=config_dir).download_zip_file(".")
+
+    try:
+        files = _archived_files(response)
+        assert files == {"64Q/chip.yaml": b"chip: test\n"}
+        assert all(b"top secret" not in content for content in files.values())
+    finally:
+        shutil.rmtree(Path(response.path).parent, ignore_errors=True)
+
+
+def test_download_zip_file_does_not_follow_directory_links(tmp_path: Path) -> None:
+    config_dir = tmp_path / "qubex-config"
+    (config_dir / "64Q").mkdir(parents=True)
+    (config_dir / "64Q" / "chip.yaml").write_text("chip: test\n", encoding="utf-8")
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "secret.txt").write_text("top secret\n", encoding="utf-8")
+    (config_dir / "outside-link").symlink_to(outside, target_is_directory=True)
+    # A link back to an ancestor would loop forever if directory links were followed.
+    (config_dir / "64Q" / "loop").symlink_to(config_dir, target_is_directory=True)
+
+    response = FileService(config_base_path=config_dir).download_zip_file(".")
+
+    try:
+        assert _archived_files(response) == {"64Q/chip.yaml": b"chip: test\n"}
+    finally:
+        shutil.rmtree(Path(response.path).parent, ignore_errors=True)
+
+
+def test_download_zip_file_keeps_file_link_inside_config(tmp_path: Path) -> None:
+    config_dir = tmp_path / "qubex-config"
+    (config_dir / "shared").mkdir(parents=True)
+    (config_dir / "64Q").mkdir()
+    (config_dir / "shared" / "params.yaml").write_text("p: 1\n", encoding="utf-8")
+    (config_dir / "64Q" / "params.yaml").symlink_to(config_dir / "shared" / "params.yaml")
+    (config_dir / "empty").mkdir()
+
+    response = FileService(config_base_path=config_dir).download_zip_file(".")
+
+    try:
+        assert _archived_files(response) == {
+            "64Q/params.yaml": b"p: 1\n",
+            "shared/params.yaml": b"p: 1\n",
+        }
+        with zipfile.ZipFile(response.path) as archive:
+            assert "empty/" in archive.namelist()
+            assert archive.testzip() is None
+    finally:
+        shutil.rmtree(Path(response.path).parent, ignore_errors=True)
+
+
+def test_download_zip_file_rejects_single_file_link_outside_config(tmp_path: Path) -> None:
+    config_dir = tmp_path / "qubex-config"
+    config_dir.mkdir()
+    secret = tmp_path / "secret.txt"
+    secret.write_text("top secret\n", encoding="utf-8")
+    (config_dir / "leak.yaml").symlink_to(secret)
+
+    with pytest.raises(HTTPException) as exc_info:
+        FileService(config_base_path=config_dir).download_zip_file("leak.yaml")
+
+    assert exc_info.value.status_code == 400
+
+
+def test_download_zip_file_single_file_keeps_name(tmp_path: Path) -> None:
+    config_dir = tmp_path / "qubex-config"
+    (config_dir / "64Q").mkdir(parents=True)
+    (config_dir / "64Q" / "chip.yaml").write_text("chip: test\n", encoding="utf-8")
+
+    response = FileService(config_base_path=config_dir).download_zip_file("64Q/chip.yaml")
+
+    try:
+        assert response.filename is not None
+        assert response.filename.startswith("chip.yaml_")
+        assert _archived_files(response) == {"chip.yaml": b"chip: test\n"}
+    finally:
+        shutil.rmtree(Path(response.path).parent, ignore_errors=True)
+
+
 # --- Workspaces: the same service serves config and knowledge ---
 
 
