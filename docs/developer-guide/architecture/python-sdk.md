@@ -27,7 +27,7 @@ retain all spec fields; authoring overrides alongside them raise `TypeError`.
 ## Session and client ownership
 
 Create one `QDash` session and reuse it across operations or notebook cells.
-`QDash(config)`, `from_env()`, and `from_profile()` own their HTTP connection; call `close()`
+`QDash()`, `QDash(config)`, `from_env()`, and `from_profile()` own their HTTP connection; call `close()`
 when the session is no longer needed. A `with` block is an optional way to close it on exit. `QDash(config, http_client=...)` borrows an `httpx.Client` and never
 closes it. The supplied client's TLS and proxy settings apply. `with_project()` creates a
 session on the same connection without taking ownership. Close the owning session last.
@@ -41,11 +41,19 @@ new session after expiry, or use API tokens. Read helpers retry connection and r
 errors, but not read timeouts. Writes retain a single attempt. A session snapshots its
 configuration; `config` returns a copy, and `with_project()` explicitly changes scope.
 
-Profiles use `config.toml` with `[profiles.<name>]` tables. Explicit profile selection takes
+`QDash()` loads the default profile; `QDash(config)` uses explicit settings without reading
+a file. Profiles use `config.toml` with top-level `[<name>]` tables. Explicit profile selection takes
 precedence over `default_profile`, then `"default"`. The SDK reads deprecated INI only when
 the default TOML file is absent or the caller explicitly supplies an INI path; it emits
 `QDashConfigDeprecationWarning`. TOML errors never trigger fallback. `api_token_env` resolves
 only the selected profile's token. See the [migration procedure](../../reference/clients/python.md#migrate-an-ini-profile).
+
+`qdash config init` (also `python -m qdash.sdk config init`) creates a single-profile TOML
+file with exclusive creation and owner-only file permissions on POSIX. It performs no network
+requests. The template enables common defaults and an empty `api_token`, with commented
+examples for all other fields. An explicit `--api-token-env` enables environment-based token
+loading instead. Python and TypeScript
+share configuration fixtures under `sdks/testdata/`; keep parser and initializer behavior aligned.
 
 ## Following a run
 
@@ -155,6 +163,7 @@ common release pipeline. Usage examples live in the [Python client reference](..
 | --- | --- |
 | `sdks/python/src/qdash/sdk/_session.py` | Session and connection ownership |
 | `sdks/python/src/qdash/sdk/_config.py` | Environment and profile settings |
+| `sdks/python/src/qdash/sdk/_cli.py` | Configuration initialization CLI |
 | `sdks/python/src/qdash/sdk/_http.py` | Authentication, HTTP configuration, error translation |
 | `sdks/python/src/qdash/sdk/errors.py` | SDK exception types |
 | `sdks/python/src/qdash/sdk/_runs.py` | Execution lookup and whole-run polling |

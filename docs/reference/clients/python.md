@@ -19,44 +19,75 @@ Stable versions follow QDash releases. Use `pip install --pre qdash-sdk` for a p
 <a id="configuration"></a>
 
 1. Copy your token from **Settings → API Token**. The displayed curl example includes the project ID.
-2. Create `$XDG_CONFIG_HOME/qdash/config.toml`, or `~/.config/qdash/config.toml` when
-   `XDG_CONFIG_HOME` is unset. Create the parent directory if needed. Add your deployment's
-   URL and project ID:
+2. Generate the initial configuration with your deployment's URL and project ID:
 
-   ```toml
-   default_profile = "local"
-
-   [profiles.local]
-   base_url = "http://localhost:5714/api"
-   api_token_env = "QDASH_LOCAL_TOKEN"
-   project_id = "your-project-id"
-   timeout_sec = 30
-   verify_tls = true
-   read_attempts = 3
+   ```bash
+   qdash config init --base-url http://localhost:5714/api --project-id your-project-id
    ```
 
-3. Set `QDASH_LOCAL_TOKEN` in the environment of your script or notebook before connecting.
-   For an interactive Python session, use a hidden prompt:
+   This creates `$XDG_CONFIG_HOME/qdash/config.toml`, or `~/.config/qdash/config.toml`
+   when `XDG_CONFIG_HOME` is unset, with `default_profile = "local"` and a `[local]`
+   table. It creates parent directories and restricts the new file to your user on POSIX.
+   If the file already exists, edit it or use `--path /path/to/config.toml`; the command
+   never overwrites it. If `qdash` is not on your PATH, use `python -m qdash.sdk config init`
+   with the same options.
 
-   ```python
-   import os
-   from getpass import getpass
+3. Open the printed file path and paste your token into `api_token = ""`. Keep the file
+   readable only by your user. Verify the connection with the
+   [API read example](#access-the-api-through-the-sdk).
 
-   os.environ["QDASH_LOCAL_TOKEN"] = getpass("QDash API token: ")
-   ```
+### Initialize a Configuration
+
+`qdash config init` creates one profile without contacting the server or requiring a token.
+The file enables `base_url`, an empty `api_token`, `timeout_sec = 30`, `verify_tls = true`,
+and `read_attempts = 3`. Every other supported profile field appears as a commented example
+with its purpose. `--project-id` enables the project setting when supplied.
+
+To use an environment variable instead of storing a token in the file, pass
+`--api-token-env QDASH_LOCAL_TOKEN` when creating it, then set that variable before connecting.
+For an existing file, remove `api_token` and uncomment `api_token_env` instead.
+
+| Option | Default | Purpose |
+| --- | --- | --- |
+| `--profile NAME` | `local` | Profile to create and select as `default_profile` |
+| `--base-url URL` | `http://localhost:5714/api` | QDash API base URL |
+| `--project-id ID` | Omitted | Project for SDK operations |
+| `--api-token-env NAME` | Omitted; empty `api_token` enabled | Use an environment variable instead of a token in the file |
+| `--path FILE` | Default configuration path | New file ending in `.toml` |
 
 ### Profiles
 
-`QDash.from_profile("local")` selects the named profile. `QDash.from_profile()` selects
-`default_profile`, or `"default"` when that key is absent. Reuse the returned session across
-operations. `QDash.from_profile("local", path="/path/to/config.toml")` reads only that file.
+```toml
+default_profile = "local"
+
+[local]
+base_url = "http://localhost:5714/api"
+api_token = "<your-api-token>"
+project_id = "your-project-id"
+```
+
+Add another top-level table, such as `[production]`, for another deployment.
+Profile names must be nonempty; `default_profile` and `profiles` are reserved.
+Quote names containing dots, such as `["lab.device"]`, to keep them as one profile.
+
+`QDash()` and `QDash.from_profile()` select `default_profile`, or `"default"` when that
+key is absent. `QDash.from_profile("local")` selects the named profile. A missing or invalid
+configuration raises `QDashConfigError`; it does not fall back to environment settings.
+Reuse the returned session across operations. `QDash.from_profile("local", path="/path/to/config.toml")` reads only that file.
 For configuration without a file, pass `qdash.sdk.QDashConfig(...)` to `QDash(...)`.
 
-Each `[profiles.<name>]` table accepts `QDashConfig` fields and `api_token_env`. The latter
+Each top-level `[<name>]` table accepts `QDashConfig` fields and `api_token_env`. The latter
 names an environment variable; a missing or empty variable is an error. Set either
 `api_token_env` or `api_token`, not both. If you store a token directly, restrict the file to
 your user (`chmod 600 /path/to/config.toml`). Other environment variables do not override a
 profile; use `from_env()` to configure the session from environment variables instead.
+
+### Migrate Nested TOML Profiles
+
+The SDK no longer accepts `[profiles.<name>]`. Back up your `config.toml`, then change
+headers such as `[profiles.local]` to `[local]`. Keep `default_profile` before the tables
+and leave the profile fields unchanged. The initializer does not migrate existing files.
+Verify the updated profile with the [API read example](#access-the-api-through-the-sdk).
 
 ### Migrate an INI Profile
 
@@ -64,7 +95,7 @@ SDK reads of `config.ini` are deprecated and emit `QDashConfigDeprecationWarning
 `FutureWarning`. The SDK uses INI only when the default TOML file is absent, or when an
 explicit `.ini` path is supplied. It never merges the files or falls back after a TOML error.
 
-To migrate, create `config.toml`, change `[local]` to `[profiles.local]`, and quote string
+To migrate, create `config.toml`, retain the `[local]` section name, and quote string
 values as shown above. Rename `timeout_seconds` to `timeout_sec` and `retry_max_attempts` to
 `read_attempts`. Write booleans as `true` or `false` and numeric settings without quotes.
 Omit legacy client-only worker and backoff settings. Set `default_profile` if needed, then
@@ -72,7 +103,7 @@ verify the connection with `qdash.chips.list()`.
 
 Existing `qdash-client` applications continue reading `config.ini` without this deprecation.
 Keep that file if those applications still use it. Their `QDashConfig.save()` writes INI;
-the SDK does not yet provide a profile-writing method. The existing-client example below
+use `qdash config init` to create a new SDK TOML file. The existing-client example below
 requires its own `local` INI profile.
 
 ### Environment Variables
@@ -103,7 +134,7 @@ Legacy password authentication uses `QDASH_USERNAME` and the variable named by
 ```python
 from qdash.sdk import QDash
 
-qdash = QDash.from_profile("local")
+qdash = QDash()
 chips = qdash.chips.list()
 print("Total:", len(chips))
 for chip in chips:

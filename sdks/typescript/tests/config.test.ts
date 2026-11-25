@@ -84,7 +84,7 @@ describe("config.toml cases shared with the Python SDK", () => {
 });
 
 describe("config file discovery", () => {
-  const toml = '[profiles.default]\nbase_url = "http://toml.local"\napi_token = "t"\n';
+  const toml = '[default]\nbase_url = "http://toml.local"\napi_token = "t"\n';
   const ini = "[default]\nbase_url = http://ini.local\napi_token = i\ntimeout_seconds = 7\nretry_max_attempts = 2\nverify_tls = false\n";
 
   it("follows XDG_CONFIG_HOME, else ~/.config/qdash", () => {
@@ -121,13 +121,15 @@ describe("config file discovery", () => {
     expect(options).toEqual({ type: "DeprecationWarning", code: INI_CONFIG_DEPRECATION_CODE });
     expect(String(message)).toMatch(/deprecated in @oqtopus-team\/qdash-sdk/);
     expect(String(message)).toMatch(/qdash-client keeps using config\.ini/);
+    expect(String(message)).toMatch(/top-level \[<name>\] tables/);
+    expect(String(message)).toMatch(/qdash config init/);
     expect(String(message)).not.toContain("api_token = i");
   });
 
   it("does not fall back on an invalid config.toml or a missing TOML profile", async () => {
     mkdirSync(join(dir, "qdash"));
     file("qdash/config.ini", ini);
-    file("qdash/config.toml", "[profiles.default\n");
+    file("qdash/config.toml", "[default\n");
     const env = { XDG_CONFIG_HOME: dir };
     await expect(QDashConfig.fromFile(undefined, undefined, { env })).rejects.toThrow(/Invalid TOML/);
     file("qdash/config.toml", toml);
@@ -167,7 +169,7 @@ describe("config file discovery", () => {
   });
 
   it("builds a session from a profile, its project overridable", async () => {
-    const path = file("config.toml", '[profiles.lab]\nbase_url = "http://lab.local"\napi_token = "t"\nproject_id = "p1"\n');
+    const path = file("config.toml", '[lab]\nbase_url = "http://lab.local"\napi_token = "t"\nproject_id = "p1"\n');
     const qdash = await QDash.fromProfile("lab", path);
     expect(qdash.projectId).toBe("p1");
     expect((await QDash.fromProfile("lab", path, { projectId: "p2" })).projectId).toBe("p2");

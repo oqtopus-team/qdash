@@ -33,10 +33,16 @@ if TYPE_CHECKING:
 class QDash:
     """Entry point of the QDash SDK.
 
-    ``QDash(config)``, ``QDash.from_env()`` and ``QDash.from_profile()`` create an HTTP
-    connection that the session owns; :meth:`close`, or leaving a ``with`` block, closes it.
-    ``QDash(config, http_client=client)`` uses an ``httpx.Client`` the caller created and
-    closes; the session never closes it, and the client's own TLS and proxy settings apply.
+    ``QDash()`` reads the default profile of the QDash config file, as
+    ``QDash.from_profile()`` does; it does not read ``QDASH_*`` environment variables, which
+    :meth:`from_env` reads. ``QDash(config)`` uses the given :class:`QDashConfig` and reads
+    no file.
+
+    ``QDash()``, ``QDash(config)``, ``QDash.from_env()`` and ``QDash.from_profile()`` create
+    an HTTP connection that the session owns; :meth:`close`, or leaving a ``with`` block,
+    closes it. ``QDash(config, http_client=client)`` uses an ``httpx.Client`` the caller
+    created and closes; the session never closes it, and the client's own TLS and proxy
+    settings apply.
     :meth:`with_project` returns a session on the same connection that does not close it.
 
     ``project_id`` (else ``config.project_id``) is sent as ``X-Project-Id`` with every
@@ -51,12 +57,23 @@ class QDash:
 
     def __init__(
         self,
-        config: QDashConfig,
+        config: QDashConfig | None = None,
         *,
         project_id: str | None = None,
         http_client: httpx.Client | None = None,
         sleep: Callable[[float], None] = time.sleep,
     ) -> None:
+        """Open a session with ``config``, else with the default profile of the config file.
+
+        Without ``config``, the file and profile resolve as in :meth:`QDashConfig.from_file`
+        with no arguments: ``config.toml`` and its ``default_profile``, else the profile
+        ``"default"``; the deprecated ``config.ini`` is read only when ``config.toml`` does
+        not exist. A missing or invalid file raises
+        :class:`~qdash.sdk.errors.QDashConfigError`. Opening a session sends no request.
+        """
+        if config is None:
+            # Level 1 is _load_config, 2 this method, 3 the caller.
+            config = _load_config(None, None, stacklevel=3)
         if project_id is not None:
             if not project_id:
                 raise ValueError("project_id must be a non-empty string")
@@ -99,7 +116,8 @@ class QDash:
         """A session configured from a profile of the QDash config file.
 
         The file and profile resolve as in :meth:`QDashConfig.from_file`: ``config.toml``
-        and its ``default_profile`` unless ``path`` or ``profile`` is given.
+        and its ``default_profile`` unless ``path`` or ``profile`` is given. Without
+        arguments it is the same as ``QDash()``.
         """
         return cls(_load_config(profile, path, stacklevel=3), project_id=project_id)
 

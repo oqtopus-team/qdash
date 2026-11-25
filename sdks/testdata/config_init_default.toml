@@ -1,0 +1,32 @@
+# QDash SDK configuration, created by `qdash config init`.
+# Each [<name>] table is a profile; default_profile selects one when none is given.
+default_profile = "local"
+
+[local]
+base_url = "http://localhost:5714/api"
+
+# Authentication: set one of api_token, api_token_env, or username with password_env.
+# Paste the token from Settings > API Token in QDash; empty means no token.
+api_token = ""
+# To keep the token out of this file, delete api_token and name the environment
+# variable that holds it:
+# api_token_env = "QDASH_LOCAL_TOKEN"
+# To sign in with a password instead, leave api_token empty and set:
+# username = "<username>"
+# password_env = "QDASH_PASSWORD"  # environment variable holding the password
+
+# Project sent as X-Project-Id; running tasks from the Python SDK needs it. Without it
+# the server uses your default project.
+# project_id = "<project-id>"
+
+timeout_sec = 30  # seconds per request
+verify_tls = true
+read_attempts = 3  # tries of a read (GET) on a transient failure; writes are sent once
+# Proxy for API requests. In the TypeScript SDK, proxy and verify_tls = false need a
+# custom fetch (session option).
+# proxy = "http://proxy.example:8080"
+# User-Agent header for API requests:
+# user_agent = "my-tool/1.0"
+# Cloudflare Access service token, for a server behind Cloudflare Access:
+# cf_access_client_id = "<client-id>.access"
+# cf_access_client_secret = "<client-secret>"

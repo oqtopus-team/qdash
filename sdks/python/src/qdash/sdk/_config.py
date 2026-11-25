@@ -1,7 +1,17 @@
 """SDK configuration: ``QDASH_*`` variables, or a profile of the TOML config file.
 
-The SDK reads ``config.toml``; the ``config.ini`` file of qdash-client is still read when no
-``config.toml`` exists, with a :class:`~qdash.sdk.errors.QDashConfigDeprecationWarning`.
+The SDK reads ``config.toml``, where each profile is a top-level table and the optional root
+``default_profile`` names the profile used when none is given::
+
+    default_profile = "local"
+
+    [local]
+    base_url = "http://localhost:5714/api"
+    api_token_env = "QDASH_LOCAL_TOKEN"
+
+``qdash config init`` writes such a file. The ``config.ini`` file of qdash-client is still
+read when no ``config.toml`` exists, with a
+:class:`~qdash.sdk.errors.QDashConfigDeprecationWarning`.
 """
 
 from __future__ import annotations
@@ -35,7 +45,11 @@ _TOML_STRING_KEYS = frozenset(
     }
 )
 _TOML_PROFILE_KEYS = _TOML_STRING_KEYS | {"timeout_sec", "verify_tls", "read_attempts"}
-_TOML_TOP_LEVEL_KEYS = frozenset({"default_profile", "profiles"})
+# Root keys of config.toml that are not profile tables. "profiles" held the profiles of the
+# earlier [profiles.<name>] layout; it stays reserved so that layout fails with a migration hint.
+DEFAULT_PROFILE_KEY = "default_profile"
+LEGACY_PROFILES_KEY = "profiles"
+RESERVED_PROFILE_NAMES = frozenset({DEFAULT_PROFILE_KEY, LEGACY_PROFILES_KEY})
 
 
 def _config_dir() -> Path:
@@ -158,8 +172,8 @@ def _load_config(profile: str | None, path: str | Path | None, *, stacklevel: in
 def _warn_ini(path: Path, *, stacklevel: int) -> None:
     warnings.warn(
         f"qdash-sdk read the INI config file {path}. Reading INI config files is deprecated "
-        f"in qdash-sdk; move the profiles to {default_config_path()} as [profiles.<name>] "
-        "tables (TOML). qdash-client keeps using config.ini; this deprecation applies to "
+        f"in qdash-sdk; move the profiles to {default_config_path()} as top-level "
+        "[<name>] tables (TOML); `qdash config init` creates a starting file. qdash-client keeps using config.ini; this deprecation applies to "
         "qdash-sdk only.",
         QDashConfigDeprecationWarning,
         stacklevel=stacklevel,
@@ -220,38 +234,43 @@ def _read_toml(config_path: Path) -> dict[str, Any]:
 
 def _from_toml(config_path: Path, profile: str | None) -> QDashConfig:
     document = _read_toml(config_path)
-    unknown = sorted(set(document) - _TOML_TOP_LEVEL_KEYS)
-    if unknown:
+    if LEGACY_PROFILES_KEY in document:
         raise QDashConfigError(
-            f"Unknown top-level keys in config file {config_path}: {', '.join(unknown)}. "
-            "Put profile settings under [profiles.<name>]."
+            f"Config file {config_path} uses the removed [profiles.<name>] layout: move each "
+            "[profiles.<name>] table to a top-level [<name>] table and keep default_profile "
+            "at the top."
         )
-    default_profile = document.get("default_profile")
+    default_profile = document.get(DEFAULT_PROFILE_KEY)
     if default_profile is not None and (
         not isinstance(default_profile, str) or not default_profile
     ):
         raise QDashConfigError(
             f"default_profile in config file {config_path} must be a non-empty string."
         )
-    profiles = document.get("profiles", {})
-    if not isinstance(profiles, dict):
+    # Every other root key is a profile table; a root value holds a misplaced setting.
+    unknown = sorted(
+        key
+        for key, value in document.items()
+        if key != DEFAULT_PROFILE_KEY and not isinstance(value, dict)
+    )
+    if unknown:
         raise QDashConfigError(
-            f"profiles in config file {config_path} must be a table of [profiles.<name>]."
+            f"Unknown top-level keys in config file {config_path}: {', '.join(unknown)}. "
+            "Put profile settings under a [<name>] table."
         )
-    for name, table in profiles.items():
-        if not isinstance(table, dict):
-            raise QDashConfigError(
-                f"Profile '{name}' in config file {config_path} must be a table."
-            )
+    if "" in document:
+        raise QDashConfigError(f"A profile in config file {config_path} has an empty name.")
 
     selected = profile if profile is not None else (default_profile or DEFAULT_PROFILE)
-    if selected not in profiles:
+    if selected in RESERVED_PROFILE_NAMES:
+        raise QDashConfigError(f"Config profile name '{selected}' is reserved.")
+    if selected not in document:
         raise QDashConfigError(f"Config profile not found: {selected}")
-    return _profile_config(selected, profiles[selected])
+    return _profile_config(selected, document[selected])
 
 
 def _profile_config(profile: str, table: dict[str, Any]) -> QDashConfig:
-    """Validate one ``[profiles.<name>]`` table; error messages never carry values."""
+    """Validate one ``[<name>]`` profile table; error messages never carry values."""
     unknown = sorted(set(table) - _TOML_PROFILE_KEYS)
     if unknown:
         raise QDashConfigError(f"Unknown keys in profile '{profile}': {', '.join(unknown)}")

@@ -5,6 +5,7 @@ from __future__ import annotations
 import warnings
 from typing import TYPE_CHECKING
 
+import httpx
 import pytest
 
 from qdash.sdk import QDash, QDashConfig, QDashConfigDeprecationWarning, QDashConfigError
@@ -18,11 +19,11 @@ SECRET = "s3cret-token-value"  # noqa: S105 - a marker that must not leak
 TOML = """\
 default_profile = "lab"
 
-[profiles.default]
+[default]
 base_url = "http://default.local"
 api_token = "default-token"
 
-[profiles.lab]
+[lab]
 base_url = "http://lab.local/"
 api_token = "lab-token"
 project_id = "lab"
@@ -98,9 +99,102 @@ def test_from_profile_uses_the_default_profile_of_the_file(config_home: Path) ->
         assert qdash.project_id == "other"
 
 
+def no_request(request: httpx.Request) -> httpx.Response:
+    raise AssertionError(f"unexpected request: {request.method} {request.url}")
+
+
+def test_qdash_without_config_reads_the_default_profile(config_home: Path) -> None:
+    write(config_home / "config.toml", TOML)
+
+    with QDash() as qdash:
+        assert qdash.config == QDash.from_profile().config
+        assert (qdash.config.base_url, qdash.project_id) == ("http://lab.local", "lab")
+        assert (qdash.config.timeout_sec, qdash.config.read_attempts) == (9.0, 2)
+    with QDash(None, project_id="other") as qdash:
+        assert qdash.project_id == "other"
+        assert qdash.config.base_url == "http://lab.local"
+
+
+def test_qdash_without_config_falls_back_to_the_default_profile_name(
+    config_home: Path,
+) -> None:
+    write(config_home / "config.toml", TOML.replace('default_profile = "lab"\n', ""))
+
+    with QDash() as qdash:
+        assert qdash.config == QDashConfig.from_file("default")
+        assert qdash.config.base_url == "http://default.local"
+
+
+def test_qdash_without_config_borrows_a_client_and_sends_nothing(config_home: Path) -> None:
+    write(config_home / "config.toml", TOML)
+    http_client = httpx.Client(transport=httpx.MockTransport(no_request))
+
+    with QDash(http_client=http_client, project_id="p") as qdash:
+        assert qdash._http_client is http_client
+        assert qdash.project_id == "p"
+    assert not http_client.is_closed
+    http_client.close()
+
+
+def test_qdash_with_a_config_reads_no_file(
+    config_home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The config directory holds a file the explicit config must not touch.
+    write(config_home / "config.toml", "default_profile = \n")
+    monkeypatch.setattr(
+        "qdash.sdk._session._load_config",
+        lambda *args, **kwargs: pytest.fail("QDash(config) read the config file"),
+    )
+    config = QDashConfig(base_url="http://explicit.local", api_token="t")
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        with QDash(config) as qdash:
+            assert qdash.config == config
+
+
+def test_qdash_without_config_does_not_fall_back_to_the_environment(
+    config_home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("QDASH_BASE_URL", "http://env.local")
+    monkeypatch.setenv("QDASH_API_TOKEN", "env-token")
+
+    with pytest.raises(QDashConfigError, match=r"Config file not found: .*config\.toml"):
+        QDash()
+
+
+@pytest.mark.parametrize(
+    ("text", "match"),
+    [
+        ("default_profile = \n", "Invalid TOML"),
+        ('default_profile = "absent"\n[default]\nbase_url = "http://d.local"\n', "absent"),
+        ('[lab]\nbase_url = "http://lab.local"\n', "profile not found: default"),
+    ],
+)
+def test_qdash_without_config_raises_config_errors(
+    config_home: Path, text: str, match: str
+) -> None:
+    write(config_home / "config.toml", text)
+    write(config_home / "config.ini", INI)
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        with pytest.raises(QDashConfigError, match=match):
+            QDash()
+
+
+def test_qdash_without_config_falls_back_to_ini_only_without_toml(config_home: Path) -> None:
+    write(config_home / "config.ini", INI)
+
+    with pytest.warns(QDashConfigDeprecationWarning) as record, QDash() as qdash:
+        assert qdash.config.base_url == "http://ini-default.local"
+    assert len(record) == 1
+    assert record[0].filename == __file__
+
+
 def test_discovery_prefers_toml_and_never_merges_the_ini(config_home: Path) -> None:
     write(config_home / "config.ini", INI)
-    write(config_home / "config.toml", '[profiles.default]\nbase_url = "http://toml.local"\n')
+    write(config_home / "config.toml", '[default]\nbase_url = "http://toml.local"\n')
 
     with warnings.catch_warnings():
         warnings.simplefilter("error")
@@ -122,7 +216,8 @@ def test_discovery_falls_back_to_ini_only_without_toml(config_home: Path) -> Non
     assert str(ini_path) in message
     assert "deprecated" in message
     assert str(config_home / "config.toml") in message
-    assert "[profiles.<name>]" in message
+    assert "top-level [<name>] tables" in message
+    assert "qdash config init" in message
     assert "qdash-client keeps using config.ini" in message
     assert record[0].filename == __file__
     assert issubclass(QDashConfigDeprecationWarning, FutureWarning)
@@ -161,7 +256,7 @@ def test_explicit_paths_are_authoritative(config_home: Path, tmp_path: Path) -> 
         pytest.raises(QDashConfigError, match="not found"),
     ):
         QDashConfig.from_file(path=tmp_path / "absent.ini")
-    other = write(tmp_path / "other.TOML", '[profiles.default]\nbase_url = "http://o.local"\n')
+    other = write(tmp_path / "other.TOML", '[default]\nbase_url = "http://o.local"\n')
     assert QDashConfig.from_file(path=other).base_url == "http://o.local"
     with pytest.raises(QDashConfigError, match="profile not found: lab"):
         QDashConfig.from_file("lab", other)
@@ -194,8 +289,8 @@ def test_api_token_env_resolves_the_selected_profile_only(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     text = (
-        '[profiles.default]\nbase_url = "http://d.local"\napi_token_env = "QDASH_TEST_TOKEN"\n'
-        '[profiles.other]\nbase_url = "http://o.local"\napi_token_env = "QDASH_TEST_UNSET"\n'
+        '[default]\nbase_url = "http://d.local"\napi_token_env = "QDASH_TEST_TOKEN"\n'
+        '[other]\nbase_url = "http://o.local"\napi_token_env = "QDASH_TEST_UNSET"\n'
     )
     monkeypatch.setenv("QDASH_TEST_TOKEN", SECRET)
     monkeypatch.delenv("QDASH_TEST_UNSET", raising=False)
@@ -211,14 +306,14 @@ def test_api_token_env_unset_or_empty(
         monkeypatch.delenv("QDASH_TEST_TOKEN", raising=False)
     else:
         monkeypatch.setenv("QDASH_TEST_TOKEN", value)
-    text = '[profiles.default]\nbase_url = "http://d.local"\napi_token_env = "QDASH_TEST_TOKEN"\n'
+    text = '[default]\nbase_url = "http://d.local"\napi_token_env = "QDASH_TEST_TOKEN"\n'
     with pytest.raises(QDashConfigError, match=r"QDASH_TEST_TOKEN .* is not set or empty"):
         load_toml(tmp_path, text)
 
 
 def test_api_token_env_is_not_interpolated(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("QDASH_TEST_TOKEN", SECRET)
-    text = '[profiles.default]\nbase_url = "http://d.local"\napi_token = "${QDASH_TEST_TOKEN}"\n'
+    text = '[default]\nbase_url = "http://d.local"\napi_token = "${QDASH_TEST_TOKEN}"\n'
     assert load_toml(tmp_path, text).api_token == "${QDASH_TEST_TOKEN}"  # noqa: S105
 
 
@@ -234,7 +329,7 @@ def test_api_token_env_validation(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, body: str, match: str
 ) -> None:
     monkeypatch.setenv("X", SECRET)
-    text = f'[profiles.default]\nbase_url = "http://d.local"\n{body}\n'
+    text = f'[default]\nbase_url = "http://d.local"\n{body}\n'
     with pytest.raises(QDashConfigError, match=match) as excinfo:
         load_toml(tmp_path, text)
     assert SECRET not in str(excinfo.value)
@@ -246,19 +341,21 @@ def test_api_token_env_validation(
         ('base_url = "http://x"\n', "Unknown top-level keys .*: base_url"),
         ("default_profile = 1\n", "default_profile .* must be a non-empty string"),
         ('default_profile = ""\n', "default_profile .* must be a non-empty string"),
-        ('profiles = "lab"\n', "profiles .* must be a table"),
-        ("[profiles]\nlab = 1\n", "Profile 'lab' .* must be a table"),
-        ('default_profile = "missing"\n[profiles.lab]\nbase_url = "x"\n', "not found: missing"),
-        ("[profiles.default]\nproject_id = 'p'\n", "'base_url' is required"),
-        ("[profiles.default]\nbase_url = 'x'\ntimeout_seconds = 3\n", "Unknown keys .*timeout_"),
-        ("[profiles.default]\nbase_url = 'x'\nverify_tls = 'false'\n", "must be a boolean"),
-        ("[profiles.default]\nbase_url = 'x'\ntimeout_sec = '3'\n", "must be a number"),
-        ("[profiles.default]\nbase_url = 'x'\ntimeout_sec = true\n", "must be a number"),
-        ("[profiles.default]\nbase_url = 'x'\ntimeout_sec = 0\n", "timeout_sec"),
-        ("[profiles.default]\nbase_url = 'x'\nread_attempts = 1.5\n", "must be an integer"),
-        ("[profiles.default]\nbase_url = 'x'\nread_attempts = 0\n", "read_attempts"),
-        ("[profiles.default]\nbase_url = 1\n", "'base_url' .* must be a string"),
-        ("[profiles.default\n", "Invalid TOML"),
+        ('profiles = "lab"\n', r"removed \[profiles\.<name>\] layout"),
+        ("[profiles.lab]\nbase_url = 'x'\n", r"removed \[profiles\.<name>\] layout"),
+        ("lab = 1\n", "Unknown top-level keys .*: lab"),
+        ('default_profile = "profiles"\n', "'profiles' is reserved"),
+        ('default_profile = "missing"\n[lab]\nbase_url = "x"\n', "not found: missing"),
+        ("[default]\nproject_id = 'p'\n", "'base_url' is required"),
+        ("[default]\nbase_url = 'x'\ntimeout_seconds = 3\n", "Unknown keys .*timeout_"),
+        ("[default]\nbase_url = 'x'\nverify_tls = 'false'\n", "must be a boolean"),
+        ("[default]\nbase_url = 'x'\ntimeout_sec = '3'\n", "must be a number"),
+        ("[default]\nbase_url = 'x'\ntimeout_sec = true\n", "must be a number"),
+        ("[default]\nbase_url = 'x'\ntimeout_sec = 0\n", "timeout_sec"),
+        ("[default]\nbase_url = 'x'\nread_attempts = 1.5\n", "must be an integer"),
+        ("[default]\nbase_url = 'x'\nread_attempts = 0\n", "read_attempts"),
+        ("[default]\nbase_url = 1\n", "'base_url' .* must be a string"),
+        ("[default\n", "Invalid TOML"),
     ],
 )
 def test_invalid_toml_files(tmp_path: Path, text: str, match: str) -> None:
@@ -268,10 +365,10 @@ def test_invalid_toml_files(tmp_path: Path, text: str, match: str) -> None:
 
 def test_errors_do_not_carry_secrets(tmp_path: Path) -> None:
     cases = [
-        f"[profiles.default]\nbase_url = 'x'\napi_token = 1\ncf_access_client_secret = 2\n"
+        f"[default]\nbase_url = 'x'\napi_token = 1\ncf_access_client_secret = 2\n"
         f"username = '{SECRET}'\nread_attempts = 0\n",
-        f"[profiles.default]\nbase_url = 'x'\napi_token = '{SECRET}'\nread_attempts = 0\n",
-        f"[profiles.default]\nbase_url = 'x'\napi_token = '{SECRET}\n",
+        f"[default]\nbase_url = 'x'\napi_token = '{SECRET}'\nread_attempts = 0\n",
+        f"[default]\nbase_url = 'x'\napi_token = '{SECRET}\n",
     ]
     for text in cases:
         with pytest.raises(QDashConfigError) as excinfo:

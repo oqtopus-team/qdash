@@ -19,8 +19,17 @@ Stable versions follow QDash releases. Append `@beta` for a prerelease.
 <a id="configuration"></a>
 
 The SDK reads the same `config.toml` as Python, including `default_profile` and
-`[profiles.<name>]`. Follow the [profile setup](./python.md#connect-to-a-deployment) to create
-it and set the token environment variable in your Node.js or Bun process.
+top-level `[<name>]` tables. After installing the package, create the file with:
+
+```bash
+npx qdash config init --base-url http://localhost:5714/api --project-id your-project-id
+```
+
+This creates a `local` profile and refuses to overwrite an existing file. Both SDKs expose
+`qdash config init` with the same [options](./python.md#initialize-a-configuration).
+Follow the [profile setup](./python.md#connect-to-a-deployment) to fill in `api_token`, or
+use `--api-token-env NAME` and set that variable in your Node.js or Bun process. For an existing `[profiles.local]` file, follow
+[the TOML migration](./python.md#migrate-nested-toml-profiles).
 
 ```ts
 import { QDash } from "@oqtopus-team/qdash-sdk";
@@ -51,7 +60,7 @@ INI profiles are deprecated in the SDK and emit `DeprecationWarning` with code
 `QDASH_SDK_INI_CONFIG`. The SDK reads INI only when the default TOML file is absent or an
 explicit `.ini` path is given. It never merges files or falls back after a TOML error.
 Use the [INI migration procedure](./python.md#migrate-an-ini-profile); both SDKs use the same
-TOML keys and profile selection rules. The SDK does not provide a profile-writing method.
+TOML keys and profile selection rules.
 
 `qdash.withProject(projectId)` returns a new scoped session without changing the original.
 Configuration is a frozen snapshot. `proxy` or `verifyTls: false` requires a custom `fetch`

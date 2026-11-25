@@ -6,21 +6,24 @@ Existing `qdash-client` applications can continue using that package independent
 
 ```bash
 pip install qdash-sdk
+qdash config init --project-id your-project-id
 ```
 
-Configure `QDASH_BASE_URL`, `QDASH_API_TOKEN`, and `QDASH_PROJECT_ID`, then run a saved workflow:
+Fill in `api_token` in the generated file. Use `--base-url` when initializing for a remote
+deployment. `QDash()` reads the default profile; then run a saved workflow:
 
 ```python
 from qdash.sdk import QDash
 
-qdash = QDash.from_env()
+qdash = QDash()
 workflow = qdash.workflows.get("coherence_check")
 result = workflow.run(parameters={"qids": ["0", "1"]}).wait()
 print(result.status)
 ```
 
 Reuse `qdash` across notebook cells or script operations. Call `qdash.close()` when you finish
-using the connection.
+using the connection. To select a profile explicitly, use `QDash.from_profile("local")`.
+Use `QDash.from_env()` for environment-based configuration.
 
 Keep the handle from `workflow.run()` to request cancellation with `run.cancel()`;
 `run.wait()` then confirms the workflow's terminal state.
@@ -31,7 +34,7 @@ SDK reads of existing INI profiles remain supported with a deprecation warning.
 
 ## Examples
 
-Configure a `local` TOML profile, then open:
+With the `local` TOML profile configured above, open:
 
 1. [Read a project](examples/01_read_project.ipynb)
 2. [Run a registered workflow](examples/02_registered_workflow.ipynb)

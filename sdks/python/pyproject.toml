@@ -15,6 +15,9 @@ dependencies = [
     "typing-extensions>=4.12.0",
 ]
 
+[project.scripts]
+qdash = "qdash.sdk._cli:entrypoint"
+
 [dependency-groups]
 dev = [
     "mypy==2.3.0",
