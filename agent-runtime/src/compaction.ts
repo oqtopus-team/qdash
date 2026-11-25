@@ -1,7 +1,7 @@
 /**
  * Conversation compaction sized to the chat's model.
  *
- * Pi durable's built-in summarizer (pi-durable 1.6.0, `harness/compaction.js`)
+ * Pi durable's built-in summarizer (pi-durable 1.6.1, `harness/compaction.js`)
  * sends the summary request with the conversation's thinking level and caps
  * its output at `min(0.8 * reserveTokens, model.maxTokens)`. Reasoning and the
  * summary share that cap. On a local reasoning model such as qwen with a 64k
@@ -241,7 +241,7 @@ export function buildCompactionExtension(options: CompactionExtensionOptions = {
           const range = `${compaction.entries[0]?.id ?? "start"}-${compaction.firstKept}`;
           const memo = `${SUMMARY_MEMO}:${range}`;
           const stored = await api.memo<string>(memo, context);
-          if (stored !== undefined) return { summary: stored };
+          if (stored !== undefined) return { kind: "summary", summary: stored };
 
           const agent = await api.snapshot(AgentDoc, api.conversationId, context);
           const ref = agent?.model;
@@ -296,7 +296,7 @@ export function buildCompactionExtension(options: CompactionExtensionOptions = {
                 `request~${tokens}/${inputTokens} tokens`,
             );
             const summary = summaryText(message);
-            if (summary !== undefined) return { summary: await api.memo(memo, summary, context) };
+            if (summary !== undefined) return { kind: "summary", summary: await api.memo(memo, summary, context) };
             if (!retryable(message)) return undefined;
           }
           if (sent === 0) {

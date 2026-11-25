@@ -20,7 +20,7 @@ import { replaceControlCharacters, truncateToWidth, visibleWidth } from "@earend
 
 /** The parts of pi's extension UI the review uses. */
 export interface WriteReviewUI {
-  confirm(title: string, message: string, opts?: { signal?: AbortSignal }): Promise<boolean>;
+  confirm(title: string, message: string, opts?: { signal?: AbortSignal; blockedKind?: "permission" }): Promise<boolean>;
   custom?<T>(
     factory: (tui: TUI, theme: ReviewTheme, keybindings: KeybindingsManager, done: (result: T) => void) => Component & { dispose?(): void },
     options?: {
@@ -221,8 +221,9 @@ export class WriteReviewView implements Component {
 export async function reviewWrite(ctx: WriteReviewContext, title: string, text: string, signal?: AbortSignal): Promise<boolean> {
   if (signal?.aborted) return false;
   if (ctx.mode !== "tui" || typeof ctx.ui.custom !== "function") {
-    // RPC mode: the client receives the complete text.
-    return ctx.ui.confirm(title, text, signal ? { signal } : undefined);
+    // RPC mode: the client receives the complete text. The review waits for permission,
+    // which pi reports as blocked program status where the host supports it.
+    return ctx.ui.confirm(title, text, signal ? { signal, blockedKind: "permission" } : { blockedKind: "permission" });
   }
   let onAbort: (() => void) | undefined;
   try {

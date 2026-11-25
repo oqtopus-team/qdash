@@ -20,6 +20,7 @@ from typing import Any
 import pytest
 
 from qdash.dbmodel.calibration_session import CalibrationPipelineRunDocument
+from qdash.dbmodel.coupling import CouplingDocument
 from qdash.dbmodel.task import TaskDocument
 from tests.qdash.api.routers.test_calibration_pipeline import good_spec
 from tests.qdash.api.routers.test_calibration_session_audit import (
@@ -109,6 +110,16 @@ def coupling_tasks(lab):  # noqa: F811 - the fixture above, extended
             description=name,
             task_type="coupling",
         ).insert()
+    # The directed coupling the skill's spec targets; validation checks pairs against it
+    # whenever the chip's wiring is readable.
+    CouplingDocument(
+        project_id="lab-a",
+        username="owner",
+        qid="0-1",
+        chip_id=CHIP,
+        data={},
+        system_info={},
+    ).insert()
 
 
 @pytest.mark.usefixtures("coupling_tasks")
